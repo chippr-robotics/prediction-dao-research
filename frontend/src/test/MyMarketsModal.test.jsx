@@ -144,10 +144,27 @@ describe('MyMarketsModal', () => {
     )
   }
 
+  // Spec 019: the view is chosen by viewport. Default the matchMedia mock to
+  // "narrow" (no min-width match) → grid; setWideViewport() forces the table.
+  const setWideViewport = (wide) => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: wide && /min-width/.test(query),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset session-scoped UI prefs (view/density) so test order can't leak them.
+    // Reset session-scoped UI prefs so test order can't leak them.
     try { sessionStorage.clear() } catch { /* no-op */ }
+    // Default to narrow viewport (grid) for every test unless it opts into wide.
+    setWideViewport(false)
     // Mock window.ethereum to avoid provider creation errors
     global.window.ethereum = undefined
     useWallet.mockReturnValue({
@@ -338,7 +355,7 @@ describe('MyMarketsModal', () => {
       expect(optionValues).toEqual(['newest', 'endingSoon', 'stakeHighToLow'])
     })
 
-    it('should display refresh button', async () => {
+    it('no longer shows a manual refresh button (auto-refresh, spec 019)', async () => {
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen={true} onClose={mockOnClose} />
@@ -346,8 +363,9 @@ describe('MyMarketsModal', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument()
+        expect(screen.getByText('Sort:')).toBeInTheDocument()
       })
+      expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
     })
   })
 
@@ -885,8 +903,10 @@ describe('MyMarketsModal', () => {
       expect(screen.getByText('Won Wager')).toBeInTheDocument()
     })
 
-    it('shows the Claim Winnings button in the detail view opened from the table view', async () => {
+    it('shows the Claim Winnings button in the detail view opened from the table row', async () => {
       const user = userEvent.setup()
+      // Wide viewport → table view renders automatically (spec 019).
+      setWideViewport(true)
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvedWon()]} />
@@ -894,9 +914,7 @@ describe('MyMarketsModal', () => {
       })
       await openHistory(user)
 
-      // The full detail is reached from the table view (spec 018): switch to the
-      // table, then click the row.
-      await user.click(screen.getByRole('button', { name: /^table$/i }))
+      // The full detail is reached by clicking a table row.
       await user.click(await screen.findByText('Won Wager'))
 
       expect(await screen.findByText('Back to list')).toBeInTheDocument()
@@ -964,36 +982,58 @@ describe('MyMarketsModal', () => {
     })
   })
 
-  describe('View toggle (spec 018)', () => {
+  describe('Automatic view by viewport (spec 019)', () => {
     const me = '0x1234567890123456789012345678901234567890'
-    const toggleWager = {
+    const aWager = {
       id: 'v1', description: 'Toggle Wager', creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
       participants: [me], status: 'active', marketType: 'friend',
       tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
     }
 
-    it('switches between grid and table and hides the density toggle in table view', async () => {
-      const user = userEvent.setup()
+    it('renders the compact card grid on a narrow viewport (no table, no toggles)', async () => {
+      setWideViewport(false)
       await act(async () => {
         renderWithProviders(
-          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[toggleWager]} />
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[aWager]} />
         )
       })
-
       await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
-
-      // Grid is the default: the density toggle is shown, no table yet.
-      expect(screen.getByRole('button', { name: /compact/i })).toBeInTheDocument()
       expect(screen.queryByRole('table')).not.toBeInTheDocument()
+      // No manual view/density/refresh controls remain.
+      expect(screen.queryByRole('button', { name: /^grid$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^table$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /compact|comfortable/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
+    })
 
-      // Switch to table view → a table renders and density is hidden.
-      await user.click(screen.getByRole('button', { name: /^table$/i }))
+    it('renders the table on a wide viewport', async () => {
+      setWideViewport(true)
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[aWager]} />
+        )
+      })
+      await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
       expect(screen.getByRole('table')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /compact/i })).not.toBeInTheDocument()
+    })
 
-      // Switch back to grid → table is gone.
-      await user.click(screen.getByRole('button', { name: /^grid$/i }))
-      expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    it('auto-refreshes the list on an interval while open (FR-003/004)', async () => {
+      vi.useFakeTimers()
+      const refresh = vi.fn()
+      try {
+        await act(async () => {
+          renderWithProviders(
+            <MyMarketsModal isOpen onClose={mockOnClose} />,
+            { friendMarketsContext: { ...defaultFriendMarketsContext, refresh } }
+          )
+        })
+        expect(refresh).not.toHaveBeenCalled()
+        // After the poll interval the list pulls fresh data on its own.
+        await act(async () => { vi.advanceTimersByTime(30000) })
+        expect(refresh).toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 })

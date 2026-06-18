@@ -147,9 +147,8 @@ describe('Dashboard', () => {
     cy.get('.quick-action-card').contains('My Wagers').click()
     cy.get('[role="dialog"], .my-markets-modal', { timeout: 5000 }).should('be.visible')
 
-    // The full detail view is reached from the table view (spec 018): switch to
-    // the table, then click a row.
-    cy.contains('button', /^Table$/).click()
+    // At the default 1280px viewport the table view renders automatically
+    // (spec 019); clicking a row opens the full detail view.
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
       const rows = $panel.find('.mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
@@ -176,7 +175,7 @@ describe('Dashboard', () => {
 
     // Check across all tabs that status badges exist and have the right classes.
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
-      const badges = $panel.find('.wc-status')
+      const badges = $panel.find('.wc-status, .mm-status-badge')
       if (badges.length > 0) {
         // Every badge should have a status-* class.
         badges.each((_, el) => {
@@ -315,6 +314,8 @@ describe('Dashboard', () => {
   // DSH-13: Decrypt encrypted wager in list
   // ---------------------------------------------------------------------------
   it('[DSH-13] Decrypt encrypted wager in list', () => {
+    // Narrow viewport → compact card grid (spec 019), where decrypt is inline.
+    cy.viewport(390, 844)
     connectAndVisitDashboard()
 
     // Open My Wagers.
@@ -366,6 +367,8 @@ describe('Dashboard', () => {
    * matching the wallet-disconnected-from-node scenario in production caches.
    */
   function seedFriendMarketsAndOpen(markets) {
+    // Narrow viewport → compact card grid (spec 019); these checks expand cards.
+    cy.viewport(390, 844)
     connectAndVisitDashboard()
     cy.window().then((win) => {
       win.localStorage.setItem('friendMarkets', JSON.stringify(markets))

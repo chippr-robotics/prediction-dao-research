@@ -4,8 +4,9 @@ import { useWallet, useWeb3 } from '../../hooks'
 import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
-import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MY_WAGERS_DENSITY_KEY, MyWagersView, MY_WAGERS_VIEW_KEY } from '../../constants/wagerDefaults'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MyWagersView } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
@@ -91,37 +92,11 @@ function MyMarketsModal({
   const [sortKey, setSortKey] = useState('newest') // 'newest' | 'endingSoon' | 'stakeHighToLow'
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Card-grid density (spec 017). Session-scoped: read once from sessionStorage,
-  // default compact; mirrored back on toggle so it survives reopening the modal.
-  const [density, setDensity] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(MY_WAGERS_DENSITY_KEY)
-      return saved === MyWagersDensity.COMFORTABLE ? MyWagersDensity.COMFORTABLE : MyWagersDensity.COMPACT
-    } catch {
-      return MyWagersDensity.COMPACT
-    }
-  })
-  const toggleDensity = useCallback(() => {
-    setDensity(prev => {
-      const next = prev === MyWagersDensity.COMFORTABLE ? MyWagersDensity.COMPACT : MyWagersDensity.COMFORTABLE
-      try { sessionStorage.setItem(MY_WAGERS_DENSITY_KEY, next) } catch { /* storage unavailable */ }
-      return next
-    })
-  }, [])
-
-  // View mode (spec 018): grid cards vs compact table. Session-scoped, default grid.
-  const [viewMode, setViewMode] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(MY_WAGERS_VIEW_KEY)
-      return saved === MyWagersView.TABLE ? MyWagersView.TABLE : MyWagersView.GRID
-    } catch {
-      return MyWagersView.GRID
-    }
-  })
-  const selectView = useCallback((mode) => {
-    setViewMode(mode)
-    try { sessionStorage.setItem(MY_WAGERS_VIEW_KEY, mode) } catch { /* storage unavailable */ }
-  }, [])
+  // Automatic view selection (spec 019): wide displays get the table, narrow
+  // displays get the compact card grid. No manual view/density toggle.
+  const isWideViewport = useMediaQuery('(min-width: 768px)')
+  const viewMode = isWideViewport ? MyWagersView.TABLE : MyWagersView.GRID
+  const density = MyWagersDensity.COMPACT
 
   // Transient confirmation toast (spec 017 FR-015) shown after a successful
   // on-chain action (claim/refund). Auto-dismisses.
@@ -134,6 +109,15 @@ function MyMarketsModal({
     const id = setTimeout(() => setToast(null), 2600)
     return () => clearTimeout(id)
   }, [toast])
+
+  // Auto-refresh (spec 019 FR-003/004): keep the list current while the modal is
+  // open so users don't need a manual refresh button. Pulls fresh on-chain data
+  // via the FriendMarkets context every 30s; stops on close/unmount.
+  useEffect(() => {
+    if (!isOpen || !account || typeof refreshFriendMarkets !== 'function') return
+    const id = setInterval(() => { refreshFriendMarkets() }, 30000)
+    return () => clearInterval(id)
+  }, [isOpen, account, refreshFriendMarkets])
 
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
@@ -944,62 +928,6 @@ function MyMarketsModal({
               <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
-          {/* View switch (spec 018) — inline with density + refresh */}
-          <div className="mm-view-toggle" role="group" aria-label="Wager view">
-            <button
-              type="button"
-              className={`mm-view-btn ${viewMode === MyWagersView.GRID ? 'active' : ''}`}
-              onClick={() => selectView(MyWagersView.GRID)}
-              aria-pressed={viewMode === MyWagersView.GRID}
-              title="Grid view"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-              </svg>
-              Grid
-            </button>
-            <button
-              type="button"
-              className={`mm-view-btn ${viewMode === MyWagersView.TABLE ? 'active' : ''}`}
-              onClick={() => selectView(MyWagersView.TABLE)}
-              aria-pressed={viewMode === MyWagersView.TABLE}
-              title="Table view"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-              </svg>
-              Table
-            </button>
-          </div>
-          {viewMode === MyWagersView.GRID && (
-            <button
-              type="button"
-              className="mm-density-toggle"
-              onClick={toggleDensity}
-              title={density === MyWagersDensity.COMFORTABLE ? 'Switch to compact view' : 'Switch to comfortable view'}
-              aria-pressed={density === MyWagersDensity.COMFORTABLE}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                {density === MyWagersDensity.COMFORTABLE
-                  ? <path d="M3 5h18M3 12h18M3 19h18" />
-                  : <path d="M3 5h18M3 10h18M3 15h18M3 20h18" />}
-              </svg>
-              {density === MyWagersDensity.COMFORTABLE ? 'Comfortable' : 'Compact'}
-            </button>
-          )}
-          <button
-            className="mm-refresh-btn"
-            onClick={fetchMarketsData}
-            disabled={loading}
-            title="Refresh wagers"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={loading ? 'spinning' : ''}>
-              <path d="M23 4v6h-6"/>
-              <path d="M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-            </svg>
-          </button>
         </div>
 
         {/* Content Area */}
