@@ -1,76 +1,89 @@
 """
-Subgraph schema for the FriendGroupMarketFactory contract.
+Subgraph schema for the v2 WagerRegistry contract (spec 017).
 
-Deployed to The Graph's decentralized network (public during development;
-hosted endpoint in the future). The frontend WagerRepository
-(SubgraphSource) queries this schema via GraphQL and paginates using the
-`createdAt`, `endTime`, `resolutionType`, or `status` fields directly in
-the `where` / `orderBy` clauses — keeping the visible page as the only
-data transferred, which is what unlocks the millions-of-bets NFR.
+Indexes peer-to-peer wagers and, critically, one immutable WagerTransfer row per
+value-moving event carrying the transaction hash. The frontend tax/activity report
+(spec 016) enumerates and builds line items from WagerTransfer and reads only one
+transaction receipt per transfer (for the gas fee) — no eth_getLogs scans.
 
-Encrypted envelopes (metadataCipher) are stored as raw strings; the
-client decrypts them lazily via useLazyMarketDecryption.
+The "my wagers" view (SubgraphSource) and site stats (useSiteStats) query the Wager
+entity directly with where/orderBy on createdAt / status / resolutionType.
 """
 
+enum TransferDirection {
+  "value moved party -> escrow (a stake going in)"
+  deposit
+  "value moved escrow -> winner"
+  payout
+  "value moved escrow -> party (stake returned)"
+  refund
+}
+
 enum WagerStatus {
-  pending_acceptance
+  "created, awaiting opponent acceptance"
+  open
+  "opponent accepted; stakes escrowed"
   active
-  pending_resolution
-  challenged
+  "a draw has been proposed (still active until resolved)"
+  draw_proposed
+  "resolved to a winner"
   resolved
-  cancelled
+  "settled as a draw; stakes returned"
+  drawn
+  "refunded to both parties"
   refunded
-  oracle_timed_out
-}
-
-enum MarketType {
-  oneVsOne
-  smallGroup
-  eventTracking
-  propBet
-  offer
-}
-
-type User @entity(immutable: false) {
-  "lowercased wallet address"
-  id: ID!
-  wagers: [Wager!]! @derivedFrom(field: "participants")
-  created: [Wager!]! @derivedFrom(field: "creator")
+  "cancelled before acceptance; creator refunded"
+  cancelled
+  "opponent declined an open wager"
+  declined
 }
 
 type Wager @entity(immutable: false) {
-  "on-chain market id"
+  "on-chain wager id"
   id: ID!
 
-  marketType: MarketType!
-  status: WagerStatus!
+  creator: Bytes!
+  opponent: Bytes!
+  token: Bytes!
+
+  "stakes in token base units, recorded at creation so refund/accept transfers can derive amounts without contract reads"
+  creatorStake: BigInt!
+  opponentStake: BigInt!
+
+  "v2 ResolutionType enum index"
   resolutionType: Int!
+  "off-chain metadata pointer (may be empty)"
+  metadataUri: String
+  "integrity hash of the metadata"
+  metadataHash: Bytes
 
-  creator: User!
-  participants: [User!]!
-  arbitrator: Bytes
-
-  stakePerParticipant: BigInt!
-  stakeToken: Bytes!
-
-  tradingPeriodSeconds: BigInt!
-  createdAt: BigInt!
-  acceptanceDeadline: BigInt!
-  "Computed at index time: createdAt + tradingPeriodSeconds"
-  endTime: BigInt!
-
-  acceptedCount: BigInt!
-
-  "IPFS CID when the encrypted metadata is stored off-chain"
-  ipfsCid: String
-
-  "Raw description (may be the encrypted envelope JSON or a plaintext title)"
-  description: String!
-  isEncrypted: Boolean!
-  "Raw envelope (JSON string) when encryption is stored on-chain"
-  metadataCipher: String
-
-  resolvedAt: BigInt
+  status: WagerStatus!
   winner: Bytes
-  outcomeBool: Boolean
+
+  createdAt: BigInt!
+  resolvedAt: BigInt
+
+  "reverse relation — every value movement for this wager"
+  transfers: [WagerTransfer!]! @derivedFrom(field: "wager")
+}
+
+type WagerTransfer @entity(immutable: true) {
+  "txHash-logIndex (unique even when several transfers share one transaction)"
+  id: ID!
+  wager: Wager!
+  "the user whose value moved"
+  party: Bytes!
+  direction: TransferDirection!
+  token: Bytes!
+  "base units"
+  amount: BigInt!
+  "party (deposit) or escrow registry (payout/refund)"
+  from: Bytes!
+  "escrow registry (deposit) or party (payout/refund)"
+  to: Bytes!
+  "event.transaction.hash — the key addition that removes the client log scan"
+  txHash: Bytes!
+  blockNumber: BigInt!
+  "event.block.timestamp (unix seconds)"
+  timestamp: BigInt!
 }

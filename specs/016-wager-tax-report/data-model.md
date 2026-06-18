@@ -116,13 +116,20 @@ ReportHistoryEntry ──regenerates──┘  (persisted metadata only)
 
 ## Field availability matrix (sources)
 
-| Report field | Subgraph | On-chain log | Receipt | Config | Notes |
+> Updated by **spec 017** (`WagerTransfer` entity): `txHash`, per-transfer
+> `timestamp`, and `from`/`to` now come straight from the subgraph, so the report
+> performs **zero `eth_getLogs` scans** — only one `getTransactionReceipt` per
+> transfer (for the fee). The "On-chain log" column is the legacy/no-subgraph
+> bounded-scan fallback (#703).
+
+| Report field | Subgraph (017) | On-chain log (fallback) | Receipt | Config | Notes |
 |--------------|:-------:|:------------:|:-------:|:------:|-------|
-| timestamp | ~ (wager-level) | ✓ (via block) | | | exact per-transfer from block |
+| timestamp | ✓ (per-transfer) | ✓ (via block) | | | `WagerTransfer.timestamp` |
 | ticker / decimals | | | | ✓ | networks.js (+ on-chain fallback) |
-| amount | ✓ | ✓ | | | stake / event args |
+| amount | ✓ | ✓ | | | `WagerTransfer.amount` / event args |
 | usdValue / costBasis | | | | | computed ($1.00 par) |
 | **fee** | ✗ | | ✓ | | **receipt only** (subgraph blind) |
-| **txHash** | ✗ | ✓ | ✓ | | **not in subgraph** |
-| from / to | derived | ✓ | | ✓ | user ↔ `wagerRegistry` escrow |
+| **txHash** | ✓ | ✓ | ✓ | | `WagerTransfer.txHash` ← spec 017 (was not in subgraph) |
+| from / to | ✓ | ✓ | | ✓ | `WagerTransfer.from`/`to` (escrow = `wagerRegistry`) |
+| direction | ✓ | derived | | | `WagerTransfer.direction` |
 | participants | ✓ | ✓ | | | enumeration |

@@ -53,12 +53,15 @@ export async function enrichTransfers(preItems, { reader, userAddress, nativeSym
 
   const out = []
   for (const item of preItems) {
-    const [block, receipt] = await Promise.all([
-      getBlock(item.blockNumber),
-      getReceipt(item.txHash),
-    ])
-
-    const timestamp = block?.timestamp != null ? Number(block.timestamp) * 1000 : null
+    // The subgraph path (spec 017) already carries the exact transfer timestamp,
+    // so only the per-transfer fee receipt is fetched. The bounded-scan fallback
+    // path has no timestamp on the pre-item, so resolve it from the block then.
+    const receipt = await getReceipt(item.txHash)
+    let timestamp = item.timestamp != null ? Number(item.timestamp) : null
+    if (timestamp == null) {
+      const block = await getBlock(item.blockNumber)
+      timestamp = block?.timestamp != null ? Number(block.timestamp) * 1000 : null
+    }
 
     let feeNative = null
     let feeUnavailableReason = null

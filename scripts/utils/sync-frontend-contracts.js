@@ -19,6 +19,29 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
 
+/**
+ * Emit a plain-JSON ABI next to a hand-maintained `export const X_ABI = [ ... ]`
+ * JS ABI module, so the subgraph (and any other JSON consumer) reads a generated
+ * artifact rather than a hand-copied one (constitution V). The JS ABI body is a
+ * JSON array literal, so we slice from the first `[` to the last `]` and validate
+ * by parsing before writing.
+ */
+function emitAbiJson({ jsAbiPath, jsonAbiPath }) {
+  if (!fs.existsSync(jsAbiPath)) {
+    console.warn(`ABI source not found, skipping JSON emit: ${jsAbiPath}`)
+    return
+  }
+  const src = fs.readFileSync(jsAbiPath, 'utf8')
+  const start = src.indexOf('[')
+  const end = src.lastIndexOf(']')
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error(`Could not locate ABI array literal in ${jsAbiPath}`)
+  }
+  const abi = JSON.parse(src.slice(start, end + 1)) // validates it is real JSON
+  fs.writeFileSync(jsonAbiPath, JSON.stringify(abi, null, 2) + '\n')
+  console.log(`Emitted JSON ABI: ${jsonAbiPath}`)
+}
+
 function findDeploymentFile({ deploymentsDir, network, chainId }) {
   // Prefer v2 file (P2P betting architecture)
   const v2 = path.join(deploymentsDir, `${network}-chain${chainId}-v2.json`)
@@ -218,6 +241,13 @@ function main() {
 
   console.log(`Synced frontend contracts from: ${deploymentFile}`)
   console.log(`Updated: ${contractsFile}`)
+
+  // Emit the JSON ABI the subgraph consumes (generated artifact, not hand-copied).
+  const abisDir = path.join(repoRoot, 'frontend', 'src', 'abis')
+  emitAbiJson({
+    jsAbiPath: path.join(abisDir, 'WagerRegistry.js'),
+    jsonAbiPath: path.join(abisDir, 'WagerRegistry.json'),
+  })
 }
 
 main()

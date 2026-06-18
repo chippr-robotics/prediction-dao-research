@@ -29,18 +29,22 @@ const STABLE_DECIMALS = 6
 const STATS_TTL_MS = 60_000
 const QUERY_PAGE = 1000
 
+// v2 WagerRegistry schema (spec 017): 1v1 wagers with creator/opponent + per-side
+// stakes; no User entity, so unique accounts are derived from creator/opponent.
 const STATS_QUERY = `
   query SiteStats($first: Int!) {
     wagers(first: $first, orderBy: createdAt, orderDirection: desc) {
       status
-      stakePerParticipant
-      acceptedCount
-    }
-    users(first: $first) {
-      id
+      creator
+      opponent
+      creatorStake
+      opponentStake
     }
   }
 `
+
+const ZERO_ADDR = /^0x0+$/
+const STAKED_STATUSES = new Set(['active', 'draw_proposed', 'resolved', 'drawn', 'refunded'])
 
 // Cache stats per connected chain so switching networks doesn't show another
 // chain's figures within the TTL window (spec 008).
@@ -56,6 +60,37 @@ function emptyStats() {
   }
 }
 
+/**
+ * Aggregate v2 Wager rows into the landing-band stats. Pure + exported for unit
+ * testing (spec 017). Unique accounts come from creator/opponent (v2 has no User
+ * entity); the pot sums the creator stake plus the opponent stake once escrowed.
+ */
+export function aggregateWagerStats(wagers) {
+  const accounts = new Set()
+  let potBase = 0n
+  let resolved = 0
+  let active = 0
+  for (const w of wagers) {
+    if (w.status === 'resolved') resolved += 1
+    if (w.status === 'active') active += 1
+    if (w.creator) accounts.add(String(w.creator).toLowerCase())
+    if (w.opponent && !ZERO_ADDR.test(String(w.opponent))) accounts.add(String(w.opponent).toLowerCase())
+    try {
+      potBase += BigInt(w.creatorStake || 0)
+      if (STAKED_STATUSES.has(w.status)) potBase += BigInt(w.opponentStake || 0)
+    } catch {
+      // skip malformed rows rather than failing the whole aggregation
+    }
+  }
+  return {
+    activeAccounts: accounts.size,
+    valueWageredUsd: Math.round(Number(formatUnits(potBase, STABLE_DECIMALS))),
+    wagersResolved: resolved,
+    totalWagers: wagers.length,
+    activeWagers: active,
+  }
+}
+
 async function fetchFromSubgraph() {
   const res = await fetch(SUBGRAPH_URL, {
     method: 'POST',
@@ -65,30 +100,7 @@ async function fetchFromSubgraph() {
   if (!res.ok) throw new Error(`Subgraph HTTP ${res.status}`)
   const json = await res.json()
   if (json.errors) throw new Error(json.errors[0]?.message || 'Subgraph error')
-
-  const wagers = json.data?.wagers || []
-  const users = json.data?.users || []
-
-  let potBase = 0n
-  let resolved = 0
-  let active = 0
-  for (const w of wagers) {
-    if (w.status === 'resolved') resolved += 1
-    if (w.status === 'active') active += 1
-    try {
-      potBase += BigInt(w.stakePerParticipant || 0) * BigInt(w.acceptedCount || 0)
-    } catch {
-      // skip malformed rows rather than failing the whole aggregation
-    }
-  }
-
-  return {
-    activeAccounts: users.length,
-    valueWageredUsd: Math.round(Number(formatUnits(potBase, STABLE_DECIMALS))),
-    wagersResolved: resolved,
-    totalWagers: wagers.length,
-    activeWagers: active,
-  }
+  return aggregateWagerStats(json.data?.wagers || [])
 }
 
 async function fetchFromRpc(chainId) {
