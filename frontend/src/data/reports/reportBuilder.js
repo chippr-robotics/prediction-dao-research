@@ -88,16 +88,31 @@ export async function buildReport({
   const registryAddress = networkMeta?.contracts?.wagerRegistry || networkMeta?.wagerRegistry
   const resolveToken = tokenResolver || ((addr) => resolveTokenMeta(addr, chainId))
 
-  onProgress(0.05, 'Loading your wagers…')
-  const wagers = (await dataSource.enumerateWagers({ account })).filter((w) => isParty(w, account))
+  onProgress(0.05, 'Loading your wager activity…')
 
-  // Derive pre-items from each wager's lifecycle events.
-  const preItems = []
-  for (let i = 0; i < wagers.length; i++) {
-    const wager = wagers[i]
-    const events = await dataSource.getWagerEvents(wager.id)
-    preItems.push(...deriveTransfers({ wager, events, userAddress: account, registryAddress }))
-    onProgress(0.05 + 0.5 * ((i + 1) / Math.max(wagers.length, 1)), 'Reading wager activity…')
+  // Primary path (spec 017): one indexed query returns every transfer with its
+  // txHash/timestamp/from/to — NO per-wager log scans. Falls back to the bounded
+  // enumerate + scan path (#703) only when the index has no WagerTransfer data
+  // (older index, or none configured for this network — FR-016).
+  let preItems = null
+  if (typeof dataSource.listTransfers === 'function') {
+    try {
+      preItems = await dataSource.listTransfers({ account })
+    } catch (err) {
+      console.warn('[reportBuilder] listTransfers unavailable, falling back to bounded scan:', err?.message)
+      preItems = null
+    }
+  }
+
+  if (preItems == null) {
+    const wagers = (await dataSource.enumerateWagers({ account })).filter((w) => isParty(w, account))
+    preItems = []
+    for (let i = 0; i < wagers.length; i++) {
+      const wager = wagers[i]
+      const events = await dataSource.getWagerEvents(wager.id)
+      preItems.push(...deriveTransfers({ wager, events, userAddress: account, registryAddress }))
+      onProgress(0.05 + 0.5 * ((i + 1) / Math.max(wagers.length, 1)), 'Reading wager activity…')
+    }
   }
 
   onProgress(0.6, 'Fetching transaction details…')

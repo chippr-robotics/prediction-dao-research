@@ -1,0 +1,20 @@
+{
+  "polygon": {
+    "WagerRegistry": {
+      "address": "0x5023765809fDA93ab9F11B684fdb76521eD31774",
+      "startBlock": 88118344
+    }
+  },
+  "mordor": {
+    "WagerRegistry": {
+      "address": "0xAE5b3148E1509973e4A03Dc809A78098215c5Eff",
+      "startBlock": 16376172
+    }
+  },
+  "polygon-amoy": {
+    "WagerRegistry": {
+      "address": "0x916841aEe4832a2e9DD42470fa05a7329486e75a",
+      "startBlock": "RESOLVE-BEFORE-DEPLOY: Amoy contract-creation block (needs ETHERSCAN_API_KEY); see deployments/amoy-chain80002-v2.json deployBlocks.wagerRegistry"
+    }
+  }
+}

@@ -10,64 +10,51 @@
  * Falls back to EventsSource if the subgraph endpoint is unreachable.
  */
 
-import { WagerSortKey, TERMINAL_STATUSES, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
+import { WagerSortKey } from '../../constants/wagerDefaults'
 import { upsertCache } from './cacheStore'
 import * as EventsSource from './EventsSource'
 
 const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
 
+// v2 WagerRegistry has no on-chain trading/resolution deadlines in its events,
+// so "ends" sort falls back to createdAt; the detail view hydrates timing from
+// chain (needsRehydration, research R5).
 const SORT_KEY_TO_FIELD = {
   [WagerSortKey.CREATED]: 'createdAt',
-  [WagerSortKey.ENDS]: 'endTime',
+  [WagerSortKey.ENDS]: 'createdAt',
   [WagerSortKey.RESOLUTION_TYPE]: 'resolutionType',
   [WagerSortKey.STATUS]: 'status',
 }
 
+// Only declare variables the query actually uses — GraphQL rejects an operation
+// with a declared-but-unused variable. v2 wagers are 1v1, so ownership is
+// creator OR opponent (the v1 participants array is gone).
 const PAGE_QUERY = `
   query MyWagers(
-    $owner: String!
+    $owner: Bytes!
     $first: Int!
     $orderBy: Wager_orderBy!
     $orderDirection: OrderDirection!
-    $cursorField: String
-    $cursorValue: String
-    $statusIn: [String!]
-    $statusNotIn: [String!]
-    $resolutionTypesIn: [Int!]
-    $marketTypesIn: [String!]
-    $now: BigInt!
-    $tab: String!
   ) {
     wagers(
       first: $first
       orderBy: $orderBy
       orderDirection: $orderDirection
-      where: {
-        and: [
-          { or: [
-            { creator: $owner },
-            { participants_contains: [$owner] }
-          ] }
-        ]
-      }
+      where: { or: [ { creator: $owner }, { opponent: $owner } ] }
     ) {
       id
-      marketType
       status
       resolutionType
       creator
-      participants
-      stakePerParticipant
-      stakeToken
-      tradingPeriodSeconds
+      opponent
+      token
+      creatorStake
+      opponentStake
+      winner
       createdAt
-      acceptanceDeadline
-      endTime
-      acceptedCount
-      ipfsCid
-      isEncrypted
-      metadataCipher
-      description
+      resolvedAt
+      metadataUri
+      metadataHash
     }
   }
 `
@@ -86,37 +73,37 @@ async function postGraphQL(query, variables) {
 }
 
 function toWager(raw) {
+  const isIpfs = Boolean(raw.metadataUri && String(raw.metadataUri).startsWith('ipfs://'))
+  const ipfsCid = isIpfs ? String(raw.metadataUri).slice('ipfs://'.length) : null
   return {
     id: String(raw.id),
-    marketType: raw.marketType,
+    // v2 WagerRegistry is always 1v1.
+    marketType: 'oneVsOne',
     status: raw.status,
     resolutionType: Number(raw.resolutionType ?? 0),
     creator: raw.creator,
-    participants: (raw.participants || []).map(p => p.toLowerCase()),
-    arbitrator: raw.arbitrator || null,
-    stakeAmount: raw.stakePerParticipant,
-    stakeTokenAddress: raw.stakeToken,
-    stakeTokenSymbol: raw.stakeTokenSymbol || null,
-    tradingPeriodSeconds: Number(raw.tradingPeriodSeconds || 0),
+    opponent: raw.opponent || null,
+    participants: [raw.creator, raw.opponent].filter(Boolean).map(p => String(p).toLowerCase()),
+    arbitrator: null,
+    // v2 has explicit per-side stakes; expose both, with creatorStake as the
+    // representative headline amount.
+    stakeAmount: raw.creatorStake,
+    creatorStake: raw.creatorStake,
+    opponentStake: raw.opponentStake,
+    stakeTokenAddress: raw.token,
+    stakeTokenSymbol: null,
     createdAt: Number(raw.createdAt || 0) * 1000,
-    acceptanceDeadline: Number(raw.acceptanceDeadline || 0) * 1000,
-    endTime: Number(raw.endTime || 0) * 1000,
-    endDate: raw.endTime ? new Date(Number(raw.endTime) * 1000).toISOString() : null,
-    // Canonical timing pair so the detail/list show a consistent end across
-    // sources. The subgraph's `endTime` is the resolution-open time E
-    // (createdAt + tradingPeriodSeconds, per schema.graphql); resolution
-    // closes 48h later.
-    tradingEndTime: raw.endTime ? Number(raw.endTime) * 1000 : undefined,
-    resolveDeadlineTime: raw.endTime
-      ? Number(raw.endTime) * 1000 + (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
-      : undefined,
-    acceptedCount: Number(raw.acceptedCount || 0),
-    ipfsCid: raw.ipfsCid || null,
-    isEncrypted: Boolean(raw.isEncrypted),
-    metadataCipher: raw.metadataCipher || null,
-    description: raw.description || '',
-    needsIpfsFetch: Boolean(raw.ipfsCid),
-    needsRehydration: false,
+    resolvedAt: raw.resolvedAt ? Number(raw.resolvedAt) * 1000 : null,
+    winner: raw.winner || null,
+    metadataUri: raw.metadataUri || null,
+    metadataHash: raw.metadataHash || null,
+    ipfsCid,
+    needsIpfsFetch: isIpfs,
+    description: '',
+    isEncrypted: false,
+    // v2 events carry no trading/resolution deadlines or decrypted metadata, so
+    // the detail/list view rehydrates timing + description from chain (R5).
+    needsRehydration: true,
   }
 }
 
@@ -152,14 +139,6 @@ export async function listPage({
     first: pageSize + 1,
     orderBy: orderField,
     orderDirection: 'desc',
-    cursorField: orderField,
-    cursorValue: cursor?.lastSortKey || null,
-    statusIn: filter?.statuses || null,
-    statusNotIn: filter?.includeExpired ? null : Array.from(TERMINAL_STATUSES),
-    resolutionTypesIn: filter?.resolutionTypes || null,
-    marketTypesIn: filter?.marketTypes || null,
-    now: Math.floor(Date.now() / 1000).toString(),
-    tab: filter?.tab || 'participating',
   }
 
   try {
@@ -183,7 +162,7 @@ export async function getById(id, userAddress) {
   if (!SUBGRAPH_URL) return EventsSource.getById(id, userAddress)
   try {
     const data = await postGraphQL(
-      `query($id: ID!) { wager(id: $id) { id marketType status resolutionType creator participants stakePerParticipant stakeToken tradingPeriodSeconds createdAt acceptanceDeadline endTime acceptedCount ipfsCid isEncrypted metadataCipher description } }`,
+      `query($id: ID!) { wager(id: $id) { id status resolutionType creator opponent token creatorStake opponentStake winner createdAt resolvedAt metadataUri metadataHash } }`,
       { id: String(id) }
     )
     const wager = data?.wager ? toWager(data.wager) : null

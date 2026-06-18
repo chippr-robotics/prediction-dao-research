@@ -1,45 +1,49 @@
 specVersion: 0.0.5
-description: FriendGroupMarketFactory wagers index for the prediction-dao-research app
+description: v2 WagerRegistry wagers + per-transfer records for the prediction-dao-research app
 schema:
   file: ./schema.graphql
 
-# Networks: polygon-amoy during development; switch to polygon for prod.
-# Replace ADDRESS and START_BLOCK with the values from
-# deployments/<network>/FriendGroupMarketFactory.json before running
-# `graph deploy`.
+# Per-network address + startBlock live in networks.json; build per network with
+#   graph build --network <polygon|mordor|polygon-amoy>
+# The defaults below target Polygon (137). NEVER use 0x0 / startBlock 0 — indexing
+# from genesis is the root cause of the RPC flood this work removes (issue #703/#704).
 dataSources:
   - kind: ethereum
-    name: FriendGroupMarketFactory
-    network: polygon-amoy
+    name: WagerRegistry
+    network: polygon
     source:
-      address: "0x0000000000000000000000000000000000000000"
-      abi: FriendGroupMarketFactory
-      startBlock: 0
+      address: "0x5023765809fDA93ab9F11B684fdb76521eD31774"
+      abi: WagerRegistry
+      startBlock: 88118344
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
         - Wager
-        - User
+        - WagerTransfer
       abis:
-        - name: FriendGroupMarketFactory
-          file: ../frontend/src/abis/FriendGroupMarketFactory.json
+        - name: WagerRegistry
+          file: ../frontend/src/abis/WagerRegistry.json
       eventHandlers:
-        - event: MarketCreated(indexed uint256,indexed address,uint8,uint8)
-          handler: handleMarketCreated
-        - event: MemberAdded(indexed uint256,indexed address)
-          handler: handleMemberAdded
-        - event: MarketAccepted(indexed uint256,indexed address,uint256)
-          handler: handleMarketAccepted
-        - event: ResolutionProposed(indexed uint256,indexed address,bool)
-          handler: handleResolutionProposed
-        - event: MarketResolved(indexed uint256,indexed address,bool,uint256)
-          handler: handleMarketResolved
-        - event: MarketChallenged(indexed uint256,indexed address)
-          handler: handleMarketChallenged
-        - event: MarketCancelled(indexed uint256)
-          handler: handleMarketCancelled
-        - event: MarketRefunded(indexed uint256)
-          handler: handleMarketRefunded
-      file: ./src/mappings/factory.ts
+        - event: WagerCreated(indexed uint256,indexed address,indexed address,address,uint128,uint128,uint8,bytes32,string)
+          handler: handleWagerCreated
+        - event: WagerAccepted(indexed uint256,indexed address)
+          handler: handleWagerAccepted
+        - event: PayoutClaimed(indexed uint256,indexed address,uint256)
+          handler: handlePayoutClaimed
+        - event: WagerRefunded(indexed uint256,indexed address,indexed address)
+          handler: handleWagerRefunded
+        - event: WagerDrawn(indexed uint256,indexed address,indexed address,address)
+          handler: handleWagerDrawn
+        - event: WagerCancelled(indexed uint256)
+          handler: handleWagerCancelled
+        - event: WagerResolved(indexed uint256,indexed address,indexed address)
+          handler: handleWagerResolved
+        - event: WagerDeclined(indexed uint256,indexed address)
+          handler: handleWagerDeclined
+        - event: DrawProposed(indexed uint256,indexed address)
+          handler: handleDrawProposed
+        - event: DrawRevoked(indexed uint256,indexed address)
+          handler: handleDrawRevoked
+      file: ./src/mappings/wagerRegistry.ts

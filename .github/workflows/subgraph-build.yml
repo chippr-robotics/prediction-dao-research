@@ -1,0 +1,61 @@
+name: Subgraph Build and Tests
+
+# Spec 017: validate the v2 WagerRegistry subgraph (codegen → build → Matchstick)
+# as a failing gate. No continue-on-error on these steps (constitution IV).
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'subgraph/**'
+      - 'frontend/src/abis/WagerRegistry.json'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'subgraph/**'
+      - 'frontend/src/abis/WagerRegistry.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: codegen + build + matchstick
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: subgraph
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install subgraph dependencies
+        run: npm install
+
+      - name: Verify generated ABI is present
+        run: |
+          if [ ! -f "../frontend/src/abis/WagerRegistry.json" ]; then
+            echo "::error::frontend/src/abis/WagerRegistry.json missing — run npm run sync:frontend-contracts:<net>"
+            exit 1
+          fi
+
+      - name: Codegen
+        run: npm run codegen
+
+      - name: Build (WASM mappings)
+        run: npm run build
+
+      - name: Matchstick unit tests
+        run: npm test

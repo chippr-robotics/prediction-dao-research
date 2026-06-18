@@ -18,5 +18,8 @@
     "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22"
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-05-22T01:20:23.586Z"
+  "timestamp": "2026-05-22T01:20:23.586Z",
+  "deployBlocks": {
+    "wagerRegistry": null
+  }
 }

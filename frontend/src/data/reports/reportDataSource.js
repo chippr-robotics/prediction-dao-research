@@ -49,6 +49,60 @@ function subgraphConfigured() {
   return Boolean(import.meta.env?.VITE_SUBGRAPH_URL)
 }
 
+// GraphQL: a party's value movements, time-ordered, straight from the index
+// (spec 017). Carries txHash + timestamp + from/to, so the report needs NO
+// eth_getLogs scan — only one receipt per transfer for the gas fee.
+const WAGER_TRANSFERS_QUERY = `
+  query ReportTransfers($party: Bytes!, $first: Int!, $skip: Int!) {
+    wagerTransfers(
+      where: { party: $party }
+      orderBy: timestamp
+      orderDirection: asc
+      first: $first
+      skip: $skip
+    ) {
+      direction
+      token
+      amount
+      from
+      to
+      txHash
+      blockNumber
+      timestamp
+      wager { id }
+    }
+  }
+`
+
+async function postSubgraph(query, variables) {
+  const url = import.meta.env?.VITE_SUBGRAPH_URL
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  })
+  if (!res.ok) throw new Error(`Subgraph HTTP ${res.status}`)
+  const json = await res.json()
+  if (json.errors) throw new Error(`Subgraph: ${json.errors[0]?.message || 'unknown error'}`)
+  return json.data
+}
+
+/** Map a subgraph WagerTransfer row to the report's pre-item shape (deriveTransfers output). */
+function transferToPreItem(row) {
+  return {
+    wagerId: String(row.wager?.id ?? ''),
+    direction: row.direction,
+    tokenAddress: row.token,
+    amountRaw: String(row.amount),
+    fromAddress: row.from,
+    toAddress: row.to,
+    txHash: row.txHash,
+    blockNumber: Number(row.blockNumber),
+    // Per-transfer timestamp comes straight from the index now (was a getBlock call).
+    timestamp: Number(row.timestamp) * 1000,
+  }
+}
+
 function getProvider(opts = {}) {
   return opts.provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
 }
@@ -172,6 +226,27 @@ export function createReportDataSource(opts = {}) {
   }
 
   return {
+    /**
+     * Primary report path (spec 017): all of the user's transfers — with txHash,
+     * from/to, amount, token, direction, and timestamp — in one indexed query,
+     * time-ordered. Returns null when no subgraph is configured so the caller can
+     * fall back to the bounded enumerate + scan path (#703). NO log scans here.
+     */
+    async listTransfers({ account }) {
+      if (!account) return []
+      if (!subgraphConfigured()) return null
+      const party = String(account).toLowerCase()
+      const all = []
+      const pageSize = 1000
+      for (let skip = 0; skip < 100_000; skip += pageSize) {
+        const data = await postSubgraph(WAGER_TRANSFERS_QUERY, { party, first: pageSize, skip })
+        const rows = data?.wagerTransfers || []
+        all.push(...rows.map(transferToPreItem))
+        if (rows.length < pageSize) break
+      }
+      return all
+    },
+
     async enumerateWagers({ account }) {
       if (!account) return []
       if (!subgraphConfigured()) {

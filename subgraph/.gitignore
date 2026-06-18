@@ -1,0 +1,8 @@
+node_modules/
+generated/
+build/
+*.log
+.env
+tests/.bin/
+tests/.docker/
+tests/.latest.json

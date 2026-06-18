@@ -1,7 +1,7 @@
 {
   "name": "prediction-dao-research-subgraph",
   "version": "0.1.0",
-  "description": "Subgraph for FriendGroupMarketFactory wagers — powers the My Wagers paginated view via The Graph's decentralized network.",
+  "description": "Subgraph for the v2 WagerRegistry — indexes wagers + per-transfer WagerTransfer records (txHash) that power the My Wagers view, site stats, and the RPC-light tax/activity report.",
   "private": true,
   "scripts": {
     "codegen": "graph codegen",

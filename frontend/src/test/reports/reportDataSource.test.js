@@ -70,6 +70,57 @@ describe('createReportDataSource.enumerateWagers (subgraph-based, no genesis sca
   })
 })
 
+describe('createReportDataSource.listTransfers (subgraph WagerTransfer, no log scan)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it('returns null when no subgraph is configured (signals bounded-scan fallback)', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', '')
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 } })
+    expect(await ds.listTransfers({ account: USER })).toBeNull()
+  })
+
+  it('queries wagerTransfers by party and maps rows to pre-items (no contract call)', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    let sentBody = null
+    const fetchMock = vi.fn(async (_url, opts) => {
+      sentBody = JSON.parse(opts.body)
+      return {
+        ok: true,
+        json: async () => ({
+          data: {
+            wagerTransfers: [
+              { direction: 'deposit', token: '0xtok', amount: '100', from: USER, to: '0xreg', txHash: '0xaa', blockNumber: '10', timestamp: '1700000000', wager: { id: '1' } },
+              { direction: 'payout', token: '0xtok', amount: '200', from: '0xreg', to: USER, txHash: '0xbb', blockNumber: '20', timestamp: '1700000500', wager: { id: '1' } },
+            ],
+          },
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 } })
+    const items = await ds.listTransfers({ account: USER })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(sentBody.query).toMatch(/wagerTransfers/)
+    expect(sentBody.variables.party).toBe(USER.toLowerCase())
+    expect(items).toHaveLength(2)
+    expect(items[0]).toMatchObject({
+      wagerId: '1', direction: 'deposit', tokenAddress: '0xtok', amountRaw: '100',
+      fromAddress: USER, toAddress: '0xreg', txHash: '0xaa', blockNumber: 10, timestamp: 1700000000 * 1000,
+    })
+  })
+
+  it('returns [] without an account', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 } })
+    expect(await ds.listTransfers({ account: null })).toEqual([])
+  })
+})
+
 describe('createReportDataSource.getWagerEvents (bounded window, adaptive chunking)', () => {
   beforeEach(() => vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false'))
   afterEach(() => vi.unstubAllEnvs())
