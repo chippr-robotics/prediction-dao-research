@@ -8,6 +8,12 @@
 
 **Input**: User description: "My Account Dashboard — turn the My Account page (currently just wallet address + QR/Disconnect) into a real-time personal stats dashboard." Design source: `specs/020-account-stats-dashboard/design/FairWins_Account_Dashboard.html` (Claude Design export) and `specs/design-prompts/my-account-stats-dashboard.md` (design brief).
 
+## Clarifications
+
+### Session 2026-06-18
+
+- Q: How is "Net P&L" calculated? → A: Realized only — Net P&L = (payouts + refunds) − deposits over *settled* wagers; active stakes are excluded from the headline figure and surfaced separately as "at stake."
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - At-a-glance performance summary (Priority: P1)
