@@ -207,6 +207,40 @@
   margin-bottom: 14px;
 }
 
+.wc-terms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Hide/show toggle for decrypted private-bet terms (spec 018 FR-002) */
+.wc-terms-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 6px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wc-terms-toggle:hover {
+  border-color: #4C9AFF;
+  color: #4C9AFF;
+}
+
+.wc-terms-concealed {
+  letter-spacing: 0.15em;
+  color: var(--text-muted, #7A8590);
+  user-select: none;
+}
+
 .wc-terms-label,
 .wc-meta-label {
   font-size: 0.65rem;
@@ -298,6 +332,22 @@
   margin-top: 14px;
   display: flex;
   justify-content: center;
+}
+
+/* Table view (spec 018) — compact action buttons inside table rows. */
+.wc-action-sm {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  margin-right: 0.375rem;
+}
+
+.wc-action-sm:last-child { margin-right: 0; }
+
+.wc-table-amount {
+  white-space: nowrap;
+  color: var(--text-primary, #E6EDF3);
 }
 
 @media (max-width: 600px) {

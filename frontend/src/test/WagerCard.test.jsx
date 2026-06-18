@@ -46,7 +46,7 @@ describe('WagerCard (via WagerCardGrid)', () => {
     expect(screen.queryByText('Wager ID')).not.toBeInTheDocument()
   })
 
-  it('expands in place on click, revealing metadata and View details', async () => {
+  it('expands in place on click, revealing metadata (no redundant View details)', async () => {
     const user = userEvent.setup()
     render(<WagerCardGrid {...baseProps} markets={[activeWager()]} />)
     const header = screen.getByText('Lakers ML vs Mike').closest('[role="button"]')
@@ -55,7 +55,8 @@ describe('WagerCard (via WagerCardGrid)', () => {
     expect(header).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Wager ID')).toBeInTheDocument()
     expect(screen.getByText('#1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /view details/i })).toBeInTheDocument()
+    // spec 018 FR-001: the expanded card IS the detail — no "View details" button.
+    expect(screen.queryByRole('button', { name: /view details/i })).not.toBeInTheDocument()
   })
 
   it('keeps at most one card expanded (accordion)', async () => {
@@ -71,14 +72,28 @@ describe('WagerCard (via WagerCardGrid)', () => {
     expect(a).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('View details calls onSelect with the wager', async () => {
+  it('lets the user hide and re-show decrypted private terms (spec 018 FR-002)', async () => {
     const user = userEvent.setup()
-    const onSelect = vi.fn()
-    render(<WagerCardGrid {...baseProps} onSelect={onSelect} markets={[activeWager()]} />)
+    const m = activeWager({ isEncrypted: true, decryptedMetadata: { terms: 'Lakers win outright' } })
+    render(<WagerCardGrid {...baseProps} isDecrypting={() => false} markets={[m]} />)
     await user.click(screen.getByText('Lakers ML vs Mike'))
-    await user.click(screen.getByRole('button', { name: /view details/i }))
-    expect(onSelect).toHaveBeenCalledTimes(1)
-    expect(onSelect.mock.calls[0][0].id).toBe('1')
+    // Decrypted terms are visible…
+    expect(screen.getByText('Lakers win outright')).toBeInTheDocument()
+    // …hide them…
+    await user.click(screen.getByRole('button', { name: /^hide$/i }))
+    expect(screen.queryByText('Lakers win outright')).not.toBeInTheDocument()
+    // …and show them again (no re-decryption).
+    await user.click(screen.getByRole('button', { name: /^show$/i }))
+    expect(screen.getByText('Lakers win outright')).toBeInTheDocument()
+  })
+
+  it('offers no hide control for a plain (non-encrypted) wager', async () => {
+    const user = userEvent.setup()
+    const m = activeWager({ decryptedMetadata: { terms: 'Open terms' } })
+    render(<WagerCardGrid {...baseProps} markets={[m]} />)
+    await user.click(screen.getByText('Lakers ML vs Mike'))
+    expect(screen.getByText('Open terms')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^hide$/i })).not.toBeInTheDocument()
   })
 
   it('shows an inline decrypt affordance for an encrypted, undecrypted wager', async () => {

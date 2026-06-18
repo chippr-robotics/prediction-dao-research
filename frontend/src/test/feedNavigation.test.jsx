@@ -239,12 +239,6 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
       fireEvent.click(row)
     })
     expect(activityRef.current.markWagerRead).toHaveBeenCalledWith('42')
-
-    // The full detail view is still reachable via "View details".
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /view details/i }))
-    })
-    expect(await screen.findByRole('button', { name: /back to list/i })).toBeInTheDocument()
   })
 
   it('renders per-tab count badges on the pill tabs (spec 017 FR-016)', async () => {

@@ -147,13 +147,13 @@ describe('Dashboard', () => {
     cy.get('.quick-action-card').contains('My Wagers').click()
     cy.get('[role="dialog"], .my-markets-modal', { timeout: 5000 }).should('be.visible')
 
-    // If there are wager rows, clicking one should show the detail view.
+    // The full detail view is reached from the table view (spec 018): switch to
+    // the table, then click a row.
+    cy.contains('button', /^Table$/).click()
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
-      const cards = $panel.find('.wc-card .wc-header')
-      if (cards.length > 0) {
-        // Expand the first card, then open the full detail via "View details".
-        cy.wrap(cards.first()).click()
-        cy.contains('.wc-card button', 'View details').click()
+      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      if (rows.length > 0) {
+        cy.wrap(rows.first()).click()
         // Detail view should show the back button and market info.
         cy.get('.mm-detail, .mm-back-btn').should('be.visible')
         cy.get('.mm-detail-header, .mm-detail-title-row').should('be.visible')

@@ -19,24 +19,26 @@ const VARIANT_CLASS = {
 }
 
 /**
- * WagerCard (spec 017)
+ * WagerCard (spec 017, updated spec 018)
  *
  * A single wager rendered as an expandable card. Collapsed: stake, title, status
  * pill, chevron (+ opponent/time preview in comfortable density). Expanded: terms
- * (or an inline decrypt affordance for encrypted wagers), a 2-column metadata
- * grid, contextual action buttons, and a "View details" link to the full detail
- * view. Pure presentation — all side effects flow through the passed callbacks.
+ * (with a hide/show control for decrypted private wagers, or an inline decrypt
+ * affordance for encrypted ones), a 2-column metadata grid, and contextual
+ * action buttons. The expanded card IS the detail surface (spec 018 FR-001 — the
+ * separate "View details" button was removed). Pure presentation.
  */
 export default function WagerCard({
   market,
   vm,
   isOpen,
   onToggle,
-  onSelect,
   onDecrypt,
   onResolve,
   account,
   showResolveCountdown = false,
+  termsHidden = false,
+  onToggleHideTerms,
 }) {
   const headingId = `wc-${vm.id}-title`
   const panelId = `wc-${vm.id}-panel`
@@ -47,6 +49,8 @@ export default function WagerCard({
       onToggle()
     }
   }
+
+  const concealTerms = vm.canHideTerms && termsHidden
 
   return (
     <div className={`wc-card${isOpen ? ' wc-open' : ''}${vm.isExpired ? ' wc-expired' : ''}`}>
@@ -138,8 +142,39 @@ export default function WagerCard({
           )}
           {(vm.encState === 'revealed' || vm.encState === 'plain') && vm.terms && (
             <div className="wc-terms">
-              <div className="wc-terms-label">Wager terms</div>
-              <div className="wc-terms-text">{vm.terms}</div>
+              <div className="wc-terms-head">
+                <div className="wc-terms-label">Wager terms</div>
+                {vm.canHideTerms && (
+                  <button
+                    type="button"
+                    className="wc-terms-toggle"
+                    onClick={(e) => { e.stopPropagation(); onToggleHideTerms?.() }}
+                    aria-pressed={concealTerms}
+                    title={concealTerms ? 'Show wager terms' : 'Hide wager terms'}
+                  >
+                    {concealTerms ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        Show
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                        Hide
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {concealTerms ? (
+                <div className="wc-terms-text wc-terms-concealed" aria-hidden="true">•••• •••••• ••••</div>
+              ) : (
+                <div className="wc-terms-text">{vm.terms}</div>
+              )}
             </div>
           )}
 
@@ -154,30 +189,25 @@ export default function WagerCard({
           </div>
 
           {/* Actions */}
-          <div className="wc-actions">
-            {showResolveCountdown && !vm.isExpired && (
-              <ResolveButtonWithCountdown market={market} onResolve={onResolve} account={account} />
-            )}
-            {vm.actions.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                className={`wc-action ${VARIANT_CLASS[a.variant] || 'wc-action-ghost'}`}
-                onClick={(e) => { e.stopPropagation(); a.onClick() }}
-                disabled={a.disabled}
-                title={a.title}
-              >
-                {a.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="wc-action wc-action-ghost wc-action-details"
-              onClick={(e) => { e.stopPropagation(); onSelect() }}
-            >
-              View details
-            </button>
-          </div>
+          {(vm.actions.length > 0 || (showResolveCountdown && !vm.isExpired)) && (
+            <div className="wc-actions">
+              {showResolveCountdown && !vm.isExpired && (
+                <ResolveButtonWithCountdown market={market} onResolve={onResolve} account={account} />
+              )}
+              {vm.actions.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  className={`wc-action ${VARIANT_CLASS[a.variant] || 'wc-action-ghost'}`}
+                  onClick={(e) => { e.stopPropagation(); a.onClick() }}
+                  disabled={a.disabled}
+                  title={a.title}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Per-card action errors */}
           {vm.actions.filter(a => a.error).map((a) => (
