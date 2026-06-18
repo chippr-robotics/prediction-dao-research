@@ -27,11 +27,14 @@ Addresses + start blocks live in [`networks.json`](./networks.json), sourced fro
 `deployments/<net>-v2.json` (`deployBlocks.wagerRegistry`). Never `0x0` / `startBlock: 0`
 — indexing from genesis is what caused the RPC issue this work removes.
 
-| Network | chainId | startBlock |
-|---------|--------:|-----------:|
-| polygon | 137 | 88118344 |
+Use The Graph's **canonical** network ids (Studio rejects aliases): Polygon
+mainnet is `matic` (not `polygon`); Amoy is `polygon-amoy`.
+
+| Network (manifest id) | chainId | startBlock |
+|-----------------------|--------:|-----------:|
+| matic (Polygon mainnet) | 137 | 88118344 |
 | mordor | 63 | 16376172 |
-| polygon-amoy | 80002 | **resolve from explorer before deploy** (needs `ETHERSCAN_API_KEY`) |
+| polygon-amoy | 80002 | 40172425 |
 
 ## Build, test, deploy
 
@@ -43,14 +46,17 @@ npm --prefix .. run sync:frontend-contracts:polygon   # emits ../frontend/src/ab
 
 # 2. Codegen + build + unit tests:
 npm run codegen
-npm run build            # or: graph build --network <polygon|mordor|polygon-amoy>
+npm run build            # or: graph build --network <matic|mordor|polygon-amoy>
 npm test                 # Matchstick (graph test). On platforms whose prebuilt
                          # binary is unsupported, run: npx graph test -d  (Docker)
 
-# 3. Deploy one subgraph per network (Graph Studio):
+# 3. Deploy one subgraph per network (Graph Studio). The Studio slug differs per
+#    network; build+deploy in one step with --network (reads networks.json):
 graph auth <DEPLOY_KEY>  # secret — keep in local .env, never commit
-graph build --network polygon
-npm run deploy:studio
+graph deploy fairwins-polygon --studio --network matic        -l <ver>   # Polygon mainnet (137)
+graph deploy fairwins-amoy    --studio --network polygon-amoy -l <ver>   # Amoy testnet (80002)
+# Mordor (63) is not supported by Studio -> no subgraph; the frontend uses the
+# bounded RPC fallback for it (research R2).
 ```
 
 Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
