@@ -57,5 +57,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/017-subgraph-v2-wager-transfers/plan.md
+at specs/020-account-stats-dashboard/plan.md
 <!-- SPECKIT END -->
