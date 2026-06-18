@@ -57,5 +57,13 @@ jobs:
       - name: Build (WASM mappings)
         run: npm run build
 
-      - name: Matchstick unit tests
-        run: npm test
+      # graph-cli 0.80's `graph test` binary fetcher rejects newer platforms
+      # (Ubuntu 24.04 runners → "Unsupported platform: Linux x64 24"), and
+      # `graph test -d` needs an interactive TTY CI lacks. Build the vendored
+      # Matchstick image and run it non-interactively against the bind-mounted
+      # project (generated/ produced by the codegen step above).
+      - name: Build Matchstick runner image
+        run: docker build -f matchstick.Dockerfile -t fw-matchstick .
+
+      - name: Matchstick unit tests (Docker)
+        run: docker run --rm -v "$PWD":/matchstick fw-matchstick
