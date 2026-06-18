@@ -3,16 +3,8 @@ import { createReportDataSource, resolveEscrow } from '../../data/reports/report
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 
 const USER = '0x1111111111111111111111111111111111111111'
-const OTHER = '0x2222222222222222222222222222222222222222'
-const TOKEN = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 
-// Regression: the deployment registers the escrow as `wagerRegistry`, NOT
-// `friendGroupMarketFactory`. Asking for the factory key produced
-// "FriendGroupMarketFactory address not configured" on every live network.
-// resolveEscrow must resolve the configured wagerRegistry across all chains and
-// throw a clear error only when nothing is configured.
-
-describe('resolveEscrow (address-config bug fix)', () => {
+describe('resolveEscrow (contract resolution)', () => {
   for (const chainId of [137, 80002, 63, 1337]) {
     it(`resolves the v2 WagerRegistry on chain ${chainId} with the v2 ABI + events`, () => {
       const e = resolveEscrow(chainId)
@@ -29,58 +21,119 @@ describe('resolveEscrow (address-config bug fix)', () => {
   })
 })
 
-// Regression: enumeration must read the wagerRegistry contract directly and
-// NEVER fall back to the legacy EventsSource (which threw
-// "FriendGroupMarketFactory address not configured").
-describe('createReportDataSource.enumerateWagers (self-contained chain scan)', () => {
-  // The test env pins VITE_SKIP_BLOCKCHAIN_CALLS='true'; turn it off so the scan runs.
-  beforeEach(() => vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false'))
+describe('createReportDataSource.enumerateWagers (subgraph-based, no genesis scan)', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  function fakeContract(logsByEvent) {
+  function fakeRepo(pages) {
+    let call = 0
     return {
-      filters: new Proxy({}, {
-        get: (_t, name) => (...args) => ({ name: String(name), args }),
-      }),
-      // Return logs only on the first chunk (from===0) to avoid duplicates.
-      queryFilter: async (filter, from) => {
-        if (from !== 0) return []
-        const all = logsByEvent[filter.name] || []
-        // crude topic match: the indexed user arg must equal a log party
-        return all.filter((log) => filter.args.includes(log._match))
-      },
+      listMyWagers: vi.fn(async () => pages[Math.min(call++, pages.length - 1)]),
     }
   }
 
-  it('collects the user\'s wagers from indexed registry logs (no repository)', async () => {
-    const logsByEvent = {
-      WagerCreated: [
-        { _match: USER, fragment: { name: 'WagerCreated' }, transactionHash: '0xa1', blockNumber: 100,
-          args: { wagerId: 1n, creator: USER, opponent: OTHER, token: TOKEN } },
-      ],
-      WagerAccepted: [
-        { _match: USER, fragment: { name: 'WagerAccepted' }, transactionHash: '0xb2', blockNumber: 130,
-          args: { wagerId: 2n, opponent: USER } },
-      ],
-      PayoutClaimed: [],
-    }
-    const ds = createReportDataSource({
-      chainId: 137,
-      provider: { getBlockNumber: async () => 5000 },
-      contract: fakeContract(logsByEvent),
-    })
+  it('requires the subgraph and throws a clear error when it is not configured', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', '')
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: fakeRepo([]) })
+    await expect(ds.enumerateWagers({ account: USER })).rejects.toThrow(/requires the indexing subgraph/i)
+  })
+
+  it('enumerates the user\'s wagers from the subgraph repository (never scans logs)', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const repo = fakeRepo([
+      {
+        source: 'subgraph',
+        hasMore: false,
+        nextCursor: null,
+        items: [
+          { id: '1', creator: USER, participants: [USER], stakeTokenAddress: '0xtok', stakeAmount: '100', createdAt: 1700000000000 },
+          { id: '2', creator: '0xother', participants: ['0xother', USER], stakeTokenAddress: '0xtok', stakeAmount: '50', createdAt: 1700001000000 },
+        ],
+      },
+    ])
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: repo })
     const wagers = await ds.enumerateWagers({ account: USER })
-    const ids = wagers.map((w) => w.id).sort()
-    expect(ids).toEqual(['1', '2'])
-    const w1 = wagers.find((w) => w.id === '1')
-    expect(w1.creator).toBe(USER)
-    expect(w1.stakeTokenAddress).toBe(TOKEN)
-    // user is recorded as a party so buildReport's isParty filter keeps it
-    expect(wagers.find((w) => w.id === '2').participants).toContain(USER)
+    expect(wagers.map((w) => w.id)).toEqual(['1', '2'])
+    expect(repo.listMyWagers).toHaveBeenCalledWith(expect.objectContaining({ userAddress: USER, filter: { includeExpired: true } }))
+  })
+
+  it('fails clearly if the repository falls back to the legacy events source', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const repo = fakeRepo([{ source: 'subgraph-fallback', hasMore: false, nextCursor: null, items: [] }])
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: repo })
+    await expect(ds.enumerateWagers({ account: USER })).rejects.toThrow(/subgraph is unreachable/i)
   })
 
   it('returns [] without an account', async () => {
-    const ds = createReportDataSource({ chainId: 137, provider: { getBlockNumber: async () => 1 }, contract: fakeContract({}) })
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: fakeRepo([]) })
     expect(await ds.enumerateWagers({ account: null })).toEqual([])
+  })
+})
+
+describe('createReportDataSource.getWagerEvents (bounded window, adaptive chunking)', () => {
+  beforeEach(() => vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false'))
+  afterEach(() => vi.unstubAllEnvs())
+
+  function fakeContract(onQuery) {
+    return {
+      filters: new Proxy({}, { get: (_t, name) => (...args) => ({ name: String(name), args }) }),
+      queryFilter: onQuery,
+    }
+  }
+
+  it('does not scan from genesis — starts near the wager createdAt and stays within budget', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const calls = []
+    // latest block ~ 1,000,000; createdAt recent → window should be small.
+    const provider = {
+      getBlockNumber: async () => 1_000_000,
+      getBlock: async () => ({ timestamp: 2_000_000 }),
+    }
+    const contract = fakeContract(async (filter, from, to) => {
+      calls.push([from, to])
+      return []
+    })
+    const repo = {
+      listMyWagers: async () => ({
+        source: 'subgraph', hasMore: false, nextCursor: null,
+        // createdAt ~ now (latestSec 2,000,000) → window starts just below latest block
+        items: [{ id: '5', creator: '0x1111111111111111111111111111111111111111', participants: [], stakeTokenAddress: '0xtok', stakeAmount: '1', createdAt: 1_999_000_000 }],
+      }),
+    }
+    const ds = createReportDataSource({ chainId: 80002, provider, contract, repository: repo })
+    await ds.enumerateWagers({ account: '0x1111111111111111111111111111111111111111' })
+    await ds.getWagerEvents('5')
+
+    expect(calls.length).toBeGreaterThan(0)
+    const minFrom = Math.min(...calls.map((c) => c[0]))
+    // Must NOT start at genesis.
+    expect(minFrom).toBeGreaterThan(0)
+    // Bounded request count (budget).
+    expect(calls.length).toBeLessThanOrEqual(60)
+  })
+
+  it('shrinks the chunk when the RPC rejects the block range', async () => {
+    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
+    const sizes = []
+    let firstBig = true
+    const provider = { getBlockNumber: async () => 10_000, getBlock: async () => ({ timestamp: 1000 }) }
+    const contract = fakeContract(async (filter, from, to) => {
+      sizes.push(to - from + 1)
+      if (firstBig && to - from + 1 > 1000) {
+        firstBig = false
+        const e = new Error('block range exceeds configured limit')
+        throw e
+      }
+      return []
+    })
+    const repo = {
+      listMyWagers: async () => ({ source: 'subgraph', hasMore: false, nextCursor: null,
+        items: [{ id: '9', creator: '0x1', participants: [], stakeTokenAddress: '0xt', stakeAmount: '1', createdAt: 0 }] }),
+    }
+    const ds = createReportDataSource({ chainId: 80002, provider, contract, repository: repo })
+    await ds.enumerateWagers({ account: '0xabc' })
+    await ds.getWagerEvents('9')
+    // After the rejection, a smaller chunk size must have been attempted.
+    expect(Math.min(...sizes)).toBeLessThan(5000)
   })
 })
