@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { deriveTransfers, DIRECTION } from '../../data/reports/transferDerivation'
-import { WAGERS, EVENTS, USER, OTHER, REGISTRY } from '../fixtures/wagers'
+import { WAGERS, EVENTS, V1_EVENTS_WAGER, USER, OTHER, REGISTRY, TOKEN } from '../fixtures/wagers'
 
 const derive = (id) =>
   deriveTransfers({ wager: WAGERS[id], events: EVENTS[id], userAddress: USER, registryAddress: REGISTRY })
@@ -30,6 +30,18 @@ describe('deriveTransfers (FR-003/FR-006, research D2)', () => {
     const items = derive(3)
     expect(items.map((i) => i.direction)).toEqual([DIRECTION.DEPOSIT, DIRECTION.REFUND])
     expect(items[1]).toMatchObject({ fromAddress: REGISTRY, toAddress: USER, txHash: '0xc2' })
+  })
+
+  it('handles legacy v1 FriendGroupMarketFactory events (Mordor path)', () => {
+    const items = deriveTransfers({
+      wager: { id: '7', stakeTokenAddress: TOKEN },
+      events: V1_EVENTS_WAGER,
+      userAddress: USER,
+      registryAddress: REGISTRY,
+    })
+    expect(items.map((i) => i.direction)).toEqual([DIRECTION.DEPOSIT, DIRECTION.REFUND])
+    expect(items[0]).toMatchObject({ amountRaw: '40000000', txHash: '0xd1', fromAddress: USER })
+    expect(items[1]).toMatchObject({ amountRaw: '40000000', txHash: '0xd2', toAddress: USER })
   })
 
   it('excludes wagers/events where the user is not a party', () => {

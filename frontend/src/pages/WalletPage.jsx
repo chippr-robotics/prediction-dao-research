@@ -10,11 +10,23 @@ import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryServi
 import SwapPanel from '../components/fairwins/SwapPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
+import WalletTabMenu from '../components/wallet/WalletTabMenu'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import AddressQRModal from '../components/ui/AddressQRModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import './WalletPage.css'
+
+// My Account sections, shown via the WalletTabMenu kebab menu.
+const WALLET_TABS = [
+  { id: 'account', label: 'Account' },
+  { id: 'membership', label: 'Membership' },
+  { id: 'network', label: 'Network' },
+  { id: 'security', label: 'Security' },
+  { id: 'preferences', label: 'Preferences' },
+  { id: 'reports', label: 'Reporting' },
+  { id: 'swap', label: 'Swap' },
+]
 
 const CONNECTOR_CONFIG = {
   walletConnect: {
@@ -247,15 +259,7 @@ function WalletPage() {
             </div>
           ) : (
             <>
-              <div className="tabs" role="tablist">
-                <button role="tab" aria-selected={activeTab === 'account'} className={`tab ${activeTab === 'account' ? 'active' : ''}`} onClick={() => setActiveTab('account')}>Account</button>
-                <button role="tab" aria-selected={activeTab === 'membership'} className={`tab ${activeTab === 'membership' ? 'active' : ''}`} onClick={() => setActiveTab('membership')}>Membership</button>
-                <button role="tab" aria-selected={activeTab === 'network'} className={`tab ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>Network</button>
-                <button role="tab" aria-selected={activeTab === 'security'} className={`tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
-                <button role="tab" aria-selected={activeTab === 'preferences'} className={`tab ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>Preferences</button>
-                <button role="tab" aria-selected={activeTab === 'reports'} className={`tab ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>Tax Reports</button>
-                <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap</button>
-              </div>
+              <WalletTabMenu tabs={WALLET_TABS} activeTab={activeTab} onChange={setActiveTab} />
 
               <div className="tab-content">
                 {activeTab === 'account' && (
