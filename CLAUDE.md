@@ -45,6 +45,14 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
+- **Active wager contract is `wagerRegistry` (v2 `WagerRegistry` ABI/events:
+  `WagerCreated`/`WagerAccepted`/`PayoutClaimed`/`WagerRefunded`/`WagerCancelled`/
+  `WagerDrawn`).** The v1 `FriendGroupMarketFactory` (events `MarketCreatedPending`/
+  `ParticipantAccepted`/`WinningsClaimed`/`StakeRefunded`) is **legacy** — no live
+  network configures its address. New/active code MUST resolve the escrow via
+  `getContractAddressForChain('wagerRegistry', chainId)` and read `WagerRegistry`
+  events; do not depend on `friendGroupMarketFactory` except as an explicit
+  legacy fallback.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
