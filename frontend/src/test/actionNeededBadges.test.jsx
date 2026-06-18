@@ -245,6 +245,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
 
   describe('MyMarketsModal wager cards', () => {
     it('shows a Refund button on exactly the wager that needs a refund', async () => {
+      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'refund', '2': null }
       })
@@ -254,16 +255,21 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         render(modalUi(markets))
       })
 
-      const row1 = screen.getByText('Wager One').closest('tr')
-      expect(within(row1).getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
+      // Actions live in the expanded card — open Wager One to reveal them.
+      await user.click(screen.getByText('Wager One'))
+      const card1 = screen.getByText('Wager One').closest('.wc-card')
+      expect(within(card1).getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
       // The button replaces the badge — no redundant status pill.
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
 
-      const row2 = screen.getByText('Wager Two').closest('tr')
-      expect(within(row2).queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
+      // Wager Two needs nothing — even expanded it has no Refund.
+      await user.click(screen.getByText('Wager Two'))
+      const card2 = screen.getByText('Wager Two').closest('.wc-card')
+      expect(within(card2).queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
     })
 
     it('shows a Respond to Draw button when a draw is proposed', async () => {
+      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'respondDraw' }
       })
@@ -272,9 +278,10 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         render(modalUi([wagerOne()]))
       })
 
-      const row = screen.getByText('Wager One').closest('tr')
-      expect(within(row).getByRole('button', { name: /respond to draw/i })).toBeInTheDocument()
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      await user.click(screen.getByText('Wager One'))
+      const card = screen.getByText('Wager One').closest('.wc-card')
+      expect(within(card).getByRole('button', { name: /respond to draw/i })).toBeInTheDocument()
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
     // Every action kind now has a matching button in the Actions column, so the
@@ -290,11 +297,12 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
           render(modalUi([wagerOne()]))
         })
 
-        expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+        expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
       }
     )
 
     it('removes the Refund button when the action is no longer needed', async () => {
+      const user = userEvent.setup()
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': 'refund', '2': null }
       })
@@ -305,6 +313,8 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view = render(modalUi(markets))
       })
 
+      // Expand Wager One to reveal its Refund action.
+      await user.click(screen.getByText('Wager One'))
       expect(screen.getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
 
       activityRef.current = baseActivity({
@@ -315,7 +325,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       expect(screen.queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
     it('suppresses the "refund" badge when the row shows a Clear/Reclaim button', async () => {
@@ -347,9 +357,11 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       expect(screen.getByText('Expired Offer')).toBeInTheDocument()
+      // Expand the card to reveal its actions.
+      await user.click(screen.getByText('Expired Offer'))
       // The Clear button is present, so the refund badge is suppressed.
       expect(screen.getByRole('button', { name: /^clear$/i })).toBeInTheDocument()
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
     it('renders without crashing (and without badges) outside the provider', async () => {
@@ -360,7 +372,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       expect(screen.getByText('Wager One')).toBeInTheDocument()
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
   })
 })

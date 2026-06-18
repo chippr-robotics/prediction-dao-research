@@ -5,50 +5,18 @@ import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
-import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MY_WAGERS_DENSITY_KEY } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
-import Badge from '../ui/Badge'
+import WagerCardGrid from './WagerCardGrid'
+import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
+import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
 import './MyMarketsModal.css'
-
-// Spec 012 FR-007: user-facing labels for the activity watcher's ActionKind
-// values, shown as a badge on wager rows that need something from the user.
-const ACTION_NEEDED_LABELS = {
-  accept: 'Accept',
-  resolve: 'Resolve',
-  claim: 'Claim',
-  refund: 'Refund',
-  respondDraw: 'Respond to draw'
-}
-
-// Action kinds whose row always renders a matching button in the Actions
-// column ("View Offer", "Claim", "Resolve"), so a duplicate status-column badge
-// is just noise (and the badge looked clickable but wasn't). 'refund' and
-// 'respondDraw' also have buttons now, but only conditionally, so they're
-// handled per-row (see actionBadgeRedundant) rather than in this set.
-const ACTION_BADGES_WITH_BUTTON = new Set(['accept', 'claim', 'resolve'])
-
-/**
- * True when `account` is the declared winner of a resolved wager whose payout
- * has not yet been pulled — i.e. the viewer can call claimPayout to collect.
- *
- * WagerRegistry escrows both stakes and pays the winner on a *pull* basis
- * (claimPayout), so a resolved wager sits here until the winner claims. The
- * list row and the detail view both gate the "Claim" action on this so the
- * green action badge has a real button behind it (previously the badge looked
- * clickable but only opened the detail card — nothing claimed the funds).
- */
-function isWinnerUnpaid(market, account) {
-  if (!market || !account) return false
-  if (String(market.status).toLowerCase() !== 'resolved') return false
-  if (market.paid) return false
-  return market.winner != null &&
-    market.winner.toLowerCase() === account.toLowerCase()
-}
+import './WagerCard.css'
 
 /**
  * MyMarketsModal Component
@@ -122,6 +90,36 @@ function MyMarketsModal({
   // stake size).
   const [sortKey, setSortKey] = useState('newest') // 'newest' | 'endingSoon' | 'stakeHighToLow'
   const [statusFilter, setStatusFilter] = useState('all')
+
+  // Card-grid density (spec 017). Session-scoped: read once from sessionStorage,
+  // default compact; mirrored back on toggle so it survives reopening the modal.
+  const [density, setDensity] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(MY_WAGERS_DENSITY_KEY)
+      return saved === MyWagersDensity.COMFORTABLE ? MyWagersDensity.COMFORTABLE : MyWagersDensity.COMPACT
+    } catch {
+      return MyWagersDensity.COMPACT
+    }
+  })
+  const toggleDensity = useCallback(() => {
+    setDensity(prev => {
+      const next = prev === MyWagersDensity.COMFORTABLE ? MyWagersDensity.COMPACT : MyWagersDensity.COMFORTABLE
+      try { sessionStorage.setItem(MY_WAGERS_DENSITY_KEY, next) } catch { /* storage unavailable */ }
+      return next
+    })
+  }, [])
+
+  // Transient confirmation toast (spec 017 FR-015) shown after a successful
+  // on-chain action (claim/refund). Auto-dismisses.
+  const [toast, setToast] = useState(null)
+  const fireToast = useCallback((message) => {
+    setToast(message)
+  }, [])
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 2600)
+    return () => clearTimeout(id)
+  }, [toast])
 
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
@@ -504,6 +502,12 @@ function MyMarketsModal({
     markWagerRead?.(String(market.id))
   }
 
+  // FR-004 carried to the card grid: expanding a card to preview a wager also
+  // counts as viewing it, so clear its unread activity without opening detail.
+  const handleMarketView = (market) => {
+    markWagerRead?.(String(market.id))
+  }
+
   const handleBackToList = () => {
     setSelectedMarketId(null)
   }
@@ -700,6 +704,7 @@ function MyMarketsModal({
       // Pull fresh on-chain data so the claimed wager flips to paid (which
       // hides the Claim affordances) and clear its unread activity.
       markWagerRead?.(id)
+      fireToast('Winnings claimed 🎉')
       await refreshFriendMarkets?.()
     } catch (err) {
       const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
@@ -720,7 +725,7 @@ function MyMarketsModal({
     } finally {
       setClaimingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets])
+  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets, fireToast])
 
   // Participant reclaims their stake on a wager that ran past its resolution
   // window without a winner being declared (the "refundable" state). Mirrors
@@ -758,6 +763,7 @@ function MyMarketsModal({
       // Pull fresh on-chain data so the refunded wager leaves the list and clear
       // its unread activity.
       markWagerRead?.(id)
+      fireToast('Refund claimed')
       await refreshFriendMarkets?.()
     } catch (err) {
       const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
@@ -776,7 +782,7 @@ function MyMarketsModal({
     } finally {
       setRefundingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets])
+  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets, fireToast])
 
   if (!isOpen) return null
 
@@ -840,6 +846,7 @@ function MyMarketsModal({
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <span>Participating</span>
+            <span className="mm-tab-count">{categorizedMarkets.participating.length}</span>
           </button>
           <button
             className={`mm-tab ${activeTab === 'created' ? 'active' : ''}`}
@@ -856,6 +863,7 @@ function MyMarketsModal({
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <span>Created</span>
+            <span className="mm-tab-count">{categorizedMarkets.created.length}</span>
           </button>
           {categorizedMarkets.arbitrating.length > 0 && (
             <button
@@ -870,6 +878,7 @@ function MyMarketsModal({
                 <path d="M12 3v18M5 7h14M5 7l-3 6a4 4 0 008 0L5 7zM19 7l-3 6a4 4 0 008 0l-5-6z"/>
               </svg>
               <span>Arbitrating</span>
+              <span className="mm-tab-count">{categorizedMarkets.arbitrating.length}</span>
             </button>
           )}
           <button
@@ -885,6 +894,7 @@ function MyMarketsModal({
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>History</span>
+            <span className="mm-tab-count">{categorizedMarkets.history.length}</span>
           </button>
         </nav>
 
@@ -920,6 +930,20 @@ function MyMarketsModal({
               <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
+          <button
+            type="button"
+            className="mm-density-toggle"
+            onClick={toggleDensity}
+            title={density === MyWagersDensity.COMFORTABLE ? 'Switch to compact view' : 'Switch to comfortable view'}
+            aria-pressed={density === MyWagersDensity.COMFORTABLE}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              {density === MyWagersDensity.COMFORTABLE
+                ? <path d="M3 5h18M3 12h18M3 19h18" />
+                : <path d="M3 5h18M3 10h18M3 15h18M3 20h18" />}
+            </svg>
+            {density === MyWagersDensity.COMFORTABLE ? 'Comfortable' : 'Compact'}
+          </button>
           <button
             className="mm-refresh-btn"
             onClick={fetchMarketsData}
@@ -994,7 +1018,11 @@ function MyMarketsModal({
                       <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
-                    <MarketsTable
+                    <WagerCardGrid
+                      density={density}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting}
+                      onView={handleMarketView}
                       markets={categorizedMarkets.participating}
                       onSelect={handleMarketSelect}
                       formatDate={formatDate}
@@ -1061,7 +1089,11 @@ function MyMarketsModal({
                       <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
-                    <MarketsTable
+                    <WagerCardGrid
+                      density={density}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting}
+                      onView={handleMarketView}
                       markets={categorizedMarkets.created}
                       onSelect={handleMarketSelect}
                       formatDate={formatDate}
@@ -1115,7 +1147,11 @@ function MyMarketsModal({
                       <p className="mm-hint">When someone names you as the neutral resolver, those wagers appear here.</p>
                     </div>
                   ) : (
-                    <MarketsTable
+                    <WagerCardGrid
+                      density={density}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting}
+                      onView={handleMarketView}
                       markets={categorizedMarkets.arbitrating}
                       onSelect={handleMarketSelect}
                       formatDate={formatDate}
@@ -1161,7 +1197,11 @@ function MyMarketsModal({
                       <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
-                    <MarketsTable
+                    <WagerCardGrid
+                      density={density}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting}
+                      onView={handleMarketView}
                       markets={categorizedMarkets.history}
                       onSelect={handleMarketSelect}
                       formatDate={formatDate}
@@ -1210,468 +1250,20 @@ function MyMarketsModal({
           contractABI={WAGER_REGISTRY_ABI}
         />
       )}
-    </div>
-  )
-}
 
-/**
- * Markets Table Component
- */
-/**
- * Get display title for a market, handling encrypted markets
- */
-function getMarketDisplayTitle(market) {
-  // Check decrypted metadata (from useLazyMarketDecryption hook)
-  if (market.decryptedMetadata) {
-    const title = market.decryptedMetadata.name || market.decryptedMetadata.description || market.decryptedMetadata.question
-    if (title) return title
-  }
-
-  if (market.metadata && market.canView !== false) {
-    const title = market.metadata.name || market.metadata.description || market.metadata.question
-    if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
-      return title
-    }
-  }
-
-  // For friend markets, use description field
-  if (market.marketType === 'friend') {
-    const desc = market.description
-    // Skip placeholder values
-    if (desc && desc !== 'Encrypted Market' && desc !== 'Encrypted Wager' && desc !== 'Private Market' && desc !== 'Private Wager') {
-      return desc
-    }
-    // If encrypted/private, show stake and time info
-    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
-    return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
-  }
-
-  // For prediction markets, use proposalTitle or description
-  return market.proposalTitle || market.description || `Market #${market.id}`
-}
-
-/**
- * Human-readable outcome for a terminal wager row in the History tab.
- *
- * The raw `market.outcome` field is almost never populated for peer wagers (it
- * only exists for some oracle markets), which is why the Outcome column showed
- * "N/A" for every resolved bet. We derive a meaningful result from the wager's
- * terminal status and on-chain winner instead:
- *   - resolved + you won              → "Won"   (green)
- *   - resolved + you staked and lost  → "Lost"  (red)
- *   - resolved + you only arbitrated  → winner's short address (neutral)
- *   - draw / refunded / cancelled / … → that status (neutral)
- */
-function getRowOutcome(market, account) {
-  const status = market.computedStatus
-  if (status === MarketStatus.DRAW) return { label: 'Draw', tone: 'neutral' }
-  if (status === MarketStatus.REFUNDED) return { label: 'Refunded', tone: 'neutral' }
-  if (status === MarketStatus.CANCELLED) return { label: 'Cancelled', tone: 'neutral' }
-  if (status === MarketStatus.DECLINED) return { label: 'Declined', tone: 'neutral' }
-  if (status === MarketStatus.ORACLE_TIMED_OUT) return { label: 'Timed Out', tone: 'neutral' }
-
-  if (status === MarketStatus.RESOLVED) {
-    const userAddr = account?.toLowerCase()
-    const winner = market.winner?.toLowerCase?.()
-    if (userAddr && winner) {
-      if (winner === userAddr) return { label: 'Won', tone: 'positive' }
-      const isCreator = market.creator?.toLowerCase() === userAddr
-      const isParticipant = market.participants?.some(p => p?.toLowerCase() === userAddr)
-      if (isCreator || isParticipant) return { label: 'Lost', tone: 'negative' }
-    }
-    if (market.winner) {
-      return { label: `${market.winner.slice(0, 6)}…${market.winner.slice(-4)}`, tone: 'neutral' }
-    }
-    return { label: 'Resolved', tone: 'neutral' }
-  }
-
-  // Non-terminal or unknown: fall back to any explicit outcome the data carries.
-  if (market.outcome) {
-    const positive = market.outcome === 'Pass' || market.outcome === 'Yes' || market.outcome === 'Won'
-    return { label: market.outcome, tone: positive ? 'positive' : 'negative' }
-  }
-  return { label: 'N/A', tone: 'neutral' }
-}
-
-function MarketsTable({
-  markets,
-  onSelect,
-  getStatusClass,
-  getStatusLabel,
-  getTimeRemaining,
-  showActions = false,
-  showOutcome = false,
-  canResolve,
-  canAccept,
-  isCreatorOfPending,
-  onResolve,
-  onAccept,
-  onClearExpired,
-  onClearAllExpired,
-  onClaim,
-  claimingId,
-  claimError,
-  onRefund,
-  refundingId,
-  refundError,
-  statusFilter,
-  account,
-  showResolveCountdown = false
-}) {
-  // Action-needed badges (spec 012 FR-007): derived live from the activity
-  // watcher; null outside WagerActivityProvider (legacy trees → no badges).
-  const activity = useWagerActivityOptional()
-  const actionNeededByWagerId = activity?.actionNeededByWagerId
-
-  const expiredMarkets = useMemo(
-    () => markets.filter(m => m.computedStatus === MarketStatus.EXPIRED),
-    [markets]
-  )
-  const showClearAll =
-    statusFilter === MarketStatus.EXPIRED &&
-    expiredMarkets.length > 0 &&
-    typeof onClearAllExpired === 'function'
-
-  // Pick the appropriate countdown source for each row. Pending offers use
-  // the *acceptance* deadline, not the trading/resolve deadline — those are
-  // unrelated for an un-accepted wager, and using endDate is what made
-  // expired offers report "tomorrow" instead of "Expired".
-  const rowTimeLeft = (market) => {
-    const isPending =
-      market.computedStatus === MarketStatus.PENDING_ACCEPTANCE ||
-      market.computedStatus === MarketStatus.EXPIRED
-    const endTime = isPending && market.acceptanceDeadline
-      ? market.acceptanceDeadline
-      : (market.tradingEndTime || market.endDate)
-    if (market.computedStatus === MarketStatus.EXPIRED) return 'Expired'
-    return getTimeRemaining(endTime)
-  }
-
-  // A resolved wager whose winner is the viewer and hasn't pulled their payout
-  // yet gets a real Claim button in the actions column (fixes the bug where the
-  // green "Claim" badge only opened the detail card instead of claiming).
-  const canClaim = (market) =>
-    typeof onClaim === 'function' && isWinnerUnpaid(market, account)
-  const hasClaimableRow = markets.some(canClaim)
-
-  // Rows that need a Refund (refundable, not the expired-offer case) or a
-  // Respond-to-Draw button — both derived from the activity watcher's action
-  // kind, so the Actions column appears even in tabs that have no other button.
-  const actionKindOf = (market) => actionNeededByWagerId?.[String(market.id)] ?? null
-  const hasRefundRow = typeof onRefund === 'function' &&
-    markets.some(m => actionKindOf(m) === 'refund' && m.computedStatus !== MarketStatus.EXPIRED)
-  const hasDrawRow = typeof onResolve === 'function' &&
-    markets.some(m => actionKindOf(m) === 'respondDraw')
-
-  const tableHasActionsColumn =
-    showActions || canAccept || showResolveCountdown || hasClaimableRow ||
-    hasRefundRow || hasDrawRow ||
-    (typeof onClearExpired === 'function' && expiredMarkets.length > 0)
-
-  return (
-    <div className="mm-table-container">
-      <table className="mm-table" role="table">
-        <thead>
-          <tr>
-            <th>Wager</th>
-            <th>{showOutcome ? 'Outcome' : 'Time Left'}</th>
-            <th>Status</th>
-            {tableHasActionsColumn && <th>Actions</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {markets.map((market) => {
-            const timeLeft = rowTimeLeft(market)
-            const isExpired = market.computedStatus === MarketStatus.EXPIRED
-            const showResolveBtn = showActions && canResolve?.(market)
-            const showAcceptBtn = !isExpired && canAccept?.(market)
-            const showUnderConsideration = !isExpired && isCreatorOfPending?.(market)
-            const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
-            const showClearBtn = isExpired && typeof onClearExpired === 'function'
-            const displayTitle = getMarketDisplayTitle(market)
-            const actionNeeded = actionNeededByWagerId?.[String(market.id)] ?? null
-            const rowOutcome = showOutcome ? getRowOutcome(market, account) : null
-            // Refundable case (active past the resolve window): a "Refund"
-            // button that pulls the stake back. The expired pre-acceptance case
-            // keeps its own "Reclaim & Clear" button (showClearBtn) instead.
-            const showRefundBtn =
-              actionNeeded === 'refund' && !showClearBtn && typeof onRefund === 'function'
-            // Counterparty proposed a draw: a "Respond to Draw" button that opens
-            // the resolution flow so this user can confirm (or decline) it.
-            const showDrawBtn =
-              actionNeeded === 'respondDraw' && typeof onResolve === 'function'
-            // Hide the action badge whenever this row already exposes a button for
-            // the same action — accept→"View Offer", claim→"Claim",
-            // resolve→"Resolve", refund→"Reclaim & Clear"/"Refund",
-            // respondDraw→"Respond to Draw". Falls back to the badge only when no
-            // matching button is rendered (e.g. outside the relevant tab).
-            const actionBadgeRedundant =
-              ACTION_BADGES_WITH_BUTTON.has(actionNeeded) ||
-              (actionNeeded === 'refund' && (showClearBtn || showRefundBtn)) ||
-              showDrawBtn
-
-            return (
-              <tr
-                key={`${market.marketType}-${market.id}`}
-                onClick={() => onSelect(market)}
-                className={`mm-table-row${isExpired ? ' mm-table-row-expired' : ''}`}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
-              >
-                <td className="mm-table-market">
-                  <span className="mm-table-market-title">
-                    {market.isPrivate && (
-                      <svg
-                        className="mm-privacy-icon"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        title="Private wager"
-                        style={{ marginRight: '6px', verticalAlign: 'middle', opacity: 0.7 }}
-                      >
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                        <path d="M7 11V7a5 5 0 0110 0v4"/>
-                      </svg>
-                    )}
-                    {displayTitle}
-                  </span>
-                  {market.category && (
-                    <span className="mm-table-category">{market.category}</span>
-                  )}
-                </td>
-                <td className="mm-table-time">
-                  {showOutcome ? (
-                    <span className={`mm-outcome ${rowOutcome.tone}`}>
-                      {rowOutcome.label}
-                    </span>
-                  ) : isExpired ? (
-                    <span className="mm-time-expired">Expired</span>
-                  ) : (
-                    timeLeft
-                  )}
-                </td>
-                <td>
-                  <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
-                    {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
-                  </span>
-                  {actionNeeded && !actionBadgeRedundant && (
-                    <Badge
-                      variant={actionNeeded === 'claim' ? 'success' : 'warning'}
-                      className="mm-action-needed-badge"
-                    >
-                      {ACTION_NEEDED_LABELS[actionNeeded] ?? actionNeeded}
-                    </Badge>
-                  )}
-                </td>
-                {tableHasActionsColumn && (
-                  <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>
-                    {showAcceptBtn && (
-                      <button
-                        className="mm-action-btn mm-action-accept"
-                        onClick={(e) => { e.stopPropagation(); onAccept(market) }}
-                        title="View offer details"
-                      >
-                        View Offer
-                      </button>
-                    )}
-                    {showResolveCountdown && !isExpired && (
-                      <ResolveButtonWithCountdown
-                        market={market}
-                        onResolve={onResolve}
-                        account={account}
-                      />
-                    )}
-                    {showResolveBtn && !showResolveCountdown && (
-                      <button
-                        className="mm-action-btn mm-action-resolve"
-                        onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-                        title="Resolve wager"
-                      >
-                        Resolve
-                      </button>
-                    )}
-                    {showClearBtn && (
-                      <button
-                        className="mm-action-btn mm-action-clear"
-                        onClick={(e) => { e.stopPropagation(); onClearExpired(market) }}
-                        title={isCreator ? 'Reclaim stake and clear' : 'Clear from list'}
-                      >
-                        {isCreator ? 'Reclaim & Clear' : 'Clear'}
-                      </button>
-                    )}
-                    {canClaim(market) && (
-                      <>
-                        <button
-                          className="mm-action-btn mm-action-claim"
-                          onClick={(e) => { e.stopPropagation(); onClaim(market) }}
-                          disabled={claimingId === String(market.id)}
-                          title="Claim your winnings"
-                        >
-                          {claimingId === String(market.id) ? 'Claiming…' : 'Claim'}
-                        </button>
-                        {claimError?.id === String(market.id) && (
-                          <span className="mm-action-error" role="alert">{claimError.message}</span>
-                        )}
-                      </>
-                    )}
-                    {showRefundBtn && (
-                      <>
-                        <button
-                          className="mm-action-btn mm-action-refund"
-                          onClick={(e) => { e.stopPropagation(); onRefund(market) }}
-                          disabled={refundingId === String(market.id)}
-                          title="Reclaim your stake — the resolution window has passed"
-                        >
-                          {refundingId === String(market.id) ? 'Refunding…' : 'Refund'}
-                        </button>
-                        {refundError?.id === String(market.id) && (
-                          <span className="mm-action-error" role="alert">{refundError.message}</span>
-                        )}
-                      </>
-                    )}
-                    {showDrawBtn && (
-                      <button
-                        className="mm-action-btn mm-action-draw"
-                        onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-                        title="Your counterparty proposed a draw — review and respond"
-                      >
-                        Respond to Draw
-                      </button>
-                    )}
-                  </td>
-                )}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      {showClearAll && (
-        <div className="mm-table-footer">
-          <button
-            type="button"
-            className="mm-btn-secondary mm-btn-small"
-            onClick={() => onClearAllExpired(expiredMarkets)}
-            title="Hide all expired offers from this list"
-          >
-            Clear all expired ({expiredMarkets.length})
-          </button>
+      {/* Confirmation toast (spec 017 FR-015) */}
+      {toast && (
+        <div className="mm-toast" role="status" aria-live="polite">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#36B37E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"></path>
+          </svg>
+          {toast}
         </div>
       )}
     </div>
   )
 }
 
-/**
- * Resolve Button Component
- * Shows resolve button when the user is authorized and the wager is active.
- * The contract allows resolution any time while status=Active and before resolveDeadline.
- * @param {string} variant - 'compact' (table) or 'full' (detail view)
- */
-function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'compact' }) {
-  // Tick every second so the resolve window opens automatically without a reload.
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  const userAddr = account?.toLowerCase()
-  const isCreator = market.creator?.toLowerCase() === userAddr
-  const isOpponent = market.participants?.length > 1 &&
-    market.participants[1]?.toLowerCase() === userAddr
-  const isArbitrator = market.arbitrator &&
-    market.arbitrator !== ethers.ZeroAddress &&
-    market.arbitrator.toLowerCase() === userAddr
-
-  const resType = market.resolutionType ?? 0
-  const isAuthorized = (() => {
-    if (resType === 0) return isCreator || isOpponent || isArbitrator
-    if (resType === 1) return isCreator
-    if (resType === 2) return isOpponent
-    if (resType === 3) return isArbitrator
-    return false
-  })()
-
-  // A draw returns both stakes and so needs BOTH participants to agree; allow
-  // either participant to open the resolution flow to propose/confirm a draw on
-  // participant-resolved types (Either/Creator/Opponent), even when they cannot
-  // declare a winner (e.g. the opponent on a Creator-resolved wager).
-  const canProposeDraw = (resType === 0 || resType === 1 || resType === 2) && (isCreator || isOpponent)
-
-  if (!isAuthorized && !canProposeDraw) return null
-
-  const status = market.computedStatus || market.status
-  if (status === 'resolved' || status === 'disputed' || status === 'cancelled' ||
-      status === 'canceled' || status === 'refunded' || status === 'expired' ||
-      status === 'declined' || status === 'pending_acceptance') {
-    return null
-  }
-
-  // Resolve-window gate (Bug #1). Resolution is only allowed in
-  // [tradingEndTime, resolveDeadlineTime]:
-  //   - before tradingEndTime  → show a countdown, no resolve button
-  //   - after resolveDeadlineTime → nothing (the Claim Refund flow takes over)
-  // tradingEndTime is the user's chosen end time `E`; resolveDeadlineTime = E + 48h.
-  // Fall back to "resolvable" when the timestamps are missing (e.g. legacy wagers).
-  const tradingEndTime = market.tradingEndTime
-  const resolveDeadlineTime = market.resolveDeadlineTime
-  if (typeof resolveDeadlineTime === 'number' && now > resolveDeadlineTime) {
-    return null
-  }
-  if (typeof tradingEndTime === 'number' && now < tradingEndTime) {
-    const diff = tradingEndTime - now
-    const days = Math.floor(diff / 86400000)
-    const hours = Math.floor((diff % 86400000) / 3600000)
-    const minutes = Math.floor((diff % 3600000) / 60000)
-    const label = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
-    if (variant === 'full') {
-      return (
-        <div className="mm-resolve-countdown-full" title="Resolution opens after the wager's end time">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          Resolution opens in <strong>{label}</strong>
-        </div>
-      )
-    }
-    return (
-      <span className="mm-resolve-countdown" title="Resolution opens after the wager's end time">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        {label}
-      </span>
-    )
-  }
-
-  if (variant === 'full') {
-    return (
-      <button
-        type="button"
-        className="mm-btn-primary"
-        onClick={() => onResolve(market)}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-        Resolve Market
-      </button>
-    )
-  }
-  return (
-    <button
-      className="mm-action-btn mm-action-resolve"
-      onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-      title="Resolve wager"
-    >
-      Resolve
-    </button>
-  )
-}
 
 /**
  * Market Detail View Component

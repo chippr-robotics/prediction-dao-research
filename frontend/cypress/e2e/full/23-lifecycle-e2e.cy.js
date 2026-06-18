@@ -51,7 +51,7 @@ describe('End-to-End Lifecycle Scenarios', () => {
       cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
       cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
       cy.openMyWagers('created')
-      cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
+      cy.get('.wc-card', { timeout: 15000 }).should('exist')
     })
   })
 

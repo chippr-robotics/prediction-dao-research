@@ -138,7 +138,7 @@ function createAcceptAndResolve(config = {}) {
     if (resolveBtn.length > 0) {
       cy.wrap(resolveBtn.first()).click({ force: true })
     } else {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -187,7 +187,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -232,7 +232,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -257,7 +257,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -311,7 +311,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -343,7 +343,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -385,7 +385,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -436,7 +436,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('created')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -469,7 +469,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -501,7 +501,7 @@ describe('Claim Payouts', () => {
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
