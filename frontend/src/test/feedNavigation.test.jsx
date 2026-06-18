@@ -234,17 +234,16 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
     expect(screen.queryByRole('button', { name: /back to list/i })).not.toBeInTheDocument()
     expect(activityRef.current.markWagerRead).not.toHaveBeenCalled()
 
+    // Expanding the card to preview the wager counts as viewing it (FR-004).
     await act(async () => {
       fireEvent.click(row)
     })
-
-    expect(await screen.findByRole('button', { name: /back to list/i })).toBeInTheDocument()
     expect(activityRef.current.markWagerRead).toHaveBeenCalledWith('42')
   })
 
-  it('no longer renders the legacy per-tab count badges (FR-016)', async () => {
-    // One created + one participating wager — these used to produce per-tab
-    // count badges; the bell is now the single unread indicator.
+  it('renders per-tab count badges on the pill tabs (spec 017 FR-016)', async () => {
+    // One created + one participating wager — each tab shows a count badge of
+    // the wagers it contains (the card-grid redesign reintroduces these).
     const markets = [
       wager42(),
       {
@@ -269,13 +268,15 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
       )
     })
 
-    // Tabs themselves remain…
+    // Tabs render as pills…
     const participatingTab = screen.getByRole('tab', { name: /participating/i })
     expect(participatingTab).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+    const createdTab = screen.getByRole('tab', { name: /created/i })
+    expect(createdTab).toBeInTheDocument()
 
-    // …but the legacy count badges are gone everywhere.
-    expect(document.querySelector('.mm-tab-badge')).toBeNull()
-    expect(within(participatingTab).queryByText('1')).not.toBeInTheDocument()
+    // …each with a count badge of the wagers it contains (one each here).
+    expect(document.querySelectorAll('.mm-tab-count').length).toBeGreaterThan(0)
+    expect(within(participatingTab).getByText('1')).toBeInTheDocument()
+    expect(within(createdTab).getByText('1')).toBeInTheDocument()
   })
 })

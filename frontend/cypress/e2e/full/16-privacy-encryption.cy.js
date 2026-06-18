@@ -58,8 +58,8 @@ describe('Privacy & Encryption (E2E)', () => {
     connect(CREATOR)
     cy.openMyWagers('created')
     // Listed as private/encrypted (the cleartext description is not shown on-chain).
-    cy.contains('.mm-table-row', /private|encrypted/i, { timeout: 15000 }).should('exist')
-    cy.contains('.mm-table-row', DESC).should('not.exist')
+    cy.contains('.wc-card', /private|encrypted/i, { timeout: 15000 }).should('exist')
+    cy.contains('.wc-card', DESC).should('not.exist')
   })
 
   it('[PRV-02] the invited opponent sees public fields, but the private details stay encrypted', () => {
@@ -87,7 +87,7 @@ describe('Privacy & Encryption (E2E)', () => {
     cy.interceptIpfs()
     connect(CREATOR)
     cy.openMyWagers('created')
-    cy.contains('.mm-table-row', /private|encrypted/i, { timeout: 15000 }).first().click()
+    cy.contains('.wc-card', /private|encrypted/i, { timeout: 15000 }).first().click()
     // Asking to read the encrypted details fetches the stored blob from (mocked) IPFS.
     cy.contains('button', /decrypt wager details/i, { timeout: 15000 }).click()
     cy.wait('@ipfsFetch', { timeout: 15000 }).its('response.statusCode').should('eq', 200)

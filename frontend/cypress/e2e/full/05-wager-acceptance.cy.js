@@ -308,7 +308,7 @@ describe('Wager Acceptance', () => {
       const pendingBadges = $panel.find('.status-pending-acceptance, :contains("Pending")')
       if (pendingBadges.length > 0) {
         // Verify pending wagers show "Under Consideration" or "Pending Acceptance"
-        cy.get('.mm-status-badge').first().invoke('text').then((text) => {
+        cy.get('.wc-status, .mm-status-badge').first().invoke('text').then((text) => {
           const lower = text.toLowerCase()
           expect(lower.includes('pending') || lower.includes('under consideration') || lower.includes('active')).to.be.true
         })
@@ -414,7 +414,7 @@ describe('Wager Acceptance', () => {
       const acceptedBadge = $panel.find(':contains("Accepted"), :contains("Active")')
       if (acceptedBadge.length > 0) {
         // Click on a wager row to see details
-        const row = $panel.find('.mm-table-row, tr[role="button"]')
+        const row = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
         if (row.length > 0) {
           cy.wrap(row.first()).click()
           cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')

@@ -1,0 +1,356 @@
+/* WagerCard / WagerCardGrid (spec 017)
+   Card-grid presentation for My Wagers. Adapts the "Wager Grid" mockup to the
+   app's existing dark theme tokens (--bg-*, --text-*, accent #4C9AFF). */
+
+.wc-grid-container {
+  width: 100%;
+}
+
+.wc-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+/* Each card takes ~half the row on desktop, full width on phones. */
+.wc-grid-item {
+  flex: 1 1 330px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wc-card {
+  background: var(--bg-secondary, #141C24);
+  border: 1.5px solid var(--border-color, #23303D);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+
+.wc-card.wc-open {
+  border-color: rgba(76, 154, 255, 0.5);
+  box-shadow: 0 8px 24px rgba(76, 154, 255, 0.12);
+}
+
+.wc-card.wc-expired {
+  opacity: 0.75;
+}
+
+/* ── Header (collapsed, always visible) ── */
+.wc-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wc-header:hover {
+  background: rgba(76, 154, 255, 0.05);
+}
+
+.wc-header:focus-visible {
+  outline: 2px solid #4C9AFF;
+  outline-offset: -2px;
+}
+
+.wc-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wc-stake {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-primary, #E6EDF3);
+}
+
+.wc-token {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #7A8590);
+}
+
+.wc-outcome {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.wc-outcome.positive { color: #36B37E; }
+.wc-outcome.negative { color: #E5533D; }
+.wc-outcome.neutral { color: var(--text-secondary, #AAB6C2); }
+
+.wc-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  min-width: 0;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.875rem;
+}
+
+.wc-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.wc-privacy-icon {
+  flex: none;
+  opacity: 0.7;
+}
+
+.wc-preview {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.wc-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.wc-preview-text {
+  font-size: 0.8rem;
+  color: var(--text-muted, #7A8590);
+}
+
+.wc-dot { color: var(--border-color, #23303D); }
+
+.wc-header-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Reuse the status colour classes from MyMarketsModal.css via the shared
+   status-* class names; this only sets the pill shape. */
+.wc-status {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 7px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+/* Status colours (mirror .mm-status-badge.* so cards match the rest of the app) */
+.wc-status.status-active { background: rgba(54, 179, 126, 0.15); color: #36B37E; }
+.wc-status.status-pending-acceptance { background: rgba(156, 39, 176, 0.15); color: #AB47BC; }
+.wc-status.status-pending { background: rgba(245, 166, 35, 0.15); color: #F5A623; }
+.wc-status.status-disputed { background: rgba(229, 83, 61, 0.15); color: #E5533D; }
+.wc-status.status-resolved { background: rgba(76, 154, 255, 0.15); color: #4C9AFF; }
+.wc-status.status-cancelled { background: rgba(170, 182, 194, 0.15); color: #AAB6C2; }
+.wc-status.status-draw { background: rgba(159, 122, 234, 0.15); color: #9F7AEA; }
+.wc-status.status-expired { background: rgba(170, 182, 194, 0.12); color: #7A8590; }
+.wc-status.status-default { background: rgba(170, 182, 194, 0.15); color: #AAB6C2; }
+
+.wc-action-needed { vertical-align: middle; }
+
+.wc-chevron {
+  color: var(--text-muted, #7A8590);
+  transition: transform 0.2s;
+}
+.wc-open .wc-chevron { transform: rotate(180deg); }
+
+/* ── Body (expanded) ── */
+.wc-body {
+  padding: 0 16px 16px;
+}
+
+.wc-divider {
+  height: 1px;
+  background: var(--border-color, #23303D);
+  margin-bottom: 14px;
+}
+
+.wc-locked {
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.wc-locked-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #AAB6C2);
+  margin-bottom: 12px;
+}
+
+.wc-locked-text:last-child { margin-bottom: 0; }
+
+.wc-terms {
+  background: var(--bg-primary, #0E141B);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-bottom: 14px;
+}
+
+.wc-terms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Hide/show toggle for decrypted private-bet terms (spec 018 FR-002) */
+.wc-terms-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 6px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wc-terms-toggle:hover {
+  border-color: #4C9AFF;
+  color: #4C9AFF;
+}
+
+.wc-terms-concealed {
+  letter-spacing: 0.15em;
+  color: var(--text-muted, #7A8590);
+  user-select: none;
+}
+
+.wc-terms-label,
+.wc-meta-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #7A8590);
+  text-transform: uppercase;
+}
+
+.wc-terms-text {
+  font-size: 0.9rem;
+  color: var(--text-primary, #E6EDF3);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.wc-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 12px;
+}
+
+.wc-meta-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 3px;
+  color: var(--text-primary, #E6EDF3);
+  overflow-wrap: anywhere;
+}
+.wc-meta-value.positive { color: #36B37E; }
+.wc-meta-value.negative { color: #E5533D; }
+.wc-meta-value.neutral { color: var(--text-secondary, #AAB6C2); }
+
+/* ── Actions ── */
+.wc-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.wc-action {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.wc-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wc-action-primary { color: #fff; background: #4C9AFF; }
+.wc-action-primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+.wc-action-success { color: #fff; background: #16a34a; }
+.wc-action-success:hover:not(:disabled) { filter: brightness(1.08); }
+
+.wc-action-danger { color: #E5533D; background: transparent; border-color: rgba(229, 83, 61, 0.5); }
+.wc-action-danger:hover:not(:disabled) { background: rgba(229, 83, 61, 0.1); }
+
+.wc-action-warning { color: #F5A623; background: transparent; border-color: rgba(245, 166, 35, 0.5); }
+.wc-action-warning:hover:not(:disabled) { background: rgba(245, 166, 35, 0.1); }
+
+.wc-action-ghost {
+  color: var(--text-primary, #E6EDF3);
+  background: transparent;
+  border-color: var(--border-color, #23303D);
+}
+.wc-action-ghost:hover:not(:disabled) { background: rgba(76, 154, 255, 0.08); }
+
+.wc-action-details { flex: 0 0 auto; }
+
+.wc-action-error {
+  color: #E5533D;
+  font-size: 0.75rem;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.wc-grid-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Table view (spec 018) — compact action buttons inside table rows. */
+.wc-action-sm {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  margin-right: 0.375rem;
+}
+
+.wc-action-sm:last-child { margin-right: 0; }
+
+.wc-table-amount {
+  white-space: nowrap;
+  color: var(--text-primary, #E6EDF3);
+}
+
+@media (max-width: 600px) {
+  .wc-grid-item { flex: 1 1 100%; }
+  .wc-stake { font-size: 1.3rem; }
+}

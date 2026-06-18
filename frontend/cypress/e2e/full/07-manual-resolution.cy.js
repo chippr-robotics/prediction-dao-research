@@ -142,7 +142,7 @@ function openResolutionForFirstWager() {
       cy.wrap(resolveBtn.first()).click({ force: true })
     } else {
       // Click into first wager to get detail view with resolve option
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -249,7 +249,7 @@ describe('Manual Resolution', () => {
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -320,7 +320,7 @@ describe('Manual Resolution', () => {
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -424,7 +424,7 @@ describe('Manual Resolution', () => {
     cy.openMyWagers('created')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -468,7 +468,7 @@ describe('Manual Resolution', () => {
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -550,7 +550,7 @@ describe('Manual Resolution', () => {
       const resolvedRows = $panel.find('.status-resolved, :contains("Resolved")')
       if (resolvedRows.length > 0) {
         // Click into a resolved wager
-        const rows = $panel.find('.mm-table-row, tr[role="button"]')
+        const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
         if (rows.length > 0) {
           cy.wrap(rows.first()).click()
           cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -579,7 +579,7 @@ describe('Manual Resolution', () => {
       const pendingBadges = $panel.find('.status-pending-acceptance, :contains("Pending"), :contains("Under Consideration")')
       if (pendingBadges.length > 0) {
         // Pending wager should not show resolve button
-        const rows = $panel.find('.mm-table-row, tr[role="button"]')
+        const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
         if (rows.length > 0) {
           cy.wrap(rows.first()).click()
           cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
@@ -630,7 +630,7 @@ describe('Manual Resolution', () => {
     cy.openMyWagers('created')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
         cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
