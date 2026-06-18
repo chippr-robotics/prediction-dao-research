@@ -499,6 +499,108 @@
   padding: 0;
 }
 
+/* Tax Reports Section */
+.reports-section h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.reports-section .tax-reports-intro {
+  margin: 0 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.reports-section fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 0 0 12px;
+}
+
+.reports-section .period-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 16px;
+}
+
+.reports-section .custom-range {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.reports-section .custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.reports-section .period-error,
+.reports-section .report-error {
+  color: var(--color-danger, #c0392b);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.reports-section .generate-report-btn,
+.reports-section .report-download-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.reports-section .generate-report-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reports-section .report-download-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reports-section .report-history {
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.reports-section .report-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.reports-section .report-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reports-section .report-history-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.reports-section .report-history-date {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.reports-section .report-history-actions {
+  display: flex;
+  gap: 6px;
+}
+
 /* Security Section */
 .security-section h3 {
   margin: 0 0 8px;

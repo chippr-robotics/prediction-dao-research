@@ -34,8 +34,8 @@ describe('deriveTransfers (FR-003/FR-006, research D2)', () => {
 
   it('excludes wagers/events where the user is not a party', () => {
     const items = deriveTransfers({
-      wager: { id: '9', stakeTokenAddress: WAGERS[1].stakeTokenAddress, stakeAmount: '1' },
-      events: [{ name: 'WagerCreated', transactionHash: '0xz', blockNumber: 1, args: { creator: OTHER, opponent: OTHER } }],
+      wager: { id: '9', stakeTokenAddress: WAGERS[1].stakeTokenAddress },
+      events: [{ name: 'MarketCreatedPending', transactionHash: '0xz', blockNumber: 1, args: { creator: OTHER, stakePerParticipant: '1', stakeToken: WAGERS[1].stakeTokenAddress } }],
       userAddress: USER,
       registryAddress: REGISTRY,
     })

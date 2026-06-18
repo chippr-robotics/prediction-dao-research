@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
+import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import AddressQRModal from '../components/ui/AddressQRModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
@@ -252,6 +253,7 @@ function WalletPage() {
                 <button role="tab" aria-selected={activeTab === 'network'} className={`tab ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>Network</button>
                 <button role="tab" aria-selected={activeTab === 'security'} className={`tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
                 <button role="tab" aria-selected={activeTab === 'preferences'} className={`tab ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>Preferences</button>
+                <button role="tab" aria-selected={activeTab === 'reports'} className={`tab ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>Tax Reports</button>
                 <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap</button>
               </div>
 
@@ -431,6 +433,12 @@ function WalletPage() {
                         </button>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {activeTab === 'reports' && (
+                  <div className="reports-section" role="tabpanel">
+                    <TaxReportsPanel />
                   </div>
                 )}
 

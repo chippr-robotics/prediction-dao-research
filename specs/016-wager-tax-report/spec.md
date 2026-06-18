@@ -161,9 +161,11 @@ it disappears from the list.
   a misleading or partial report.
 - **FR-014**: The system MUST scope reported activity to the active network and MUST NOT
   combine testnet and mainnet activity in a single report.
-- **FR-015**: When fair-market-value or cost-basis information for a transfer cannot be
-  determined, the report MUST surface the gap explicitly rather than silently substituting
-  a value.
+- **FR-015**: When a value for a transfer cannot be determined — in v1 this is the network
+  fee for a transaction the user did not send, and in future the fair-market value once a
+  historical price feed is integrated — the report MUST surface the gap explicitly (with a
+  reason) rather than silently substituting a value. (Under the v1 $1.00 par baseline, USD
+  fair-market value and cost basis are always determinable.)
 - **FR-016**: Cost basis MUST be derived from the recorded USD fair market value of the
   stablecoin at the time the tokens were staked / entered the platform for that transfer
   (the same valuation source used for fair market value, reflecting any de-pegging). The
@@ -232,7 +234,7 @@ it disappears from the list.
   uses on the active network (currently USDC); USDT/PYUSD are illustrative tickers and are
   reported only if/when supported.
 - **Cost-basis method (v1)**: Cost basis uses the USD fair market value of the stablecoin at
-  staking time (FR-019). User-supplied per-lot acquisition cost is deferred to a future
+  staking time (FR-016). User-supplied per-lot acquisition cost is deferred to a future
   enhancement and is out of scope for v1.
 - **Not tax advice**: The report is an informational activity record; the platform does not
   compute tax owed or provide tax advice, and the document states this.

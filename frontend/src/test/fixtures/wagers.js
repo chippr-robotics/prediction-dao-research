@@ -44,20 +44,24 @@ export const WAGERS = {
   3: { id: '3', creator: USER, participants: [USER, OTHER], stakeAmount: '30000000', stakeTokenAddress: TOKEN },
 }
 
-/** wagerId → ordered lifecycle events (args keyed by name for readability) */
+/**
+ * wagerId → ordered FriendGroupMarketFactory lifecycle events (args keyed by
+ * name for readability). Mirrors the real events the on-chain adapter reads:
+ * MarketCreatedPending / ParticipantAccepted / WinningsClaimed / StakeRefunded.
+ */
 export const EVENTS = {
   1: [
-    { name: 'WagerCreated', transactionHash: '0xa1', blockNumber: 100, args: { wagerId: '1', creator: USER, opponent: OTHER, token: TOKEN, creatorStake: '100000000', opponentStake: '100000000' } },
-    { name: 'WagerAccepted', transactionHash: '0xa2', blockNumber: 110, args: { wagerId: '1', opponent: OTHER } },
-    { name: 'PayoutClaimed', transactionHash: '0xa3', blockNumber: 200, args: { wagerId: '1', winner: USER, amount: '200000000' } },
+    { name: 'MarketCreatedPending', transactionHash: '0xa1', blockNumber: 100, args: { friendMarketId: '1', creator: USER, stakePerParticipant: '100000000', stakeToken: TOKEN } },
+    { name: 'ParticipantAccepted', transactionHash: '0xa2', blockNumber: 110, args: { friendMarketId: '1', participant: OTHER, stakedAmount: '100000000' } },
+    { name: 'WinningsClaimed', transactionHash: '0xa3', blockNumber: 200, args: { friendMarketId: '1', winner: USER, amount: '200000000', token: TOKEN } },
   ],
   2: [
-    { name: 'WagerCreated', transactionHash: '0xb1', blockNumber: 120, args: { wagerId: '2', creator: OTHER, opponent: USER, token: TOKEN, creatorStake: '50000000', opponentStake: '50000000' } },
-    { name: 'WagerAccepted', transactionHash: '0xb2', blockNumber: 130, args: { wagerId: '2', opponent: USER } },
+    { name: 'MarketCreatedPending', transactionHash: '0xb1', blockNumber: 120, args: { friendMarketId: '2', creator: OTHER, stakePerParticipant: '50000000', stakeToken: TOKEN } },
+    { name: 'ParticipantAccepted', transactionHash: '0xb2', blockNumber: 130, args: { friendMarketId: '2', participant: USER, stakedAmount: '50000000' } },
   ],
   3: [
-    { name: 'WagerCreated', transactionHash: '0xc1', blockNumber: 140, args: { wagerId: '3', creator: USER, opponent: OTHER, token: TOKEN, creatorStake: '30000000', opponentStake: '30000000' } },
-    { name: 'WagerRefunded', transactionHash: '0xc2', blockNumber: 150, args: { wagerId: '3', creator: USER, opponent: OTHER } },
+    { name: 'MarketCreatedPending', transactionHash: '0xc1', blockNumber: 140, args: { friendMarketId: '3', creator: USER, stakePerParticipant: '30000000', stakeToken: TOKEN } },
+    { name: 'StakeRefunded', transactionHash: '0xc2', blockNumber: 150, args: { friendMarketId: '3', participant: USER, amount: '30000000' } },
   ],
 }
 

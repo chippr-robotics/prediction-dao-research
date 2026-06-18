@@ -76,13 +76,13 @@ totals reconcile, and PDF+CSV download (spec Story 1; SC-001..SC-004).
 
 ### Hook + UI
 
-- [ ] T021 [P] [US1] Write tests `frontend/src/test/reports/useTaxReport.test.js` for the `idle → generating(progress) → ready | error` state machine and download triggering (contracts/reports-ui.md).
-- [ ] T022 [US1] Implement `frontend/src/hooks/useTaxReport.js` (resolve+validate period → `buildReport` with `onProgress` → render PDF+CSV → `file-saver` download) to satisfy T021.
-- [ ] T023 [P] [US1] Write tests `frontend/src/test/reports/ReportPeriodSelector.test.jsx`: preset + custom inputs, invalid-range error surfaced and generation disabled (FR-002/FR-013).
-- [ ] T024 [US1] Implement `frontend/src/components/wallet/ReportPeriodSelector.jsx` (accessible presets + from/to inputs + validation) to satisfy T023.
-- [ ] T025 [P] [US1] Write tests `frontend/src/test/reports/TaxReportsPanel.test.jsx`: generate flow renders rows/totals, empty "no activity" state, error state, download actions (Story 1 AC1–AC5).
-- [ ] T026 [US1] Implement `frontend/src/components/wallet/TaxReportsPanel.jsx` (period selector + generate button + progress + result/empty/error + download) to satisfy T025; scope to active `chainId` via `useChainId()`.
-- [ ] T027 [US1] Wire the "Tax Reports" tab into `frontend/src/pages/WalletPage.jsx` (add `role="tab"` button + `role="tabpanel"` rendering `TaxReportsPanel`, following the existing tab pattern) and add `.reports-section` styles to `frontend/src/pages/WalletPage.css`.
+- [X] T021 [P] [US1] Write tests `frontend/src/test/reports/useTaxReport.test.js` for the `idle → generating(progress) → ready | error` state machine and download triggering (contracts/reports-ui.md).
+- [X] T022 [US1] Implement `frontend/src/hooks/useTaxReport.js` (resolve+validate period → `buildReport` with `onProgress` → render PDF+CSV → `file-saver` download) to satisfy T021.
+- [X] T023 [P] [US1] Write tests `frontend/src/test/reports/ReportPeriodSelector.test.jsx`: preset + custom inputs, invalid-range error surfaced and generation disabled (FR-002/FR-013).
+- [X] T024 [US1] Implement `frontend/src/components/wallet/ReportPeriodSelector.jsx` (accessible presets + from/to inputs + validation) to satisfy T023.
+- [X] T025 [P] [US1] Write tests `frontend/src/test/reports/TaxReportsPanel.test.jsx`: generate flow renders rows/totals, empty "no activity" state, error state, download actions (Story 1 AC1–AC5).
+- [X] T026 [US1] Implement `frontend/src/components/wallet/TaxReportsPanel.jsx` (period selector + generate button + progress + result/empty/error + download) to satisfy T025; scope to active `chainId` via `useChainId()`.
+- [X] T027 [US1] Wire the "Tax Reports" tab into `frontend/src/pages/WalletPage.jsx` (add `role="tab"` button + `role="tabpanel"` rendering `TaxReportsPanel`, following the existing tab pattern) and add `.reports-section` styles to `frontend/src/pages/WalletPage.css`.
 
 **Checkpoint**: US1 is a complete, independently testable MVP — pick a period, generate,
 view rows + totals, download PDF + CSV.
@@ -101,10 +101,10 @@ wager data untouched) (spec Story 2 AC1–AC3; FR-010/FR-011).
 
 - [X] T028 [P] [US2] Write tests `frontend/src/test/reports/reportHistoryStore.test.js`: `add`/`list`/`remove` with strict `address`+`chainId` key scoping, newest-first ordering, and corrupt-store→empty defensiveness (contracts/report-history-store.md; FR-012/FR-014).
 - [X] T029 [US2] Implement `frontend/src/data/reports/reportHistoryStore.js` (localStorage key `fw_user_<address>_tax_report_history_v1_<chainId>`, metadata-only entries) to satisfy T028.
-- [ ] T030 [US2] Persist a `ReportHistoryEntry` from `frontend/src/hooks/useTaxReport.js` on successful generation (call `reportHistoryStore.add`); add a test to `frontend/src/test/reports/useTaxReport.test.js` asserting the entry is saved (FR-010).
-- [ ] T031 [P] [US2] Write tests `frontend/src/test/reports/ReportHistoryList.test.jsx`: lists entries (period + date), re-download regenerates via `buildReport`, remove deletes the entry (Story 2 AC1–AC3).
-- [ ] T032 [US2] Implement `frontend/src/components/wallet/ReportHistoryList.jsx` (accessible list with re-download + remove actions) to satisfy T031.
-- [ ] T033 [US2] Integrate `ReportHistoryList` into `frontend/src/components/wallet/TaxReportsPanel.jsx` (render history below the generator; refresh on generate/remove; scope to active account+chainId).
+- [X] T030 [US2] Persist a `ReportHistoryEntry` from `frontend/src/hooks/useTaxReport.js` on successful generation (call `reportHistoryStore.add`); add a test to `frontend/src/test/reports/useTaxReport.test.js` asserting the entry is saved (FR-010).
+- [X] T031 [P] [US2] Write tests `frontend/src/test/reports/ReportHistoryList.test.jsx`: lists entries (period + date), re-download regenerates via `buildReport`, remove deletes the entry (Story 2 AC1–AC3).
+- [X] T032 [US2] Implement `frontend/src/components/wallet/ReportHistoryList.jsx` (accessible list with re-download + remove actions) to satisfy T031.
+- [X] T033 [US2] Integrate `ReportHistoryList` into `frontend/src/components/wallet/TaxReportsPanel.jsx` (render history below the generator; refresh on generate/remove; scope to active account+chainId).
 
 **Checkpoint**: US2 complete — history list, re-download, and removal all work atop US1.
 
@@ -114,11 +114,11 @@ wager data untouched) (spec Story 2 AC1–AC3; FR-010/FR-011).
 
 **Purpose**: Quality gates and finishing touches spanning both stories.
 
-- [ ] T034 [P] Add an accessibility test/audit for the Tax Reports tab (axe via the existing test setup) ensuring WCAG 2.1 AA: keyboard-operable tabs/controls, labeled inputs, `aria-live` progress/status (Constitution V; contracts/reports-ui.md).
-- [ ] T035 [P] Add a network-scoping integration test `frontend/src/test/reports/networkScoping.test.js`: switching `chainId` shows only the active network's history and report rows (Constitution III; FR-014).
-- [ ] T036 [P] Verify no hardcoded addresses/ABIs — the engine reads `wagerRegistry` and token data only from synced `config/contracts.js` / `config/networks.js` (Constitution V); add an assertion/comment guard where helpful.
-- [ ] T037 Run the full frontend quality gate: `npm run test:frontend` and `npm run test:coverage`, fix ESLint warnings in new files, and confirm CI steps stay fail-loud (no `continue-on-error`) (Constitution II/IV).
-- [ ] T038 Execute `specs/016-wager-tax-report/quickstart.md` manual validation against a configured network (presets, custom range, invalid range, empty period, history re-download + remove, network switch) and confirm SC-001..SC-005.
+- [X] T034 [P] Add an accessibility test/audit for the Tax Reports tab (axe via the existing test setup) ensuring WCAG 2.1 AA: keyboard-operable tabs/controls, labeled inputs, `aria-live` progress/status (Constitution V; contracts/reports-ui.md).
+- [X] T035 [P] Add a network-scoping integration test `frontend/src/test/reports/networkScoping.test.js`: switching `chainId` shows only the active network's history and report rows (Constitution III; FR-014).
+- [X] T036 [P] Verify no hardcoded addresses/ABIs — the engine reads `wagerRegistry` and token data only from synced `config/contracts.js` / `config/networks.js` (Constitution V); add an assertion/comment guard where helpful.
+- [X] T037 Run the full frontend quality gate: `npm run test:frontend` and `npm run test:coverage`, fix ESLint warnings in new files, and confirm CI steps stay fail-loud (no `continue-on-error`) (Constitution II/IV).
+- [ ] T038 Execute `specs/016-wager-tax-report/quickstart.md` manual validation against a configured network (presets, custom range, invalid range, empty period, history re-download + remove, network switch) and confirm SC-001..SC-005. **(Deferred: requires a live wallet + RPC + subgraph; not runnable in the CI/automation environment. Automated coverage stands in for the logic; run this manual pass before release.)**
 
 ---
 
