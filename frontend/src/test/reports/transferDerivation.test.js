@@ -1,0 +1,44 @@
+import { describe, it, expect } from 'vitest'
+import { deriveTransfers, DIRECTION } from '../../data/reports/transferDerivation'
+import { WAGERS, EVENTS, USER, OTHER, REGISTRY } from '../fixtures/wagers'
+
+const derive = (id) =>
+  deriveTransfers({ wager: WAGERS[id], events: EVENTS[id], userAddress: USER, registryAddress: REGISTRY })
+
+describe('deriveTransfers (FR-003/FR-006, research D2)', () => {
+  it('emits creator deposit + winner payout for a resolved wager the user created and won', () => {
+    const items = derive(1)
+    expect(items).toHaveLength(2)
+    const [dep, pay] = items
+    expect(dep).toMatchObject({
+      direction: DIRECTION.DEPOSIT, fromAddress: USER, toAddress: REGISTRY, amountRaw: '100000000', txHash: '0xa1',
+    })
+    expect(pay).toMatchObject({
+      direction: DIRECTION.PAYOUT, fromAddress: REGISTRY, toAddress: USER, amountRaw: '200000000', txHash: '0xa3',
+    })
+  })
+
+  it('emits only the opponent deposit (not the creator\'s) when the user accepted', () => {
+    const items = derive(2)
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      direction: DIRECTION.DEPOSIT, fromAddress: USER, toAddress: REGISTRY, amountRaw: '50000000', txHash: '0xb2',
+    })
+  })
+
+  it('emits deposit + refund for a refunded wager', () => {
+    const items = derive(3)
+    expect(items.map((i) => i.direction)).toEqual([DIRECTION.DEPOSIT, DIRECTION.REFUND])
+    expect(items[1]).toMatchObject({ fromAddress: REGISTRY, toAddress: USER, txHash: '0xc2' })
+  })
+
+  it('excludes wagers/events where the user is not a party', () => {
+    const items = deriveTransfers({
+      wager: { id: '9', stakeTokenAddress: WAGERS[1].stakeTokenAddress, stakeAmount: '1' },
+      events: [{ name: 'WagerCreated', transactionHash: '0xz', blockNumber: 1, args: { creator: OTHER, opponent: OTHER } }],
+      userAddress: USER,
+      registryAddress: REGISTRY,
+    })
+    expect(items).toHaveLength(0)
+  })
+})

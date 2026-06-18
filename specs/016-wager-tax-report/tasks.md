@@ -27,9 +27,9 @@ Web frontend (single SPA). Source under `frontend/src/`, tests under `frontend/s
 
 **Purpose**: Dependencies and module scaffolding.
 
-- [ ] T001 Add frontend dependencies `jspdf`, `jspdf-autotable`, `papaparse`, `file-saver` to `frontend/package.json` (and lockfile) per research.md D6; run install and confirm the dev build still boots.
-- [ ] T002 [P] Create the reports module directory `frontend/src/data/reports/` and the test directory `frontend/src/test/reports/` (add a short `frontend/src/data/reports/README.md` summarizing the module per plan.md).
-- [ ] T003 [P] Confirm lint/test scripts cover the new paths: run `npm run test:frontend` (baseline green) and ESLint over `frontend/src/data/reports/` and `frontend/src/components/wallet/` (no new ignores; Constitution IV/V).
+- [X] T001 Add frontend dependencies `jspdf`, `jspdf-autotable`, `papaparse`, `file-saver` to `frontend/package.json` (and lockfile) per research.md D6; run install and confirm the dev build still boots.
+- [X] T002 [P] Create the reports module directory `frontend/src/data/reports/` and the test directory `frontend/src/test/reports/` (add a short `frontend/src/data/reports/README.md` summarizing the module per plan.md).
+- [X] T003 [P] Confirm lint/test scripts cover the new paths: run `npm run test:frontend` (baseline green) and ESLint over `frontend/src/data/reports/` and `frontend/src/components/wallet/` (no new ignores; Constitution IV/V).
 
 ---
 
@@ -39,13 +39,13 @@ Web frontend (single SPA). Source under `frontend/src/`, tests under `frontend/s
 
 ⚠️ Complete before starting Phase 3.
 
-- [ ] T004 [P] Create shared test fixture `frontend/src/test/fixtures/wagers.js` with sample wagers + lifecycle event logs + receipts (deposit/payout/refund cases, multi-month, multi-ticker, plus a transfer the user did NOT send) per data-model.md.
-- [ ] T005 [P] Write tests `frontend/src/test/reports/reportPeriods.test.js` for named-preset resolution (last month/quarter/year/calendar year) to UTC boundaries and range validation (inverted, future-`to`, equal bounds) per data-model.md ReportingPeriod.
-- [ ] T006 Implement `frontend/src/utils/reportPeriods.js` (preset→`{from,to,label}` in UTC + `validateRange`) to satisfy T005.
-- [ ] T007 [P] Write tests `frontend/src/test/reports/valuation.test.js` for the $1.00 par `usdValue`/`costBasis` and the structured-field shape (research.md D3).
-- [ ] T008 [P] Implement `frontend/src/data/reports/valuation.js` (par-baseline FMV + cost basis, structured for a future price feed) to satisfy T007.
-- [ ] T009 [P] Write tests `frontend/src/test/reports/tokenMeta.test.js` for resolving stablecoin ticker/decimals from `config/networks.js` with a memoized on-chain `symbol()/decimals()` fallback for non-default tokens (research.md D7).
-- [ ] T010 [P] Implement `frontend/src/data/reports/tokenMeta.js` (ticker/decimals resolver, memoized per address+chainId) to satisfy T009.
+- [X] T004 [P] Create shared test fixture `frontend/src/test/fixtures/wagers.js` with sample wagers + lifecycle event logs + receipts (deposit/payout/refund cases, multi-month, multi-ticker, plus a transfer the user did NOT send) per data-model.md.
+- [X] T005 [P] Write tests `frontend/src/test/reports/reportPeriods.test.js` for named-preset resolution (last month/quarter/year/calendar year) to UTC boundaries and range validation (inverted, future-`to`, equal bounds) per data-model.md ReportingPeriod.
+- [X] T006 Implement `frontend/src/utils/reportPeriods.js` (preset→`{from,to,label}` in UTC + `validateRange`) to satisfy T005.
+- [X] T007 [P] Write tests `frontend/src/test/reports/valuation.test.js` for the $1.00 par `usdValue`/`costBasis` and the structured-field shape (research.md D3).
+- [X] T008 [P] Implement `frontend/src/data/reports/valuation.js` (par-baseline FMV + cost basis, structured for a future price feed) to satisfy T007.
+- [X] T009 [P] Write tests `frontend/src/test/reports/tokenMeta.test.js` for resolving stablecoin ticker/decimals from `config/networks.js` with a memoized on-chain `symbol()/decimals()` fallback for non-default tokens (research.md D7).
+- [X] T010 [P] Implement `frontend/src/data/reports/tokenMeta.js` (ticker/decimals resolver, memoized per address+chainId) to satisfy T009.
 
 **Checkpoint**: shared period, valuation, and token-metadata utilities exist and are green.
 
@@ -63,16 +63,16 @@ totals reconcile, and PDF+CSV download (spec Story 1; SC-001..SC-004).
 
 ### Data layer (engine)
 
-- [ ] T011 [P] [US1] Write tests `frontend/src/test/reports/transferDerivation.test.js`: each lifecycle event → correct line item(s) with `direction` and `from`/`to` (user ↔ `wagerRegistry` escrow) per research.md D2 / data-model.md.
-- [ ] T012 [US1] Implement `frontend/src/data/reports/transferDerivation.js` (wager + lifecycle events → `TransferLineItem[]` with direction/from/to/amount/ticker) using synced `config/contracts.js` escrow address, to satisfy T011.
-- [ ] T013 [P] [US1] Write tests `frontend/src/test/reports/receiptEnrichment.test.js`: resolves `txHash` + exact block `timestamp`; populates `feeNative` when the user sent the tx and `null` + `feeUnavailableReason` when they did not (data-model.md; FR-005/FR-015).
-- [ ] T014 [US1] Implement `frontend/src/data/reports/receiptEnrichment.js` (ethers logs/receipts/blocks → txHash, timestamp, gas fee) to satisfy T013.
-- [ ] T015 [P] [US1] Write tests `frontend/src/test/reports/csvReport.test.js`: all 11 columns present, full untruncated txHash/addresses, metadata + disclaimer block (contracts/report-line-item.md).
-- [ ] T016 [US1] Implement `frontend/src/data/reports/csvReport.js` (papaparse render → CSV string) to satisfy T015.
-- [ ] T017 [P] [US1] Write tests `frontend/src/test/reports/pdfReport.test.js`: produces a PDF blob containing header, line-item table, totals, valuation note + disclaimer (contracts/report-line-item.md).
-- [ ] T018 [US1] Implement `frontend/src/data/reports/pdfReport.js` (jspdf + jspdf-autotable render → Blob) to satisfy T017.
-- [ ] T019 [US1] Write integration tests `frontend/src/test/reports/reportBuilder.test.js`: enumerate→derive→enrich→filter-by-period→value→totals; empty period yields a valid empty report; only the signed-in account's data; per-ticker + overall totals reconcile exactly to line items (SC-002/SC-003/SC-004/SC-005).
-- [ ] T020 [US1] Implement `frontend/src/data/reports/reportBuilder.js` orchestrator per contracts/report-builder.md (reuses `WagerRepository` for enumeration + the modules above), to satisfy T019.
+- [X] T011 [P] [US1] Write tests `frontend/src/test/reports/transferDerivation.test.js`: each lifecycle event → correct line item(s) with `direction` and `from`/`to` (user ↔ `wagerRegistry` escrow) per research.md D2 / data-model.md.
+- [X] T012 [US1] Implement `frontend/src/data/reports/transferDerivation.js` (wager + lifecycle events → `TransferLineItem[]` with direction/from/to/amount/ticker) using synced `config/contracts.js` escrow address, to satisfy T011.
+- [X] T013 [P] [US1] Write tests `frontend/src/test/reports/receiptEnrichment.test.js`: resolves `txHash` + exact block `timestamp`; populates `feeNative` when the user sent the tx and `null` + `feeUnavailableReason` when they did not (data-model.md; FR-005/FR-015).
+- [X] T014 [US1] Implement `frontend/src/data/reports/receiptEnrichment.js` (ethers logs/receipts/blocks → txHash, timestamp, gas fee) to satisfy T013.
+- [X] T015 [P] [US1] Write tests `frontend/src/test/reports/csvReport.test.js`: all 11 columns present, full untruncated txHash/addresses, metadata + disclaimer block (contracts/report-line-item.md).
+- [X] T016 [US1] Implement `frontend/src/data/reports/csvReport.js` (papaparse render → CSV string) to satisfy T015.
+- [X] T017 [P] [US1] Write tests `frontend/src/test/reports/pdfReport.test.js`: produces a PDF blob containing header, line-item table, totals, valuation note + disclaimer (contracts/report-line-item.md).
+- [X] T018 [US1] Implement `frontend/src/data/reports/pdfReport.js` (jspdf + jspdf-autotable render → Blob) to satisfy T017.
+- [X] T019 [US1] Write integration tests `frontend/src/test/reports/reportBuilder.test.js`: enumerate→derive→enrich→filter-by-period→value→totals; empty period yields a valid empty report; only the signed-in account's data; per-ticker + overall totals reconcile exactly to line items (SC-002/SC-003/SC-004/SC-005).
+- [X] T020 [US1] Implement `frontend/src/data/reports/reportBuilder.js` orchestrator per contracts/report-builder.md (reuses `WagerRepository` for enumeration + the modules above), to satisfy T019.
 
 ### Hook + UI
 
@@ -99,8 +99,8 @@ demand.
 listed; re-download reproduces equivalent content; remove deletes the entry (it disappears,
 wager data untouched) (spec Story 2 AC1–AC3; FR-010/FR-011).
 
-- [ ] T028 [P] [US2] Write tests `frontend/src/test/reports/reportHistoryStore.test.js`: `add`/`list`/`remove` with strict `address`+`chainId` key scoping, newest-first ordering, and corrupt-store→empty defensiveness (contracts/report-history-store.md; FR-012/FR-014).
-- [ ] T029 [US2] Implement `frontend/src/data/reports/reportHistoryStore.js` (localStorage key `fw_user_<address>_tax_report_history_v1_<chainId>`, metadata-only entries) to satisfy T028.
+- [X] T028 [P] [US2] Write tests `frontend/src/test/reports/reportHistoryStore.test.js`: `add`/`list`/`remove` with strict `address`+`chainId` key scoping, newest-first ordering, and corrupt-store→empty defensiveness (contracts/report-history-store.md; FR-012/FR-014).
+- [X] T029 [US2] Implement `frontend/src/data/reports/reportHistoryStore.js` (localStorage key `fw_user_<address>_tax_report_history_v1_<chainId>`, metadata-only entries) to satisfy T028.
 - [ ] T030 [US2] Persist a `ReportHistoryEntry` from `frontend/src/hooks/useTaxReport.js` on successful generation (call `reportHistoryStore.add`); add a test to `frontend/src/test/reports/useTaxReport.test.js` asserting the entry is saved (FR-010).
 - [ ] T031 [P] [US2] Write tests `frontend/src/test/reports/ReportHistoryList.test.jsx`: lists entries (period + date), re-download regenerates via `buildReport`, remove deletes the entry (Story 2 AC1–AC3).
 - [ ] T032 [US2] Implement `frontend/src/components/wallet/ReportHistoryList.jsx` (accessible list with re-download + remove actions) to satisfy T031.
