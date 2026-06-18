@@ -23,6 +23,6 @@
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-15T02:23:55.220Z",
   "deployBlocks": {
-    "wagerRegistry": null
+    "wagerRegistry": 40172425
   }
 }

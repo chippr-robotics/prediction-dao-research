@@ -14,7 +14,7 @@
   "polygon-amoy": {
     "WagerRegistry": {
       "address": "0x916841aEe4832a2e9DD42470fa05a7329486e75a",
-      "startBlock": "RESOLVE-BEFORE-DEPLOY: Amoy contract-creation block (needs ETHERSCAN_API_KEY); see deployments/amoy-chain80002-v2.json deployBlocks.wagerRegistry"
+      "startBlock": 40172425
     }
   }
 }
