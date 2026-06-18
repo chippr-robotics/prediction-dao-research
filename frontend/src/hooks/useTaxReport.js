@@ -39,7 +39,11 @@ export function useTaxReport(options = {}) {
   const makeDataSource = useMemo(() => options.createDataSource || createReportDataSource, [options.createDataSource])
   const networkOf = useMemo(() => options.getNetwork || getNetwork, [options.getNetwork])
   const escrowOf = useMemo(
-    () => options.getEscrow || ((cid) => getContractAddressForChain('friendGroupMarketFactory', cid)),
+    () =>
+      options.getEscrow ||
+      ((cid) =>
+        getContractAddressForChain('wagerRegistry', cid) ||
+        getContractAddressForChain('friendGroupMarketFactory', cid)),
     [options.getEscrow],
   )
   const history = useMemo(() => options.history || historyStore, [options.history])
