@@ -269,9 +269,43 @@
   border-color: #4C9AFF;
 }
 
-/* Density toggle (spec 017) — sits to the right of the filter controls. */
-.mm-density-toggle {
+/* View switch (spec 018) — leads the right-aligned toolbar cluster
+   (view toggle → density → refresh). */
+.mm-view-toggle {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-secondary, #141C24);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 8px;
+}
+
+.mm-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mm-view-btn:hover { color: var(--text-primary, #E6EDF3); }
+
+.mm-view-btn.active {
+  background: rgba(76, 154, 255, 0.12);
+  color: #4C9AFF;
+}
+
+/* Density toggle (spec 017) — sits between the view switch and refresh. */
+.mm-density-toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;

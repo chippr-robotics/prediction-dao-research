@@ -146,6 +146,8 @@ describe('MyMarketsModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset session-scoped UI prefs (view/density) so test order can't leak them.
+    try { sessionStorage.clear() } catch { /* no-op */ }
     // Mock window.ethereum to avoid provider creation errors
     global.window.ethereum = undefined
     useWallet.mockReturnValue({
@@ -883,7 +885,7 @@ describe('MyMarketsModal', () => {
       expect(screen.getByText('Won Wager')).toBeInTheDocument()
     })
 
-    it('shows the Claim Winnings button in the detail view when the row is opened', async () => {
+    it('shows the Claim Winnings button in the detail view opened from the table view', async () => {
       const user = userEvent.setup()
       await act(async () => {
         renderWithProviders(
@@ -892,9 +894,10 @@ describe('MyMarketsModal', () => {
       })
       await openHistory(user)
 
-      // Expand the card, then open the full detail via "View details".
+      // The full detail is reached from the table view (spec 018): switch to the
+      // table, then click the row.
+      await user.click(screen.getByRole('button', { name: /^table$/i }))
       await user.click(await screen.findByText('Won Wager'))
-      await user.click(await screen.findByRole('button', { name: /view details/i }))
 
       expect(await screen.findByText('Back to list')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /claim winnings/i })).toBeInTheDocument()
@@ -958,6 +961,39 @@ describe('MyMarketsModal', () => {
         const tabpanel = screen.queryByRole('tabpanel')
         expect(tabpanel).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('View toggle (spec 018)', () => {
+    const me = '0x1234567890123456789012345678901234567890'
+    const toggleWager = {
+      id: 'v1', description: 'Toggle Wager', creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+      participants: [me], status: 'active', marketType: 'friend',
+      tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+    }
+
+    it('switches between grid and table and hides the density toggle in table view', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[toggleWager]} />
+        )
+      })
+
+      await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
+
+      // Grid is the default: the density toggle is shown, no table yet.
+      expect(screen.getByRole('button', { name: /compact/i })).toBeInTheDocument()
+      expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+      // Switch to table view → a table renders and density is hidden.
+      await user.click(screen.getByRole('button', { name: /^table$/i }))
+      expect(screen.getByRole('table')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /compact/i })).not.toBeInTheDocument()
+
+      // Switch back to grid → table is gone.
+      await user.click(screen.getByRole('button', { name: /^grid$/i }))
+      expect(screen.queryByRole('table')).not.toBeInTheDocument()
     })
   })
 })

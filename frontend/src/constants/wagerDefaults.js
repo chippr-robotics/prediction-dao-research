@@ -209,6 +209,15 @@ export const MyWagersDensity = {
 
 export const MY_WAGERS_DENSITY_KEY = 'fairwins.myWagers.density'
 
+// ── My Wagers view mode (spec 018) ──────────────────────────────────
+// Grid = expandable cards (default); Table = compact rows. Session-scoped.
+export const MyWagersView = {
+  GRID: 'grid',
+  TABLE: 'table',
+}
+
+export const MY_WAGERS_VIEW_KEY = 'fairwins.myWagers.view'
+
 // Terminal statuses — wagers in these states are considered "history"
 export const TERMINAL_STATUSES = new Set([
   'resolved',

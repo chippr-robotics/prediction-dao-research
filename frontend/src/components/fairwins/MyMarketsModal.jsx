@@ -5,14 +5,14 @@ import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
-import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MY_WAGERS_DENSITY_KEY } from '../../constants/wagerDefaults'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MY_WAGERS_DENSITY_KEY, MyWagersView, MY_WAGERS_VIEW_KEY } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
-import WagerCardGrid from './WagerCardGrid'
+import WagerList from './WagerList'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
 import './MyMarketsModal.css'
@@ -107,6 +107,20 @@ function MyMarketsModal({
       try { sessionStorage.setItem(MY_WAGERS_DENSITY_KEY, next) } catch { /* storage unavailable */ }
       return next
     })
+  }, [])
+
+  // View mode (spec 018): grid cards vs compact table. Session-scoped, default grid.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(MY_WAGERS_VIEW_KEY)
+      return saved === MyWagersView.TABLE ? MyWagersView.TABLE : MyWagersView.GRID
+    } catch {
+      return MyWagersView.GRID
+    }
+  })
+  const selectView = useCallback((mode) => {
+    setViewMode(mode)
+    try { sessionStorage.setItem(MY_WAGERS_VIEW_KEY, mode) } catch { /* storage unavailable */ }
   }, [])
 
   // Transient confirmation toast (spec 017 FR-015) shown after a successful
@@ -930,20 +944,50 @@ function MyMarketsModal({
               <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
-          <button
-            type="button"
-            className="mm-density-toggle"
-            onClick={toggleDensity}
-            title={density === MyWagersDensity.COMFORTABLE ? 'Switch to compact view' : 'Switch to comfortable view'}
-            aria-pressed={density === MyWagersDensity.COMFORTABLE}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              {density === MyWagersDensity.COMFORTABLE
-                ? <path d="M3 5h18M3 12h18M3 19h18" />
-                : <path d="M3 5h18M3 10h18M3 15h18M3 20h18" />}
-            </svg>
-            {density === MyWagersDensity.COMFORTABLE ? 'Comfortable' : 'Compact'}
-          </button>
+          {/* View switch (spec 018) — inline with density + refresh */}
+          <div className="mm-view-toggle" role="group" aria-label="Wager view">
+            <button
+              type="button"
+              className={`mm-view-btn ${viewMode === MyWagersView.GRID ? 'active' : ''}`}
+              onClick={() => selectView(MyWagersView.GRID)}
+              aria-pressed={viewMode === MyWagersView.GRID}
+              title="Grid view"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+              Grid
+            </button>
+            <button
+              type="button"
+              className={`mm-view-btn ${viewMode === MyWagersView.TABLE ? 'active' : ''}`}
+              onClick={() => selectView(MyWagersView.TABLE)}
+              aria-pressed={viewMode === MyWagersView.TABLE}
+              title="Table view"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+              Table
+            </button>
+          </div>
+          {viewMode === MyWagersView.GRID && (
+            <button
+              type="button"
+              className="mm-density-toggle"
+              onClick={toggleDensity}
+              title={density === MyWagersDensity.COMFORTABLE ? 'Switch to compact view' : 'Switch to comfortable view'}
+              aria-pressed={density === MyWagersDensity.COMFORTABLE}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                {density === MyWagersDensity.COMFORTABLE
+                  ? <path d="M3 5h18M3 12h18M3 19h18" />
+                  : <path d="M3 5h18M3 10h18M3 15h18M3 20h18" />}
+              </svg>
+              {density === MyWagersDensity.COMFORTABLE ? 'Comfortable' : 'Compact'}
+            </button>
+          )}
           <button
             className="mm-refresh-btn"
             onClick={fetchMarketsData}
@@ -1018,7 +1062,8 @@ function MyMarketsModal({
                       <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
-                    <WagerCardGrid
+                    <WagerList
+                      viewMode={viewMode}
                       density={density}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
@@ -1089,7 +1134,8 @@ function MyMarketsModal({
                       <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
-                    <WagerCardGrid
+                    <WagerList
+                      viewMode={viewMode}
                       density={density}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
@@ -1147,7 +1193,8 @@ function MyMarketsModal({
                       <p className="mm-hint">When someone names you as the neutral resolver, those wagers appear here.</p>
                     </div>
                   ) : (
-                    <WagerCardGrid
+                    <WagerList
+                      viewMode={viewMode}
                       density={density}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
@@ -1197,7 +1244,8 @@ function MyMarketsModal({
                       <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
-                    <WagerCardGrid
+                    <WagerList
+                      viewMode={viewMode}
                       density={density}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
