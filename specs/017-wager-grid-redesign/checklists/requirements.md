@@ -32,12 +32,12 @@
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
-- The spec resolves the mockup-vs-current divergences (tab labels, token symbol,
-  inline-vs-detail-view, mock data) via documented Assumptions rather than
-  `[NEEDS CLARIFICATION]` markers, since reasonable defaults exist for each. If a
-  stakeholder disagrees with any assumption (notably "inline expansion replaces
-  the standalone detail view" or "keep existing tab names"), run `/speckit-clarify`
-  to revisit before planning.
+- The mockup-vs-current divergences (presentation surface, detail view, tab
+  labels) were resolved via `/speckit-clarify` (Session 2026-06-18) and recorded
+  in the spec's Clarifications section: stays a modal, inline expansion is a
+  preview with the full detail view retained behind a "View details" affordance,
+  and existing tab labels are kept. Remaining divergences (token symbol, mock
+  data) are covered by documented Assumptions with reasonable defaults.
 - Light references to existing modules (`MyMarketsModal`, `useMyWagers`,
   `WagerRepository`) appear only in the Assumptions section to bound scope; they
   name *what* is in/out of scope, not *how* to build it.

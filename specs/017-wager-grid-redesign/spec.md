@@ -13,6 +13,14 @@
 > project). It is reference-only — a static, mock-data prototype — and is not
 > wired to live data or on-chain calls.
 
+## Clarifications
+
+### Session 2026-06-18
+
+- Q: Should the redesign stay a modal overlay or become a full-page route? → A: Keep as modal overlay (restyle the existing `MyMarketsModal` contents; preserve current entry points).
+- Q: Should inline card expansion replace the separate detail view, or coexist with it? → A: Inline expansion is a quick preview; the existing full detail view is retained and reached via a "View details" affordance.
+- Q: Keep the existing tab labels or adopt the mockup's "Incoming/Outgoing"? → A: Keep existing labels (Participating / Created / Arbitrating / History), only restyled as pills.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Browse my wagers as scannable cards (Priority: P1)
@@ -58,9 +66,10 @@ is encrypted and not yet decrypted, the expanded card offers an inline "Decrypt
 Wager Details" affordance; once I decrypt, the terms and metadata reveal in the
 same card.
 
-**Why this priority**: Inline expansion replaces the separate full-page detail
-view as the primary way to inspect a wager, and the decrypt step gates whether a
-user can even read what they are agreeing to. Without it the cards are not
+**Why this priority**: Inline expansion is the primary, at-a-glance way to
+inspect a wager without leaving the list, and the decrypt step gates whether a
+user can even read what they are agreeing to. The fuller detail view remains a
+click away for the deeper information. Without inline expansion the cards are not
 actionable.
 
 **Independent Test**: Click a card and confirm it expands showing terms +
@@ -82,6 +91,9 @@ and after decrypting the terms appear in place.
    succeeds, **Then** the terms and any newly readable metadata appear in the same
    card without a full page change; **When** decryption fails, **Then** I see a
    clear error and the card stays in its undecrypted state.
+5. **Given** an expanded card, **When** I choose "View details", **Then** the
+   existing full detail view opens for that wager (showing the richer information
+   such as dispute status, participants, and block-explorer links).
 
 ---
 
@@ -216,6 +228,11 @@ header stays pinned.
   terms/metadata in the same card after a successful decrypt.
 - **FR-010**: A failed decrypt MUST leave the card in its undecrypted state and
   communicate the failure without navigating away.
+- **FR-010a**: The inline expansion is a quick-look preview; an expanded card MUST
+  provide a "View details" affordance that opens the existing full detail view for
+  the wager, preserving access to the richer information it shows today (dispute
+  status, full participant list, block-explorer links). The full detail view is
+  retained, not retired.
 
 **Actions**
 
@@ -307,15 +324,18 @@ header stays pinned.
 
 ## Assumptions
 
-- **Inline expansion replaces the standalone detail view**: The accordion-style
-  in-card expansion becomes the primary way to inspect a wager. Heavier flows that
-  already open as overlays today (resolution, acceptance) continue to open as
-  overlays launched from a card's action; the previous full-panel detail view is
-  superseded by inline expansion.
-- **Existing tab names are kept**: The mockup labels tabs "Incoming/Outgoing/
-  History"; per the request to preserve current behavior, this feature keeps the
-  existing labels (Participating, Created, Arbitrating, History). Adopting the
-  mockup's wording is out of scope unless separately decided.
+- **Stays a modal** *(clarified 2026-06-18)*: The redesign restyles the contents
+  of the existing `MyMarketsModal` overlay; it is not converted to a full-page
+  route. All current entry points that open the modal are preserved.
+- **Inline expansion is a preview; detail view retained** *(clarified
+  2026-06-18)*: The accordion-style in-card expansion is the primary quick-look
+  way to inspect a wager (terms, metadata, actions). The existing full detail view
+  is kept and reachable via a "View details" affordance for richer information.
+  Heavier flows (resolution, acceptance) continue to open as overlays launched
+  from a card's action.
+- **Existing tab names are kept** *(clarified 2026-06-18)*: The mockup labels tabs
+  "Incoming/Outgoing/History"; this feature keeps the existing labels
+  (Participating, Created, Arbitrating, History), only restyled as pills.
 - **Real token symbol, not USDC**: The mockup hardcodes "USDC"; the
   implementation uses each wager's real token symbol (e.g., the network default)
   and real values.
