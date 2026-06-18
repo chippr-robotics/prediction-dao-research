@@ -2,21 +2,21 @@
  * On-chain data source adapter for the wager tax/activity report
  * (spec 016-wager-tax-report; contracts/report-builder.md; research.md D1/D2).
  *
- * Implements the `dataSource` interface reportBuilder expects:
- *   enumerateWagers({account}) → wager[]      (escrow contract logs, by user)
- *   getWagerEvents(wagerId)    → events[]      (escrow contract logs, by wager)
- *   getBlock(blockNumber)      → { timestamp } (RPC)
- *   getTransactionReceipt(tx)  → receipt       (RPC, for txHash + gas fee)
+ * Strategy (chosen for scalability on public RPCs):
+ *   - ENUMERATION via the subgraph (WagerRepository). Scanning the chain for a
+ *     user's wagers from the deployment block is not viable on a public RPC
+ *     (the node rejects wide `eth_getLogs` ranges → request floods / rate
+ *     limits). The subgraph is the indexed, scalable path. When it is not
+ *     configured we fail with a clear, actionable error rather than brute-force
+ *     scanning from genesis.
+ *   - PER-WAGER details (txHash + gas fee — which the subgraph cannot supply)
+ *     are read from chain logs, but bounded to a TIGHT block window around each
+ *     wager's `createdAt` (from the subgraph) with adaptive, shrink-on-limit
+ *     chunking and a request budget. No genesis scans.
  *
- * Self-contained: enumeration scans the escrow contract for events indexed by
- * the user's address, so the report does NOT depend on the subgraph or the
- * legacy EventsSource (which is hardwired to the retired FriendGroupMarketFactory
- * and threw "FriendGroupMarketFactory address not configured" on v2 networks).
- *
- * Two contract generations are supported, resolved from synced config per chain
- * (Constitution V — never hardcoded):
- *   - v2 WagerRegistry (Polygon/Amoy/Mordor/Hardhat): WagerCreated / WagerAccepted /
- *     PayoutClaimed / WagerRefunded / WagerCancelled / WagerDrawn
+ * Contract generations (resolved from synced config, never hardcoded):
+ *   - v2 WagerRegistry: WagerCreated / WagerAccepted / PayoutClaimed /
+ *     WagerRefunded / WagerCancelled / WagerDrawn
  *   - v1 FriendGroupMarketFactory (legacy): MarketCreatedPending /
  *     ParticipantAccepted / WinningsClaimed / StakeRefunded
  */
@@ -25,52 +25,40 @@ import { ethers } from 'ethers'
 import { getContractAddressForChain, NETWORK_CONFIG, DEPLOYMENT_BLOCKS } from '../../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
+import { getDefaultWagerRepository } from '../wagers/WagerRepository'
 
-const SCAN_CHUNK = 10_000
+const INITIAL_CHUNK = 5000
+const MIN_CHUNK = 200
+// Per-getWagerEvents request budget — bounds work for any single wager.
+const SCAN_BUDGET = 60
+// Approx block time (seconds) per chain, for timestamp → block estimation.
+const BLOCK_TIME_SEC = { 137: 2, 80002: 2, 63: 13, 1337: 1 }
+// Margin (seconds) before a wager's createdAt to start its event window.
+const PRE_WINDOW_SEC = 3600
 
-// Value-moving events + the user-indexed enumeration filters per generation.
-// Each enumeration entry is [eventName, ...topicArgs] where `null` is a wildcard
-// and `'@user'` is replaced with the report subject's address.
-const GENERATIONS = {
-  v2: {
-    abi: WAGER_REGISTRY_ABI,
-    valueEvents: ['WagerCreated', 'WagerAccepted', 'PayoutClaimed', 'WagerRefunded', 'WagerCancelled', 'WagerDrawn'],
-    enumeration: [
-      ['WagerCreated', null, '@user'], // creator
-      ['WagerCreated', null, null, '@user'], // opponent
-      ['WagerAccepted', null, '@user'], // accepted by user
-      ['PayoutClaimed', null, '@user'], // winner
-    ],
-  },
-  v1: {
-    abi: FRIEND_GROUP_MARKET_FACTORY_ABI,
-    valueEvents: ['MarketCreatedPending', 'ParticipantAccepted', 'WinningsClaimed', 'StakeRefunded'],
-    enumeration: [
-      ['MarketCreatedPending', null, '@user'], // creator
-      ['ParticipantAccepted', null, '@user'], // participant
-      ['WinningsClaimed', null, '@user'], // winner
-    ],
-  },
+const V2 = {
+  abi: WAGER_REGISTRY_ABI,
+  valueEvents: ['WagerCreated', 'WagerAccepted', 'PayoutClaimed', 'WagerRefunded', 'WagerCancelled', 'WagerDrawn'],
+}
+const V1 = {
+  abi: FRIEND_GROUP_MARKET_FACTORY_ABI,
+  valueEvents: ['MarketCreatedPending', 'ParticipantAccepted', 'WinningsClaimed', 'StakeRefunded'],
+}
+
+function subgraphConfigured() {
+  return Boolean(import.meta.env?.VITE_SUBGRAPH_URL)
 }
 
 function getProvider(opts = {}) {
   return opts.provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
 }
 
-/**
- * Resolve the escrow contract for a chain: prefer the v2 WagerRegistry; fall
- * back to the legacy v1 FriendGroupMarketFactory. Returns the address, ABI, the
- * value-event list, the user-indexed enumeration filters, and the start block.
- */
+/** Resolve the escrow contract (prefer v2 WagerRegistry, fall back to v1 factory). */
 export function resolveEscrow(chainId) {
   const registry = getContractAddressForChain('wagerRegistry', chainId)
-  if (registry) {
-    return { address: registry, ...GENERATIONS.v2, deployBlock: DEPLOYMENT_BLOCKS.wagerRegistry || 0 }
-  }
+  if (registry) return { address: registry, ...V2, deployBlock: DEPLOYMENT_BLOCKS.wagerRegistry || 0 }
   const factory = getContractAddressForChain('friendGroupMarketFactory', chainId)
-  if (factory) {
-    return { address: factory, ...GENERATIONS.v1, deployBlock: DEPLOYMENT_BLOCKS.friendGroupMarketFactory || 0 }
-  }
+  if (factory) return { address: factory, ...V1, deployBlock: DEPLOYMENT_BLOCKS.friendGroupMarketFactory || 0 }
   throw new Error('No wager escrow contract is configured for this network.')
 }
 
@@ -100,19 +88,44 @@ export function normalizeEvent(ev) {
   }
 }
 
-/** Run a topic-filtered queryFilter across the block range in bounded chunks. */
-async function scan(contract, provider, filter, fromBlock, latest, label) {
+/** Estimate a block number for a unix-second timestamp, clamped to [deployBlock, latest]. */
+function estimateBlock(targetSec, ctx) {
+  const delta = Math.max(0, Math.floor((ctx.latestSec - targetSec) / ctx.blockTimeSec))
+  return Math.min(ctx.latestBlock, Math.max(ctx.deployBlock || 0, ctx.latestBlock - delta))
+}
+
+/**
+ * queryFilter across a bounded block window with adaptive chunking: shrink the
+ * chunk on "range exceeds limit" style errors, grow it back on success, and
+ * stop with a clear error if the per-call request budget is exhausted.
+ */
+async function scanAdaptive(contract, filter, fromBlock, toBlock, label, budget) {
   const out = []
-  let from = fromBlock || 0
-  while (from <= latest) {
-    const to = Math.min(from + SCAN_CHUNK - 1, latest)
+  let from = fromBlock
+  let chunk = INITIAL_CHUNK
+  while (from <= toBlock) {
+    if (budget.used >= budget.max) {
+      throw new Error(
+        'This report period is too large to read from the network without the indexing subgraph. ' +
+        'Try a shorter period, or configure VITE_SUBGRAPH_URL for full coverage.',
+      )
+    }
+    const to = Math.min(from + chunk - 1, toBlock)
+    budget.used += 1
     try {
       const logs = await contract.queryFilter(filter, from, to)
       out.push(...logs)
+      from = to + 1
+      if (chunk < INITIAL_CHUNK) chunk = Math.min(INITIAL_CHUNK, chunk * 2)
     } catch (err) {
-      console.warn(`[reportDataSource] ${label} scan ${from}-${to} failed:`, err?.message)
+      const msg = err?.message || ''
+      if (/range|limit|exceed|too many|big/i.test(msg) && chunk > MIN_CHUNK) {
+        chunk = Math.max(MIN_CHUNK, Math.floor(chunk / 4))
+        continue
+      }
+      console.warn(`[reportDataSource] ${label} scan ${from}-${to} failed:`, msg)
+      from = to + 1
     }
-    from = to + 1
   }
   return out
 }
@@ -121,60 +134,94 @@ async function scan(contract, provider, filter, fromBlock, latest, label) {
  * Build the on-chain report data source for the active network.
  *
  * @param {object} [opts]
- * @param {number} [opts.chainId] - active chain id (for chain-scoped address resolution)
+ * @param {number} [opts.chainId] - active chain id
  * @param {object} [opts.provider] - ethers provider (defaults to NETWORK_CONFIG rpc)
  * @param {object} [opts.contract] - escrow contract override (testing)
+ * @param {object} [opts.repository] - WagerRepository override (testing)
  * @returns {object} dataSource
  */
 export function createReportDataSource(opts = {}) {
   const provider = getProvider(opts)
   const chainId = opts.chainId
+  const repository = opts.repository || getDefaultWagerRepository()
+  // wagerId → createdAt (unix seconds), captured during enumeration for windowing.
+  const createdAtById = new Map()
+
   let escrow = null
   let contract = null
-  const ensure = () => {
+  let chainCtx = null
+  const ensureContract = () => {
     if (!contract) {
       escrow = resolveEscrow(chainId)
       contract = opts.contract || new ethers.Contract(escrow.address, escrow.abi, provider)
     }
     return contract
   }
+  const ensureChainCtx = async () => {
+    if (!chainCtx) {
+      const latestBlock = await provider.getBlockNumber()
+      const block = await provider.getBlock(latestBlock)
+      chainCtx = {
+        latestBlock,
+        latestSec: Number(block?.timestamp ?? Math.floor(Date.now() / 1000)),
+        blockTimeSec: BLOCK_TIME_SEC[Number(chainId)] || 2,
+        deployBlock: escrow.deployBlock || 0,
+      }
+    }
+    return chainCtx
+  }
 
   return {
     async enumerateWagers({ account }) {
       if (!account) return []
-      if (import.meta.env?.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') return []
-      const c = ensure()
-      const latest = await provider.getBlockNumber()
-      // wagerId → wager context, built from the indexed enumeration logs.
-      const byId = new Map()
-      for (const [name, ...topics] of escrow.enumeration) {
-        const args = topics.map((t) => (t === '@user' ? account : t))
-        const filter = c.filters[name](...args)
-        const logs = await scan(c, provider, filter, escrow.deployBlock, latest, name)
-        for (const ev of logs) {
-          const n = normalizeEvent(ev)
-          const id = n.args.wagerId
-          if (id == null) continue
-          const existing = byId.get(id) || { id, participants: [account] }
-          // Capture creator + stake token from the creation event when present.
-          if (n.name === 'WagerCreated' || n.name === 'MarketCreatedPending') {
-            existing.creator = n.args.creator || existing.creator
-            existing.stakeTokenAddress = n.args.token || existing.stakeTokenAddress
-          }
-          byId.set(id, existing)
-        }
+      if (!subgraphConfigured()) {
+        throw new Error(
+          'Wager reporting requires the indexing subgraph (VITE_SUBGRAPH_URL) to be configured for this network.',
+        )
       }
-      return [...byId.values()]
+      const all = []
+      let cursor = null
+      for (let page = 0; page < 200; page++) {
+        const res = await repository.listMyWagers({
+          userAddress: account,
+          cursor,
+          pageSize: 100,
+          filter: { includeExpired: true },
+        })
+        // Guard against the repository's legacy EventsSource fallback (it targets
+        // the retired factory and cannot serve v2 reporting).
+        if (String(res.source || '').includes('fallback') || res.source === 'events') {
+          throw new Error('The reporting subgraph is unreachable right now. Please try again shortly.')
+        }
+        all.push(...(res.items || []))
+        if (!res.hasMore || !res.nextCursor) break
+        cursor = res.nextCursor
+      }
+      for (const w of all) {
+        createdAtById.set(String(w.id), Math.floor((Number(w.createdAt) || 0) / 1000))
+      }
+      return all.map((w) => ({
+        id: String(w.id),
+        creator: w.creator,
+        participants: w.participants || [],
+        stakeTokenAddress: w.stakeTokenAddress,
+        stakeAmount: w.stakeAmount,
+      }))
     },
 
     async getWagerEvents(wagerId) {
       if (import.meta.env?.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') return []
-      const c = ensure()
-      const latest = await provider.getBlockNumber()
+      const c = ensureContract()
+      const ctx = await ensureChainCtx()
+      const createdSec = createdAtById.get(String(wagerId)) || 0
+      // Tight window: from shortly before the wager was created to the chain head.
+      const fromBlock = createdSec > 0 ? estimateBlock(createdSec - PRE_WINDOW_SEC, ctx) : ctx.deployBlock
+      const toBlock = ctx.latestBlock
+      const budget = { used: 0, max: SCAN_BUDGET }
       const out = []
       for (const name of escrow.valueEvents) {
         const filter = c.filters[name](wagerId)
-        const logs = await scan(c, provider, filter, escrow.deployBlock, latest, name)
+        const logs = await scanAdaptive(c, filter, fromBlock, toBlock, name, budget)
         for (const ev of logs) out.push(normalizeEvent(ev))
       }
       return out.sort((a, b) => a.blockNumber - b.blockNumber)
