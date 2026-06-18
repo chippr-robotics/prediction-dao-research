@@ -15,6 +15,16 @@ steps:
       - 'VITE_RPC_URL=https://rpc-amoy.polygon.technology'
       - '--build-arg'
       - 'VITE_IPFS_GATEWAY=https://gateway.pinata.cloud'
+      # v2 WagerRegistry subgraph (Spec 017 / #707). Build-time only: Vite inlines
+      # VITE_* at `npm run build`, so this is baked into the bundle — NOT a Cloud Run
+      # runtime var. Public, non-secret URL. Must match VITE_NETWORK_ID above
+      # (80002 = Amoy -> fairwins-amoy). Studio dev query endpoint (rate-limited);
+      # for production traffic, publish to the decentralized net + proxy the keyed
+      # gateway URL via nginx (see the VITE_PINATA_JWT pattern).
+      - '--build-arg'
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.1.0'
+      - '--build-arg'
+      - 'VITE_WAGER_SOURCE=subgraph'
       - '-t'
       - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
       - '-t'
