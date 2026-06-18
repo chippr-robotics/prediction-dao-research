@@ -14,6 +14,7 @@
 
 - Q: How is "Net P&L" calculated? → A: Realized only — Net P&L = (payouts + refunds) − deposits over *settled* wagers; active stakes are excluded from the headline figure and surfaced separately as "at stake."
 - Q: How is "Win Rate" defined? → A: Wins ÷ (wins + losses) — denominator is wagers with a decisive winner; draws, refunds, and cancellations are excluded from both numerator and denominator.
+- Q: What does the "Total Wagered" tile sum? → A: The member's own stake only — sum of the member's own stakes across all their wagers on the active network (not the full pot, not the opponent's stake).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -227,8 +228,11 @@ content.
   member, a personal stats dashboard as its primary content, replacing the
   current address-only layout as the default focus.
 - **FR-002**: The dashboard MUST show summary tiles for at least: Net Profit/Loss
-  (USD), Win Rate, Total Wagered, Active Wagers, and Wallet Balance, each derived
-  from the member's own activity and balances on the active network.
+  (USD, realized: payouts + refunds − deposits over settled wagers), Win Rate
+  (wins ÷ (wins + losses), draws/refunds/cancellations excluded), Total Wagered
+  (the member's own stake only, summed across their wagers), Active Wagers, and
+  Wallet Balance, each derived from the member's own activity and balances on the
+  active network.
 - **FR-003**: Money-denominated values MUST be displayed in USD using compact
   notation, with token symbol/decimals resolved from the active network (no
   hard-coded token names).
