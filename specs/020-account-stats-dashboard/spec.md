@@ -15,6 +15,7 @@
 - Q: How is "Net P&L" calculated? → A: Realized only — Net P&L = (payouts + refunds) − deposits over *settled* wagers; active stakes are excluded from the headline figure and surfaced separately as "at stake."
 - Q: How is "Win Rate" defined? → A: Wins ÷ (wins + losses) — denominator is wagers with a decisive winner; draws, refunds, and cancellations are excluded from both numerator and denominator.
 - Q: What does the "Total Wagered" tile sum? → A: The member's own stake only — sum of the member's own stakes across all their wagers on the active network (not the full pot, not the opponent's stake).
+- Q: What is the chart's default range on load? → A: 30D — the time-series chart opens on the 30-day range by default (7D/30D/90D/All remain selectable; empty/low-data states still apply).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -72,7 +73,7 @@ changing the range selector re-scopes the plotted period.
 
 1. **Given** a member with money-movement history, **When** the dashboard loads,
    **Then** a time-series chart shows their cumulative net P&L over the default
-   range.
+   range of 30 days.
 2. **Given** the chart is shown, **When** the member selects a different range
    (7D / 30D / 90D / All), **Then** the chart re-scopes to that period.
 3. **Given** the member hovers or taps a point on the chart, **When** the point is
@@ -242,7 +243,7 @@ content.
 - **FR-005**: The dashboard MUST display a time-series chart of the member's
   cumulative net P&L over time as the hero visual.
 - **FR-006**: The chart MUST provide a range selector with at least 7D, 30D, 90D,
-  and All options that re-scope the plotted period.
+  and All options that re-scope the plotted period, defaulting to 30D on load.
 - **FR-007**: The chart MUST allow inspecting an individual point to reveal its
   date and cumulative value (hover on pointer devices, tap on touch devices).
 - **FR-008**: When the member has no activity (or too little to form a meaningful
