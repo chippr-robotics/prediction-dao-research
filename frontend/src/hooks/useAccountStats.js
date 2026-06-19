@@ -18,12 +18,13 @@ import { useWallet } from './useWalletManagement'
 import usePriceConversion from './usePriceConversion'
 import { useChainTokens } from './useChainTokens'
 import { getDefaultWagerRepository } from '../data/wagers/WagerRepository'
-import { createReportDataSource } from '../data/reports/reportDataSource'
+import { getContractAddressForChain } from '../config/contracts'
 import {
   computeSummary,
   computePnlSeries,
   computeBreakdowns,
   enrichTransfers,
+  deriveTransfersFromWagers,
   isSettledStatus,
   DEFAULT_RANGE,
 } from '../lib/account'
@@ -101,6 +102,25 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       setIsLoading(false)
       return
     }
+    // Network support is decided by a configured escrow for the active chain —
+    // the same resolution the wager list and report use. Without one, the
+    // dashboard's data is meaningless, so surface the "unsupported" state rather
+    // than spinning forever.
+    const escrowConfigured = Boolean(
+      getContractAddressForChain('wagerRegistry', chainId) ||
+      getContractAddressForChain('friendGroupMarketFactory', chainId),
+    )
+    if (!escrowConfigured) {
+      setIsSupportedNetwork(false)
+      setWagers([])
+      setValuedTransfers([])
+      setTokenMetaByAddress({})
+      setIsLoading(false)
+      const settled = { lastUpdated: Date.now(), status: 'fresh' }
+      setFreshness({ summary: settled, series: settled, balances: settled, activity: settled })
+      return
+    }
+
     const reqId = ++reqIdRef.current
     setIsLoading(true)
     setError(null)
@@ -112,10 +132,8 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     }))
     try {
       const repository = getDefaultWagerRepository()
-      const ds = createReportDataSource({ chainId })
-      const [loadedWagers, rawTransfers, stable] = await Promise.all([
+      const [loadedWagers, stable] = await Promise.all([
         loadAllWagers(repository, address),
-        ds.listTransfers({ account: address }),
         fetchStableBalance({
           provider,
           address,
@@ -125,7 +143,11 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       ])
       if (reqId !== reqIdRef.current) return
 
-      const { transfers, tokenMetaByAddress: meta } = await enrichTransfers(rawTransfers || [], { chainId })
+      // Derive the member's value movements from the SAME authoritative wagers
+      // that power My Wagers — not the separate WagerTransfer entity — so totals,
+      // P&L, breakdowns, and activity are always consistent with the wager list.
+      const rawTransfers = deriveTransfersFromWagers({ wagers: loadedWagers, address })
+      const { transfers, tokenMetaByAddress: meta } = await enrichTransfers(rawTransfers, { chainId })
       if (reqId !== reqIdRef.current) return
 
       setWagers(loadedWagers)

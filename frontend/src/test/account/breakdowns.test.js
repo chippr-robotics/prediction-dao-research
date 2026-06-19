@@ -6,10 +6,10 @@ const ME = '0xMe'
 
 describe('computeBreakdowns (spec 020 — US4, FR-009)', () => {
   const wagers = [
-    { id: '1', status: 'resolved', winner: ME, resolutionType: 1 },
-    { id: '2', status: 'active', resolutionType: 1 },
-    { id: '3', status: 'active', resolutionType: 2 },
-    { id: '4', status: 'refunded', resolutionType: 3 },
+    { id: '1', status: 'resolved', winner: ME, resolutionType: 1 }, // Creator (peer)
+    { id: '2', status: 'active', resolutionType: 1 }, // Creator (peer)
+    { id: '3', status: 'active', resolutionType: 2 }, // Opponent (peer)
+    { id: '4', status: 'refunded', resolutionType: 4 }, // Polymarket (oracle)
   ]
   const transfers = [
     { wagerId: '1', direction: 'deposit', tokenAddress: '0xUSDC', ticker: 'USDC', usdValue: 100 },
@@ -33,16 +33,23 @@ describe('computeBreakdowns (spec 020 — US4, FR-009)', () => {
     expect(byToken[0].symbol).toBe('USDC') // largest stake first
   })
 
-  it('byOracle labels resolution types', () => {
+  it('byOracle labels resolution types from the on-chain enum (peer vs oracle)', () => {
     const { byOracle } = computeBreakdowns({ wagers, transfers })
     const labels = byOracle.map((o) => o.label)
+    // Peer/manual resolution must NOT be mislabeled as an oracle.
+    expect(labels).toContain('Creator')
+    expect(labels).toContain('Opponent')
+    // Real oracle types keep their names.
     expect(labels).toContain('Polymarket')
-    expect(labels).toContain('Chainlink')
-    expect(labels).toContain('UMA')
+    expect(labels).not.toContain('UMA') // no UMA wager in this fixture
   })
 
-  it('oracleLabel falls back for unknown types', () => {
-    expect(oracleLabel(1)).toBe('Polymarket')
+  it('oracleLabel maps the contract enum and falls back for unknown types', () => {
+    expect(oracleLabel(0)).toBe('Either')
+    expect(oracleLabel(1)).toBe('Creator')
+    expect(oracleLabel(3)).toBe('Third Party')
+    expect(oracleLabel(4)).toBe('Polymarket')
+    expect(oracleLabel(7)).toBe('UMA Optimistic Oracle')
     expect(oracleLabel(99)).toBe('Type 99')
   })
 })
