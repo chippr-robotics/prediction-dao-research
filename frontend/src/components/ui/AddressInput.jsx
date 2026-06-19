@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useCallback } from 'react'
 import { useEnsResolution, useEnsReverseLookup } from '../../hooks/useEnsResolution'
+import AddressInputBookAddon from './AddressInputBookAddon'
 import styles from './AddressInput.module.css'
 
 /**
@@ -41,6 +42,8 @@ const AddressInput = forwardRef(({
   ariaDescribedBy,
   showResolvedAddress = true,
   label,
+  enableAddressBook = false,
+  chainId,
   ...props
 }, ref) => {
   // Use ENS resolution hook
@@ -70,6 +73,12 @@ const AddressInput = forwardRef(({
       onChange(e)
     }
   }, [onChange])
+
+  // Select a saved contact: populate the field and notify of the resolved address.
+  const handleBookPick = useCallback((addr) => {
+    if (onChange) onChange({ target: { value: addr } })
+    if (onResolvedChange) onResolvedChange(addr)
+  }, [onChange, onResolvedChange])
 
   // Determine error state
   const hasError = externalError || (value && !isLoading && resolutionError)
@@ -174,6 +183,16 @@ const AddressInput = forwardRef(({
         <div id={errorId} className={styles.errorMessage} role="alert">
           {displayError}
         </div>
+      )}
+
+      {/* Address-book search/select + inline restriction warning (opt-in) */}
+      {enableAddressBook && (
+        <AddressInputBookAddon
+          query={value}
+          chainId={chainId}
+          resolvedAddress={resolvedAddress || (isAddress ? value?.trim() : null)}
+          onPick={handleBookPick}
+        />
       )}
     </div>
   )

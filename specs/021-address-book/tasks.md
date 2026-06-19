@@ -35,8 +35,8 @@ tests under `frontend/src/test/addressBook/`.
 
 **Purpose**: Create the feature's directory structure and shared constants.
 
-- [ ] T001 Create feature directories `frontend/src/lib/addressBook/` and `frontend/src/test/addressBook/` (and confirm `frontend/src/components/account/` exists)
-- [ ] T002 [P] Create `frontend/src/lib/addressBook/constants.js` with the storage key helper (`fw_user_<address>_addressBook` via userStorage), `SCHEMA_VERSION = 1`, export `FORMAT`/`VERSION` strings, and `ADDRESS_BOOK_BACKUP_MESSAGE_V1 = "FairWins Address Book Backup v1"` (domain-separated from crypto/constants.js)
+- [x] T001 Create feature directories `frontend/src/lib/addressBook/` and `frontend/src/test/addressBook/` (and confirm `frontend/src/components/account/` exists)
+- [x] T002 [P] Create `frontend/src/lib/addressBook/constants.js` with the storage key helper (`fw_user_<address>_addressBook` via userStorage), `SCHEMA_VERSION = 1`, export `FORMAT`/`VERSION` strings, and `ADDRESS_BOOK_BACKUP_MESSAGE_V1 = "FairWins Address Book Backup v1"` (domain-separated from crypto/constants.js)
 
 ---
 
@@ -46,10 +46,10 @@ tests under `frontend/src/test/addressBook/`.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 [P] Unit tests for the data store in `frontend/src/test/addressBook/addressBookStore.test.js` — cover CRUD, `normalizeAddress`/`isValidAddress` (reject bad input), `addressKey`, `findByAddress` (duplicate detection regardless of case), `searchEntries`, and `mergeBook`/`applyConflictResolutions` (additive, no data loss) per `contracts/address-book-store.md`
-- [ ] T004 Implement `frontend/src/lib/addressBook/addressBookStore.js` — `loadAddressBook`/`saveAddressBook` (per-wallet localStorage via `utils/userStorage.js`), `createEmptyBook`, contact CRUD, address CRUD, `normalizeAddress`/`isValidAddress` (ethers `getAddress`), `addressKey`, `findByAddress`, `listEntries`, `searchEntries`, `mergeBook`, `applyConflictResolutions` (pure functions; `(address,chainId)` identity per data-model.md)
-- [ ] T005 [P] Unit tests for the hook in `frontend/src/test/addressBook/useAddressBook.test.jsx` — reactivity, per-wallet scoping/isolation, and persistence across mount
-- [ ] T006 [US1] Implement `frontend/src/hooks/useAddressBook.js` — reactive binding over the store, keyed to the connected wallet (load on mount, expose CRUD + search + merge actions that persist) (depends on T004)
+- [x] T003 [P] Unit tests for the data store in `frontend/src/test/addressBook/addressBookStore.test.js` — cover CRUD, `normalizeAddress`/`isValidAddress` (reject bad input), `addressKey`, `findByAddress` (duplicate detection regardless of case), `searchEntries`, and `mergeBook`/`applyConflictResolutions` (additive, no data loss) per `contracts/address-book-store.md`
+- [x] T004 Implement `frontend/src/lib/addressBook/addressBookStore.js` — `loadAddressBook`/`saveAddressBook` (per-wallet localStorage via `utils/userStorage.js`), `createEmptyBook`, contact CRUD, address CRUD, `normalizeAddress`/`isValidAddress` (ethers `getAddress`), `addressKey`, `findByAddress`, `listEntries`, `searchEntries`, `mergeBook`, `applyConflictResolutions` (pure functions; `(address,chainId)` identity per data-model.md)
+- [x] T005 [P] Unit tests for the hook in `frontend/src/test/addressBook/useAddressBook.test.jsx` — reactivity, per-wallet scoping/isolation, and persistence across mount
+- [x] T006 Implement `frontend/src/hooks/useAddressBook.js` — reactive binding over the store, keyed to the connected wallet (load on mount, expose CRUD + search + merge actions that persist) (depends on T004)
 
 **Checkpoint**: Store + hook ready — user story work can begin.
 
@@ -64,12 +64,12 @@ tests under `frontend/src/test/addressBook/`.
 addresses on two networks + a note, reload, confirm everything persists and is
 editable/deletable. Invalid addresses are rejected.
 
-- [ ] T007 [P] [US1] Component + axe test `frontend/src/test/addressBook/ContactEditModal.test.jsx` — add/edit contact with multiple addresses, network defaults to active chain, invalid-address rejection (FR-005), duplicate `(address,chainId)` warning
-- [ ] T008 [P] [US1] Component + axe test `frontend/src/test/addressBook/AddressBookPanel.test.jsx` — list/group, add/edit/delete contact and individual address, persistence after remount, empty state, no-wallet state
-- [ ] T009 [P] [US1] Implement `frontend/src/components/account/ContactCard.jsx` — render one contact: nickname + grouped addresses (network, shortened address, notes) with edit/delete affordances (no screening yet)
-- [ ] T010 [US1] Implement `frontend/src/components/account/ContactEditModal.jsx` — create/edit contact and its addresses; network selector defaulted to active chain (from `config/networks.js`/wallet); address validation + duplicate warning (uses store helpers)
-- [ ] T011 [US1] Implement `frontend/src/components/account/AddressBookPanel.jsx` + `AddressBookPanel.css` — list contacts via `ContactCard`, in-panel search, add/edit/delete via `ContactEditModal`, empty + no-wallet states (uses `useAddressBook`)
-- [ ] T012 [US1] Integrate the tab in `frontend/src/pages/WalletPage.jsx` — add `{ id: 'addressbook', label: 'Address Book' }` to `WALLET_TABS` and render `<AddressBookPanel address={address} />` when `activeTab === 'addressbook'`
+- [x] T007 [P] [US1] Component + axe test `frontend/src/test/addressBook/ContactEditModal.test.jsx` — add/edit contact with multiple addresses, network defaults to active chain, invalid-address rejection (FR-005), duplicate `(address,chainId)` warning
+- [x] T008 [P] [US1] Component + axe test `frontend/src/test/addressBook/AddressBookPanel.test.jsx` — list/group, add/edit/delete contact and individual address, persistence after remount, empty state, no-wallet state
+- [x] T009 [P] [US1] Implement `frontend/src/components/account/ContactCard.jsx` — render one contact: nickname + grouped addresses (network, shortened address, notes) with edit/delete affordances (no screening yet)
+- [x] T010 [US1] Implement `frontend/src/components/account/ContactEditModal.jsx` — create/edit contact and its addresses; network selector defaulted to active chain (from `config/networks.js`/wallet); address validation + duplicate warning (uses store helpers)
+- [x] T011 [US1] Implement `frontend/src/components/account/AddressBookPanel.jsx` + `AddressBookPanel.css` — list contacts via `ContactCard`, in-panel search, add/edit/delete via `ContactEditModal`, empty + no-wallet states (uses `useAddressBook`)
+- [x] T012 [US1] Integrate the tab in `frontend/src/pages/WalletPage.jsx` — add `{ id: 'addressbook', label: 'Address Book' }` to `WALLET_TABS` and render `<AddressBookPanel address={address} />` when `activeTab === 'addressbook'`
 
 **Checkpoint**: Address book CRUD is fully functional and persistent — MVP complete.
 
@@ -84,12 +84,12 @@ an uncertain (not clear) tag; contacts containing a restricted address are marke
 confirm the warning tag appears only on the restricted one, an unconfigured network
 yields "uncertain", and a contact with one restricted address is flagged.
 
-- [ ] T013 [P] [US2] Unit test `frontend/src/test/addressBook/useAddressScreening.test.jsx` — status mapping (clear/restricted/uncertain), fail-closed on unavailable (FR-011), short-TTL cache + in-flight de-dup, and network-scoped behavior (FR-014) per `contracts/address-screening.md`
-- [ ] T014 [US2] Implement `frontend/src/hooks/useAddressScreening.js` — wrap `utils/sanctionsScreen.js` (`screenAddress`/`isClear`), cache by `(chainId, lowercase(address))` with ~60s TTL, expose `getStatus`/`screen`/`anyRestricted`
-- [ ] T015 [P] [US2] Component + axe test `frontend/src/test/addressBook/RestrictionTag.test.jsx` — icon + text for restricted/uncertain, nothing for clear, distinct from colour-only (FR-023)
-- [ ] T016 [P] [US2] Implement `frontend/src/components/account/RestrictionTag.jsx` — accessible tag for `restricted | uncertain | clear | loading`
-- [ ] T017 [US2] Wire screening into `frontend/src/components/account/ContactCard.jsx` and `AddressBookPanel.jsx` — screen visible addresses on open via `useAddressScreening`, show `RestrictionTag` per address, and mark a contact "contains restricted" (FR-010, FR-012)
-- [ ] T018 [US2] Extend `frontend/src/test/addressBook/AddressBookPanel.test.jsx` — assert restricted/uncertain rendering and contact-level restricted mark (mock `screenAddress`)
+- [x] T013 [P] [US2] Unit test `frontend/src/test/addressBook/useAddressScreening.test.jsx` — status mapping (clear/restricted/uncertain), fail-closed on unavailable (FR-011), short-TTL cache + in-flight de-dup, and network-scoped behavior (FR-014) per `contracts/address-screening.md`
+- [x] T014 [US2] Implement `frontend/src/hooks/useAddressScreening.js` — wrap `utils/sanctionsScreen.js` (`screenAddress`/`isClear`), cache by `(chainId, lowercase(address))` with ~60s TTL, expose `getStatus`/`screen`/`anyRestricted`
+- [x] T015 [P] [US2] Component + axe test `frontend/src/test/addressBook/RestrictionTag.test.jsx` — icon + text for restricted/uncertain, nothing for clear, distinct from colour-only (FR-023)
+- [x] T016 [P] [US2] Implement `frontend/src/components/account/RestrictionTag.jsx` — accessible tag for `restricted | uncertain | clear | loading`
+- [x] T017 [US2] Wire screening into `frontend/src/components/account/ContactCard.jsx` and `AddressBookPanel.jsx` — screen visible addresses on open via `useAddressScreening`, show `RestrictionTag` per address, and mark a contact "contains restricted" (FR-010, FR-012)
+- [x] T018 [US2] Extend `frontend/src/test/addressBook/AddressBookPanel.test.jsx` — assert restricted/uncertain rendering and contact-level restricted mark (mock `screenAddress`)
 
 **Checkpoint**: Screening is advisory, fail-closed, network-scoped, and visible.
 
@@ -104,11 +104,11 @@ contact; selection populates the field and any restriction warning travels with 
 nickname, select an address, confirm the field populates and a restricted selection
 surfaces its warning; an empty book still allows manual entry.
 
-- [ ] T019 [P] [US3] Component + axe test `frontend/src/test/addressBook/AddressBookPicker.test.jsx` — search results (nickname/partial address), per-result `RestrictionTag`, `onSelect` payload, empty-book no misleading results
-- [ ] T020 [US3] Implement `frontend/src/components/ui/AddressBookPicker.jsx` — searchable dropdown over `searchEntries`, renders `RestrictionTag` per result, calls `onSelect({ address, chainId, nickname })`
-- [ ] T021 [US3] Extend `frontend/src/components/ui/AddressInput.jsx` — add backward-compatible optional props (`enableAddressBook`, `chainId`); when enabled, render `AddressBookPicker` and surface `RestrictionTag` for the resolved/selected address via existing `onChange`/`onResolvedChange` (FR-015/016)
-- [ ] T022 [P] [US3] Test `frontend/src/test/addressBook/AddressInput.addressBook.test.jsx` — selection populates the field, warning surfaced for restricted selection, and **no behavior change when `enableAddressBook` is falsy** (regression guard)
-- [ ] T023 [US3] Opt in the opponent and arbitrator inputs in `frontend/src/components/fairwins/FriendMarketsModal.jsx` to the picker (pass `enableAddressBook` + `chainId`)
+- [x] T019 [P] [US3] Component + axe test `frontend/src/test/addressBook/AddressBookPicker.test.jsx` — search results (nickname/partial address), per-result `RestrictionTag`, `onSelect` payload, empty-book no misleading results
+- [x] T020 [US3] Implement `frontend/src/components/ui/AddressBookPicker.jsx` — searchable dropdown over `searchEntries`, renders `RestrictionTag` per result, calls `onSelect({ address, chainId, nickname })`
+- [x] T021 [US3] Extend `frontend/src/components/ui/AddressInput.jsx` — add backward-compatible optional props (`enableAddressBook`, `chainId`); when enabled, render `AddressBookPicker` and surface `RestrictionTag` for the resolved/selected address via existing `onChange`/`onResolvedChange` (FR-015/016)
+- [x] T022 [P] [US3] Test `frontend/src/test/addressBook/AddressInput.addressBook.test.jsx` — selection populates the field, warning surfaced for restricted selection, and **no behavior change when `enableAddressBook` is falsy** (regression guard)
+- [x] T023 [US3] Opt in the opponent and arbitrator inputs in `frontend/src/components/fairwins/FriendMarketsModal.jsx` to the picker (pass `enableAddressBook` + `chainId`)
 
 **Checkpoint**: Saved contacts are reusable across the app without regressions.
 
@@ -124,9 +124,9 @@ prompt; dismissal never affects the completed action.
 after success; dismiss it (no save, action unaffected); repeat with a saved address
 and confirm no toast.
 
-- [ ] T024 [P] [US4] Component + axe test `frontend/src/test/addressBook/SaveAddressToast.test.jsx` — appears only for unsaved address, quick-add (nickname required, network prefilled, notes optional), dismiss is a no-op (FR-017/018)
-- [ ] T025 [US4] Implement `frontend/src/components/ui/SaveAddressToast.jsx` — non-blocking toast with quick-add or attach-to-existing, using `useAddressBook` + `findByAddress` to suppress when already saved
-- [ ] T026 [US4] Trigger `SaveAddressToast` after a successful create/accept in `frontend/src/components/fairwins/FriendMarketsModal.jsx` for the counterparty address when not already saved (post-on-chain-confirmation)
+- [x] T024 [P] [US4] Component + axe test `frontend/src/test/addressBook/SaveAddressToast.test.jsx` — appears only for unsaved address, quick-add (nickname required, network prefilled, notes optional), dismiss is a no-op (FR-017/018)
+- [x] T025 [US4] Implement `frontend/src/components/ui/SaveAddressToast.jsx` — non-blocking toast with quick-add or attach-to-existing, using `useAddressBook` + `findByAddress` to suppress when already saved
+- [x] T026 [US4] Trigger `SaveAddressToast` after a successful create/accept in `frontend/src/components/fairwins/FriendMarketsModal.jsx` for the counterparty address when not already saved (post-on-chain-confirmation)
 
 **Checkpoint**: The book grows naturally without interrupting the flow.
 
@@ -142,10 +142,10 @@ imports merge additively.
 restore 100%; import with a different wallet or corrupt file → clear error, book
 unchanged; overlapping import merges without loss/duplicates.
 
-- [ ] T027 [P] [US5] Unit test `frontend/src/test/addressBook/addressBookCrypto.test.js` — round-trip with same signature, wrong-wallet/corrupt → typed error (no plaintext, book untouched), and exported envelope contains no readable names/addresses/notes per `contracts/export-format.md`
-- [ ] T028 [US5] Implement `frontend/src/lib/addressBook/addressBookCrypto.js` — `deriveBackupKey(signer)` / `deriveBackupKeyFromSignature` (keccak256 of signature over `ADDRESS_BOOK_BACKUP_MESSAGE_V1`), `exportAddressBook(book, signer)` and `importAddressBook(envelopeJson, signer)` using `utils/crypto/primitives.js` (`encryptJson`/`decryptJson`); reject unknown `format`/`version`
-- [ ] T029 [US5] Add Export/Import controls + merge-conflict resolution flow to `frontend/src/components/account/AddressBookPanel.jsx` — download encrypted file on export; on import decrypt then `mergeBook` and surface per-conflict keep/take choices via `applyConflictResolutions` (FR-019–022)
-- [ ] T030 [P] [US5] Component test `frontend/src/test/addressBook/AddressBookPanel.importExport.test.jsx` — export triggers download, import restores contacts, wrong-wallet/corrupt shows error and leaves book unchanged, conflict resolution applies choices
+- [x] T027 [P] [US5] Unit test `frontend/src/test/addressBook/addressBookCrypto.test.js` — round-trip with same signature, wrong-wallet/corrupt → typed error (no plaintext, book untouched), and exported envelope contains no readable names/addresses/notes per `contracts/export-format.md`
+- [x] T028 [US5] Implement `frontend/src/lib/addressBook/addressBookCrypto.js` — `deriveBackupKey(signer)` / `deriveBackupKeyFromSignature` (keccak256 of signature over `ADDRESS_BOOK_BACKUP_MESSAGE_V1`), `exportAddressBook(book, signer)` and `importAddressBook(envelopeJson, signer)` using `utils/crypto/primitives.js` (`encryptJson`/`decryptJson`); reject unknown `format`/`version`
+- [x] T029 [US5] Add Export/Import controls + merge-conflict resolution flow to `frontend/src/components/account/AddressBookPanel.jsx` — download encrypted file on export; on import decrypt then `mergeBook` and surface per-conflict keep/take choices via `applyConflictResolutions` (FR-019–022)
+- [x] T030 [P] [US5] Component test `frontend/src/test/addressBook/AddressBookPanel.importExport.test.jsx` — export triggers download, import restores contacts, wrong-wallet/corrupt shows error and leaves book unchanged, conflict resolution applies choices
 
 **Checkpoint**: Members have portable, encrypted backups.
 
@@ -155,10 +155,10 @@ unchanged; overlapping import merges without loss/duplicates.
 
 **Purpose**: Final validation and quality gates across all stories.
 
-- [ ] T031 [P] Run `npm run test:frontend` and ensure the full Vitest suite (unit + component + `vitest-axe`) is green
-- [ ] T032 [P] Run `cd frontend && npm run lint` and resolve any ESLint errors in the new/changed files (no `continue-on-error` added)
-- [ ] T033 Execute `specs/021-address-book/quickstart.md` scenarios US1–US5 manually against a dev server (`npm run frontend`)
-- [ ] T034 Confirm the diff contains **no** changes under `contracts/`, `subgraph/`, or any backend, and that no contract addresses are hardcoded (all via `config/contracts.js`)
+- [x] T031 [P] Run `npm run test:frontend` and ensure the full Vitest suite (unit + component + `vitest-axe`) is green
+- [x] T032 [P] Run `cd frontend && npm run lint` and resolve any ESLint errors in the new/changed files (no `continue-on-error` added)
+- [x] T033 Execute `specs/021-address-book/quickstart.md` scenarios US1–US5 manually against a dev server (`npm run frontend`)
+- [x] T034 Confirm the diff contains **no** changes under `contracts/`, `subgraph/`, or any backend, and that no contract addresses are hardcoded (all via `config/contracts.js`)
 
 ---
 

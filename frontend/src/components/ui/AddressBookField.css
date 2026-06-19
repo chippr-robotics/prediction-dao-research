@@ -1,0 +1,62 @@
+.ab-field-addon {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ab-field-addon-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ab-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 0.4rem;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--card-bg, #fff);
+}
+
+.ab-picker-list li + li {
+  border-top: 1px solid var(--border-color, #f1f5f9);
+}
+
+.ab-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  color: inherit;
+}
+
+.ab-picker-option:hover,
+.ab-picker-option:focus-visible {
+  background: var(--chip-bg, #f1f5f9);
+}
+
+.ab-picker-nick {
+  font-weight: 600;
+}
+
+.ab-picker-addr {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.ab-picker-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+}
