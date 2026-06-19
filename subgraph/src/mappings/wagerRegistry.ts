@@ -187,6 +187,12 @@ export function handleWagerDeclined(event: WagerDeclined): void {
   if (wager == null) return
   wager.status = 'declined'
   wager.save()
+
+  // Declining an open wager refunds the creator their stake on-chain
+  // (WagerRegistry.declineWager → token.safeTransfer(creator, creatorStake)).
+  // Only the creator ever deposited, so record one refund row — without it the
+  // creator's deposit looks like an unrecovered loss in P&L/activity reporting.
+  recordTransfer(event, id, wager.creator, REFUND, wager.token, wager.creatorStake, event.address, wager.creator)
 }
 
 export function handleDrawProposed(event: DrawProposed): void {

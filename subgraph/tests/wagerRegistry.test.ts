@@ -239,4 +239,26 @@ describe('US2: WagerTransfer records', () => {
     assert.fieldEquals('WagerTransfer', id, 'direction', 'refund')
     assert.fieldEquals('WagerTransfer', id, 'amount', '1000')
   })
+
+  test('WagerDeclined emits one refund row (creator only) for the returned stake', () => {
+    handleWagerCreated(created(16))
+    // One deposit row from creation so far.
+    assert.entityCount('WagerTransfer', 1)
+    let event = declined(16)
+    // The decline happens in a different transaction than creation; give it a
+    // distinct hash so the refund row doesn't share the deposit's transfer id
+    // (newMockEvent reuses one default txHash/logIndex across mock events).
+    event.transaction.hash = Bytes.fromHexString(
+      '0x00000000000000000000000000000000000000000000000000000000deadbeef',
+    )
+    handleWagerDeclined(event)
+    // Decline refunds the creator their stake — a second (refund) row.
+    assert.entityCount('WagerTransfer', 2)
+    let id = transferId(event, CREATOR)
+    assert.fieldEquals('WagerTransfer', id, 'direction', 'refund')
+    assert.fieldEquals('WagerTransfer', id, 'party', CREATOR.toHexString())
+    assert.fieldEquals('WagerTransfer', id, 'amount', '1000')
+    assert.fieldEquals('WagerTransfer', id, 'from', event.address.toHexString())
+    assert.fieldEquals('WagerTransfer', id, 'to', CREATOR.toHexString())
+  })
 })
