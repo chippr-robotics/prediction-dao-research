@@ -2,6 +2,18 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
+
+// Stub the camera-driven scanner: when open, expose a button that fires a scan.
+const SCANNED = '0x52908400098527886E0F7030069857D2E4169EE7'
+vi.mock('../../components/ui/QRScanner', () => ({
+  default: ({ isOpen, onScanSuccess }) =>
+    isOpen ? (
+      <button type="button" onClick={() => onScanSuccess(`ethereum:${SCANNED}`)}>
+        mock-scan
+      </button>
+    ) : null,
+}))
+
 import ContactEditModal from '../../components/account/ContactEditModal'
 
 const NETWORKS = [
@@ -60,6 +72,14 @@ describe('ContactEditModal', () => {
     setup({ findDuplicate })
     await user.type(screen.getByLabelText('Address *'), VALID)
     expect(await screen.findByText(/Already saved under "Bob"/)).toBeInTheDocument()
+  })
+
+  it('fills an address row from a scanned QR code (iteration 2)', async () => {
+    const user = userEvent.setup()
+    setup()
+    await user.click(screen.getByRole('button', { name: 'Scan a QR code for address 1' }))
+    await user.click(screen.getByRole('button', { name: 'mock-scan' }))
+    expect(screen.getByLabelText('Address *')).toHaveValue(SCANNED)
   })
 
   it('has no accessibility violations', async () => {

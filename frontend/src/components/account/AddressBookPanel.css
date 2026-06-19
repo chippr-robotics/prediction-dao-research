@@ -4,6 +4,49 @@
   gap: 1rem;
 }
 
+.ab-panel-head-titles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Address input + inline QR scan button inside the contact edit modal. */
+.ab-input-with-scan {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.ab-input-with-scan input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ab-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-width: 42px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 0.375rem;
+  background: var(--btn-bg, #f8fafc);
+  color: inherit;
+  cursor: pointer;
+}
+
+.ab-scan-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.ab-scan-btn:hover,
+.ab-scan-btn:focus-visible {
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+}
+
 .ab-panel-head {
   display: flex;
   align-items: center;

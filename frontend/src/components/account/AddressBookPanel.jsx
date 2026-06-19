@@ -15,6 +15,7 @@ import { addressKey, listEntries } from '../../lib/addressBook/addressBookStore'
 import ContactCard from './ContactCard'
 import ContactEditModal from './ContactEditModal'
 import AddressBookImportExport from './AddressBookImportExport'
+import ScreeningInfoButton from '../ui/ScreeningInfoButton'
 import './AddressBookPanel.css'
 
 function networkName(chainId) {
@@ -99,7 +100,10 @@ export default function AddressBookPanel({ address }) {
   return (
     <div className="ab-panel">
       <div className="ab-panel-head">
-        <h3>Address Book</h3>
+        <div className="ab-panel-head-titles">
+          <h3>Address Book</h3>
+          <ScreeningInfoButton />
+        </div>
         <div className="ab-panel-head-actions">
           <AddressBookImportExport />
           <button
