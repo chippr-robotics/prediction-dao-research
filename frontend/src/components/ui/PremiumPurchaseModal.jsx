@@ -5,12 +5,13 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
-import { ensureKeyRegistered } from '../../utils/keyRegistryService'
+import { getUserTierOnChain } from '../../utils/blockchainService'
 import { getCurrentDocument } from '../../utils/legalDocs'
 import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
 import MembershipAttestation from '../compliance/MembershipAttestation'
 import { getTransactionUrl } from '../../config/blockExplorer'
+import { usePurchaseFlow } from '../../hooks/usePurchaseFlow'
+import PurchaseProgressView from './PurchaseProgressView'
 import './PremiumPurchaseModal.css'
 
 /**
@@ -91,6 +92,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { showNotification } = useNotification()
   const { getPrice, getLimits } = useTierPrices()
   const { ensureInitialized } = useEncryption()
+  const flow = usePurchaseFlow()
 
   const isUpgradeFlow = action === 'upgrade'
   const isExtendFlow = action === 'extend'
@@ -98,11 +100,15 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [acknowledged, setAcknowledged] = useState(false)
-  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [showProcessing, setShowProcessing] = useState(false)
   const [purchaseResult, setPurchaseResult] = useState(null)
   const [errors, setErrors] = useState({})
   const [keyRegStatus, setKeyRegStatus] = useState(null) // null | 'registering' | 'success' | 'skipped' | 'failed'
   const [keyRegError, setKeyRegError] = useState(null)
+
+  // While any wallet interaction is in flight the modal must not be dismissed
+  // (FR-012) and the step/footer controls are locked.
+  const isBusy = flow.status === 'running'
 
   const [userCurrentTier, setUserCurrentTier] = useState(0)
   const [isLoadingTier, setIsLoadingTier] = useState(false)
@@ -180,12 +186,14 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     }
     if (!validateStep(1)) return
 
-    setIsPurchasing(true)
-    try {
-      const tierValue = selectedTierInfo.id
-      const tierName = selectedTierInfo.name
-      showNotification(`Please confirm the transaction in your wallet (${tierName} tier, ${selectedPrice} USDC)`, 'info', 10000)
+    const tierValue = selectedTierInfo.id
+    const tierName = selectedTierInfo.name
+    showNotification(`Confirm the wallet prompts to complete your ${tierName} membership (${selectedPrice} USDC)`, 'info', 10000)
 
+    // Switch to the dedicated Processing view (spec 022) — the step indicator
+    // surfaces each wallet interaction in turn.
+    setShowProcessing(true)
+    try {
       // Get a fresh signer
       const { ethers } = await import('ethers')
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
@@ -195,46 +203,56 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
 
       // Spec 007 (FR-039): record the accepted in-force Terms version hash on-chain.
       const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
-      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action, acceptedTermsHash)
-      grantRole(ROLE_KEY)
-      recordRolePurchase(account, ROLE_KEY, {
-        price: selectedPrice,
-        currency: 'USDC',
-        tier: selectedTier,
-        tierValue,
-        txHash: receipt.hash,
-        purchasedBy: account,
-      }, chainId)
-      setPurchaseResult({ success: true, tier: tierName, txHash: receipt.hash })
-      try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
-      showNotification(`${tierName} membership activated.`, 'success', 7000)
 
-      // Auto-register encryption key after successful payment
-      setKeyRegStatus('registering')
-      try {
-        const keys = await ensureInitialized()
-        if (keys?.publicKey) {
-          const wasNew = await ensureKeyRegistered(signer, account, keys.publicKey)
-          setKeyRegStatus(wasNew ? 'success' : 'skipped')
-        } else {
-          setKeyRegStatus('failed')
-          setKeyRegError('Could not derive encryption keys')
-        }
-      } catch (keyErr) {
-        console.warn('[PremiumPurchaseModal] key registration failed (non-fatal):', keyErr.message)
-        setKeyRegStatus('failed')
-        setKeyRegError(keyErr.message)
-      }
-
-      setCurrentStep(2)
+      await flow.start({
+        signer,
+        account,
+        roleName: ROLE_KEY,
+        priceUSD: selectedPrice,
+        tier: tierValue,
+        action,
+        termsHash: acceptedTermsHash,
+        ensureInitialized,
+        // Membership is active the moment payment confirms — run side effects then,
+        // before the (non-blocking) key steps.
+        onPaid: async (receipt) => {
+          grantRole(ROLE_KEY)
+          recordRolePurchase(account, ROLE_KEY, {
+            price: selectedPrice,
+            currency: 'USDC',
+            tier: selectedTier,
+            tierValue,
+            txHash: receipt.hash,
+            purchasedBy: account,
+          }, chainId)
+          try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
+          showNotification(`${tierName} membership activated.`, 'success', 7000)
+        },
+      })
     } catch (err) {
-      console.error('[PremiumPurchaseModal] purchase failed:', err)
+      // Failure to even acquire a signer (before the flow starts). In-flow failures
+      // are handled by the progress view's Retry / Continue actions.
+      console.error('[PremiumPurchaseModal] purchase setup failed:', err)
       setPurchaseResult({ success: false, error: err.message })
       showNotification('Purchase failed: ' + err.message, 'error', 7000)
-    } finally {
-      setIsPurchasing(false)
+      setShowProcessing(false)
+      setCurrentStep(2)
     }
   }
+
+  // React to the flow reaching a terminal success (all steps done, or the member
+  // chose "Continue anyway" past a non-blocking key step).
+  useEffect(() => {
+    if (flow.status !== 'succeeded') return
+    setPurchaseResult({ success: true, tier: selectedTierInfo?.name, txHash: flow.purchaseReceipt?.hash })
+    setKeyRegStatus(flow.keyRegOutcome) // 'success' | 'skipped' | 'failed'
+    if (flow.keyRegOutcome === 'failed') {
+      setKeyRegError('Key registration was not completed')
+    }
+    setShowProcessing(false)
+    setCurrentStep(2)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.status])
 
   const resetForm = useCallback(() => {
     setCurrentStep(0)
@@ -242,17 +260,18 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     setAcknowledged(false)
     setPurchaseResult(null)
     setErrors({})
-    setIsPurchasing(false)
+    setShowProcessing(false)
     setKeyRegStatus(null)
     setKeyRegError(null)
-  }, [])
+    flow.reset()
+  }, [flow])
 
   const handleClose = useCallback(() => {
-    if (!isPurchasing) {
+    if (!isBusy) {
       resetForm()
       onClose?.()
     }
-  }, [isPurchasing, resetForm, onClose])
+  }, [isBusy, resetForm, onClose])
 
   if (!isOpen) return null
 
@@ -281,7 +300,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
           <button
             className="ppm-close-btn"
             onClick={handleClose}
-            disabled={isPurchasing}
+            disabled={isBusy}
             aria-label="Close modal"
           >
             <span aria-hidden="true">&times;</span>
@@ -297,7 +316,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                 key={step.id}
                 className={`ppm-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
                 onClick={() => handleStepClick(index)}
-                disabled={isPurchasing || index > currentStep}
+                disabled={isBusy || index > currentStep}
                 aria-current={isActive ? 'step' : undefined}
               >
                 <span className="ppm-step-icon" aria-hidden="true">
@@ -310,8 +329,32 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         </nav>
 
         <div className="ppm-content">
+          {/* Processing view (spec 022): dedicated per-wallet-interaction progress,
+              shown between Review and Complete. */}
+          {showProcessing && (
+            <div className="ppm-panel" role="tabpanel">
+              <section className="ppm-section">
+                <h3 className="ppm-section-title">
+                  <span aria-hidden="true">⏳</span> Completing your purchase
+                </h3>
+                <PurchaseProgressView
+                  steps={flow.steps}
+                  activeIndex={flow.activeIndex}
+                  activeStep={flow.activeStep}
+                  status={flow.status}
+                  completedCount={flow.completedCount}
+                  total={flow.total}
+                  progressFraction={flow.progressFraction}
+                  canContinueAnyway={flow.canContinueAnyway}
+                  onRetry={flow.retry}
+                  onContinueAnyway={flow.continueAnyway}
+                />
+              </section>
+            </div>
+          )}
+
           {/* Step 1: Tier */}
-          {currentStep === 0 && (
+          {!showProcessing && currentStep === 0 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section">
                 <div className="ppm-section-header">
@@ -379,7 +422,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                             value={tierKey}
                             checked={isSelected}
                             onChange={() => setSelectedTier(tierKey)}
-                            disabled={isPurchasing}
+                            disabled={isBusy}
                             className="ppm-tier-radio"
                           />
                           <div className="ppm-tier-content">
@@ -404,7 +447,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
           )}
 
           {/* Step 2: Review */}
-          {currentStep === 1 && (
+          {!showProcessing && currentStep === 1 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section">
                 <h3 className="ppm-section-title">
@@ -574,40 +617,38 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
 
         <footer className="ppm-footer">
           <div className="ppm-footer-left">
-            {currentStep > 0 && currentStep < 2 && (
-              <button type="button" className="ppm-btn-secondary" onClick={handleBack} disabled={isPurchasing}>
+            {!showProcessing && currentStep > 0 && currentStep < 2 && (
+              <button type="button" className="ppm-btn-secondary" onClick={handleBack} disabled={isBusy}>
                 Back
               </button>
             )}
           </div>
           <div className="ppm-footer-right">
-            {currentStep < 2 && (
-              <button type="button" className="ppm-btn-secondary" onClick={handleClose} disabled={isPurchasing}>
+            {/* During the Processing view, recovery actions live in the progress
+                view itself (Retry / Continue anyway), so the form footer is hidden. */}
+            {!showProcessing && currentStep < 2 && (
+              <button type="button" className="ppm-btn-secondary" onClick={handleClose} disabled={isBusy}>
                 Cancel
               </button>
             )}
-            {currentStep === 0 && (
+            {!showProcessing && currentStep === 0 && (
               <button
                 type="button"
                 className="ppm-btn-primary"
                 onClick={handleNext}
-                disabled={isPurchasing || availableTiers.length === 0}
+                disabled={isBusy || availableTiers.length === 0}
               >
                 Continue
               </button>
             )}
-            {currentStep === 1 && (
+            {!showProcessing && currentStep === 1 && (
               <button
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
                 onClick={handlePurchase}
-                disabled={isPurchasing || !isConnected || !isCorrectNetwork || !acknowledged}
+                disabled={isBusy || !isConnected || !isCorrectNetwork || !acknowledged}
               >
-                {isPurchasing ? (
-                  <><span className="ppm-spinner" aria-hidden="true" /> Processing...</>
-                ) : (
-                  <>Confirm Purchase (${selectedPrice.toFixed(2)} USDC)</>
-                )}
+                Confirm Purchase (${selectedPrice.toFixed(2)} USDC)
               </button>
             )}
             {currentStep === 2 && (
