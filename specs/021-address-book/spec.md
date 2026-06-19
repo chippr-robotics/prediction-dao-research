@@ -26,6 +26,12 @@ book lives entirely on the member's own device (it is private contact data, not
 shared protocol state) and can be exported and re-imported in encrypted form so a
 member can move their contacts between devices or back them up safely.
 
+## Clarifications
+
+### Session 2026-06-19
+
+- Q: How is the encrypted export/import keyed? → A: Wallet-signature-derived key — the encryption key is derived deterministically from a member's wallet signature (reusing the project's deterministic key-generation pattern); a backup is restorable only with the same wallet, with no passphrase to remember.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Manage contacts in the My Account address book (Priority: P1)
@@ -284,10 +290,15 @@ confirm importing with a wrong secret fails safely.
 
 - **FR-019**: Members MUST be able to export their entire address book to an
   encrypted file that does not expose names, addresses, or notes in readable form.
+  The encryption key MUST be derived deterministically from the member's wallet
+  signature (reusing the project's deterministic key-generation pattern), so the
+  export requires no separately-remembered passphrase.
 - **FR-020**: Members MUST be able to import a previously exported file, restoring
-  all contacts with their addresses, networks, and notes intact.
-- **FR-021**: Import with an incorrect secret or a corrupted/invalid file MUST fail
-  with a clear error and MUST leave the existing address book unchanged.
+  all contacts with their addresses, networks, and notes intact, by re-deriving the
+  key from the same wallet that produced the export.
+- **FR-021**: Import attempted with a different/incorrect wallet, or with a
+  corrupted/invalid file, MUST fail with a clear error (and MUST NOT reveal contact
+  data) and MUST leave the existing address book unchanged.
 - **FR-022**: When an import overlaps with existing contacts, the system MUST let the
   member merge without silently discarding existing data or creating unintended
   duplicates.
@@ -345,10 +356,12 @@ confirm importing with a wrong secret fails safely.
 - **Per-member scoping**: The book is associated with the connected wallet so that
   different members on a shared device do not see each other's contacts; this mirrors
   the project's network-/member-scoping principle.
-- **Encryption secret for export/import**: Export/import is protected by a
-  member-supplied secret (e.g. a passphrase) so the backup is portable across devices
-  and wallets; the exact key-derivation approach is an implementation detail to be
-  settled in planning and may align with the project's existing encryption utilities.
+- **Encryption secret for export/import**: Export/import is protected by a key
+  derived deterministically from the member's wallet signature (reusing the project's
+  deterministic key-generation pattern), so there is no separate passphrase to
+  remember. A consequence is that a backup is restorable only with the **same
+  wallet** that created it — portability is across devices for that wallet, not
+  across different wallets.
 - **Restriction is advisory in the client**: Consistent with existing behaviour, the
   client warning is a pre-check for UX; the authoritative block remains the on-chain
   guard, so the address book never needs to "enforce" anything itself.
