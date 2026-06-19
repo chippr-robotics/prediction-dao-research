@@ -161,3 +161,7 @@ medusa-corpus/
 
 # MkDocs
 site/
+
+# Playwright MCP session artifacts (console logs, page snapshots, downloaded
+# browser extensions like the MetaMask .crx) — transient, can be tens of MB.
+.playwright-mcp/
