@@ -29,7 +29,7 @@ import {
 import { diffWagers } from '../data/notifications/diffEngine'
 import { deriveActionNeeded } from '../data/notifications/derivedState'
 import { computeDeadlineWarnings } from '../data/notifications/deadlineWarnings'
-import { scanDrawProposals } from '../data/notifications/drawProposalScan'
+import { fetchDrawProposals } from '../data/notifications/drawProposalScan'
 
 const MAX_TOASTS_PER_CYCLE = 3
 const TOAST_DURATION_MS = 6000
@@ -37,7 +37,7 @@ const TOAST_DURATION_MS = 6000
 export function WagerActivityProvider({
   children,
   fetchWagers = fetchFriendMarketsForUser,
-  scanProposals = scanDrawProposals,
+  scanProposals = fetchDrawProposals,
 }) {
   const { account: rawAccount, chainId } = useWallet()
   const { showNotification } = useNotification()
@@ -89,25 +89,27 @@ export function WagerActivityProvider({
       const base = storeRef.current
       const ids = wagers.map(w => String(w.id))
 
-      // Best-effort draw-proposal scan — pending consent is not readable from
-      // chain state, only observable as events. Failure never blocks the
-      // struct pipeline.
-      let scan = { proposals: [], toBlock: base.drawScanBlock }
+      // Best-effort draw-proposal read — the open-draw proposer is not in the
+      // WagerRegistry struct, so it comes from the subgraph (`drawProposer`).
+      // Failure never blocks the struct pipeline.
+      let scan = { proposals: [], ok: false }
       try {
-        scan = await scanProposals({ chainId, wagerIds: ids, fromBlock: base.drawScanBlock })
+        scan = await scanProposals({ chainId, wagerIds: ids })
       } catch {
-        scan = { proposals: [], toBlock: base.drawScanBlock }
+        scan = { proposals: [], ok: false }
       }
       if (scopeRef.current !== scope) return
 
-      // Latest event per wager wins (scan results are chronological).
-      const latestProposal = new Map()
-      for (const p of scan.proposals || []) latestProposal.set(String(p.wagerId), p)
-      const enriched = wagers.map(w => {
-        const p = latestProposal.get(String(w.id))
-        if (!p) return w
-        return { ...w, drawProposedBy: p.revoked ? null : p.proposer }
-      })
+      // A successful read is a COMPLETE snapshot of the requested wagers' draw
+      // state, so set drawProposedBy for every wager (proposer or null) — the
+      // diff then detects both a new proposal (null → proposer) and a revoke
+      // (proposer → null). On a failed read, retain prior state (leave
+      // drawProposedBy unset) rather than null everything and fabricate revokes.
+      const proposerByWagerId = new Map()
+      for (const p of scan.proposals || []) proposerByWagerId.set(String(p.wagerId), p.proposer)
+      const enriched = scan.ok
+        ? wagers.map(w => ({ ...w, drawProposedBy: proposerByWagerId.get(String(w.id)) ?? null }))
+        : wagers
 
       const { entries: changeEntries, nextSnapshots } = diffWagers({
         snapshots: base.snapshots,
@@ -124,16 +126,17 @@ export function WagerActivityProvider({
       const fresh = [...changeEntries, ...warnEntries]
 
       // Re-read the store AFTER all awaits: a markRead that landed while this
-      // poll was in flight must survive the save. snapshots/deadlineWarnings/
-      // drawScanBlock are poll-owned (polls never overlap), so the freshly
-      // computed values are authoritative; entries and their read flags come
-      // from the latest store.
+      // poll was in flight must survive the save. snapshots/deadlineWarnings are
+      // poll-owned (polls never overlap), so the freshly computed values are
+      // authoritative; entries and their read flags come from the latest store.
       const latest = storeRef.current
       let next = {
         ...latest,
         snapshots: nextSnapshots,
         deadlineWarnings: nextWarnRecords,
-        drawScanBlock: scan.toBlock ?? base.drawScanBlock,
+        // Draw state now comes from the subgraph each poll, not an incremental
+        // log scan — the watermark is retained (store-shape compat) but unused.
+        drawScanBlock: base.drawScanBlock,
         lastPolledAt: nowMs,
       }
       next = appendEntries(next, fresh)

@@ -16,6 +16,8 @@ import {
   WagerCancelled,
   WagerResolved,
   WagerDeclined,
+  DrawProposed,
+  DrawRevoked,
 } from '../generated/WagerRegistry/WagerRegistry'
 import {
   handleWagerCreated,
@@ -26,6 +28,8 @@ import {
   handleWagerCancelled,
   handleWagerResolved,
   handleWagerDeclined,
+  handleDrawProposed,
+  handleDrawRevoked,
 } from '../src/mappings/wagerRegistry'
 
 const CREATOR = Address.fromString('0x1111111111111111111111111111111111111111')
@@ -119,6 +123,22 @@ function declined(wagerId: i32): WagerDeclined {
   return event
 }
 
+function drawProposed(wagerId: i32, proposer: Address): DrawProposed {
+  let event = changetype<DrawProposed>(newMockEvent())
+  event.parameters = new Array<ethereum.EventParam>()
+  event.parameters.push(new ethereum.EventParam('wagerId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(wagerId))))
+  event.parameters.push(new ethereum.EventParam('proposer', ethereum.Value.fromAddress(proposer)))
+  return event
+}
+
+function drawRevoked(wagerId: i32, proposer: Address): DrawRevoked {
+  let event = changetype<DrawRevoked>(newMockEvent())
+  event.parameters = new Array<ethereum.EventParam>()
+  event.parameters.push(new ethereum.EventParam('wagerId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(wagerId))))
+  event.parameters.push(new ethereum.EventParam('proposer', ethereum.Value.fromAddress(proposer)))
+  return event
+}
+
 // ---------------------------------------------------------------------------
 // US1 — Wager identity + lifecycle status
 // ---------------------------------------------------------------------------
@@ -163,6 +183,28 @@ describe('US1: Wager indexing', () => {
     handleWagerCreated(created(6))
     handleWagerDeclined(declined(6))
     assert.fieldEquals('Wager', '6', 'status', 'declined')
+  })
+
+  test('draw proposed records proposer + draw_proposed; revoke clears it and returns to active', () => {
+    handleWagerCreated(created(20))
+    handleWagerAccepted(accepted(20))
+    assert.fieldEquals('Wager', '20', 'status', 'active')
+
+    // Opponent proposes a draw: status flips and the proposer is recorded so the
+    // notifier can name them (and decide the creator's respond-draw action)
+    // without an eth_getLogs scan.
+    handleDrawProposed(drawProposed(20, OPPONENT))
+    assert.fieldEquals('Wager', '20', 'status', 'draw_proposed')
+    assert.fieldEquals('Wager', '20', 'drawProposer', OPPONENT.toHexString())
+
+    // Revoke returns the wager to active and clears the proposer (matchstick
+    // renders an unset nullable field as the string 'null').
+    handleDrawRevoked(drawRevoked(20, OPPONENT))
+    assert.fieldEquals('Wager', '20', 'status', 'active')
+    assert.fieldEquals('Wager', '20', 'drawProposer', 'null')
+
+    // No draw event ever produces a value movement (no WagerTransfer rows).
+    assert.entityCount('WagerTransfer', 2) // creator + opponent deposits only
   })
 })
 

@@ -22,7 +22,7 @@ steps:
       # for production traffic, publish to the decentralized net + proxy the keyed
       # gateway URL via nginx (see the VITE_PINATA_JWT pattern).
       - '--build-arg'
-      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.1.0'
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.2.0'
       - '--build-arg'
       - 'VITE_WAGER_SOURCE=subgraph'
       - '-t'

@@ -70,7 +70,7 @@ function OptionalProbe() {
   return <div data-testid="optional">{value === null ? 'null' : 'present'}</div>
 }
 
-const okScan = vi.fn(async ({ fromBlock }) => ({ proposals: [], toBlock: fromBlock || 100 }))
+const okScan = vi.fn(async () => ({ proposals: [], ok: true }))
 
 function renderProvider({ fetchWagers, scanProposals = okScan } = {}) {
   return render(
@@ -246,10 +246,10 @@ describe('catch-up + feed (T013)', () => {
     let releaseScan
     const gate = new Promise((res) => { releaseScan = res })
     const scanProposals = vi.fn()
-      .mockImplementationOnce(async ({ fromBlock }) => ({ proposals: [], toBlock: fromBlock }))
-      .mockImplementationOnce(async ({ fromBlock }) => {
+      .mockImplementationOnce(async () => ({ proposals: [], ok: true }))
+      .mockImplementationOnce(async () => {
         await gate
-        return { proposals: [], toBlock: fromBlock }
+        return { proposals: [], ok: true }
       })
     renderProvider({ fetchWagers, scanProposals })
     await flushPoll(0) // poll 1: catch-up creates the entry
@@ -378,13 +378,15 @@ describe('deadline warnings wiring (T029)', () => {
   })
 })
 
-describe('draw-proposal scan wiring (T022)', () => {
+describe('draw-proposal subgraph wiring (T022)', () => {
   it('emits draw-proposed entry and respondDraw action when counterparty proposes', async () => {
     const w = wager({ status: 'active' })
     const fetchWagers = vi.fn(async () => [w])
+    // Subgraph snapshot: first poll has no open draw; the next reports the
+    // opponent's open proposal on wager 1.
     const scanProposals = vi.fn()
-      .mockResolvedValueOnce({ proposals: [], toBlock: 50 })
-      .mockResolvedValue({ proposals: [{ wagerId: '1', proposer: OPPONENT, revoked: false }], toBlock: 80 })
+      .mockResolvedValueOnce({ proposals: [], ok: true })
+      .mockResolvedValue({ proposals: [{ wagerId: '1', proposer: OPPONENT }], ok: true })
     renderProvider({ fetchWagers, scanProposals })
     await flushPoll(0)
     expect(captured.entries.filter(e => e.type === 'draw-proposed')).toEqual([])
@@ -392,19 +394,50 @@ describe('draw-proposal scan wiring (T022)', () => {
     await flushPoll(30_000)
     expect(captured.entries.some(e => e.type === 'draw-proposed')).toBe(true)
     expect(captured.actionNeededByWagerId['1']).toBe('respondDraw')
-    // watermark advanced + persisted
-    expect(loadStore(ACCOUNT, CHAIN).drawScanBlock).toBe(80)
-    // scan got the known wager ids and prior watermark
+    // The lookup is scoped to the user's wager ids (no log-scan watermark).
     expect(scanProposals).toHaveBeenLastCalledWith(
-      expect.objectContaining({ chainId: CHAIN, wagerIds: ['1'], fromBlock: 50 })
+      expect.objectContaining({ chainId: CHAIN, wagerIds: ['1'] })
     )
+  })
+
+  it('detects a revoke when a previously-proposed wager drops out of the snapshot', async () => {
+    const fetchWagers = vi.fn(async () => [wager({ status: 'active' })])
+    // No open draw at first sight; a live poll introduces the opponent's
+    // proposal, then a later poll shows it withdrawn (gone from the snapshot).
+    const scanProposals = vi.fn()
+      .mockResolvedValueOnce({ proposals: [], ok: true })
+      .mockResolvedValueOnce({ proposals: [{ wagerId: '1', proposer: OPPONENT }], ok: true })
+      .mockResolvedValue({ proposals: [], ok: true })
+    renderProvider({ fetchWagers, scanProposals })
+    await flushPoll(0) // first sight: snapshot drawProposedBy = null, no entry
+    await flushPoll(30_000) // proposal appears (live): draw-proposed
+    expect(captured.entries.some(e => e.type === 'draw-proposed')).toBe(true)
+    expect(captured.actionNeededByWagerId['1']).toBe('respondDraw')
+    await flushPoll(30_000) // proposal gone: draw-revoked
+    expect(captured.entries.some(e => e.type === 'draw-revoked')).toBe(true)
+    expect(captured.actionNeededByWagerId['1']).toBeNull()
+  })
+
+  it('a failed subgraph read (ok:false) retains prior draw state — no false revoke', async () => {
+    const fetchWagers = vi.fn(async () => [wager({ status: 'active' })])
+    const scanProposals = vi.fn()
+      .mockResolvedValueOnce({ proposals: [], ok: true })
+      .mockResolvedValueOnce({ proposals: [{ wagerId: '1', proposer: OPPONENT }], ok: true })
+      .mockResolvedValue({ proposals: [], ok: false }) // subgraph unreachable
+    renderProvider({ fetchWagers, scanProposals })
+    await flushPoll(0) // first sight: drawProposedBy = null
+    await flushPoll(30_000) // proposal appears: draw-proposed
+    expect(captured.entries.some(e => e.type === 'draw-proposed')).toBe(true)
+    await flushPoll(30_000) // failed read: must NOT fabricate a revoke
+    expect(captured.entries.some(e => e.type === 'draw-revoked')).toBe(false)
+    expect(captured.actionNeededByWagerId['1']).toBe('respondDraw')
   })
 
   it('scan failure leaves the struct pipeline unaffected', async () => {
     const fetchWagers = vi.fn()
       .mockResolvedValueOnce([wager()])
       .mockResolvedValue([wager({ status: 'active' })])
-    const scanProposals = vi.fn(async ({ fromBlock }) => ({ proposals: [], toBlock: fromBlock || 0 }))
+    const scanProposals = vi.fn(async () => ({ proposals: [], ok: false }))
     renderProvider({ fetchWagers, scanProposals })
     await flushPoll(0)
     await flushPoll(30_000)
