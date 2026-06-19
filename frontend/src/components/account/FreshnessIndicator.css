@@ -1,0 +1,39 @@
+.account-freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-freshness-badge.stale {
+  color: var(--semantic-warning, #F5A623);
+  font-weight: 600;
+}
+
+.account-freshness-refresh {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full, 9999px);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.account-freshness-refresh:hover:not(:disabled) {
+  color: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary, #36B37E);
+}
+
+.account-freshness-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-freshness-refresh:focus-visible {
+  outline: 2px solid var(--brand-secondary, #4C9AFF);
+  outline-offset: 1px;
+}

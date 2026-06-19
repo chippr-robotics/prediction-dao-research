@@ -1,0 +1,33 @@
+.account-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-identity-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-identity-address {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.account-identity .status-dot.connected {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--semantic-win, #2ECC71);
+  display: inline-block;
+}

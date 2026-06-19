@@ -34,6 +34,26 @@ vi.mock('../hooks/useUserPreferences', () => ({
 vi.mock('../hooks/useChainTokens', () => ({
   useChainTokens: () => ({ capabilities: {} }),
 }))
+// Spec 020 — the Account tab now renders the stats dashboard. Mock its data
+// hook so this entry-point test stays network-free; the dashboard still renders
+// the preserved wallet utilities (address + Show QR + Disconnect).
+vi.mock('../hooks/useAccountStats', () => ({
+  useAccountStats: () => ({
+    summary: null,
+    series: { range: '30D', points: [], isEmpty: true, isLowData: true, endValueUsd: 0 },
+    setRange: vi.fn(),
+    breakdowns: null,
+    activity: [],
+    isConnected: true,
+    isSupportedNetwork: true,
+    chainId: 137,
+    isLoading: false,
+    isEmpty: true,
+    error: null,
+    freshness: { summary: { lastUpdated: null, status: 'fresh' } },
+    refresh: vi.fn(),
+  }),
+}))
 vi.mock('../utils/keyRegistryService', () => ({
   hasRegisteredKey: vi.fn().mockResolvedValue(false),
   ensureKeyRegistered: vi.fn(),

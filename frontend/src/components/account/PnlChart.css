@@ -1,0 +1,93 @@
+.account-chart {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.account-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.account-chart-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.account-range {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full, 9999px);
+  padding: 3px;
+}
+
+.account-range-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.account-range-btn.active {
+  background: var(--brand-primary, #36B37E);
+  color: #fff;
+}
+
+.account-range-btn:focus-visible {
+  outline: 2px solid var(--brand-secondary, #4C9AFF);
+  outline-offset: 1px;
+}
+
+.account-chart-loading {
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-chart-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-chart-tooltip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  padding: 6px 10px;
+  box-shadow: var(--shadow-md);
+  font-size: 0.8rem;
+}
+
+.account-chart-tooltip-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
