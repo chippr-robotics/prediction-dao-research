@@ -10,6 +10,17 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
+/* Landing page header defaults to a dark appearance so it blends with the
+   dark hero section instead of contrasting against it. Overriding the theme
+   variables the header consumes keeps nav links, the hamburger and the mobile
+   nav consistently dark regardless of the active light/dark theme. */
+.landing-page .site-header {
+  --bg-secondary: #0a0f1a;
+  --text-primary: #E6EDF3;
+  --border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
 .header-container {
   max-width: 1400px;
   margin: 0 auto;
