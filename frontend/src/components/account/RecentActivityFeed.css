@@ -1,0 +1,94 @@
+.account-feed {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  padding: 14px 16px;
+}
+
+.account-feed-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.account-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.account-feed-row:last-child {
+  border-bottom: none;
+}
+
+.account-feed-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full, 9999px);
+  font-weight: 700;
+}
+
+.account-feed-icon.tone-in {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--semantic-win, #2ECC71);
+}
+
+.account-feed-icon.tone-out {
+  background: rgba(229, 83, 61, 0.12);
+  color: var(--semantic-loss, #E5533D);
+}
+
+.account-feed-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.account-feed-label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.account-feed-amount {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.account-feed-token {
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-feed-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+  white-space: nowrap;
+}
+
+.account-feed-link {
+  color: var(--brand-secondary, #4C9AFF);
+  text-decoration: none;
+}
+
+.account-feed-link:hover {
+  text-decoration: underline;
+}

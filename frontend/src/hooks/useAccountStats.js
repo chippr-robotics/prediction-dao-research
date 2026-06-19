@@ -1,0 +1,231 @@
+/**
+ * useAccountStats — the Account dashboard's single data seam (spec 020).
+ *
+ * Composes existing feeds into the derived view models in data-model.md:
+ *  - member wagers (WagerRepository.listMyWagers, all pages)
+ *  - valued WagerTransfers (report data source `listTransfers` + enrichment)
+ *  - wallet balances + native→USD (wallet context + usePriceConversion)
+ *
+ * Pure aggregation lives in lib/account/*; this hook only wires feeds, manages
+ * the range selection (local recompute, no refetch), per-section freshness, and
+ * honest empty/error states. Everything is keyed on the active chainId.
+ *
+ * Updates are polling-based — no websockets. See research.md R5.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useWallet } from './useWalletManagement'
+import usePriceConversion from './usePriceConversion'
+import { useChainTokens } from './useChainTokens'
+import { getDefaultWagerRepository } from '../data/wagers/WagerRepository'
+import { createReportDataSource } from '../data/reports/reportDataSource'
+import {
+  computeSummary,
+  computePnlSeries,
+  computeBreakdowns,
+  enrichTransfers,
+  isSettledStatus,
+  DEFAULT_RANGE,
+} from '../lib/account'
+
+const POLL_MS = 60_000
+
+function emptyFreshness() {
+  return { lastUpdated: null, status: 'refreshing' }
+}
+
+async function loadAllWagers(repository, account) {
+  const all = []
+  let cursor = null
+  for (let page = 0; page < 200; page++) {
+    const res = await repository.listMyWagers({
+      userAddress: account,
+      cursor,
+      pageSize: 100,
+      filter: { includeExpired: true },
+    })
+    all.push(...(res.items || []))
+    if (!res.hasMore || !res.nextCursor) break
+    cursor = res.nextCursor
+  }
+  return all
+}
+
+export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
+  const wallet = useWallet() || {}
+  const { address, chainId, isConnected, balances, refreshBalances } = wallet
+  const { convertToUsd } = usePriceConversion()
+  const tokens = useChainTokens()
+
+  const [range, setRange] = useState(initialRange)
+  const [wagers, setWagers] = useState([])
+  const [valuedTransfers, setValuedTransfers] = useState([])
+  const [tokenMetaByAddress, setTokenMetaByAddress] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [isSupportedNetwork, setIsSupportedNetwork] = useState(true)
+  const [freshness, setFreshness] = useState({
+    summary: emptyFreshness(),
+    series: emptyFreshness(),
+    balances: emptyFreshness(),
+    activity: emptyFreshness(),
+  })
+
+  const reqIdRef = useRef(0)
+
+  const load = useCallback(async () => {
+    if (!isConnected || !address) {
+      setWagers([])
+      setValuedTransfers([])
+      setIsLoading(false)
+      return
+    }
+    const reqId = ++reqIdRef.current
+    setIsLoading(true)
+    setError(null)
+    setFreshness((f) => ({
+      summary: { ...f.summary, status: 'refreshing' },
+      series: { ...f.series, status: 'refreshing' },
+      balances: { ...f.balances, status: 'refreshing' },
+      activity: { ...f.activity, status: 'refreshing' },
+    }))
+    try {
+      const repository = getDefaultWagerRepository()
+      const ds = createReportDataSource({ chainId })
+      const [loadedWagers, rawTransfers] = await Promise.all([
+        loadAllWagers(repository, address),
+        ds.listTransfers({ account: address }),
+      ])
+      if (reqId !== reqIdRef.current) return
+
+      const { transfers, tokenMetaByAddress: meta } = await enrichTransfers(rawTransfers || [], { chainId })
+      if (reqId !== reqIdRef.current) return
+
+      setWagers(loadedWagers)
+      setValuedTransfers(transfers)
+      setTokenMetaByAddress(meta)
+      setIsSupportedNetwork(true)
+      const now = Date.now()
+      const fresh = { lastUpdated: now, status: 'fresh' }
+      setFreshness({ summary: fresh, series: fresh, balances: fresh, activity: fresh })
+    } catch (err) {
+      if (reqId !== reqIdRef.current) return
+      const msg = err?.message || 'Failed to load account stats'
+      if (/escrow|subgraph|configured for this network/i.test(msg)) {
+        setIsSupportedNetwork(false)
+      }
+      setError(msg)
+      // keep last-known values; mark sections stale rather than blanking
+      setFreshness((f) => ({
+        summary: { ...f.summary, status: 'stale' },
+        series: { ...f.series, status: 'stale' },
+        balances: { ...f.balances, status: 'stale' },
+        activity: { ...f.activity, status: 'stale' },
+      }))
+    } finally {
+      if (reqId === reqIdRef.current) setIsLoading(false)
+    }
+  }, [isConnected, address, chainId])
+
+  // Reload on connect / account / network change.
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // Polling.
+  useEffect(() => {
+    if (!isConnected || !address) return undefined
+    const id = setInterval(() => load(), POLL_MS)
+    return () => clearInterval(id)
+  }, [isConnected, address, load])
+
+  const refresh = useCallback(async () => {
+    try {
+      await refreshBalances?.()
+    } catch {
+      /* balance refresh is best-effort */
+    }
+    await load()
+  }, [refreshBalances, load])
+
+  // ---- Wallet balance (USD) ----
+  const { walletBalanceUsd, walletBalances } = useMemo(() => {
+    const rows = []
+    let usd = 0
+    const nativeAmt = Number(balances?.native) || 0
+    if (nativeAmt > 0 || tokens.native) {
+      const nUsd = Number(convertToUsd(nativeAmt)) || 0
+      usd += nUsd
+      rows.push({ symbol: tokens.native || 'NATIVE', amount: nativeAmt, usdValue: nUsd })
+    }
+    // Stablecoin balance (par $1) when the wallet context exposes it.
+    const stableAmt = Number(balances?.stable ?? balances?.tokens?.[tokens.stableAddress]) || 0
+    if (stableAmt > 0) {
+      usd += stableAmt
+      rows.push({ symbol: tokens.stable || 'STABLE', amount: stableAmt, usdValue: stableAmt })
+    }
+    return { walletBalanceUsd: usd, walletBalances: rows }
+  }, [balances, convertToUsd, tokens.native, tokens.stable, tokens.stableAddress])
+
+  // ---- Derived view models ----
+  const wagerStatusById = useMemo(() => {
+    const m = new Map()
+    for (const w of wagers) m.set(String(w.id), w.status)
+    return m
+  }, [wagers])
+
+  const summary = useMemo(
+    () => computeSummary({ wagers, transfers: valuedTransfers, address, walletBalanceUsd, walletBalances }),
+    [wagers, valuedTransfers, address, walletBalanceUsd, walletBalances],
+  )
+
+  const settledTransfers = useMemo(
+    () => valuedTransfers.filter((t) => isSettledStatus(wagerStatusById.get(String(t.wagerId)))),
+    [valuedTransfers, wagerStatusById],
+  )
+
+  const series = useMemo(
+    () => computePnlSeries(settledTransfers, range, Date.now()),
+    [settledTransfers, range],
+  )
+
+  const breakdowns = useMemo(
+    () => computeBreakdowns({ wagers, transfers: valuedTransfers, tokenMetaByAddress }),
+    [wagers, valuedTransfers, tokenMetaByAddress],
+  )
+
+  const activity = useMemo(() => {
+    return [...valuedTransfers]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 25)
+      .map((t) => ({
+        id: `${t.txHash}-${t.wagerId}-${t.direction}`,
+        direction: t.direction,
+        amount: t.amount,
+        symbol: t.ticker,
+        usdValue: t.usdValue,
+        timestamp: t.timestamp,
+        txHash: t.txHash,
+        wagerId: t.wagerId,
+      }))
+  }, [valuedTransfers])
+
+  const isEmpty = isConnected && !isLoading && wagers.length === 0 && valuedTransfers.length === 0
+
+  return {
+    summary,
+    series,
+    setRange,
+    breakdowns,
+    activity,
+    isConnected: Boolean(isConnected),
+    isSupportedNetwork,
+    chainId,
+    isLoading,
+    isEmpty,
+    error,
+    freshness,
+    refresh,
+  }
+}
+
+export default useAccountStats

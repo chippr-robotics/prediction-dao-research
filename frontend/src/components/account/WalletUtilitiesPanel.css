@@ -1,0 +1,67 @@
+.account-utilities {
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  background: transparent;
+  opacity: 0.92;
+}
+
+.account-utilities-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-utilities-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-utilities-address {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.account-utilities-link {
+  border: none;
+  background: transparent;
+  color: var(--brand-secondary, #4C9AFF);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+}
+
+.account-utilities-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.account-utilities-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md, 8px);
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.account-utilities-btn:hover {
+  color: var(--text-primary);
+}
+
+.account-utilities-btn.danger {
+  color: var(--semantic-loss, #E5533D);
+  border-color: var(--semantic-loss, #E5533D);
+}
+
+.account-utilities-btn:focus-visible {
+  outline: 2px solid var(--brand-secondary, #4C9AFF);
+  outline-offset: 1px;
+}

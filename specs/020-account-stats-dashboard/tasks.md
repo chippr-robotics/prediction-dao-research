@@ -38,9 +38,9 @@ story is an independently testable increment. This is a **frontend-only** featur
 
 **Purpose**: Dependencies and directory scaffolding.
 
-- [ ] T001 Add `recharts` (^3.8) to `frontend/package.json` dependencies and run install; confirm `frontend` build still succeeds (chart will be lazy-loaded later).
-- [ ] T002 [P] Create directory scaffolding with index barrels: `frontend/src/components/account/index.js` and `frontend/src/lib/account/index.js`.
-- [ ] T003 [P] Confirm `vitest-axe` is wired for accessibility assertions (matcher import) and add a shared test helper at `frontend/src/components/account/__test-utils__/renderWithProviders.jsx` (wallet/theme/router context) for component tests.
+- [x] T001 Add `recharts` (^3.8) to `frontend/package.json` dependencies and run install; confirm `frontend` build still succeeds (chart will be lazy-loaded later).
+- [x] T002 [P] Create directory scaffolding with index barrels: `frontend/src/components/account/index.js` and `frontend/src/lib/account/index.js`.
+- [x] T003 [P] Confirm `vitest-axe` is wired for accessibility assertions (matcher import) and add a shared test helper at `frontend/src/components/account/__test-utils__/renderWithProviders.jsx` (wallet/theme/router context) for component tests.
 
 ---
 
@@ -52,11 +52,11 @@ utilities so nothing regresses.
 
 **⚠️ CRITICAL**: No user-story work can begin until this phase is complete.
 
-- [ ] T004 Implement transfer source adapter `frontend/src/lib/account/transfersSource.js` that fetches the member's WagerTransfer rows for the **active chain** by reusing `data/reports/reportDataSource.js` (`ReportTransfers` query) + `data/reports/valuation.js`, returning normalized `{ direction, tokenAddress, amount, usdValue, timestamp, txHash, wagerId }`.
-- [ ] T005 Scaffold the data hook `frontend/src/hooks/useAccountStats.js` returning the full contract shape from `contracts/dashboard-data.md` with loading/empty/neutral defaults: `summary:null`, `series:{range:'30D',points:[],isEmpty:true,isLowData:true,endValueUsd:0}`, `breakdowns:null`, `activity:[]`, `isConnected/isSupportedNetwork/chainId/isLoading/isEmpty/error`, per-section `freshness`, `setRange()`, `refresh()`. Wire `useMyWagers`, `useWalletManagement`, `usePriceConversion`, `useChainTokens`, and T004; key all state on active `chainId` (no cross-network blending).
-- [ ] T006 [P] Create the orchestrator shell `frontend/src/components/account/AccountDashboard.jsx` (+ `AccountDashboard.css`): gating for not-connected (reuse existing connect prompt), unsupported-network, `isEmpty`, and full layout; mobile-first single column with section slots for tiles/chart/breakdowns/feed/utilities.
-- [ ] T007 [P] Create `frontend/src/components/account/WalletUtilitiesPanel.jsx` (+ css) preserving the existing **address + copy**, **Show QR Code** (existing `AddressQRModal`), and **Disconnect Wallet** behavior moved out of `WalletPage`.
-- [ ] T008 Modify `frontend/src/pages/WalletPage.jsx` so the `account` tab body renders `<AccountDashboard/>` (with `WalletUtilitiesPanel`), leaving Membership/Network/Security/Preferences/Reporting/Swap tabs untouched.
+- [x] T004 Implement transfer source adapter `frontend/src/lib/account/transfersSource.js` that fetches the member's WagerTransfer rows for the **active chain** by reusing `data/reports/reportDataSource.js` (`ReportTransfers` query) + `data/reports/valuation.js`, returning normalized `{ direction, tokenAddress, amount, usdValue, timestamp, txHash, wagerId }`.
+- [x] T005 Scaffold the data hook `frontend/src/hooks/useAccountStats.js` returning the full contract shape from `contracts/dashboard-data.md` with loading/empty/neutral defaults: `summary:null`, `series:{range:'30D',points:[],isEmpty:true,isLowData:true,endValueUsd:0}`, `breakdowns:null`, `activity:[]`, `isConnected/isSupportedNetwork/chainId/isLoading/isEmpty/error`, per-section `freshness`, `setRange()`, `refresh()`. Wire `useMyWagers`, `useWalletManagement`, `usePriceConversion`, `useChainTokens`, and T004; key all state on active `chainId` (no cross-network blending).
+- [x] T006 [P] Create the orchestrator shell `frontend/src/components/account/AccountDashboard.jsx` (+ `AccountDashboard.css`): gating for not-connected (reuse existing connect prompt), unsupported-network, `isEmpty`, and full layout; mobile-first single column with section slots for tiles/chart/breakdowns/feed/utilities.
+- [x] T007 [P] Create `frontend/src/components/account/WalletUtilitiesPanel.jsx` (+ css) preserving the existing **address + copy**, **Show QR Code** (existing `AddressQRModal`), and **Disconnect Wallet** behavior moved out of `WalletPage`.
+- [x] T008 Modify `frontend/src/pages/WalletPage.jsx` so the `account` tab body renders `<AccountDashboard/>` (with `WalletUtilitiesPanel`), leaving Membership/Network/Security/Preferences/Reporting/Swap tabs untouched.
 
 **Checkpoint**: Account tab renders the dashboard shell; address/QR/Disconnect still work; other sub-tabs unchanged.
 
@@ -70,15 +70,15 @@ utilities so nothing regresses.
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T009 [P] [US1] Unit test `frontend/src/lib/account/computeSummary.test.js`: realized net P&L = Σ(payout+refund)−Σ(deposit); win rate = wins÷(wins+losses) with draws/refunds/cancellations excluded (incl. denominator=0 → null); total wagered = member's own stake only; active count = {open,active,draw_proposed}; multi-token totals.
-- [ ] T010 [P] [US1] Component test `frontend/src/components/account/SummaryTiles.test.jsx`: compact-USD formatting, win/loss styling carries a non-color cue, `winRate===null` renders "—", count-up falls back to final value under `prefers-reduced-motion`.
+- [x] T009 [P] [US1] Unit test `frontend/src/lib/account/computeSummary.test.js`: realized net P&L = Σ(payout+refund)−Σ(deposit); win rate = wins÷(wins+losses) with draws/refunds/cancellations excluded (incl. denominator=0 → null); total wagered = member's own stake only; active count = {open,active,draw_proposed}; multi-token totals.
+- [x] T010 [P] [US1] Component test `frontend/src/components/account/SummaryTiles.test.jsx`: compact-USD formatting, win/loss styling carries a non-color cue, `winRate===null` renders "—", count-up falls back to final value under `prefers-reduced-motion`.
 
 ### Implementation for User Story 1
 
-- [ ] T011 [P] [US1] Implement pure `frontend/src/lib/account/computeSummary.js` → `AccountSummary` per `data-model.md` (deterministic; inject `now`).
-- [ ] T012 [US1] Extend `useAccountStats` (T005) to populate `summary` via `computeSummary` from wagers + transfers + balances + native rate (depends on T011).
-- [ ] T013 [P] [US1] Implement `frontend/src/components/account/SummaryTiles.jsx` (+ css): five tiles, ease-out-cubic count-up reusing the `LiveStats` pattern, win/loss tokens + non-color cue, reduced-motion guard.
-- [ ] T014 [US1] Wire `SummaryTiles` into `AccountDashboard` (identity strip + tile row) and verify reconciliation against the member's history.
+- [x] T011 [P] [US1] Implement pure `frontend/src/lib/account/computeSummary.js` → `AccountSummary` per `data-model.md` (deterministic; inject `now`).
+- [x] T012 [US1] Extend `useAccountStats` (T005) to populate `summary` via `computeSummary` from wagers + transfers + balances + native rate (depends on T011).
+- [x] T013 [P] [US1] Implement `frontend/src/components/account/SummaryTiles.jsx` (+ css): five tiles, ease-out-cubic count-up reusing the `LiveStats` pattern, win/loss tokens + non-color cue, reduced-motion guard.
+- [x] T014 [US1] Wire `SummaryTiles` into `AccountDashboard` (identity strip + tile row) and verify reconciliation against the member's history.
 
 **Checkpoint**: Summary tiles fully functional and independently testable (MVP).
 
@@ -92,15 +92,15 @@ utilities so nothing regresses.
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they fail)
 
-- [ ] T015 [P] [US2] Unit test `frontend/src/lib/account/computePnlSeries.test.js`: cumulative running sum (+payout +refund −deposit); range windowing seeds first point at cumulative-as-of-range-start; default 30D; `<2` points → `isLowData`; empty → `isEmpty`; dense history collapses to daily buckets above threshold; `endValueUsd` (ALL) equals summary net P&L.
-- [ ] T016 [P] [US2] Component test `frontend/src/components/account/PnlChart.test.jsx`: default range is 30D, `setRange` recomputes locally (no fetch), tooltip exposes date + value, chart lazy module resolves.
+- [x] T015 [P] [US2] Unit test `frontend/src/lib/account/computePnlSeries.test.js`: cumulative running sum (+payout +refund −deposit); range windowing seeds first point at cumulative-as-of-range-start; default 30D; `<2` points → `isLowData`; empty → `isEmpty`; dense history collapses to daily buckets above threshold; `endValueUsd` (ALL) equals summary net P&L.
+- [x] T016 [P] [US2] Component test `frontend/src/components/account/PnlChart.test.jsx`: default range is 30D, `setRange` recomputes locally (no fetch), tooltip exposes date + value, chart lazy module resolves.
 
 ### Implementation for User Story 2
 
-- [ ] T017 [P] [US2] Implement pure `frontend/src/lib/account/computePnlSeries.js` → `PnlSeries` per `data-model.md` (event-stepped + daily-bucket guard; deterministic).
-- [ ] T018 [US2] Extend `useAccountStats` with `series` + `setRange` that recompute from already-fetched transfers (default `'30D'`, local-only, <1s) (depends on T017).
-- [ ] T019 [P] [US2] Implement `frontend/src/components/account/PnlChart.jsx` (+ css): **lazy-loaded** Recharts area/line, `ResponsiveContainer`, colors from `--chart-series-*`/`--semantic-win|loss`, keyboard-operable `7D|30D|90D|All` button group (`aria-pressed`), tooltip, and a visually-hidden text summary + data-table fallback for screen readers.
-- [ ] T020 [US2] Wire `PnlChart` into `AccountDashboard` as the hero section.
+- [x] T017 [P] [US2] Implement pure `frontend/src/lib/account/computePnlSeries.js` → `PnlSeries` per `data-model.md` (event-stepped + daily-bucket guard; deterministic).
+- [x] T018 [US2] Extend `useAccountStats` with `series` + `setRange` that recompute from already-fetched transfers (default `'30D'`, local-only, <1s) (depends on T017).
+- [x] T019 [P] [US2] Implement `frontend/src/components/account/PnlChart.jsx` (+ css): **lazy-loaded** Recharts area/line, `ResponsiveContainer`, colors from `--chart-series-*`/`--semantic-win|loss`, keyboard-operable `7D|30D|90D|All` button group (`aria-pressed`), tooltip, and a visually-hidden text summary + data-table fallback for screen readers.
+- [x] T020 [US2] Wire `PnlChart` into `AccountDashboard` as the hero section.
 
 **Checkpoint**: Time-series chart functional with range switching and accessible inspection.
 
@@ -114,13 +114,13 @@ utilities so nothing regresses.
 
 ### Tests for User Story 3 ⚠️ (write first, ensure they fail)
 
-- [ ] T021 [P] [US3] Component test `frontend/src/components/account/EmptyStates.test.jsx`: with empty `useAccountStats` data, `SummaryTiles`/`PnlChart` render honest empty states with **no** synthetic points/values; low-data (1 point) renders markers not a misleading line; network-switch yields per-network empty state.
+- [x] T021 [P] [US3] Component test `frontend/src/components/account/EmptyStates.test.jsx`: with empty `useAccountStats` data, `SummaryTiles`/`PnlChart` render honest empty states with **no** synthetic points/values; low-data (1 point) renders markers not a misleading line; network-switch yields per-network empty state.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Ensure `useAccountStats` computes `isEmpty`/`series.isEmpty`/`series.isLowData` correctly and per active `chainId` (depends on T012, T018).
-- [ ] T023 [P] [US3] Create `frontend/src/components/account/EmptyState.jsx` (+ css): reusable empty/low-data block with a "create or accept your first wager" CTA; integrate into `SummaryTiles` and `PnlChart` (and breakdown/feed placeholders).
-- [ ] T024 [US3] Verify no fabricated data path exists (zeros are labelled, chart never draws an invented trend) and the empty layout is mobile-legible.
+- [x] T022 [US3] Ensure `useAccountStats` computes `isEmpty`/`series.isEmpty`/`series.isLowData` correctly and per active `chainId` (depends on T012, T018).
+- [x] T023 [P] [US3] Create `frontend/src/components/account/EmptyState.jsx` (+ css): reusable empty/low-data block with a "create or accept your first wager" CTA; integrate into `SummaryTiles` and `PnlChart` (and breakdown/feed placeholders).
+- [x] T024 [US3] Verify no fabricated data path exists (zeros are labelled, chart never draws an invented trend) and the empty layout is mobile-legible.
 
 **Checkpoint**: All P1 stories complete — honest, populated-or-empty dashboard. Deployable MVP slice.
 
@@ -134,16 +134,16 @@ utilities so nothing regresses.
 
 ### Tests for User Story 4 ⚠️ (write first, ensure they fail)
 
-- [ ] T025 [P] [US4] Unit test `frontend/src/lib/account/breakdowns.test.js`: `Σ byStatus.count` = total wagers and active subset = `activeWagers`; `Σ byToken.ownStakeUsd` = `totalWageredUsd`; `byOracle` labels Polymarket/Chainlink/UMA.
-- [ ] T026 [P] [US4] Component test `frontend/src/components/account/RecentActivityFeed.test.jsx`: newest-first ordering, direction icon+text, relative "Ns ago", explorer link built for the active network; empty copy when no activity.
+- [x] T025 [P] [US4] Unit test `frontend/src/lib/account/breakdowns.test.js`: `Σ byStatus.count` = total wagers and active subset = `activeWagers`; `Σ byToken.ownStakeUsd` = `totalWageredUsd`; `byOracle` labels Polymarket/Chainlink/UMA.
+- [x] T026 [P] [US4] Component test `frontend/src/components/account/RecentActivityFeed.test.jsx`: newest-first ordering, direction icon+text, relative "Ns ago", explorer link built for the active network; empty copy when no activity.
 
 ### Implementation for User Story 4
 
-- [ ] T027 [P] [US4] Implement pure `frontend/src/lib/account/breakdowns.js` → `Breakdown` per `data-model.md`.
-- [ ] T028 [US4] Extend `useAccountStats` to populate `breakdowns` (from wagers) and `activity` (from transfers, newest-first, windowed) (depends on T027).
-- [ ] T029 [P] [US4] Implement `frontend/src/components/account/ActivityBreakdowns.jsx` (+ css): status/token/oracle views with text labels (not color-only).
-- [ ] T030 [P] [US4] Implement `frontend/src/components/account/RecentActivityFeed.jsx` (+ css): feed rows with explorer links (per-network) and optional wager deep-link; no counterparty private data.
-- [ ] T031 [US4] Wire `ActivityBreakdowns` + `RecentActivityFeed` into `AccountDashboard` and verify reconciliation.
+- [x] T027 [P] [US4] Implement pure `frontend/src/lib/account/breakdowns.js` → `Breakdown` per `data-model.md`.
+- [x] T028 [US4] Extend `useAccountStats` to populate `breakdowns` (from wagers) and `activity` (from transfers, newest-first, windowed) (depends on T027).
+- [x] T029 [P] [US4] Implement `frontend/src/components/account/ActivityBreakdowns.jsx` (+ css): status/token/oracle views with text labels (not color-only).
+- [x] T030 [P] [US4] Implement `frontend/src/components/account/RecentActivityFeed.jsx` (+ css): feed rows with explorer links (per-network) and optional wager deep-link; no counterparty private data.
+- [x] T031 [US4] Wire `ActivityBreakdowns` + `RecentActivityFeed` into `AccountDashboard` and verify reconciliation.
 
 **Checkpoint**: Breakdowns and activity feed functional and reconciling.
 
@@ -157,14 +157,14 @@ utilities so nothing regresses.
 
 ### Tests for User Story 5 ⚠️ (write first, ensure they fail)
 
-- [ ] T032 [P] [US5] Component test `frontend/src/components/account/FreshnessIndicator.test.jsx`: renders "updated Ns ago" from `lastUpdated`, ticks, manual refresh invokes `onRefresh` and resets; `stale`/`error` status shows a badge without blanking.
+- [x] T032 [P] [US5] Component test `frontend/src/components/account/FreshnessIndicator.test.jsx`: renders "updated Ns ago" from `lastUpdated`, ticks, manual refresh invokes `onRefresh` and resets; `stale`/`error` status shows a badge without blanking.
 
 ### Implementation for User Story 5
 
-- [ ] T033 [US5] Extend `useAccountStats` to track per-section `freshness{lastUpdated,status}`, implement `refresh()` (re-reads balances via `refreshBalances()` + re-pulls transfers), and set `stale`/`error` on poll failure keeping last-known values (depends on T028).
-- [ ] T034 [P] [US5] Implement `frontend/src/components/account/FreshnessIndicator.jsx` (+ css): 1s display ticker, accessible manual-refresh button, stale/error badge.
+- [x] T033 [US5] Extend `useAccountStats` to track per-section `freshness{lastUpdated,status}`, implement `refresh()` (re-reads balances via `refreshBalances()` + re-pulls transfers), and set `stale`/`error` on poll failure keeping last-known values (depends on T028).
+- [x] T034 [P] [US5] Implement `frontend/src/components/account/FreshnessIndicator.jsx` (+ css): 1s display ticker, accessible manual-refresh button, stale/error badge.
 - [ ] T035 [US5] Add pull-to-refresh affordance on mobile and wire `FreshnessIndicator` into each live section of `AccountDashboard`.
-- [ ] T036 [US5] Apply count-up to tile value **changes** on poll (not just first load), respecting reduced motion.
+- [x] T036 [US5] Apply count-up to tile value **changes** on poll (not just first load), respecting reduced motion.
 
 **Checkpoint**: Dashboard feels live and degrades honestly on errors.
 
@@ -178,12 +178,12 @@ utilities so nothing regresses.
 
 ### Tests for User Story 6 ⚠️ (write first, ensure they fail)
 
-- [ ] T037 [P] [US6] Component/regression test `frontend/src/pages/WalletPage.test.jsx`: address copy, Show QR (modal opens), and Disconnect work from `WalletUtilitiesPanel`; Membership/Network/Security/Preferences/Reporting/Swap tabs render their existing content unchanged.
+- [x] T037 [P] [US6] Component/regression test `frontend/src/pages/WalletPage.test.jsx`: address copy, Show QR (modal opens), and Disconnect work from `WalletUtilitiesPanel`; Membership/Network/Security/Preferences/Reporting/Swap tabs render their existing content unchanged.
 
 ### Implementation for User Story 6
 
-- [ ] T038 [US6] Refine `WalletUtilitiesPanel` (T007) styling to be visually de-emphasised beneath the stats per the design reference, retaining all actions.
-- [ ] T039 [US6] Verify `WalletPage` tab routing/state for the other six sub-tabs is intact after the Account-tab swap.
+- [x] T038 [US6] Refine `WalletUtilitiesPanel` (T007) styling to be visually de-emphasised beneath the stats per the design reference, retaining all actions.
+- [x] T039 [US6] Verify `WalletPage` tab routing/state for the other six sub-tabs is intact after the Account-tab swap.
 
 **Checkpoint**: All six user stories independently functional with no regressions.
 
@@ -193,11 +193,11 @@ utilities so nothing regresses.
 
 **Purpose**: Accessibility, theming, responsiveness, and end-to-end validation.
 
-- [ ] T040 [P] Accessibility test `frontend/src/components/account/AccountDashboard.axe.test.jsx` using `vitest-axe`: no violations; keyboard-operable range selector + refresh; chart accessible name + hidden summary present (FR-018).
-- [ ] T041 [P] Dark/light theme pass: verify every account component (incl. chart series/area) uses `--bg-*`/`--text-*`/`--semantic-*`/`--chart-series-*` tokens and re-themes on toggle (FR-015).
-- [ ] T042 [P] Mobile responsiveness pass at ~390px: no horizontal scroll, touch targets adequate, chart legible (FR-016, SC-006).
-- [ ] T043 Confirm Recharts is lazy-loaded (not in the initial route chunk) and `npm run build` chunking is sane.
-- [ ] T044 Run `frontend` gates: `npm run lint`, `npm run test:run`, `npm run build` — all green (no `continue-on-error`).
+- [x] T040 [P] Accessibility test `frontend/src/components/account/AccountDashboard.axe.test.jsx` using `vitest-axe`: no violations; keyboard-operable range selector + refresh; chart accessible name + hidden summary present (FR-018).
+- [x] T041 [P] Dark/light theme pass: verify every account component (incl. chart series/area) uses `--bg-*`/`--text-*`/`--semantic-*`/`--chart-series-*` tokens and re-themes on toggle (FR-015).
+- [x] T042 [P] Mobile responsiveness pass at ~390px: no horizontal scroll, touch targets adequate, chart legible (FR-016, SC-006).
+- [x] T043 Confirm Recharts is lazy-loaded (not in the initial route chunk) and `npm run build` chunking is sane.
+- [x] T044 Run `frontend` gates: `npm run lint`, `npm run test:run`, `npm run build` — all green (no `continue-on-error`).
 - [ ] T045 Execute `specs/020-account-stats-dashboard/quickstart.md` validation scenarios 1–8 against a populated wallet and a fresh wallet.
 
 ---

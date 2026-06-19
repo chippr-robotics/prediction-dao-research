@@ -8,11 +8,11 @@ import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
+import AccountDashboard from '../components/account/AccountDashboard'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import WalletTabMenu from '../components/wallet/WalletTabMenu'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
-import AddressQRModal from '../components/ui/AddressQRModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import './WalletPage.css'
@@ -62,7 +62,7 @@ const POLYMARKET_CATEGORY_OPTIONS = [
 
 function WalletPage() {
   const { address, isConnected, connectors, provider, signer } = useWallet()
-  const { connectWallet, disconnectWallet } = useWalletConnection()
+  const { connectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
@@ -71,7 +71,6 @@ function WalletPage() {
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('account')
-  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -101,11 +100,6 @@ function WalletPage() {
     } finally {
       setConnectingConnectorId(null)
     }
-  }
-
-  const handleDisconnect = () => {
-    disconnectWallet()
-    navigate('/app')
   }
 
   const handleOpenPurchaseModal = () => {
@@ -264,26 +258,7 @@ function WalletPage() {
               <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
-                    <div className="section">
-                      <h3>Wallet</h3>
-                      <div className="wallet-details">
-                        <div className="detail-row">
-                          <span className="label">Address:</span>
-                          <span className="value">{address}</span>
-                        </div>
-                        <div className="wallet-actions">
-                          <button onClick={() => setIsQRModalOpen(true)} className="show-qr-btn">Show QR Code</button>
-                          <button onClick={handleDisconnect} className="disconnect-btn">Disconnect Wallet</button>
-                        </div>
-                      </div>
-                      {isQRModalOpen && (
-                        <AddressQRModal
-                          isOpen
-                          onClose={() => setIsQRModalOpen(false)}
-                          address={address}
-                        />
-                      )}
-                    </div>
+                    <AccountDashboard address={address} />
 
                     {hasRole(ROLES.ADMIN) && (
                       <div className="section admin-section">
