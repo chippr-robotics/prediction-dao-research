@@ -34,6 +34,7 @@ member can move their contacts between devices or back them up safely.
 - Q: How does import resolve overlaps with the existing book? → A: Additive merge keyed on address — import adds addresses not already present and keeps existing ones (no duplicates); when an imported address carries a different nickname/notes, the member is prompted to keep existing or take imported, and existing data is never silently deleted.
 - Q: Is a network required for each saved address? → A: Required, with a default — every saved address must have a network; the field is pre-filled with the currently active network so the member rarely has to choose. The unique key for an entry is (address + network).
 - Q: When is the member prompted to save a newly-entered address? → A: Non-blocking toast after the action succeeds — once the underlying action (e.g., wager created/accepted) confirms on-chain, a dismissible "Save to address book?" toast appears; it never interrupts the flow, and is only offered for addresses not already saved.
+- Q: When are saved addresses (re-)screened against the sanctions oracle? → A: On view/selection with a short-lived session cache — addresses are screened when the book is opened and when an address is selected in a flow, with results cached briefly within the session to avoid redundant on-chain reads; no background/periodic refresh.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -218,8 +219,9 @@ confirm importing with a wrong secret fails safely.
   one network is allowed (network is part of what distinguishes an entry).
 - **Address normalisation**: addresses that differ only by capitalisation/checksum
   formatting are treated as the same address for duplicate detection and matching.
-- **A clear contact later becomes restricted**: the warning appears on the next
-  screening without the member re-saving the contact.
+- **A clear contact later becomes restricted**: the warning appears the next time the
+  book is opened (or the address is selected) and the short-lived cache has expired —
+  without the member re-saving the contact.
 - **Restricted address selected in a transaction flow**: the client warning is
   advisory; the on-chain enforcement (existing sanctions guard) remains the actual
   block, and the UX must not imply the client warning alone is the enforcement.
@@ -266,8 +268,12 @@ confirm importing with a wrong secret fails safely.
 #### Compliance / sanctions screening
 
 - **FR-010**: The system MUST screen each saved address against the project's
-  compliance/sanctions oracle and display a clear warning tag on any address
-  reported as restricted.
+  compliance/sanctions oracle when the address book is opened and when an address is
+  selected in a flow, and display a clear warning tag on any address reported as
+  restricted. Results MAY be cached briefly within the session to avoid redundant
+  on-chain reads, but the system MUST NOT rely on a status stored at save time as the
+  only source (no stale-only behaviour) and does not require background/periodic
+  refresh.
 - **FR-011**: When screening cannot be performed (oracle unreachable or not
   configured for the active network), the system MUST present the address status as
   uncertain/unscreened and MUST NOT imply the address is clear (fail-closed UX).
