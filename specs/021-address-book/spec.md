@@ -31,6 +31,7 @@ member can move their contacts between devices or back them up safely.
 ### Session 2026-06-19
 
 - Q: How is the encrypted export/import keyed? → A: Wallet-signature-derived key — the encryption key is derived deterministically from a member's wallet signature (reusing the project's deterministic key-generation pattern); a backup is restorable only with the same wallet, with no passphrase to remember.
+- Q: How does import resolve overlaps with the existing book? → A: Additive merge keyed on address — import adds addresses not already present and keeps existing ones (no duplicates); when an imported address carries a different nickname/notes, the member is prompted to keep existing or take imported, and existing data is never silently deleted.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -198,8 +199,10 @@ confirm importing with a wrong secret fails safely.
    to import it, **Then** the import fails with a clear error and the existing
    address book is left unchanged.
 4. **Given** an import that overlaps with existing contacts, **When** it is
-   applied, **Then** the member is able to merge without silently losing existing
-   contacts or creating unintended duplicates.
+   applied, **Then** new addresses are added and existing ones are kept without
+   duplicates, and **When** an imported address has a differing nickname/notes,
+   **Then** the member is prompted to keep the existing or take the imported values
+   (nothing is silently lost).
 
 ---
 
@@ -299,9 +302,12 @@ confirm importing with a wrong secret fails safely.
 - **FR-021**: Import attempted with a different/incorrect wallet, or with a
   corrupted/invalid file, MUST fail with a clear error (and MUST NOT reveal contact
   data) and MUST leave the existing address book unchanged.
-- **FR-022**: When an import overlaps with existing contacts, the system MUST let the
-  member merge without silently discarding existing data or creating unintended
-  duplicates.
+- **FR-022**: When an import overlaps with existing contacts, the system MUST perform
+  an additive merge keyed on the address: addresses not already present are added,
+  already-present addresses are kept without creating duplicates, and existing data
+  is never silently deleted. When an imported address carries a nickname or notes
+  that differ from the stored ones, the member MUST be prompted to keep the existing
+  values or take the imported values.
 
 #### Quality
 
