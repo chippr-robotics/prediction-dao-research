@@ -28,9 +28,11 @@ export const WAGER_DEFAULTS = {
   ODDS_MULTIPLIER: 200,
 
   /** Default resolution type: 1=Creator ("Me"), 2=Opponent ("Them"), 3=ThirdParty
-   *  ("Friend"), 4=Polymarket ("Oracle"). The legacy "Either Party" (0) option was
-   *  retired — every wager now names a single settler, which also drives who puts
-   *  up the majority stake in an Offer. */
+   *  ("Friend"), 4=Polymarket ("Oracle"). "Either of Us" (0) lets either side
+   *  submit the outcome and is offered only on even-money (equal-stakes) wagers —
+   *  the contract reverts EitherRequiresEqualStakes on asymmetric Offers — so it is
+   *  never the default (an Offer names a single settler, who carries the majority
+   *  stake). */
   RESOLUTION_TYPE: 1,
 
   /** Default trading / wager duration in days */

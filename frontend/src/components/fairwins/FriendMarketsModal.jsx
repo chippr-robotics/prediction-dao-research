@@ -44,11 +44,15 @@ const CUSTOM_TOKEN_OPTION = { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Toke
 
 // Participant-resolved (people settle it) resolution types, in enum order.
 // Oracle-resolved types are computed per-chain at render time (adapter-gated).
-// "Either Party" (ResolutionType.Either) was retired: every wager now names a
-// single settler, which also drives who puts up the majority stake in an Offer.
 const PARTICIPANT_RESOLUTION_TYPES = [
   ResolutionType.Creator,
   ResolutionType.Opponent,
+  // "Either of us" (ResolutionType.Either) lets either side submit the outcome —
+  // a mutual-trust path with no named settler. The WagerRegistry only permits it
+  // on equal-stakes (non-leveraged) wagers, so it is offered for even-money bets
+  // and withheld from Offers (which carry asymmetric stakes). See
+  // `participantResolutionTypes` below, which gates it on the market type.
+  ResolutionType.Either,
   // ThirdParty re-enabled (Spec Kit 005): the WagerRegistry v3 per-user index now
   // records the arbitrator (so they can discover the wagers they oversee via
   // getUserWagers), and the creator encrypts the private terms for the arbitrator
@@ -56,12 +60,18 @@ const PARTICIPANT_RESOLUTION_TYPES = [
   ResolutionType.ThirdParty,
 ]
 
+// Even-money (equal-stakes) wagers may additionally let either side report the
+// result; Offers cannot (asymmetric stakes would let the smaller-staked side
+// self-declare and seize the pot — the contract reverts EitherRequiresEqualStakes).
+const EITHER_ALLOWED_MARKET_TYPES = new Set(['oneVsOne'])
+
 // Dropdown labels + helper text for every resolution type. Kept here so the
 // participant/oracle flows render from a single mapped source instead of a
 // hand-maintained option list.
 const RESOLUTION_TYPE_LABELS = {
   [ResolutionType.Creator]: 'Me (Creator)',
   [ResolutionType.Opponent]: 'Them (Opponent)',
+  [ResolutionType.Either]: 'Either of Us (equal stakes)',
   [ResolutionType.ThirdParty]: 'A Friend (Arbitrator)',
   [ResolutionType.Polymarket]: 'An Oracle (Polymarket)',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed (price condition)',
@@ -71,6 +81,7 @@ const RESOLUTION_TYPE_LABELS = {
 const RESOLUTION_TYPE_HINTS = {
   [ResolutionType.Creator]: 'You settle the outcome — so you put up the majority stake (skin in the game)',
   [ResolutionType.Opponent]: 'Your opponent settles the outcome — so they put up the majority stake (skin in the game)',
+  [ResolutionType.Either]: 'Either side can submit the outcome (you both agree on a draw). Only available on even-money wagers where you each stake the same — best when you trust each other to report honestly',
   [ResolutionType.ThirdParty]: 'A neutral friend you name settles the wager (they can read the terms but cannot take a side)',
   [ResolutionType.Polymarket]: 'Settles automatically when the linked Polymarket market resolves',
   [ResolutionType.ChainlinkDataFeed]: 'Settles automatically once the price feed reading at the deadline passes the threshold',
@@ -98,6 +109,7 @@ const ORACLE_TAB_TYPES = [
 const RESOLUTION_TAB_LABELS = {
   [ResolutionType.Creator]: 'Me',
   [ResolutionType.Opponent]: 'Them',
+  [ResolutionType.Either]: 'Either',
   [ResolutionType.ThirdParty]: 'Friend',
   [ResolutionType.Polymarket]: 'Oracle',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed',
@@ -111,6 +123,7 @@ const RESOLUTION_TAB_LABELS = {
 const RESOLUTION_TAB_ICONS = {
   [ResolutionType.Creator]: '👤',
   [ResolutionType.Opponent]: '👥',
+  [ResolutionType.Either]: '🤝',
   [ResolutionType.ThirdParty]: '⚖️',
   [ResolutionType.Polymarket]: '🔮',
   [ResolutionType.ChainlinkDataFeed]: '🔮',
@@ -168,6 +181,11 @@ function FriendMarketsModal({
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
 
+  // Declared up here (ahead of the resolution-option memos) because those memos
+  // gate the "Either of us" settler on the market type: it's only valid for
+  // even-money (equal-stakes) wagers, not Offers.
+  const [friendMarketType, setFriendMarketType] = useState(initialType || 'oneVsOne')
+
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
   // Polymarket CTF is reachable (Polygon Amoy and Mainnet).
@@ -203,11 +221,21 @@ function FriendMarketsModal({
     ...(umaAdapter && isOracleModelExposed(ResolutionType.UMA) ? [ResolutionType.UMA] : []),
   ], [polymarketSidebetsEnabled, chainlinkDataFeedAdapter, chainlinkFunctionsAdapter, umaAdapter])
 
+  // Participant settlers offered for the current market type. "Either of us"
+  // (Either) is only sound on equal-stakes wagers, so it's dropped for Offers
+  // — keeping the UI in lockstep with the contract's EitherRequiresEqualStakes
+  // guard so the user never picks an option that would revert.
+  const participantResolutionTypes = useMemo(() => (
+    EITHER_ALLOWED_MARKET_TYPES.has(friendMarketType)
+      ? PARTICIPANT_RESOLUTION_TYPES
+      : PARTICIPANT_RESOLUTION_TYPES.filter((t) => t !== ResolutionType.Either)
+  ), [friendMarketType])
+
   const resolutionOptionTypes = useMemo(() => {
-    if (resolutionCategory === 'participant') return PARTICIPANT_RESOLUTION_TYPES
+    if (resolutionCategory === 'participant') return participantResolutionTypes
     if (resolutionCategory === 'oracle') return availableOracleResolutionTypes
-    return [...PARTICIPANT_RESOLUTION_TYPES, ...availableOracleResolutionTypes]
-  }, [resolutionCategory, availableOracleResolutionTypes])
+    return [...participantResolutionTypes, ...availableOracleResolutionTypes]
+  }, [resolutionCategory, participantResolutionTypes, availableOracleResolutionTypes])
 
   // Default resolution to pre-select when the modal opens, per category.
   const defaultResolutionType = useMemo(() => {
@@ -251,8 +279,8 @@ function FriendMarketsModal({
   // settlement choices first.
   const resolutionTabTypes = useMemo(() => {
     if (resolutionCategory === 'oracle') return ORACLE_TAB_TYPES
-    return [...PARTICIPANT_RESOLUTION_TYPES, ...ORACLE_TAB_TYPES]
-  }, [resolutionCategory])
+    return [...participantResolutionTypes, ...ORACLE_TAB_TYPES]
+  }, [resolutionCategory, participantResolutionTypes])
 
   // A tab is locked only for oracle types whose adapter/CTF isn't reachable.
   const isTabLocked = useCallback(
@@ -287,7 +315,6 @@ function FriendMarketsModal({
 
   // Creation flow state
   const [creationStep, setCreationStep] = useState('form') // 'form', 'success'
-  const [friendMarketType, setFriendMarketType] = useState(initialType || 'oneVsOne')
   const [createdMarket, setCreatedMarket] = useState(null)
 
   // Form data

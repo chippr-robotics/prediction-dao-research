@@ -206,7 +206,9 @@ describe("WagerRegistry — Draw resolution", function () {
   describe("fund correctness & finality", function () {
     it("unequal stakes: each party gets exactly their own stake back (sum == escrowed)", async () => {
       const fx = await loadFixture(deployFixture);
-      const id = await createActive(fx, { creatorStake: usdc(30), opponentStake: usdc(10) });
+      // Unequal "Offer" stakes can't use Either; Creator/Opponent types still
+      // settle a draw by mutual consent, so use Creator here.
+      const id = await createActive(fx, { resolutionType: Resolution.Creator, creatorStake: usdc(30), opponentStake: usdc(10) });
       const aBefore = await fx.usdcToken.balanceOf(fx.alice.address);
       const bBefore = await fx.usdcToken.balanceOf(fx.bob.address);
       await fx.reg.connect(fx.alice).declareDraw(id);

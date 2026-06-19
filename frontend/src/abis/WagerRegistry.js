@@ -139,6 +139,11 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "EitherRequiresEqualStakes",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotCreator",
     "type": "error"
   },
