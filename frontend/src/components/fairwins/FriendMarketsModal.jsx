@@ -13,6 +13,7 @@ import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefau
 import QRScanner from '../ui/QRScanner'
 import WagerQRCode from '../ui/WagerQRCode'
 import AddressInput from '../ui/AddressInput'
+import SaveAddressToast from '../ui/SaveAddressToast'
 import { isEnsName } from '../../utils/validation'
 import { getCurrentDocument } from '../../utils/legalDocs'
 
@@ -1451,6 +1452,8 @@ function FriendMarketsModal({
                               disabled={submitting}
                               error={!!errors.opponent}
                               errorMessage={errors.opponent}
+                              enableAddressBook
+                              chainId={chainId}
                             />
                           </div>
                           <button
@@ -1587,6 +1590,8 @@ function FriendMarketsModal({
                           disabled={submitting}
                           error={!!errors.arbitrator}
                           errorMessage={errors.arbitrator}
+                          enableAddressBook
+                          chainId={chainId}
                         />
                         <span className="fm-hint">
                           A neutral third party who decides the outcome and can read the
@@ -2040,6 +2045,10 @@ function FriendMarketsModal({
                       <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
                   </div>
+
+                  {createdMarket.opponent && (
+                    <SaveAddressToast address={createdMarket.opponent} chainId={chainId} />
+                  )}
 
                   <div className="fm-success-actions">
                     <button

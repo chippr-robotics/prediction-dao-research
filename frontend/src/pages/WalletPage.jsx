@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
+import AddressBookPanel from '../components/account/AddressBookPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import WalletTabMenu from '../components/wallet/WalletTabMenu'
@@ -20,6 +21,7 @@ import './WalletPage.css'
 // My Account sections, shown via the WalletTabMenu kebab menu.
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
+  { id: 'addressbook', label: 'Address Book' },
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
   { id: 'security', label: 'Security' },
@@ -267,6 +269,12 @@ function WalletPage() {
                         <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === 'addressbook' && (
+                  <div className="addressbook-section" role="tabpanel">
+                    <AddressBookPanel address={address} />
                   </div>
                 )}
 
