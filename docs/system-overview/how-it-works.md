@@ -67,7 +67,7 @@ How a wager resolves is fixed at creation time:
 
 | Resolution type | Who can settle | How |
 |----------------|----------------|-----|
-| `Either` | Creator or opponent | `declareWinner(wagerId, winner)` |
+| `Either` | Creator or opponent | `declareWinner(wagerId, winner)` — **equal-stakes wagers only** |
 | `Creator` | Creator only | `declareWinner(...)` |
 | `Opponent` | Opponent only | `declareWinner(...)` |
 | `ThirdParty` | Named arbitrator | `declareWinner(...)` |
@@ -77,10 +77,17 @@ How a wager resolves is fixed at creation time:
 | `UMA` | Anyone | `autoResolveFromOracle(wagerId)` reads the settled UMA Optimistic Oracle V3 assertion |
 
 The on-chain enum names are unchanged. In the create UI these are surfaced as
-**Me** (`Creator`), **Them** (`Opponent`), **A Friend** (`ThirdParty`), and
-**An Oracle** (`Polymarket` / Chainlink / UMA). `Either` is retained on-chain for
-pre-existing wagers but is no longer offered when creating new ones — every new
-wager names a single settler, which in an Offer also carries the majority stake.
+**Me** (`Creator`), **Them** (`Opponent`), **Either of Us** (`Either`),
+**A Friend** (`ThirdParty`), and **An Oracle** (`Polymarket` / Chainlink / UMA).
+
+`Either` lets either side submit the outcome — a mutual-trust path with no named
+settler. It is only sound on a level peer-to-peer wager where both sides stake the
+same amount, so the registry **restricts it to equal-stakes (non-leveraged) bets**
+(`EitherRequiresEqualStakes`). An asymmetric **Offer** (where the settler puts up
+the majority stake) must instead name a single settler, a third-party arbitrator,
+or an oracle — otherwise the smaller-staked side could self-declare and seize the
+pot. The create UI mirrors this: **Either of Us** is offered for even-money wagers
+and withheld from Offers.
 
 For oracle types, the creator declares at creation which side they take
 (`creatorIsYes`); when the adapter reports the outcome, the registry maps it to

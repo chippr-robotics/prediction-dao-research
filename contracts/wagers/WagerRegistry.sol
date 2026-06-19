@@ -15,8 +15,11 @@ import "../oracles/IOracleAdapter.sol";
 
 /// @title WagerRegistry
 /// @notice Peer-to-peer wager escrow. Each wager has a named creator and opponent,
-///         a stake in an allowlisted ERC20 (USDC or WMATIC), and one of five
-///         resolution types: Either / Creator / Opponent / ThirdParty / Polymarket.
+///         a stake in an allowlisted ERC20 (USDC or WMATIC), and a resolution type:
+///         Either / Creator / Opponent / ThirdParty / Polymarket (plus extensible
+///         oracle types). `Either` lets either party submit the outcome and is only
+///         permitted on equal-stakes (non-leveraged) wagers — asymmetric "Offer"
+///         stakes must use a single settler, an arbitrator, or an oracle.
 /// @dev    Role separation:
 ///           DEFAULT_ADMIN_ROLE       — config (membership manager, adapter, token allowlist)
 ///           GUARDIAN_ROLE            — emergency pause / unpause
@@ -99,6 +102,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     error AcceptExpired();
     error ResolveExpired();
     error NotAuthorized();
+    error EitherRequiresEqualStakes();
     error WinnerNotParticipant();
     error NotWinner();
     error NotResolved();
@@ -279,6 +283,16 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (resolveDeadline <= acceptDeadline) revert BadDeadlines();
         if (acceptDeadline > block.timestamp + MAX_ACCEPT_WINDOW) revert BadDeadlines();
         if (resolveDeadline > block.timestamp + MAX_RESOLVE_WINDOW) revert BadDeadlines();
+
+        // "Either side submits the outcome" (ResolutionType.Either) is a mutual-trust
+        // resolution path — no oracle, no arbitrator, and whoever calls declareWinner
+        // first decides the result. That is only sound on a level peer-to-peer wager
+        // where both sides stake the same amount. On an asymmetric "Offer" (leveraged)
+        // wager the side risking less could self-declare and seize the larger
+        // counterparty stake, so restrict Either to equal-stakes (non-leveraged) bets.
+        if (resolutionType == ResolutionType.Either && creatorStake != opponentStake) {
+            revert EitherRequiresEqualStakes();
+        }
 
         if (resolutionType == ResolutionType.ThirdParty) {
             if (arbitrator == address(0)) revert ArbitratorRequired();

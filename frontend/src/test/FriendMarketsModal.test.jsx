@@ -378,20 +378,35 @@ describe('FriendMarketsModal', () => {
       expect(screen.queryByLabelText(/minimum participants/i)).not.toBeInTheDocument()
     })
 
-    it('participant category shows people-settled resolution options incl. Friend (no Either Party)', () => {
+    it('participant category (even-money) offers Me / Them / Either of Us / Friend', () => {
       renderWithProviders(
-        <FriendMarketsModal {...defaultProps} resolutionCategory="participant" />
+        <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />
       )
       const select = screen.getByLabelText(/who can resolve/i)
       const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
-      // "Either Party" was retired — every wager names a single settler. ThirdParty
-      // ("A Friend") is re-enabled (Spec Kit 005): the arbitrator is indexed for
-      // discovery and encrypted-for, so they can find and resolve the wager.
+      // "Either of Us" lets either side submit the outcome — re-enabled but only
+      // on even-money (equal-stakes) wagers, so it appears here. ThirdParty
+      // ("A Friend") is indexed for discovery and encrypted-for so the named
+      // arbitrator can find and resolve the wager (Spec Kit 005).
       expect(labels).toEqual([
         'Me (Creator)',
         'Them (Opponent)',
+        'Either of Us (equal stakes)',
         'A Friend (Arbitrator)',
       ])
+    })
+
+    it('Offer flow withholds the "Either of Us" settler (asymmetric stakes)', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
+      )
+      // The Offer flow renders settlers as a tab strip. "Either" is not sound on
+      // asymmetric stakes, so it must not appear (the contract would revert
+      // EitherRequiresEqualStakes).
+      expect(screen.queryByRole('tab', { name: /^either$/i })).not.toBeInTheDocument()
+      // The single-settler tabs are still present.
+      expect(screen.getByRole('tab', { name: /^me$/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^them$/i })).toBeInTheDocument()
     })
 
     it('selecting Third Party reveals a required arbitrator address input', async () => {

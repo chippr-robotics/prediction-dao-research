@@ -53,6 +53,11 @@ describe('useFriendMarketCreation: translateRevert', () => {
       .toMatch(/insufficient token balance/i)
   })
 
+  it('maps EitherRequiresEqualStakes to equal-stakes guidance', () => {
+    expect(translateRevert('execution reverted: EitherRequiresEqualStakes'))
+      .toMatch(/equal-stakes \(non-leveraged\)/i)
+  })
+
   it('falls back to a generic message for unknown reasons', () => {
     expect(translateRevert('out of gas: 0x1234'))
       .toMatch(/transaction will fail/i)

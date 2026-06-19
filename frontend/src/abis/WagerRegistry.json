@@ -139,6 +139,11 @@
   },
   {
     "inputs": [],
+    "name": "EitherRequiresEqualStakes",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotCreator",
     "type": "error"
   },

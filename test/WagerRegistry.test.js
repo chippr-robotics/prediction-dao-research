@@ -224,6 +224,56 @@ describe("WagerRegistry", function () {
       await time.increase(31 * 24 * 3600);
       await expect(createDefault(reg, fx)).to.be.revertedWithCustomError(reg, "MembershipDenied");
     });
+
+    // "Either side submits the outcome" (ResolutionType.Either) is mutual-trust
+    // self-resolution: it is only allowed on a level peer-to-peer wager where both
+    // sides stake the same. Asymmetric/leveraged "Offer" stakes must use an oracle,
+    // a third-party arbitrator, or a single named resolver (Creator/Opponent).
+    describe("Either resolution requires equal (non-leveraged) stakes", () => {
+      it("allows Either when stakes are equal", async () => {
+        const fx = await loadFixture(deployFixture);
+        const id = await createDefault(fx.reg, fx, {
+          resolutionType: Resolution.Either,
+          creatorStake: usdc(25),
+          opponentStake: usdc(25),
+        });
+        const w = await fx.reg.getWager(id);
+        expect(w.resolutionType).to.equal(Resolution.Either);
+        expect(w.creatorStake).to.equal(w.opponentStake);
+      });
+
+      it("rejects Either when creator stakes more (leveraged)", async () => {
+        const fx = await loadFixture(deployFixture);
+        await expect(createDefault(fx.reg, fx, {
+          resolutionType: Resolution.Either,
+          creatorStake: usdc(30),
+          opponentStake: usdc(10),
+        })).to.be.revertedWithCustomError(fx.reg, "EitherRequiresEqualStakes");
+      });
+
+      it("rejects Either when opponent stakes more (leveraged)", async () => {
+        const fx = await loadFixture(deployFixture);
+        await expect(createDefault(fx.reg, fx, {
+          resolutionType: Resolution.Either,
+          creatorStake: usdc(10),
+          opponentStake: usdc(30),
+        })).to.be.revertedWithCustomError(fx.reg, "EitherRequiresEqualStakes");
+      });
+
+      it("still allows asymmetric stakes for non-Either resolution types", async () => {
+        const fx = await loadFixture(deployFixture);
+        // ThirdParty arbitration tolerates an asymmetric "Offer" wager.
+        const id = await createDefault(fx.reg, fx, {
+          resolutionType: Resolution.ThirdParty,
+          arbitrator: fx.charlie.address,
+          creatorStake: usdc(30),
+          opponentStake: usdc(10),
+        });
+        const w = await fx.reg.getWager(id);
+        expect(w.creatorStake).to.equal(usdc(30));
+        expect(w.opponentStake).to.equal(usdc(10));
+      });
+    });
   });
 
   describe("acceptWager", () => {
@@ -550,8 +600,11 @@ describe("WagerRegistry", function () {
     it("works end-to-end with WMATIC", async () => {
       const fx = await loadFixture(deployFixture);
       const { reg, wmatic, alice, bob } = fx;
+      // Asymmetric "Offer" stakes can't use Either self-resolution; use a single
+      // named resolver (Creator) instead.
       const id = await createDefault(reg, fx, {
         token: await wmatic.getAddress(),
+        resolutionType: Resolution.Creator,
         creatorStake: ethers.parseEther("1"),
         opponentStake: ethers.parseEther("2"),
       });

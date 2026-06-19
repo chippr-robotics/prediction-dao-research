@@ -297,6 +297,17 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           'Either change the resolution type or clear the conditionId.'
         )
       }
+      // "Either side submits the outcome" is only allowed on a level peer-to-peer
+      // wager (equal stakes). An asymmetric Offer must use a single named resolver,
+      // a third party, or an oracle — never mutual-trust self-resolution. Mirror the
+      // contract's EitherRequiresEqualStakes guard so the user gets a clear message.
+      if (resolutionType === ResolutionType.Either && creatorStakeWei !== opponentStakeWei) {
+        throw new Error(
+          'Letting either side submit the outcome is only available on equal-stakes ' +
+          '(non-leveraged) peer-to-peer wagers. Use a single resolver, a third-party ' +
+          'arbitrator, or an oracle for an Offer with uneven stakes.'
+        )
+      }
 
       // Metadata (encrypted envelope → IPFS, or plaintext)
       let metadataReference
@@ -502,6 +513,7 @@ export function translateRevert(reason) {
   if (reason.includes('OracleAdapterNotSet')) return 'No oracle adapter is configured on-chain for this resolution type.'
   if (reason.includes('UnsupportedOracleResolutionType')) return 'This resolution type is not supported by the registry.'
   if (reason.includes('AdapterNotSet')) return 'Polymarket adapter not configured on-chain.'
+  if (reason.includes('EitherRequiresEqualStakes')) return 'Letting either side submit the outcome is only allowed on equal-stakes (non-leveraged) peer-to-peer wagers. For an Offer with uneven stakes, use a single resolver, a third-party arbitrator, or an oracle.'
   if (reason.includes('ArbitratorRequired')) return 'ThirdParty resolution requires an arbitrator.'
   if (reason.includes('ArbitratorDisallowed')) return 'Only ThirdParty resolution allows an arbitrator.'
   if (reason.includes('ZeroAddress')) return 'Invalid address (zero address not allowed).'
