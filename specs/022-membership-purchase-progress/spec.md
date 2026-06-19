@@ -24,6 +24,28 @@ This feature adds a visual, step-by-step progress indicator to the purchase moda
 so the member always knows what they are being asked to approve, where they are in
 the sequence, and how much is left.
 
+## Clarifications
+
+### Session 2026-06-19
+
+- Q: Should this feature only add the progress indicator, or also reduce the number
+  of wallet prompts (e.g. EIP-2612 permit)? → A: Progress indicator only — the
+  purchase mechanics (approve → pay → sign → register) are unchanged; this feature
+  is presentation only.
+- Q: How is the per-wallet-interaction progress laid out relative to the existing
+  3-step nav (Choose Tier → Review → Complete)? → A: A dedicated "Processing" view
+  shown after the member confirms — a distinct phase between Review and Complete
+  that lists the ordered wallet steps with per-step state. The top-level nav stays
+  at three phases.
+- Q: When the member already has sufficient USDC allowance (no approval prompt),
+  how should the approval step appear? → A: Omit it entirely — the indicator shows
+  only the steps that will actually prompt the wallet this time, so the step count
+  varies per purchase.
+- Q: If a non-blocking encryption-key step (signature or registration) fails, what
+  should the processing view do? → A: Mark it failed and offer BOTH an inline
+  "Retry" (resumes the key step, no re-payment) and a "Continue anyway" that
+  advances to Complete with a "register key later in Security settings" notice.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - See which wallet action I am approving (Priority: P1)
@@ -118,9 +140,11 @@ without repeating already-completed payments.
    or key registration) failed, **When** the member retries, **Then** the flow
    resumes at the failed step and does not re-request payment.
 3. **Given** the encryption-key signing or registration step fails, **When** the
-   member chooses to continue, **Then** the membership is still recognized as
-   active (the key step is non-blocking) and the member is told they can complete
-   key registration later from Security settings.
+   processing view marks it failed, **Then** the member is offered both an inline
+   "Retry" of that step (no re-payment) and a "Continue anyway" action; choosing
+   "Continue anyway" advances to Complete with the membership recognized as active
+   (the key step is non-blocking) and a notice that key registration can be
+   completed later from Security settings.
 
 ---
 
@@ -128,9 +152,9 @@ without repeating already-completed payments.
 
 - **Approval already granted**: If the member has already approved sufficient
   stablecoin allowance, the approval step is not requested by the wallet. The
-  indicator must reflect this honestly — either present the step as already
-  complete or omit it — and not leave a permanently "pending" step that never
-  activates.
+  indicator MUST omit the approval step entirely in that case, showing only the
+  steps that will actually prompt the wallet this time, and never leave a
+  permanently "pending" step that never activates.
 - **Extend flow**: The extend action does not change tier price and may not
   require a fresh approval; the indicator must show only the steps actually
   required for that action and keep the count accurate.
@@ -154,7 +178,13 @@ without repeating already-completed payments.
 - **FR-001**: The purchase modal MUST display a visual indicator of the ordered
   sequence of wallet interactions required to complete the purchase (approve
   spending, pay for membership, sign for encryption-key setup, register encryption
-  key), shown once the member confirms the purchase.
+  key), shown in a dedicated "Processing" view presented after the member confirms
+  the purchase. This view is a distinct phase between Review and Complete; the
+  top-level modal nav remains three phases (Choose Tier → Review → Complete).
+- **FR-001a**: This feature is presentation only. It MUST NOT change the purchase
+  mechanics, pricing, the contracts called, or the order/number of underlying
+  wallet interactions; it only changes how that existing sequence is surfaced to
+  the member.
 - **FR-002**: For the currently-active interaction, the indicator MUST show a
   human-readable label describing what the member is approving.
 - **FR-003**: The indicator MUST distinguish a transaction (moves funds or changes
@@ -175,11 +205,15 @@ without repeating already-completed payments.
   already-completed paid steps (no duplicate payment).
 - **FR-009**: The displayed steps MUST match the wallet interactions actually
   required for the chosen action (purchase, upgrade, or extend) and the current
-  approval state, including correctly handling the case where stablecoin approval
-  is already granted.
+  approval state. When stablecoin approval is already granted, the approval step
+  MUST be omitted entirely so the indicator shows only steps that will prompt the
+  wallet this time.
 - **FR-010**: The encryption-key signing and registration steps MUST be presented
-  as part of the sequence but treated as non-blocking — if they fail, the member is
-  informed the membership is active and key setup can be completed later.
+  as part of the sequence but treated as non-blocking. If one fails, the indicator
+  MUST mark it failed and offer both an inline "Retry" of that step (without
+  re-requesting payment) and a "Continue anyway" action that advances to the
+  completion confirmation with the membership recognized as active and a notice
+  that key setup can be completed later from Security settings.
 - **FR-011**: On successful completion of all required steps, the indicator MUST
   show all steps as done and lead into the existing purchase-complete confirmation.
 - **FR-012**: The modal MUST continue to prevent accidental dismissal while any
@@ -235,5 +269,6 @@ without repeating already-completed payments.
   grant occur in a single transaction on some networks). The indicator reflects the
   real interactions for the member's situation rather than a fixed count.
 - The existing three-phase modal framing (Choose Tier → Review → Complete) is
-  retained; this feature enriches the transition between Review and Complete — the
-  phase where the wallet interactions occur — with per-interaction progress.
+  retained; this feature adds a dedicated "Processing" view between Review and
+  Complete — the phase where the wallet interactions occur — that surfaces
+  per-interaction progress. The top-level three-phase nav is unchanged.
