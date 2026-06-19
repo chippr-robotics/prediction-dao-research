@@ -33,6 +33,7 @@ member can move their contacts between devices or back them up safely.
 - Q: How is the encrypted export/import keyed? → A: Wallet-signature-derived key — the encryption key is derived deterministically from a member's wallet signature (reusing the project's deterministic key-generation pattern); a backup is restorable only with the same wallet, with no passphrase to remember.
 - Q: How does import resolve overlaps with the existing book? → A: Additive merge keyed on address — import adds addresses not already present and keeps existing ones (no duplicates); when an imported address carries a different nickname/notes, the member is prompted to keep existing or take imported, and existing data is never silently deleted.
 - Q: Is a network required for each saved address? → A: Required, with a default — every saved address must have a network; the field is pre-filled with the currently active network so the member rarely has to choose. The unique key for an entry is (address + network).
+- Q: When is the member prompted to save a newly-entered address? → A: Non-blocking toast after the action succeeds — once the underlying action (e.g., wager created/accepted) confirms on-chain, a dismissible "Save to address book?" toast appears; it never interrupts the flow, and is only offered for addresses not already saved.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -144,31 +145,32 @@ confirm the field is populated with that exact address and any warning is shown.
 ### User Story 4 - Prompt to save a newly entered address (Priority: P2)
 
 After a member manually enters a new address (one not already in their address
-book) into an address field and proceeds, they are prompted to save it to their
-address book with a nickname, network, and optional notes, so their book grows
-naturally as they use the app.
+book) and the action they used it for succeeds on-chain, a dismissible,
+non-blocking toast invites them to save it to their address book with a nickname,
+network, and optional notes, so their book grows naturally as they use the app
+without interrupting their flow.
 
 **Why this priority**: This is the growth mechanism that keeps the book useful
 without forcing members to curate it manually. It depends on the book existing
 (US1) and is valuable but not required for the MVP.
 
-**Independent Test**: Enter a brand-new address in an address field, proceed, and
-confirm a save prompt appears; accept it, then confirm the new contact is in the
-address book; repeat with an address already saved and confirm no prompt appears.
+**Independent Test**: Enter a brand-new address, complete the action so it confirms
+on-chain, and confirm a dismissible save toast appears; accept it, then confirm the
+new contact is in the address book; repeat with an address already saved and confirm
+no toast appears.
 
 **Acceptance Scenarios**:
 
-1. **Given** a member enters an address not already in their book, **When** they
-   submit/confirm that field, **Then** they are prompted to save it with a
-   nickname, network, and optional notes.
-2. **Given** the save prompt, **When** the member confirms, **Then** the address is
+1. **Given** a member used an address not already in their book, **When** the
+   underlying action succeeds on-chain, **Then** a dismissible, non-blocking toast
+   invites them to save it with a nickname, network, and optional notes.
+2. **Given** the save toast, **When** the member confirms, **Then** the address is
    added to their address book (creating a new contact or attaching to an existing
    name they choose).
-3. **Given** the save prompt, **When** the member declines or dismisses it,
-   **Then** the address is not saved and the original action still completes
-   normally.
-4. **Given** the entered address already exists in the book, **When** the member
-   submits the field, **Then** no save prompt is shown.
+3. **Given** the save toast, **When** the member dismisses or ignores it, **Then**
+   the address is not saved and nothing about the completed action is affected.
+4. **Given** the entered address already exists in the book, **When** the action
+   succeeds, **Then** no save toast is shown.
 
 ---
 
@@ -285,11 +287,13 @@ confirm importing with a wrong secret fails safely.
   place of typing the address.
 - **FR-016**: Selecting a saved address MUST populate the target address field with
   that exact address, and any restriction warning MUST be surfaced in that flow.
-- **FR-017**: After a member enters an address that is not already in their book and
-  proceeds, the system MUST prompt them to save it (nickname, network, optional
-  notes), and MUST NOT prompt when the address is already saved.
-- **FR-018**: Declining or dismissing the save prompt MUST NOT block or alter the
-  member's original action.
+- **FR-017**: After a member uses an address that is not already in their book and
+  the underlying action confirms on-chain, the system MUST surface a dismissible,
+  non-blocking toast inviting them to save it (nickname, network, optional notes),
+  and MUST NOT surface it when the address is already saved.
+- **FR-018**: The save toast MUST be non-blocking — dismissing or ignoring it MUST
+  NOT block or alter the member's completed action, and it MUST never interrupt the
+  flow.
 
 #### Portability (encrypted import/export)
 
@@ -343,8 +347,9 @@ confirm importing with a wrong secret fails safely.
 - **SC-003**: 100% of saved addresses that the oracle reports as restricted display a
   visible warning tag; 0% of addresses with an unknown/unscreenable status are shown
   as "clear".
-- **SC-004**: A member who enters a brand-new address is offered the save prompt 100%
-  of the time, and never offered it for an address already in their book.
+- **SC-004**: A member who transacts with a brand-new address is offered the save
+  toast 100% of the time after the action succeeds, and never offered it for an
+  address already in their book.
 - **SC-005**: A member can export and then import their address book onto a different
   device/profile and recover 100% of contacts, addresses, networks, and notes; an
   import with the wrong secret never reveals contact data and never corrupts the
