@@ -13,6 +13,8 @@ import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefau
 import QRScanner from '../ui/QRScanner'
 import WagerQRCode from '../ui/WagerQRCode'
 import AddressInput from '../ui/AddressInput'
+import AddressBookButton from '../ui/AddressBookButton'
+import AddressScreenNotice from '../ui/AddressScreenNotice'
 import SaveAddressToast from '../ui/SaveAddressToast'
 import { isEnsName } from '../../utils/validation'
 import { getCurrentDocument } from '../../utils/legalDocs'
@@ -1452,10 +1454,16 @@ function FriendMarketsModal({
                               disabled={submitting}
                               error={!!errors.opponent}
                               errorMessage={errors.opponent}
-                              enableAddressBook
-                              chainId={chainId}
                             />
                           </div>
+                          <AddressBookButton
+                            chainId={chainId}
+                            disabled={submitting}
+                            onSelect={(entry) => {
+                              handleFormChange('opponent', entry.address)
+                              handleFormChange('opponentResolved', entry.address)
+                            }}
+                          />
                           <button
                             type="button"
                             className="fm-scan-btn"
@@ -1469,6 +1477,10 @@ function FriendMarketsModal({
                             </svg>
                           </button>
                         </div>
+                        <AddressScreenNotice
+                          address={formData.opponentResolved || formData.opponent}
+                          chainId={chainId}
+                        />
                       </div>
                     )}
 
@@ -1581,16 +1593,30 @@ function FriendMarketsModal({
                         <label htmlFor="fm-arbitrator">
                           Arbitrator Address <span className="fm-required">*</span>
                         </label>
-                        <AddressInput
-                          id="fm-arbitrator"
-                          value={formData.arbitrator}
-                          onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                          onResolvedChange={(addr) => handleFormChange('arbitratorResolved', addr || '')}
-                          placeholder="0x... or ENS name — the neutral resolver"
-                          disabled={submitting}
-                          error={!!errors.arbitrator}
-                          errorMessage={errors.arbitrator}
-                          enableAddressBook
+                        <div className="fm-input-with-action">
+                          <div className="fm-address-input-wrap">
+                            <AddressInput
+                              id="fm-arbitrator"
+                              value={formData.arbitrator}
+                              onChange={(e) => handleFormChange('arbitrator', e.target.value)}
+                              onResolvedChange={(addr) => handleFormChange('arbitratorResolved', addr || '')}
+                              placeholder="0x... or ENS name — the neutral resolver"
+                              disabled={submitting}
+                              error={!!errors.arbitrator}
+                              errorMessage={errors.arbitrator}
+                            />
+                          </div>
+                          <AddressBookButton
+                            chainId={chainId}
+                            disabled={submitting}
+                            onSelect={(entry) => {
+                              handleFormChange('arbitrator', entry.address)
+                              handleFormChange('arbitratorResolved', entry.address)
+                            }}
+                          />
+                        </div>
+                        <AddressScreenNotice
+                          address={formData.arbitratorResolved || formData.arbitrator}
                           chainId={chainId}
                         />
                         <span className="fm-hint">

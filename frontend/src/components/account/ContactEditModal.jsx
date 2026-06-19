@@ -6,8 +6,10 @@
  * addresses before save (FR-005) and warns on duplicates (edge case).
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { isValidAddress } from '../../lib/addressBook/addressBookStore'
+import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+import QRScanner from '../ui/QRScanner'
 
 function emptyRow(defaultChainId) {
   return { address: '', chainId: defaultChainId, notes: '' }
@@ -29,6 +31,18 @@ export default function ContactEditModal({
       : [emptyRow(defaultChainId)],
   )
   const [error, setError] = useState('')
+  const [scanRow, setScanRow] = useState(null)
+
+  // Fill the scanned row with the address extracted from the QR payload.
+  const handleScanSuccess = useCallback((decodedText) => {
+    const addr = extractAddressFromScan(decodedText)
+    setScanRow((idx) => {
+      if (addr && idx != null) {
+        setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, address: addr } : r)))
+      }
+      return null
+    })
+  }, [])
 
   const setRow = (i, patch) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -105,15 +119,28 @@ export default function ContactEditModal({
             <div className="ab-address-edit-row" key={i}>
               <div className="ab-field">
                 <label htmlFor={`ab-addr-${i}`}>Address *</label>
-                <input
-                  id={`ab-addr-${i}`}
-                  type="text"
-                  value={row.address}
-                  onChange={(e) => setRow(i, { address: e.target.value })}
-                  placeholder="0x…"
-                  autoComplete="off"
-                  spellCheck="false"
-                />
+                <div className="ab-input-with-scan">
+                  <input
+                    id={`ab-addr-${i}`}
+                    type="text"
+                    value={row.address}
+                    onChange={(e) => setRow(i, { address: e.target.value })}
+                    placeholder="0x…"
+                    autoComplete="off"
+                    spellCheck="false"
+                  />
+                  <button
+                    type="button"
+                    className="ab-scan-btn"
+                    onClick={() => setScanRow(i)}
+                    title="Scan QR code"
+                    aria-label={`Scan a QR code for address ${i + 1}`}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+                    </svg>
+                  </button>
+                </div>
                 {duplicateWarnings[i] && (
                   <span className="ab-warn" role="status">
                     {duplicateWarnings[i]}
@@ -177,6 +204,12 @@ export default function ContactEditModal({
           </button>
         </div>
       </div>
+
+      <QRScanner
+        isOpen={scanRow !== null}
+        onClose={() => setScanRow(null)}
+        onScanSuccess={handleScanSuccess}
+      />
     </div>
   )
 }
