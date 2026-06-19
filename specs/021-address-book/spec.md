@@ -32,6 +32,7 @@ member can move their contacts between devices or back them up safely.
 
 - Q: How is the encrypted export/import keyed? → A: Wallet-signature-derived key — the encryption key is derived deterministically from a member's wallet signature (reusing the project's deterministic key-generation pattern); a backup is restorable only with the same wallet, with no passphrase to remember.
 - Q: How does import resolve overlaps with the existing book? → A: Additive merge keyed on address — import adds addresses not already present and keeps existing ones (no duplicates); when an imported address carries a different nickname/notes, the member is prompted to keep existing or take imported, and existing data is never silently deleted.
+- Q: Is a network required for each saved address? → A: Required, with a default — every saved address must have a network; the field is pre-filled with the currently active network so the member rarely has to choose. The unique key for an entry is (address + network).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -240,8 +241,9 @@ confirm importing with a wrong secret fails safely.
 - **FR-002**: Members MUST be able to associate one or more wallet addresses with a
   single contact (one name, many addresses), so a friend's multiple wallets are
   grouped together.
-- **FR-003**: Each stored address MUST be able to carry a network designation and
-  optional free-text notes.
+- **FR-003**: Each stored address MUST carry a required network designation (the
+  entry field defaults to the currently active network) and optional free-text
+  notes. The unique identity of an entry is the combination of (address + network).
 - **FR-004**: Members MUST be able to view, edit, and delete contacts, and add,
   edit, or delete individual addresses within a contact (full CRUD).
 - **FR-005**: The system MUST validate that an entered address is a well-formed
@@ -319,9 +321,11 @@ confirm importing with a wrong secret fails safely.
 
 - **Contact**: A named person/entity in a member's address book. Has a nickname and
   a collection of associated addresses. Belongs to exactly one member (the owner).
-- **Saved Address**: A single wallet address belonging to a contact, with a network
-  designation, optional notes, and a derived (screened) restriction status. A
-  contact may have many; an address is tracked per network.
+- **Saved Address**: A single wallet address belonging to a contact, with a required
+  network designation (defaulted to the active network), optional notes, and a
+  derived (screened) restriction status. A contact may have many; an entry's unique
+  identity is (address + network), so the same address on two networks is two
+  entries.
 - **Address Book**: The full collection of a member's contacts, scoped to the owning
   member, persisted on-device, and the unit of encrypted export/import.
 - **Restriction Status**: The screened compliance/sanctions result for an address on
