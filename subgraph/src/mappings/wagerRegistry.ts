@@ -200,6 +200,9 @@ export function handleDrawProposed(event: DrawProposed): void {
   let wager = Wager.load(id)
   if (wager == null) return
   wager.status = 'draw_proposed'
+  // Record who proposed so the notifier can name the proposer and decide the
+  // counterparty's "respond to draw" action without an eth_getLogs scan.
+  wager.drawProposer = event.params.proposer
   wager.save()
 }
 
@@ -207,7 +210,8 @@ export function handleDrawRevoked(event: DrawRevoked): void {
   let id = event.params.wagerId.toString()
   let wager = Wager.load(id)
   if (wager == null) return
-  // Revoking a draw proposal returns the wager to active.
+  // Revoking a draw proposal returns the wager to active and clears the proposer.
   wager.status = 'active'
+  wager.drawProposer = null
   wager.save()
 }

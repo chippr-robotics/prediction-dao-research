@@ -60,6 +60,9 @@ type Wager @entity(immutable: false) {
   status: WagerStatus!
   winner: Bytes
 
+  "address that proposed the open draw while status == draw_proposed; cleared on revoke. Lets the notifier surface the proposer (and the counterparty 'respond to draw' action) without an eth_getLogs scan."
+  drawProposer: Bytes
+
   createdAt: BigInt!
   resolvedAt: BigInt
 

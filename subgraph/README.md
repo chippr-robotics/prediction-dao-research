@@ -66,7 +66,9 @@ Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
 
 - **Wager** — identity, both parties, per-side stakes, lifecycle status, winner,
   createdAt/resolvedAt. Stakes are stored at creation so refund/accept transfers
-  derive amounts without contract reads.
+  derive amounts without contract reads. `drawProposer` carries the open-draw
+  proposer while `status == draw_proposed` (cleared on revoke), so the wager
+  watcher can surface draw proposals without an `eth_getLogs` scan.
 - **WagerTransfer** (immutable) — one row per value movement, keyed by
   `txHash-logIndex-party` (unique even when one log refunds two parties).
 
