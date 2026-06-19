@@ -13,6 +13,7 @@
  * Updates are polling-based — no websockets. See research.md R5.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Contract, formatUnits } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import usePriceConversion from './usePriceConversion'
 import { useChainTokens } from './useChainTokens'
@@ -29,8 +30,27 @@ import {
 
 const POLL_MS = 60_000
 
+const ERC20_BALANCE_ABI = ['function balanceOf(address) view returns (uint256)']
+
 function emptyFreshness() {
   return { lastUpdated: null, status: 'refreshing' }
+}
+
+/**
+ * Read the connected wallet's stablecoin balance in human units. The wallet
+ * context only tracks the native balance, so the dashboard's "Wallet Balance"
+ * tile would otherwise omit the user's USDC — the very token wagers are staked
+ * in. Best-effort: a read failure returns null and leaves the tile unchanged.
+ */
+async function fetchStableBalance({ provider, address, stableAddress, stableDecimals }) {
+  if (!provider || !address || !stableAddress) return null
+  try {
+    const token = new Contract(stableAddress, ERC20_BALANCE_ABI, provider)
+    const raw = await token.balanceOf(address)
+    return Number(formatUnits(raw, stableDecimals ?? 6))
+  } catch {
+    return null
+  }
 }
 
 async function loadAllWagers(repository, account) {
@@ -52,12 +72,13 @@ async function loadAllWagers(repository, account) {
 
 export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
   const wallet = useWallet() || {}
-  const { address, chainId, isConnected, balances, refreshBalances } = wallet
+  const { address, chainId, isConnected, balances, refreshBalances, provider } = wallet
   const { convertToUsd } = usePriceConversion()
   const tokens = useChainTokens()
 
   const [range, setRange] = useState(initialRange)
   const [wagers, setWagers] = useState([])
+  const [stableBalance, setStableBalance] = useState(null)
   const [valuedTransfers, setValuedTransfers] = useState([])
   const [tokenMetaByAddress, setTokenMetaByAddress] = useState({})
   const [isLoading, setIsLoading] = useState(false)
@@ -76,6 +97,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     if (!isConnected || !address) {
       setWagers([])
       setValuedTransfers([])
+      setStableBalance(null)
       setIsLoading(false)
       return
     }
@@ -91,9 +113,15 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     try {
       const repository = getDefaultWagerRepository()
       const ds = createReportDataSource({ chainId })
-      const [loadedWagers, rawTransfers] = await Promise.all([
+      const [loadedWagers, rawTransfers, stable] = await Promise.all([
         loadAllWagers(repository, address),
         ds.listTransfers({ account: address }),
+        fetchStableBalance({
+          provider,
+          address,
+          stableAddress: tokens.stableAddress,
+          stableDecimals: tokens.stableDecimals,
+        }),
       ])
       if (reqId !== reqIdRef.current) return
 
@@ -101,6 +129,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       if (reqId !== reqIdRef.current) return
 
       setWagers(loadedWagers)
+      if (stable != null) setStableBalance(stable)
       setValuedTransfers(transfers)
       setTokenMetaByAddress(meta)
       setIsSupportedNetwork(true)
@@ -124,7 +153,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     } finally {
       if (reqId === reqIdRef.current) setIsLoading(false)
     }
-  }, [isConnected, address, chainId])
+  }, [isConnected, address, chainId, provider, tokens.stableAddress, tokens.stableDecimals])
 
   // Reload on connect / account / network change.
   useEffect(() => {
@@ -157,14 +186,15 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       usd += nUsd
       rows.push({ symbol: tokens.native || 'NATIVE', amount: nativeAmt, usdValue: nUsd })
     }
-    // Stablecoin balance (par $1) when the wallet context exposes it.
-    const stableAmt = Number(balances?.stable ?? balances?.tokens?.[tokens.stableAddress]) || 0
+    // Stablecoin balance (par $1) read directly from the token contract — the
+    // wallet context only tracks native, so this is the wager-staking balance.
+    const stableAmt = Number(stableBalance) || 0
     if (stableAmt > 0) {
       usd += stableAmt
       rows.push({ symbol: tokens.stable || 'STABLE', amount: stableAmt, usdValue: stableAmt })
     }
     return { walletBalanceUsd: usd, walletBalances: rows }
-  }, [balances, convertToUsd, tokens.native, tokens.stable, tokens.stableAddress])
+  }, [balances, convertToUsd, stableBalance, tokens.native, tokens.stable])
 
   // ---- Derived view models ----
   const wagerStatusById = useMemo(() => {
