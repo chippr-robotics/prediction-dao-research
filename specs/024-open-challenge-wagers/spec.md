@@ -58,6 +58,12 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   should save it to re-read later; there is no re-keying to a registered encryption key at
   accept. Losing the code yields "terms unavailable" without affecting funds or resolution.
   This preserves the no-registered-key property for the unknown taker.
+- Q: Must the code→commitment/key derivation be deliberately costly to resist offline
+  brute force? → A: No (v1) — a fast derivation with entropy alone is acceptable to start.
+  The threat goal is downgraded to resisting **casual/indiscriminate** guessing; a
+  determined offline attacker who has the public commitment could brute-force a 4-word code
+  (~2^44), and that residual risk is accepted for v1. A memory-hard/slow derivation or
+  higher entropy is a documented future hardening.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -115,9 +121,9 @@ impractical for a worthwhile wager within the wager's open window.
    they cannot determine which entry it is or read its terms.
 2. **Given** an open challenge, **When** someone submits a wrong code (or no code) to accept,
    **Then** acceptance is refused.
-3. **Given** an open challenge, **When** an attacker tries to discover the code by guessing (to take
-   or read the wager without authorization), **Then** the number of guesses required is large enough
-   that succeeding within the wager's open window is impractical (entropy floor met).
+3. **Given** an open challenge, **When** a casual attacker tries a handful of likely codes to take or
+   read the wager, **Then** they fail — the four-word space (~2^44) makes indiscriminate guessing
+   futile. (v1 does not claim resistance to a determined offline brute force of the public commitment.)
 4. **Given** a legitimate taker who holds the code is submitting their acceptance, **When** an
    observer watching pending activity copies what they can see of that acceptance, **Then** the
    observer cannot use it to steal the counterparty slot for themselves — the legitimate taker who
@@ -186,7 +192,12 @@ code-holders.
 - **FR-002**: Creating an open challenge MUST bind a **claim code** to the wager such that the code is
   required to discover, accept, and read it.
 - **FR-003**: The claim code MUST be a human-friendly four-word phrase drawn from a standard word list,
-  carrying at least ~2^44 of effective entropy (the agreed floor for resisting offline guessing).
+  carrying at least ~2^44 of effective entropy (the agreed v1 floor).
+- **FR-003a**: For v1, the code→commitment/key derivation MAY be fast (entropy is the only barrier). The
+  system's anti-guessing guarantee is therefore scoped to **casual/indiscriminate** guessing only; the
+  spec explicitly accepts that a determined offline attacker holding the public commitment could
+  brute-force a four-word code. Strengthening this (a deliberately slow/memory-hard derivation or higher
+  entropy) is recorded as future hardening and MUST NOT be assumed by v1 acceptance tests.
 - **FR-004**: The creator's stake MUST be escrowed at creation for an open challenge exactly as for a
   named-opponent wager (no change to custody or accounting).
 - **FR-005**: An open challenge MUST count against the creator's membership limits at creation, the same
@@ -306,8 +317,11 @@ code-holders.
   (when still open), with no step requiring them to have been named in advance.
 - **SC-003**: 100% of attempts to read or accept an open challenge **without** the correct code fail to
   reveal the terms or bind the taker.
-- **SC-004**: Guessing an open challenge's code by brute force (to take or read it without authorization)
-  is impractical within the wager's open window (the chosen entropy floor of ~2^44 or greater is met).
+- **SC-004**: An open challenge's code resists **casual and indiscriminate** guessing — a non-holder
+  cannot find, read, or take a wager by trying a handful of likely codes, and the four-word floor (~2^44)
+  is met. (v1 scope: this does NOT defend against a determined offline attacker who brute-forces the
+  public commitment with specialized hardware; see FR-003a and the residual-risk assumption. Hardening
+  the derivation or raising entropy is deferred.)
 - **SC-005**: In a race where several code-holders try to accept, exactly one becomes the opponent and no
   losing taker has funds taken or left stuck.
 - **SC-006**: A front-running observer who copies what is visible of a legitimate taker's acceptance cannot
@@ -330,6 +344,12 @@ code-holders.
   trade-off between memorability/shareability and resistance to offline guessing; higher-entropy options may
   be offered later but four words is the v1 baseline. Low-entropy formats (short PINs, a few emoji from a
   small set) are explicitly out of scope because the public on-chain commitment makes them brute-forceable.
+- **v1 accepts a residual offline-brute-force risk (FR-003a).** With a fast derivation, a determined
+  attacker who has the public commitment and specialized hardware could exhaust a four-word space; this is
+  knowingly accepted to ship a simple, shareable code, and the anti-guessing guarantee is scoped to
+  casual/indiscriminate attempts. A slow/memory-hard derivation or higher entropy is the planned hardening
+  path if the threat materializes. This trade-off MUST be surfaced honestly to creators staking meaningful
+  amounts (Constitution Principle III — honest state).
 - **The code, not a registered key, secures private terms for open challenges.** Named-opponent private
   wagers continue to use the existing recipient-key encryption; only open challenges use code-derived
   readability (because the taker is unknown at creation).
