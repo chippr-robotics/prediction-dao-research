@@ -64,6 +64,11 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   determined offline attacker who has the public commitment could brute-force a 4-word code
   (~2^44), and that residual risk is accepted for v1. A memory-hard/slow derivation or
   higher entropy is a documented future hardening.
+- Q: Must an open-challenge taker hold a paid membership to accept (incl. public
+  challenges)? → A: Yes — membership is required for **all** takers, no exemption. A
+  non-member holding the code is cleanly blocked at accept and prompted to purchase first;
+  there is no membership backdoor via open challenges. A public challenge's reachable
+  audience is therefore "members who obtain the code."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -171,7 +176,9 @@ code-holders.
   resolver would be an unknown party. The creator must choose an oracle, `Either`, or a named
   third-party arbitrator instead. Named-opponent wagers are unaffected and may still use self-resolution.
 - **Sanctioned or non-member taker**: a taker who fails sanctions screening or lacks an active
-  membership/limit is refused at accept time, exactly as a named opponent would be.
+  membership/limit is refused at accept time, exactly as a named opponent would be — there is no
+  membership exemption for open challenges (including public ones). A non-member who holds the code is
+  blocked and prompted to purchase membership before they can accept.
 - **Lost code**: if the creator loses the code before anyone accepts, the wager simply cannot be
   accepted or read by anyone; it remains until it expires and the stake is refunded. The code cannot
   be recovered (there is no escrow of the code itself).
@@ -231,7 +238,9 @@ code-holders.
 - **FR-013**: A taker who becomes the opponent MUST be subject to **all** existing accept-time
   protections, unchanged: sanctions screening (of the taker and the creator), active-membership and
   concurrency-limit checks, stake escrow of the opponent's stake, and recording of the taker against the
-  wager so they can find it afterward.
+  wager so they can find it afterward. Membership is required for **every** taker with no open-challenge
+  exemption (including public challenges); a non-member who holds the code is blocked at accept and the
+  app MUST prompt them to purchase membership before they can take the wager.
 - **FR-014**: The creator MUST NOT be able to accept their own open challenge (the two parties must be
   distinct).
 - **FR-015**: For third-party (arbitrator) resolution, a taker who is the named arbitrator MUST be refused
