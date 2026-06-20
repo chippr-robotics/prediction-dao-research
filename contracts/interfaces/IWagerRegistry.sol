@@ -58,6 +58,19 @@ interface IWagerRegistry {
     event AccountFrozen(address indexed user, address indexed by, string reason);
     event AccountUnfrozen(address indexed user, address indexed by);
 
+    /// @notice Emitted when an open challenge (no named opponent, code-gated) is created (feature 024).
+    ///         The opponent is bound later via {WagerAccepted} on acceptOpenWager.
+    event OpenWagerCreated(
+        uint256 indexed wagerId,
+        address indexed creator,
+        address indexed claimAuthority,
+        address token,
+        uint128 stake,
+        ResolutionType resolutionType,
+        bytes32 metadataHash,
+        string  metadataUri
+    );
+
     function createWager(
         address opponent,
         address arbitrator,
@@ -74,6 +87,26 @@ interface IWagerRegistry {
     ) external returns (uint256 wagerId);
 
     function acceptWager(uint256 wagerId) external;
+
+    // ----- Open challenges (feature 024): no named opponent, gated by a code-derived claim authority -----
+    function createOpenWager(
+        address claimAuthority_,
+        address arbitrator,
+        address token,
+        uint128 stake,
+        uint64 acceptDeadline,
+        uint64 resolveDeadline,
+        ResolutionType resolutionType,
+        bytes32 oracleConditionId,
+        bool creatorIsYes,
+        bytes32 metadataHash,
+        string calldata metadataUri
+    ) external returns (uint256 wagerId);
+
+    function acceptOpenWager(uint256 wagerId, bytes calldata signature) external;
+    function openWagerIdForClaim(address authority) external view returns (uint256);
+    function isOpenChallenge(uint256 wagerId) external view returns (bool);
+
     function cancelOpen(uint256 wagerId) external;
     function declineWager(uint256 wagerId) external;
     function declareWinner(uint256 wagerId, address winner) external;

@@ -165,3 +165,7 @@ site/
 # Playwright MCP session artifacts (console logs, page snapshots, downloaded
 # browser extensions like the MetaMask .crx) — transient, can be tens of MB.
 .playwright-mcp/
+
+# Stray Playwright screenshots saved to repo root
+/dashboard-loaded.png
+/open-challenge-modal-taker.png

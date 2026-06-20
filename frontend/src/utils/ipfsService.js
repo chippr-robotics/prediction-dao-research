@@ -588,13 +588,17 @@ export const uploadEncryptedEnvelope = async (envelope, options = {}) => {
     throw new Error('Envelope must be a valid object')
   }
 
+  // Code-keyed envelopes (feature 024, open challenges) have NO recipients `keys` list — readability is by
+  // the code-derived symmetric key, not registered recipient keys — so the keys checks don't apply to them.
+  const isCodeKeyed = envelope.mode === 'code'
+
   // Validate it looks like an encrypted envelope
-  if (!envelope.version || !envelope.algorithm || !envelope.content || !envelope.keys) {
+  if (!envelope.version || !envelope.algorithm || !envelope.content || (!isCodeKeyed && !envelope.keys)) {
     throw new Error('Invalid envelope format: missing required fields (version, algorithm, content, keys)')
   }
 
-  // Validate keys is an array
-  if (!Array.isArray(envelope.keys)) {
+  // Validate keys is an array (recipient-keyed only)
+  if (!isCodeKeyed && !Array.isArray(envelope.keys)) {
     throw new Error('Invalid envelope format: keys must be an array')
   }
 
@@ -604,7 +608,7 @@ export const uploadEncryptedEnvelope = async (envelope, options = {}) => {
   }
 
   // Validate supported algorithms
-  const supportedAlgorithms = ['x25519-chacha20poly1305', 'xwing-chacha20poly1305']
+  const supportedAlgorithms = ['x25519-chacha20poly1305', 'xwing-chacha20poly1305', 'code-xchacha20poly1305']
   if (!supportedAlgorithms.includes(envelope.algorithm)) {
     throw new Error(`Unsupported envelope algorithm: ${envelope.algorithm}`)
   }
@@ -650,8 +654,9 @@ export const fetchEncryptedEnvelope = async (cid, options = {}) => {
     throw new Error('Fetched envelope has invalid content structure: missing nonce or ciphertext')
   }
 
-  // Validate keys is an array
-  if (!Array.isArray(envelope.keys)) {
+  // Validate keys is an array (recipient-keyed only). Code-keyed envelopes (feature 024) have no recipients
+  // list — readability is by the code-derived symmetric key.
+  if (envelope.mode !== 'code' && !Array.isArray(envelope.keys)) {
     throw new Error('Fetched envelope has invalid keys: must be an array')
   }
 
