@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -26,9 +28,10 @@ import "../oracles/IOracleAdapter.sol";
 ///           ACCOUNT_MODERATOR_ROLE   — freeze / unfreeze individual accounts
 ///         A frozen account cannot create, accept, cancel, declare, claim, or refund
 ///         on this contract. See docs/system-overview/account-moderation.md.
-contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgradeable, EIP712Upgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
+    using ECDSA for bytes32;
 
     bytes32 public constant WAGER_PARTICIPANT_ROLE = keccak256("WAGER_PARTICIPANT_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
@@ -36,6 +39,10 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
 
     uint64 public constant MAX_ACCEPT_WINDOW = 30 days;
     uint64 public constant MAX_RESOLVE_WINDOW = 180 days;
+
+    /// @notice EIP-712 typehash for an open-challenge acceptance. Binding `taker` (= msg.sender) to the
+    ///         signature is the front-running defense (FR-011): a copied signature is useless to anyone else.
+    bytes32 private constant OPEN_ACCEPT_TYPEHASH = keccak256("OpenAccept(uint256 wagerId,address taker)");
 
     IMembershipManager public membershipManager;
     IOracleAdapter public polymarketAdapter;
@@ -76,9 +83,17 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
     ///         Enables O(N_user) lookup without log scans (avoids `eth_getLogs` block-range limits).
     mapping(address => EnumerableSet.UintSet) private _userWagerIds;
 
-    /// @dev Trailing storage reserve for append-only upgrades (e.g. feature 024 appends claimAuthority /
-    ///      openWagerIdByClaim here). Never insert or reorder existing state above this gap; only consume it.
-    uint256[50] private __gap;
+    // ---- Open challenges (feature 024), appended after all prior state (consumes 2 __gap slots) ----
+    /// @notice Code-derived address committed to an open challenge. 0 ⇒ not an open challenge. Set in
+    ///         createOpenWager; cleared when the wager leaves Open (accept / cancel / expire / refund).
+    mapping(uint256 => address) public claimAuthority;
+    /// @notice Reverse index: the single Open open-challenge for a claim authority (0 ⇒ none). Powers code
+    ///         discovery (FR-007) and active-uniqueness (FR-006a).
+    mapping(address => uint256) public openWagerIdByClaim;
+
+    /// @dev Trailing storage reserve for append-only upgrades. Reduced 50 → 48 when the two open-challenge
+    ///      mappings above were appended (feature 024). Never insert or reorder existing state above this gap.
+    uint256[48] private __gap;
 
     event MembershipManagerUpdated(address indexed manager);
     event PolymarketAdapterUpdated(address indexed adapter);
@@ -119,6 +134,15 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
     error DrawNotApplicable();
     error NoDrawProposal();
     error AccountFrozenError(address user);
+    // Open challenges (feature 024)
+    error ZeroClaimAuthority();
+    error ClaimAuthorityInUse();
+    error OpenResolutionTypeNotAllowed();
+    error NotOpenChallenge();
+    error BadClaimSignature();
+    error ArbitratorCannotTake();
+    error InsufficientMembershipTier();
+    error DeclineNotAllowedForOpenChallenge();
 
     modifier notFrozen(address user) {
         if (_frozen[user]) revert AccountFrozenError(user);
@@ -137,6 +161,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
         __UUPSManaged_init(admin); // UUPS + AccessControl; grants DEFAULT_ADMIN_ROLE + UPGRADER_ROLE to admin
         __ReentrancyGuard_init();
         __Pausable_init();
+        __EIP712_init("FairWins WagerRegistry", "1"); // open-challenge accept signatures (feature 024)
 
         if (admin == address(0) || membershipManager_ == address(0)) revert ZeroAddress();
         membershipManager = IMembershipManager(membershipManager_);
@@ -150,6 +175,15 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
         _grantRole(GUARDIAN_ROLE, admin);
         _grantRole(ACCOUNT_MODERATOR_ROLE, admin);
         _nextWagerId = 1; // MOVED from the inline initializer (must run behind the proxy)
+    }
+
+    /// @notice One-time upgrade initializer for feature 024 (open challenges). Because 024 ships as an
+    ///         in-place upgrade of an already-initialized proxy, the constructor-replacement {initialize}
+    ///         does NOT run again — so the EIP-712 domain (used by acceptOpenWager signatures) is set here,
+    ///         invoked via `upgradeToAndCall` during the upgrade. Fresh deploys set it in {initialize} and
+    ///         never call this (reinitializer(2) > the version-1 initializer). Runs at most once.
+    function initializeOpenChallenges() external reinitializer(2) {
+        __EIP712_init("FairWins WagerRegistry", "1");
     }
 
     // ---------- Admin ----------
@@ -197,6 +231,48 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
 
     function _isOracleResolvedType(ResolutionType rt) internal pure returns (bool) {
         return rt == ResolutionType.Polymarket || _isExtensibleOracleType(rt);
+    }
+
+    /// @dev Shared deadline checks for both create paths (named-opponent and open challenge).
+    function _checkDeadlines(uint64 acceptDeadline, uint64 resolveDeadline) internal view {
+        if (acceptDeadline <= block.timestamp) revert BadDeadlines();
+        if (resolveDeadline <= acceptDeadline) revert BadDeadlines();
+        if (acceptDeadline > block.timestamp + MAX_ACCEPT_WINDOW) revert BadDeadlines();
+        if (resolveDeadline > block.timestamp + MAX_RESOLVE_WINDOW) revert BadDeadlines();
+    }
+
+    /// @dev Shared oracle-condition validation/linkage for both create paths. For oracle types the condition
+    ///      must be set, the adapter configured, and the condition not already resolved (stale-condition
+    ///      mitigation); non-oracle types must not carry a condition.
+    function _checkOracleLinkage(ResolutionType resolutionType, bytes32 conditionId) internal view {
+        if (resolutionType == ResolutionType.Polymarket) {
+            if (conditionId == bytes32(0)) revert PolymarketRequired();
+            if (address(polymarketAdapter) == address(0)) revert AdapterNotSet();
+            if (polymarketAdapter.isConditionResolved(conditionId)) revert ConditionAlreadyResolved();
+        } else if (_isExtensibleOracleType(resolutionType)) {
+            if (conditionId == bytes32(0)) revert OracleConditionRequired();
+            IOracleAdapter adapter = oracleAdapters[resolutionType];
+            if (address(adapter) == address(0)) revert OracleAdapterNotSet();
+            if (adapter.isConditionResolved(conditionId)) revert ConditionAlreadyResolved();
+        } else {
+            if (conditionId != bytes32(0)) revert PolymarketDisallowed();
+        }
+    }
+
+    /// @dev Shared accept-time gauntlet for both accept paths: sanctions-screen the taker (msg.sender) and
+    ///      the creator, then enforce the membership gate on the taker. (Spec 007 FR-054 + membership.)
+    function _runAcceptGuard(address creator) internal view {
+        _screen(msg.sender);
+        _screen(creator);
+        if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
+    }
+
+    /// @dev Shared accept tail for both accept paths: escrow the opponent's stake, charge the membership
+    ///      counter, and emit {WagerAccepted}. Status/opponent effects happen at the call site first.
+    function _settleAccept(uint256 wagerId, address token, uint128 opponentStake) internal {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), opponentStake);
+        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
+        emit WagerAccepted(wagerId, msg.sender);
     }
 
     function setTokenAllowed(address token, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -292,10 +368,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
         if (opponent == msg.sender) revert SelfWager();
         if (!_allowedTokens[token]) revert NotAllowedToken();
         if (creatorStake == 0 || opponentStake == 0) revert ZeroStake();
-        if (acceptDeadline <= block.timestamp) revert BadDeadlines();
-        if (resolveDeadline <= acceptDeadline) revert BadDeadlines();
-        if (acceptDeadline > block.timestamp + MAX_ACCEPT_WINDOW) revert BadDeadlines();
-        if (resolveDeadline > block.timestamp + MAX_RESOLVE_WINDOW) revert BadDeadlines();
+        _checkDeadlines(acceptDeadline, resolveDeadline);
 
         // "Either side submits the outcome" (ResolutionType.Either) is a mutual-trust
         // resolution path — no oracle, no arbitrator, and whoever calls declareWinner
@@ -314,20 +387,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
             if (arbitrator != address(0)) revert ArbitratorDisallowed();
         }
 
-        if (resolutionType == ResolutionType.Polymarket) {
-            if (polymarketConditionId == bytes32(0)) revert PolymarketRequired();
-            if (address(polymarketAdapter) == address(0)) revert AdapterNotSet();
-            // Stale-condition attack mitigation
-            if (polymarketAdapter.isConditionResolved(polymarketConditionId)) revert ConditionAlreadyResolved();
-        } else if (_isExtensibleOracleType(resolutionType)) {
-            if (polymarketConditionId == bytes32(0)) revert OracleConditionRequired();
-            IOracleAdapter adapter = oracleAdapters[resolutionType];
-            if (address(adapter) == address(0)) revert OracleAdapterNotSet();
-            // Stale-condition attack mitigation (parity with the Polymarket branch above)
-            if (adapter.isConditionResolved(polymarketConditionId)) revert ConditionAlreadyResolved();
-        } else {
-            if (polymarketConditionId != bytes32(0)) revert PolymarketDisallowed();
-        }
+        _checkOracleLinkage(resolutionType, polymarketConditionId);
 
         // Membership gate
         if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
@@ -379,22 +439,156 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
         }
     }
 
+    // ---------- Open challenges (feature 024) ----------
+
+    /// @notice Create an open challenge: a wager with NO named opponent, gated by a code-derived
+    ///         `claimAuthority_`. Equal stakes only (single `stake`). Restricted to trust-minimized
+    ///         resolution types (oracle / Either / ThirdParty — NOT Creator/Opponent). Silver+ to create.
+    function createOpenWager(
+        address claimAuthority_,
+        address arbitrator,
+        address token,
+        uint128 stake,
+        uint64 acceptDeadline,
+        uint64 resolveDeadline,
+        ResolutionType resolutionType,
+        bytes32 oracleConditionId,
+        bool creatorIsYes,
+        bytes32 metadataHash,
+        string calldata metadataUri
+    ) external nonReentrant whenNotPaused notFrozen(msg.sender) returns (uint256 wagerId) {
+        // Checks
+        _screen(msg.sender);
+        if (claimAuthority_ == address(0)) revert ZeroClaimAuthority();
+        if (openWagerIdByClaim[claimAuthority_] != 0) revert ClaimAuthorityInUse(); // active-uniqueness (FR-006a)
+        if (!_allowedTokens[token]) revert NotAllowedToken();
+        if (stake == 0) revert ZeroStake();
+        _checkDeadlines(acceptDeadline, resolveDeadline);
+
+        // Resolution-type restriction (FR-016a): single-party self-resolution is barred because the taker is
+        // unknown at creation — a lone unknown party must never be the sole resolver.
+        if (resolutionType == ResolutionType.Creator || resolutionType == ResolutionType.Opponent) {
+            revert OpenResolutionTypeNotAllowed();
+        }
+
+        if (resolutionType == ResolutionType.ThirdParty) {
+            if (arbitrator == address(0)) revert ArbitratorRequired();
+            // The opponent is unknown now, so the arbitrator != opponent half is enforced at accept.
+            if (arbitrator == msg.sender) revert ArbitratorDisallowed();
+        } else {
+            if (arbitrator != address(0)) revert ArbitratorDisallowed();
+        }
+
+        _checkOracleLinkage(resolutionType, oracleConditionId);
+
+        // Membership gate + Silver-tier-or-above creation privilege (FR-005a). Participation (accept) has no
+        // tier floor; only creating an open challenge is gatekept.
+        if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
+        if (uint8(membershipManager.getActiveTier(msg.sender, WAGER_PARTICIPANT_ROLE)) < uint8(IMembershipManager.Tier.Silver)) {
+            revert InsufficientMembershipTier();
+        }
+
+        // Effects — equal stakes by construction (creatorStake == opponentStake == stake), opponent unbound.
+        wagerId = _nextWagerId++;
+        Wager storage w = _wagers[wagerId];
+        w.creator = msg.sender;
+        // w.opponent stays address(0) until acceptOpenWager binds the taker.
+        w.arbitrator = arbitrator;
+        w.token = token;
+        w.creatorStake = stake;
+        w.opponentStake = stake;
+        w.acceptDeadline = acceptDeadline;
+        w.resolveDeadline = resolveDeadline;
+        w.resolutionType = resolutionType;
+        w.status = Status.Open;
+        w.creatorIsYes = creatorIsYes;
+        w.metadataHash = metadataHash;
+        w.polymarketConditionId = oracleConditionId;
+        w.metadataUri = metadataUri;
+
+        claimAuthority[wagerId] = claimAuthority_;
+        openWagerIdByClaim[claimAuthority_] = wagerId;
+
+        _userWagerIds[msg.sender].add(wagerId);
+        if (arbitrator != address(0)) {
+            _userWagerIds[arbitrator].add(wagerId);
+        }
+
+        // Interactions
+        IERC20(token).safeTransferFrom(msg.sender, address(this), stake);
+        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
+
+        emit OpenWagerCreated(wagerId, msg.sender, claimAuthority_, token, stake, resolutionType, metadataHash, metadataUri);
+        if (resolutionType == ResolutionType.Polymarket) {
+            emit PolymarketLinked(wagerId, oracleConditionId, creatorIsYes);
+        } else if (_isExtensibleOracleType(resolutionType)) {
+            emit OracleConditionLinked(wagerId, resolutionType, oracleConditionId, creatorIsYes);
+        }
+    }
+
+    /// @notice Accept an open challenge by proving knowledge of the claim code via an EIP-712 signature from
+    ///         the code-derived key over (wagerId, msg.sender). Binds the taker as opponent; runs the same
+    ///         accept-time gauntlet as {acceptWager}. No tier floor — any active member may take (FR-013).
+    function acceptOpenWager(uint256 wagerId, bytes calldata signature)
+        external
+        nonReentrant
+        whenNotPaused
+        notFrozen(msg.sender)
+    {
+        Wager storage w = _wagers[wagerId];
+        address authority = claimAuthority[wagerId];
+        if (w.status != Status.Open || authority == address(0)) revert NotOpenChallenge();
+        if (block.timestamp > w.acceptDeadline) revert AcceptExpired();
+
+        // Front-running resistant: the signature is only valid for this exact taker (= msg.sender). ECDSA
+        // .recover rejects malleable/invalid signatures (never returns address(0) to collide with an unset slot).
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(OPEN_ACCEPT_TYPEHASH, wagerId, msg.sender)));
+        if (digest.recover(signature) != authority) revert BadClaimSignature();
+
+        if (msg.sender == w.creator) revert SelfWager();
+        if (w.resolutionType == ResolutionType.ThirdParty && msg.sender == w.arbitrator) revert ArbitratorCannotTake();
+
+        _runAcceptGuard(w.creator); // no tier floor — any active member may take (FR-013)
+
+        // Effects
+        w.opponent = msg.sender;
+        w.status = Status.Active;
+        _clearClaim(wagerId); // free the code for reuse (FR-006a) before interactions
+        _userWagerIds[msg.sender].add(wagerId);
+        _settleAccept(wagerId, w.token, w.opponentStake);
+    }
+
+    /// @dev Clear the claim-authority mappings when an open challenge leaves the Open state, freeing the code
+    ///      for reuse. Called from acceptOpenWager, cancelOpen, the Open branch of claimRefund, and
+    ///      batchExpireOpen. No-op for non-open-challenge wagers.
+    function _clearClaim(uint256 wagerId) internal {
+        address a = claimAuthority[wagerId];
+        if (a != address(0)) {
+            delete openWagerIdByClaim[a];
+            delete claimAuthority[wagerId];
+        }
+    }
+
+    /// @notice Active open wager id for a code-derived authority, or 0 if none. Discovery entrypoint (FR-007).
+    function openWagerIdForClaim(address authority) external view returns (uint256) {
+        return openWagerIdByClaim[authority];
+    }
+
+    /// @notice True iff the wager is an open challenge still awaiting a taker.
+    function isOpenChallenge(uint256 wagerId) external view returns (bool) {
+        return claimAuthority[wagerId] != address(0) && _wagers[wagerId].status == Status.Open;
+    }
+
     function acceptWager(uint256 wagerId) external nonReentrant whenNotPaused notFrozen(msg.sender) {
         Wager storage w = _wagers[wagerId];
         if (w.status != Status.Open) revert NotOpen();
         if (msg.sender != w.opponent) revert NotOpponent();
         if (block.timestamp > w.acceptDeadline) revert AcceptExpired();
-        // Sanctions screen both parties (Spec 007, FR-054): the accepting opponent AND the
-        // creator (counterparty) — a creator listed after creation blocks acceptance.
-        _screen(msg.sender);
-        _screen(w.creator);
-        if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
+        // Sanctions screen both parties (Spec 007, FR-054) + membership gate on the accepting opponent.
+        _runAcceptGuard(w.creator);
 
         w.status = Status.Active;
-        IERC20(w.token).safeTransferFrom(msg.sender, address(this), w.opponentStake);
-        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
-
-        emit WagerAccepted(wagerId, msg.sender);
+        _settleAccept(wagerId, w.token, w.opponentStake);
     }
 
     function cancelOpen(uint256 wagerId) external nonReentrant notFrozen(msg.sender) {
@@ -407,6 +601,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
         address creator = w.creator;
 
         membershipManager.recordClose(creator, WAGER_PARTICIPANT_ROLE);
+        _clearClaim(wagerId); // free the code if this was an open challenge (no-op otherwise)
         delete _wagers[wagerId];
 
         token.safeTransfer(creator, refund);
@@ -416,6 +611,9 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
     function declineWager(uint256 wagerId) external nonReentrant notFrozen(msg.sender) {
         Wager storage w = _wagers[wagerId];
         if (w.status != Status.Open) revert NotOpen();
+        // Decline is a named-opponent action; an open challenge has no bound opponent. Reject it outright so
+        // no party other than the creator (via cancelOpen) can release an unaccepted open challenge (FR-023).
+        if (claimAuthority[wagerId] != address(0)) revert DeclineNotAllowedForOpenChallenge();
         if (msg.sender != w.opponent) revert NotOpponent();
 
         IERC20 token = IERC20(w.token);
@@ -616,6 +814,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
             if (block.timestamp <= w.acceptDeadline) revert NotRefundable();
             w.status = Status.Refunded;
             membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+            _clearClaim(wagerId); // free the code if this was an open challenge (no-op otherwise)
             IERC20(w.token).safeTransfer(w.creator, w.creatorStake);
             emit WagerRefunded(wagerId, w.creator, address(0));
         } else if (w.status == Status.Active) {
@@ -647,6 +846,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
 
             w.status = Status.Refunded;
             membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+            _clearClaim(wagerIds[i]); // free the code if this was an open challenge (no-op otherwise)
             IERC20(w.token).safeTransfer(w.creator, w.creatorStake);
             emit WagerRefunded(wagerIds[i], w.creator, address(0));
         }
