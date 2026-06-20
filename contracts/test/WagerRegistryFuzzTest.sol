@@ -313,4 +313,16 @@ contract WagerRegistryFuzzTest {
     function property_wager_id_starts_at_one() public view returns (bool) {
         return registry.nextWagerId() >= 1;
     }
+
+    /// @notice Upgrade-safety invariant (spec 025 FR-011): the proxy's one-time initializer can never be
+    ///         called again — no attacker can re-initialize to seize roles or reset state.
+    function property_cannot_reinitialize() public returns (bool) {
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(token);
+        try registry.initialize(deployer, address(membership), address(0), tokens) {
+            return false; // re-initialization succeeded — invariant VIOLATED
+        } catch {
+            return true; // reverted as expected
+        }
+    }
 }

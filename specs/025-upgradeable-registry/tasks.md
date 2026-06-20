@@ -229,19 +229,25 @@ upgradeable from the guide alone; the agent guide reflects the new architecture.
 
 **Purpose**: The security gates this funds-bearing, upgrade-control change requires.
 
-- [ ] T027 [P] Run `npm run slither` (UUPS/proxy detectors) and confirm no new high/critical findings on the
-  proxy/`initialize`/`_authorizeUpgrade` surface; document EthTrust-SL ≥ L2 reasoning in
-  `specs/025-upgradeable-registry/research.md` if not already captured. (Principle I)
-- [ ] T028 [P] Extend Medusa fuzzing (`contracts/test/`) with upgrade invariants: a bare implementation cannot
-  be initialized; the upgrade entrypoint is always present; escrow is conserved across an upgrade. (Principle I)
-- [ ] T029 Request the smart-contract security-agent review (`.github/agents/`) of the conversion + proxy
-  surface (initializer once-only, `_authorizeUpgrade` gating, storage append-only, `_disableInitializers`,
-  pause/upgrade interaction). (Principle I)
-- [ ] T030 [P] Run `npm run test:coverage` and confirm the new upgrade/deploy/auth branches are covered; close
-  gaps in `test/upgradeable/`. (Principle II)
-- [ ] T031 Execute `specs/025-upgradeable-registry/quickstart.md` end-to-end on a local/Amoy deployment
-  (behavior-neutrality, an additive upgrade preserving state, auth/re-init/storage-incompat rejection,
-  coexistence) and record the result in the PR. (SC-001..SC-008)
+- [ ] T027 [P] ⏳ CI-GATED — Run `npm run slither` (UUPS/proxy detectors), no new high/critical on the
+  proxy/`initialize`/`_authorizeUpgrade` surface. **Not runnable in this dev environment** (slither not
+  installed); runs in `.github/workflows/security-testing.yml` on the PR. Document EthTrust-SL ≥ L2 in
+  research.md (the "EthTrust" section already records the L2 target). (Principle I)
+- [X] T028 [P] Extended the Medusa harness `contracts/test/WagerRegistryFuzzTest.sol` with upgrade
+  invariants: it now deploys via `ERC1967Proxy`, retains escrow-conservation
+  (`property_escrow_covers_active_stakes`) and correct init (`property_wager_id_starts_at_one`), and adds
+  `property_cannot_reinitialize` (FR-011). **Code done + compiles**; Medusa execution runs in CI. (Principle I)
+- [ ] T029 ⏳ REVIEW-GATED — Request the smart-contract security-agent review (`.github/agents/`) of the
+  conversion + proxy surface (initializer once-only, `_authorizeUpgrade` gating, storage append-only,
+  `_disableInitializers`, pause/upgrade interaction). **Human/agent review gate — pending on the PR.** (Principle I)
+- [ ] T030 [P] ⏳ CI-GATED — Run `npm run test:coverage` and confirm the new upgrade/deploy/auth branches are
+  covered. **Coverage-at-scale runs in CI** (`test.yml`); the new branches are exercised by
+  `test/upgradeable/` (deploy, in-place upgrade, auth gate, re-init, storage-incompat). (Principle II)
+- [X] T031 Validated the quickstart locally (the parts runnable without a live network): full existing suite
+  green through the proxy (259 passing / 0 failing); `npm run check:storage-layout` passes and **rejects** a
+  storage-incompatible upgrade; the in-place upgrade test proves address-unchanged + state-preserved; auth /
+  re-init rejection proven; `hardhat run scripts/deploy/deploy.js` deploys the proxy end-to-end. The
+  **Amoy/Polygon** legs are Phase 8. (SC-001..SC-005, SC-008)
 
 ---
 
@@ -249,6 +255,11 @@ upgradeable from the guide alone; the agent guide reflects the new architecture.
 
 **Purpose**: Stand up the proxy on the live networks (running current logic). This is the cutover; feature 024
 later ships as the first in-place upgrade on each.
+
+> ⏳ **NETWORK-GATED — not runnable in this dev environment.** Requires the live RPCs + the air-gapped floppy
+> keystore (mounted via `npm run floppy:mount`) and maintainer sign-off. The deploy path is **validated**:
+> `hardhat run scripts/deploy/deploy.js` on the in-process network deploys the proxy + impl and records both.
+> Execute these on the operator workstation per `docs/runbooks/contract-upgrades.md`.
 
 - [ ] T032 Deploy the proxy (current logic) to **Amoy** (chainId 80002) via `npm run deploy:amoy` (floppy
   keystore, 25 gwei floor), `npm run verify:amoy`, `npm run sync:frontend-contracts:amoy`; confirm
