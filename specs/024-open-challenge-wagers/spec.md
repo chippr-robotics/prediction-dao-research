@@ -44,6 +44,10 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   (Polymarket/Chainlink/UMA), `Either`, and `ThirdParty` (a named neutral arbitrator);
   **reject `Creator`/`Opponent` self-resolution at the contract level** for open
   challenges — a single unknown party must never be the sole resolver.
+- Q: May an open challenge use asymmetric ("Offer"/leveraged) stakes? → A: No — open
+  challenges MUST have equal stakes (`creatorStake == opponentStake`); asymmetric Offers
+  revert at creation and remain a named-opponent feature. Equal stakes have no favorable
+  side to snipe, avoiding adverse selection on a publicly shared code.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -101,9 +105,9 @@ impractical for a worthwhile wager within the wager's open window.
    they cannot determine which entry it is or read its terms.
 2. **Given** an open challenge, **When** someone submits a wrong code (or no code) to accept,
    **Then** acceptance is refused.
-3. **Given** an open challenge that is a favorable deal for the taker, **When** an attacker tries
-   to discover the code by guessing, **Then** the number of guesses required is large enough that
-   succeeding within the wager's open window is impractical (entropy floor met).
+3. **Given** an open challenge, **When** an attacker tries to discover the code by guessing (to take
+   or read the wager without authorization), **Then** the number of guesses required is large enough
+   that succeeding within the wager's open window is impractical (entropy floor met).
 4. **Given** a legitimate taker who holds the code is submitting their acceptance, **When** an
    observer watching pending activity copies what they can see of that acceptance, **Then** the
    observer cannot use it to steal the counterparty slot for themselves — the legitimate taker who
@@ -248,6 +252,11 @@ code-holders.
   (oracle-resolved, `Either`, and `ThirdParty` per FR-016a), so the creator cannot pick a self-resolution
   type that the contract would reject; the disallowed self-resolution types remain available only on
   named-opponent wagers.
+- **FR-016b**: An open challenge MUST have equal stakes (`creatorStake == opponentStake`); an attempt to
+  create an open challenge with asymmetric ("Offer"/leveraged) stakes MUST revert at creation. Equal
+  stakes remove any favorable side, so a publicly shared code cannot be exploited by adverse-selection
+  sniping. Asymmetric Offers remain available only on named-opponent wagers, where the counterparty has
+  agreed to the odds.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -275,7 +284,7 @@ code-holders.
   (when still open), with no step requiring them to have been named in advance.
 - **SC-003**: 100% of attempts to read or accept an open challenge **without** the correct code fail to
   reveal the terms or bind the taker.
-- **SC-004**: For an open challenge that is a favorable deal for the taker, guessing the code by brute force
+- **SC-004**: Guessing an open challenge's code by brute force (to take or read it without authorization)
   is impractical within the wager's open window (the chosen entropy floor of ~2^44 or greater is met).
 - **SC-005**: In a race where several code-holders try to accept, exactly one becomes the opponent and no
   losing taker has funds taken or left stuck.
@@ -302,9 +311,10 @@ code-holders.
 - **The code, not a registered key, secures private terms for open challenges.** Named-opponent private
   wagers continue to use the existing recipient-key encryption; only open challenges use code-derived
   readability (because the taker is unknown at creation).
-- **First-come-first-served acceptance is acceptable and intended.** For a favorable open challenge, the
-  fastest code-holder wins the slot; this is by design (it is how a public challenge works) and is not
-  treated as a defect.
+- **First-come-first-served acceptance is acceptable and intended.** The fastest code-holder wins the
+  counterparty slot; this is by design (it is how a public challenge works) and is not treated as a
+  defect. Because open challenges are equal-stakes (FR-016b), there is no favorable side to snipe — the
+  race only decides *who* takes a symmetric bet, not an economic edge.
 - **Single-party self-resolution is prevented on open challenges, not just warned (FR-016a).** Open
   challenges are restricted at the contract level to oracle-resolved, `Either`, and `ThirdParty`
   (named-arbitrator) resolution; `Creator`/`Opponent` self-resolution reverts at creation because the
