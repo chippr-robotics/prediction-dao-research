@@ -1,6 +1,6 @@
 # Roles and Tiers
 
-The protocol has **one user-purchasable role** and **four on-chain admin
+The protocol has **one user-purchasable role** and **five on-chain admin
 roles**. Every privileged action is gated by exactly one of the admin roles,
 enforced via OpenZeppelin AccessControl.
 
@@ -31,7 +31,7 @@ time you create a wager after 30 days have elapsed since the last reset.
 Closed wagers (resolved, refunded, or cancelled) free up your concurrent
 slot.
 
-## The four admin roles
+## The five admin roles
 
 All admin roles are bytes32 hashes enforced via OpenZeppelin AccessControl on
 either `MembershipManager` or `WagerRegistry`.
@@ -42,11 +42,13 @@ either `MembershipManager` or `WagerRegistry`.
 | `GUARDIAN_ROLE` | WagerRegistry | `pause` and `unpause` WagerRegistry in response to security incidents | Multisig + on-call signer(s) |
 | `ACCOUNT_MODERATOR_ROLE` | WagerRegistry | `freezeAccount` / `unfreezeAccount` for individual accounts | Trust-and-safety multisig |
 | `ROLE_MANAGER_ROLE` | MembershipManager | `grantMembership` / `revokeMembership` outside the purchase flow (gifts, support, dispute resolution) | Ops multisig |
+| `UPGRADER_ROLE` | WagerRegistry | Replace the contract implementation behind the UUPS proxy (logic swaps, stable address). Separate from `DEFAULT_ADMIN_ROLE` for least privilege | Floppy-keystore admin |
 
 The separation is deliberate: a guardian can stop the protocol but cannot
 seize an account; an account moderator can freeze an account but cannot pause
 the protocol or move treasury funds; a role manager can hand out memberships
-but cannot revoke admin roles.
+but cannot revoke admin roles; an upgrader can ship new logic behind the proxy
+but holds no other privilege and cannot grant itself one.
 
 ## What each role can **not** do
 
@@ -56,6 +58,7 @@ but cannot revoke admin roles.
 | `GUARDIAN_ROLE` | Cannot freeze individual accounts; cannot configure tiers; cannot withdraw fees |
 | `ACCOUNT_MODERATOR_ROLE` | Cannot pause the protocol; cannot configure tiers; cannot withdraw fees; cannot seize funds |
 | `ROLE_MANAGER_ROLE` | Cannot grant or revoke admin roles; cannot pause; cannot freeze; cannot withdraw fees |
+| `UPGRADER_ROLE` | Cannot grant or revoke admin roles; cannot pause; cannot freeze; cannot configure tiers; cannot withdraw fees; cannot move escrowed stakes |
 
 ## Related documents
 

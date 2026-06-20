@@ -54,6 +54,34 @@ the project multisig.
 
 For the full role / privilege matrix, see [Roles and Tiers](roles-and-tiers.md).
 
+## Contract upgradeability
+
+The core value-bearing contracts (starting with `WagerRegistry`) are
+UUPS-upgradeable. The frontend and subgraph always point at a **stable proxy
+address**; the logic implementation behind it can be replaced without changing
+that address or moving escrowed state. Future logic ships as an in-place
+upgrade, never a fresh redeploy that would strand existing wagers.
+
+Upgrades are governed under least privilege:
+
+- **`UPGRADER_ROLE`** — the only role that can replace the implementation
+  behind the proxy. It is separate from `DEFAULT_ADMIN_ROLE` so day-to-day
+  configuration and upgrade authority are not held by the same key. Upgrade
+  transactions are signed with the air-gapped floppy keystore. Authorization is
+  non-brickable: the role cannot be configured into a state that locks out
+  future upgrades.
+- **Initializer protection** — implementations call `_disableInitializers()` in
+  their constructor so the logic contract can never be initialized directly, and
+  the proxy's `initialize` runs exactly once. This closes the classic
+  uninitialized-implementation takeover.
+- **Append-only storage** — storage layout is append-only across upgrades;
+  existing slots are never reordered or repurposed. `npm run check:storage-layout`
+  validates this and gates CI, so an incompatible layout fails before deploy.
+
+See [ADR 004: Upgradeable registry (UUPS)](../adr/004-upgradeable-registry-uups.md)
+for the decision record and the [Contract upgrades runbook](../runbooks/contract-upgrades.md)
+for the operational procedure.
+
 ## Threat model
 
 ## Philosophy of Security

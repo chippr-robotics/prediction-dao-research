@@ -197,25 +197,25 @@ US3 Independent Test)
 pattern so the membership sibling spec adopts it without rediscovery. These are required deliverables, not
 optional.
 
-- [ ] T020 [P] Write the upgrade runbook `docs/runbooks/contract-upgrades.md`: how to deploy the proxy, how to
+- [X] T020 [P] Write the upgrade runbook `docs/runbooks/contract-upgrades.md`: how to deploy the proxy, how to
   perform an in-place upgrade via the floppy keystore (`upgradeProxy`), the append-only storage rules + the
   `check:storage-layout` gate, pre-flight validation, abort/rollback considerations, and recording proxy/impl
   in `deployments/`. (quickstart.md; FR-009/010/014)
-- [ ] T021 [P] Add an ADR under `docs/adr/` (e.g. `adr/00NN-upgradeable-registry-uups.md`): the decision to
+- [X] T021 [P] Add an ADR under `docs/adr/` (e.g. `adr/00NN-upgradeable-registry-uups.md`): the decision to
   adopt UUPS, the reusable `UUPSManaged` base, the coexistence cutover, the `UPGRADER_ROLE` least-privilege
   choice, and alternatives rejected (Transparent/Beacon/Diamond; drain-first/state-migration). (research.md)
-- [ ] T022 [P] Write the reusability handoff guide `docs/developer-guide/upgradeable-contracts.md`: how to make
+- [X] T022 [P] Write the reusability handoff guide `docs/developer-guide/upgradeable-contracts.md`: how to make
   any value-bearing contract upgradeable by inheriting `UUPSManaged`, converting constructor→`initialize`,
   keeping storage append-only with `__gap`, and deploying/validating via the shared tooling — explicitly
   citing `MembershipManager` (sibling spec) and the voucher feature as the next adopters. (PR #724 reuse ask)
-- [ ] T023 [P] Update `docs/system-overview/security.md` and `docs/system-overview/roles-and-tiers.md` (and
+- [X] T023 [P] Update `docs/system-overview/security.md` and `docs/system-overview/roles-and-tiers.md` (and
   `governance.md` if roles are listed there): the registry is now UUPS-upgradeable; document `UPGRADER_ROLE`,
   the upgrade authorization model, `_disableInitializers`, and storage-layout safety. (FR-009/010)
-- [ ] T024 [P] Update `scripts/deploy/README.md`: the proxy deploy + in-place upgrade flow, the
+- [X] T024 [P] Update `scripts/deploy/README.md`: the proxy deploy + in-place upgrade flow, the
   `check:storage-layout` step, and the `deployments/` schema (proxy / impl / legacy). (FR-014)
-- [ ] T025 [P] Update the root `README.md` and `docs/architecture/` to state that the core contracts are
+- [X] T025 [P] Update the root `README.md` and `docs/architecture/` to state that the core contracts are
   UUPS-upgradeable behind stable proxy addresses (logic swappable, state preserved). (FR-001/006)
-- [ ] T026 Update `CLAUDE.md` Guardrails: the active wager contract is a **UUPS proxy at a stable address**;
+- [X] T026 Update `CLAUDE.md` Guardrails: the active wager contract is a **UUPS proxy at a stable address**;
   new value-bearing contracts inherit `contracts/upgradeable/UUPSManaged.sol`; contract storage is
   **append-only** (run `check:storage-layout`); `deployments/` records proxy + impl + legacy. (keeps the agent
   guide accurate post-migration)
