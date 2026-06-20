@@ -6,6 +6,7 @@ import "../access/MembershipManager.sol";
 import "../mocks/MockERC20.sol";
 import "../interfaces/IWagerRegistry.sol";
 import "../interfaces/IMembershipManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title WagerRegistryFuzzTest
 /// @notice Medusa fuzz test contract for WagerRegistry invariants.
@@ -45,10 +46,18 @@ contract WagerRegistryFuzzTest {
         // 2. Deploy MembershipManager
         membership = new MembershipManager(deployer, address(token), TREASURY);
 
-        // 3. Deploy WagerRegistry (no polymarket adapter, single token)
+        // 3. Deploy WagerRegistry (no polymarket adapter, single token).
+        //    Now UUPS-upgradeable: deploy the implementation behind an ERC1967 proxy (the implementation's
+        //    own initializers are disabled by UUPSManaged, so we initialize through the proxy — exactly as
+        //    production does). The fuzzer then targets the proxy.
         address[] memory tokens = new address[](1);
         tokens[0] = address(token);
-        registry = new WagerRegistry(deployer, address(membership), address(0), tokens);
+        WagerRegistry registryImpl = new WagerRegistry();
+        bytes memory initData = abi.encodeCall(
+            WagerRegistry.initialize,
+            (deployer, address(membership), address(0), tokens)
+        );
+        registry = WagerRegistry(address(new ERC1967Proxy(address(registryImpl), initData)));
 
         // 4. Authorize the WagerRegistry to call membership hooks
         membership.setAuthorizedCaller(address(registry), true);
@@ -303,5 +312,17 @@ contract WagerRegistryFuzzTest {
 
     function property_wager_id_starts_at_one() public view returns (bool) {
         return registry.nextWagerId() >= 1;
+    }
+
+    /// @notice Upgrade-safety invariant (spec 025 FR-011): the proxy's one-time initializer can never be
+    ///         called again — no attacker can re-initialize to seize roles or reset state.
+    function property_cannot_reinitialize() public returns (bool) {
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(token);
+        try registry.initialize(deployer, address(membership), address(0), tokens) {
+            return false; // re-initialization succeeded — invariant VIOLATED
+        } catch {
+            return true; // reverted as expected
+        }
     }
 }

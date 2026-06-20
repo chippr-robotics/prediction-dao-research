@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("../../helpers/proxy");
 
 const Tier = { None: 0, Bronze: 1 };
 const Resolution = {
@@ -39,11 +40,10 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
       true
     );
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(
+    const reg = await deployWagerRegistry([
       admin.address, await mgr.getAddress(), await pmAdapter.getAddress(),
       [await usdcToken.getAddress(), await wmatic.getAddress()]
-    );
+    ]);
     await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
     await reg.connect(admin).setOracleAdapter(Resolution.ChainlinkFunctions, await fnAdapter.getAddress());
 

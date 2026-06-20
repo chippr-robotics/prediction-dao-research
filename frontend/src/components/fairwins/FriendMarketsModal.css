@@ -890,6 +890,28 @@
   gap: 0.75rem;
 }
 
+/* Block-explorer link on the "Wager Created" popup */
+.fm-tx-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--brand-primary, #36B37E);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--brand-primary, #36B37E);
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.fm-tx-link:hover {
+  background: rgba(54, 179, 126, 0.1);
+  text-decoration: none;
+}
+
 /* Explicit exit from the share screen (Minor bug #3) */
 .fm-success-done {
   display: block;

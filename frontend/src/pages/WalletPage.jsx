@@ -12,7 +12,7 @@ import AccountDashboard from '../components/account/AccountDashboard'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
-import WalletTabMenu from '../components/wallet/WalletTabMenu'
+import PortalNav from '../components/ui/PortalNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
@@ -73,6 +73,7 @@ function WalletPage() {
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('account')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -188,19 +189,11 @@ function WalletPage() {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
+  const activeTabLabel = (WALLET_TABS.find((t) => t.id === activeTab) || WALLET_TABS[0]).label
+
   return (
     <div className="wallet-page-wrapper">
       <div className="wallet-page">
-
-          {isConnected && (
-            <div className="page-header-section">
-              <div className="wallet-info-header">
-                <BlockiesAvatar address={address} size={40} className="wallet-avatar" />
-                <span className="wallet-address-display">{shortenAddress(address)}</span>
-                <span className="status-dot connected" aria-hidden="true"></span>
-              </div>
-            </div>
-          )}
 
           {!isConnected ? (
             <div className="connect-section">
@@ -254,10 +247,36 @@ function WalletPage() {
               </div>
             </div>
           ) : (
-            <>
-              <WalletTabMenu tabs={WALLET_TABS} activeTab={activeTab} onChange={setActiveTab} />
+            <div className={`wallet-portal portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
+              <aside className="portal-sidebar wallet-portal-sidebar">
+                <div className="wallet-portal-identity">
+                  <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
+                  <span className="wallet-address-display">{shortenAddress(address)}</span>
+                  <span className="status-dot connected" aria-hidden="true"></span>
+                </div>
+                <PortalNav
+                  items={WALLET_TABS}
+                  activeId={activeTab}
+                  onSelect={setActiveTab}
+                  ariaLabel="Account sections"
+                />
+              </aside>
 
-              <div className="tab-content">
+              <div className="portal-main wallet-portal-main">
+                <div className="wallet-portal-topbar">
+                  <button
+                    type="button"
+                    className="portal-sidebar-toggle"
+                    aria-expanded={sidebarOpen}
+                    aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    onClick={() => setSidebarOpen((o) => !o)}
+                  >
+                    <span aria-hidden="true">{'☰'}</span>
+                  </button>
+                  <span className="wallet-portal-current">{activeTabLabel}</span>
+                </div>
+
+                <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
                     <AccountDashboard address={address} />
@@ -434,8 +453,9 @@ function WalletPage() {
                     <SwapPanel />
                   </div>
                 )}
+                </div>
               </div>
-            </>
+            </div>
           )}
       </div>
     </div>

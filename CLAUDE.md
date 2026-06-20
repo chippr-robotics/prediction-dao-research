@@ -45,6 +45,19 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
+- **Upgradeable contracts (UUPS, spec 025):** `WagerRegistry` (and, going forward,
+  other value-bearing contracts like `MembershipManager`) is a **UUPS proxy at a
+  stable address** — logic is swappable, state is preserved. New upgradeable
+  contracts MUST inherit `contracts/upgradeable/UUPSManaged.sol` (do not re-roll
+  the proxy/auth wiring), replace the constructor with a one-time `initialize`
+  (move any inline state initializers into it), and keep storage **append-only**
+  with a trailing `__gap` (never insert/reorder/remove existing state). Run
+  `npm run check:storage-layout` (gating in CI) before any upgrade; ship logic
+  changes as in-place upgrades (`scripts/deploy/lib/upgradeable.js`), never a
+  fresh redeploy. `deployments/` records the proxy (`wagerRegistry`) and the
+  current implementation (`wagerRegistryImpl`). See
+  `docs/developer-guide/upgradeable-contracts.md` and
+  `docs/runbooks/contract-upgrades.md`.
 - **Active wager contract is `wagerRegistry` (v2 `WagerRegistry` ABI/events:
   `WagerCreated`/`WagerAccepted`/`PayoutClaimed`/`WagerRefunded`/`WagerCancelled`/
   `WagerDrawn`).** The v1 `FriendGroupMarketFactory` (events `MarketCreatedPending`/
@@ -57,5 +70,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/023-oracle-graph-gating/plan.md
+at specs/025-upgradeable-registry/plan.md
 <!-- SPECKIT END -->

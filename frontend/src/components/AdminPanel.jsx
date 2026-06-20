@@ -13,6 +13,7 @@ import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
+import PortalNav from './ui/PortalNav'
 import './AdminPanel.css'
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -82,6 +83,7 @@ function AdminPanel() {
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
   const [activeTab, setActiveTab] = useState('overview')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [pendingTx, setPendingTx] = useState(false)
   const [contractState, setContractState] = useState({
     isPaused: false,
@@ -282,6 +284,20 @@ function AdminPanel() {
     )
   }
 
+  // Role-gated section list for the left sidebar. Mirrors the per-tab role
+  // checks below — a tab only appears if the connected account can use it.
+  const adminTabs = [
+    { id: 'overview', label: 'Overview' },
+    isGuardian && { id: 'emergency', label: 'Emergency' },
+    isAdmin && { id: 'tiers', label: 'Tiers' },
+    isRoleManager && { id: 'members', label: 'Members' },
+    isAccountModerator && { id: 'moderation', label: 'Account Moderation' },
+    isAdmin && { id: 'admin-roles', label: 'Admin Roles' },
+    isAdmin && { id: 'treasury', label: 'Treasury' },
+    isAdmin && { id: 'oracle-adapters', label: 'Oracle Adapters' },
+    isAdmin && { id: 'deny-list', label: 'Deny-list' },
+  ].filter(Boolean)
+
   if (!hasAdminAccess) {
     return (
       <div className="admin-panel">
@@ -324,60 +340,31 @@ function AdminPanel() {
         </div>
       </header>
 
-      <nav className="admin-panel-tabs" role="tablist">
-        <button role="tab" aria-selected={activeTab === 'overview'}
-          className={`admin-panel-tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}>Overview</button>
+      <div className={`portal-shell admin-portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
+        <aside className="portal-sidebar admin-portal-sidebar">
+          <PortalNav
+            items={adminTabs}
+            activeId={activeTab}
+            onSelect={setActiveTab}
+            ariaLabel="Admin sections"
+          />
+        </aside>
 
-        {isGuardian && (
-          <button role="tab" aria-selected={activeTab === 'emergency'}
-            className={`admin-panel-tab ${activeTab === 'emergency' ? 'active' : ''}`}
-            onClick={() => setActiveTab('emergency')}>Emergency</button>
-        )}
+        <div className="portal-main">
+          <div className="admin-portal-topbar">
+            <button
+              type="button"
+              className="portal-sidebar-toggle"
+              aria-expanded={sidebarOpen}
+              aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              onClick={() => setSidebarOpen((o) => !o)}
+            >
+              <span aria-hidden="true">{'☰'}</span>
+              <span className="portal-sidebar-toggle-label">Menu</span>
+            </button>
+          </div>
 
-        {isAdmin && (
-          <button role="tab" aria-selected={activeTab === 'tiers'}
-            className={`admin-panel-tab ${activeTab === 'tiers' ? 'active' : ''}`}
-            onClick={() => setActiveTab('tiers')}>Tiers</button>
-        )}
-
-        {isRoleManager && (
-          <button role="tab" aria-selected={activeTab === 'members'}
-            className={`admin-panel-tab ${activeTab === 'members' ? 'active' : ''}`}
-            onClick={() => setActiveTab('members')}>Members</button>
-        )}
-
-        {isAccountModerator && (
-          <button role="tab" aria-selected={activeTab === 'moderation'}
-            className={`admin-panel-tab ${activeTab === 'moderation' ? 'active' : ''}`}
-            onClick={() => setActiveTab('moderation')}>Account Moderation</button>
-        )}
-
-        {isAdmin && (
-          <button role="tab" aria-selected={activeTab === 'admin-roles'}
-            className={`admin-panel-tab ${activeTab === 'admin-roles' ? 'active' : ''}`}
-            onClick={() => setActiveTab('admin-roles')}>Admin Roles</button>
-        )}
-
-        {isAdmin && (
-          <button role="tab" aria-selected={activeTab === 'treasury'}
-            className={`admin-panel-tab ${activeTab === 'treasury' ? 'active' : ''}`}
-            onClick={() => setActiveTab('treasury')}>Treasury</button>
-        )}
-
-        {isAdmin && (
-          <button role="tab" aria-selected={activeTab === 'oracle-adapters'}
-            className={`admin-panel-tab ${activeTab === 'oracle-adapters' ? 'active' : ''}`}
-            onClick={() => setActiveTab('oracle-adapters')}>Oracle Adapters</button>
-        )}
-        {isAdmin && (
-          <button role="tab" aria-selected={activeTab === 'deny-list'}
-            className={`admin-panel-tab ${activeTab === 'deny-list' ? 'active' : ''}`}
-            onClick={() => setActiveTab('deny-list')}>Deny-list</button>
-        )}
-      </nav>
-
-      <main className="admin-panel-content">
+          <main className="admin-panel-content">
         {/* Overview */}
         {activeTab === 'overview' && (
           <div className="admin-tab-content" role="tabpanel">
@@ -708,7 +695,9 @@ function AdminPanel() {
             pendingTx={pendingTx}
           />
         )}
-      </main>
+          </main>
+        </div>
+      </div>
     </div>
   )
 }
