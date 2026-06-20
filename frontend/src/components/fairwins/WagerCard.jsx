@@ -95,7 +95,14 @@ export default function WagerCard({
         </div>
         <div className="wc-header-side">
           <span className={`wc-status ${vm.statusClass}`}>{vm.statusText}</span>
-          {vm.actionNeeded && !vm.actionBadgeRedundant && (
+          {/* Action-needed tag. While the card is collapsed this tag is the only
+              signal that the wager needs attention — its action buttons live in
+              the expanded body, and on phones the grid never auto-expands, so a
+              claimable/refundable wager would otherwise look inert (the user
+              can't tell which rows need them without opening each one). Once the
+              card is open the matching button is visible, so the tag is dropped
+              for the kinds that render a button to avoid the duplicate. */}
+          {vm.actionNeeded && (!isOpen || !vm.actionBadgeRedundant) && (
             <Badge variant={vm.actionNeeded === 'claim' ? 'success' : 'warning'} className="wc-action-needed">
               {ACTION_NEEDED_LABELS[vm.actionNeeded] ?? vm.actionNeeded}
             </Badge>

@@ -284,11 +284,14 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
     })
 
-    // Every action kind now has a matching button in the Actions column, so the
-    // duplicate status badge is suppressed across the board.
+    // While collapsed, the action-needed tag is the ONLY signal that a card
+    // needs attention (its action button lives in the expanded body, and the
+    // phone grid never auto-expands). Once expanded the matching button shows,
+    // so the now-redundant tag is dropped.
     it.each(['accept', 'claim', 'resolve', 'refund', 'respondDraw'])(
-      'does not render a redundant status badge for "%s"',
+      'tags the collapsed card for "%s", then drops the redundant tag once expanded',
       async (kind) => {
+        const user = userEvent.setup()
         activityRef.current = baseActivity({
           actionNeededByWagerId: { '1': kind }
         })
@@ -297,6 +300,11 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
           render(modalUi([wagerOne()]))
         })
 
+        // Collapsed: the tag flags the wager without the user opening it.
+        expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(1)
+
+        // Expanding reveals the matching button → the duplicate tag drops.
+        await user.click(screen.getByText('Wager One'))
         expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
       }
     )
