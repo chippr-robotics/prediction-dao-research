@@ -1,0 +1,52 @@
+/* Open-challenge modal — small additions on top of the shared fm-* (FriendMarketsModal) styles. */
+
+.oc-mode-tabs {
+  margin-bottom: 1.25rem;
+}
+
+.oc-code-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--fm-accent, #2fbf71);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  margin: 0.75rem 0;
+}
+
+.oc-code {
+  flex: 1;
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  word-spacing: 0.18em;
+  color: var(--fm-accent, #2fbf71);
+  user-select: all;
+}
+
+.oc-terms-body {
+  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  padding: 0.7rem;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+}
+
+.oc-notice {
+  font-size: 0.88rem;
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.oc-notice--warn {
+  background: rgba(255, 184, 0, 0.1);
+  border: 1px solid rgba(255, 184, 0, 0.35);
+  color: #d99b00;
+}

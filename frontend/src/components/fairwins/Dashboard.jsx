@@ -7,8 +7,7 @@ import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
-import TakeChallengeModal from './TakeChallengeModal'
-import CreateOpenChallengeModal from './CreateOpenChallengeModal'
+import OpenChallengeModal from './OpenChallengeModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
@@ -129,6 +128,20 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
       ),
       title: 'Make an Offer',
       description: 'Offer odds and choose who settles — you or your friend'
+    },
+    {
+      id: 'open-challenge',
+      category: 'create',
+      tag: 'Code-gated',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+          <circle cx="12" cy="16" r="1" />
+        </svg>
+      ),
+      title: 'Open Challenge',
+      description: 'Post without naming an opponent — share a four-word code to create or take'
     }
   ]
 
@@ -451,8 +464,8 @@ function Dashboard() {
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
-  const [showTakeChallenge, setShowTakeChallenge] = useState(false)
-  const [showCreateOpenChallenge, setShowCreateOpenChallenge] = useState(false)
+  const [showOpenChallenge, setShowOpenChallenge] = useState(false)
+  const [openChallengeTab, setOpenChallengeTab] = useState('maker')
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -504,6 +517,10 @@ function Dashboard() {
         setCreateWagerType('offer')
         setCreateResolutionCategory('all')
         setShowCreateWager(true)
+        break
+      case 'open-challenge':
+        setOpenChallengeTab('maker')
+        setShowOpenChallenge(true)
         break
       case 'my-wagers':
         setShowMyWagers(true)
@@ -615,24 +632,6 @@ function Dashboard() {
       {/* Quick Actions */}
       <section className="dashboard-section">
         <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
-        {isConnected && (
-          <div className="dashboard-take-challenge">
-            <button
-              type="button"
-              className="cta-banner-btn primary"
-              onClick={() => setShowCreateOpenChallenge(true)}
-            >
-              Create an open challenge
-            </button>
-            <button
-              type="button"
-              className="cta-banner-btn primary"
-              onClick={() => setShowTakeChallenge(true)}
-            >
-              Take a challenge with a code
-            </button>
-          </div>
-        )}
       </section>
 
       {/* Top Polymarket markets — self-gates on chain capability, renders
@@ -663,20 +662,14 @@ function Dashboard() {
         initialPolymarketMarket={initialPolymarketMarket}
       />
 
-      {/* Create an open challenge (feature 024). key remounts for fresh state per open. */}
-      <CreateOpenChallengeModal
-        key={showCreateOpenChallenge ? 'create-open' : 'create-closed'}
-        isOpen={showCreateOpenChallenge}
-        onClose={() => setShowCreateOpenChallenge(false)}
-      />
-
-      {/* Take a Challenge (open-challenge wagers, feature 024). key remounts for fresh state per open. */}
-      <TakeChallengeModal
-        key={showTakeChallenge ? 'take-open' : 'take-closed'}
-        isOpen={showTakeChallenge}
-        onClose={() => setShowTakeChallenge(false)}
+      {/* Open Challenge (feature 024) — one modal, Maker/Taker tabs. key remounts for fresh state per open. */}
+      <OpenChallengeModal
+        key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
+        isOpen={showOpenChallenge}
+        initialTab={openChallengeTab}
+        onClose={() => setShowOpenChallenge(false)}
         onBuyMembership={() => {
-          setShowTakeChallenge(false)
+          setShowOpenChallenge(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
         }}
       />
