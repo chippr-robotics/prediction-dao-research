@@ -53,6 +53,11 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   reverts on a collision. The commitment slot frees when the wager leaves Open (accepted,
   cancelled, or expired), so a code can be reused for a later wager. No global lifetime
   uniqueness (avoids unbounded state).
+- Q: After a taker accepts, how do they keep read access to the terms? → A: Readability
+  stays **code-derived only** — the opponent (like any holder) reads via the code and
+  should save it to re-read later; there is no re-keying to a registered encryption key at
+  accept. Losing the code yields "terms unavailable" without affecting funds or resolution.
+  This preserves the no-registered-key property for the unknown taker.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -236,6 +241,11 @@ code-holders.
   NOT be readable by anyone who does not.
 - **FR-018**: Readability MUST NOT depend on the taker having a previously published encryption key, since
   the taker is unknown at creation.
+- **FR-018a**: Readability MUST remain code-derived for the lifetime of the wager, including after a taker
+  accepts: the bound opponent reads the terms via the code like any holder, and acceptance MUST NOT
+  require the opponent to have a registered encryption key nor re-key a durable copy to them. The app MUST
+  prompt the opponent to retain the code for continued access; losing the code yields the "terms
+  unavailable" state (FR-020) without affecting funds or resolution.
 - **FR-019**: A code-holder MUST be able to verify that the terms they read are the ones the wager
   committed to (a substituted or corrupted terms bundle is detectable, not shown as valid) — parity with
   existing private wagers.
