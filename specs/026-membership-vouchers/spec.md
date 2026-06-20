@@ -36,6 +36,10 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 - Q: What flat resale royalty rate and hard ceiling? → A: **2.5% advertised rate, with a 5% hard ceiling** enforced by the contract — an admin may configure the rate up to but never above 5%. The conservative rate keeps the utility (not appreciating-asset) framing defensible.
 - Q: Can a minter get a primary refund before redeeming? → A: **No primary refund.** A minted voucher's value is recovered only by reselling it on the secondary market or by redeeming it. This matches the existing direct-purchase rail (no refund) and avoids any refund/treasury-clawback accounting.
 
+### Session 2026-06-20 (round 2)
+
+- Q: Does a voucher bind to a role, or just a tier? → A: **Each voucher binds an explicit `(role, tier)` pair** and redemption grants that role+tier. This mirrors the role-generic `MembershipManager` so future paid roles need no token redesign; the only paid role today is `WAGER_PARTICIPANT_ROLE`.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Buy a membership voucher and gift or resell it (Priority: P1)
@@ -125,7 +129,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 
 #### Acquisition & minting (voucher rail)
 
-- **FR-001**: The system MUST let anyone mint a voucher for any active tier by paying that tier's configured USDC price, issuing a transferable token that records the tier it was minted for.
+- **FR-001**: The system MUST let anyone mint a voucher for any active `(role, tier)` by paying that tier's configured USDC price, issuing a transferable token that records the `(role, tier)` pair it was minted for. (The only paid role today is the wager-participant role; the design is role-generic.)
 - **FR-002**: A voucher MUST confer **no** membership standing, usage allowance, or started clock while held — inspecting the holder's membership MUST show no membership attributable to the voucher.
 - **FR-003**: A voucher MUST be freely transferable and resellable on standard secondary markets, with transfers creating no membership and requiring no platform involvement.
 - **FR-004**: USDC paid to mint a voucher MUST accrue to the platform/treasury on the same basis as a direct membership purchase (no cheaper rail, no arbitrage between rails).
@@ -134,10 +138,10 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 
 #### Redemption (membership grant)
 
-- **FR-006**: A voucher holder MUST be able to redeem a voucher, which atomically **burns** the voucher and writes a **soulbound** membership of the voucher's tier to the redeemer's address.
+- **FR-006**: A voucher holder MUST be able to redeem a voucher, which atomically **burns** the voucher and writes a **soulbound** membership of the voucher's `(role, tier)` to the redeemer's address.
 - **FR-007**: On redemption the membership clock MUST start at the moment of redemption (full tier duration) and usage counters MUST be reset, identical to a fresh direct purchase.
 - **FR-008**: A redeemed membership MUST be indistinguishable downstream from a directly purchased membership of the same tier — `WagerRegistry` and all membership reads (active status, tier, usage limits, expiry, revocation) MUST behave identically regardless of acquisition rail.
-- **FR-009**: A voucher MUST grant the tier it was minted for, unaffected by any later change to that tier's price, limits, or active state.
+- **FR-009**: A voucher MUST grant the `(role, tier)` it was minted for, unaffected by any later change to that tier's price, limits, or active state.
 - **FR-010**: Redemption MUST be single-use: a burned voucher MUST NOT be redeemable again, and no redemption may grant more than one membership.
 - **FR-011**: Redemption MUST be rejected if the redeemer's address already holds an active membership for the role (no stacking/extension in v1), leaving the voucher intact.
 
@@ -178,7 +182,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 
 ### Key Entities *(include if feature involves data)*
 
-- **Membership Voucher**: A transferable, non-expiring token representing the right to claim a membership of a specific tier. Records its tier at mint; confers no membership while held; single-use (burned on redemption). Freely giftable and resellable.
+- **Membership Voucher**: A transferable, non-expiring token representing the right to claim a membership of a specific `(role, tier)`. Records its `(role, tier)` pair at mint; confers no membership while held; single-use (burned on redemption). Freely giftable and resellable.
 - **Redemption**: The act of burning a voucher to write a soulbound membership of the voucher's tier to the redeemer, gated by sanctions screening and Terms acceptance, with the clock starting at redemption.
 - **Membership** (existing): The soulbound, time-bound, address-keyed access record the platform already issues (tier, expiry, usage counters). Unchanged; produced identically by both acquisition rails.
 - **Tier** (existing): The configured membership level (Bronze/Silver/Gold/Platinum) with its USDC price, duration, and usage limits. A voucher binds to a tier at mint.
