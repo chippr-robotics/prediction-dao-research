@@ -8,6 +8,7 @@ import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import TakeChallengeModal from './TakeChallengeModal'
+import CreateOpenChallengeModal from './CreateOpenChallengeModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
@@ -451,6 +452,7 @@ function Dashboard() {
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showTakeChallenge, setShowTakeChallenge] = useState(false)
+  const [showCreateOpenChallenge, setShowCreateOpenChallenge] = useState(false)
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -618,6 +620,13 @@ function Dashboard() {
             <button
               type="button"
               className="cta-banner-btn primary"
+              onClick={() => setShowCreateOpenChallenge(true)}
+            >
+              Create an open challenge
+            </button>
+            <button
+              type="button"
+              className="cta-banner-btn primary"
               onClick={() => setShowTakeChallenge(true)}
             >
               Take a challenge with a code
@@ -652,6 +661,13 @@ function Dashboard() {
         initialType={createWagerType}
         resolutionCategory={createResolutionCategory}
         initialPolymarketMarket={initialPolymarketMarket}
+      />
+
+      {/* Create an open challenge (feature 024). key remounts for fresh state per open. */}
+      <CreateOpenChallengeModal
+        key={showCreateOpenChallenge ? 'create-open' : 'create-closed'}
+        isOpen={showCreateOpenChallenge}
+        onClose={() => setShowCreateOpenChallenge(false)}
       />
 
       {/* Take a Challenge (open-challenge wagers, feature 024). key remounts for fresh state per open. */}
