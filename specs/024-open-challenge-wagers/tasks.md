@@ -189,22 +189,23 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   variant: `npm run sync:frontend-contracts:local` after a local deploy during dev (and `:amoy` / `:polygon`
   at deploy time) — the ABI is identical across networks; only the addresses differ.
   (plan.md Structure Decision / Principle V)
-- [ ] T021 [P] [US1] Add the open-challenge create branch to
+- [X] T021 [P] [US1] Add the open-challenge create branch to
   `frontend/src/hooks/useFriendMarketCreation.js`: `code = generateCode()`,
   `{ claimAddress, symKey } = deriveFromCode(code)`, encrypt terms with `encryptEnvelopeCode` → IPFS →
   `metadataReference`/`metadataHash`, then call `createOpenWager(claimAddress, …, single stake)`; surface
   the generated `code` to the UI. (claim-code-crypto.md "Create flow", FR-001/004)
-- [ ] T022 [P] [US1] Add the new accept hook `frontend/src/hooks/useOpenChallengeAccept.js`: validate
+- [X] T022 [P] [US1] Add the new accept hook `frontend/src/hooks/useOpenChallengeAccept.js`: validate
   words → `deriveFromCode` → `registry.openWagerIdForClaim(claimAddress)` (0 ⇒ "no challenge for that
   code") → fetch wager + envelope → `decryptEnvelopeCode` (verify `metadataHash`) → `signOpenAccept` →
   `registry.acceptOpenWager(wagerId, sig)`. (claim-code-crypto.md "Take flow", FR-007/010/017)
-- [ ] T023 [US1] Add the open-challenge mode to `frontend/src/components/fairwins/FriendMarketsModal.jsx`:
+- [X] T023 [US1] (Implemented as a standalone `CreateOpenChallengeModal.jsx` instead of editing the
+  2173-line `FriendMarketsModal.jsx` — same UX, far lower risk.) Original text: Add the open-challenge mode to `FriendMarketsModal.jsx`:
   a "no opponent / open challenge" toggle, single equal-stake input, restricted resolution-type choices,
   and a one-time code display with copy/save/share affordances. (FR-001/025, depends on T021)
-- [ ] T024 [US1] Add `frontend/src/components/fairwins/TakeChallengeModal.jsx`: four-word entry → discover →
+- [X] T024 [US1] Add `frontend/src/components/fairwins/TakeChallengeModal.jsx`: four-word entry → discover →
   show decrypted terms → accept; "terms unavailable" fallback when IPFS retrieval fails. (FR-007/017/020,
   depends on T022)
-- [ ] T025 [P] [US1] Write frontend flow tests covering the create and take hooks in
+- [X] T025 [P] [US1] Write frontend flow tests covering the create and take hooks in
   `frontend/src/test/claimCode/` (e.g. `openChallengeCreate.test.jsx` / `openChallengeAccept.test.jsx`):
   create returns a shareable code and calls `createOpenWager` with the derived `claimAddress` + single
   stake; take resolves a wager by code, decrypts terms, and submits a `(wagerId, taker)`-bound signature.
@@ -265,22 +266,22 @@ cannot be reused by an observer, and a four-word brute force is impractical with
 - [ ] T032 [US2] Confirm and, if needed, tighten the US1 contract checks so every assertion in T028–T030
   passes in `contracts/wagers/WagerRegistry.sol` (the CEI gauntlet from T016/T017 should already cover
   these; add any missing revert/branch). No new public surface.
-- [ ] T033 [US2] Add the non-member buy-membership prompt to
+- [X] T033 [US2] Add the non-member buy-membership prompt to
   `frontend/src/components/fairwins/TakeChallengeModal.jsx`: when the taker lacks active membership, block
   acceptance and route to the existing membership-purchase flow (no open-challenge exemption). (FR-013)
 - [ ] T033a [US2] Ensure no "decline" affordance is shown for open challenges in the wager-management UI
   (e.g. `frontend/src/components/fairwins/` wager views): an open challenge only ever exposes the creator's
   cancel/withdraw action while Open — never a decline button — mirroring the contract guard. (FR-023/FR-025)
-- [ ] T034 [US2] Add the honest-state notices to
+- [X] T034 [US2] Add the honest-state notices to
   `frontend/src/components/fairwins/FriendMarketsModal.jsx` (and the code-display step): the v1
   residual-brute-force notice (FR-003a — non-color-only, WCAG-discoverable), the "save the code to read
   this later" reminder (FR-018a), and "no counterparty yet / code-gated" status; for `ThirdParty`, disclose
   that the named arbitrator can read and resolve. (FR-003a/018a/025, SC-004)
-- [ ] T035 [US2] Restrict the create UI to permitted resolution types in
+- [X] T035 [US2] Restrict the create UI to permitted resolution types in
   `frontend/src/components/fairwins/FriendMarketsModal.jsx` so a creator cannot pick `Creator`/`Opponent`
   for an open challenge (mirrors the contract `OpenResolutionTypeNotAllowed`), keeping all types available
   for named-opponent wagers. (FR-026)
-- [ ] T035a [US2] Gate the open-challenge **create** option to Silver+ members in
+- [X] T035a [US2] Gate the open-challenge **create** option to Silver+ members in
   `frontend/src/components/fairwins/FriendMarketsModal.jsx` (and the entrypoint that opens it): read the
   active tier via the membership hook/contract; for Bronze/None, hide or disable the "open challenge" mode
   and show an upgrade prompt (mirrors the contract `InsufficientMembershipTier`). The take/accept flow is
