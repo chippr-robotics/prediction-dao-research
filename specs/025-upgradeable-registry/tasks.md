@@ -68,11 +68,11 @@ required by all three user stories.
   `Initializable + UUPSUpgradeable + AccessControlUpgradeable`; `UPGRADER_ROLE`; `constructor(){ _disableInitializers(); }`
   (annotated `@custom:oz-upgrades-unsafe-allow constructor`); `__UUPSManaged_init(admin)`;
   `_authorizeUpgrade onlyRole(UPGRADER_ROLE)`; `uint256[50] __gap`. **Done** — makes T003 pass.
-- [ ] T005 [P] Implement the generic storage-layout gate `scripts/deploy/check-storage-layout.js` (OZ
+- [X] T005 [P] Implement the generic storage-layout gate `scripts/deploy/check-storage-layout.js` (OZ
   `validateImplementation` first deploy / `validateUpgrade` thereafter, driven by a small upgradeable-contract
   registry list) and wire it as a **gating** step (no `continue-on-error`) into
   `.github/workflows/test.yml`. (contracts/deploy-upgrade-tooling.md; FR-010/SC-005, Principle IV)
-- [ ] T006 Implement the generic deploy/upgrade tooling `scripts/deploy/lib/upgradeable.js`:
+- [X] T006 Implement the generic deploy/upgrade tooling `scripts/deploy/lib/upgradeable.js`:
   `deployProxy(hre,{name,initArgs,deploymentsKey})` (validate → deploy impl → `ERC1967Proxy(impl, initialize)`
   via the floppy signer → record `{key:proxy, key+"Impl":impl}` in `deployments/`) and
   `upgradeProxy(hre,{name,proxyAddress,deploymentsKey})` (validateUpgrade → deploy impl → `upgradeToAndCall`
@@ -99,7 +99,7 @@ non-upgradeable registry plus correct fund accounting. (spec US1 Independent Tes
   `ERC1967Proxy` + `initialize`) and routed all 11 existing WagerRegistry-deploying test files through it
   (3 unit, 8 integration/oracle). Also fixed the Medusa harness `contracts/test/WagerRegistryFuzzTest.sol`
   to deploy via `ERC1967Proxy`. **Done.** (FR-003/SC-003)
-- [ ] T008 [P] [US1] Write FAILING deploy/init tests in `test/upgradeable/WagerRegistry.deploy.test.js`:
+- [X] T008 [P] [US1] Deploy/init tests in `test/upgradeable/WagerRegistry.deploy.test.js`:
   the proxy deploys and `initialize` runs exactly once; `_nextWagerId == 1`; a wager created via the proxy
   round-trips through `getWager`; the implementation address is recorded distinctly from the proxy; re-calling
   `initialize` on the proxy reverts. (FR-001/005/011, SC-008)
@@ -142,7 +142,7 @@ funds are intact, and the new logic is active. (spec US2 Independent Test)
 
 ### Tests for User Story 2 (write first, must fail) ⚠️
 
-- [ ] T015 [P] [US2] Write FAILING upgrade-lifecycle tests in `test/upgradeable/WagerRegistry.upgrade.test.js`:
+- [X] T015 [P] [US2] Upgrade-lifecycle tests in `test/upgradeable/WagerRegistry.upgrade.test.js`:
   deploy proxy → create Open and Active wagers (escrow funds) → upgrade to an additive implementation →
   assert the **proxy address is unchanged**, every pre-existing wager/balance/mapping reads back unchanged and
   remains operable, in-flight wagers continue (accept/resolve/claim), and the new function is callable while
@@ -150,10 +150,10 @@ funds are intact, and the new logic is active. (spec US2 Independent Test)
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Finalize the `upgradeProxy` path in `scripts/deploy/lib/upgradeable.js` (validateUpgrade →
+- [X] T016 [US2] Finalized the `upgradeProxy` path in `scripts/deploy/lib/upgradeable.js` (validateUpgrade →
   deploy new impl → `upgradeToAndCall` via the floppy signer → update `wagerRegistryImpl` in `deployments/`,
   proxy key unchanged) and confirm it drives T015. (FR-014; contracts/deploy-upgrade-tooling.md)
-- [ ] T017 [US2] Add a minimal additive test implementation
+- [X] T017 [US2] Added the additive test implementation
   `contracts/mocks/WagerRegistryUpgradeMock.sol` (extends the registry with one trivial view + appends one
   state var from `__gap`) used only by the upgrade tests to prove append-only, state-preserving upgrades.
   (test-only; mocks live under `contracts/mocks/` per the constitution)
@@ -173,7 +173,7 @@ US3 Independent Test)
 
 ### Tests for User Story 3 (write first, must fail) ⚠️
 
-- [ ] T018 [P] [US3] Write FAILING authorization/safety tests in
+- [X] T018 [P] [US3] Authorization/safety tests in
   `test/upgradeable/WagerRegistry.upgrade.test.js`: a non-`UPGRADER_ROLE` upgrade reverts; `initialize`
   re-call (proxy) and `initialize` on a bare impl both revert; the upgrade entrypoint survives an upgrade
   (non-brickable); a deliberately **storage-incompatible** mock (reordered/removed var) is rejected by
@@ -182,7 +182,7 @@ US3 Independent Test)
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Confirm/close any gaps so T018 passes: the `UUPSManaged` role gate + `_disableInitializers`
+- [X] T019 [US3] Confirmed gaps closed so T018 passes: the `UUPSManaged` role gate + `_disableInitializers`
   (T004) and the `check:storage-layout` gate (T005) cover auth, re-init, and storage safety; ensure each
   successful `upgradeProxy` records the new implementation address in `deployments/` (auditable trail). No new
   public surface. (FR-014)

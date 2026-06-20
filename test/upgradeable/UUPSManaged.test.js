@@ -72,6 +72,19 @@ describe("UUPSManaged (reusable upgrade base)", function () {
     expect(await upgraded.extra()).to.equal(99n);
   });
 
+  it("rejects a storage-incompatible (reordered) upgrade before applying it", async function () {
+    const { proxy } = await deploy();
+    const Bad = await ethers.getContractFactory("UUPSManagedHarnessBadLayout");
+    let threw = false;
+    try {
+      await upgrades.upgradeProxy(await proxy.getAddress(), Bad);
+    } catch (e) {
+      threw = true;
+      expect(e.message.toLowerCase()).to.match(/storage layout|incompatible|deleted|moved/);
+    }
+    expect(threw, "expected a storage-incompatible upgrade to be rejected").to.equal(true);
+  });
+
   it("keeps the upgrade path non-brickable across upgrades", async function () {
     const { admin, proxy } = await deploy();
     const addr = await proxy.getAddress();
