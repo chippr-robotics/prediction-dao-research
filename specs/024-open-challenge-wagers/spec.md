@@ -36,6 +36,15 @@ The result is a "tell-a-friend (or a crowd) the magic words" wager that is priva
 hard to snipe, and does not need to know the taker in advance. Existing named-opponent
 1v1 wagers and all of their flows are unchanged.
 
+## Clarifications
+
+### Session 2026-06-20
+
+- Q: Which resolution types may an open challenge use? → A: Allow oracle types
+  (Polymarket/Chainlink/UMA), `Either`, and `ThirdParty` (a named neutral arbitrator);
+  **reject `Creator`/`Opponent` self-resolution at the contract level** for open
+  challenges — a single unknown party must never be the sole resolver.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Post an open challenge and let a chosen friend take it with a code (Priority: P1)
@@ -137,9 +146,10 @@ code-holders.
 - **Third-party (arbitrator) resolution on an open challenge**: the arbitrator is chosen at creation,
   but the opponent is unknown then, so the rule that the arbitrator may be neither party MUST still
   hold once the taker is known — a taker who is the named arbitrator MUST be refused.
-- **Self-resolution types (creator-decides / opponent-decides) on an open challenge**: permitted, but
-  the taker is trusting a stranger (or being trusted by one) to report the outcome honestly; the app
-  MUST make this trust implication clear before a taker accepts such a wager.
+- **Self-resolution types (creator-decides / opponent-decides) on an open challenge**: rejected at
+  creation (FR-016a) — an open challenge cannot use single-party self-resolution because the sole
+  resolver would be an unknown party. The creator must choose an oracle, `Either`, or a named
+  third-party arbitrator instead. Named-opponent wagers are unaffected and may still use self-resolution.
 - **Sanctioned or non-member taker**: a taker who fails sanctions screening or lacks an active
   membership/limit is refused at accept time, exactly as a named opponent would be.
 - **Lost code**: if the creator loses the code before anyone accepts, the wager simply cannot be
@@ -199,6 +209,12 @@ code-holders.
 - **FR-016**: Once an open challenge has been accepted, it MUST behave identically to a named-opponent
   wager for every subsequent action — resolution, payout claim, refund, and draw — with no new or altered
   resolution rules.
+- **FR-016a**: Creating an open challenge MUST be restricted at the contract level to trust-minimized
+  resolution types: oracle-resolved (Polymarket/Chainlink/UMA), `Either` (either side submits, which
+  already requires equal stakes), and `ThirdParty` (a named neutral arbitrator). Attempting to create an
+  open challenge with `Creator` or `Opponent` (single-party self-resolution) MUST revert, because the
+  taker is unknown at creation and a lone unknown party must never be the sole resolver. Named-opponent
+  wagers retain access to all resolution types unchanged.
 
 #### Readability of private terms
 
@@ -227,11 +243,11 @@ code-holders.
 - **FR-024**: All existing named-opponent wagers and their flows (create, accept, cancel, decline, resolve,
   draw, refund, claim) MUST continue to work unchanged; the open-challenge path is additive.
 - **FR-025**: The app MUST present an open challenge's state honestly: that it has no counterparty yet, that
-  it is code-gated, and — for self-resolution types — that the chosen resolver (creator or opponent) will be
-  trusted to report the outcome.
-- **FR-026**: The system MUST make clear to a creator which resolution types are trust-minimized for an open
-  challenge (oracle-resolved and "either side submits") versus those that rely on a participant's honesty,
-  so the creator can choose appropriately for a taker they may not know.
+  it is code-gated, and — for `ThirdParty` resolution — that the named arbitrator can read and resolve it.
+- **FR-026**: The app MUST offer a creator only the resolution types permitted for open challenges
+  (oracle-resolved, `Either`, and `ThirdParty` per FR-016a), so the creator cannot pick a self-resolution
+  type that the contract would reject; the disallowed self-resolution types remain available only on
+  named-opponent wagers.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -289,9 +305,10 @@ code-holders.
 - **First-come-first-served acceptance is acceptable and intended.** For a favorable open challenge, the
   fastest code-holder wins the slot; this is by design (it is how a public challenge works) and is not
   treated as a defect.
-- **Trust implications of self-resolution are surfaced, not prevented.** Open challenges with
-  creator-decides or opponent-decides resolution are allowed, but the app warns about the trust required;
-  oracle-resolved and "either side submits" types are the trust-minimized recommendations.
+- **Single-party self-resolution is prevented on open challenges, not just warned (FR-016a).** Open
+  challenges are restricted at the contract level to oracle-resolved, `Either`, and `ThirdParty`
+  (named-arbitrator) resolution; `Creator`/`Opponent` self-resolution reverts at creation because the
+  sole resolver would be an unknown party. Named-opponent wagers keep all resolution types.
 - **Networks**: Applies to the live deployments (Polygon mainnet, Amoy testnet); legacy read-only networks
   are out of scope.
 - **No new fund or resolution mechanics, and no change to the on-chain stake-custody model.** The contract
