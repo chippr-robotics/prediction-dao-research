@@ -40,6 +40,7 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 
 - Q: Does a voucher bind to a role, or just a tier? → A: **Each voucher binds an explicit `(role, tier)` pair** and redemption grants that role+tier. This mirrors the role-generic `MembershipManager` so future paid roles need no token redesign; the only paid role today is `WAGER_PARTICIPANT_ROLE`.
 - Q: When are voucher mint proceeds recognized as treasury revenue? → A: **At mint.** Proceeds accrue and are withdrawable immediately, identical to a direct purchase; no escrow is held until redemption. Granting a membership at redemption has zero marginal on-chain cost, so no escrow/solvency reserve is required.
+- Q: Where does voucher display metadata (`tokenURI`) come from? → A: **Generated fully on-chain** (self-contained JSON + SVG rendering the `(role, tier)`), with no off-chain/IPFS pinning dependency. Keeps a value-bearing token self-contained and censorship-resistant; IPFS in this repo is reserved for *encrypted* per-wager data, not public marketplace art.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -136,6 +137,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **FR-004**: USDC paid to mint a voucher MUST accrue to the platform/treasury on the same basis as a direct membership purchase (no cheaper rail, no arbitrage between rails), recognized **at mint** (immediately withdrawable, no escrow held until redemption).
 - **FR-005**: Vouchers MUST NOT expire; an unredeemed voucher remains valid indefinitely until redeemed or destroyed by its owner.
 - **FR-005a**: The system MUST NOT offer a primary refund of mint proceeds; a holder recovers value only by reselling on the secondary market or by redeeming. No refund or treasury-clawback path is provided.
+- **FR-005b**: Each voucher's display metadata (`tokenURI`) MUST be generated fully on-chain (self-contained JSON + SVG reflecting the voucher's `(role, tier)`), with no off-chain or IPFS pinning dependency.
 
 #### Redemption (membership grant)
 
