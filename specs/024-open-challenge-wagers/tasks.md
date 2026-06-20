@@ -15,6 +15,9 @@ code they cover and must fail first.
 **Organization**: Tasks are grouped by user story. US1 (P1) is the MVP. US2 (P1) is the defensive/anti-snipe
 story (inseparable from US1 — ships with it). US3 (P2) is the public first-come extension.
 
+
+> **Implementation status (2026-06-20):** Contract layer COMPLETE on PR #722 — `createOpenWager` / `acceptOpenWager` (EIP-712, front-run resistant) / claim mappings / Silver+ create gate / decline guard / `_clearClaim` wiring, on the now-upgradeable WagerRegistry. 12 open-challenge unit tests pass; full suite 271 passing / 0 failing; contract 24460 bytes (< 24576); storage-layout upgrade-safe. Terms-binding create variant deferred (addable as a later in-place upgrade). REMAINING: frontend claim-code crypto + create/take modals (T021–T025, T031–T039) and the subgraph `OpenWagerCreated` handler (T026–T027); contract negative-path tests T028/T029/T030/T037 are covered by `test/WagerRegistry.openChallenge.test.js`.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependency on an incomplete task)
@@ -86,25 +89,25 @@ errors exist.
 
 ### Contract scaffolding (additive surface; no function bodies yet)
 
-- [ ] T009 Edit `contracts/wagers/WagerRegistry.sol` to add EIP-712 support on the **upgradeable** base from
+- [X] T009 Edit `contracts/wagers/WagerRegistry.sol` to add EIP-712 support on the **upgradeable** base from
   spec 025: inherit `EIP712Upgradeable` and call `__EIP712_init("FairWins WagerRegistry", "1")` in the
   registry's initializer (OZ's EIP712 is proxy-safe — it recomputes the domain separator when proxied), add
   `import {ECDSA}` + `using ECDSA for bytes32`, and declare
   `bytes32 private constant OPEN_ACCEPT_TYPEHASH = keccak256("OpenAccept(uint256 wagerId,address taker)")`.
   No logic change to existing functions. (depends on 025; contracts/wager-registry-open-challenge.md "EIP-712")
-- [ ] T010 Add the two public side mappings to `contracts/wagers/WagerRegistry.sol`:
+- [X] T010 Add the two public side mappings to `contracts/wagers/WagerRegistry.sol`:
   `mapping(uint256 => address) public claimAuthority;` and
   `mapping(address => uint256) public openWagerIdByClaim;`, **appended after the last existing state
   variable** (storage-layout-compatible with the 025 UUPS upgrade — never insert before or reorder existing
   storage), following the existing out-of-struct pattern. The OZ storage-layout check (T047) must pass.
   (data-model.md "New side mappings", research.md R3)
-- [ ] T011 [P] Add the new events and errors to `contracts/wagers/WagerRegistry.sol` (and mirror in
+- [X] T011 [P] Add the new events and errors to `contracts/wagers/WagerRegistry.sol` (and mirror in
   `contracts/interfaces/IWagerRegistry.sol`): event `OpenWagerCreated(uint256 indexed wagerId, address
   indexed creator, address indexed claimAuthority, address token, uint128 stake, ResolutionType
   resolutionType, bytes32 metadataHash, string metadataUri)`; errors `ZeroClaimAuthority`,
   `ClaimAuthorityInUse`, `OpenResolutionTypeNotAllowed`, `NotOpenChallenge`, `BadClaimSignature`,
   `ArbitratorCannotTake`. The `Wager` struct and all existing signatures stay byte-identical (FR-024).
-- [ ] T012 Add the `_clearClaim(uint256 wagerId)` internal helper to `contracts/wagers/WagerRegistry.sol`
+- [X] T012 Add the `_clearClaim(uint256 wagerId)` internal helper to `contracts/wagers/WagerRegistry.sol`
   (deletes `openWagerIdByClaim[claimAuthority[wagerId]]` then `claimAuthority[wagerId]`, no-op if unset).
   Not yet wired into callers — that happens with the function bodies in US1.
   (contracts/wager-registry-open-challenge.md "Internal _clearClaim")
@@ -126,7 +129,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
 
 ### Tests for User Story 1 (write first, must fail) ⚠️
 
-- [ ] T013 [P] [US1] Write FAILING happy-path unit tests in `test/WagerRegistry.openChallenge.test.js`:
+- [X] T013 [P] [US1] Write FAILING happy-path unit tests in `test/WagerRegistry.openChallenge.test.js`:
   `createOpenWager` with each ALLOWED resolution type (`Either`, `ThirdParty`, `Polymarket`,
   `ChainlinkDataFeed`, `ChainlinkFunctions`, `UMA`) succeeds, escrows the creator stake, charges
   `recordCreate`, sets `opponent == address(0)` / `status == Open` / `creatorStake == opponentStake`, and
@@ -134,13 +137,13 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   A valid member-taker signature → `opponent == taker`, `status == Active`, opponent stake escrowed,
   `openWagerIdForClaim(authority) == 0` (slot freed), `WagerAccepted` emitted. (Use a **Silver+** creator;
   tier-floor negatives are in T030.) (FR-001/004/005/005a/007/010/012/016b, quickstart §1)
-- [ ] T014 [P] [US1] Write FAILING lifecycle/slot-release unit tests in
+- [X] T014 [P] [US1] Write FAILING lifecycle/slot-release unit tests in
   `test/WagerRegistry.openChallenge.test.js`: `cancelOpen` before accept refunds the creator and
   `openWagerIdForClaim == 0` (code reusable); after `acceptDeadline` with no taker, `claimRefund` and
   `batchExpireOpen` refund the creator, release the membership slot, and clear the claim mappings
   (FR-021/FR-022); after accept, `declareWinner` / oracle auto-resolve / `declareDraw` / `claimPayout` /
   `claimRefund` behave identically to a named-opponent wager (FR-016/SC-009).
-- [ ] T014a [P] [US1] Write FAILING decline/withdrawal-authorization tests in
+- [X] T014a [P] [US1] Write FAILING decline/withdrawal-authorization tests in
   `test/WagerRegistry.openChallenge.test.js`: `declineWager` against an open challenge reverts
   `DeclineNotAllowedForOpenChallenge` (for any caller, including a random address and the creator); a
   non-creator calling `cancelOpen` reverts `NotCreator`; only the creator can withdraw an unaccepted open
@@ -152,7 +155,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement `createOpenWager(...)` and the `createOpenWagerWithTerms(...)` overload in
+- [X] T016 [US1] Implement `createOpenWager(...)` and the `createOpenWagerWithTerms(...)` overload in
   `contracts/wagers/WagerRegistry.sol` per data-model "createOpenWager Checks" (sanctions `_screen`;
   `claimAuthority_ != 0` else `ZeroClaimAuthority`; `openWagerIdByClaim[claimAuthority_] == 0` else
   `ClaimAuthorityInUse`; allowed-token + non-zero stake → `creatorStake = opponentStake = stake`; deadline
@@ -162,7 +165,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   single stake (checks→effects→interaction under `nonReentrant whenNotPaused notFrozen`), set the claim
   mappings, index the creator (+ arbitrator), emit `OpenWagerCreated` (+ `OracleConditionLinked` /
   terms-bound events). (FR-001/004/005/005a/006/006a/016a/016b)
-- [ ] T017 [US1] Implement `acceptOpenWager(uint256 wagerId, bytes calldata signature)` in
+- [X] T017 [US1] Implement `acceptOpenWager(uint256 wagerId, bytes calldata signature)` in
   `contracts/wagers/WagerRegistry.sol` (checks→effects→interaction, `nonReentrant whenNotPaused
   notFrozen`): `status == Open && claimAuthority[id] != 0` else `NotOpenChallenge`; `<= acceptDeadline`
   else `AcceptExpired`; `ECDSA.recover(_hashTypedDataV4(OpenAccept(id, msg.sender)), signature) ==
@@ -170,14 +173,14 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   `msg.sender != arbitrator` else `ArbitratorCannotTake`; `_screen(taker)`, `_screen(creator)`,
   `checkCanCreate(taker)`; then set `opponent`/`Active`, `_clearClaim(id)`, index taker, `recordCreate`,
   `safeTransferFrom(opponentStake)`, emit `WagerAccepted`. (FR-010–016, makes T013 happy path pass)
-- [ ] T018 [US1] Add the two views to `contracts/wagers/WagerRegistry.sol` (and `IWagerRegistry.sol`):
+- [X] T018 [US1] Add the two views to `contracts/wagers/WagerRegistry.sol` (and `IWagerRegistry.sol`):
   `openWagerIdForClaim(address authority) → uint256` and `isOpenChallenge(uint256 wagerId) → bool`.
   (contracts/wager-registry-open-challenge.md "New views", FR-007/FR-008 discovery)
-- [ ] T019 [US1] Wire `_clearClaim` into every path an open wager leaves `Open` in
+- [X] T019 [US1] Wire `_clearClaim` into every path an open wager leaves `Open` in
   `contracts/wagers/WagerRegistry.sol`: at the start of `cancelOpen` (before its existing `delete`), in the
   `Open` branch of `claimRefund`, and in `batchExpireOpen` (`acceptOpenWager` already calls it via T017).
   Makes T014 pass. (data-model "_clearClaim called from…", FR-006a/021/022)
-- [ ] T019a [US1] Add the `declineWager` open-challenge guard in `contracts/wagers/WagerRegistry.sol`: at the
+- [X] T019a [US1] Add the `declineWager` open-challenge guard in `contracts/wagers/WagerRegistry.sol`: at the
   top of `declineWager`, `if (claimAuthority[wagerId] != address(0)) revert DeclineNotAllowedForOpenChallenge();`
   so decline is rejected for open challenges (the creator's `cancelOpen` stays the only withdrawal path).
   Makes T014a pass. (FR-023, contracts doc "declineWager guard")
