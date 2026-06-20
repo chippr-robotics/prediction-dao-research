@@ -2,7 +2,7 @@
 
 **Branch**: `claude/oracle-graph-network-gating-3r55fg` | **Date**: 2026-06-19 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/022-oracle-graph-gating/spec.md`
+**Input**: Feature specification from `specs/023-oracle-graph-gating/spec.md`
 
 ## Summary
 
@@ -95,7 +95,7 @@ architecture, no new dependencies, no constitution conflicts. **Still PASS.**
 ### Documentation (this feature)
 
 ```text
-specs/022-oracle-graph-gating/
+specs/023-oracle-graph-gating/
 ├── plan.md              # This file (/speckit-plan command output)
 ├── research.md          # Phase 0 output (/speckit-plan command)
 ├── data-model.md        # Phase 1 output (/speckit-plan command)
