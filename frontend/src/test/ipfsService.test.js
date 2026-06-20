@@ -455,6 +455,23 @@ describe('IPFS Service', () => {
       expect(result.cid).toBe('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     })
 
+    it('uploads a code-keyed envelope (no recipients keys) successfully', async () => {
+      // Feature 024: open-challenge terms are sealed under a code-derived key, so the envelope has mode
+      // "code" and NO keys array. The validator must accept it (and the code algorithm).
+      const codeEnvelope = {
+        version: 'code-1.0',
+        algorithm: 'code-xchacha20poly1305',
+        mode: 'code',
+        content: { nonce: 'abc123', ciphertext: 'def456' }
+      }
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ IpfsHash: 'bafyCodeKeyedEnvelopeCidExampleValue00000000000000000000', PinSize: 99 })
+      })
+      const result = await uploadEncryptedEnvelope(codeEnvelope, { marketType: 'openChallenge' })
+      expect(result.cid).toBe('bafyCodeKeyedEnvelopeCidExampleValue00000000000000000000')
+    })
+
     it('throws error for invalid envelope structure', async () => {
       await expect(uploadEncryptedEnvelope({})).rejects.toThrow('Invalid envelope format')
       await expect(uploadEncryptedEnvelope({ version: '1.0' })).rejects.toThrow('Invalid envelope format')
