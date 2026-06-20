@@ -59,30 +59,30 @@ errors exist.
 
 ### Off-chain claim-code crypto (pure, deterministic, device-independent)
 
-- [ ] T003 [P] Write FAILING wordlist tests in `frontend/src/test/claimCode/wordlist.test.js`:
+- [X] T003 [P] Write FAILING wordlist tests in `frontend/src/test/claimCode/wordlist.test.js`:
   `generateCode()` yields exactly 4 valid BIP-39 (LangEn) words; `isValidCode` rejects wrong length /
   unknown words / extra whitespace; `normalizeCode` collapses case + internal whitespace + NFKC
   (`"River  Amber tiger Kite"` → `"river amber tiger kite"`). (research.md R6, claim-code-crypto.md)
-- [ ] T004 Implement `frontend/src/utils/claimCode/wordlist.js`:
+- [X] T004 Implement `frontend/src/utils/claimCode/wordlist.js`:
   `generateCode()` (44 bits CSPRNG via `crypto.getRandomValues` → 4 `LangEn` indices),
   `normalizeCode(input)`, `isValidCode(input)`. Makes T003 pass. (FR-003, research.md R6)
-- [ ] T005 [P] Write FAILING derivation tests in `frontend/src/test/claimCode/deriveFromCode.test.js`:
+- [X] T005 [P] Write FAILING derivation tests in `frontend/src/test/claimCode/deriveFromCode.test.js`:
   `deriveFromCode` is deterministic across calls and independent of device; `claimAddress` and `symKey` are
   domain-separated (changing one tag does not change the other); `signOpenAccept` produces a signature whose
   recovered address equals `claimAddress` for the bound `(wagerId, taker)` and **fails** for any other taker
   or wagerId (front-run/replay vector, mirrors `ECDSA.recover`). (claim-code-crypto.md, research.md R1/R2,
   FR-011/SC-006)
-- [ ] T006 Implement `frontend/src/utils/claimCode/deriveFromCode.js`:
+- [X] T006 Implement `frontend/src/utils/claimCode/deriveFromCode.js`:
   `deriveFromCode(code) → { claimPrivateKey, claimAddress, symKey }` using
   `keccak256("FairWins/claim/v1"‖normalize)` (reduce mod n, reject 0) and
   `keccak256("FairWins/terms/v1"‖normalize)`; and
   `signOpenAccept(code, {wagerId, taker, chainId, verifyingContract})` producing the EIP-712 `OpenAccept`
   signature with `claimPrivateKey`. Makes T005 pass. (research.md R1/R2, FR-002/FR-010/FR-011)
-- [ ] T007 [P] Write FAILING code-keyed envelope tests in
+- [X] T007 [P] Write FAILING code-keyed envelope tests in
   `frontend/src/test/claimCode/envelopeCode.test.js`: `encryptEnvelopeCode → decryptEnvelopeCode`
   round-trips; a tampered ciphertext throws (FR-019); a wrong `symKey` fails to decrypt and never reveals
   terms (FR-009/SC-003); `isCodeEnvelope` detects `mode === "code"`. (claim-code-crypto.md R4)
-- [ ] T008 Add the code-keyed envelope mode to `frontend/src/utils/crypto/envelopeEncryption.js`:
+- [X] T008 Add the code-keyed envelope mode to `frontend/src/utils/crypto/envelopeEncryption.js`:
   `encryptEnvelopeCode(terms, symKey, termsVersion?)` (XChaCha20-Poly1305, random 24-byte nonce, no
   recipients list, AAD binds the terms-version hash), `decryptEnvelopeCode(envelope, symKey)`, and
   `isCodeEnvelope(envelope)`. Makes T007 pass. (research.md R4, data-model.md "Code-keyed terms envelope")
@@ -184,7 +184,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   top of `declineWager`, `if (claimAuthority[wagerId] != address(0)) revert DeclineNotAllowedForOpenChallenge();`
   so decline is rejected for open challenges (the creator's `cancelOpen` stays the only withdrawal path).
   Makes T014a pass. (FR-023, contracts doc "declineWager guard")
-- [ ] T020 [US1] Regenerate the frontend contract artifacts so the new functions/events land in
+- [X] T020 [US1] Regenerate the frontend contract artifacts so the new functions/events land in
   `frontend/src/abis/WagerRegistry.{js,json}` (GENERATED — never hand-edit). Run the network-matching
   variant: `npm run sync:frontend-contracts:local` after a local deploy during dev (and `:amoy` / `:polygon`
   at deploy time) — the ABI is identical across networks; only the addresses differ.
@@ -213,7 +213,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   bound opponent re-derives `symKey` from the code and `decryptEnvelopeCode`s the terms **after** accepting
   (no re-key step, no registered encryption key required), and that discarding the code yields the "terms
   unavailable" state without affecting funds or resolution. (FR-018/FR-018a)
-- [ ] T026 [P] [US1] Add `handleOpenWagerCreated` to `subgraph/src/mappings/wagerRegistry.ts` (writes a
+- [X] T026 [P] [US1] Add `handleOpenWagerCreated` to `subgraph/src/mappings/wagerRegistry.ts` (writes a
   `Wager` with `opponent = null`, `status = "open"`) and register the `OpenWagerCreated` event in
   `subgraph/subgraph.yaml`. (research.md R5, FR-007 discovery indexing)
 - [ ] T027 [P] [US1] Add a matchstick test under `subgraph/tests/` asserting `handleOpenWagerCreated`
