@@ -1,31 +1,7 @@
-// Auto-derived from the WagerRegistry artifact ABI. Open-challenge (024) fragments appended.
+// Full WagerRegistry ABI, mirrored from the compiled artifact (contracts/wagers/WagerRegistry.sol).
+// Includes the open-challenge surface (createOpenWager/acceptOpenWager/openWagerIdForClaim/
+// openWagerIdByClaim/claimAuthority/isOpenChallenge/OpenWagerCreated). Keep in sync with the contract.
 export const WAGER_REGISTRY_ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "admin",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "membershipManager_",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "polymarketAdapter_",
-        "type": "address"
-      },
-      {
-        "internalType": "address[]",
-        "name": "initialTokens",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
   {
     "inputs": [],
     "name": "AcceptExpired",
@@ -69,8 +45,24 @@ export const WAGER_REGISTRY_ABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      }
+    ],
+    "name": "AddressEmptyCode",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "AlreadyPaid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ArbitratorCannotTake",
     "type": "error"
   },
   {
@@ -85,7 +77,17 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "BadClaimSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "BadDeadlines",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ClaimAuthorityInUse",
     "type": "error"
   },
   {
@@ -100,7 +102,60 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "DeclineNotAllowedForOpenChallenge",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "DrawNotApplicable",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ECDSAInvalidSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "length",
+        "type": "uint256"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureS",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
+    ],
+    "name": "ERC1967InvalidImplementation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ERC1967NonPayable",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EitherRequiresEqualStakes",
     "type": "error"
   },
   {
@@ -111,6 +166,21 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "ExpectedPause",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "FailedCall",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InsufficientMembershipTier",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidInitialization",
     "type": "error"
   },
   {
@@ -140,17 +210,22 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
-    "name": "EitherRequiresEqualStakes",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "NotCreator",
     "type": "error"
   },
   {
     "inputs": [],
+    "name": "NotInitializing",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotOpen",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotOpenChallenge",
     "type": "error"
   },
   {
@@ -176,6 +251,11 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "NotWinner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OpenResolutionTypeNotAllowed",
     "type": "error"
   },
   {
@@ -226,6 +306,22 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "UUPSUnauthorizedCallContext",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "slot",
+        "type": "bytes32"
+      }
+    ],
+    "name": "UUPSUnsupportedProxiableUUID",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "UnsupportedOracleResolutionType",
     "type": "error"
   },
@@ -237,6 +333,11 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "ZeroAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroClaimAuthority",
     "type": "error"
   },
   {
@@ -328,6 +429,25 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "anonymous": false,
+    "inputs": [],
+    "name": "EIP712DomainChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
+    ],
+    "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
     "inputs": [
       {
         "indexed": true,
@@ -337,6 +457,61 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "MembershipManagerUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "claimAuthority",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "stake",
+        "type": "uint128"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "metadataHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
+      }
+    ],
+    "name": "OpenWagerCreated",
     "type": "event"
   },
   {
@@ -583,6 +758,19 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "Unpaused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
+    ],
+    "name": "Upgraded",
     "type": "event"
   },
   {
@@ -864,6 +1052,32 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "UPGRADER_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "WAGER_PARTICIPANT_ROLE",
     "outputs": [
       {
@@ -873,6 +1087,24 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "signature",
+        "type": "bytes"
+      }
+    ],
+    "name": "acceptOpenWager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -944,6 +1176,25 @@ export const WAGER_REGISTRY_ABI = [
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimAuthority",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "wagerId",
         "type": "uint256"
       }
@@ -963,6 +1214,75 @@ export const WAGER_REGISTRY_ABI = [
     ],
     "name": "claimRefund",
     "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "claimAuthority_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "arbitrator",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
+        "name": "stake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint64",
+        "name": "acceptDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "resolveDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "oracleConditionId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "creatorIsYes",
+        "type": "bool"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "metadataHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
+      }
+    ],
+    "name": "createOpenWager",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1182,6 +1502,49 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "bool",
         "name": "opponentAgreed",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "eip712Domain",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "fields",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "verifyingContract",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "extensions",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -1530,6 +1893,41 @@ export const WAGER_REGISTRY_ABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "membershipManager_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "polymarketAdapter_",
+        "type": "address"
+      },
+      {
+        "internalType": "address[]",
+        "name": "initialTokens",
+        "type": "address[]"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "initializeOpenChallenges",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "token",
         "type": "address"
       }
@@ -1565,6 +1963,25 @@ export const WAGER_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "isOpenChallenge",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "membershipManager",
     "outputs": [
@@ -1580,6 +1997,44 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "nextWagerId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "openWagerIdByClaim",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "authority",
+        "type": "address"
+      }
+    ],
+    "name": "openWagerIdForClaim",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1637,6 +2092,19 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "contract IOracleAdapter",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -1821,6 +2289,24 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
+    ],
+    "name": "upgradeToAndCall",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
@@ -1832,205 +2318,6 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "creator",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "claimAuthority",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint128",
-        "name": "stake",
-        "type": "uint128"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum IWagerRegistry.ResolutionType",
-        "name": "resolutionType",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "metadataHash",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "metadataUri",
-        "type": "string"
-      }
-    ],
-    "name": "OpenWagerCreated",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes",
-        "name": "signature",
-        "type": "bytes"
-      }
-    ],
-    "name": "acceptOpenWager",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "claimAuthority",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "claimAuthority_",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "arbitrator",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint128",
-        "name": "stake",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint64",
-        "name": "acceptDeadline",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint64",
-        "name": "resolveDeadline",
-        "type": "uint64"
-      },
-      {
-        "internalType": "enum IWagerRegistry.ResolutionType",
-        "name": "resolutionType",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "oracleConditionId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bool",
-        "name": "creatorIsYes",
-        "type": "bool"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "metadataHash",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "string",
-        "name": "metadataUri",
-        "type": "string"
-      }
-    ],
-    "name": "createOpenWager",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      }
-    ],
-    "name": "isOpenChallenge",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "openWagerIdByClaim",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",
