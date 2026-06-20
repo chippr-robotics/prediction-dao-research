@@ -33,6 +33,7 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 - Q: Who is sanctions-screened on the voucher rail? → A: **The redeemer only**, at redemption, fail-closed. Voucher minters and buyers are deliberately **not** screened — an explicitly accepted tradeoff (a sanctioned party could profit from reselling a voucher without ever redeeming). Screening at the point membership standing is granted preserves the existing non-bypassable control.
 - Q: What tier does a voucher grant if tier configuration changes between mint and redemption? → A: **The tier the voucher was minted for**, unconditionally. The voucher records its tier at mint and is a bearer claim on *that* tier, independent of later price/limit/active-state changes to tier configuration.
 - Q: How is resale royalty handled? → A: **Best-effort EIP-2981 metadata hint only** — a flat, capped royalty advertised to marketplaces and routed to the treasury. No enforced-royalty, allowlisted-operator, or platform-run marketplace mechanism, so open-marketplace composability and trading privacy are preserved.
+- Q: What flat resale royalty rate and hard ceiling? → A: **2.5% advertised rate, with a 5% hard ceiling** enforced by the contract — an admin may configure the rate up to but never above 5%. The conservative rate keeps the utility (not appreciating-asset) framing defensible.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -157,7 +158,8 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 
 #### Economics & royalty
 
-- **FR-021**: The voucher MUST advertise a flat, capped resale royalty (best-effort, via standard marketplace royalty metadata) payable to the treasury; the system MUST NOT rely on enforced royalties, allowlisted operators, or a platform-run marketplace.
+- **FR-021**: The voucher MUST advertise a flat resale royalty (best-effort, via standard marketplace royalty metadata) payable to the treasury, defaulting to **2.5%**; the system MUST NOT rely on enforced royalties, allowlisted operators, or a platform-run marketplace.
+- **FR-021a**: The royalty rate MUST be admin-configurable but the contract MUST enforce a **hard ceiling of 5%** — any attempt to set a rate above 5% MUST be rejected.
 - **FR-022**: Voucher pricing/marketing MUST present the voucher as access utility (a claim on membership), not as an investment or appreciating asset.
 
 #### Integration & non-regression
@@ -177,7 +179,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **Redemption**: The act of burning a voucher to write a soulbound membership of the voucher's tier to the redeemer, gated by sanctions screening and Terms acceptance, with the clock starting at redemption.
 - **Membership** (existing): The soulbound, time-bound, address-keyed access record the platform already issues (tier, expiry, usage counters). Unchanged; produced identically by both acquisition rails.
 - **Tier** (existing): The configured membership level (Bronze/Silver/Gold/Platinum) with its USDC price, duration, and usage limits. A voucher binds to a tier at mint.
-- **Royalty Configuration**: The flat, capped, best-effort resale royalty rate and the treasury recipient advertised to marketplaces.
+- **Royalty Configuration**: The flat, best-effort resale royalty rate (default 2.5%, admin-configurable up to a 5% hard ceiling) and the treasury recipient advertised to marketplaces.
 - **Redeemer / Holder**: The address that owns a voucher (holder) and the address that claims the membership (redeemer) — which may deliberately differ for privacy.
 
 ## Success Criteria *(mandatory)*
@@ -192,7 +194,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **SC-006**: A voucher that fails redemption remains owned and re-tradable, and a subsequent eligible buyer can redeem it successfully — demonstrated end-to-end.
 - **SC-007**: A voucher redeemed from a fresh wallet yields a membership whose on-chain record contains no stored link back to the minting/selling wallet (verified by inspecting the record).
 - **SC-008**: The existing direct-purchase rail and the full existing test suite pass with **zero regression** after the feature is added.
-- **SC-009**: The resale royalty is exposed to marketplaces via standard royalty metadata pointing at the treasury, with a flat capped rate, in 100% of voucher tokens.
+- **SC-009**: The resale royalty is exposed to marketplaces via standard royalty metadata pointing at the treasury, at a flat 2.5% rate, in 100% of voucher tokens; any configuration attempt above the 5% hard ceiling is rejected 100% of the time.
 - **SC-010**: Every voucher mint and redemption is observable on-chain and reflected in the frontend/subgraph via generated sync artifacts (no hand-copied addresses/ABIs).
 
 ## Assumptions
@@ -201,7 +203,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **Voucher pricing equals tier price**: minting a voucher costs the tier's configured USDC price, so neither rail is cheaper; mint proceeds accrue like a direct purchase.
 - **No voucher expiry; membership clock starts at redemption**: vouchers are bearer instruments with no expiry.
 - **Redeemer-only screening**: sanctions screening and Terms acceptance occur at redemption on the redeemer, fail-closed; minters/buyers are not screened (accepted tradeoff).
-- **Best-effort royalty only**: a flat, capped EIP-2981-style royalty hint to the treasury, with no enforced-royalty/allowlist/platform-marketplace mechanism, preserving open-market composability and privacy.
+- **Best-effort royalty only**: a flat EIP-2981-style royalty hint to the treasury (default 2.5%, admin-configurable up to a 5% hard ceiling), with no enforced-royalty/allowlist/platform-marketplace mechanism, preserving open-market composability and privacy.
 - **Pragmatic privacy, no zero-knowledge**: privacy is achieved by fresh-wallet redemption (pseudonymity) with an optional future relayer; cryptographic/zero-knowledge unlinkability is explicitly out of scope.
 - **Networks**: applies to the live deployments (Polygon mainnet, Amoy testnet); legacy read-only networks (Mordor/ETC) are out of scope.
 
