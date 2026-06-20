@@ -48,6 +48,11 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   challenges MUST have equal stakes (`creatorStake == opponentStake`); asymmetric Offers
   revert at creation and remain a named-opponent feature. Equal stakes have no favorable
   side to snipe, avoiding adverse selection on a publicly shared code.
+- Q: Must a claim code be unique, and for how long? → A: Enforce uniqueness of the code
+  commitment among currently-**active** (Open, unaccepted) open challenges — creation
+  reverts on a collision. The commitment slot frees when the wager leaves Open (accepted,
+  cancelled, or expired), so a code can be reused for a later wager. No global lifetime
+  uniqueness (avoids unbounded state).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -183,6 +188,11 @@ code-holders.
   as a named-opponent wager.
 - **FR-006**: The system MUST commit to the code on-chain in a form that lets the contract later verify a
   taker's knowledge of the code **without** the creator having to store or reveal the code on-chain.
+- **FR-006a**: The code commitment MUST be unique among currently-active (Open, unaccepted) open
+  challenges: creating an open challenge whose commitment matches a still-Open one MUST revert, so a code
+  routes to exactly one live wager (deterministic discovery, no ambiguous acceptance or decryption). The
+  commitment slot MUST be released when the wager leaves the Open state (accepted, cancelled, or expired),
+  allowing the same code to be reused for a later wager. No global lifetime uniqueness is required.
 
 #### Discovery
 
@@ -268,7 +278,9 @@ code-holders.
   with; never stored on-chain in recoverable form. Its entropy is the security parameter that resists
   offline guessing.
 - **Code Commitment**: The public, on-chain value bound to a wager that lets the contract verify a taker
-  knows the code, and lets the app route a code to its wager, without exposing the code itself.
+  knows the code, and lets the app route a code to its wager, without exposing the code itself. Unique
+  among currently-active open challenges (FR-006a); its uniqueness slot is released when the wager leaves
+  the Open state, so a code may be reused for a later wager.
 - **Taker (Opponent)**: The first code-holder to accept; becomes the bound opponent and is thereafter
   treated exactly like a named opponent (subject to sanctions, membership, escrow, and resolution rules).
 - **Private Terms Bundle**: The off-chain confidential terms of the wager, unlockable with the code and
