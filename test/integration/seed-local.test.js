@@ -4,6 +4,7 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
 const { seedLocal } = require("../../scripts/operations/seed-local");
 const { ROLE_HASHES } = require("../../scripts/deploy/lib/constants");
+const { deployWagerRegistry } = require("../helpers/proxy");
 
 const ROLE = ROLE_HASHES.WAGER_PARTICIPANT_ROLE;
 
@@ -31,14 +32,12 @@ describe("Local Dev Environment — seedLocal invariants", function () {
     );
     await mm.waitForDeployment();
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(
+    const reg = await deployWagerRegistry([
       walletZero.address,
       await mm.getAddress(),
       ethers.ZeroAddress, // polymarket adapter disabled for the local default flow
       [await usdc.getAddress(), await wmatic.getAddress()]
-    );
-    await reg.waitForDeployment();
+    ]);
 
     // Deployment record in the exact shape seedLocal() / sync expect.
     const deployment = {

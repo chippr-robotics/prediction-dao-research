@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAccountStats } from '../../hooks/useAccountStats'
 import { useWalletConnection } from '../../hooks/useWalletManagement'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
 import SummaryTiles from './SummaryTiles'
 import PnlChart from './PnlChart'
 import ActivityBreakdowns from './ActivityBreakdowns'
@@ -10,11 +9,6 @@ import FreshnessIndicator from './FreshnessIndicator'
 import WalletUtilitiesPanel from './WalletUtilitiesPanel'
 import EmptyState from './EmptyState'
 import './AccountDashboard.css'
-
-function shorten(address) {
-  if (!address) return ''
-  return `${address.substring(0, 6)}…${address.substring(address.length - 4)}`
-}
 
 /**
  * AccountDashboard — the Account tab body (spec 020). Real-time personal stats:
@@ -38,12 +32,10 @@ function AccountDashboard({ address }) {
 
   return (
     <div className="account-dashboard">
+      {/* Identity (avatar + address) lives in the My Account sidebar; here we
+          only surface the data-freshness indicator to avoid a duplicate
+          address on the page. */}
       <div className="account-identity">
-        <div className="account-identity-main">
-          <BlockiesAvatar address={address} size={36} />
-          <span className="account-identity-address">{shorten(address)}</span>
-          <span className="status-dot connected" aria-hidden="true" />
-        </div>
         <FreshnessIndicator state={freshness?.summary} onRefresh={refresh} />
       </div>
 

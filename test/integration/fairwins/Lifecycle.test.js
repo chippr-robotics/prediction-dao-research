@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("../../helpers/proxy");
 
 // End-to-end USER-FLOW coverage: full lifecycle journeys through the deployed
 // stack (MembershipManager + PolymarketOracleAdapter + WagerRegistry), proving
@@ -29,9 +30,8 @@ async function buildStack(concurrentLimit) {
   await mgr.connect(admin).setTier(ROLE, Tier.Bronze, usdc(50), 30,
     { monthlyMarketCreation: 1000, maxConcurrentMarkets: concurrentLimit }, true);
 
-  const Reg = await ethers.getContractFactory("WagerRegistry");
-  const reg = await Reg.deploy(admin.address, await mgr.getAddress(), await adapter.getAddress(),
-    [await token.getAddress(), await wmatic.getAddress()]);
+  const reg = await deployWagerRegistry([admin.address, await mgr.getAddress(), await adapter.getAddress(),
+    [await token.getAddress(), await wmatic.getAddress()]]);
   await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
 
   for (const u of [alice, bob, carol]) {

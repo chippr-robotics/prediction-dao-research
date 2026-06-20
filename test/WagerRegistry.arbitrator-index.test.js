@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("./helpers/proxy");
 
 // Spec Kit 005: an assigned arbitrator must be able to DISCOVER the wagers they
 // oversee. createWager now indexes the arbitrator into the per-user set so
@@ -32,11 +33,10 @@ describe("WagerRegistry — arbitrator discovery index", function () {
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 }, true
     );
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(
+    const reg = await deployWagerRegistry([
       admin.address, await mgr.getAddress(), await adapter.getAddress(),
       [await usdcToken.getAddress(), await wmatic.getAddress()]
-    );
+    ]);
     await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
 
     for (const u of [alice, bob, charlie]) {

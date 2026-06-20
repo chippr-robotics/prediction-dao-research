@@ -3,9 +3,13 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WagerCardGrid from '../components/fairwins/WagerCardGrid'
 
-// The activity watcher is optional; stub it so the grid renders without a provider.
+// The activity watcher is optional; stub it so the grid renders without a
+// provider. Tests assign activityRef.current per scenario to drive the
+// action-needed tags; the mock reads it lazily so the same object is returned
+// on every render.
+const activityRef = vi.hoisted(() => ({ current: { actionNeededByWagerId: {} } }))
 vi.mock('../hooks/useWagerActivity', () => ({
-  useWagerActivityOptional: () => ({ actionNeededByWagerId: {} }),
+  useWagerActivityOptional: () => activityRef.current,
 }))
 
 const ME = '0x1234567890123456789012345678901234567890'
@@ -34,7 +38,10 @@ const activeWager = (over = {}) => ({
 })
 
 describe('WagerCard (via WagerCardGrid)', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    activityRef.current = { actionNeededByWagerId: {} }
+  })
 
   it('renders a collapsed card with stake, token, title and status pill', () => {
     render(<WagerCardGrid {...baseProps} markets={[activeWager()]} />)
@@ -126,6 +133,25 @@ describe('WagerCard (via WagerCardGrid)', () => {
     const claimBtn = screen.getByRole('button', { name: /^claim$/i })
     await user.click(claimBtn)
     expect(onClaim).toHaveBeenCalledTimes(1)
+  })
+
+  it('flags a claimable wager with a Claim tag while collapsed, then shows the button when expanded', async () => {
+    const user = userEvent.setup()
+    activityRef.current = { actionNeededByWagerId: { '42': 'claim' } }
+    const won = activeWager({ id: '42', description: 'Won Wager', status: 'resolved', computedStatus: 'resolved', winner: ME, paid: false })
+    render(<WagerCardGrid {...baseProps} onClaim={vi.fn()} showOutcome markets={[won]} />)
+
+    const card = screen.getByText('Won Wager').closest('.wc-card')
+    // Collapsed: the Claim button lives in the body, so the tag is the visible cue.
+    expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+    const tag = card.querySelector('.wc-action-needed')
+    expect(tag).toBeInTheDocument()
+    expect(tag).toHaveTextContent(/claim/i)
+
+    // Expanding reveals the real Claim button and drops the now-redundant tag.
+    await user.click(screen.getByText('Won Wager'))
+    expect(screen.getByRole('button', { name: /^claim$/i })).toBeInTheDocument()
+    expect(card.querySelector('.wc-action-needed')).toBeNull()
   })
 
   it('does not show a Claim action to the losing side', async () => {

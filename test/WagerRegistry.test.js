@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("./helpers/proxy");
 
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const Resolution = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4 };
@@ -40,14 +41,12 @@ describe("WagerRegistry", function () {
       true
     );
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(
+    const reg = await deployWagerRegistry([
       admin.address,
       await mgr.getAddress(),
       await adapter.getAddress(),
       [await usdcToken.getAddress(), await wmatic.getAddress()]
-    );
-    await reg.waitForDeployment();
+    ]);
 
     await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
 

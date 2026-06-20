@@ -132,9 +132,18 @@ async function main() {
   add("MembershipManager", c.membershipManager, "membershipManager",
     [deployer, record.paymentToken, treasury],
     "contracts/access/MembershipManager.sol:MembershipManager");
-  add("WagerRegistry", c.wagerRegistry, "wagerRegistry",
-    [deployer, c.membershipManager, isAddr(c.polymarketAdapter) ? c.polymarketAdapter : ZERO, initialTokens],
-    "contracts/wagers/WagerRegistry.sol:WagerRegistry");
+  // WagerRegistry is a UUPS proxy: verify the IMPLEMENTATION (no constructor args — init data lives in the
+  // proxy). Explorers detect the ERC1967 proxy and link it to this verified implementation automatically.
+  // Older (pre-025, non-proxy) records have no wagerRegistryImpl: fall back to verifying the address under
+  // `wagerRegistry` with the legacy constructor args.
+  if (isAddr(c.wagerRegistryImpl)) {
+    add("WagerRegistry", c.wagerRegistryImpl, "wagerRegistryImpl", [],
+      "contracts/wagers/WagerRegistry.sol:WagerRegistry");
+  } else {
+    add("WagerRegistry", c.wagerRegistry, "wagerRegistry",
+      [deployer, c.membershipManager, isAddr(c.polymarketAdapter) ? c.polymarketAdapter : ZERO, initialTokens],
+      "contracts/wagers/WagerRegistry.sol:WagerRegistry");
+  }
   add("KeyRegistry", c.keyRegistry, "keyRegistry", [],
     "contracts/privacy/KeyRegistry.sol:KeyRegistry");
   add("SanctionsGuard", c.sanctionsGuard, "sanctionsGuard", [deployer, sanctionsOracle],

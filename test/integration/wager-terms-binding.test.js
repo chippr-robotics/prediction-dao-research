@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("../helpers/proxy");
 
 // On-chain governing-terms binding for wagers (Spec 007 — FR-056/FR-057/FR-058, SC-017).
 // createWagerWithTerms records & emits the version hash; the existing createWager ABI is
@@ -25,9 +26,7 @@ describe("Wager terms-version binding (integration)", function () {
     await mgr.waitForDeployment();
     await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30, { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 }, true);
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(admin.address, await mgr.getAddress(), ethers.ZeroAddress, [await usdcToken.getAddress()]);
-    await reg.waitForDeployment();
+    const reg = await deployWagerRegistry([admin.address, await mgr.getAddress(), ethers.ZeroAddress, [await usdcToken.getAddress()]]);
     await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
 
     for (const u of [alice, bob]) {

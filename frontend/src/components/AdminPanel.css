@@ -191,6 +191,30 @@
 }
 
 /* ===================================
+   Portal Layout (left sidebar tabs)
+   =================================== */
+
+.admin-portal-shell {
+  align-items: stretch;
+}
+
+.admin-portal-sidebar {
+  min-height: 100%;
+}
+
+.admin-portal-topbar {
+  display: flex;
+  align-items: center;
+  padding: 1.25rem 2rem 0;
+}
+
+@media (max-width: 768px) {
+  .admin-portal-topbar {
+    padding: 1rem 1rem 0;
+  }
+}
+
+/* ===================================
    Content Area
    =================================== */
 

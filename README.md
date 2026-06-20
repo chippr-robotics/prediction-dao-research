@@ -103,6 +103,10 @@ privilege matrix. No role can move escrowed stakes.
 └───────────────┘
 ```
 
+Core contracts are UUPS-upgradeable behind stable proxy addresses — logic is
+swappable in place while escrowed state is preserved (see
+[ADR 004](docs/adr/004-upgradeable-registry-uups.md)).
+
 Frontend: React + Vite SPA (no backend) served by nginx on Cloud Run behind
 Cloudflare. Deployed addresses are recorded in [`deployments/`](deployments/)
 — Polygon mainnet (137) and Polygon Amoy testnet (80002). Full picture:

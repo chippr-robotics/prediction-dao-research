@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployWagerRegistry } = require("../helpers/proxy");
 
 // Integration: SanctionsGuard wired into WagerRegistry + MembershipManager (Spec 007,
 // FR-016/FR-021/FR-054, SC-004/SC-016). Verifies value-bearing entrypoints are screened
@@ -34,14 +35,12 @@ describe("Sanctions gating (integration)", function () {
     const guard = await Guard.deploy(admin.address, await oracle.getAddress());
     await guard.waitForDeployment();
 
-    const WagerRegistry = await ethers.getContractFactory("WagerRegistry");
-    const reg = await WagerRegistry.deploy(
+    const reg = await deployWagerRegistry([
       admin.address,
       await mgr.getAddress(),
       ethers.ZeroAddress, // no polymarket adapter needed
       [await usdcToken.getAddress()]
-    );
-    await reg.waitForDeployment();
+    ]);
 
     await mgr.connect(admin).setAuthorizedCaller(await reg.getAddress(), true);
     // Wire the guard into both fund contracts
