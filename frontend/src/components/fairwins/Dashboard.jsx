@@ -7,6 +7,7 @@ import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
+import TakeChallengeModal from './TakeChallengeModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
@@ -449,6 +450,7 @@ function Dashboard() {
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
+  const [showTakeChallenge, setShowTakeChallenge] = useState(false)
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -611,6 +613,17 @@ function Dashboard() {
       {/* Quick Actions */}
       <section className="dashboard-section">
         <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
+        {isConnected && (
+          <div className="dashboard-take-challenge">
+            <button
+              type="button"
+              className="cta-banner-btn primary"
+              onClick={() => setShowTakeChallenge(true)}
+            >
+              Take a challenge with a code
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Top Polymarket markets — self-gates on chain capability, renders
@@ -639,6 +652,17 @@ function Dashboard() {
         initialType={createWagerType}
         resolutionCategory={createResolutionCategory}
         initialPolymarketMarket={initialPolymarketMarket}
+      />
+
+      {/* Take a Challenge (open-challenge wagers, feature 024). key remounts for fresh state per open. */}
+      <TakeChallengeModal
+        key={showTakeChallenge ? 'take-open' : 'take-closed'}
+        isOpen={showTakeChallenge}
+        onClose={() => setShowTakeChallenge(false)}
+        onBuyMembership={() => {
+          setShowTakeChallenge(false)
+          showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
+        }}
       />
 
       {/* My Wagers Modal */}
