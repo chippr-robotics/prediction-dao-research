@@ -47,7 +47,10 @@
   msg.sender`, clears the claim mappings (frees the code), escrows the opponent's equal stake.
 - **Open → Cancelled** (`cancelOpen`, creator only) / **Open → Refunded** (`claimRefund` or
   `batchExpireOpen` after `acceptDeadline`): refund the creator and clear the claim mappings.
-- **`declineWager` does not apply** to open challenges (no named opponent) — FR-023.
+- **`declineWager` MUST revert** for an open challenge (guard `claimAuthority[id] != 0` →
+  `DeclineNotAllowedForOpenChallenge`), not merely fail on the absent opponent. The creator's `cancelOpen`
+  is the only non-expiry exit from `Open`, and only the creator may call it — so no party other than the
+  creator can release an unaccepted open challenge or move its funds — FR-023/FR-021.
 - From `Active` onward the wager is indistinguishable from a named-opponent wager: `declareWinner`,
   `declareDraw`/`revokeDraw`, `autoResolveFromPolymarket`/`autoResolveFromOracle`, `claimPayout`,
   `claimRefund` (Active branch) are unchanged (FR-016, FR-009-equivalent).
@@ -67,6 +70,9 @@
    `arbitrator != opponent` half is enforced at accept). Other types: `arbitrator == 0`.
 8. Oracle types: non-zero `oracleConditionId`, adapter set, condition not already resolved (reused logic).
 9. Membership gate `checkCanCreate(msg.sender)`.
+10. Creation-tier floor: `getActiveTier(msg.sender, WAGER_PARTICIPANT_ROLE) >= Tier.Silver` → else
+    `InsufficientMembershipTier` (FR-005a — open-challenge creation is a Silver+ privilege; Bronze/None
+    rejected). Named-opponent `createWager` is unaffected.
 
 ## Validation rules (acceptOpenWager — Checks phase)
 
@@ -78,7 +84,8 @@
 4. `msg.sender != creator` → else `SelfWager` (FR-014).
 5. `ThirdParty`: `msg.sender != arbitrator` → else `ArbitratorCannotTake` (FR-015).
 6. `_screen(msg.sender)`, `_screen(creator)` (FR-013).
-7. `checkCanCreate(msg.sender)` membership gate (FR-013).
+7. `checkCanCreate(msg.sender)` membership gate (FR-013). **No tier floor on accept** — any active
+   membership tier may take an open challenge; the Silver+ requirement is creation-only (FR-005a).
 
 Effects then interactions exactly as `acceptWager` (set opponent/Active, clear claim mappings, index
 taker, `recordCreate`, then `safeTransferFrom(opponentStake)`), under `nonReentrant`/`whenNotPaused`.

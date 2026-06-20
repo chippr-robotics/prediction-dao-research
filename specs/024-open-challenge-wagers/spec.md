@@ -69,6 +69,10 @@ hard to snipe, and does not need to know the taker in advance. Existing named-op
   non-member holding the code is cleanly blocked at accept and prompted to purchase first;
   there is no membership backdoor via open challenges. A public challenge's reachable
   audience is therefore "members who obtain the code."
+- Q: Which membership tier may *create* an open challenge? → A: **Silver and above** (Silver, Gold,
+  Platinum). Open-challenge creation is treated as a higher-tier privilege; a Bronze or non-member creator is
+  refused at creation and prompted to upgrade. **Participation (accepting) remains open to any active tier**
+  (subject to the existing membership/sanctions gate) — only creation carries the tier floor (FR-005a).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -168,6 +172,12 @@ code-holders.
   named-opponent wager — the creator's stake becomes refundable and the concurrency slot is released.
 - **Creator cancels before anyone accepts**: allowed, exactly as today for an unaccepted wager;
   the stake is returned.
+- **Anyone tries to "decline" an open challenge**: refused — decline is a named-opponent action, and an open
+  challenge has no bound opponent. The contract rejects the call outright; the only way to release an
+  unaccepted open challenge is the creator's cancel (FR-021/FR-023), and only the creator may invoke it.
+- **A creator below the Silver tier tries to post an open challenge**: refused at creation — open-challenge
+  creation is a Silver-and-above privilege (FR-005a). The app prompts a Bronze/non-member creator to upgrade;
+  they may still *accept* (participate in) any open challenge they hold the code for.
 - **Third-party (arbitrator) resolution on an open challenge**: the arbitrator is chosen at creation,
   but the opponent is unknown then, so the rule that the arbitrator may be neither party MUST still
   hold once the taker is known — a taker who is the named arbitrator MUST be refused.
@@ -209,6 +219,13 @@ code-holders.
   named-opponent wager (no change to custody or accounting).
 - **FR-005**: An open challenge MUST count against the creator's membership limits at creation, the same
   as a named-opponent wager.
+- **FR-005a**: Creating an open challenge MUST be restricted to creators holding a **Silver tier or above**
+  membership (Silver, Gold, or Platinum) for the wager-participant role; a Bronze or non-member creator MUST
+  be refused at creation (revert). Open-challenge *creation* is a privilege of higher tiers, whereas
+  *participation* (accepting) is open to any active membership tier (FR-013). This gate is additive to the
+  existing membership-limit check (FR-005) and applies only to open challenges; named-opponent `createWager`
+  retains its current any-active-tier gate. The app MUST offer the open-challenge create option only to
+  Silver+ members and prompt lower tiers to upgrade.
 - **FR-006**: The system MUST commit to the code on-chain in a form that lets the contract later verify a
   taker's knowledge of the code **without** the creator having to store or reveal the code on-chain.
 - **FR-006a**: The code commitment MUST be unique among currently-active (Open, unaccepted) open
@@ -240,7 +257,9 @@ code-holders.
   concurrency-limit checks, stake escrow of the opponent's stake, and recording of the taker against the
   wager so they can find it afterward. Membership is required for **every** taker with no open-challenge
   exemption (including public challenges); a non-member who holds the code is blocked at accept and the
-  app MUST prompt them to purchase membership before they can take the wager.
+  app MUST prompt them to purchase membership before they can take the wager. **Any active membership tier
+  may accept** — participation has no tier floor; the Silver-and-above requirement applies only to *creating*
+  an open challenge (FR-005a), not to taking one.
 - **FR-014**: The creator MUST NOT be able to accept their own open challenge (the two parties must be
   distinct).
 - **FR-015**: For third-party (arbitrator) resolution, a taker who is the named arbitrator MUST be refused
@@ -279,8 +298,13 @@ code-holders.
 - **FR-022**: An open challenge that no one accepts before its accept deadline MUST become refundable to the
   creator and release the creator's concurrency slot, exactly as a named-opponent wager that was never
   accepted — including via any existing batch-expiry path.
-- **FR-023**: The "decline" action (a named opponent rejecting a wager) MUST NOT apply to an open challenge,
-  since there is no named opponent to decline; the creator's cancel path covers the equivalent need.
+- **FR-023**: The "decline" action (a named opponent rejecting a wager) MUST NOT apply to an open challenge.
+  Because an open challenge has no bound opponent while it is Open, the contract MUST **actively reject** any
+  `declineWager` call against an open challenge (revert with a dedicated error), rather than relying only on
+  the implicit "caller is not the opponent" check — no party other than the creator may release an
+  unaccepted open challenge or move its funds. The creator's cancel path (FR-021) is the **sole** withdrawal
+  route for an unaccepted open challenge, and only the creator may invoke it; the app MUST NOT surface a
+  decline action for open challenges.
 
 #### Backward compatibility and honesty
 
@@ -370,6 +394,11 @@ code-holders.
   challenges are restricted at the contract level to oracle-resolved, `Either`, and `ThirdParty`
   (named-arbitrator) resolution; `Creator`/`Opponent` self-resolution reverts at creation because the
   sole resolver would be an unknown party. Named-opponent wagers keep all resolution types.
+- **Open-challenge creation is a Silver-tier-and-above privilege (FR-005a); participation is open to all
+  tiers.** This is a deliberate product choice — posting a code-gated, taker-unknown wager is gatekept to
+  higher-tier members, while anyone with an active membership may take one. It reuses the existing
+  `IMembershipManager` tier model (`None/Bronze/Silver/Gold/Platinum`) via `getActiveTier`; no new tier or
+  role is introduced.
 - **Networks**: Applies to the live deployments (Polygon mainnet, Amoy testnet); legacy read-only networks
   are out of scope.
 - **No new fund or resolution mechanics, and no change to the on-chain stake-custody model.** The contract

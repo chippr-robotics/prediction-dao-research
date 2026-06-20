@@ -16,7 +16,8 @@ Technical approach (smallest change that satisfies the spec):
 - **On-chain (`WagerRegistry`)**: the code is committed as an Ethereum **address** (`claimAuthority`)
   derived from the code via a deterministic keypair. A new `createOpenWager` entrypoint escrows a
   single equal stake, records `claimAuthority`, restricts resolution to oracle/`Either`/`ThirdParty`,
-  and enforces active-commitment uniqueness. A new `acceptOpenWager(wagerId, signature)` verifies an
+  enforces active-commitment uniqueness, and gates creation to **Silver tier and above** (an
+  open-challenge creation privilege; any active tier may still *accept*). A new `acceptOpenWager(wagerId, signature)` verifies an
   **EIP-712 signature** from the code-derived key over `(wagerId, taker, chainId, contract)` — binding
   the acceptance to the taker's own address so a mempool observer cannot steal it — then runs the exact
   same accept-time gauntlet as today (sanctions, membership, escrow) and binds the taker as opponent.
@@ -67,7 +68,7 @@ existing function signature, and all events stay byte-compatible (FR-024). Netwo
 (Principle III). v1 anti-guessing guarantee is explicitly scoped to casual/indiscriminate attempts
 (spec FR-003a) and MUST be surfaced honestly in the UI for meaningful stakes.
 
-**Scale/Scope**: ~4 chains; 3 user stories; 31 functional requirements. Touches `WagerRegistry.sol` +
+**Scale/Scope**: ~4 chains; 3 user stories; 32 functional requirements. Touches `WagerRegistry.sol` +
 its interface, one new wordlist/crypto module + envelope mode in the frontend, the create/accept modals,
 the contract→frontend ABI sync, and one subgraph mapping handler.
 
@@ -90,6 +91,11 @@ the contract→frontend ABI sync, and one subgraph mapping handler.
     paths are byte-for-byte the existing ones.
   - **Access control**: `createOpenWager`/`acceptOpenWager` keep the membership gate and sanctions guard;
     no new roles. Resolution-type restriction (FR-016a) and equal-stakes (FR-016b) revert at creation.
+    Open-challenge *creation* additionally requires **Silver tier or above** (FR-005a) via
+    `getActiveTier` (reusing the existing `IMembershipManager` tier enum — no new role); *acceptance* keeps
+    the any-active-tier gate (participation has no tier floor). `declineWager` is guarded to revert on open
+    challenges (FR-023), so the creator's `cancelOpen` is the sole withdrawal path for an unaccepted open
+    challenge and no other party can release it.
   - **Tooling**: Slither clean (no new high/critical), Medusa fuzz extended to the open path, EthTrust-SL
     ≥ L2 with documented reasoning. Smart-contract security agent review before merge. **PASS (with the
     above carried into the design and tasks).**
@@ -119,6 +125,14 @@ subgraph handler. It introduces no new core technology, no new roles, and reuses
 membership, sanctions, IPFS, and ABI-sync machinery. Signature handling uses the audited OZ `ECDSA`
 library rather than raw `ecrecover`. **Still PASS.**
 
+**Dependency on spec `025-upgradeable-registry` (UUPS):** to avoid stranding wagers on every contract change,
+the registry is being migrated to a UUPS proxy in a separate, prior spec (025). 024 ships as the **first
+in-place implementation upgrade** of that proxy, so: (a) the two new mappings MUST be **appended after all
+existing storage** (never inserted/reordered) and pass the OZ storage-layout compatibility check on each
+upgrade; (b) EIP-712 is added via `EIP712Upgradeable` + `__EIP712_init` in the initializer (OZ's EIP712 is
+proxy-safe); (c) the proxy address is unchanged on upgrade, so no frontend/subgraph repoint is needed. 024's
+deployment phase (Phase 7 in tasks.md) is blocked on 025's proxy being live on each target network.
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -142,7 +156,8 @@ specs/024-open-challenge-wagers/
 ```text
 contracts/
 ├── wagers/
-│   └── WagerRegistry.sol          # EDIT: createOpenWager, acceptOpenWager, claim mappings + cleanup
+│   └── WagerRegistry.sol          # EDIT: createOpenWager (Silver+ gate), acceptOpenWager, claim
+│                                  #       mappings + cleanup, declineWager open-challenge guard
 ├── interfaces/
 │   └── IWagerRegistry.sol         # EDIT: new fns/events/errors (struct UNCHANGED)
 └── test/
@@ -151,7 +166,8 @@ contracts/
 test/
 ├── WagerRegistry.openChallenge.test.js   # NEW: unit tests for the open path
 └── integration/
-    └── openChallengeLifecycle.test.js     # NEW: create → discover → accept → resolve → claim
+    └── fairwins/
+        └── openChallengeLifecycle.test.js # NEW: create → discover → accept → resolve → claim
 
 frontend/
 ├── src/

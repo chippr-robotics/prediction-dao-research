@@ -45,13 +45,16 @@ function createOpenWager(
 // + createOpenWagerWithTerms(...) overload binding termsVersionHash, mirroring createWagerWithTerms.
 ```
 
-Behavior: validates per data-model "createOpenWager Checks", escrows `stake` from the creator, sets
-`opponent = address(0)`, `status = Open`, `claimAuthority[wagerId] = claimAuthority_`,
-`openWagerIdByClaim[claimAuthority_] = wagerId`, indexes creator (and arbitrator) in `_userWagerIds`,
-`recordCreate(creator)`, emits `OpenWagerCreated` (+ `OracleConditionLinked` for oracle types,
-`WagerTermsBound` when terms bound). Reverts: `ZeroClaimAuthority`, `ClaimAuthorityInUse`,
-`OpenResolutionTypeNotAllowed`, plus the reused `NotAllowedToken` / `ZeroStake` / `BadDeadlines` /
-`ArbitratorRequired` / `ArbitratorDisallowed` / oracle / `MembershipDenied` reverts.
+Behavior: validates per data-model "createOpenWager Checks", **requires the creator to hold Silver tier or
+above** (`membershipManager.getActiveTier(msg.sender, WAGER_PARTICIPANT_ROLE) >= IMembershipManager.Tier.Silver`
+else `InsufficientMembershipTier`, FR-005a — in addition to the existing `checkCanCreate` gate), escrows
+`stake` from the creator, sets `opponent = address(0)`, `status = Open`,
+`claimAuthority[wagerId] = claimAuthority_`, `openWagerIdByClaim[claimAuthority_] = wagerId`, indexes creator
+(and arbitrator) in `_userWagerIds`, `recordCreate(creator)`, emits `OpenWagerCreated`
+(+ `OracleConditionLinked` for oracle types, `WagerTermsBound` when terms bound). Reverts:
+`ZeroClaimAuthority`, `ClaimAuthorityInUse`, `OpenResolutionTypeNotAllowed`, `InsufficientMembershipTier`,
+plus the reused `NotAllowedToken` / `ZeroStake` / `BadDeadlines` / `ArbitratorRequired` /
+`ArbitratorDisallowed` / oracle / `MembershipDenied` reverts.
 
 ### `acceptOpenWager`
 
@@ -68,6 +71,7 @@ Behavior (checks → effects → interaction, `nonReentrant`):
 - `msg.sender != creator` else `SelfWager`.
 - ThirdParty: `msg.sender != arbitrator` else `ArbitratorCannotTake`.
 - `_screen(msg.sender)`, `_screen(creator)`; `checkCanCreate(msg.sender)` else `MembershipDenied`.
+  **No tier floor here** — any active membership tier may accept (the Silver+ gate is creation-only, FR-005a).
 - Effects: `opponent = msg.sender`, `status = Active`, `_clearClaim(wagerId)`,
   `_userWagerIds[msg.sender].add(wagerId)`, `recordCreate(msg.sender)`.
 - Interaction: `safeTransferFrom(msg.sender, address(this), opponentStake)`.
@@ -88,6 +92,19 @@ function _clearClaim(uint256 wagerId) internal {
 Called from `acceptOpenWager`, `cancelOpen`, the `Open` branch of `claimRefund`, and `batchExpireOpen`
 (all the paths an open wager can leave `Open`). `cancelOpen` currently `delete`s the wager — call
 `_clearClaim` first.
+
+### `declineWager` guard (edit to existing function)
+
+`declineWager` is a named-opponent action. Add a guard at its top so an open challenge can never be declined:
+
+```solidity
+if (claimAuthority[wagerId] != address(0)) revert DeclineNotAllowedForOpenChallenge();
+```
+
+This makes the rejection explicit and honest (FR-023) rather than relying on the implicit
+`msg.sender != opponent` check (an open challenge's `opponent` is `address(0)` while Open). The creator's
+`cancelOpen` remains the **only** way to withdraw an unaccepted open challenge, and only the creator may
+call it — so no other party can release it or move its funds.
 
 ## New views
 
@@ -123,6 +140,8 @@ error OpenResolutionTypeNotAllowed();
 error NotOpenChallenge();
 error BadClaimSignature();
 error ArbitratorCannotTake();
+error InsufficientMembershipTier();          // creator below Silver on createOpenWager (FR-005a)
+error DeclineNotAllowedForOpenChallenge();   // declineWager invoked on an open challenge (FR-023)
 ```
 
 `SelfWager` / `AcceptExpired` / `MembershipDenied` / `NotAllowedToken` / `ZeroStake` / `BadDeadlines` /
