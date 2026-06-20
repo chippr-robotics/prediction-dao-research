@@ -229,10 +229,9 @@ upgradeable from the guide alone; the agent guide reflects the new architecture.
 
 **Purpose**: The security gates this funds-bearing, upgrade-control change requires.
 
-- [ ] T027 [P] ⏳ CI-GATED — Run `npm run slither` (UUPS/proxy detectors), no new high/critical on the
-  proxy/`initialize`/`_authorizeUpgrade` surface. **Not runnable in this dev environment** (slither not
-  installed); runs in `.github/workflows/security-testing.yml` on the PR. Document EthTrust-SL ≥ L2 in
-  research.md (the "EthTrust" section already records the L2 target). (Principle I)
+- [X] T027 [P] Slither static analysis (UUPS/proxy detectors) — **passed in CI** on PR #724 ("Slither Static
+  Analysis" + "Security Analysis / Slither Static Analysis" both green), no new high/critical on the
+  proxy/`initialize`/`_authorizeUpgrade` surface. EthTrust-SL ≥ L2 target recorded in research.md. (Principle I)
 - [X] T028 [P] Extended the Medusa harness `contracts/test/WagerRegistryFuzzTest.sol` with upgrade
   invariants: it now deploys via `ERC1967Proxy`, retains escrow-conservation
   (`property_escrow_covers_active_stakes`) and correct init (`property_wager_id_starts_at_one`), and adds
@@ -240,8 +239,7 @@ upgradeable from the guide alone; the agent guide reflects the new architecture.
 - [ ] T029 ⏳ REVIEW-GATED — Request the smart-contract security-agent review (`.github/agents/`) of the
   conversion + proxy surface (initializer once-only, `_authorizeUpgrade` gating, storage append-only,
   `_disableInitializers`, pause/upgrade interaction). **Human/agent review gate — pending on the PR.** (Principle I)
-- [ ] T030 [P] ⏳ CI-GATED — Run `npm run test:coverage` and confirm the new upgrade/deploy/auth branches are
-  covered. **Coverage-at-scale runs in CI** (`test.yml`); the new branches are exercised by
+- [X] T030 [P] Coverage — **"Coverage Analysis" passed in CI** on PR #724; the new branches are exercised by
   `test/upgradeable/` (deploy, in-place upgrade, auth gate, re-init, storage-incompat). (Principle II)
 - [X] T031 Validated the quickstart locally (the parts runnable without a live network): full existing suite
   green through the proxy (259 passing / 0 failing); `npm run check:storage-layout` passes and **rejects** a
