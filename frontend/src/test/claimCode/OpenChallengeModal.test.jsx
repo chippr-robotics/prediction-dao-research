@@ -14,6 +14,7 @@ vi.mock('../../hooks/useOpenChallengeAccept', () => ({
 }))
 
 import OpenChallengeModal from '../../components/fairwins/OpenChallengeModal'
+import { buildTakeChallengeUrl, parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 
 describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
   beforeEach(() => { createOpenChallenge.mockReset(); discover.mockReset(); accept.mockReset() })
@@ -31,7 +32,7 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     expect(screen.getByLabelText(/what's the wager/i)).toBeInTheDocument()
   })
 
-  it('Maker: gates create until description + stake, then shows the generated code', async () => {
+  it('Maker: gates create until description + stake, then shows the generated code + a scannable QR', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
@@ -42,6 +43,15 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     expect(await screen.findByText('river tiger kite zoo')).toBeInTheDocument()
     expect(screen.getByText(/Save this code now/i)).toBeInTheDocument()
+    // A scannable QR (deep link into the Taker flow) is shown alongside the code.
+    expect(screen.getByText(/scan to take/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/QR code to take this challenge/i)).toBeInTheDocument()
+  })
+
+  it('Taker: pre-fills the code from a deep link (initialCode) and enables lookup', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" initialCode="river tiger kite zoo" />)
+    expect(screen.getByLabelText(/word code/i)).toHaveValue('river tiger kite zoo')
+    expect(screen.getByRole('button', { name: /find challenge/i })).toBeEnabled()
   })
 
   it('Taker: switching tabs, looking up by code, and accepting', async () => {
@@ -73,6 +83,14 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     expect(screen.queryByRole('button', { name: /accept challenge/i })).not.toBeInTheDocument()
     fireEvent.click(buyBtn)
     expect(onBuyMembership).toHaveBeenCalled()
+  })
+
+  it('deep-link helpers round-trip the code through a take URL', () => {
+    const url = buildTakeChallengeUrl('river tiger kite zoo')
+    expect(url).toMatch(/\/app\?oc=take&code=/)
+    const { search } = new URL(url)
+    expect(parseTakeChallengeParams(search)).toBe('river tiger kite zoo')
+    expect(parseTakeChallengeParams('?foo=bar')).toBeNull()
   })
 
   it('Taker: shows terms-unavailable but still allows accept', async () => {

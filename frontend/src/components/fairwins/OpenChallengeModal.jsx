@@ -3,6 +3,8 @@ import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
 import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordlist.js'
+import WagerQRCode from '../ui/WagerQRCode'
+import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -18,7 +20,7 @@ const CloseIcon = () => (
  *   • Taker  — enter a four-word code to discover, read, and accept one.
  * Styled to match the create-a-wager modal (shared `fm-*` classes).
  */
-function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'maker' }) {
+function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'maker', initialCode = '' }) {
   const [tab, setTab] = useState(initialTab)
 
   useEffect(() => {
@@ -75,7 +77,7 @@ function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'ma
 
             {tab === 'maker'
               ? <MakerPanel onClose={onClose} />
-              : <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} />}
+              : <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} initialCode={initialCode} />}
           </div>
         </div>
       </div>
@@ -135,6 +137,11 @@ function MakerPanel({ onClose }) {
         <div className="oc-code-display">
           <code className="oc-code">{result.code}</code>
           <button type="button" className="fm-btn-secondary" onClick={handleCopy}>{copied ? 'Copied ✓' : 'Copy'}</button>
+        </div>
+
+        <div className="oc-qr">
+          <WagerQRCode value={buildTakeChallengeUrl(result.code)} size={180} ariaLabel="QR code to take this challenge" />
+          <span className="oc-qr-caption">Scan to take this challenge — opens the app with the code filled in</span>
         </div>
 
         <div className="oc-notice oc-notice--warn" role="alert">
@@ -209,9 +216,9 @@ function MakerPanel({ onClose }) {
 // ---------------------------------------------------------------------------
 // Taker — accept an open challenge by code
 // ---------------------------------------------------------------------------
-function TakerPanel({ onClose, onBuyMembership }) {
+function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
   const { discover, accept, busy } = useOpenChallengeAccept()
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(initialCode)
   const [phase, setPhase] = useState('enter') // enter | found | accepted
   const [found, setFound] = useState(null)
   const [error, setError] = useState(null)

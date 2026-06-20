@@ -8,6 +8,7 @@ import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
+import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
@@ -466,6 +467,7 @@ function Dashboard() {
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
   const [openChallengeTab, setOpenChallengeTab] = useState('maker')
+  const [openChallengeInitialCode, setOpenChallengeInitialCode] = useState('')
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -500,6 +502,19 @@ function Dashboard() {
     if (routeWagerId == null) return
     navigate(location.pathname, { replace: true, state: {} })
   }, [routeWagerId, location.pathname, navigate])
+
+  // Open-challenge deep link (feature 024): a shared QR / link of the form
+  // /app?oc=take&code=<four words> opens the Open Challenge modal on the Taker tab with the code pre-filled.
+  // After consuming it we strip the query so it doesn't re-trigger on re-render or get bookmarked with the code.
+  useEffect(() => {
+    const code = parseTakeChallengeParams(location.search)
+    if (code) {
+      setOpenChallengeInitialCode(code)
+      setOpenChallengeTab('taker')
+      setShowOpenChallenge(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.search, location.pathname, navigate])
 
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
@@ -667,6 +682,7 @@ function Dashboard() {
         key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
         isOpen={showOpenChallenge}
         initialTab={openChallengeTab}
+        initialCode={openChallengeInitialCode}
         onClose={() => setShowOpenChallenge(false)}
         onBuyMembership={() => {
           setShowOpenChallenge(false)
