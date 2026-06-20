@@ -1835,5 +1835,204 @@
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "claimAuthority",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "stake",
+        "type": "uint128"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "metadataHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
+      }
+    ],
+    "name": "OpenWagerCreated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "signature",
+        "type": "bytes"
+      }
+    ],
+    "name": "acceptOpenWager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimAuthority",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "claimAuthority_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "arbitrator",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
+        "name": "stake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint64",
+        "name": "acceptDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "resolveDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "oracleConditionId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "creatorIsYes",
+        "type": "bool"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "metadataHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
+      }
+    ],
+    "name": "createOpenWager",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "isOpenChallenge",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "openWagerIdByClaim",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
 ]
