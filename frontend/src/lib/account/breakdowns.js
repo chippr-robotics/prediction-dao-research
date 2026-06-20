@@ -8,15 +8,15 @@
  *   Σ byToken.ownStakeUsd === AccountSummary.totalWageredUsd
  */
 import { isActiveStatus, normalizeStatus } from './status'
+import { ResolutionTypeNames } from '../../constants/wagerDefaults'
 
-// resolutionType (subgraph Int) → human label. Indexes match the adapter
-// registry order; unknown values fall back to a generic label.
-export const ORACLE_LABELS = Object.freeze({
-  0: 'Manual',
-  1: 'Polymarket',
-  2: 'Chainlink',
-  3: 'UMA',
-})
+// resolutionType (on-chain enum) → human label, sourced from the single source
+// of truth (constants/wagerDefaults → contracts/interfaces/IWagerRegistry.sol).
+// The previous hand-maintained map was wrong (0:Manual, 1:Polymarket, 2:Chainlink,
+// 3:UMA): it mislabeled peer/manual resolution (Either/Creator/Opponent/
+// ThirdParty) as oracles and showed real Polymarket (4) as "Type 4". Unknown
+// values still fall back to a generic label.
+export const ORACLE_LABELS = ResolutionTypeNames
 
 export function oracleLabel(resolutionType) {
   const n = Number(resolutionType)
