@@ -38,13 +38,16 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 **Purpose**: Pull in the upgradeable toolchain. No behavior change.
 
-- [ ] T001 Add the upgradeable dependencies to `package.json`: `@openzeppelin/contracts-upgradeable@^5.4.0`
-  (dependencies — pin to match `@openzeppelin/contracts@5.4.0`; ensure the stray transitive `4.9.3` is
-  overridden/deduped) and `@openzeppelin/hardhat-upgrades@^3` (devDependencies); run `npm install` and commit
-  the lockfile. (plan.md Technical Context / new-dep justification)
-- [ ] T002 [P] Wire the plugin and script: add `require("@openzeppelin/hardhat-upgrades");` to
-  `hardhat.config.js` (compose with the existing floppy-keystore loader and `hardhat-toolbox`) and add
-  `"check:storage-layout": "hardhat run scripts/deploy/check-storage-layout.js"` to `package.json` scripts.
+- [X] T001 Add the upgradeable dependencies to `package.json`: `@openzeppelin/contracts-upgradeable` and
+  `@openzeppelin/hardhat-upgrades`; run `npm install` and commit the lockfile. (plan.md Technical Context /
+  new-dep justification) — **Done**: pinned BOTH `@openzeppelin/contracts` and
+  `@openzeppelin/contracts-upgradeable` to **exactly `5.4.0`** (a loose `^5.4.0` resolved to 5.6.1, which
+  bumped the main contracts package AND dropped `ReentrancyGuardUpgradeable`); added
+  `@openzeppelin/hardhat-upgrades@^3.9.0`.
+- [X] T002 [P] Wire the plugin and script: added `require("@openzeppelin/hardhat-upgrades");` to
+  `hardhat.config.js` (composes with the floppy-keystore loader + `hardhat-toolbox`) and added
+  `"check:storage-layout": "hardhat run scripts/deploy/check-storage-layout.js"` to `package.json`. Baseline
+  `npx hardhat compile` is green (evm target: paris → persistent `ReentrancyGuardUpgradeable` is correct).
 
 **Checkpoint**: `npm run compile` succeeds with the upgradeable toolchain available.
 
@@ -58,15 +61,13 @@ required by all three user stories.
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete. These artifacts MUST stay generic
 (contract name is a parameter) so the membership sibling spec adopts them by inheritance + one registry entry.
 
-- [ ] T003 [P] Write FAILING base tests in `test/upgradeable/UUPSManaged.test.js`: only an `UPGRADER_ROLE`
-  holder can upgrade (non-holder `upgradeToAndCall` reverts; revoke blocks, grant re-enables); calling
-  `initialize` on a bare implementation reverts (`_disableInitializers`); after an upgrade the
-  `_authorizeUpgrade`/`UPGRADER_ROLE` still exist and a further upgrade works (non-brickable).
-  (contracts/uups-managed-base.md; FR-009/011/012)
-- [ ] T004 Implement `contracts/upgradeable/UUPSManaged.sol`: abstract
-  `Initializable + UUPSUpgradeable + AccessControlUpgradeable`; `UPGRADER_ROLE`; `constructor(){ _disableInitializers(); }`;
-  `__UUPSManaged_init(admin)` (grants `DEFAULT_ADMIN_ROLE` + `UPGRADER_ROLE`); `_authorizeUpgrade(address)
-  onlyRole(UPGRADER_ROLE)`; trailing `uint256[50] __gap`. Makes T003 pass. (contracts/uups-managed-base.md)
+- [X] T003 [P] Base tests in `test/upgradeable/UUPSManaged.test.js`: UPGRADER_ROLE-gated upgrade,
+  `_disableInitializers` on a bare impl, re-init rejection, non-brickable upgrade path, append-only
+  state-preserving upgrade. **Done** — 6 passing (uses a `UUPSManagedHarness`/`V2` mock pair).
+- [X] T004 Implement `contracts/upgradeable/UUPSManaged.sol`: abstract
+  `Initializable + UUPSUpgradeable + AccessControlUpgradeable`; `UPGRADER_ROLE`; `constructor(){ _disableInitializers(); }`
+  (annotated `@custom:oz-upgrades-unsafe-allow constructor`); `__UUPSManaged_init(admin)`;
+  `_authorizeUpgrade onlyRole(UPGRADER_ROLE)`; `uint256[50] __gap`. **Done** — makes T003 pass.
 - [ ] T005 [P] Implement the generic storage-layout gate `scripts/deploy/check-storage-layout.js` (OZ
   `validateImplementation` first deploy / `validateUpgrade` thereafter, driven by a small upgradeable-contract
   registry list) and wire it as a **gating** step (no `continue-on-error`) into
@@ -94,9 +95,10 @@ non-upgradeable registry plus correct fund accounting. (spec US1 Independent Tes
 
 ### Tests for User Story 1 (write first, must fail) ⚠️
 
-- [ ] T007 [P] [US1] Add a proxy deploy helper and route the **existing** `test/WagerRegistry.*.test.js`
-  suite through it (deploy via `ERC1967Proxy` + `initialize(...)` instead of the constructor) — this suite is
-  the behavior-neutrality gate and MUST pass unchanged otherwise. (FR-003/SC-003)
+- [X] T007 [P] [US1] Added `test/helpers/proxy.js` (`deployWagerRegistry(initArgs)` — manual impl +
+  `ERC1967Proxy` + `initialize`) and routed all 11 existing WagerRegistry-deploying test files through it
+  (3 unit, 8 integration/oracle). Also fixed the Medusa harness `contracts/test/WagerRegistryFuzzTest.sol`
+  to deploy via `ERC1967Proxy`. **Done.** (FR-003/SC-003)
 - [ ] T008 [P] [US1] Write FAILING deploy/init tests in `test/upgradeable/WagerRegistry.deploy.test.js`:
   the proxy deploys and `initialize` runs exactly once; `_nextWagerId == 1`; a wager created via the proxy
   round-trips through `getWager`; the implementation address is recorded distinctly from the proxy; re-calling
@@ -104,20 +106,18 @@ non-upgradeable registry plus correct fund accounting. (spec US1 Independent Tes
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Convert `contracts/wagers/WagerRegistry.sol`: inherit `UUPSManaged` +
-  `ReentrancyGuardUpgradeable` + `PausableUpgradeable`; remove the constructor; add `initialize(admin,
-  membershipManager_, polymarketAdapter_, initialTokens) external initializer` calling
-  `__UUPSManaged_init(admin)` → `__ReentrancyGuard_init()` → `__Pausable_init()` then the **exact** former
-  constructor body, **moving `_nextWagerId = 1` into `initialize`** (declare `_nextWagerId` without the inline
-  `= 1`); append a trailing `uint256[N] __gap`. No function/event/error/struct/behavior change.
-  (contracts/wager-registry-uups.md; FR-002/003/006)
+- [X] T009 [US1] Converted `contracts/wagers/WagerRegistry.sol`: inherits `UUPSManaged` +
+  `ReentrancyGuardUpgradeable` + `PausableUpgradeable`; constructor → `initialize(...) external initializer`
+  (`__UUPSManaged_init` → `__ReentrancyGuard_init` → `__Pausable_init` then the exact former body);
+  `_nextWagerId` moved to `initialize` (`= 1`); appended `uint256[50] __gap`. No
+  function/event/error/struct/behavior change. **Done** — compiles. (FR-002/003/006)
 - [ ] T010 [US1] Update the `-------- WagerRegistry --------` section of `scripts/deploy/deploy.js` to deploy
   via `deployProxy(hre,{name:"WagerRegistry", initArgs:[admin, membershipManager, polymarketAdapter,
   allowedTokens], deploymentsKey:"wagerRegistry"})`; keep all downstream wiring unchanged.
 - [ ] T011 [US1] Update `scripts/deploy/verify.js` to verify the **implementation** (empty constructor args)
   and record/link the proxy under `wagerRegistry`. (FR-014)
-- [ ] T012 [US1] Run the FULL existing suite (`npm test`) against the proxied registry and confirm **zero
-  regression** across create/accept/cancel/decline/resolve/draw/refund/claim. (FR-003/SC-003)
+- [X] T012 [US1] Ran the FULL existing suite against the proxied registry: **254 passing, 5 pending
+  (pre-existing fork/live-oracle), 0 failing** — zero regression. **Done.** (FR-003/SC-003)
 - [ ] T013 [US1] Define and write the `deployments/<net>-chain<id>-v2.json` schema for the upgradeable
   registry — `wagerRegistry` (proxy), `wagerRegistryImpl`, `wagerRegistryLegacy` — in the deploy tooling, and
   run `npm run sync:frontend-contracts:*` so the frontend resolves the **proxy** as the stable address.

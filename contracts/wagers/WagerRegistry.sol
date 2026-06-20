@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {UUPSManaged} from "../upgradeable/UUPSManaged.sol";
 import "../interfaces/IWagerRegistry.sol";
 import "../interfaces/IMembershipManager.sol";
 import "../interfaces/ISanctionsGuard.sol";
@@ -26,7 +26,7 @@ import "../oracles/IOracleAdapter.sol";
 ///           ACCOUNT_MODERATOR_ROLE   — freeze / unfreeze individual accounts
 ///         A frozen account cannot create, accept, cancel, declare, claim, or refund
 ///         on this contract. See docs/system-overview/account-moderation.md.
-contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausable {
+contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -56,7 +56,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     ///         FR-057). 0 ⇒ legacy/unbound (governed by the launch version). Set only via
     ///         createWagerWithTerms; never re-bound (prospective-only).
     mapping(uint256 => bytes32) public wagerTermsVersionHash;
-    uint256 private _nextWagerId = 1;
+    /// @dev Initialized to 1 in {initialize} (NOT inline — inline initializers run in constructor context
+    ///      and are ignored behind a proxy, which would start wager ids at 0).
+    uint256 private _nextWagerId;
 
     /// @notice Per-wager draw-consent bitmask for participant resolution types
     ///         (Either/Creator/Opponent). bit0 = creator agreed, bit1 = opponent
@@ -73,6 +75,10 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     ///         Populated in `createWager` for both creator and opponent; never removed.
     ///         Enables O(N_user) lookup without log scans (avoids `eth_getLogs` block-range limits).
     mapping(address => EnumerableSet.UintSet) private _userWagerIds;
+
+    /// @dev Trailing storage reserve for append-only upgrades (e.g. feature 024 appends claimAuthority /
+    ///      openWagerIdByClaim here). Never insert or reorder existing state above this gap; only consume it.
+    uint256[50] private __gap;
 
     event MembershipManagerUpdated(address indexed manager);
     event PolymarketAdapterUpdated(address indexed adapter);
@@ -119,12 +125,19 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         _;
     }
 
-    constructor(
+    /// @notice One-time initializer (replaces the constructor for the UUPS proxy). Behavior-identical to the
+    ///         former constructor. Callable exactly once; the implementation's own initializers are disabled
+    ///         by {UUPSManaged} so a bare implementation can never be initialized.
+    function initialize(
         address admin,
         address membershipManager_,
         address polymarketAdapter_,
         address[] memory initialTokens
-    ) {
+    ) external initializer {
+        __UUPSManaged_init(admin); // UUPS + AccessControl; grants DEFAULT_ADMIN_ROLE + UPGRADER_ROLE to admin
+        __ReentrancyGuard_init();
+        __Pausable_init();
+
         if (admin == address(0) || membershipManager_ == address(0)) revert ZeroAddress();
         membershipManager = IMembershipManager(membershipManager_);
         polymarketAdapter = IOracleAdapter(polymarketAdapter_); // may be zero to disable
@@ -134,9 +147,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
             _allowedTokens[t] = true;
             emit TokenAllowed(t, true);
         }
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GUARDIAN_ROLE, admin);
         _grantRole(ACCOUNT_MODERATOR_ROLE, admin);
+        _nextWagerId = 1; // MOVED from the inline initializer (must run behind the proxy)
     }
 
     // ---------- Admin ----------

@@ -6,6 +6,7 @@ import "../access/MembershipManager.sol";
 import "../mocks/MockERC20.sol";
 import "../interfaces/IWagerRegistry.sol";
 import "../interfaces/IMembershipManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title WagerRegistryFuzzTest
 /// @notice Medusa fuzz test contract for WagerRegistry invariants.
@@ -45,10 +46,18 @@ contract WagerRegistryFuzzTest {
         // 2. Deploy MembershipManager
         membership = new MembershipManager(deployer, address(token), TREASURY);
 
-        // 3. Deploy WagerRegistry (no polymarket adapter, single token)
+        // 3. Deploy WagerRegistry (no polymarket adapter, single token).
+        //    Now UUPS-upgradeable: deploy the implementation behind an ERC1967 proxy (the implementation's
+        //    own initializers are disabled by UUPSManaged, so we initialize through the proxy — exactly as
+        //    production does). The fuzzer then targets the proxy.
         address[] memory tokens = new address[](1);
         tokens[0] = address(token);
-        registry = new WagerRegistry(deployer, address(membership), address(0), tokens);
+        WagerRegistry registryImpl = new WagerRegistry();
+        bytes memory initData = abi.encodeCall(
+            WagerRegistry.initialize,
+            (deployer, address(membership), address(0), tokens)
+        );
+        registry = WagerRegistry(address(new ERC1967Proxy(address(registryImpl), initData)));
 
         // 4. Authorize the WagerRegistry to call membership hooks
         membership.setAuthorizedCaller(address(registry), true);
