@@ -34,6 +34,7 @@ import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
 import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
 
@@ -2101,6 +2102,17 @@ function FriendMarketsModal({
 
                   {createdMarket.opponent && (
                     <SaveAddressToast address={createdMarket.opponent} chainId={chainId} />
+                  )}
+
+                  {txProgress.txHash && (
+                    <a
+                      href={getTransactionUrl(chainId, txProgress.txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="fm-tx-link"
+                    >
+                      View Transaction
+                    </a>
                   )}
 
                   <div className="fm-success-actions">
