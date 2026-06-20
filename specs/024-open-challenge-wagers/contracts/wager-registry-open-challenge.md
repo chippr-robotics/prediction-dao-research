@@ -21,7 +21,29 @@ mapping(address => uint256) public openWagerIdByClaim;
 bytes32 constant OPEN_ACCEPT_TYPEHASH = keccak256("OpenAccept(uint256 wagerId,address taker)");
 ```
 
-Implemented via OpenZeppelin `EIP712` + `ECDSA` (the registry inherits `EIP712("FairWins WagerRegistry","1")`).
+Implemented via OpenZeppelin **`EIP712Upgradeable`** + `ECDSA` (the registry is a UUPS proxy after spec 025,
+so the **upgradeable** EIP712 base is required — `EIP712Upgradeable` uses ERC-7201 namespaced storage, adding
+no sequential storage slots).
+
+**Initialization (upgrade-aware — important):** because 024 ships as an *in-place upgrade* of the
+already-initialized WagerRegistry proxy, the one-time `initialize(...)` does **not** run again, so EIP-712
+cannot be set up there for existing deployments. Set the domain via a **`reinitializer(2)`** that the upgrade
+invokes through `upgradeToAndCall`:
+
+```solidity
+function initializeOpenChallengeV2() external reinitializer(2) {
+    __EIP712_init("FairWins WagerRegistry", "1");
+}
+```
+
+Also add `__EIP712_init("FairWins WagerRegistry", "1")` to `initialize(...)` so a **fresh** post-024 deploy
+(new network / local) is fully configured in one call. Fresh deploys run `initialize` (EIP712 at v1) and
+never call the reinitializer; existing proxies run the reinitializer (v2) during the upgrade and never re-run
+`initialize`. No double-init.
+
+**Storage (append-only, spec 025 rule):** declare `claimAuthority` + `openWagerIdByClaim` **before** the
+trailing `uint256[50] private __gap` and **reduce the gap to `uint256[48]`** (two new mapping slots), so every
+subsequent slot position is unchanged and `npm run check:storage-layout` passes `validateUpgrade`.
 
 ## New functions
 
