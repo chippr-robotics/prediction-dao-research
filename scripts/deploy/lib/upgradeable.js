@@ -12,12 +12,13 @@
  * proxy is the stable address the frontend/subgraph consume; the implementation changes on each upgrade.
  */
 
+const { ethers, upgrades } = require("hardhat");
+
 /**
  * Deploy `name` behind a fresh ERC1967 UUPS proxy, initialized with `initArgs`.
  * @returns {Promise<{ proxy: string, implementation: string, contract: import("ethers").Contract }>}
  */
-async function deployProxy(hre, { name, initArgs, kind = "uups" }) {
-  const { ethers, upgrades } = hre;
+async function deployProxy({ name, initArgs, kind = "uups" }) {
   const Factory = await ethers.getContractFactory(name);
   const proxy = await upgrades.deployProxy(Factory, initArgs, { kind });
   await proxy.waitForDeployment();
@@ -34,8 +35,7 @@ async function deployProxy(hre, { name, initArgs, kind = "uups" }) {
  * sent on-chain. The proxy address is unchanged.
  * @returns {Promise<{ proxy: string, implementation: string, contract: import("ethers").Contract }>}
  */
-async function upgradeProxy(hre, { name, proxyAddress, kind = "uups", call } = {}) {
-  const { ethers, upgrades } = hre;
+async function upgradeProxy({ name, proxyAddress, kind = "uups", call } = {}) {
   const Factory = await ethers.getContractFactory(name);
   const opts = { kind };
   if (call) opts.call = call; // optional reinitializer to run during the upgrade, e.g. { fn, args }
@@ -48,8 +48,8 @@ async function upgradeProxy(hre, { name, proxyAddress, kind = "uups", call } = {
 }
 
 /** Read the current implementation address behind a proxy (for verification / deployments records). */
-async function getImplementation(hre, proxyAddress) {
-  return hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
+async function getImplementation(proxyAddress) {
+  return upgrades.erc1967.getImplementationAddress(proxyAddress);
 }
 
 module.exports = { deployProxy, upgradeProxy, getImplementation };

@@ -111,14 +111,14 @@ non-upgradeable registry plus correct fund accounting. (spec US1 Independent Tes
   (`__UUPSManaged_init` → `__ReentrancyGuard_init` → `__Pausable_init` then the exact former body);
   `_nextWagerId` moved to `initialize` (`= 1`); appended `uint256[50] __gap`. No
   function/event/error/struct/behavior change. **Done** — compiles. (FR-002/003/006)
-- [ ] T010 [US1] Update the `-------- WagerRegistry --------` section of `scripts/deploy/deploy.js` to deploy
+- [X] T010 [US1] Updated the `-------- WagerRegistry --------` section of `scripts/deploy/deploy.js` to deploy
   via `deployProxy(hre,{name:"WagerRegistry", initArgs:[admin, membershipManager, polymarketAdapter,
   allowedTokens], deploymentsKey:"wagerRegistry"})`; keep all downstream wiring unchanged.
-- [ ] T011 [US1] Update `scripts/deploy/verify.js` to verify the **implementation** (empty constructor args)
+- [X] T011 [US1] Updated `scripts/deploy/verify.js` to verify the **implementation** (empty constructor args)
   and record/link the proxy under `wagerRegistry`. (FR-014)
 - [X] T012 [US1] Ran the FULL existing suite against the proxied registry: **254 passing, 5 pending
   (pre-existing fork/live-oracle), 0 failing** — zero regression. **Done.** (FR-003/SC-003)
-- [ ] T013 [US1] Define and write the `deployments/<net>-chain<id>-v2.json` schema for the upgradeable
+- [X] T013 [US1] Defined the `deployments/<net>-chain<id>-v2.json` schema for the upgradeable
   registry — `wagerRegistry` (proxy), `wagerRegistryImpl`, `wagerRegistryLegacy` — in the deploy tooling, and
   run `npm run sync:frontend-contracts:*` so the frontend resolves the **proxy** as the stable address.
   (FR-014/FR-015; data-model.md "deployments record")

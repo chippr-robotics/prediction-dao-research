@@ -51,6 +51,8 @@ const {
   getDeploymentFilename,
 } = require("./lib/helpers");
 
+const { deployProxy } = require("./lib/upgradeable");
+
 const USDC_DECIMALS = 6;
 
 // Convert a tier config's price (authored in 18-decimal ethers) to the payment
@@ -278,22 +280,27 @@ async function main() {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
   }
 
-  // -------- WagerRegistry --------
-  // Salt suffix bumped (`-userindex`) when the per-user EnumerableSet index was added
-  // to force a fresh deterministic address; old wagers stay on the prior registry.
-  // v3 / Draw resolution (Spec Kit 004): the Draw outcome (Status.Draw +
-  // declareDraw/revokeDraw + Polymarket tie auto-draw) changes the bytecode, so
-  // CREATE2 already yields a new address. When cutting v3 over, bump this suffix
-  // to `WagerRegistry-userindex-draw` for an explicit fresh address and record
-  // the result as deployments/<network>-chain<id>-v3.json. The Polymarket adapter
-  // is REUSED as-is (no adapter redeploy / no setPolymarketAdapter change).
-  const regDeploy = await deployDeterministic(
-    "WagerRegistry",
-    [deployer.address, mgrDeploy.address, adapterAddress, stakeTokens],
-    generateSalt(SALT_PREFIXES.V2 + "WagerRegistry-userindex"),
-    deployer
-  );
-  deployments.wagerRegistry = regDeploy.address;
+  // -------- WagerRegistry (UUPS proxy — spec 025) --------
+  // The registry is now upgradeable: deployed behind an ERC1967 UUPS proxy so future logic ships as an
+  // in-place upgrade (stable address, preserved state) instead of a fresh address that strands wagers.
+  // The PROXY address is the stable one recorded under `wagerRegistry`; the implementation is recorded
+  // under `wagerRegistryImpl` (changes on each upgrade). Storage-layout safety is validated by the plugin
+  // here and by `npm run check:storage-layout` in CI. NOTE: unlike the prior CREATE2 deploy this is NOT
+  // idempotent — re-running mints a new proxy; to change logic on an existing deployment, run an upgrade
+  // (scripts/deploy/lib/upgradeable.js `upgradeProxy`), not this script.
+  console.log("\nDeploying WagerRegistry behind a UUPS proxy...");
+  const regProxy = await deployProxy({
+    name: "WagerRegistry",
+    initArgs: [deployer.address, mgrDeploy.address, adapterAddress, stakeTokens],
+  });
+  const regDeploy = { address: regProxy.proxy, contract: regProxy.contract, alreadyDeployed: false };
+  deployments.wagerRegistry = regProxy.proxy;
+  deployments.wagerRegistryImpl = regProxy.implementation;
+
+  // The hardhat-upgrades plugin sends the impl+proxy txs via the raw signer, bypassing our client-side
+  // NonceManager — so reset its cached nonce to re-sync with the chain before the next tx (else: "Nonce too
+  // low"). reset() is an ethers v6 NonceManager method; guard for older shapes.
+  if (typeof deployer.reset === "function") deployer.reset();
 
   if (!regDeploy.alreadyDeployed) {
     console.log("\nAuthorizing WagerRegistry on MembershipManager...");
@@ -462,7 +469,9 @@ async function main() {
   // in the SAME process as the deploy, so they equal the deploy-time values.
   const constructorArgs = {
     membershipManager: [deployer.address, usdc, treasury],
-    wagerRegistry: [deployer.address, mgrDeploy.address, adapterAddress, stakeTokens],
+    // UUPS proxy: the implementation is verified with EMPTY constructor args (init data lives in the proxy,
+    // not the implementation's constructor). verify.js verifies the implementation address below.
+    wagerRegistryImpl: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
   };
@@ -488,7 +497,8 @@ async function main() {
       // frontend capability tag does not falsely report it as deployed.
       ...(flags.noPolymarket ? {} : { polymarketAdapter: adapterAddress }),
       membershipManager: mgrDeploy.address,
-      wagerRegistry: regDeploy.address,
+      wagerRegistry: regDeploy.address, // ERC1967 proxy (stable address)
+      wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
       keyRegistry: keyDeploy.address,
       sanctionsGuard: guardDeploy.address,
       ...oracleDeployments,
