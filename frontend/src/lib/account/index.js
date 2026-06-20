@@ -3,6 +3,7 @@ export { computeSummary } from './computeSummary'
 export { computePnlSeries, RANGES, DEFAULT_RANGE, BUCKET_THRESHOLD } from './computePnlSeries'
 export { computeBreakdowns, oracleLabel, ORACLE_LABELS } from './breakdowns'
 export { enrichTransfers } from './enrichTransfers'
+export { deriveTransfersFromWagers } from './deriveTransfers'
 export {
   ACTIVE_STATUSES,
   classifyOutcome,

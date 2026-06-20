@@ -54,7 +54,7 @@ function ActivityBreakdowns({ breakdowns }) {
         </ul>
       </Group>
 
-      <Group title="By oracle">
+      <Group title="By resolution">
         <ul className="account-breakdown-list">
           {b.byOracle.map((o) => (
             <li key={o.resolutionType}>
