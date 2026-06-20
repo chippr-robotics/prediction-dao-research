@@ -39,6 +39,7 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 ### Session 2026-06-20 (round 2)
 
 - Q: Does a voucher bind to a role, or just a tier? → A: **Each voucher binds an explicit `(role, tier)` pair** and redemption grants that role+tier. This mirrors the role-generic `MembershipManager` so future paid roles need no token redesign; the only paid role today is `WAGER_PARTICIPANT_ROLE`.
+- Q: When are voucher mint proceeds recognized as treasury revenue? → A: **At mint.** Proceeds accrue and are withdrawable immediately, identical to a direct purchase; no escrow is held until redemption. Granting a membership at redemption has zero marginal on-chain cost, so no escrow/solvency reserve is required.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -132,7 +133,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **FR-001**: The system MUST let anyone mint a voucher for any active `(role, tier)` by paying that tier's configured USDC price, issuing a transferable token that records the `(role, tier)` pair it was minted for. (The only paid role today is the wager-participant role; the design is role-generic.)
 - **FR-002**: A voucher MUST confer **no** membership standing, usage allowance, or started clock while held — inspecting the holder's membership MUST show no membership attributable to the voucher.
 - **FR-003**: A voucher MUST be freely transferable and resellable on standard secondary markets, with transfers creating no membership and requiring no platform involvement.
-- **FR-004**: USDC paid to mint a voucher MUST accrue to the platform/treasury on the same basis as a direct membership purchase (no cheaper rail, no arbitrage between rails).
+- **FR-004**: USDC paid to mint a voucher MUST accrue to the platform/treasury on the same basis as a direct membership purchase (no cheaper rail, no arbitrage between rails), recognized **at mint** (immediately withdrawable, no escrow held until redemption).
 - **FR-005**: Vouchers MUST NOT expire; an unredeemed voucher remains valid indefinitely until redeemed or destroyed by its owner.
 - **FR-005a**: The system MUST NOT offer a primary refund of mint proceeds; a holder recovers value only by reselling on the secondary market or by redeeming. No refund or treasury-clawback path is provided.
 
