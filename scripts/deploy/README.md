@@ -107,6 +107,33 @@ Each script saves a JSON file to `deployments/`:
 - `<network>-chain<chainId>-markets-deployment.json`
 - `<network>-chain<chainId>-registries-deployment.json`
 
+## Upgradeable WagerRegistry (UUPS proxy)
+
+`WagerRegistry` deploys as a **UUPS proxy** (via `scripts/deploy/lib/upgradeable.js`).
+The deployment artifact records two addresses: `wagerRegistry` (the stable
+**proxy** address that the frontend and subgraph consume) and
+`wagerRegistryImpl` (the current logic implementation, which changes on every
+upgrade). If a prior non-upgradeable registry coexists, it is recorded as
+`wagerRegistryLegacy` (settle-only).
+
+**Pre-flight gate.** Before deploying or upgrading, run:
+
+```bash
+npm run check:storage-layout
+```
+
+Storage is append-only; this check validates the layout against the recorded
+baseline and **gates CI**, so an incompatible layout fails before anything
+reaches a network.
+
+**Ship logic changes as in-place upgrades, not redeploys.** Re-running
+`deploy.js` mints a **new** proxy at a new address — it is **not** idempotent
+for the proxy, so a fresh deploy would strand existing wagers behind the old
+address. To change `WagerRegistry` logic on a live network, perform an upgrade
+(authorised by `UPGRADER_ROLE`, signed with the floppy keystore) following the
+[Contract upgrades runbook](../../docs/runbooks/contract-upgrades.md). The proxy
+address and all escrowed state are preserved; only `wagerRegistryImpl` changes.
+
 ## Shared Library
 
 ### lib/constants.js

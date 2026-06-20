@@ -36,6 +36,11 @@ jobs:
       - name: Compile contracts
         run: npm run compile
 
+      # Gate (spec 025, FR-010/SC-005): block a storage-incompatible / upgrade-unsafe implementation BEFORE
+      # it can ship. Must fail the pipeline loudly — do NOT add continue-on-error (Constitution IV).
+      - name: Check upgradeable storage layout
+        run: npm run check:storage-layout
+
       - name: Run tests
         run: npm test 2>&1 | tee test-output.txt
 
