@@ -34,6 +34,7 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 - Q: What tier does a voucher grant if tier configuration changes between mint and redemption? → A: **The tier the voucher was minted for**, unconditionally. The voucher records its tier at mint and is a bearer claim on *that* tier, independent of later price/limit/active-state changes to tier configuration.
 - Q: How is resale royalty handled? → A: **Best-effort EIP-2981 metadata hint only** — a flat, capped royalty advertised to marketplaces and routed to the treasury. No enforced-royalty, allowlisted-operator, or platform-run marketplace mechanism, so open-marketplace composability and trading privacy are preserved.
 - Q: What flat resale royalty rate and hard ceiling? → A: **2.5% advertised rate, with a 5% hard ceiling** enforced by the contract — an admin may configure the rate up to but never above 5%. The conservative rate keeps the utility (not appreciating-asset) framing defensible.
+- Q: Can a minter get a primary refund before redeeming? → A: **No primary refund.** A minted voucher's value is recovered only by reselling it on the secondary market or by redeeming it. This matches the existing direct-purchase rail (no refund) and avoids any refund/treasury-clawback accounting.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -113,6 +114,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **Voucher held indefinitely**: vouchers do not expire; an old voucher redeems to a full-duration membership starting at redemption.
 - **Double-redeem / redeem-after-burn**: a burned voucher cannot be redeemed again; redemption is single-use and atomic with the burn.
 - **Royalty ignored by a marketplace**: acceptable and expected — the royalty is a best-effort hint; the platform earns reliably only on the primary mint.
+- **Minter's remorse / no primary refund**: a minter who changes their mind has no refund path; they recover value by reselling the voucher or by redeeming it. A holder may voluntarily destroy (burn) their own voucher, forfeiting its value.
 - **Direct-purchase rail unaffected**: existing direct USDC purchases, upgrades, extensions, grants, and revokes behave exactly as today; the voucher rail is additive.
 - **Gifting to a wallet with no key registered / no Terms history**: the recipient completes screening and Terms acceptance at redemption, so a gift recipient with no prior platform history can still redeem.
 - **Membership downstream behavior**: a redeemed membership participates in wager creation/acceptance, usage limits, expiry, and revocation identically to a directly purchased one; `WagerRegistry` requires no awareness of how the membership was acquired.
@@ -128,6 +130,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **FR-003**: A voucher MUST be freely transferable and resellable on standard secondary markets, with transfers creating no membership and requiring no platform involvement.
 - **FR-004**: USDC paid to mint a voucher MUST accrue to the platform/treasury on the same basis as a direct membership purchase (no cheaper rail, no arbitrage between rails).
 - **FR-005**: Vouchers MUST NOT expire; an unredeemed voucher remains valid indefinitely until redeemed or destroyed by its owner.
+- **FR-005a**: The system MUST NOT offer a primary refund of mint proceeds; a holder recovers value only by reselling on the secondary market or by redeeming. No refund or treasury-clawback path is provided.
 
 #### Redemption (membership grant)
 
