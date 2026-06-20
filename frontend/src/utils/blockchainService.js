@@ -1103,9 +1103,17 @@ const PAYMENT_PROCESSOR_ABI = [
  * @param {string} action - 'purchase' (default), 'upgrade', or 'extend'
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase', termsHash = null) {
+export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase', termsHash = null, onProgress = null) {
   if (!signer) {
     throw new Error('Wallet not connected')
+  }
+
+  // Spec 022: best-effort progress emission so the purchase modal can surface the
+  // approve/pay sub-steps. MUST NOT change control flow or on-chain calls — a
+  // throwing callback is swallowed.
+  const emit = (step, phase, extra = {}) => {
+    if (typeof onProgress !== 'function') return
+    try { onProgress({ step, phase, ...extra }) } catch (e) { /* non-fatal */ void e }
   }
 
   // Resolve the MembershipManager for the wallet's CURRENT chain, not the
@@ -1165,8 +1173,13 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
 
       const allowance = await paymentToken.allowance(userAddress, mmAddress)
       if (allowance < price) {
+        emit('approve', 'start')
         const approveTx = await paymentToken.approve(mmAddress, price)
+        emit('approve', 'sent', { txHash: approveTx.hash })
         await approveTx.wait()
+        emit('approve', 'confirmed', { txHash: approveTx.hash })
+      } else {
+        emit('approve', 'skipped')
       }
 
       // Spec 007 (FR-039): when an accepted T&C version hash is supplied, use the
@@ -1177,6 +1190,7 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         : null
       const hasTerms = normTerms !== null && /^0x[0-9a-fA-F]{64}$/.test(normTerms)
       let tx
+      emit('pay', 'start')
       if (action === 'upgrade') {
         tx = hasTerms
           ? await mm.upgradeTierWithTerms(roleHash, validTier, normTerms)
@@ -1188,7 +1202,9 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
           ? await mm.purchaseTierWithTerms(roleHash, validTier, normTerms)
           : await mm.purchaseTier(roleHash, validTier)
       }
+      emit('pay', 'sent', { txHash: tx.hash })
       const receipt = await tx.wait()
+      emit('pay', 'confirmed', { txHash: receipt.hash })
       return {
         hash: receipt.hash,
         blockNumber: receipt.blockNumber,
@@ -1264,6 +1280,7 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     const allowance = BigInt(allowanceRaw.toString())
 
     if (allowance < amount) {
+      emit('approve', 'start')
       console.log('Approving the stablecoin for PaymentProcessor...', {
         spender: paymentProcessorAddress,
         amount: amountWei.toString(),
@@ -1286,8 +1303,10 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         const approveTx = await stableContract.approve(paymentProcessorAddress, amountWei, {
           gasLimit: gasLimit
         })
+        emit('approve', 'sent', { txHash: approveTx.hash })
         console.log('Approve transaction sent:', approveTx.hash)
         await approveTx.wait()
+        emit('approve', 'confirmed', { txHash: approveTx.hash })
         console.log('Stablecoin approved successfully')
       } catch (approveError) {
         console.error('Approve failed:', approveError)
@@ -1302,6 +1321,7 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         throw new Error(`Failed to approve the stablecoin. Please ensure you have enough native token for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
       }
     } else {
+      emit('approve', 'skipped')
       console.log('Stablecoin already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
@@ -1319,13 +1339,16 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
       amount: amountWei.toString()
     })
 
+    emit('pay', 'start')
     const purchaseTx = await paymentProcessor.purchaseTierWithToken(
       roleHash,
       validTier,
       stableAddress,
       amountWei
     )
+    emit('pay', 'sent', { txHash: purchaseTx.hash })
     const receipt = await purchaseTx.wait()
+    emit('pay', 'confirmed', { txHash: receipt.hash })
 
     console.log('Role purchased successfully:', receipt)
 
@@ -1353,6 +1376,67 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     } else {
       throw new Error(error.message || 'Transaction failed')
     }
+  }
+}
+
+/**
+ * Spec 022: read-only pre-flight to decide whether the membership purchase will
+ * require a separate ERC-20 approval prompt. Lets the progress indicator build the
+ * exact step list up front and OMIT the approval step entirely when the member
+ * already has sufficient allowance (FR-009). No wallet prompt is issued.
+ *
+ * Mirrors the contract/price resolution used by `purchaseRoleWithStablecoin`.
+ * On any error it conservatively returns `true` (assume approval needed) so the
+ * indicator never hides a prompt that does appear.
+ *
+ * @returns {Promise<boolean>} true if an approval transaction will be requested
+ */
+export async function checkApprovalNeeded(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase') {
+  if (!signer) return true
+  try {
+    let walletChainId = null
+    try {
+      walletChainId = Number((await signer.provider.getNetwork()).chainId)
+    } catch { /* fall back to build-time chain */ }
+
+    const mmAddress = getContractAddressForChain('membershipManager', walletChainId)
+    if (mmAddress) {
+      const code = await signer.provider.getCode(mmAddress)
+      if (!code || code === '0x') return true
+      const roleHash = getRoleHash(roleName)
+      if (!roleHash) return true
+      const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, signer)
+      const paymentTokenAddr = await mm.paymentToken()
+      if (!paymentTokenAddr || paymentTokenAddr === ethers.ZeroAddress) return true
+      const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, signer)
+      const userAddress = await signer.getAddress()
+
+      let price
+      if (action === 'upgrade') {
+        const membership = await mm.getMembership(userAddress, roleHash)
+        const currentCfg = await mm.getTierConfig(roleHash, membership.tier)
+        const newCfg = await mm.getTierConfig(roleHash, validTier)
+        price = newCfg.priceUSDC - currentCfg.priceUSDC
+      } else {
+        const tierCfg = await mm.getTierConfig(roleHash, validTier)
+        price = tierCfg.priceUSDC
+      }
+      const allowance = await paymentToken.allowance(userAddress, mmAddress)
+      return allowance < price
+    }
+
+    // Legacy PaymentProcessor path
+    const paymentProcessorAddress = getContractAddress('paymentProcessor')
+    if (!paymentProcessorAddress) return true
+    const stableContract = new ethers.Contract(DEX_ADDRESSES.STABLECOIN, ERC20_ABI, signer)
+    const userAddress = await signer.getAddress()
+    const amountWei = ethers.parseUnits(String(priceUSD), 6)
+    const allowance = await stableContract.allowance(userAddress, paymentProcessorAddress)
+    return BigInt(allowance.toString()) < BigInt(amountWei.toString())
+  } catch (e) {
+    console.warn('[checkApprovalNeeded] pre-flight failed, assuming approval needed:', e?.message)
+    return true
   }
 }
 

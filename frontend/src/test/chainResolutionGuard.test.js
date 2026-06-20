@@ -37,7 +37,10 @@ const ALLOW = {
   // resolver fallbacks (hasRoleOnChain / getUserTierOnChain / fetchFriendMarketsForUser),
   // the generic getContract() helper, and legacy v1 reads (tierRegistry /
   // roleManager / paymentProcessor / registerZKKey) not deployed on v2.
-  'utils/blockchainService.js': { addr: 11, prov: 2 },
+  // +1 (spec 022): checkApprovalNeeded's legacy-path paymentProcessor pre-flight,
+  // mirroring purchaseRoleWithStablecoin's own legacy fallback (MM path is
+  // chain-aware via getContractAddressForChain).
+  'utils/blockchainService.js': { addr: 12, prov: 2 },
   // catch-branch fallbacks in getKeyRegistryContract + registerEncryptionKey
   'utils/keyRegistryService.js': { addr: 4, prov: 0 },
   // catch-branch fallback in screenAddress

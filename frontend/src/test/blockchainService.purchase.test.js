@@ -57,6 +57,38 @@ describe('purchaseRoleWithStablecoin — chain-aware contract resolution', () =>
   })
 })
 
+describe('purchaseRoleWithStablecoin — onProgress callback (spec 022)', () => {
+  beforeEach(() => resolverMock.mockReset())
+
+  // The approve/pay event SEQUENCE is exercised end-to-end via usePurchaseFlow,
+  // which drives a mocked purchaseRoleWithStablecoin. Here we guard the additive
+  // 7th `onProgress` parameter: it must not change the existing control flow, and a
+  // throwing callback must never abort the purchase.
+
+  it('accepts an onProgress arg without altering the no-contract error path (regression)', async () => {
+    resolverMock.mockReturnValue(POLYGON_MM)
+    const signer = makeSigner({ chainId: 80002, code: '0x' })
+    const onProgress = vi.fn()
+
+    await expect(
+      purchaseRoleWithStablecoin(signer, 'WAGER_PARTICIPANT', 2, 1, 'purchase', null, onProgress)
+    ).rejects.toThrow(/switch your wallet to Polygon/i)
+  })
+
+  it('behaves identically whether or not onProgress is provided', async () => {
+    resolverMock.mockReturnValue(POLYGON_MM)
+    const signer = makeSigner({ chainId: 80002, code: '0x' })
+
+    const withCb = purchaseRoleWithStablecoin(signer, 'WAGER_PARTICIPANT', 2, 1, 'purchase', null, () => { throw new Error('cb boom') })
+    const without = purchaseRoleWithStablecoin(signer, 'WAGER_PARTICIPANT', 2, 1, 'purchase', null)
+
+    // A throwing callback does not surface as the rejection reason; both paths
+    // reject with the same actionable contract error.
+    await expect(withCb).rejects.toThrow(/switch your wallet to Polygon/i)
+    await expect(without).rejects.toThrow(/switch your wallet to Polygon/i)
+  })
+})
+
 describe('getUserTierOnChain — chain-aware tier read', () => {
   beforeEach(() => resolverMock.mockReset())
   // The test env sets VITE_SKIP_BLOCKCHAIN_CALLS=true (vite.config.js) which
