@@ -53,6 +53,10 @@ const ALLOW = {
   'hooks/useNullifierContracts.js': { addr: 1, prov: 0 },
   // legacy: v1 friendGroupMarketFactory event source (not deployed on v2)
   'data/wagers/EventsSource.js': { addr: 1, prov: 5 },
+  // open-challenge hooks (spec 024): chain-aware via getContractAddressForChain(name, chainId|execChainId),
+  // each with a getContractAddress fallback for the disconnected-wallet case (same pattern as blockchainService).
+  'hooks/useOpenChallengeAccept.js': { addr: 2, prov: 0 },
+  'hooks/useOpenChallengeCreate.js': { addr: 1, prov: 0 },
 }
 
 function walk(dir) {
