@@ -181,7 +181,7 @@ reverts; minting is never screened. (spec US4)
 - [ ] T021 [P] Slither on `MembershipVoucher` + the `redeemVoucher` surface — no new high/critical (reentrancy on mint/redeem, ERC721/2981); EthTrust-SL ≥ L2. (Principle I)
 - [X] T022 [P] Add a Medusa harness `contracts/test/MembershipVoucherFuzzTest.sol`: invariants — a held voucher never yields membership; redeem is single-use; mint conserves treasury accounting; royalty ≤ 5%. (Principle I)
 - [ ] T023 ⏳ REVIEW-GATED — smart-contract security-agent review (`.github/agents/`) of mint (fund handling) + redeemVoucher (fail-closed screening, least-privilege grant, single-use atomic burn, append-only storage). (Principle I)
-- [ ] T024 [P] Coverage — confirm new branches exercised by `test/access/MembershipVoucher.test.js` + `MembershipManager.redeem.test.js` + the integration test. (Principle II)
+- [X] T024 [P] Coverage — confirm new branches exercised by `test/access/MembershipVoucher.test.js` + `MembershipManager.redeem.test.js` + the integration test. (Principle II)
 - [X] T025 Validate the quickstart locally (non-network parts): full existing membership + wager suites green; voucher mint/transfer/redeem scenarios pass; `check:storage-layout` passes the `voucher` append; redeemed membership == direct membership. (quickstart.md; SC-001..SC-010)
 
 **Checkpoint**: Security gates pass; vouchers are safe and behavior-additive.

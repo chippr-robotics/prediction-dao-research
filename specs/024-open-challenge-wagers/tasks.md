@@ -148,7 +148,7 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   `DeclineNotAllowedForOpenChallenge` (for any caller, including a random address and the creator); a
   non-creator calling `cancelOpen` reverts `NotCreator`; only the creator can withdraw an unaccepted open
   challenge and its funds are never released to anyone else. (FR-023/FR-021)
-- [ ] T015 [P] [US1] Write FAILING integration test in
+- [X] T015 [P] [US1] Write FAILING integration test in
   `test/integration/fairwins/openChallengeLifecycle.test.js`: end-to-end create → discover via
   `openWagerIdForClaim` → accept with a code-derived signature → resolve → winner `claimPayout` gets the
   full pot, mirroring an equivalent named-opponent run. (quickstart §1 "Lifecycle", SC-009)
@@ -210,14 +210,14 @@ claim slot is freed, and a configured resolution path pays the winner the full p
   create returns a shareable code and calls `createOpenWager` with the derived `claimAddress` + single
   stake; take resolves a wager by code, decrypts terms, and submits a `(wagerId, taker)`-bound signature.
   (SC-001/SC-002)
-- [ ] T025a [P] [US1] Write a post-accept readability test in `frontend/src/test/claimCode/` asserting the
+- [X] T025a [P] [US1] Write a post-accept readability test in `frontend/src/test/claimCode/` asserting the
   bound opponent re-derives `symKey` from the code and `decryptEnvelopeCode`s the terms **after** accepting
   (no re-key step, no registered encryption key required), and that discarding the code yields the "terms
   unavailable" state without affecting funds or resolution. (FR-018/FR-018a)
 - [X] T026 [P] [US1] Add `handleOpenWagerCreated` to `subgraph/src/mappings/wagerRegistry.ts` (writes a
   `Wager` with `opponent = null`, `status = "open"`) and register the `OpenWagerCreated` event in
   `subgraph/subgraph.yaml`. (research.md R5, FR-007 discovery indexing)
-- [ ] T027 [P] [US1] Add a matchstick test under `subgraph/tests/` asserting `handleOpenWagerCreated`
+- [X] T027 [P] [US1] Add a matchstick test under `subgraph/tests/` asserting `handleOpenWagerCreated`
   indexes `opponent = null` / `status = "open"` and that the existing `handleWagerAccepted` backfills
   `opponent` on accept (run via the Docker matchstick flow). (quickstart §4)
 
@@ -256,7 +256,7 @@ cannot be reused by an observer, and a four-word brute force is impractical with
   (equal stakes are enforced by the single-`stake` param — assert `creatorStake == opponentStake`); a
   **Bronze or non-member (None)** creator → `InsufficientMembershipTier`, while **Silver / Gold / Platinum**
   creators succeed — the Silver+ creation privilege (FR-005a). (FR-005a/006a/016a/016b)
-- [ ] T031 [P] [US2] Write FAILING frontend defensive tests in `frontend/src/test/claimCode/`: an unknown
+- [X] T031 [P] [US2] Write FAILING frontend defensive tests in `frontend/src/test/claimCode/`: an unknown
   code yields "no challenge for that code" and never reveals a wager; a tampered envelope shows "terms
   unavailable"/error rather than partial terms; `signOpenAccept` for taker A cannot be replayed by taker B
   (JS-side `recover` mismatch). (FR-008/009/019, SC-003)
@@ -318,7 +318,7 @@ the others revert, and the terms were readable to every code-holder. (spec US3 I
   `frontend/src/components/fairwins/FriendMarketsModal.jsx` (share-the-code openly / "anyone with the code
   can take" copy) and ensure the take flow handles a lost race gracefully ("already accepted" rather than a
   raw revert) in `frontend/src/components/fairwins/TakeChallengeModal.jsx`. (US3, FR-012/025)
-- [ ] T039 [P] [US3] Add a frontend test in `frontend/src/test/claimCode/` asserting the public-mode
+- [X] T039 [P] [US3] Add a frontend test in `frontend/src/test/claimCode/` asserting the public-mode
   messaging renders and that a `NotOpenChallenge`/already-accepted result surfaces as a clean "already
   taken" state, not an unhandled error. (SC-005)
 
@@ -331,10 +331,10 @@ the others revert, and the terms were readable to every code-holder. (spec US3 I
 **Purpose**: Whole-feature hardening, regression, and the security gates the constitution requires before
 this funds-bearing change can ship.
 
-- [ ] T040 [P] Extend `contracts/test/WagerRegistryFuzzTest.sol` (Medusa) with open-path invariants: escrow
+- [X] T040 [P] Extend `contracts/test/WagerRegistryFuzzTest.sol` (Medusa) with open-path invariants: escrow
   conservation across create/accept/refund, single-binding (≤ one opponent), claim-slot release on
   leaving `Open`, and "no accept without a matching claim signature." (plan.md Testing, quickstart §2)
-- [ ] T040a [P] Add a fork test under `test/fork/` exercising one oracle-resolved (Polymarket/Chainlink/UMA)
+- [X] T040a [P] Add a fork test under `test/fork/` exercising one oracle-resolved (Polymarket/Chainlink/UMA)
   open-challenge lifecycle (create → accept → oracle auto-resolve → claim), OR document in
   `specs/024-open-challenge-wagers/research.md` that existing oracle fork coverage applies unchanged because
   post-accept behavior is identical to a named-opponent wager (FR-016). (Constitution II — fork tests where
@@ -344,9 +344,9 @@ this funds-bearing change can ship.
 - [ ] T042 [P] Run `npm run slither` and confirm no new high/critical findings on the changed paths;
   document EthTrust-SL ≥ L2 reasoning + the v1 residual-brute-force acceptance (FR-003a) in
   `specs/024-open-challenge-wagers/research.md` "EthTrust" section if not already captured. (Principle I)
-- [ ] T043 [P] Run `npm run test:coverage` and confirm the open create/accept/lifecycle branches are
+- [X] T043 [P] Run `npm run test:coverage` and confirm the open create/accept/lifecycle branches are
   covered; close any gap with targeted cases in `test/WagerRegistry.openChallenge.test.js`. (Principle II)
-- [ ] T044 [P] Run the a11y check on the new/edited modals
+- [X] T044 [P] Run the a11y check on the new/edited modals
   (`FriendMarketsModal.jsx`, `TakeChallengeModal.jsx`): labeled code input, clear error states, non-color-only
   residual-risk notice (WCAG 2.1 AA). (Principle V, FR-003a)
 - [ ] T045 Request the smart-contract security-agent review (`.github/agents/`) of the
