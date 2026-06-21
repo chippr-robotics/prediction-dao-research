@@ -13,7 +13,9 @@ import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
+import OpenChallengeDecryptModal from './OpenChallengeDecryptModal'
 import WagerList from './WagerList'
+import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
 import './MyMarketsModal.css'
@@ -52,7 +54,12 @@ function MyMarketsModal({
   const { dismissedIds, dismissMarket, dismissMarkets, refresh: refreshFriendMarkets } = useFriendMarkets()
 
   const { markets: marketsWithEnvelopes, fetchEnvelope } = useLazyIpfsEnvelope(friendMarkets)
-  const { markets: decryptableMarkets, decryptMarket, isMarketDecrypting } = useLazyMarketDecryption(marketsWithEnvelopes)
+  const { markets: decryptableMarkets, decryptMarket, setDecryptedMetadata, isMarketDecrypting } = useLazyMarketDecryption(marketsWithEnvelopes)
+
+  // Open-challenge code-decrypt prompt (feature 024). Code-keyed terms can't be
+  // read with the wallet-key path, so a click on a code-keyed wager routes here
+  // to collect the four-word code. Holds the target market id + its envelope.
+  const [codeDecrypt, setCodeDecrypt] = useState(null)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
@@ -126,6 +133,13 @@ function MyMarketsModal({
       // envelope over directly lets a single click run fetch → decrypt in one
       // pass instead of the old fetch-then-(re-click)-to-decrypt flow.
       const envelope = await fetchEnvelope(marketId)
+      // Open challenges (feature 024) seal their terms under the four-word code, not a
+      // recipient key — the wallet-key path can't read them. Route those to the code
+      // prompt instead; everything else decrypts with the connected wallet as before.
+      if (isCodeEnvelope(envelope)) {
+        setCodeDecrypt({ marketId, envelope })
+        return
+      }
       await decryptMarket(marketId, envelope)
     } catch (err) {
       console.error('[MyMarketsModal] Decryption failed:', err)
@@ -1224,6 +1238,16 @@ function MyMarketsModal({
           onAccepted={handleMarketAccepted}
           contractAddress={getContractAddressForChain('wagerRegistry', chainId)}
           contractABI={WAGER_REGISTRY_ABI}
+        />
+      )}
+
+      {/* Open-challenge code-decrypt prompt (feature 024) */}
+      {codeDecrypt && (
+        <OpenChallengeDecryptModal
+          isOpen
+          envelope={codeDecrypt.envelope}
+          onClose={() => setCodeDecrypt(null)}
+          onDecrypted={(metadata) => setDecryptedMetadata(codeDecrypt.marketId, metadata)}
         />
       )}
 
