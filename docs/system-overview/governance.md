@@ -1,6 +1,10 @@
 # Governance
 
-Governance structure and progressive decentralization roadmap for FairWins.
+How FairWins is operated today, and the direction of travel toward reducing
+that operator authority over time. FairWins is a peer-to-peer wager protocol —
+there is **no on-chain token governance, no DAO, and no proposal/voting
+process**. "Governance" here means the small set of bounded operator roles and
+how they are custodied.
 
 ## On-chain operator roles
 
@@ -17,6 +21,10 @@ authority. For the full privilege matrix see
 | `ROLE_MANAGER_ROLE` | Grant / revoke `WAGER_PARTICIPANT` memberships outside the purchase flow | Ops multisig |
 | `UPGRADER_ROLE` | Authorize UUPS implementation upgrades on `WagerRegistry` / `MembershipManager` (logic swaps at stable addresses; state preserved) | Air-gapped floppy-keystore admin |
 
+**No role can move escrowed stakes or redirect a payout.** Escrow is held by
+`WagerRegistry` and only ever flows to a wager's own participants via the
+resolution and refund paths.
+
 ### The right to pause
 
 `GUARDIAN_ROLE` holders can pause `WagerRegistry`, halting wager creation and
@@ -32,249 +40,61 @@ refund wagers until unfrozen. Every freeze emits `AccountFrozen(user,
 moderator, reason)`; every unfreeze emits `AccountUnfrozen(user, moderator)`.
 The full disclosure is in [Account Moderation Policy](account-moderation.md).
 
-## Current Governance Structure
-
-### Guardian Multisig
-
-**Composition**: 5-of-7 multisig
-
-**Powers**:
-- Holds `GUARDIAN_ROLE` and `DEFAULT_ADMIN_ROLE` during the guarded launch
-- Initial parameter tuning (tier prices, allowlisted tokens)
-- Temporary intervention if critical issues
-
-**Members**: TBD during launch phase
-
-### Futarchy Process
-
-All non-emergency decisions go through futarchy:
-
-1. Community votes on welfare metrics
-2. Proposals submitted with bonds
-3. Prediction markets determine outcomes
-4. Execute if markets indicate approval
-
-## Progressive Decentralization
-
-### Phase 1: Guarded Launch (Year 1)
-
-**Guardian Powers**:
-- Full emergency pause authority
-- Can update certain parameters
-- Monitor system closely
-
-**Rationale**: New system needs close oversight
-
-**Spending Limits**:
-- 50,000 MATIC per proposal
-- 100,000 MATIC daily aggregate
-
-### Phase 2: Increased Threshold (Year 2)
-
-**Changes**:
-- Guardian threshold: 5-of-7 → 6-of-7
-- Longer timelock periods
-- Higher spending limits
-- More community oversight
-
-**Rationale**: Require broader consensus for intervention
-
-### Phase 3: Reduced Authority (Year 3)
-
-**Changes**:
-- Guardians can only pause, not modify
-- Community can override guardian pause
-- Significantly higher spending limits
-- Automated monitoring reduces need for intervention
-
-**Rationale**: System proven stable, reduce central control
-
-### Phase 4: Full Decentralization (Year 4+)
-
-**Changes**:
-- Guardian multisig disbanded
-- All decisions via futarchy
-- Meta-governance: system governs itself
-- No special privileges for anyone
-
-**Rationale**: System mature enough for full autonomy
-
-## Governance Parameters
-
-### Adjustable Parameters
-
-Parameters that can be changed via governance:
-
-**Economic**:
-- Bond amounts (proposal, oracle, challenge)
-- Spending limits
-- LMSR liquidity parameter
-- Fee structure
-
-**Timing**:
-- Review period duration
-- Trading period range
-- Challenge period
-- Timelock duration
-
-**Welfare Metrics**:
-- Add new metrics
-- Adjust metric weights
-- Change calculation methods
-- Update data sources
-
-### Parameter Change Process
-
-1. Submit proposal for parameter change
-2. Goes through full futarchy process
-3. Market determines if change improves welfare
-4. If approved, parameter updated after timelock
-
-## Welfare Metric Governance
-
-### Current Metrics
-
-1. **Treasury Value** (Primary) - Weight: 40%
-2. **Network Activity** (Secondary) - Weight: 30%
-3. **Hash Rate Security** (Tertiary) - Weight: 20%
-4. **Developer Activity** (Quaternary) - Weight: 10%
-
-### Changing Metrics
-
-**Adding New Metrics**:
-
-1. Propose new metric definition
-2. Specify calculation methodology
-3. Provide data sources
-4. Markets decide if addition improves governance
-
-**Adjusting Weights**:
-
-1. Propose new weight distribution
-2. Justify based on protocol priorities
-3. Markets evaluate impact on decision quality
-
-## Meta-Governance
-
-### System Governs Itself
-
-Once fully decentralized, protocol upgrades go through futarchy:
-
-**Upgrade Process**:
-
-1. Propose contract upgrade
-2. Specify changes and rationale
-3. Select welfare metric (typically treasury value)
-4. Market decides if upgrade improves protocol
-5. If approved, UUPS proxy updated
-
-**Benefits**:
-
-- No external control
-- Economically optimal decisions
-- Continuous improvement
-- Self-correcting system
-
-## Emergency Procedures
-
-### When Guardians Can Pause
-
-**Valid Reasons**:
-- Critical smart contract vulnerability
-- Oracle manipulation detected
-- Market manipulation detected
-- Significant unexpected behavior
-
-**Invalid Reasons**:
-- Disagreement with community decisions
-- Political pressure
-- Personal interests
-
-### Pause Process
-
-1. Guardian multisig detects issue
-2. Threshold of guardians agree (5-of-7)
-3. Emergency pause activated
-4. Public announcement with explanation
-5. Investigation and fix
-6. Community review
-7. Unpause via futarchy vote
-
-### Overriding Guardian Pause
-
-After Year 3, community can override:
-
-1. Token holders vote
-2. Requires supermajority (67%)
-3. Unpause if approved
-4. Guardian action logged for accountability
-
-## Governance Participation
-
-### Who Can Participate
-
-**Submit Proposals**: Anyone with 50 MATIC bond
-
-**Trade on Markets**: Anyone with MATIC for gas + position collateral
-
-**Report Oracle Values**: Anyone with 100 MATIC bond
-
-**Challenge Reports**: Anyone with 150 MATIC bond
-
-**Vote on Metrics**: Token holders (if applicable)
-
-### Incentives
-
-**Aligned Incentives**:
-- Traders profit from accurate predictions
-- Proposers bond returned if legitimate
-- Oracles build reputation
-- Token value increases with good governance
-
-**Penalties**:
-- Spam proposals lose bond
-- False oracle reports lose bond
-- Frivolous challenges lose bond
-
-## Governance Analytics
-
-### Key Metrics to Track
-
-**Participation**:
-- Number of proposals per month
-- Trading volume per market
-- Number of unique traders
-- Oracle accuracy rate
-
-**Outcomes**:
-- Proposal approval rate
-- Average welfare metric improvement
-- Challenge frequency
-- Ragequit utilization
-
-**Health**:
-- Market liquidity
-- Price volatility
-- Time to resolution
-- Bond forfeiture rate
-
-## Future Governance Features
-
-### Potential Additions
-
-**Delegation**: Delegate trading/voting power
-
-**Reputation**: Track historical accuracy
-
-**Quadratic Mechanisms**: QF or QV for certain decisions
-
-**Prediction Markets for Metrics**: Markets decide metric weights
-
-**Multi-chain**: Cross-chain governance coordination
+## Operator custody
+
+During the guarded launch the admin roles are held by a **project multisig**,
+which also tunes the only on-chain parameters that exist — tier prices, the
+allowlisted stake tokens, and the treasury address. `UPGRADER_ROLE` is held
+separately, on an **air-gapped floppy keystore**, so day-to-day configuration
+and the authority to replace contract logic are never the same key.
+
+This separation is the point: a guardian can stop the protocol but cannot seize
+an account; a moderator can freeze an account but cannot pause the protocol or
+move treasury funds; a role manager can hand out memberships but cannot touch
+admin roles; an upgrader can ship new logic behind a proxy but holds no other
+privilege and cannot grant itself one.
+
+## Emergency pause
+
+`GUARDIAN_ROLE` is for incident response, not policy. Legitimate grounds are a
+credible exploit report, a discovered vulnerability, or an oracle/adapter
+compromise — **not** disagreement with how people are using the protocol. The
+process is:
+
+1. The guardian multisig detects or receives a credible report.
+2. A threshold of signers agree and activate the pause.
+3. A public notice explains what was paused and why.
+4. The issue is investigated and fixed (a fix ships as a UUPS upgrade — see the
+   [Contract upgrades runbook](../runbooks/contract-upgrades.md)).
+5. The same role calls `unpause()` to restore creation/acceptance.
+
+Because pause does not gate settlement or refunds, escrowed wagers continue to
+resolve and remain refundable even while creation/acceptance is halted.
+
+## Decentralization direction
+
+FairWins launches operator-guarded and aims to reduce that authority as the
+system proves out. The roles are already bounded (no role can move user funds),
+and the intended path is to move `DEFAULT_ADMIN_ROLE` and `UPGRADER_ROLE`
+behind a **timelock and/or a broader multisig** before scaling on mainnet, so
+upgrades and parameter changes carry a public delay window. There is no token,
+and no plan to gate the protocol behind one.
+
+## Historical note
+
+This repository began as *prediction-dao-research*, an exploration of
+**futarchy-based DAO governance** (the "ClearPath" design: welfare-metric
+oracles, conditional-token prediction markets, proposal bonds, and
+ragequit). That governance design is **not deployed and not maintained** — it
+is preserved for reference under
+[`docs/archived/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/docs/archived)
+and `contracts-archive/`. The live product is the peer-to-peer wager system
+these docs describe; its only "governance" is the bounded operator roles above.
 
 ## For More Details
 
 - [Introduction](introduction.md)
 - [How It Works](how-it-works.md)
 - [Security Model](security.md)
+- [Account Moderation Policy](account-moderation.md)
 - [Contributing Guidelines](../developer-guide/contributing.md)
