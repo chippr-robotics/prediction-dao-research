@@ -142,7 +142,7 @@ runbook/ADR/developer-guide are generic and already cite membership as the next 
 
 - [X] T017 [P] Update `docs/developer-guide/upgradeable-contracts.md` to mark `MembershipManager` as an adopter of `UUPSManaged` (it is already named as a next adopter), referencing this feature. (PR #724 reuse)
 - [X] T018 [P] Update `docs/system-overview/security.md` and `docs/system-overview/roles-and-tiers.md`: `MembershipManager` is now UUPS-upgradeable; document its `UPGRADER_ROLE`, the upgrade authorization model, `_disableInitializers`, and append-only storage. (FR-011/FR-012)
-- [ ] T019 [P] Update `scripts/deploy/README.md` and the `deployments/` schema notes to include the membership proxy/impl keys and the `WagerRegistry` repoint step at cutover. (FR-014/FR-016)
+- [X] T019 [P] Update `scripts/deploy/README.md` and the `deployments/` schema notes to include the membership proxy/impl keys and the `WagerRegistry` repoint step at cutover. (FR-014/FR-016)
 - [X] T020 Update `CLAUDE.md` Guardrails: `MembershipManager` is now a **UUPS proxy at a stable address** (logic swappable, state preserved); `deployments/` records `membershipManager` (proxy) + `membershipManagerImpl`; storage is append-only (run `check:storage-layout`). (keeps the agent guide accurate post-migration)
 
 **Checkpoint**: Docs reflect the membership migration; an operator/developer can act from them.
@@ -172,7 +172,7 @@ This is the cutover; feature 026 later ships as the first in-place upgrade on ea
 > keystore (`npm run floppy:mount`) and maintainer sign-off. Execute on the operator workstation per
 > `docs/runbooks/contract-upgrades.md`.
 
-- [ ] T026 Deploy the membership proxy (current logic) to **Amoy** (chainId 80002) via the floppy-keystore flow; repoint `WagerRegistry.setMembershipManager(proxy)`; `npm run verify:amoy`; `npm run sync:frontend-contracts:amoy`; confirm `deployments/amoy-chain80002-v2.json` records `membershipManager` (proxy) + `membershipManagerImpl`. (plan.md Target Platform; FR-009)
+- [X] T026 Deploy the membership proxy (current logic) to **Amoy** (chainId 80002) via the floppy-keystore flow; repoint `WagerRegistry.setMembershipManager(proxy)`; `npm run verify:amoy`; `npm run sync:frontend-contracts:amoy`; confirm `deployments/amoy-chain80002-v2.json` records `membershipManager` (proxy) + `membershipManagerImpl`. (plan.md Target Platform; FR-009)
 - [ ] T027 Validate on **Amoy**: full membership lifecycle parity through the proxy; wager gating works via the repointed registry; coexistence shown honestly; perform an additive upgrade dry-run and confirm state preserved + address unchanged (SC-006 proof). Get maintainer sign-off before mainnet. Block T028 on sign-off.
 - [ ] T028 After sign-off, deploy the membership proxy (current logic) to **Polygon** mainnet (chainId 137) via the floppy-keystore flow; repoint `WagerRegistry`; `npm run verify:polygon`; `npm run sync:frontend-contracts:polygon`; record proxy/impl in `deployments/polygon-chain137-v2.json`; withdraw accrued fees from the legacy authority via its admin path. Then feature 026 ships as the first in-place upgrade.
 

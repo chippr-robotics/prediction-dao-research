@@ -122,7 +122,7 @@ non-upgradeable registry plus correct fund accounting. (spec US1 Independent Tes
   registry — `wagerRegistry` (proxy), `wagerRegistryImpl`, `wagerRegistryLegacy` — in the deploy tooling, and
   run `npm run sync:frontend-contracts:*` so the frontend resolves the **proxy** as the stable address.
   (FR-014/FR-015; data-model.md "deployments record")
-- [ ] T014 [P] [US1] Coexistence config (no logic change): point `frontend/` and `subgraph/` at the proxy
+- [X] T014 [P] [US1] Coexistence config (no logic change): point `frontend/` and `subgraph/` at the proxy
   address and surface the legacy registry as **settle-only** (existing wagers claimable/resolvable there, not
   implied to have moved). (FR-007, Principle III)
 
@@ -259,7 +259,7 @@ later ships as the first in-place upgrade on each.
 > `hardhat run scripts/deploy/deploy.js` on the in-process network deploys the proxy + impl and records both.
 > Execute these on the operator workstation per `docs/runbooks/contract-upgrades.md`.
 
-- [ ] T032 Deploy the proxy (current logic) to **Amoy** (chainId 80002) via `npm run deploy:amoy` (floppy
+- [X] T032 Deploy the proxy (current logic) to **Amoy** (chainId 80002) via `npm run deploy:amoy` (floppy
   keystore, 25 gwei floor), `npm run verify:amoy`, `npm run sync:frontend-contracts:amoy`; confirm
   `deployments/amoy-chain80002-v2.json` records `wagerRegistry` (proxy) / `wagerRegistryImpl` /
   `wagerRegistryLegacy`. (plan.md Target Platform)

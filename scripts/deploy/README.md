@@ -107,14 +107,29 @@ Each script saves a JSON file to `deployments/`:
 - `<network>-chain<chainId>-markets-deployment.json`
 - `<network>-chain<chainId>-registries-deployment.json`
 
-## Upgradeable WagerRegistry (UUPS proxy)
+## Upgradeable contracts (UUPS proxies)
 
-`WagerRegistry` deploys as a **UUPS proxy** (via `scripts/deploy/lib/upgradeable.js`).
-The deployment artifact records two addresses: `wagerRegistry` (the stable
-**proxy** address that the frontend and subgraph consume) and
-`wagerRegistryImpl` (the current logic implementation, which changes on every
-upgrade). If a prior non-upgradeable registry coexists, it is recorded as
+Two contracts deploy as **UUPS proxies** (via `scripts/deploy/lib/upgradeable.js`):
+`WagerRegistry` (spec 025) and `MembershipManager` (spec 027). Each records a
+stable **proxy** address (consumed by the frontend and subgraph) plus a current
+**implementation** address (changes on every upgrade):
+
+| Contract | Proxy key | Implementation key |
+|----------|-----------|--------------------|
+| WagerRegistry | `wagerRegistry` | `wagerRegistryImpl` |
+| MembershipManager | `membershipManager` | `membershipManagerImpl` |
+
+If a prior non-upgradeable registry coexists, it is recorded as
 `wagerRegistryLegacy` (settle-only).
+
+**Registry → membership repoint (cutover).** `WagerRegistry` resolves
+membership against the `MembershipManager` **proxy**. On a fresh full deploy the
+registry is initialized pointing at the proxy directly; when migrating a network
+whose registry pointed at a non-proxy membership authority, repoint it with
+`WagerRegistry.setMembershipManager(<membershipManager proxy>)` at cutover (and
+withdraw any accrued fees from the legacy authority via its admin path). The
+voucher rail (spec 026) ships as the **first in-place upgrade** of the
+`membershipManager` proxy — never a redeploy.
 
 **Pre-flight gate.** Before deploying or upgrading, run:
 
