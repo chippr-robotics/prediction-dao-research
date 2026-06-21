@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("./helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("./helpers/proxy");
 
 // Feature 024 — open-challenge wagers (no named opponent, gated by a code-derived claim authority + EIP-712
 // acceptance signature). Silver+ to create; any active tier to accept. Ships as the first in-place upgrade
@@ -21,9 +21,8 @@ describe("WagerRegistry — open challenges (024)", function () {
     const usdcToken = await MockERC20.deploy("USD Coin", "USDC", 0);
     await usdcToken.waitForDeployment();
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
-    await mgr.waitForDeployment();
+    // MembershipManager is a UUPS proxy (spec 027) — deploy via the proxy helper, not the constructor.
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     const limits = { monthlyMarketCreation: 100, maxConcurrentMarkets: 20 };
     await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30, limits, true);
     await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Silver, usdc(100), 30, limits, true);
