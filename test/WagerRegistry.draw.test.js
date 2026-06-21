@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("./helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("./helpers/proxy");
 
 // Coverage for the Draw outcome (Spec Kit 004): a draw returns each party their
 // own original stake. Manual draw requires mutual consent for participant
@@ -29,8 +29,7 @@ describe("WagerRegistry — Draw resolution", function () {
     const PolymarketAdapter = await ethers.getContractFactory("PolymarketOracleAdapter");
     const adapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.connect(admin).setTier(
       WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30,
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 }, true

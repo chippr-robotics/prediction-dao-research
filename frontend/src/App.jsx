@@ -18,6 +18,7 @@ import Footer from './components/Footer'
 
 // add-ons
 import WalletPage from './pages/WalletPage'
+import VouchersPage from './pages/VouchersPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
@@ -114,6 +115,7 @@ function AppContent() {
           <Route path="/main" element={<Dashboard />} />
           <Route path="/fairwins" element={<Dashboard />} />
           <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Route>

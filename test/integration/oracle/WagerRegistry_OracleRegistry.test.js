@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("../../helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("../../helpers/proxy");
 
 // Targeted tests for the new oracle-registry surface on WagerRegistry:
 //   - setOracleAdapter validation
@@ -35,8 +35,7 @@ describe("WagerRegistry oracle registry", function () {
     const clAdapter = await ClAdapter.deploy(admin.address);
     await clAdapter.setFeedAllowed(await feed.getAddress(), true);
 
-    const Membership = await ethers.getContractFactory("MembershipManager");
-    const mgr = await Membership.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.connect(admin).setTier(
       WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30,
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 }, true

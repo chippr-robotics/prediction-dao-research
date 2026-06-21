@@ -1,0 +1,157 @@
+/* Membership Vouchers page (spec 026). Plain CSS with vch-* prefix + shared theme custom properties. */
+
+.vch-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.vch-header h1 {
+  margin: 0 0 0.4rem;
+  color: var(--text-primary);
+}
+.vch-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.vch-privacy {
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--brand-primary, #6c8cff);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  padding: 0.85rem 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.vch-unavailable {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  padding: 0.85rem 1rem;
+  color: var(--text-secondary);
+}
+
+.vch-status {
+  min-height: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.vch-error {
+  color: #d9534f;
+}
+.vch-tx {
+  font-family: monospace;
+}
+
+.vch-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--bg-secondary);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.vch-card h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+}
+
+.vch-tiers {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.vch-tiers legend {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+.vch-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: var(--transition-base, all 0.15s ease);
+}
+.vch-tier.is-selected {
+  border-color: var(--brand-primary, #6c8cff);
+  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+}
+.vch-tier-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.vch-tier-price {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.vch-fineprint,
+.vch-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.vch-redeem-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.vch-redeem-row label {
+  color: var(--text-secondary);
+}
+.vch-input {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.vch-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+}
+
+.vch-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.vch-success,
+.vch-ok {
+  color: #3c9a5f;
+}
+.vch-warn {
+  color: #c77d11;
+}

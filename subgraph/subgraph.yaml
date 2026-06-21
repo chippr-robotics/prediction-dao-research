@@ -52,3 +52,58 @@ dataSources:
         - event: DrawRevoked(indexed uint256,indexed address)
           handler: handleDrawRevoked
       file: ./src/mappings/wagerRegistry.ts
+
+# ---------------------------------------------------------------------------
+# Membership vouchers (spec 026) — ENABLE AT DEPLOY (Phase 10).
+# The voucher (immutable) and the upgradeable MembershipManager proxy are not
+# yet deployed, so there is no valid address/startBlock. Per the project rule,
+# NEVER ship 0x0 / startBlock 0 (RPC-flood from genesis). At deploy:
+#   1) run `npm run sync:frontend-contracts:<net>` so
+#      ../frontend/src/abis/MembershipVoucher.json and MembershipManager.json exist,
+#   2) add the per-network `MembershipVoucher` + `MembershipManager` address+startBlock
+#      to networks.json (from deployments/<net>.json),
+#   3) uncomment the two dataSources below and `graph codegen && graph build --network <net>`.
+# Schema (Voucher) and handlers (./src/mappings/membershipVoucher.ts) are already in place.
+# ---------------------------------------------------------------------------
+#  - kind: ethereum
+#    name: MembershipVoucher
+#    network: matic
+#    source:
+#      address: "0x0000000000000000000000000000000000000000" # FILL from deployments (membershipVoucher)
+#      abi: MembershipVoucher
+#      startBlock: 0 # FILL: voucher deploy block
+#    mapping:
+#      kind: ethereum/events
+#      apiVersion: 0.0.7
+#      language: wasm/assemblyscript
+#      entities:
+#        - Voucher
+#      abis:
+#        - name: MembershipVoucher
+#          file: ../frontend/src/abis/MembershipVoucher.json
+#      eventHandlers:
+#        - event: VoucherMinted(indexed uint256,indexed address,indexed bytes32,uint8,uint32,uint128)
+#          handler: handleVoucherMinted
+#        - event: Transfer(indexed address,indexed address,indexed uint256)
+#          handler: handleTransfer
+#      file: ./src/mappings/membershipVoucher.ts
+#  - kind: ethereum
+#    name: MembershipManager
+#    network: matic
+#    source:
+#      address: "0x0000000000000000000000000000000000000000" # FILL from deployments (membershipManager proxy)
+#      abi: MembershipManager
+#      startBlock: 0 # FILL: membership proxy deploy block
+#    mapping:
+#      kind: ethereum/events
+#      apiVersion: 0.0.7
+#      language: wasm/assemblyscript
+#      entities:
+#        - Voucher
+#      abis:
+#        - name: MembershipManager
+#          file: ../frontend/src/abis/MembershipManager.json
+#      eventHandlers:
+#        - event: MembershipRedeemed(indexed address,indexed bytes32,uint8,indexed uint256,uint64)
+#          handler: handleMembershipRedeemed
+#      file: ./src/mappings/membershipVoucher.ts

@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployMembershipManager } = require("./helpers/proxy");
 
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
@@ -18,8 +19,7 @@ describe("MembershipManager", function () {
     const token = await MockERC20.deploy("USD Coin", "USDC", 0);
     await token.waitForDeployment();
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await token.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await token.getAddress(), treasury.address]);
     await mgr.waitForDeployment();
 
     // Seed test tiers for WAGER_PARTICIPANT_ROLE (test-scale prices, not the

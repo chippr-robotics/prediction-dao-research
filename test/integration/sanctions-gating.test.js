@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("../helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("../helpers/proxy");
 
 // Integration: SanctionsGuard wired into WagerRegistry + MembershipManager (Spec 007,
 // FR-016/FR-021/FR-054, SC-004/SC-016). Verifies value-bearing entrypoints are screened
@@ -20,8 +20,7 @@ describe("Sanctions gating (integration)", function () {
     const usdcToken = await MockERC20.deploy("USD Coin", "USDC", 0);
     await usdcToken.waitForDeployment();
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.waitForDeployment();
     const limits = { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 };
     await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30, limits, true);

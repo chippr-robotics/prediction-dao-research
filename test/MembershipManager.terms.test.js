@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployMembershipManager } = require("./helpers/proxy");
 
 // On-chain membership terms recording (Spec 007 — FR-039). purchaseTierWithTerms /
 // upgradeTierWithTerms record the accepted T&C version hash + emit MembershipTermsRecorded.
@@ -17,8 +18,7 @@ describe("MembershipManager terms recording", function () {
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     const usdcToken = await MockERC20.deploy("USD Coin", "USDC", 0);
     await usdcToken.waitForDeployment();
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.waitForDeployment();
     const limits = { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 };
     await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30, limits, true);

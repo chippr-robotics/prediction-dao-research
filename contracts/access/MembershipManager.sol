@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {UUPSManaged} from "../upgradeable/UUPSManaged.sol";
 import "../interfaces/IMembershipManager.sol";
+import "../interfaces/IMembershipVoucher.sol";
 import "../interfaces/ISanctionsGuard.sol";
 
 /// @title MembershipManager
@@ -15,7 +16,7 @@ import "../interfaces/ISanctionsGuard.sol";
 ///           DEFAULT_ADMIN_ROLE     — treasury, tier config, role administration
 ///           ROLE_MANAGER_ROLE      — grant / revoke memberships out-of-band
 ///           authorizedCallers map  — kept for the WagerRegistry hook surface
-contract MembershipManager is IMembershipManager, AccessControl {
+contract MembershipManager is IMembershipManager, UUPSManaged {
     using SafeERC20 for IERC20;
 
     uint64 private constant ROLLING_WINDOW = 30 days;
@@ -37,6 +38,15 @@ contract MembershipManager is IMembershipManager, AccessControl {
     /// @notice Accepted T&C version hash recorded at membership purchase/upgrade
     ///         (Spec 007, FR-039): user => role => SHA-256 of the in-force Terms.
     mapping(address => mapping(bytes32 => bytes32)) public memberTermsHash;
+
+    /// @notice The MembershipVoucher contract whose redemption mints memberships here (spec 026).
+    ///         Appended after all prior state (consumes one `__gap` slot — append-only).
+    address public voucher;
+
+    /// @dev Trailing reserve so future upgrades can append state append-only without shifting layout
+    ///      (spec 027 — UUPS migration). Validated by `npm run check:storage-layout`. Never insert/reorder/
+    ///      remove the state above. (Reduced from 50 → 49 when `voucher` was appended in spec 026.)
+    uint256[49] private __gap;
 
     event TierSet(bytes32 indexed role, Tier indexed tier, uint128 priceUSDC, uint32 durationDays, bool active);
     event TreasuryUpdated(address indexed treasury);
@@ -63,17 +73,24 @@ contract MembershipManager is IMembershipManager, AccessControl {
     error ZeroAddress();
     error InsufficientFees();
     error TierNone();
+    error VoucherNotSet();
+    error NotVoucherOwner();
 
     modifier onlyAuthorized() {
         if (!authorizedCallers[msg.sender]) revert NotAuthorized();
         _;
     }
 
-    constructor(address admin, address paymentToken_, address treasury_) {
+    /// @notice One-time initializer that replaces the constructor for the UUPS proxy (spec 027).
+    /// @dev    Same args/effects as the former constructor. `__UUPSManaged_init` is called FIRST and grants
+    ///         DEFAULT_ADMIN_ROLE + UPGRADER_ROLE to `admin`; ROLE_MANAGER_ROLE is re-granted here to preserve
+    ///         the prior behavior. The bare implementation's initializers are disabled by UUPSManaged's
+    ///         constructor, so only the proxy can be initialized — and only once.
+    function initialize(address admin, address paymentToken_, address treasury_) external initializer {
         if (admin == address(0) || paymentToken_ == address(0) || treasury_ == address(0)) revert ZeroAddress();
+        __UUPSManaged_init(admin);
         paymentToken = IERC20(paymentToken_);
         treasury = treasury_;
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ROLE_MANAGER_ROLE, admin);
     }
 
@@ -114,6 +131,13 @@ contract MembershipManager is IMembershipManager, AccessControl {
     function setSanctionsGuard(address guard) external onlyRole(DEFAULT_ADMIN_ROLE) {
         sanctionsGuard = ISanctionsGuard(guard);
         emit SanctionsGuardUpdated(guard);
+    }
+
+    /// @notice Wire the MembershipVoucher contract whose redemption mints memberships here (spec 026).
+    function setVoucher(address voucher_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (voucher_ == address(0)) revert ZeroAddress();
+        voucher = voucher_;
+        emit VoucherSet(voucher_);
     }
 
     /// @dev Sanctions screen (Spec 007, FR-054). No-op when unset; otherwise reverts for a
@@ -243,6 +267,37 @@ contract MembershipManager is IMembershipManager, AccessControl {
         m.expiresAt = base + uint64(cfg.durationDays) * 1 days;
 
         emit MembershipExtended(msg.sender, role, cfg.durationDays, cfg.priceUSDC, m.expiresAt);
+    }
+
+    /// @notice Redeem a voucher (spec 026): burns the voucher and writes a soulbound membership of the
+    ///         voucher's `(role, tier)` to the redeemer (msg.sender). Sanctions-screens the redeemer
+    ///         fail-closed and records their accepted T&C. No funds move here — USDC was paid at mint.
+    /// @dev    Checks → effects (membership write, Terms) → interaction (burn LAST) — strict CEI, so a blocked
+    ///         or failed redemption leaves the voucher intact and re-tradable (FR-015). No new fund flow, so no
+    ///         reentrancy guard is needed; the only external call is the trusted voucher burn, performed last.
+    function redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash) external {
+        address v = voucher;
+        if (v == address(0)) revert VoucherNotSet();
+        if (IMembershipVoucher(v).ownerOf(voucherId) != msg.sender) revert NotVoucherOwner();
+
+        IMembershipVoucher.VoucherInfo memory info = IMembershipVoucher(v).voucherInfo(voucherId);
+
+        Membership storage m = _memberships[msg.sender][info.role];
+        if (m.tier != Tier.None && m.expiresAt > block.timestamp) revert AlreadyActive(); // FR-011
+
+        _screen(msg.sender); // Sanctions screen (Spec 007 FR-054 / spec 026 FR-012) — fail-closed, before effects
+
+        // Effects: grant the snapshotted (role, tier); clock starts now; counters reset (like a fresh purchase).
+        m.tier = info.tier;
+        m.expiresAt = uint64(block.timestamp) + uint64(info.durationDays) * 1 days;
+        m.monthCount = 0;
+        m.monthAnchor = uint64(block.timestamp);
+        _recordTerms(info.role, acceptedTermsHash); // FR-013
+
+        // Interaction (last): single-use burn. Reverts roll back all effects atomically.
+        IMembershipVoucher(v).burn(voucherId);
+
+        emit MembershipRedeemed(msg.sender, info.role, info.tier, voucherId, m.expiresAt);
     }
 
     // ---------- Hooks (authorized callers) ----------

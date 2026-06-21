@@ -20,4 +20,22 @@ async function deployWagerRegistry(initArgs) {
   return Impl.attach(await proxy.getAddress());
 }
 
-module.exports = { deployWagerRegistry };
+/// Deploy MembershipManager behind an ERC1967 UUPS proxy and return the contract bound to the proxy address
+/// (spec 027). `initArgs` is the same ordered list the former constructor took:
+///   [admin, paymentToken, treasury]
+/// Same rationale as deployWagerRegistry: manual proxy wiring keeps the existing suite fast; the plugin's
+/// storage-layout/safety validation is exercised in test/upgradeable/ and via `npm run check:storage-layout`.
+async function deployMembershipManager(initArgs) {
+  const Impl = await ethers.getContractFactory("MembershipManager");
+  const impl = await Impl.deploy();
+  await impl.waitForDeployment();
+
+  const initData = Impl.interface.encodeFunctionData("initialize", initArgs);
+  const Proxy = await ethers.getContractFactory("ERC1967Proxy");
+  const proxy = await Proxy.deploy(await impl.getAddress(), initData);
+  await proxy.waitForDeployment();
+
+  return Impl.attach(await proxy.getAddress());
+}
+
+module.exports = { deployWagerRegistry, deployMembershipManager };
