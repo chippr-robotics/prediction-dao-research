@@ -19,8 +19,8 @@
 const MORDOR_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   treasury: '',
-  wagerRegistry: '0xbAcED6826A6107fE70C3929C3912b073808ebd5B',
-  membershipManager: '0xB6Cd0Cf7E11Cc58398b2f1ACA6938509B070a38E',
+  wagerRegistry: '0x3ccB144d8aa838e8d4D695867cC72e548117830C',
+  membershipManager: '0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541',
   keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
   sanctionsGuard: '0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3',
   // Classic USD (USC) — real on-chain stablecoin (no mock); set by sync.
