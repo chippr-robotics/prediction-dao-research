@@ -90,3 +90,33 @@ type WagerTransfer @entity(immutable: true) {
   "event.block.timestamp (unix seconds)"
   timestamp: BigInt!
 }
+
+"Lifecycle of a membership voucher NFT (spec 026)."
+enum VoucherStatus {
+  held
+  redeemed
+  burned
+}
+
+"A transferable membership voucher NFT and its lifecycle (spec 026). Indexed for secondary-market and redemption visibility; on-chain and public by nature."
+type Voucher @entity(immutable: false) {
+  "tokenId (decimal string)"
+  id: ID!
+  tokenId: BigInt!
+  "current holder; updated on every ERC-721 Transfer"
+  owner: Bytes!
+  "membership role the voucher claims"
+  role: Bytes!
+  "tier enum index (1=Bronze .. 4=Platinum), snapshotted at mint"
+  tier: Int!
+  "membership duration granted on redemption, snapshotted at mint"
+  durationDays: Int!
+  status: VoucherStatus!
+  minter: Bytes!
+  mintedAt: BigInt!
+  mintTxHash: Bytes!
+  "address that redeemed the voucher (received the membership) — may differ from the minter (fresh-wallet redeem)"
+  redeemedBy: Bytes
+  redeemedAt: BigInt
+  redeemTxHash: Bytes
+}

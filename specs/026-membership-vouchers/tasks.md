@@ -21,10 +21,11 @@ appends one slot (`voucher`) from that gap.
 immutable `MembershipVoucher` (mint/burn/on-chain `tokenURI`/2.5%-cap-5% royalty), and the `redeemVoucher`
 append-only upgrade on `MembershipManager` (fail-closed redeemer screening, Terms recording, single-use atomic
 burn, CEI) are implemented with deploy/verify wiring. **281 passing / 5 pending / 0 failing** (17 new voucher/
-redeem/integration tests), `check:storage-layout` validates the `voucher` append. Remaining unchecked are
-**integration + environment-gated**: T016 (subgraph), T017–T019 (frontend mint/gift/redeem UI + sync), T020
-(docs), T021 (Slither CI), T022 (voucher Medusa harness), T023 (security-agent review), T024 (coverage CI),
-T026–T027 (Amoy/Polygon deploy via floppy keystore + sign-off).
+redeem/integration tests), `check:storage-layout` validates the `voucher` append. Now also done: subgraph schema+mappings (T016, manifest data
+sources are a deploy-time template since addresses/ABIs are network-gated), frontend mint+redeem UI with honest
+privacy disclosure (T017/T018, 1500 frontend tests pass), and the voucher Medusa harness (T022). Remaining are
+environment-/CI-gated: T019 (sync voucher ABI/address at deploy), T020 (docs), T021 (Slither CI), T023
+(security-agent review), T024 (coverage CI), T026–T027 (Amoy/Polygon deploy via floppy keystore + sign-off).
 
 **Design decisions (research.md)**: voucher is **immutable** (NOT upgradeable, D1); redeem-to-self in v1
 (D2); mint price/treasury read live from `MembershipManager`, paid to treasury at mint (D3); manager-driven
@@ -156,9 +157,9 @@ reverts; minting is never screened. (spec US4)
 
 **Purpose**: Observability + honest, accessible UX, sourced only from synced artifacts.
 
-- [ ] T016 [P] Subgraph: add a `Voucher` entity (`status: Held | Redeemed`) to `subgraph/schema.graphql` and index `VoucherMinted`, ERC-721 `Transfer`, and `MembershipRedeemed` in `subgraph/src/mappings/`. (FR-026)
-- [ ] T017 [P] Frontend: mint flow (choose role+tier, approve+pay USDC) in `frontend/src/` consuming synced artifacts. (FR-001, Principle V)
-- [ ] T018 [P] Frontend: redeem flow (connect redeeming wallet, accept Terms, screen, redeem-to-this-wallet) with an **honest privacy disclosure** banner (public mints/transfers; pseudonymity, not ZK) and royalty display. WCAG 2.1 AA. (FR-013/020, Principle III/V)
+- [X] T016 [P] Subgraph: add a `Voucher` entity (`status: Held | Redeemed`) to `subgraph/schema.graphql` and index `VoucherMinted`, ERC-721 `Transfer`, and `MembershipRedeemed` in `subgraph/src/mappings/`. (FR-026)
+- [X] T017 [P] Frontend: mint flow (choose role+tier, approve+pay USDC) in `frontend/src/` consuming synced artifacts. (FR-001, Principle V)
+- [X] T018 [P] Frontend: redeem flow (connect redeeming wallet, accept Terms, screen, redeem-to-this-wallet) with an **honest privacy disclosure** banner (public mints/transfers; pseudonymity, not ZK) and royalty display. WCAG 2.1 AA. (FR-013/020, Principle III/V)
 - [ ] T019 Run `npm run sync:frontend-contracts:*` so the frontend resolves the voucher address/ABI from artifacts (never hand-copied). (FR-026, Principle V)
 
 **Checkpoint**: Vouchers are indexed and mint/gift/redeem is usable with honest disclosure.
@@ -178,7 +179,7 @@ reverts; minting is never screened. (spec US4)
 **Purpose**: Security gates for a USDC-handling + access-granting change.
 
 - [ ] T021 [P] Slither on `MembershipVoucher` + the `redeemVoucher` surface — no new high/critical (reentrancy on mint/redeem, ERC721/2981); EthTrust-SL ≥ L2. (Principle I)
-- [ ] T022 [P] Add a Medusa harness `contracts/test/MembershipVoucherFuzzTest.sol`: invariants — a held voucher never yields membership; redeem is single-use; mint conserves treasury accounting; royalty ≤ 5%. (Principle I)
+- [X] T022 [P] Add a Medusa harness `contracts/test/MembershipVoucherFuzzTest.sol`: invariants — a held voucher never yields membership; redeem is single-use; mint conserves treasury accounting; royalty ≤ 5%. (Principle I)
 - [ ] T023 ⏳ REVIEW-GATED — smart-contract security-agent review (`.github/agents/`) of mint (fund handling) + redeemVoucher (fail-closed screening, least-privilege grant, single-use atomic burn, append-only storage). (Principle I)
 - [ ] T024 [P] Coverage — confirm new branches exercised by `test/access/MembershipVoucher.test.js` + `MembershipManager.redeem.test.js` + the integration test. (Principle II)
 - [X] T025 Validate the quickstart locally (non-network parts): full existing membership + wager suites green; voucher mint/transfer/redeem scenarios pass; `check:storage-layout` passes the `voucher` append; redeemed membership == direct membership. (quickstart.md; SC-001..SC-010)
