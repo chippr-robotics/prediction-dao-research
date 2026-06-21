@@ -105,4 +105,20 @@ describe('contracts config', () => {
       )
     })
   })
+
+  describe('feature-complete testnets resolve the full contract set', () => {
+    // Specs 024/026/027: Amoy (80002) and Mordor (63) are deployed feature-complete
+    // (open challenges + vouchers + UUPS membership). Every slot the app needs to
+    // resolve MUST be a real address — guards against a deployed contract silently
+    // going unconfigured in the frontend (e.g. membershipVoucher was missing from
+    // the sync mapping, which disabled the voucher UI on both chains).
+    const ADDR = /^0x[0-9a-fA-F]{40}$/
+    for (const chainId of [63, 80002]) {
+      for (const name of ['wagerRegistry', 'membershipManager', 'membershipVoucher', 'paymentToken', 'sanctionsGuard']) {
+        it(`resolves ${name} on chain ${chainId}`, () => {
+          expect(getContractAddressForChain(name, chainId)).toMatch(ADDR)
+        })
+      }
+    }
+  })
 })
