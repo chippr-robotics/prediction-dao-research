@@ -45,7 +45,7 @@ vi.mock('ethers', async () => {
   const real = await vi.importActual('ethers')
   function FakeContract(address) {
     if (address === REGISTRY) {
-      const acceptOpenWager = (...a) => {
+      const acceptOpenWager = (..._a) => {
         calls.push('accept')
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1, hash: '0xtxhash' }) })
       }
@@ -61,7 +61,7 @@ vi.mock('ethers', async () => {
       symbol: () => Promise.resolve('USDC'),
       balanceOf: () => Promise.resolve(state.balance),
       allowance: () => Promise.resolve(state.allowance),
-      approve: (...a) => {
+      approve: (..._a) => {
         calls.push('approve')
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1 }) })
       },
