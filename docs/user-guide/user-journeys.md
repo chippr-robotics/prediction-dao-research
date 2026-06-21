@@ -110,13 +110,72 @@ The **Account Center** (My Account) is home base:
 | Tab | What it's for |
 |-----|---------------|
 | Account | Your address, connection status, disconnect |
-| Membership | Your current tier, limits, and tier purchase/renewal |
+| Membership | Your current tier and limits; buy/renew a tier, or buy/redeem a [membership voucher](membership-vouchers.md) |
 | Security | Registering your encryption key for private wagers |
 | Preferences | Polymarket category filters for oracle browsing |
 | Swap | Swapping tokens via Uniswap (e.g. POL → USDC) |
 
 A QR **scanner** is also available for accepting wagers in person — point it
 at a friend's share code and you land directly on the acceptance page.
+
+## Journey 7: An open challenge anyone can take
+
+When the creator doesn't have one specific opponent in mind, they post an
+**open challenge** — no named opponent, gated by a four-word code.
+
+```mermaid
+sequenceDiagram
+    actor A as Alex (creator, Silver+)
+    actor B as Bri (taker)
+    participant App as FairWins app
+    participant Chain as Polygon
+
+    A->>App: Dashboard → "Open Challenge"
+    A->>App: terms, 10 USDC stake, "Either" resolution
+    App->>Chain: approve USDC + createOpenWager
+    App-->>A: four-word code + QR  (save it!)
+    A-->>B: shares the code
+    B->>App: "Take a challenge" → enters code
+    App-->>B: shows decrypted terms
+    B->>App: Accept → approve + sign + confirm
+    App->>Chain: acceptOpenWager (matching stake escrowed)
+    Note over A,B: now a normal wager — resolves + pays out
+```
+
+1. **Alex creates an open challenge.** Requires a **Silver** membership or
+   above. Alex enters the terms, the (equal) stake, and a resolution method —
+   *Either side* or a *named arbitrator*. The app returns a **four-word code**
+   and a QR/link. **Alex saves the code** — it can't be recovered.
+2. **Alex shares the code** with one person or many — whoever gets it first can
+   take the other side.
+3. **Bri takes it.** Any active membership tier works. Bri chooses *Take a
+   challenge*, enters the four words, reads the decrypted terms, then
+   **approves** the stake, **signs** to authorize, and **confirms** — escrowing
+   the matching stake.
+4. From here it's identical to Journey 1: it resolves, draws, or refunds.
+
+Full guide: [Open Challenges](open-challenges.md).
+
+## Journey 8: Gifting a membership with a voucher
+
+A membership can be bought as a transferable token and given away.
+
+```mermaid
+flowchart LR
+    A["Account Center → Membership<br/>Buy a voucher (USDC)"] --> B[Voucher NFT lands<br/>in your wallet]
+    B --> C[Send the NFT to<br/>a friend's address]
+    C --> D["Friend: Redeem voucher<br/>(burns it)"]
+    D --> E[Friend gets a soulbound<br/>30-day membership]
+```
+
+1. **Buy a voucher** for a tier in Account Center → Membership (pays that tier's
+   USDC price). It arrives as an ERC-721 in your wallet and confers no
+   membership while held.
+2. **Gift or resell it** — send the NFT to whoever you like (or list it).
+3. **They redeem it.** Redemption burns the voucher and writes a soulbound,
+   time-bound membership to the redeemer's wallet, unlocking wagering for them.
+
+Full guide: [Membership Vouchers](membership-vouchers.md).
 
 ## What happens behind the scenes
 

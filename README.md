@@ -36,6 +36,9 @@ outcome is determined by battle-tested oracles.
 
 - **1v1 even-money or Make an Offer odds** — equal stakes, or asymmetric stakes
   at a creator-set multiplier where the settler puts up the majority stake
+- **Open challenges** — post a wager with no named opponent, gated by a
+  four-word claim code; whoever you share the code with can take the other side
+  (Silver+ to create, any active tier to take)
 - **QR / deep-link sharing** — the opponent scans a code and accepts in-app
 - **Mutual draws** — both parties (or the arbitrator) can settle a push; each
   side gets its own stake back
@@ -55,16 +58,22 @@ outcome is determined by battle-tested oracles.
 
 ### Roles, tiers, and operator powers
 
-Wager creation requires a paid **Wager Participant** membership on
-`MembershipManager`. The four-tier ladder is anchored at **$2 Bronze** in
-USDC:
+Wager participation requires a paid **Wager Participant** membership on
+`MembershipManager` (the default tier is **None** — no participation). The
+four-tier ladder is anchored at **$2 Bronze** in USDC:
 
 | Tier | Price | Wagers / month | Open wagers at once |
 |------|-------|----------------|---------------------|
+| None     | —    | 0         | 0         |
 | Bronze   | $2   | 15        | 5         |
 | Silver   | $8   | 30        | 10        |
 | Gold     | $25  | 100       | 30        |
 | Platinum | $100 | Unlimited | Unlimited |
+
+A membership can be **bought directly** (soulbound) or acquired by **redeeming
+a `MembershipVoucher`** — a transferable ERC-721 bought with USDC at a tier's
+price that can be gifted or resold, then redeemed (burned) for the soulbound
+membership.
 
 The operator team retains a narrow set of on-chain powers, each bound to a
 distinct OpenZeppelin AccessControl role:
@@ -76,8 +85,10 @@ distinct OpenZeppelin AccessControl role:
   for full disclosure.
 - `ROLE_MANAGER_ROLE` — grant / revoke memberships outside the purchase
   flow (support, gifts, dispute resolution).
+- `UPGRADER_ROLE` — authorize UUPS implementation upgrades on the proxies
+  (logic swaps at stable addresses; no other privilege).
 - `DEFAULT_ADMIN_ROLE` — tier config, treasury, and authority to grant the
-  three roles above.
+  roles above.
 
 See [Roles and Tiers](docs/system-overview/roles-and-tiers.md) for the full
 privilege matrix. No role can move escrowed stakes.
@@ -97,19 +108,23 @@ privilege matrix. No role can move escrowed stakes.
 │ tiers, limits │ │ Chainalysis  │  │ Polymarket · Chainlink  │
 └───────────────┘ └──────────────┘  │ DataFeed · Functions ·  │
                                     │ UMA OOv3                │
-┌───────────────┐                   └─────────────────────────┘
-│ KeyRegistry   │   public keys for end-to-end
-│ (privacy)     │   encrypted wager terms (IPFS)
-└───────────────┘
+┌───────────────┐  ┌──────────────┐ └─────────────────────────┘
+│ KeyRegistry   │  │ Membership   │  public keys (privacy) +
+│ (privacy)     │  │ Voucher      │  transferable ERC-721 voucher
+└───────────────┘  └──────────────┘  redeemed via MembershipManager
 ```
 
-Core contracts are UUPS-upgradeable behind stable proxy addresses — logic is
-swappable in place while escrowed state is preserved (see
-[ADR 004](docs/adr/004-upgradeable-registry-uups.md)).
+`WagerRegistry` and `MembershipManager` are UUPS-upgradeable behind stable
+proxy addresses — logic is swappable in place while escrowed state is
+preserved (see [ADR 004](docs/adr/004-upgradeable-registry-uups.md)). The
+`MembershipVoucher` ERC-721 is the deliberate exception: a tradable bearer
+asset is kept immutable.
 
 Frontend: React + Vite SPA (no backend) served by nginx on Cloud Run behind
-Cloudflare. Deployed addresses are recorded in [`deployments/`](deployments/)
-— Polygon mainnet (137) and Polygon Amoy testnet (80002). Full picture:
+Cloudflare. Deployed addresses are recorded in [`deployments/`](deployments/).
+The testnets — Polygon Amoy (80002) and Mordor/ETC (63) — run the
+feature-complete upgradeable set; Polygon mainnet (137) is still the pre-UUPS
+set pending migration. Full picture:
 [Architecture guide](docs/developer-guide/architecture.md).
 
 ## Quick Start
@@ -184,8 +199,9 @@ contract MyOracleAdapter is IOracleAdapter {
 
 | Contract | Location | Description |
 |----------|----------|-------------|
-| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow |
-| `MembershipManager` | `contracts/access/` | Tiered memberships, rate limits |
+| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow, incl. open challenges (UUPS proxy) |
+| `MembershipManager` | `contracts/access/` | Tiered memberships, rate limits, voucher redemption (UUPS proxy) |
+| `MembershipVoucher` | `contracts/access/` | Transferable ERC-721 voucher → soulbound membership (immutable) |
 | `SanctionsGuard` | `contracts/access/` | Chainalysis screening + deny list |
 | `KeyRegistry` | `contracts/privacy/` | Encryption public keys |
 | `PolymarketOracleAdapter` | `contracts/oracles/` | Polymarket CTF outcomes |

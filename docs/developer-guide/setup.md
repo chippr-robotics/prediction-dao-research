@@ -61,19 +61,22 @@ npx hardhat compile
 
 ```
 prediction-dao-research/
-├── contracts/              # Solidity smart contracts
-│   ├── FutarchyGovernor.sol
-│   ├── WelfareMetricRegistry.sol
-│   ├── ProposalRegistry.sol
-│   ├── ConditionalMarketFactory.sol
-│   ├── PrivacyCoordinator.sol
-│   ├── OracleResolver.sol
-│   └── RagequitModule.sol
-├── test/                   # Contract tests (Mocha/Chai)
-│   ├── WelfareMetricRegistry.test.js
-│   └── ProposalRegistry.test.js
+├── contracts/              # Active Solidity smart contracts
+│   ├── wagers/
+│   │   └── WagerRegistry.sol            # escrow + open challenges (UUPS proxy)
+│   ├── access/
+│   │   ├── MembershipManager.sol        # tiers + voucher redemption (UUPS proxy)
+│   │   ├── MembershipVoucher.sol        # transferable ERC-721 voucher (immutable)
+│   │   └── SanctionsGuard.sol           # compliance screening
+│   ├── privacy/
+│   │   └── KeyRegistry.sol              # encryption public keys
+│   ├── oracles/                         # Polymarket / Chainlink (×2) / UMA adapters
+│   └── upgradeable/
+│       └── UUPSManaged.sol              # shared UUPS + AccessControl base
+│   # (contracts-archive/ holds superseded research — reference-only)
+├── test/                   # Hardhat tests: unit (*.test.js), integration/, fork/, oracles/, upgradeable/
 ├── scripts/                # Deployment and utility scripts
-│   └── deploy.js
+│   └── deploy/             # deploy + lib/upgradeable.js (deployProxy/upgradeProxy)
 ├── frontend/              # React frontend application
 │   ├── src/
 │   │   ├── components/   # React components

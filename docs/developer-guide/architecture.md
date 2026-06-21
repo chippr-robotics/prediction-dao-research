@@ -62,8 +62,9 @@ The active contracts live under `contracts/` (everything in
 
 | Contract | Directory | Responsibility |
 |----------|-----------|----------------|
-| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow: create, accept, resolve, draw, claim, refund |
-| `MembershipManager` | `contracts/access/` | Tiered, time-bound memberships (USDC); monthly & concurrent creation limits |
+| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow: create, accept, resolve, draw, claim, refund — including **open challenges** (code-gated, no named opponent). **UUPS proxy** (spec 025) |
+| `MembershipManager` | `contracts/access/` | Tiered, time-bound memberships (USDC); monthly & concurrent creation limits; **voucher redemption**. **UUPS proxy** (spec 027) |
+| `MembershipVoucher` | `contracts/access/` | Transferable ERC-721 bearer claim on a membership — bought with USDC, redeemed (burned) for a soulbound membership (spec 026). **Immutable** by design |
 | `SanctionsGuard` | `contracts/access/` | Non-bypassable screening against the Chainalysis oracle + operator deny list |
 | `KeyRegistry` | `contracts/privacy/` | Public encryption keys for end-to-end encrypted wager terms |
 | `PolymarketOracleAdapter` | `contracts/oracles/` | Reads outcomes from Polymarket's Conditional Token Framework |
@@ -76,6 +77,15 @@ All four oracle adapters implement the same `IOracleAdapter` interface
 resolves any oracle-typed wager through a uniform `autoResolveFromOracle` /
 `autoResolveFromPolymarket` path. See [Smart Contracts](smart-contracts.md)
 for per-contract detail and the lifecycle state machine.
+
+The two value-bearing core contracts are **UUPS upgradeable proxies**: their
+logic is swapped in place (state and addresses preserved) so features ship
+without stranding wagers or memberships. New upgradeable contracts inherit
+`contracts/upgradeable/UUPSManaged.sol`; storage stays append-only behind a
+`__gap` and `npm run check:storage-layout` gates every upgrade. See
+[Upgradeable Contracts](upgradeable-contracts.md) and
+[ADR-004](../adr/004-upgradeable-registry-uups.md). `MembershipVoucher` is the
+deliberate exception — a tradable bearer asset is kept immutable.
 
 ## Frontend layer
 
@@ -97,7 +107,7 @@ for per-contract detail and the lifecycle state machine.
 flowchart LR
     subgraph Reads
         RPC[Polygon JSON-RPC] -->|getWager / getUserWagers / events| Ctx[FriendMarketsContext cache]
-        SUB[Subgraph<br/>optional, legacy v1] -.fallback only.-> Ctx
+        SUB[Subgraph<br/>v2 WagerRegistry] -.draw proposals, transfers.-> Ctx
         Ctx --> UI[Dashboard / My Wagers]
     end
     subgraph Writes
@@ -106,9 +116,11 @@ flowchart LR
 ```
 
 - **Reads** go straight to the chain with ethers.js (`getWager`,
-  `getUserWagers`, event scans). The Graph subgraph under `subgraph/` indexes
-  the *legacy v1* `FriendGroupMarketFactory`, not `WagerRegistry`, so the live
-  app does not depend on it.
+  `getUserWagers`, event scans) for the wager lists. The Graph subgraph under
+  `subgraph/` now indexes the **v2 `WagerRegistry`** (spec 017, including a
+  per-transfer record) and sources specific features such as draw proposals;
+  the wager grid still reads direct-from-chain, so a subgraph outage degrades
+  gracefully. The legacy v1 `FriendGroupMarketFactory` is no longer indexed.
 - **Writes** are wallet transactions. In-flight transactions are tracked in
   localStorage so a page reload can resume a half-finished creation flow.
 - **Encrypted terms** never touch a server: the SPA encrypts client-side,
@@ -154,16 +166,19 @@ application backend.
 
 ## Networks and deployments
 
-| Network | Chain ID | Purpose | Record |
-|---------|----------|---------|--------|
-| Polygon mainnet | 137 | Production | `deployments/polygon-chain137-v2.json` |
-| Polygon Amoy | 80002 | Testnet | `deployments/amoy-chain80002-v2.json` |
-| Hardhat | 1337 | Local development | generated locally |
-| Mordor (ETC) | 63 | Testnet (Ethereum Classic, v2 core-only) | `deployments/mordor-chain63-v2.json` |
+| Network | Chain ID | Purpose | Contract set | Record |
+|---------|----------|---------|--------------|--------|
+| Polygon mainnet | 137 | Production | **Pre-UUPS** (plain contracts, no voucher; migration pending) | `deployments/polygon-chain137-v2.json` |
+| Polygon Amoy | 80002 | Testnet | Feature-complete (UUPS + voucher + open challenges) | `deployments/amoy-chain80002-v2.json` |
+| Hardhat | 1337 | Local development | Feature-complete | generated locally |
+| Mordor (ETC) | 63 | Testnet (Ethereum Classic, core-only) | Feature-complete, no oracle adapters | `deployments/mordor-chain63-v2.json` |
 
-Contracts deploy deterministically via the Safe Singleton Factory with a
-versioned salt prefix (`FairWins-P2P-v2.0-`) — see
-[Singleton Deployment Patterns](singleton-deployment-patterns.md).
+The original v2 set deployed deterministically via the Safe Singleton Factory
+with a versioned salt prefix (`FairWins-P2P-v2.0-`) — see
+[Singleton Deployment Patterns](singleton-deployment-patterns.md). The
+upgradeable contracts now live behind proxies; logic changes ship as in-place
+upgrades. The testnets (Amoy, Mordor) are feature-complete; Polygon mainnet
+still runs the pre-UUPS set pending the upgradeable migration.
 
 ### Mordor (Ethereum Classic testnet)
 
@@ -185,7 +200,8 @@ deployment record and operational links (explorer, faucet, Classic USD, ETCswap)
 - **Checks-effects-interactions** throughout; payouts are pull-based.
 - **Role separation**: `DEFAULT_ADMIN_ROLE` (config), `GUARDIAN_ROLE`
   (pause), `ACCOUNT_MODERATOR_ROLE` (freeze accounts), `ROLE_MANAGER_ROLE`
-  (memberships). No role can move escrowed stakes.
+  (memberships), `UPGRADER_ROLE` (authorizes UUPS upgrades). No role can move
+  escrowed stakes.
 - **Sanctions screening** on every create/accept via `SanctionsGuard`.
 - **CI security gates**: Slither, Medusa fuzzing, and the full Hardhat suite
   must pass — see [Security Testing](../security/index.md).

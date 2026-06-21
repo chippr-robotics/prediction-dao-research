@@ -2,8 +2,8 @@
 
 This guide shows how to make a value-bearing contract upgradeable by reusing the shared primitives built in
 spec 025 — **without reimplementing** the proxy, authorization, storage-safety, or deploy machinery
-(the PR #724 ask). `WagerRegistry` is the reference adopter; `MembershipManager` (and then the voucher
-feature) is the next.
+(the PR #724 ask). `WagerRegistry` is the reference adopter (spec 025); `MembershipManager` (spec 027) is the
+second, with voucher redemption (spec 026) shipped as its first in-place upgrade — both are now live.
 
 Background: [ADR-004](../adr/004-upgradeable-registry-uups.md). Operations:
 [runbooks/contract-upgrades.md](../runbooks/contract-upgrades.md).
@@ -83,10 +83,14 @@ function (state that defaults to 0 needs none).
    `deployProxy` and registered in the storage-layout check (`{ name: "MembershipManager", deploymentsKey:
    "membershipManager" }`). Behavior-neutral cutover (memberships are 30-day time-bound, so the legacy
    coexistence window drains in ~a month); `WagerRegistry` is repointed via `setMembershipManager(proxy)`.
-2. **Voucher redemption** (new feature): ships as the membership proxy's **first in-place upgrade** — append
-   the voucher state, add the redemption functions, `upgradeProxy({ name: "MembershipManager", proxyAddress })`.
-   No membership redeploy, no state migration, no broad role grant — exactly mirroring how feature 024 lands
-   on the WagerRegistry proxy.
+2. **Voucher redemption** (spec 026 — ✅ implemented): two parts. The tradable asset is a **separate,
+   immutable** `MembershipVoucher` (`contracts/access/MembershipVoucher.sol`) — an ERC-721 bearer claim that is
+   intentionally **not** upgradeable (a bearer asset's rules must not change after purchase, and it minimizes
+   the attack surface on a USDC-taking contract). Only the **mutable redemption logic** (screening, Terms,
+   grant) is added to the membership proxy as its **first in-place upgrade** — append the voucher pointer +
+   `redeemVoucher`/`setVoucher`, then `upgradeProxy({ name: "MembershipManager", proxyAddress })`. No membership
+   redeploy, no state migration, no broad role grant — exactly mirroring how feature 024 lands on the
+   WagerRegistry proxy. (So: don't make the voucher upgradeable; do ship its redemption logic as an upgrade.)
 
 ## Don'ts
 

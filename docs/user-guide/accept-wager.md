@@ -1,7 +1,13 @@
 # Accepting a Wager
 
 This guide walks you through accepting a wager someone created for you on
-FairWins.
+FairWins — one created **for your specific address** and shared by QR or link.
+
+!!! tip "Taking an open challenge instead?"
+    If someone gave you a **four-word code** rather than a direct link, you're
+    taking an *open challenge* — a wager with no named opponent. The flow is
+    slightly different (enter the code → approve → sign → confirm). See
+    [Open Challenges](open-challenges.md#taking-an-open-challenge).
 
 ## Prerequisites
 
@@ -41,13 +47,16 @@ the wrong network, the app offers a one-click switch.
 
 ### 4. Accept (or decline)
 
-Click **Accept**. You'll be prompted for up to two transactions:
+Click **Accept**. Accepting **escrows your matching stake**, so you'll be
+prompted for up to two transactions:
 
-1. **Approve** — allow `WagerRegistry` to take your USDC stake
+1. **Approve** — allow `WagerRegistry` to take your USDC stake (skipped if you
+   already have enough allowance)
 2. **Accept** — the `acceptWager` call; your stake joins the creator's in escrow
 
 Acceptance also screens both addresses against the sanctions oracle and checks
-your membership tier.
+your membership tier. (Taking an *open challenge* by code adds a signing step
+between the two — see [Open Challenges](open-challenges.md#taking-an-open-challenge).)
 
 Not interested? **Decline** rejects the offer and releases the creator's stake
 back to them immediately.

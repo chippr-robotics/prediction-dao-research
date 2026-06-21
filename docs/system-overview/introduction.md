@@ -10,7 +10,10 @@ the whole flow usable from a phone.
 It is deliberately **not** a prediction market. There is no order book, no
 liquidity pool, no market maker, and no token trading. Every wager is a private
 agreement between exactly two people (optionally with a named arbitrator), and
-the protocol's only job is to hold the stakes and pay the right person.
+the protocol's only job is to hold the stakes and pay the right person. You can
+name your opponent up front, or post an **open challenge** — a wager gated by a
+four-word code that whoever you share it with can take the other side of (see
+[How It Works](how-it-works.md#open-challenges-no-named-opponent)).
 
 > Before purchasing a membership, please read
 > [Roles and Tiers](roles-and-tiers.md) and the
@@ -89,14 +92,22 @@ flowchart LR
   See [Security Model](security.md) and [Account Moderation](account-moderation.md).
 - **Membership-gated creation.** Creating and accepting wagers requires an
   active membership tier (Bronze → Platinum, priced in USDC), which also rate
-  limits how many wagers an account can run concurrently. See
+  limits how many wagers an account can run concurrently. Memberships can be
+  bought directly (soulbound) or acquired by redeeming a transferable
+  **membership voucher** (a gift/resale-friendly ERC-721). See
   [Roles and Tiers](roles-and-tiers.md).
+- **Upgradeable, never redeployed.** The value-bearing core contracts
+  (`WagerRegistry`, `MembershipManager`) are UUPS proxies at stable addresses:
+  new features ship as in-place logic upgrades that preserve every wager,
+  membership, and balance — so an improvement never strands your funds. The
+  voucher token is the deliberate exception (immutable by design). See
+  [Upgradeable Contracts](../developer-guide/upgradeable-contracts.md).
 
 ## Where things live
 
 | Layer | Technology | Location |
 |-------|-----------|----------|
-| Contracts | Solidity (Hardhat) | `contracts/` — deployed on Polygon 137 & Amoy 80002 |
+| Contracts | Solidity (Hardhat) | `contracts/` — Polygon 137 (mainnet), Amoy 80002 & Mordor/ETC 63 (testnets). The testnets run the feature-complete upgradeable set; mainnet's UUPS migration is pending |
 | Frontend | React + Vite + wagmi/ethers | `frontend/` — served at [fairwins.app](https://fairwins.app) |
 | Encrypted metadata | IPFS (Pinata) | referenced from each wager's `metadataUri` |
 | Address book | JSON deployment records | `deployments/` (source of truth) |
