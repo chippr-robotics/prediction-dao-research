@@ -2,8 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
+import { useWeb3 } from '../../hooks/useWeb3'
 import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordlist.js'
 import WagerQRCode from '../ui/WagerQRCode'
+import AddressInput from '../ui/AddressInput'
+import AddressBookButton from '../ui/AddressBookButton'
+import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
@@ -94,21 +98,40 @@ function MakerPanel({ onClose }) {
   const [stake, setStake] = useState('10')
   const [resolutionType, setResolutionType] = useState(String(OPEN_RESOLUTION_TYPES.Either))
   const [arbitrator, setArbitrator] = useState('')
+  const [arbitratorResolved, setArbitratorResolved] = useState('')
+  // Deadlines (feature 024 feedback): the maker sets when the challenge can still be taken and when it must
+  // be resolved by, so the time constraints aren't hidden defaults. Stored as <input type="datetime-local">
+  // strings and converted to unix seconds on submit.
+  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * 3600 * 1000))
+  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * 3600 * 1000))
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
-  const arbitratorValid = !isThirdParty || isAddress(arbitrator)
-  const canCreate = description.trim().length > 0 && Number(stake) > 0 && arbitratorValid && !busy
+  const arbitratorAddr = arbitratorResolved || arbitrator
+  const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
+  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
+  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
+  const deadlinesValid =
+    Number.isFinite(acceptMs) && Number.isFinite(resolveMs) &&
+    acceptMs > Date.now() && resolveMs > acceptMs
+  const canCreate = description.trim().length > 0 && Number(stake) > 0 && arbitratorValid && deadlinesValid && !busy
 
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()
     setError(null)
     try {
       const res = await createOpenChallenge(
-        { description: description.trim(), stake, resolutionType: Number(resolutionType), arbitrator: isThirdParty ? arbitrator : undefined },
+        {
+          description: description.trim(),
+          stake,
+          resolutionType: Number(resolutionType),
+          arbitrator: isThirdParty ? arbitratorAddr : undefined,
+          acceptDeadline: Number.isFinite(acceptMs) ? Math.floor(acceptMs / 1000) : undefined,
+          resolveDeadline: Number.isFinite(resolveMs) ? Math.floor(resolveMs / 1000) : undefined,
+        },
         (p) => setProgress(p)
       )
       setResult(res)
@@ -117,7 +140,7 @@ function MakerPanel({ onClose }) {
     } finally {
       setProgress(null)
     }
-  }, [createOpenChallenge, description, stake, resolutionType, isThirdParty, arbitrator])
+  }, [createOpenChallenge, description, stake, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs])
 
   const handleCopy = useCallback(async () => {
     try {
@@ -194,11 +217,37 @@ function MakerPanel({ onClose }) {
       </div>
 
       {isThirdParty && (
-        <div className="fm-form-group fm-form-full">
-          <label htmlFor="oc-arb">Arbitrator address <span className="fm-required">*</span></label>
-          <input id="oc-arb" type="text" placeholder="0x…" value={arbitrator} onChange={(e) => setArbitrator(e.target.value)} disabled={busy} />
-          <span className="fm-hint">The arbitrator can read and resolve this challenge, and cannot also take it.</span>
-        </div>
+        <ArbitratorField
+          value={arbitrator}
+          onChange={setArbitrator}
+          onResolvedChange={setArbitratorResolved}
+          disabled={busy}
+        />
+      )}
+
+      {/* Time constraints (feature 024 feedback): make the deadlines explicit and editable. */}
+      <div className="fm-form-group">
+        <label htmlFor="oc-accept-by">Open for acceptance until <span className="fm-required">*</span></label>
+        <input
+          id="oc-accept-by" type="datetime-local" className="oc-datetime"
+          value={acceptBy} min={toDatetimeLocal(Date.now())}
+          onChange={(e) => setAcceptBy(e.target.value)} disabled={busy}
+        />
+        <span className="fm-hint">After this, the challenge can no longer be taken and your stake is refundable.</span>
+      </div>
+      <div className="fm-form-group">
+        <label htmlFor="oc-resolve-by">Must be resolved by <span className="fm-required">*</span></label>
+        <input
+          id="oc-resolve-by" type="datetime-local" className="oc-datetime"
+          value={resolveBy} min={acceptBy || toDatetimeLocal(Date.now())}
+          onChange={(e) => setResolveBy(e.target.value)} disabled={busy}
+        />
+        <span className="fm-hint">The outcome must be submitted before this time.</span>
+      </div>
+      {!deadlinesValid && (acceptBy || resolveBy) && (
+        <p className="fm-hint oc-deadline-warn" role="alert">
+          Pick an acceptance time in the future and a resolve time after it.
+        </p>
       )}
 
       {progress && <p className="fm-hint" role="status">{progress.message}</p>}
@@ -210,6 +259,62 @@ function MakerPanel({ onClose }) {
         </button>
       </div>
     </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Arbitrator entry — ENS-aware address input with address-book + QR-scan helpers
+// (feature 024 feedback). Isolated in its own component so the wallet-scoped
+// hooks (chainId, address book) only mount for the third-party path.
+// ---------------------------------------------------------------------------
+function ArbitratorField({ value, onChange, onResolvedChange, disabled }) {
+  const { chainId } = useWeb3()
+  const [scannerOpen, setScannerOpen] = useState(false)
+
+  const handleScan = useCallback((decodedText) => {
+    const addr = extractAddress(decodedText)
+    if (addr) {
+      onChange(addr)
+      onResolvedChange(addr)
+    }
+    setScannerOpen(false)
+  }, [onChange, onResolvedChange])
+
+  return (
+    <div className="fm-form-group fm-form-full">
+      <label htmlFor="oc-arb">Arbitrator address <span className="fm-required">*</span></label>
+      <div className="fm-input-with-action">
+        <div className="fm-address-input-wrap">
+          <AddressInput
+            id="oc-arb"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onResolvedChange={(addr) => onResolvedChange(addr || '')}
+            placeholder="0x… or ENS name — the neutral resolver"
+            disabled={disabled}
+          />
+        </div>
+        <AddressBookButton
+          chainId={chainId}
+          disabled={disabled}
+          onSelect={(entry) => { onChange(entry.address); onResolvedChange(entry.address) }}
+        />
+        <button
+          type="button"
+          className="fm-scan-btn"
+          onClick={() => setScannerOpen(true)}
+          disabled={disabled}
+          title="Scan QR code"
+          aria-label="Scan QR code"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
+          </svg>
+        </button>
+      </div>
+      <span className="fm-hint">The arbitrator can read and resolve this challenge, and cannot also take it.</span>
+      <QRScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScanSuccess={handleScan} />
+    </div>
   )
 }
 
@@ -258,10 +363,14 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
         <div className="fm-success-icon" aria-hidden="true">&#10003;</div>
         <h3>You&apos;ve taken the challenge</h3>
         <p className="fm-success-desc">You&apos;re now the bound opponent. Keep your code to re-read the private terms in future.</p>
-        {txHash && <p className="fm-success-details">Transaction: <code>{shorten(txHash)}</code></p>}
         <div className="fm-success-actions">
           <button type="button" className="fm-btn-primary fm-success-done" onClick={onClose}>Done</button>
         </div>
+        {txHash && (
+          <p className="oc-tx-note">
+            Confirmed on-chain · <code className="oc-tx-hash">{shorten(txHash)}</code>
+          </p>
+        )}
       </div>
     )
   }
@@ -280,6 +389,9 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
             <pre className="oc-terms-body">{formatTerms(found.terms)}</pre>
           )}
         </div>
+
+        {/* Time constraints (feature 024 feedback): state the deadlines so the taker knows the window. */}
+        <ChallengeDeadlines wager={found.wager} />
 
         {found.needsMembership ? (
           <>
@@ -348,6 +460,54 @@ function stepClass(current, step) {
 
 function stepLabel(step) {
   return STEP_LABELS[step] || 'Accepting'
+}
+
+/** Show an open challenge's accept/resolve deadlines (feature 024). Reads the on-chain wager struct. */
+function ChallengeDeadlines({ wager }) {
+  const accept = formatDeadline(wager?.acceptDeadline)
+  const resolve = formatDeadline(wager?.resolveDeadline)
+  if (!accept && !resolve) return null
+  return (
+    <div className="oc-deadlines" aria-label="Challenge time constraints">
+      {accept && (
+        <div className="oc-deadline">
+          <span className="oc-deadline-label">Take by</span>
+          <span className="oc-deadline-value">{accept}</span>
+        </div>
+      )}
+      {resolve && (
+        <div className="oc-deadline">
+          <span className="oc-deadline-label">Resolve by</span>
+          <span className="oc-deadline-value">{resolve}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Format an on-chain unix-seconds deadline (bigint/number) as a local date-time, or '' if unset. */
+function formatDeadline(value) {
+  if (value == null) return ''
+  const secs = typeof value === 'bigint' ? Number(value) : Number(value)
+  if (!Number.isFinite(secs) || secs <= 0) return ''
+  try {
+    return new Date(secs * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return ''
+  }
+}
+
+/** Format a unix-ms instant as a value for <input type="datetime-local"> (local time, minute precision). */
+function toDatetimeLocal(ms) {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000)
+  return d.toISOString().slice(0, 16)
+}
+
+/** Pull a 0x-address out of scanned QR text — a bare address or one embedded in a URL path/query. */
+function extractAddress(decodedText) {
+  if (!decodedText) return null
+  const match = String(decodedText).match(/0x[a-fA-F0-9]{40}/)
+  return match ? match[0] : null
 }
 
 function formatTerms(terms) {

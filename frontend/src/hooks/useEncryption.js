@@ -931,6 +931,27 @@ export function useLazyMarketDecryption(markets) {
     }
   }, [markets, decryptionCache, decryptingIds, isEncrypted, decryptMetadata, account])
 
+  // Inject an already-decrypted metadata object into the cache. Used by the
+  // open-challenge (feature 024) flow, whose terms are sealed under a code-derived
+  // symmetric key — not a recipient key — so they're decrypted out-of-band (the
+  // user supplies their four-word code) rather than through decryptMetadata's
+  // wallet-key path. Storing the result here lets the shared view model render the
+  // revealed terms exactly as it does for recipient-keyed wagers.
+  const setDecryptedMetadata = useCallback((marketId, metadata) => {
+    const marketIdStr = String(marketId)
+    setDecryptionCache(prev => {
+      const next = new Map(prev)
+      next.set(marketIdStr, { metadata, timestamp: Date.now() })
+      return next
+    })
+    setDecryptionErrors(prev => {
+      if (!prev.has(marketIdStr)) return prev
+      const next = new Map(prev)
+      next.delete(marketIdStr)
+      return next
+    })
+  }, [])
+
   // Check if a specific market is currently decrypting
   const isMarketDecrypting = useCallback((marketId) => {
     return decryptingIds.has(String(marketId))
@@ -993,6 +1014,9 @@ export function useLazyMarketDecryption(markets) {
 
     // Function to decrypt a single market on demand
     decryptMarket,
+
+    // Inject an out-of-band decryption (open challenges — code-keyed terms)
+    setDecryptedMetadata,
 
     // Check if a specific market is currently decrypting
     isMarketDecrypting,

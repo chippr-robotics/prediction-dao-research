@@ -48,6 +48,31 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     expect(screen.getByLabelText(/QR code to take this challenge/i)).toBeInTheDocument()
   })
 
+  it('Maker: passes the chosen accept/resolve deadlines (seconds) to createOpenChallenge', async () => {
+    createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
+    const form = createOpenChallenge.mock.calls[0][0]
+    expect(typeof form.acceptDeadline).toBe('number')
+    expect(typeof form.resolveDeadline).toBe('number')
+    // Resolve must be after accept, and accept must be in the future.
+    expect(form.resolveDeadline).toBeGreaterThan(form.acceptDeadline)
+    expect(form.acceptDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
+  })
+
+  it('Maker: disables create when the resolve time is not after the accept time', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    const createBtn = screen.getByRole('button', { name: /create & generate code/i })
+    expect(createBtn).toBeEnabled()
+    // Set resolve-by into the past relative to accept-by → invalid window.
+    fireEvent.change(screen.getByLabelText(/must be resolved by/i), { target: { value: '2000-01-01T00:00' } })
+    expect(createBtn).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/future/i)
+  })
+
   it('Taker: pre-fills the code from a deep link (initialCode) and enables lookup', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" initialCode="river tiger kite zoo" />)
     expect(screen.getByLabelText(/word code/i)).toHaveValue('river tiger kite zoo')

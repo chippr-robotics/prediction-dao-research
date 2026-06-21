@@ -125,3 +125,61 @@
   border-color: var(--fm-accent, #2fbf71);
   color: #0a0a0a;
 }
+
+/* Datetime inputs for the maker's accept/resolve deadlines. */
+.oc-datetime {
+  color-scheme: dark;
+}
+
+.oc-deadline-warn {
+  color: #d99b00;
+}
+
+/* Read-only deadline summary on the taker's "challenge found" view. */
+.oc-deadlines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--fm-surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+}
+
+.oc-deadline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.oc-deadline-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fm-text-muted, rgba(255, 255, 255, 0.55));
+}
+
+.oc-deadline-value {
+  font-size: 0.88rem;
+  color: var(--fm-text, rgba(255, 255, 255, 0.9));
+}
+
+/* Subtle post-accept transaction footnote (feature 024 feedback): de-emphasized,
+   not a headline. Replaces the prominent "Transaction: …" line. */
+.oc-tx-note {
+  margin: 0.85rem 0 0;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--fm-text-muted, rgba(255, 255, 255, 0.45));
+}
+
+.oc-tx-hash {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+/* Code-decrypt prompt reuses the shared modal chrome; keep it compact. */
+.oc-decrypt-modal {
+  max-width: 460px;
+}
