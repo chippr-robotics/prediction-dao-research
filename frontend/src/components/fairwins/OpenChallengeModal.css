@@ -70,3 +70,58 @@
   border: 1px solid rgba(255, 184, 0, 0.35);
   color: #d99b00;
 }
+
+/* Take-a-challenge step checklist — shows the approve → sign → confirm sequence. */
+.oc-steps {
+  list-style: none;
+  counter-reset: oc-step;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0;
+}
+
+.oc-step {
+  counter-increment: oc-step;
+  position: relative;
+  padding: 0.35rem 0 0.35rem 2rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--fm-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.oc-step::before {
+  content: counter(oc-step);
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 50%;
+  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.2));
+  color: inherit;
+}
+
+.oc-step--active {
+  color: var(--fm-accent, #2fbf71);
+  font-weight: 600;
+}
+
+.oc-step--active::before {
+  border-color: var(--fm-accent, #2fbf71);
+  color: var(--fm-accent, #2fbf71);
+}
+
+.oc-step--done {
+  color: var(--fm-text, rgba(255, 255, 255, 0.85));
+}
+
+.oc-step--done::before {
+  content: '\2713';
+  background: var(--fm-accent, #2fbf71);
+  border-color: var(--fm-accent, #2fbf71);
+  color: #0a0a0a;
+}
