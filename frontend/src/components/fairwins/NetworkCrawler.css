@@ -1,0 +1,118 @@
+/* Subtle deployed-networks ticker that sits beneath the header bar. Thin,
+   low-contrast, and quietly scrolling so it reads as a trust signal rather
+   than a call to action. */
+.network-crawler {
+  overflow: hidden;
+  width: 100%;
+  padding: 0.3rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  /* Fade the edges so items slide in/out instead of popping at the borders. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+.network-crawler-track {
+  display: flex;
+  width: max-content;
+  animation: network-crawl 32s linear infinite;
+}
+
+/* Pause so the explorer links can actually be clicked. */
+.network-crawler:hover .network-crawler-track,
+.network-crawler:focus-within .network-crawler-track {
+  animation-play-state: paused;
+}
+
+.network-crawler-group {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Right margin on every item (including the last of each group) provides the
+   inter-item spacing AND the seam between the two groups, so translateX(-50%)
+   loops without a visible jump. */
+.network-crawler-group > li {
+  margin-right: 2.25rem;
+}
+
+.network-crawler-label {
+  color: rgba(123, 220, 181, 0.7);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.network-crawler-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(230, 237, 243, 0.5);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a.network-crawler-item:hover {
+  color: rgba(230, 237, 243, 0.92);
+}
+
+.network-crawler-dot {
+  width: 5px;
+  height: 5px;
+  background: #36B37E;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.network-crawler-tag {
+  color: rgba(158, 197, 255, 0.55);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@keyframes network-crawl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* No motion: drop the scroll, hide the duplicate copy, and let the row scroll
+   manually if it overflows. */
+@media (prefers-reduced-motion: reduce) {
+  .network-crawler {
+    overflow-x: auto;
+  }
+
+  .network-crawler-track {
+    animation: none;
+  }
+
+  .network-crawler-group[aria-hidden='true'] {
+    display: none;
+  }
+}

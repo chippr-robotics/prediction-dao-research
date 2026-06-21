@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import LiveStats from './fairwins/LiveStats'
-import DeployedNetworks from './fairwins/DeployedNetworks'
 import Footer from './Footer'
 import { useChainTokens } from '../hooks/useChainTokens'
 import './LandingPage.css'
@@ -51,8 +50,6 @@ function LandingPage() {
         </div>
 
         <div className="hero-content">
-          <DeployedNetworks />
-
           <h1 className="hero-headline">
             Your Wager.<br />
             <span className="hero-headline-accent">Your Rules.</span><br />
