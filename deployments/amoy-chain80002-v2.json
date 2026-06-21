@@ -17,7 +17,8 @@
     "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3",
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
     "chainlinkFunctionsAdapter": "0x074fC18C1E322a7537b53B8B2Bf0762629E3b532",
-    "umaAdapter": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88"
+    "umaAdapter": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88",
+    "voucherBatchMinter": "0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1"
   },
   "mocks": {
     "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",
@@ -51,13 +52,17 @@
       "0xd8866E76441df243fc98B892362Fc6264dC3ca80"
     ],
     "mockSanctionsOracle": [],
-    "mockPolymarketCTF": []
+    "mockPolymarketCTF": [],
+    "voucherBatchMinter": [
+      "0x33C8Ccacf6442Cf4238f01419e38C781cB859769"
+    ]
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:38:55.285Z",
   "deployBlocks": {
     "wagerRegistry": 40521027,
     "membershipManager": 40521018,
-    "membershipVoucher": 40521024
+    "membershipVoucher": 40521024,
+    "voucherBatchMinter": 40545690
   }
 }

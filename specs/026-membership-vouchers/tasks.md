@@ -196,8 +196,21 @@ membership proxy.
 > ⏳ **NETWORK-GATED — not runnable in this dev environment.** Requires live RPCs + the air-gapped floppy
 > keystore and maintainer sign-off; depends on feature 027's membership proxy being deployed on the network.
 
-- [ ] T026 Deploy `MembershipVoucher` (immutable) to **Amoy**; apply the `redeemVoucher` append-only upgrade to the membership proxy via `upgradeProxy`; `MembershipManager.setVoucher(voucher)`; verify + sync; record `membershipVoucher` + new `membershipManagerImpl` in `deployments/amoy-chain80002-v2.json`. Validate the quickstart on Amoy. Sign-off gate before mainnet.
-- [ ] T027 After sign-off, repeat on **Polygon** mainnet (chainId 137): deploy voucher, apply the redeem upgrade, `setVoucher`, verify, sync, record. (SC-006)
+- [X] T026 Deploy `MembershipVoucher` (immutable) to **Amoy** + **Mordor**; apply the `redeemVoucher` append-only upgrade to the membership proxy via `upgradeProxy`; `MembershipManager.setVoucher(voucher)`; verify + sync; record `membershipVoucher` + new `membershipManagerImpl`. (Both testnets feature-complete.)
+- [ ] T027 After sign-off, repeat on **Polygon** mainnet (chainId 137): deploy voucher, apply the redeem upgrade, `setVoucher`, verify, sync, record. (SC-006) — pending the mainnet UUPS migration.
+
+---
+
+## Phase 11: Batch & gift convenience (helper)
+
+**Purpose**: Buy a quantity of vouchers and gift them directly to an address in one transaction, and redeem by
+picking from the wallet's held vouchers. Delivered by the immutable, custody-free `VoucherBatchMinter`
+(FR-001a–FR-001d, FR-011a).
+
+- [X] T028 New immutable `contracts/access/VoucherBatchMinter.sol`: `mintBatch(role, tier, quantity, recipient)` — pull `quantity × price` once, mint the batch, forward every token to `recipient` in the same tx, reset allowance; `nonReentrant` + `IERC721Receiver`; `MAX_QUANTITY = 50`; no admin/withdrawal/upgrade. (FR-001a–FR-001c)
+- [X] T029 [P] `test/access/VoucherBatchMinter.test.js`: exact accounting, gift-to-recipient, no residual funds/allowance/NFTs, quantity bounds, zero-recipient, inactive tier, snapshot correctness (9 cases).
+- [X] T030 [P] Frontend: `useVouchers.mintVouchers(role, tier, quantity, recipient)` routes through the helper for quantity > 1 / gifts and falls back to a direct single self-mint when the helper isn't deployed; `listMyVouchers()` enumerates holdings via a bounded `Transfer` scan; `VouchersPage` gains a quantity input, validated gift-address, live total, selectable held-voucher list, and graceful "not available yet" notes. (FR-001a/b/d, FR-011a)
+- [X] T031 Deploy `VoucherBatchMinter` to **Amoy** + **Mordor** via `scripts/deploy/deploy-voucher-batch-minter.js` (does not touch the live UUPS proxies); verify (Mordor ✓ on Blockscout; Amoy verification blocked on the invalid Etherscan key); sync `voucherBatchMinter` into `frontend/src/config/contracts.js` per chain. Polygon pending the mainnet migration.
 
 ---
 

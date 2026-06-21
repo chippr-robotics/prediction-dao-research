@@ -27,6 +27,24 @@ membership authority. The redeemed membership reuses the **existing** `Membershi
 `treasury` and per-tier `priceUSDC`/`durationDays`/`active` are **read live** from `membershipManager` (not
 duplicated). Royalty `receiver` is `membershipManager.treasury()` resolved via ERC-2981 `royaltyInfo`.
 
+### VoucherBatchMinter (immutable helper — batch & gift)
+
+A stateless, custody-free helper over the immutable voucher (whose `mint()` makes one token, to the caller).
+All fields are `immutable` (no mutable storage):
+
+| # | Variable | Type | Notes |
+|---|----------|------|-------|
+| 1 | `voucher` | `address` (immutable) | the `MembershipVoucher` it mints from |
+| 2 | `manager` | `address` (immutable) | config source (tier price), read from the voucher's `membershipManager()` |
+| 3 | `paymentToken` | `address` (immutable) | USDC-like token, read from the manager |
+| — | `MAX_QUANTITY` | `constant = 50` | per-batch cap (bounded gas) |
+
+`mintBatch(role, tier, quantity, recipient)`: price `quantity × priceUSDC`, pull it once from the buyer,
+`forceApprove` the voucher, loop `mint()` (each mint pulls `price` to the treasury) and `transferFrom` every
+token to `recipient`, then reset the allowance to 0. `nonReentrant`; `IERC721Receiver` so it can hold the
+freshly minted token for the same-tx forward. Emits `BatchMinted(buyer, recipient, role, tier, quantity,
+totalPaid, firstId, lastId)`. No admin, no withdrawal path, no upgradeability (FR-001a–FR-001c).
+
 ### MembershipManager (append-only upgrade)
 
 Existing slots (tiers, memberships, payment token, treasury, accruedFees, sanctionsGuard, memberTermsHash,
@@ -50,6 +68,12 @@ ledger (the burn + membership write are the only effects).
 
 **Transfer/resale** — standard ERC-721; no membership effect (FR-003). Royalty advertised via ERC-2981
 (2.5%, receiver = treasury), best-effort (FR-021).
+
+**Batch mint** (`VoucherBatchMinter.mintBatch`)
+- `recipient != 0` and `1 ≤ quantity ≤ MAX_QUANTITY` — else revert (FR-001a/FR-001b).
+- Tier active with `priceUSDC > 0` — else revert.
+- Pull exactly `quantity × priceUSDC` from the buyer once; forward every minted token to `recipient` in the
+  same tx; reset allowance to 0; atomic (any mint reverts the batch). No funds/NFTs held at rest (FR-001c).
 
 **Redeem** (`MembershipManager.redeemVoucher(voucherId, acceptedTermsHash)`)
 - `voucher` MUST be configured; caller MUST own `voucherId` — else revert.

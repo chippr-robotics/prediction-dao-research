@@ -28,8 +28,16 @@ Technical approach (smallest change that satisfies the spec):
 - **Reuse the merged 025 primitives**: the redeem upgrade rides `contracts/upgradeable/UUPSManaged.sol`, the
   `scripts/deploy/lib/upgradeable.js` proxy/upgrade tooling, and the `npm run check:storage-layout` CI gate —
   all already merged via #724. Nothing in the proxy machinery is re-derived.
-- **Integration**: subgraph indexes voucher mint/transfer/redeem; frontend adds mint/gift/redeem flows with an
-  honest privacy disclosure and royalty display, sourced only from synced artifacts.
+- **New immutable `VoucherBatchMinter` (batch & gift helper)**: the immutable voucher mints exactly one token
+  to the caller, so "buy N" and "gift to an address" are delivered by a separate immutable, custody-free helper
+  (`mintBatch(role, tier, quantity, recipient)`) that pulls `quantity × price` once, mints the batch, forwards
+  every token to `recipient` in the same tx, and resets its allowance — atomic, no admin/withdrawal/upgrade,
+  `MAX_QUANTITY = 50`. Strictly additive: when it isn't deployed, single self-mint still works and the UI
+  degrades to an honest "not available yet" state (FR-001a–FR-001d). See Decision D1 (same immutability
+  rationale as the voucher).
+- **Integration**: subgraph indexes voucher mint/transfer/redeem; frontend adds buy-a-quantity / gift-to-address
+  mint, a select-from-your-held-vouchers redeem (bounded `Transfer` scan, honest empty state), an honest privacy
+  disclosure, and royalty display — sourced only from synced artifacts.
 
 ### ⚠️ Hard prerequisite (out of scope here, must land first)
 
@@ -156,6 +164,8 @@ contracts/
 ├── access/
 │   ├── MembershipVoucher.sol        # NEW (immutable): ERC721 + ERC721Burnable + ERC2981; mint(role,tier);
 │   │                                #   VoucherInfo{role,tier,durationDays}; on-chain tokenURI; royalty (2.5%/cap 5%)
+│   ├── VoucherBatchMinter.sol       # NEW (immutable, custody-free): mintBatch(role,tier,quantity,recipient);
+│   │                                #   buy-N + gift in one tx; MAX_QUANTITY=50; no admin/withdrawal/upgrade
 │   └── MembershipManager.sol        # EDIT (append-only upgrade, post-migration): + address voucher; + setVoucher;
 │                                    #   + redeemVoucher(voucherId, acceptedTermsHash); reduce __gap; new events
 └── interfaces/
@@ -165,6 +175,8 @@ contracts/
 test/
 ├── access/
 │   ├── MembershipVoucher.test.js    # NEW: mint/price/transfer/burn-auth/royalty cap/tokenURI
+│   ├── VoucherBatchMinter.test.js   # NEW: exact accounting, gift-to-recipient, no residual funds/allowance/NFTs,
+│   │                                #   quantity bounds, zero-recipient, inactive tier, snapshot correctness
 │   └── MembershipManager.redeem.test.js  # NEW: redeem happy + fail-closed + already-active + double-redeem + drift
 ├── integration/
 │   └── voucher-redeem-membership.test.js # NEW: redeemed membership == direct membership across WagerRegistry
@@ -173,17 +185,20 @@ test/
 └── (existing membership + wager suites)  # MUST pass unchanged (FR-008/FR-023)
 
 scripts/deploy/
-├── deploy.js                        # EDIT: deploy MembershipVoucher (immutable); wire voucher↔manager;
-│                                    #   apply redeem upgrade to the membership proxy via lib/upgradeable.js
+├── deploy.js                        # EDIT: deploy MembershipVoucher (immutable) + VoucherBatchMinter; wire
+│                                    #   voucher↔manager; apply redeem upgrade to the membership proxy
+├── deploy-voucher-batch-minter.js   # NEW: targeted single-contract deploy of VoucherBatchMinter against an
+│                                    #   already-deployed voucher (does NOT touch the live UUPS proxies)
 └── (lib/upgradeable.js, check-storage-layout.js)  # REUSE unchanged (merged via #724)
 
 subgraph/
 ├── schema.graphql                   # EDIT: + Voucher entity (status: Held/Redeemed) + VoucherRedeemed
 └── src/*                            # EDIT: map VoucherMinted / Transfer / VoucherRedeemed
 
-frontend/src/                        # EDIT: mint (choose role+tier, approve+pay USDC), gift/resell hint,
-│                                    #   redeem (connect wallet, accept T&C, screen, redeem-to-this-wallet),
-│                                    #   honest privacy disclosure, royalty display — all via synced artifacts
+frontend/src/                        # EDIT: mint (choose role+tier, buy a quantity, optional gift-to-address,
+│                                    #   approve+pay USDC via VoucherBatchMinter; single self-mint fallback),
+│                                    #   redeem (pick from your held vouchers via a bounded Transfer scan, honest
+│                                    #   empty state, accept T&C, screen), privacy disclosure, royalty display
 deployments/*.json                   # EDIT: record membershipVoucher address (+ existing membership proxy/impl)
 ```
 
