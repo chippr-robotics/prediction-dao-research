@@ -24,39 +24,50 @@ or from the stakes recorded on the `Wager` at creation (opponent deposit, refund
 ## Per-network config (no genesis indexing)
 
 Addresses + start blocks live in [`networks.json`](./networks.json), sourced from
-`deployments/<net>-v2.json` (`deployBlocks.wagerRegistry`). Never `0x0` / `startBlock: 0`
+`deployments/<net>-v2.json` (`deployBlocks.*`). Never `0x0` / `startBlock: 0`
 — indexing from genesis is what caused the RPC issue this work removes.
 
 Use The Graph's **canonical** network ids (Studio rejects aliases): Polygon
 mainnet is `matic` (not `polygon`); Amoy is `polygon-amoy`.
 
-| Network (manifest id) | chainId | startBlock |
-|-----------------------|--------:|-----------:|
-| matic (Polygon mainnet) | 137 | 88118344 |
-| mordor | 63 | 16376172 |
-| polygon-amoy | 80002 | 40172425 |
+The manifest's inline defaults target **`polygon-amoy`** — the membership voucher
+feature (spec 026) is live on Amoy + Mordor only, so a bare `graph build` produces
+a valid, fully-featured subgraph. `matic` carries `WagerRegistry` only until the
+voucher + redemption manager ship to mainnet, so `graph build --network matic`
+fails by design (`'MembershipVoucher' was not found in the 'matic' configuration`).
+
+| Network (manifest id) | chainId | WagerRegistry | MembershipVoucher | MembershipManager |
+|-----------------------|--------:|--------------:|------------------:|------------------:|
+| matic (Polygon mainnet) | 137 | 88118344 | — (deferred) | — (deferred) |
+| mordor | 63 | 16404317 | 16404315 | 16404308 |
+| polygon-amoy | 80002 | 40521027 | 40521024 | 40521018 |
 
 ## Build, test, deploy
 
 ```sh
 cd subgraph && npm install
 
-# 1. Generate the JSON ABI the manifest consumes (generated artifact, never hand-copied):
-npm --prefix .. run sync:frontend-contracts:polygon   # emits ../frontend/src/abis/WagerRegistry.json
+# 1. Generate the JSON ABIs the manifest consumes (generated artifacts, never hand-copied):
+npm --prefix .. run sync:frontend-contracts:polygon   # emits ../frontend/src/abis/{WagerRegistry,MembershipVoucher,MembershipManager}.json
 
 # 2. Codegen + build + unit tests:
 npm run codegen
-npm run build            # or: graph build --network <matic|mordor|polygon-amoy>
+npm run build            # default = polygon-amoy. Other nets: graph build --network <mordor|matic>
+                         # NOTE: `--network <net>` rewrites subgraph.yaml in place (and strips
+                         # comments). Restore it afterwards: git checkout -- subgraph.yaml
 npm test                 # Matchstick (graph test). On platforms whose prebuilt
                          # binary is unsupported, run: npx graph test -d  (Docker)
 
 # 3. Deploy one subgraph per network (Graph Studio). The Studio slug differs per
 #    network; build+deploy in one step with --network (reads networks.json):
 graph auth <DEPLOY_KEY>  # secret — keep in local .env, never commit
-graph deploy fairwins-polygon --studio --network matic        -l <ver>   # Polygon mainnet (137)
-graph deploy fairwins-amoy    --studio --network polygon-amoy -l <ver>   # Amoy testnet (80002)
+graph deploy fairwins-amoy    --studio --network polygon-amoy -l <ver>   # Amoy testnet (80002) — wagers + vouchers
+# Polygon mainnet (matic, 137): wagers only until the voucher + redemption manager
+# ship to mainnet (add their matic entries to networks.json first):
+graph deploy fairwins-polygon --studio --network matic        -l <ver>
 # Mordor (63) is not supported by Studio -> no subgraph; the frontend uses the
-# bounded RPC fallback for it (research R2).
+# bounded RPC fallback for it (research R2). `npm run build:mordor` is for a
+# self-hosted graph-node only.
 ```
 
 Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
@@ -71,6 +82,11 @@ Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
   watcher can surface draw proposals without an `eth_getLogs` scan.
 - **WagerTransfer** (immutable) — one row per value movement, keyed by
   `txHash-logIndex-party` (unique even when one log refunds two parties).
+- **Voucher** (spec 026) — a transferable membership voucher NFT and its
+  lifecycle. Created `held` on `VoucherMinted`, ownership tracked across
+  gifts/resales via ERC-721 `Transfer`, and flipped to `redeemed` (or `burned`)
+  when `MembershipManager.MembershipRedeemed` fires. On-chain/public by nature;
+  no contract calls in the handlers.
 
 See `schema.graphql` and `specs/017-subgraph-v2-wager-transfers/` for the full
 contract.

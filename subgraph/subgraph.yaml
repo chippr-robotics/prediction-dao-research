@@ -1,23 +1,41 @@
 specVersion: 0.0.5
-description: v2 WagerRegistry wagers + per-transfer records for the prediction-dao-research app
+description: v2 WagerRegistry wagers + per-transfer records and membership vouchers (spec 026) for the prediction-dao-research app
 schema:
   file: ./schema.graphql
 
 # Per-network address + startBlock live in networks.json; build per network with
-#   graph build --network <matic|mordor|polygon-amoy>
+#   graph build --network <polygon-amoy|mordor|matic>
 # `matic` is The Graph's canonical network id for Polygon mainnet (137); the
 # alias `polygon` is rejected by the Studio deploy node ("network is not
 # supported"). Amoy's canonical id is `polygon-amoy`.
-# The defaults below target Polygon (137). NEVER use 0x0 / startBlock 0 — indexing
-# from genesis is the root cause of the RPC flood this work removes (issue #703/#704).
+#
+# NOTE: `graph build --network <net>` REWRITES this file in place (and strips
+# comments). Build via the package.json scripts (build:amoy/build:mordor) which
+# operate on a copy, or restore this file from git afterwards.
+#
+# DEFAULT NETWORK: polygon-amoy (80002). The voucher feature (spec 026) and the
+# redemption-enabled MembershipManager proxy are deployed on the Amoy and Mordor
+# testnets only — NOT yet on Polygon mainnet (matic). The inline defaults below
+# therefore target Amoy so a bare `graph build` (and `--network polygon-amoy`)
+# produces a valid, fully-featured subgraph. `graph build --network mordor`
+# rebuilds the same data sources against Mordor via networks.json.
+#
+# matic (Polygon mainnet) is DEFERRED: networks.json only carries WagerRegistry
+# for matic, so `graph build --network matic` fails by design ("'MembershipVoucher'
+# was not found in the 'matic' configuration") — a mixed-network manifest is
+# rejected. When the voucher + redemption manager ship to mainnet, add their
+# matic entries to networks.json and matic builds will work.
+#
+# NEVER use 0x0 / startBlock 0 — indexing from genesis is the root cause of the
+# RPC flood this work removes (issue #703/#704).
 dataSources:
   - kind: ethereum
     name: WagerRegistry
-    network: matic
+    network: polygon-amoy
     source:
-      address: "0x5023765809fDA93ab9F11B684fdb76521eD31774"
+      address: "0xA429CdaD3E1497e33BEA7D6FE7d6913fE880241b"
       abi: WagerRegistry
-      startBlock: 88118344
+      startBlock: 40521027
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -53,57 +71,51 @@ dataSources:
           handler: handleDrawRevoked
       file: ./src/mappings/wagerRegistry.ts
 
-# ---------------------------------------------------------------------------
-# Membership vouchers (spec 026) — ENABLE AT DEPLOY (Phase 10).
-# The voucher (immutable) and the upgradeable MembershipManager proxy are not
-# yet deployed, so there is no valid address/startBlock. Per the project rule,
-# NEVER ship 0x0 / startBlock 0 (RPC-flood from genesis). At deploy:
-#   1) run `npm run sync:frontend-contracts:<net>` so
-#      ../frontend/src/abis/MembershipVoucher.json and MembershipManager.json exist,
-#   2) add the per-network `MembershipVoucher` + `MembershipManager` address+startBlock
-#      to networks.json (from deployments/<net>.json),
-#   3) uncomment the two dataSources below and `graph codegen && graph build --network <net>`.
-# Schema (Voucher) and handlers (./src/mappings/membershipVoucher.ts) are already in place.
-# ---------------------------------------------------------------------------
-#  - kind: ethereum
-#    name: MembershipVoucher
-#    network: matic
-#    source:
-#      address: "0x0000000000000000000000000000000000000000" # FILL from deployments (membershipVoucher)
-#      abi: MembershipVoucher
-#      startBlock: 0 # FILL: voucher deploy block
-#    mapping:
-#      kind: ethereum/events
-#      apiVersion: 0.0.7
-#      language: wasm/assemblyscript
-#      entities:
-#        - Voucher
-#      abis:
-#        - name: MembershipVoucher
-#          file: ../frontend/src/abis/MembershipVoucher.json
-#      eventHandlers:
-#        - event: VoucherMinted(indexed uint256,indexed address,indexed bytes32,uint8,uint32,uint128)
-#          handler: handleVoucherMinted
-#        - event: Transfer(indexed address,indexed address,indexed uint256)
-#          handler: handleTransfer
-#      file: ./src/mappings/membershipVoucher.ts
-#  - kind: ethereum
-#    name: MembershipManager
-#    network: matic
-#    source:
-#      address: "0x0000000000000000000000000000000000000000" # FILL from deployments (membershipManager proxy)
-#      abi: MembershipManager
-#      startBlock: 0 # FILL: membership proxy deploy block
-#    mapping:
-#      kind: ethereum/events
-#      apiVersion: 0.0.7
-#      language: wasm/assemblyscript
-#      entities:
-#        - Voucher
-#      abis:
-#        - name: MembershipManager
-#          file: ../frontend/src/abis/MembershipManager.json
-#      eventHandlers:
-#        - event: MembershipRedeemed(indexed address,indexed bytes32,uint8,indexed uint256,uint64)
-#          handler: handleMembershipRedeemed
-#      file: ./src/mappings/membershipVoucher.ts
+  # ---------------------------------------------------------------------------
+  # Membership vouchers (spec 026). Schema (Voucher) + handlers
+  # (./src/mappings/membershipVoucher.ts) ship with the manifest. Per-network
+  # address + startBlock live in networks.json; defaults below target Amoy.
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: MembershipVoucher
+    network: polygon-amoy
+    source:
+      address: "0x33C8Ccacf6442Cf4238f01419e38C781cB859769"
+      abi: MembershipVoucher
+      startBlock: 40521024
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Voucher
+      abis:
+        - name: MembershipVoucher
+          file: ../frontend/src/abis/MembershipVoucher.json
+      eventHandlers:
+        - event: VoucherMinted(indexed uint256,indexed address,indexed bytes32,uint8,uint32,uint128)
+          handler: handleVoucherMinted
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+      file: ./src/mappings/membershipVoucher.ts
+
+  - kind: ethereum
+    name: MembershipManager
+    network: polygon-amoy
+    source:
+      address: "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465"
+      abi: MembershipManager
+      startBlock: 40521018
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Voucher
+      abis:
+        - name: MembershipManager
+          file: ../frontend/src/abis/MembershipManager.json
+      eventHandlers:
+        - event: MembershipRedeemed(indexed address,indexed bytes32,uint8,indexed uint256,uint64)
+          handler: handleMembershipRedeemed
+      file: ./src/mappings/membershipVoucher.ts

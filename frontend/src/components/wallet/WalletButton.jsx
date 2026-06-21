@@ -387,6 +387,13 @@ function WalletButton({ className = '' }) {
                       <span aria-hidden="true">🔓</span>
                       <span>Get Access - from $2 USDC / month</span>
                     </button>
+                    <button
+                      onClick={() => { setIsOpen(false); navigate('/vouchers#vch-redeem-h') }}
+                      className="promo-voucher-link"
+                      role="menuitem"
+                    >
+                      Have a voucher? Redeem it
+                    </button>
                   </div>
                 </div>
               )}
@@ -400,6 +407,14 @@ function WalletButton({ className = '' }) {
                 >
                   <span aria-hidden="true">{'\u2699\uFE0F'}</span>
                   <span>My Account</span>
+                </button>
+                <button
+                  onClick={() => { setIsOpen(false); navigate('/vouchers') }}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">{'\uD83C\uDF9F\uFE0F'}</span>
+                  <span>Membership Vouchers</span>
                 </button>
                 {hasRole(ROLES.ADMIN) && (
                   <button

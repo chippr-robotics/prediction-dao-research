@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useNotification } from '../../hooks/useUI'
@@ -7,6 +8,7 @@ import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { getUserTierOnChain } from '../../utils/blockchainService'
 import { getCurrentDocument } from '../../utils/legalDocs'
+import { getContractAddressForChain } from '../../config/contracts'
 import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
 import MembershipAttestation from '../compliance/MembershipAttestation'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -93,9 +95,19 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { getPrice, getLimits } = useTierPrices()
   const { ensureInitialized } = useEncryption()
   const flow = usePurchaseFlow()
+  const navigate = useNavigate()
 
   const isUpgradeFlow = action === 'upgrade'
   const isExtendFlow = action === 'extend'
+
+  // The voucher rail (spec 026) is a parallel way to get the same membership:
+  // buy a transferable voucher to gift/resell, or redeem one you hold. It lives
+  // on the dedicated /vouchers view; only surface the entry point where the
+  // voucher contracts are actually deployed for the connected chain.
+  const voucherAvailable = Boolean(
+    getContractAddressForChain('membershipVoucher', chainId) &&
+    getContractAddressForChain('membershipManager', chainId)
+  )
 
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedTier, setSelectedTier] = useState('BRONZE')
@@ -273,6 +285,14 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     }
   }, [isBusy, resetForm, onClose])
 
+  // Leave the purchase modal and open the dedicated voucher view (buy or redeem).
+  const goToVouchers = useCallback((hash = '') => {
+    if (isBusy) return
+    resetForm()
+    onClose?.()
+    navigate(`/vouchers${hash}`)
+  }, [isBusy, resetForm, onClose, navigate])
+
   if (!isOpen) return null
 
   return (
@@ -443,6 +463,38 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
 
                 {errors.tier && <div className="ppm-error">{errors.tier}</div>}
               </section>
+
+              {/* Voucher rail (spec 026): same membership, bought/redeemed as a
+                  transferable token. Shown only where vouchers are deployed. */}
+              {voucherAvailable && (
+                <section className="ppm-section ppm-voucher-alt">
+                  <h3 className="ppm-section-title">
+                    <span aria-hidden="true">🎟️</span> Have a voucher — or want to gift access?
+                  </h3>
+                  <p className="ppm-voucher-alt-text">
+                    A voucher is a transferable token that redeems into the same membership. Redeem one you were
+                    given, or buy a voucher to gift or resell.
+                  </p>
+                  <div className="ppm-voucher-alt-actions">
+                    <button
+                      type="button"
+                      className="ppm-btn-secondary"
+                      onClick={() => goToVouchers('#vch-redeem-h')}
+                      disabled={isBusy}
+                    >
+                      Redeem a voucher
+                    </button>
+                    <button
+                      type="button"
+                      className="ppm-btn-secondary"
+                      onClick={() => goToVouchers('#vch-buy-h')}
+                      disabled={isBusy}
+                    >
+                      Buy a giftable voucher
+                    </button>
+                  </div>
+                </section>
+              )}
             </div>
           )}
 

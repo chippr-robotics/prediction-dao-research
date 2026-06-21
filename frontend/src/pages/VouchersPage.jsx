@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useWallet } from '../hooks/useWalletManagement'
 import { useVouchers } from '../hooks/useVouchers'
 import { useTierPrices } from '../hooks/useTierPrices'
@@ -18,6 +18,15 @@ export default function VouchersPage() {
   const { account, isConnected } = useWallet()
   const { getPrice, ROLE_HASHES, TIER_IDS } = useTierPrices()
   const { status, error, lastTxHash, voucherAvailable, mintVoucher, redeemVoucher, getVoucher } = useVouchers()
+  const { hash } = useLocation()
+
+  // Deep links from the "Get Wager Access" modal (#vch-buy-h / #vch-redeem-h)
+  // scroll to the relevant section.
+  useEffect(() => {
+    if (!hash) return
+    const el = document.getElementById(hash.slice(1))
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }, [hash])
 
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [mintedId, setMintedId] = useState(null)

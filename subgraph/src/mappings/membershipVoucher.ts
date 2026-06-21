@@ -16,7 +16,7 @@ export function handleVoucherMinted(event: VoucherMinted): void {
   v.owner = event.params.minter
   v.role = event.params.role
   v.tier = event.params.tier
-  v.durationDays = event.params.durationDays
+  v.durationDays = event.params.durationDays.toI32()
   v.status = HELD
   v.minter = event.params.minter
   v.mintedAt = event.block.timestamp

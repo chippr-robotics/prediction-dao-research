@@ -345,6 +345,24 @@
   opacity: 0.9;
 }
 
+/* Secondary "redeem a voucher" link under the Get Access button */
+.promo-voucher-link {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--primary-color, #4a9eff);
+  font-size: 0.85rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.promo-voucher-link:hover {
+  text-decoration: underline;
+}
+
 /* Toggle Rows */
 .toggle-row {
   display: flex;

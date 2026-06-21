@@ -1816,3 +1816,25 @@
     transition: none;
   }
 }
+
+/* Voucher rail entry point (spec 026) — shown on the Choose Tier step. */
+.ppm-voucher-alt {
+  margin-top: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px dashed var(--border-color, #2d3748);
+}
+.ppm-voucher-alt-text {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--text-secondary, #a0aec0);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.ppm-voucher-alt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.ppm-voucher-alt-actions .ppm-btn-secondary {
+  flex: 1 1 0;
+  min-width: 12rem;
+}
