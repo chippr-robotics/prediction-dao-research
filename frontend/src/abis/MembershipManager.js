@@ -1,25 +1,7 @@
+// Full MembershipManager ABI, mirrored from the compiled artifact (contracts/access/MembershipManager.sol).
+// Includes the UUPS + voucher surface (redeemVoucher/setVoucher/voucher) added in specs 026/027.
+// Hand-maintained — keep in sync with the contract (no auto-gen; sync script only updates addresses).
 export const MEMBERSHIP_MANAGER_ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "admin",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "paymentToken_",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "treasury_",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
   {
     "inputs": [],
     "name": "AccessControlBadConfirmation",
@@ -42,6 +24,17 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      }
+    ],
+    "name": "AddressEmptyCode",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "AlreadyActive",
     "type": "error"
@@ -52,8 +45,34 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
+    ],
+    "name": "ERC1967InvalidImplementation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ERC1967NonPayable",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "FailedCall",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InsufficientFees",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidInitialization",
     "type": "error"
   },
   {
@@ -73,7 +92,17 @@ export const MEMBERSHIP_MANAGER_ABI = [
   },
   {
     "inputs": [],
+    "name": "NotInitializing",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotUpgrade",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotVoucherOwner",
     "type": "error"
   },
   {
@@ -100,6 +129,27 @@ export const MEMBERSHIP_MANAGER_ABI = [
   {
     "inputs": [],
     "name": "TierNone",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UUPSUnauthorizedCallContext",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "slot",
+        "type": "bytes32"
+      }
+    ],
+    "name": "UUPSUnsupportedProxiableUUID",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "VoucherNotSet",
     "type": "error"
   },
   {
@@ -143,6 +193,19 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "FeesWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
+    ],
+    "name": "Initialized",
     "type": "event"
   },
   {
@@ -248,6 +311,43 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "MembershipPurchased",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum IMembershipManager.Tier",
+        "name": "tier",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "voucherId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "MembershipRedeemed",
     "type": "event"
   },
   {
@@ -500,6 +600,32 @@ export const MEMBERSHIP_MANAGER_ABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
+    ],
+    "name": "Upgraded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "voucher",
+        "type": "address"
+      }
+    ],
+    "name": "VoucherSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "user",
         "type": "address"
       },
@@ -553,6 +679,32 @@ export const MEMBERSHIP_MANAGER_ABI = [
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "UPGRADER_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -877,6 +1029,29 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "paymentToken_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "treasury_",
+        "type": "address"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "",
         "type": "address"
       },
@@ -905,6 +1080,19 @@ export const MEMBERSHIP_MANAGER_ABI = [
         "internalType": "contract IERC20",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -983,6 +1171,24 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "recordCreate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "voucherId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "acceptedTermsHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "redeemVoucher",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1164,6 +1370,19 @@ export const MEMBERSHIP_MANAGER_ABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "voucher_",
+        "type": "address"
+      }
+    ],
+    "name": "setVoucher",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes4",
         "name": "interfaceId",
         "type": "bytes4"
@@ -1232,6 +1451,37 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "name": "upgradeTierWithTerms",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
+    ],
+    "name": "upgradeToAndCall",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "voucher",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
