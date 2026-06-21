@@ -1,8 +1,16 @@
 # Runbook: Upgrading the contracts (UUPS proxies)
 
-How to deploy and upgrade the upgradeable contracts (`WagerRegistry`, and any contract that inherits
-`UUPSManaged`). Background: [ADR-004](../adr/004-upgradeable-registry-uups.md). Reuse guide for making a new
-contract upgradeable: [developer-guide/upgradeable-contracts.md](../developer-guide/upgradeable-contracts.md).
+How to deploy and upgrade the upgradeable contracts. Two contracts are UUPS proxies today —
+**`WagerRegistry`** (spec 025) and **`MembershipManager`** (spec 027) — plus any future contract that inherits
+`UUPSManaged`. This runbook is written with `WagerRegistry` in the examples; for `MembershipManager` substitute
+the contract name and its deployment keys (`membershipManager` proxy / `membershipManagerImpl`). Background:
+[ADR-004](../adr/004-upgradeable-registry-uups.md). Reuse guide for making a new contract upgradeable:
+[developer-guide/upgradeable-contracts.md](../developer-guide/upgradeable-contracts.md).
+
+> **Worked precedents.** Feature 024 (open challenges) shipped as an in-place upgrade of the `WagerRegistry`
+> proxy; voucher redemption (spec 026) shipped as the **first in-place upgrade** of the `MembershipManager`
+> proxy (the tradable `MembershipVoucher` ERC-721 is a separate, immutable contract — not upgraded). Both
+> followed the In-place upgrade steps below verbatim.
 
 > **Why this matters**: an upgrade replaces the code that custodies user funds. The proxy address never
 > changes and all state is preserved — but a bad storage layout or a lost upgrade key is catastrophic. Follow
@@ -109,4 +117,9 @@ The proxy address does NOT change; all state and funds are preserved.
   logic on an existing deployment, run an **upgrade**, never the deploy script.
 - **Lost `UPGRADER_ROLE` key** → the contract keeps working but can never be upgraded again. Protect the
   floppy keystore; consider moving `UPGRADER_ROLE` to a timelock/multisig before mainnet scale.
-- **Mordor/ETC** are legacy read-only and out of scope.
+- **Per-contract scope** → an upgrade targets one proxy. Upgrading `WagerRegistry` does not touch
+  `MembershipManager` (and vice-versa); run the pre-flight, `check:storage-layout`, and post-upgrade checks
+  separately for each, against its own `…Impl` record.
+- **Network state** → Amoy (80002) and Mordor/ETC (63) run the feature-complete upgradeable set (UUPS
+  registry + UUPS membership + voucher + open challenges). Polygon mainnet (137) is still the **pre-UUPS**
+  set; its first deploy is a cutover to proxies (carrying members over), not an in-place upgrade.

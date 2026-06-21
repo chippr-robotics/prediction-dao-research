@@ -23,7 +23,8 @@ flowchart LR
 2. **Buy a membership** tier — this is what authorizes you to create and accept
    wagers, and sets how many you can run at once.
 3. **Create a wager**: terms, stake (USDC), deadlines, and a resolution method.
-4. **Share it** with your friend as a QR code or link.
+4. **Share it** with your friend as a QR code or link — or post an
+   [open challenge](open-challenges.md) that anyone with a four-word code can take.
 5. They **accept**, their stake locks, and the bet is on.
 6. When the event happens, the wager **resolves** — by one of you, an
    arbitrator, or an oracle — and the **winner claims** both stakes.
@@ -34,6 +35,9 @@ flowchart LR
   [User Journeys](user-journeys.md) to see the full flows.
 - **Making your first bet?** [Creating a Wager](create-wager.md), then
   [Accepting a Wager](accept-wager.md) for your friend's side.
+- **No opponent in mind?** [Open Challenges](open-challenges.md) — post a wager
+  anyone with the code can take.
+- **Gifting access?** [Membership Vouchers](membership-vouchers.md).
 - **Bet finished?** [Resolving a Wager](resolve-wager.md) covers declaring
   winners, draws, oracle settlement, and refunds.
 - **Care about privacy?** [Private Wager Encryption](private-market-encryption.md)

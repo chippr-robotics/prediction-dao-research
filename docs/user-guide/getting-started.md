@@ -65,7 +65,9 @@ Creating and accepting wagers requires an active membership tier:
    wagers per month and more running at the same time
 3. Approve the USDC payment and confirm the purchase transaction
 
-Memberships are time-bound and renewable. Details and current pricing:
+Memberships are time-bound and renewable. You can also receive one as a
+[membership voucher](membership-vouchers.md) — a transferable token someone buys
+and gifts you, which you redeem for the membership. Details and current pricing:
 [Roles and Tiers](../system-overview/roles-and-tiers.md).
 
 ## 5. (Optional) Register an encryption key

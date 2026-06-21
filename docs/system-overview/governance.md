@@ -4,7 +4,7 @@ Governance structure and progressive decentralization roadmap for FairWins.
 
 ## On-chain operator roles
 
-The protocol's privileged actions are split across four OpenZeppelin
+The protocol's privileged actions are split across five OpenZeppelin
 AccessControl roles, deliberately separated so no single key carries blanket
 authority. For the full privilege matrix see
 [Roles and Tiers](roles-and-tiers.md).
@@ -15,6 +15,7 @@ authority. For the full privilege matrix see
 | `GUARDIAN_ROLE` | Pause / unpause `WagerRegistry` in response to security incidents | Guardian Multisig + on-call signer(s) |
 | `ACCOUNT_MODERATOR_ROLE` | Per-account freeze / unfreeze on `WagerRegistry`. See [Account Moderation Policy](account-moderation.md). | Trust-and-safety multisig |
 | `ROLE_MANAGER_ROLE` | Grant / revoke `WAGER_PARTICIPANT` memberships outside the purchase flow | Ops multisig |
+| `UPGRADER_ROLE` | Authorize UUPS implementation upgrades on `WagerRegistry` / `MembershipManager` (logic swaps at stable addresses; state preserved) | Air-gapped floppy-keystore admin |
 
 ### The right to pause
 
