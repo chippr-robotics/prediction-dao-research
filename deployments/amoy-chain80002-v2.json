@@ -8,8 +8,10 @@
   "polymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",
   "contracts": {
     "polymarketAdapter": "0x98fe63209f5BffcCe905bF8779a1F06576A2C313",
-    "membershipManager": "0x101C3eC35fa48A500c2dFA9026f1d42F1431Abe8",
-    "wagerRegistry": "0x72ECAD23D369BFD0C22221a303faD1fE4b480d11",
+    "membershipManager": "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465",
+    "membershipManagerImpl": "0xb6499596703cEE6eA4BE5b5F01DEc4d7ccfe10bD",
+    "membershipVoucher": "0x33C8Ccacf6442Cf4238f01419e38C781cB859769",
+    "wagerRegistry": "0xA429CdaD3E1497e33BEA7D6FE7d6913fE880241b",
     "wagerRegistryImpl": "0xa2176F5Fea39888cD1697Be4651415490C78905d",
     "keyRegistry": "0xcEFdeBba8E040c035c690ca9057cF22E73247c24",
     "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3",
@@ -22,10 +24,10 @@
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
   },
   "constructorArgs": {
-    "membershipManager": [
+    "membershipManagerImpl": [],
+    "membershipVoucher": [
       "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
-      "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
-      "0x52502d049571C7893447b86c4d8B38e6184bF6e1"
+      "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465"
     ],
     "wagerRegistryImpl": [],
     "sanctionsGuard": [
@@ -52,5 +54,5 @@
     "mockPolymarketCTF": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-06-21T02:51:29.600Z"
+  "timestamp": "2026-06-21T03:38:55.285Z"
 }
