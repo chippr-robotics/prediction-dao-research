@@ -14,6 +14,9 @@
 /** Deep link to the Account Moderation section inside the in-app Terms document. */
 export const ACCOUNT_MODERATION_PATH = '/terms#account-moderation'
 
+/** Deep link to the Membership Vouchers section inside the in-app Terms document. */
+export const MEMBERSHIP_VOUCHERS_TERMS_PATH = '/terms#membership-vouchers'
+
 /** Ordered policy/legal links shown in the footer (both variants). */
 export const LEGAL_LINKS = [
   { label: 'Terms & Conditions', href: '/terms' },

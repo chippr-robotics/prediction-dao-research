@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import { getContractAddressForChain } from '../config/contracts'
-import { MEMBERSHIP_VOUCHER_ABI, MEMBERSHIP_VOUCHER_REDEEM_ABI } from '../abis/MembershipVoucher'
+import { MEMBERSHIP_VOUCHER_ABI } from '../abis/MembershipVoucher'
+import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import { ERC20_ABI } from '../abis/ERC20'
 
 /**
@@ -44,7 +45,7 @@ export function useVouchers() {
       setError(null)
       setLastTxHash(null)
       try {
-        const manager = new ethers.Contract(managerAddress, MEMBERSHIP_VOUCHER_REDEEM_ABI, signer)
+        const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
         const cfg = await manager.getTierConfig(roleHash, tierId)
         if (!cfg.active) throw new Error('That tier is not available for purchase.')
         const priceUnits = cfg.priceUSDC
@@ -93,7 +94,7 @@ export function useVouchers() {
       setError(null)
       setLastTxHash(null)
       try {
-        const manager = new ethers.Contract(managerAddress, MEMBERSHIP_VOUCHER_REDEEM_ABI, signer)
+        const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
         const tx = await manager.redeemVoucher(tokenId, termsHash || ethers.ZeroHash)
         setLastTxHash(tx.hash)
         await tx.wait()

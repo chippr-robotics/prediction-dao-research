@@ -90,6 +90,20 @@ You agree **not** to use a VPN, proxy, Tor, false residence or identity informat
 
 **8.4 No guarantee.** A Membership Pass does not guarantee uninterrupted access, the availability of any market or counterparty, or any outcome.
 
+### Membership Vouchers
+
+**8.5 What a voucher is.** A Membership Voucher is a transferable token representing a prepaid claim to a Membership Pass of a stated tier. It is a utility access token — **not a Wager, stake, deposit, investment, or security** — and confers no ownership interest, profit expectation, or claim on any pool of funds. Buying a voucher is a non-refundable payment for the right to redeem it for access.
+
+**8.6 Redemption.** Redeeming a voucher burns it and grants the corresponding soulbound Membership Pass to the wallet that redeems it. The membership term begins at redemption. A voucher grants the tier it was minted for, regardless of later changes to tier pricing or configuration, and vouchers do not expire.
+
+**8.7 Eligibility and screening at redemption.** Eligibility, sanctions screening, and acceptance of these Terms are evaluated for the **redeeming wallet at the time of redemption**, on the same fail-closed basis as a direct membership purchase. Buying, holding, gifting, or reselling a voucher does not grant access until it is successfully redeemed by an eligible wallet.
+
+**8.8 Transfers are public; privacy is pseudonymous.** Voucher mints, transfers, and burns are recorded publicly on the blockchain. Redeeming from a fresh wallet that received the voucher keeps your membership from being linked on-chain to the wallet that bought it — this is **pseudonymity, not cryptographic anonymity**, and the transfer history remains public.
+
+**8.9 Resale and royalties.** Vouchers may be gifted or resold on third-party marketplaces. A best-effort resale royalty hint (EIP-2981) directs a small percentage to the treasury where marketplaces honor it; it is not enforced on-chain. FairWins does not operate a marketplace and does not guarantee any resale price, liquidity, or that any marketplace will honor the royalty.
+
+**8.10 Non-refundable; failed redemption.** Voucher purchases are non-refundable. If a redemption is blocked (for example, the redeeming wallet fails screening or eligibility), the voucher is **preserved — not burned and not refunded** — so it remains transferable and can be redeemed later by an eligible wallet.
+
 ## 9. How Wagers Work
 
 **9.1 Peer-to-peer.** A Wager is formed when one User's offer is accepted by another User (a Private Wager) or by any address (a Public Wager). The agreement is between those Users. FairWins is not a party to it.
