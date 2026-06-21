@@ -9,7 +9,8 @@
   "contracts": {
     "polymarketAdapter": "0x98fe63209f5BffcCe905bF8779a1F06576A2C313",
     "membershipManager": "0x101C3eC35fa48A500c2dFA9026f1d42F1431Abe8",
-    "wagerRegistry": "0x916841aEe4832a2e9DD42470fa05a7329486e75a",
+    "wagerRegistry": "0x72ECAD23D369BFD0C22221a303faD1fE4b480d11",
+    "wagerRegistryImpl": "0xa2176F5Fea39888cD1697Be4651415490C78905d",
     "keyRegistry": "0xcEFdeBba8E040c035c690ca9057cF22E73247c24",
     "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3",
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
@@ -20,9 +21,36 @@
     "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
   },
+  "constructorArgs": {
+    "membershipManager": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1"
+    ],
+    "wagerRegistryImpl": [],
+    "sanctionsGuard": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
+    ],
+    "keyRegistry": [],
+    "polymarketAdapter": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0x95F40ea10E6C51892783c4E7721Ada1425917e22"
+    ],
+    "chainlinkDataFeedAdapter": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1"
+    ],
+    "chainlinkFunctionsAdapter": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xC22a79eBA640940ABB6dF0f7982cc119578E11De"
+    ],
+    "umaAdapter": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xd8866E76441df243fc98B892362Fc6264dC3ca80"
+    ],
+    "mockSanctionsOracle": [],
+    "mockPolymarketCTF": []
+  },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-06-15T02:23:55.220Z",
-  "deployBlocks": {
-    "wagerRegistry": 40172425
-  }
+  "timestamp": "2026-06-21T02:51:29.600Z"
 }
