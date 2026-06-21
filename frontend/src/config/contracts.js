@@ -26,6 +26,7 @@ const MORDOR_CONTRACTS = {
   // Classic USD (USC) — real on-chain stablecoin (no mock); set by sync.
   paymentToken: '0xDE093684c796204224BC081f937aa059D903c52a',
   wmatic: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
+  membershipVoucher: '0xf514e0e342A898E4681bf51590B672aEC5620401',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -59,6 +60,7 @@ const AMOY_CONTRACTS = {
   chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
   chainlinkFunctionsAdapter: '0x074fC18C1E322a7537b53B8B2Bf0762629E3b532',
   umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
+  membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
