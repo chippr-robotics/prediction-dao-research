@@ -156,6 +156,9 @@ async function main() {
   add("MembershipVoucher", c.membershipVoucher, "membershipVoucher",
     [deployer, c.membershipManager],
     "contracts/access/MembershipVoucher.sol:MembershipVoucher");
+  add("VoucherBatchMinter", c.voucherBatchMinter, "voucherBatchMinter",
+    [c.membershipVoucher],
+    "contracts/access/VoucherBatchMinter.sol:VoucherBatchMinter");
   add("KeyRegistry", c.keyRegistry, "keyRegistry", [],
     "contracts/privacy/KeyRegistry.sol:KeyRegistry");
   add("SanctionsGuard", c.sanctionsGuard, "sanctionsGuard", [deployer, sanctionsOracle],

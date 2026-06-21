@@ -107,13 +107,25 @@ export const DEPLOYED_CONTRACTS =
  * support legacy Mordor reads while Amoy migrates.
  */
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0 },
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344 },
+  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315 },
+  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
+  137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344, membershipVoucher: 0 },
 }
 
 export const DEPLOYMENT_BLOCKS =
   DEPLOYMENT_BLOCKS_BY_CHAIN[ACTIVE_CHAIN_ID] || { friendGroupMarketFactory: 0, wagerRegistry: 0 }
+
+/**
+ * Deployment block for a contract on a specific chain — the bounded starting block for event scans
+ * (never scan from genesis; see issue #703/#704). Returns 0 when unknown.
+ * @param {string} contractName
+ * @param {number} chainId
+ * @returns {number}
+ */
+export function getDeploymentBlockForChain(contractName, chainId) {
+  const blocks = DEPLOYMENT_BLOCKS_BY_CHAIN[chainId]
+  return (blocks && blocks[contractName]) || 0
+}
 
 /**
  * Get contract address from environment or use deployed default
