@@ -42,6 +42,12 @@ This feature is funds-adjacent (vouchers are minted for USDC) and access-control
 - Q: When are voucher mint proceeds recognized as treasury revenue? → A: **At mint.** Proceeds accrue and are withdrawable immediately, identical to a direct purchase; no escrow is held until redemption. Granting a membership at redemption has zero marginal on-chain cost, so no escrow/solvency reserve is required.
 - Q: Where does voucher display metadata (`tokenURI`) come from? → A: **Generated fully on-chain** (self-contained JSON + SVG rendering the `(role, tier)`), with no off-chain/IPFS pinning dependency. Keeps a value-bearing token self-contained and censorship-resistant; IPFS in this repo is reserved for *encrypted* per-wager data, not public marketplace art.
 
+### Session 2026-06-21 (batch & gift convenience)
+
+- Q: How do "buy a quantity" and "gift directly to an address" work given the voucher mints exactly one token to the caller and is immutable? → A: Via a **separate, immutable, custody-free helper** (`VoucherBatchMinter`), not by changing the voucher. The helper pulls exactly `quantity × price` from the buyer, mints the batch, and forwards every voucher to the recipient in the same transaction (one approval, one confirmation). It holds no funds/NFTs at rest, resets its allowance, is atomic, has no admin/withdrawal/upgrade path, and caps a batch at **50**. (FR-001a–FR-001c.)
+- Q: Is the helper required for the voucher rail to work? → A: **No — it is additive.** When the helper is not deployed on a network, single self-purchase still works via the direct voucher mint, and the quantity/gift UI degrades to an honest "not available on this network yet" notice. (FR-001d.)
+- Q: How does the redeem UI find which vouchers a wallet holds? → A: The user **picks from a list** of held vouchers (no token-id typing), derived from a **bounded** `Transfer`-log scan from the voucher's recorded deploy block (never genesis, per #703/#704) with current-ownership confirmation, and an honest empty state. The voucher subgraph (spec 026 indexing) can supersede the scan once relied upon. (FR-011a.)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Buy a membership voucher and gift or resell it (Priority: P1)
@@ -139,6 +145,13 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **FR-005a**: The system MUST NOT offer a primary refund of mint proceeds; a holder recovers value only by reselling on the secondary market or by redeeming. No refund or treasury-clawback path is provided.
 - **FR-005b**: Each voucher's display metadata (`tokenURI`) MUST be generated fully on-chain (self-contained JSON + SVG reflecting the voucher's `(role, tier)`), with no off-chain or IPFS pinning dependency.
 
+#### Batch & gift acquisition (convenience helper)
+
+- **FR-001a**: The system MUST let a buyer mint **a quantity** of vouchers of the same `(role, tier)` in a single transaction — one USDC approval and one wallet confirmation — charging exactly `quantity × price` and issuing all of them. A per-transaction quantity cap MAY bound gas (currently **50**).
+- **FR-001b**: The system MUST let a buyer direct the freshly minted vouchers to **any recipient address** (a direct gift) within the same minting transaction, so gifting does not require a separate transfer step. The recipient MUST be non-zero.
+- **FR-001c**: Because the voucher contract is immutable and mints exactly one token **to the caller**, the batch/gift capability MUST be provided by a **separate, immutable helper** rather than by changing the voucher. The helper MUST be **custody-free**: pull exactly `quantity × price` from the buyer, forward every minted voucher to the recipient within the same transaction, hold no USDC or NFTs at rest, reset any allowance it grants, and be **atomic** (any failed mint reverts the whole batch). It MUST have no admin, no withdrawal path, and no upgradeability — matching the voucher's own minimal-surface rationale.
+- **FR-001d**: The batch/gift helper MUST be **optional and additive**: when it is not deployed on a network, single self-purchase MUST still work via the direct voucher mint, and the quantity/gift UI MUST degrade to an honest "not available on this network yet" state rather than erroring.
+
 #### Redemption (membership grant)
 
 - **FR-006**: A voucher holder MUST be able to redeem a voucher, which atomically **burns** the voucher and writes a **soulbound** membership of the voucher's `(role, tier)` to the redeemer's address.
@@ -147,6 +160,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **FR-009**: A voucher MUST grant the `(role, tier)` it was minted for, unaffected by any later change to that tier's price, limits, or active state.
 - **FR-010**: Redemption MUST be single-use: a burned voucher MUST NOT be redeemable again, and no redemption may grant more than one membership.
 - **FR-011**: Redemption MUST be rejected if the redeemer's address already holds an active membership for the role (no stacking/extension in v1), leaving the voucher intact.
+- **FR-011a**: The redemption UI MUST let a holder **pick a voucher to redeem from their on-chain holdings** (no manual token-id entry) and MUST show an honest empty state when the wallet holds none. Until the voucher subgraph is relied upon, holdings discovery MUST use a **bounded** `Transfer`-log scan from the voucher's recorded deploy block (never a genesis scan), confirming current ownership before offering a voucher as redeemable.
 
 #### Compliance
 
@@ -186,6 +200,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 ### Key Entities *(include if feature involves data)*
 
 - **Membership Voucher**: A transferable, non-expiring token representing the right to claim a membership of a specific `(role, tier)`. Records its `(role, tier)` pair at mint; confers no membership while held; single-use (burned on redemption). Freely giftable and resellable.
+- **Voucher Batch Minter (helper)**: An immutable, custody-free helper contract that mints a quantity of vouchers of one `(role, tier)` and forwards them all to a recipient address in a single transaction. Pulls exactly `quantity × price` from the buyer, holds no funds or NFTs at rest, resets its own allowance, is atomic, and bounds each batch by a per-transaction quantity cap. No admin, no withdrawal path, no upgradeability. Strictly additive — single self-mint works without it.
 - **Redemption**: The act of burning a voucher to write a soulbound membership of the voucher's tier to the redeemer, gated by sanctions screening and Terms acceptance, with the clock starting at redemption.
 - **Membership** (existing): The soulbound, time-bound, address-keyed access record the platform already issues (tier, expiry, usage counters). Unchanged; produced identically by both acquisition rails.
 - **Tier** (existing): The configured membership level (Bronze/Silver/Gold/Platinum) with its USDC price, duration, and usage limits. A voucher binds to a tier at mint.
@@ -206,6 +221,9 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **SC-008**: The existing direct-purchase rail and the full existing test suite pass with **zero regression** after the feature is added.
 - **SC-009**: The resale royalty is exposed to marketplaces via standard royalty metadata pointing at the treasury, at a flat 2.5% rate, in 100% of voucher tokens; any configuration attempt above the 5% hard ceiling is rejected 100% of the time.
 - **SC-010**: Every voucher mint and redemption is observable on-chain and reflected in the frontend/subgraph via generated sync artifacts (no hand-copied addresses/ABIs).
+- **SC-011**: A buyer can mint a quantity (up to the cap) of one tier and gift them all to a recipient in a **single** transaction; after it, the buyer paid exactly `quantity × price`, the recipient holds exactly that many vouchers, and the helper holds **zero** USDC, NFTs, and residual allowance (verified on a test network).
+- **SC-012**: With the helper undeployed on a network, single self-purchase still succeeds and the quantity/gift UI shows an honest "not available yet" state — no error and no broken flow.
+- **SC-013**: The redeem flow lists a wallet's held vouchers for selection (no token-id entry) and shows an honest empty state when there are none.
 
 ## Assumptions
 
@@ -215,7 +233,7 @@ The redemption gate fails closed for a sanctioned/blocked redeemer, and a blocke
 - **Redeemer-only screening**: sanctions screening and Terms acceptance occur at redemption on the redeemer, fail-closed; minters/buyers are not screened (accepted tradeoff).
 - **Best-effort royalty only**: a flat EIP-2981-style royalty hint to the treasury (default 2.5%, admin-configurable up to a 5% hard ceiling), with no enforced-royalty/allowlist/platform-marketplace mechanism, preserving open-market composability and privacy.
 - **Pragmatic privacy, no zero-knowledge**: privacy is achieved by fresh-wallet redemption (pseudonymity) with an optional future relayer; cryptographic/zero-knowledge unlinkability is explicitly out of scope.
-- **Networks**: applies to the live deployments (Polygon mainnet, Amoy testnet); legacy read-only networks (Mordor/ETC) are out of scope.
+- **Networks**: the voucher rail (voucher + redemption + the batch/gift helper) is deployed feature-complete on the testnets **Amoy (80002)** and **Mordor/ETC (63)**; Polygon mainnet (137) follows once its UUPS migration lands. (Mordor is no longer legacy read-only — it runs the full upgradeable v2 set.)
 
 ## Dependencies
 

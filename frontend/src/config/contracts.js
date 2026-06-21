@@ -27,6 +27,7 @@ const MORDOR_CONTRACTS = {
   paymentToken: '0xDE093684c796204224BC081f937aa059D903c52a',
   wmatic: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
   membershipVoucher: '0xf514e0e342A898E4681bf51590B672aEC5620401',
+  voucherBatchMinter: '0xc26F02da923263e2c9CFB722006e0B8Da2F952B2',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -61,6 +62,7 @@ const AMOY_CONTRACTS = {
   chainlinkFunctionsAdapter: '0x074fC18C1E322a7537b53B8B2Bf0762629E3b532',
   umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
+  voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -107,13 +109,25 @@ export const DEPLOYED_CONTRACTS =
  * support legacy Mordor reads while Amoy migrates.
  */
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0 },
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344 },
+  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315 },
+  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
+  137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344, membershipVoucher: 0 },
 }
 
 export const DEPLOYMENT_BLOCKS =
   DEPLOYMENT_BLOCKS_BY_CHAIN[ACTIVE_CHAIN_ID] || { friendGroupMarketFactory: 0, wagerRegistry: 0 }
+
+/**
+ * Deployment block for a contract on a specific chain — the bounded starting block for event scans
+ * (never scan from genesis; see issue #703/#704). Returns 0 when unknown.
+ * @param {string} contractName
+ * @param {number} chainId
+ * @returns {number}
+ */
+export function getDeploymentBlockForChain(contractName, chainId) {
+  const blocks = DEPLOYMENT_BLOCKS_BY_CHAIN[chainId]
+  return (blocks && blocks[contractName]) || 0
+}
 
 /**
  * Get contract address from environment or use deployed default

@@ -306,6 +306,18 @@ async function main() {
     console.log("  ✓ redeemVoucher enabled (voucher rail live)");
   }
 
+  // -------- VoucherBatchMinter (immutable helper — spec 026) --------
+  // Single-tx "buy N vouchers" / "gift to an address" rail over the immutable MembershipVoucher (whose mint()
+  // makes one token, to the caller). Custody-free: pulls exactly quantity*price USDC and forwards every minted
+  // voucher to the recipient in the same tx. Immutable, no admin, no withdrawal path.
+  const batchMinterDeploy = await deployDeterministic(
+    "VoucherBatchMinter",
+    [voucherDeploy.address],
+    generateSalt(SALT_PREFIXES.V2 + "VoucherBatchMinter"),
+    deployer
+  );
+  deployments.voucherBatchMinter = batchMinterDeploy.address;
+
   // -------- WagerRegistry (UUPS proxy — spec 025) --------
   // The registry is now upgradeable: deployed behind an ERC1967 UUPS proxy so future logic ships as an
   // in-place upgrade (stable address, preserved state) instead of a fresh address that strands wagers.
@@ -498,6 +510,7 @@ async function main() {
     // in the proxy, not the implementation's constructor). verify.js verifies the implementation addresses.
     membershipManagerImpl: [],
     membershipVoucher: [deployer.address, mgrDeploy.address],
+    voucherBatchMinter: [voucherDeploy.address],
     wagerRegistryImpl: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
@@ -526,6 +539,7 @@ async function main() {
       membershipManager: mgrDeploy.address, // ERC1967 proxy (stable address)
       membershipManagerImpl: mgrProxy.implementation, // current implementation (changes on upgrade)
       membershipVoucher: voucherDeploy.address, // immutable ERC-721 voucher (spec 026)
+      voucherBatchMinter: batchMinterDeploy.address, // immutable batch/gift helper (spec 026)
       wagerRegistry: regDeploy.address, // ERC1967 proxy (stable address)
       wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
       keyRegistry: keyDeploy.address,

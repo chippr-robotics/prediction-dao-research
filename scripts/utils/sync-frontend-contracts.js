@@ -184,6 +184,7 @@ function main() {
         wagerRegistry: deployed.wagerRegistry,
         membershipManager: deployed.membershipManager,
         membershipVoucher: deployed.membershipVoucher,
+        voucherBatchMinter: deployed.voucherBatchMinter,
         keyRegistry: deployed.keyRegistry,
         sanctionsGuard: deployed.sanctionsGuard,
         polymarketAdapter: deployed.polymarketAdapter,

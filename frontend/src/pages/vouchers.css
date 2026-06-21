@@ -155,3 +155,102 @@
 .vch-warn {
   color: #c77d11;
 }
+
+/* Buy row: quantity + optional gift address (spec 026) */
+.vch-buy-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 0.25rem;
+}
+.vch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.vch-field-grow {
+  flex: 1 1 16rem;
+}
+.vch-field em {
+  font-style: normal;
+  opacity: 0.7;
+}
+.vch-qty {
+  width: 6rem;
+  flex: 0 0 auto;
+}
+.vch-input-error {
+  border-color: #c77d11;
+}
+
+/* Held-voucher list for redemption */
+.vch-myvouchers-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0.75rem 0 0.5rem;
+}
+.vch-myvouchers-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.vch-refresh {
+  background: none;
+  border: none;
+  color: var(--brand-primary, #6c8cff);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.vch-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.vch-empty {
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.vch-voucher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+.vch-voucher-list legend {
+  padding: 0;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.vch-voucher-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+}
+.vch-voucher-item.is-selected {
+  border-color: var(--brand-primary, #6c8cff);
+  box-shadow: 0 0 0 1px var(--brand-primary, #6c8cff);
+}
+.vch-voucher-meta {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.vch-voucher-id {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}

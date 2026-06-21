@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { ethers } from 'ethers'
 import { useWallet } from '../hooks/useWalletManagement'
 import { useVouchers } from '../hooks/useVouchers'
 import { useTierPrices } from '../hooks/useTierPrices'
@@ -9,16 +10,21 @@ import Button from '../components/ui/Button'
 import './vouchers.css'
 
 const TIER_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
+const MAX_QUANTITY = 50
 
 /**
- * VouchersPage (spec 026): buy a transferable membership voucher (gift/resell it), or redeem one you hold into
- * a soulbound membership for the connected wallet. The full "my vouchers" list arrives with the subgraph;
- * v1 redeems by token id. Addresses/ABIs come from synced config (Principle V); privacy is disclosed honestly.
+ * VouchersPage (spec 026): buy membership vouchers — a quantity at once, optionally gifted directly to another
+ * address — or redeem one you hold into a soulbound membership for the connected wallet. The redeem section
+ * lists the wallet's held vouchers (on-chain) so the user picks one instead of typing a token id. Addresses/
+ * ABIs come from synced config (Principle V); privacy is disclosed honestly.
  */
 export default function VouchersPage() {
   const { account, isConnected } = useWallet()
   const { getPrice, ROLE_HASHES, TIER_IDS } = useTierPrices()
-  const { status, error, lastTxHash, voucherAvailable, mintVoucher, redeemVoucher, getVoucher } = useVouchers()
+  const {
+    status, error, lastTxHash, voucherAvailable, batchMintAvailable,
+    mintVouchers, redeemVoucher, listMyVouchers,
+  } = useVouchers()
   const { hash } = useLocation()
 
   // Deep links from the "Get Wager Access" modal (#vch-buy-h / #vch-redeem-h)
@@ -30,51 +36,79 @@ export default function VouchersPage() {
   }, [hash])
 
   const [selectedTier, setSelectedTier] = useState('BRONZE')
-  const [mintedId, setMintedId] = useState(null)
+  const [quantity, setQuantity] = useState(1)
+  const [recipient, setRecipient] = useState('')
+  const [minted, setMinted] = useState(null)
 
-  const [redeemId, setRedeemId] = useState('')
-  const [preview, setPreview] = useState(null)
-  const [previewMsg, setPreviewMsg] = useState('')
+  const [myVouchers, setMyVouchers] = useState([])
+  const [loadingVouchers, setLoadingVouchers] = useState(false)
+  const [selectedVoucherId, setSelectedVoucherId] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [redeemed, setRedeemed] = useState(false)
-
-  if (!isConnected) return <Navigate to="/" replace />
 
   const role = ROLE_HASHES.WAGER_PARTICIPANT
   const busy = status === 'minting' || status === 'redeeming'
 
-  async function onMint() {
-    setMintedId(null)
+  // Deep links from the "Get Wager Access" modal (#vch-buy-h / #vch-redeem-h) scroll to the section.
+  useEffect(() => {
+    if (!hash) return
+    const el = document.getElementById(hash.slice(1))
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }, [hash])
+
+  const refreshVouchers = useCallback(async () => {
+    if (!voucherAvailable || !account) {
+      setMyVouchers([])
+      return
+    }
+    setLoadingVouchers(true)
     try {
-      const { tokenId } = await mintVoucher(role, TIER_IDS[selectedTier])
-      setMintedId(tokenId)
+      const held = await listMyVouchers()
+      setMyVouchers(held)
+      // Drop a selection that's no longer held (e.g. after redeeming it).
+      setSelectedVoucherId((cur) => (held.some((v) => v.tokenId === cur) ? cur : ''))
+    } finally {
+      setLoadingVouchers(false)
+    }
+  }, [voucherAvailable, account, listMyVouchers])
+
+  // Load the wallet's vouchers on mount and whenever the wallet/network changes.
+  useEffect(() => {
+    refreshVouchers()
+  }, [refreshVouchers])
+
+  if (!isConnected) return <Navigate to="/" replace />
+
+  const giftMode = recipient.trim().length > 0
+  const recipientValid = !giftMode || ethers.isAddress(recipient.trim())
+  const qtyNum = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number(quantity) || 1)))
+  const unitPrice = getPrice('WAGER_PARTICIPANT', selectedTier)
+  const totalPrice = unitPrice * qtyNum
+  // Multiple or gifting needs the batch helper; a single self-purchase does not.
+  const needsHelper = qtyNum > 1 || giftMode
+  const buyBlocked = needsHelper && !batchMintAvailable
+
+  async function onBuy() {
+    setMinted(null)
+    try {
+      const res = await mintVouchers(role, TIER_IDS[selectedTier], qtyNum, recipient)
+      setMinted(res)
+      // Holdings only change if you bought for yourself.
+      if (!res.gift) refreshVouchers()
     } catch {
       /* error surfaced via hook state */
     }
   }
 
-  async function onPreview() {
-    setPreview(null)
-    setPreviewMsg('')
-    if (!redeemId) return
-    const v = await getVoucher(redeemId)
-    if (!v) {
-      setPreviewMsg('No voucher with that id (it may not exist or was already redeemed/burned).')
-      return
-    }
-    setPreview(v)
-    if (!v.ownedByMe) {
-      setPreviewMsg('This voucher is owned by another address — redeeming requires the wallet that holds it.')
-    }
-  }
-
   async function onRedeem() {
     setRedeemed(false)
+    if (!selectedVoucherId) return
     try {
       // NOTE: pass the in-force Terms version hash here once wired (spec 007); the contract records whatever
       // hash is supplied for the redeemer. The checkbox captures explicit consent in the UI.
-      await redeemVoucher(redeemId, undefined)
+      await redeemVoucher(selectedVoucherId, undefined)
       setRedeemed(true)
+      refreshVouchers()
     } catch {
       /* error surfaced via hook state */
     }
@@ -106,7 +140,7 @@ export default function VouchersPage() {
 
       {/* Live status / errors */}
       <div className="vch-status" role="status" aria-live="polite" aria-atomic="true">
-        {status === 'minting' && 'Minting voucher…'}
+        {status === 'minting' && 'Submitting your purchase…'}
         {status === 'redeeming' && 'Redeeming…'}
         {error && <span className="vch-error">{error}</span>}
         {lastTxHash && !error && <span className="vch-tx">tx: {lastTxHash.slice(0, 10)}…</span>}
@@ -136,12 +170,60 @@ export default function VouchersPage() {
             )
           })}
         </fieldset>
-        <Button variant="primary" onClick={onMint} loading={status === 'minting'} disabled={!voucherAvailable || busy}>
-          Buy {TIER_NAMES[TIER_IDS[selectedTier]]} voucher
+
+        <div className="vch-buy-row">
+          <label className="vch-field">
+            <span>Quantity</span>
+            <input
+              className="vch-input vch-qty"
+              type="number"
+              min="1"
+              max={MAX_QUANTITY}
+              inputMode="numeric"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              disabled={!voucherAvailable || busy}
+            />
+          </label>
+          <label className="vch-field vch-field-grow">
+            <span>Gift to address <em>(optional)</em></span>
+            <input
+              className={`vch-input ${giftMode && !recipientValid ? 'vch-input-error' : ''}`}
+              type="text"
+              spellCheck="false"
+              autoComplete="off"
+              placeholder="0x… — leave blank to buy for yourself"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              disabled={!voucherAvailable || busy}
+            />
+          </label>
+        </div>
+        {giftMode && !recipientValid && (
+          <p className="vch-warn" role="status">That doesn’t look like a valid wallet address.</p>
+        )}
+        {buyBlocked && (
+          <p className="vch-warn" role="status">
+            Buying more than one or gifting to another address isn’t available on this network yet — you can
+            buy a single voucher for yourself.
+          </p>
+        )}
+
+        <Button
+          variant="primary"
+          onClick={onBuy}
+          loading={status === 'minting'}
+          disabled={!voucherAvailable || busy || buyBlocked || !recipientValid}
+        >
+          {giftMode
+            ? `Gift ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`
+            : `Buy ${qtyNum} ${TIER_NAMES[TIER_IDS[selectedTier]]} voucher${qtyNum > 1 ? 's' : ''} ($${totalPrice} USDC)`}
         </Button>
-        {mintedId && (
+        {minted && (
           <p className="vch-success" role="status">
-            Voucher #{mintedId} minted to your wallet. Send it to anyone, or redeem it below.
+            {minted.gift
+              ? `Sent ${minted.count} voucher${minted.count > 1 ? 's' : ''} to ${minted.recipient.slice(0, 6)}…${minted.recipient.slice(-4)}.`
+              : `${minted.count} voucher${minted.count > 1 ? 's' : ''} minted to your wallet. Redeem below, or send to anyone.`}
           </p>
         )}
         <p className="vch-fineprint">
@@ -157,45 +239,61 @@ export default function VouchersPage() {
           {account ? ` (${account.slice(0, 6)}…${account.slice(-4)})` : ''}. To keep it private, redeem from a
           fresh wallet that you transferred the voucher to.
         </p>
-        <div className="vch-redeem-row">
-          <label htmlFor="vch-token-id">Voucher id</label>
-          <input
-            id="vch-token-id"
-            className="vch-input"
-            inputMode="numeric"
-            value={redeemId}
-            onChange={(e) => {
-              setRedeemId(e.target.value.replace(/[^0-9]/g, ''))
-              setPreview(null)
-              setPreviewMsg('')
-            }}
-            placeholder="e.g. 1"
-            disabled={!voucherAvailable || busy}
-          />
-          <Button variant="secondary" onClick={onPreview} disabled={!voucherAvailable || !redeemId || busy}>
-            Preview
-          </Button>
+
+        <div className="vch-myvouchers-head">
+          <span className="vch-myvouchers-title">Your vouchers</span>
+          <button
+            type="button"
+            className="vch-refresh"
+            onClick={refreshVouchers}
+            disabled={!voucherAvailable || loadingVouchers || busy}
+          >
+            {loadingVouchers ? 'Loading…' : 'Refresh'}
+          </button>
         </div>
 
-        {preview && (
-          <div className="vch-preview">
-            <span className="vch-tier-badge" style={{ backgroundColor: TIER_COLORS[preview.tier] }}>
-              {TIER_NAMES[preview.tier]}
-            </span>
-            <span>{preview.durationDays}-day membership</span>
-            <span className={preview.ownedByMe ? 'vch-ok' : 'vch-warn'}>
-              {preview.ownedByMe ? 'You hold this voucher' : 'Held by another wallet'}
-            </span>
-          </div>
+        {loadingVouchers && myVouchers.length === 0 && (
+          <p className="vch-help" role="status">Looking up your vouchers…</p>
         )}
-        {previewMsg && <p className="vch-warn" role="status">{previewMsg}</p>}
+
+        {!loadingVouchers && voucherAvailable && myVouchers.length === 0 && (
+          <p className="vch-empty" role="status">
+            You don’t have any vouchers to redeem. Buy one above, or ask whoever gifted you a voucher to send it
+            to this wallet.
+          </p>
+        )}
+
+        {myVouchers.length > 0 && (
+          <fieldset className="vch-voucher-list" disabled={!voucherAvailable || busy}>
+            <legend>Choose a voucher to redeem</legend>
+            {myVouchers.map((v) => (
+              <label
+                key={v.tokenId}
+                className={`vch-voucher-item ${selectedVoucherId === v.tokenId ? 'is-selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="redeem-voucher"
+                  value={v.tokenId}
+                  checked={selectedVoucherId === v.tokenId}
+                  onChange={() => setSelectedVoucherId(v.tokenId)}
+                />
+                <span className="vch-tier-badge" style={{ backgroundColor: TIER_COLORS[v.tier] }}>
+                  {TIER_NAMES[v.tier]}
+                </span>
+                <span className="vch-voucher-meta">{v.durationDays}-day membership</span>
+                <span className="vch-voucher-id">#{v.tokenId}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
 
         <label className="vch-terms">
           <input
             type="checkbox"
             checked={acceptedTerms}
             onChange={(e) => setAcceptedTerms(e.target.checked)}
-            disabled={!voucherAvailable || busy}
+            disabled={!voucherAvailable || busy || myVouchers.length === 0}
           />
           I accept the{' '}
           <a href={MEMBERSHIP_VOUCHERS_TERMS_PATH} target="_blank" rel="noopener noreferrer">
@@ -208,7 +306,7 @@ export default function VouchersPage() {
           variant="primary"
           onClick={onRedeem}
           loading={status === 'redeeming'}
-          disabled={!voucherAvailable || !redeemId || !acceptedTerms || busy || (preview && !preview.ownedByMe)}
+          disabled={!voucherAvailable || !selectedVoucherId || !acceptedTerms || busy}
         >
           Redeem to this wallet
         </Button>
