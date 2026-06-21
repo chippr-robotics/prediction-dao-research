@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/MinimalRoleManager'
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
+import { makeReadProvider } from '../utils/rpcProvider'
 
 // Refresh interval for contract state (5 minutes, reduced from 30s to minimize load)
 export const CONTRACT_STATE_REFRESH_INTERVAL = 300000
@@ -67,7 +68,7 @@ export function useAdminContracts() {
    * Memoized to reuse the same provider instance
    */
   const readProvider = useMemo(() => {
-    return new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+    return makeReadProvider(NETWORK_CONFIG.rpcUrl, NETWORK_CONFIG.chainId)
   }, [])
 
   /**
