@@ -237,6 +237,25 @@ describe('WalletButton Component - Wagers', () => {
       expect(screen.queryByText('My Wagers')).not.toBeInTheDocument()
     })
 
+    it('exposes the Membership Vouchers entry so the voucher view is reachable', async () => {
+      const user = userEvent.setup()
+      useWalletRoles.mockReturnValue({
+        roles: [],
+        hasRole: vi.fn(() => false)
+      })
+
+      renderWithProviders(<WalletButton />)
+
+      const button = screen.getByRole('button', { name: /wallet account/i })
+      await user.click(button)
+
+      await waitFor(() => {
+        expect(screen.getByText('Membership Vouchers')).toBeInTheDocument()
+      })
+      // Non-members also get a direct redeem entry point.
+      expect(screen.getByText(/Have a voucher\? Redeem it/)).toBeInTheDocument()
+    })
+
     it('hides Create Prediction Market button (removed feature)', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
