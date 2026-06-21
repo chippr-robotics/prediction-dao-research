@@ -8,6 +8,12 @@
  * Last updated: 2026-05-09 (Amoy network added for Polymarket integration)
  */
 
+// Network metadata (names, explorers, native currency) lives in networks.js,
+// the single source of truth. We import it here to pair on-chain deployments
+// with their display info for getDeployedNetworks(). Safe from import cycles:
+// networks.js intentionally does NOT import from this file.
+import { NETWORKS } from './networks'
+
 // Mordor (Ethereum Classic testnet, chainId 63) — v2 P2P betting deployment.
 // CORE ONLY: no oracle adapters (ETC has no Polymarket/Chainlink/UMA), so those
 // keys are intentionally absent and their capability tags read "unavailable".
@@ -173,6 +179,51 @@ export function getContractAddressForChain(contractName, chainId) {
   if (chainId == null) return getContractAddress(contractName)
   const chainContracts = NETWORK_CONTRACTS[chainId]
   return chainContracts ? chainContracts[contractName] : undefined
+}
+
+// Local-only sandboxes — never surfaced as public "deployed" networks.
+const LOCAL_ONLY_CHAIN_IDS = new Set([1337])
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+
+/**
+ * Networks the app has been publicly deployed to — derived from
+ * NETWORK_CONTRACTS entries that carry a live `wagerRegistry` (v2 escrow)
+ * address, paired with their display metadata from networks.js. Local-only
+ * sandboxes (Hardhat 1337) are excluded. Mainnets surface before testnets so
+ * the production network reads first.
+ *
+ * This is the source for the landing page's "Deployed on" section, so it grows
+ * automatically as new chains gain a wagerRegistry deployment — no UI edits.
+ *
+ * @returns {Array<{chainId:number,name:string,isTestnet:boolean,nativeSymbol:string,explorerUrl:string,contractUrl:string}>}
+ */
+export function getDeployedNetworks() {
+  return Object.entries(NETWORK_CONTRACTS)
+    .map(([id, contracts]) => ({ chainId: parseInt(id, 10), contracts }))
+    .filter(
+      ({ chainId, contracts }) =>
+        !LOCAL_ONLY_CHAIN_IDS.has(chainId) &&
+        ADDRESS_RE.test(contracts?.wagerRegistry || '')
+    )
+    .map(({ chainId, contracts }) => {
+      const net = NETWORKS[chainId]
+      const explorerUrl = net?.explorer?.baseUrl || ''
+      return {
+        chainId,
+        name: net?.name || `Chain ${chainId}`,
+        isTestnet: Boolean(net?.isTestnet),
+        nativeSymbol: net?.nativeCurrency?.symbol || '',
+        explorerUrl,
+        // Link straight to the deployed escrow contract when an explorer exists.
+        contractUrl: explorerUrl
+          ? `${explorerUrl.replace(/\/$/, '')}/address/${contracts.wagerRegistry}`
+          : '',
+      }
+    })
+    .sort(
+      (a, b) =>
+        Number(a.isTestnet) - Number(b.isTestnet) || a.name.localeCompare(b.name)
+    )
 }
 
 /**
