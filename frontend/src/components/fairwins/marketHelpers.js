@@ -2,6 +2,8 @@
 // MyMarketsModal, and ShareWagerModal so the same display logic and
 // acceptance-URL format apply everywhere.
 
+import { isOpenChallengeMarket } from './wagerCardHelpers'
+
 export const formatUSD = (amount, symbol) => {
   const num = parseFloat(amount) || 0
   const isStablecoin = symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
@@ -40,6 +42,8 @@ export const getMarketDescription = (market) => {
   }
 
   const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'MATIC'}` : ''
+  // Open challenges (feature 024) have no bound opponent and code-gated terms — label them honestly.
+  if (isOpenChallengeMarket(market)) return `Open Challenge${stakeInfo ? ` - ${stakeInfo}` : ''}`
   return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
 }
 
