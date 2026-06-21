@@ -10,6 +10,13 @@ import { decryptEnvelopeCode, isCodeEnvelope } from '../utils/crypto/envelopeEnc
 
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE'))
 const MEMBERSHIP_ABI = ['function hasActiveRole(address user, bytes32 role) view returns (bool)']
+const ERC20_ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
+  'function symbol() view returns (string)',
+]
 
 /**
  * Take-a-challenge flow for open-challenge wagers (feature 024). The four-word code does triple duty:
@@ -84,10 +91,15 @@ export function useOpenChallengeAccept() {
   }, [provider, signer, account, chainId, resolveRegistry])
 
   /**
-   * Accept the open challenge: sign the code-derived EIP-712 message bound to this taker, then send
-   * acceptOpenWager. The signature is only valid for `account`, so an observer cannot reuse it (FR-011).
+   * Accept the open challenge. Taking the other side escrows your matching stake, so this runs the full
+   * funding flow and reports each step via onProgress({ step, message }):
+   *   1. check    — read the wager's token + stake and confirm your balance covers it
+   *   2. approve  — approve the registry to pull your stake (only when the current allowance is short)
+   *   3. sign     — sign the code-derived EIP-712 message bound to this taker (FR-011: not reusable)
+   *   4. accept   — send acceptOpenWager (a pre-flight staticCall surfaces a clear revert first)
+   * The skipped "ERC20: transfer amount exceeds allowance" failure came from sending step 4 without step 2.
    */
-  const accept = useCallback(async (code, wagerId) => {
+  const accept = useCallback(async (code, wagerId, onProgress = () => {}) => {
     setError(null)
     setBusy(true)
     try {
@@ -98,6 +110,40 @@ export function useOpenChallengeAccept() {
       const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
       const net = await signer.provider.getNetwork()
 
+      // 1. Read the authoritative stake the contract will pull (opponentStake == creatorStake for open
+      //    challenges) and make sure the taker can cover it before any wallet prompt.
+      onProgress({ step: 'check', message: 'Checking your balance and approval…' })
+      const w = await registry.getWager(wagerId)
+      const tokenAddr = w.token
+      const stake = w.opponentStake
+      if (!tokenAddr || tokenAddr === ethers.ZeroAddress) {
+        throw new Error('This challenge has no stake token configured.')
+      }
+      const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
+      let decimals = 18
+      let symbol = 'tokens'
+      try { decimals = Number(await token.decimals()) } catch { /* default 18 */ }
+      try { symbol = await token.symbol() } catch { /* default tokens */ }
+
+      const balance = await token.balanceOf(account)
+      if (balance < stake) {
+        throw new Error(
+          `Insufficient ${symbol} balance to take this challenge. ` +
+          `You have ${ethers.formatUnits(balance, decimals)} but need ${ethers.formatUnits(stake, decimals)}.`
+        )
+      }
+
+      // 2. Approve the registry to escrow your stake (skip if already approved). This is the step whose
+      //    absence caused the allowance revert — it must land before the staticCall and send below.
+      const allowance = await token.allowance(account, registryAddr)
+      if (allowance < stake) {
+        onProgress({ step: 'approve', message: `Approve ${symbol} spending in your wallet…` })
+        const approveTx = await token.approve(registryAddr, ethers.MaxUint256)
+        await approveTx.wait()
+      }
+
+      // 3. Sign the code-derived acceptance (bound to this taker, single-use).
+      onProgress({ step: 'sign', message: 'Sign to authorize acceptance…' })
       const signature = await signOpenAccept(code, {
         wagerId,
         taker: account,
@@ -105,13 +151,14 @@ export function useOpenChallengeAccept() {
         verifyingContract: registryAddr,
       })
 
-      // Pre-flight to surface a clear revert reason before the wallet prompt.
+      // 4. Pre-flight to surface a clear revert reason before the final wallet prompt.
       try {
         await registry.acceptOpenWager.staticCall(wagerId, signature)
       } catch (sim) {
         throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
       }
 
+      onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
       const tx = await registry.acceptOpenWager(wagerId, signature)
       const receipt = await tx.wait()
       if (!receipt || receipt.status === 0) throw new Error('Acceptance reverted on-chain.')
@@ -137,6 +184,8 @@ export function translateAcceptRevert(reason) {
   if (r.includes('ArbitratorCannotTake')) return 'You are the named arbitrator for this challenge and cannot take it.'
   if (r.includes('MembershipDenied')) return 'An active membership is required to take a challenge. Purchase one and try again.'
   if (r.includes('AccountFrozen')) return 'This account is restricted from accepting wagers.'
+  if (r.includes('exceeds allowance')) return 'The stake approval did not go through. Approve the token and try again.'
+  if (r.includes('exceeds balance')) return 'Your token balance is too low to cover the stake.'
   return reason || 'Acceptance failed. Please try again.'
 }
 

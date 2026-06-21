@@ -68,8 +68,12 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
 
     await waitFor(() => expect(discover).toHaveBeenCalledWith('river tiger kite zoo'))
     expect(await screen.findByText(/Will it snow/)).toBeInTheDocument()
+    // The funding steps are shown up front so the taker knows acceptance is multi-step.
+    expect(screen.getByText(/Approve the stake token/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sign to authorize acceptance/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /accept challenge/i }))
-    await waitFor(() => expect(accept).toHaveBeenCalledWith('river tiger kite zoo', 4n))
+    // accept now receives an onProgress callback (step reporting) as its 3rd arg.
+    await waitFor(() => expect(accept).toHaveBeenCalledWith('river tiger kite zoo', 4n, expect.any(Function)))
     expect(await screen.findByText(/taken the challenge/i)).toBeInTheDocument()
   })
 
