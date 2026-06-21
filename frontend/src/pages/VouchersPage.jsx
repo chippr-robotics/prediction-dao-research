@@ -4,6 +4,7 @@ import { useWallet } from '../hooks/useWalletManagement'
 import { useVouchers } from '../hooks/useVouchers'
 import { useTierPrices } from '../hooks/useTierPrices'
 import { TIER_NAMES, TIER_COLORS } from '../hooks/useRoleDetails'
+import { MEMBERSHIP_VOUCHERS_TERMS_PATH } from '../constants/legalLinks'
 import Button from '../components/ui/Button'
 import './vouchers.css'
 
@@ -196,7 +197,11 @@ export default function VouchersPage() {
             onChange={(e) => setAcceptedTerms(e.target.checked)}
             disabled={!voucherAvailable || busy}
           />
-          I accept the Terms &amp; Conditions and confirm I’m eligible.
+          I accept the{' '}
+          <a href={MEMBERSHIP_VOUCHERS_TERMS_PATH} target="_blank" rel="noopener noreferrer">
+            Terms &amp; Conditions
+          </a>{' '}
+          (including the membership voucher terms) and confirm I’m eligible.
         </label>
 
         <Button
