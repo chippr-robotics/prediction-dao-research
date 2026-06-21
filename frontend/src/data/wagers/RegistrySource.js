@@ -21,6 +21,7 @@
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork, getCurrentChainId } from '../../config/networks'
+import { makeReadProvider } from '../../utils/rpcProvider'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { upsertCache } from './cacheStore'
 import { applyFilters, paginate } from './sortFilter'
@@ -53,7 +54,7 @@ function resolveChainId(chainId) {
 
 function getProvider(chainId) {
   const net = getNetwork(chainId)
-  return new ethers.JsonRpcProvider(net?.rpcUrl)
+  return makeReadProvider(net?.rpcUrl, chainId)
 }
 
 function getRegistry(chainId, provider) {

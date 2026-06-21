@@ -27,6 +27,7 @@ import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { getDefaultWagerRepository } from '../wagers/WagerRepository'
 import { getSubgraphUrl, hasSubgraph } from '../../config/networks'
+import { makeReadProvider } from '../../utils/rpcProvider'
 
 const INITIAL_CHUNK = 5000
 const MIN_CHUNK = 200
@@ -108,7 +109,10 @@ function transferToPreItem(row) {
 }
 
 function getProvider(opts = {}) {
-  return opts.provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+  return (
+    opts.provider ||
+    makeReadProvider(NETWORK_CONFIG.rpcUrl, opts.chainId ?? NETWORK_CONFIG.chainId)
+  )
 }
 
 /** Resolve the escrow contract (prefer v2 WagerRegistry, fall back to v1 factory). */

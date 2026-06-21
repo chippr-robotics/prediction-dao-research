@@ -14,6 +14,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddress, DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
+import { makeReadProvider } from '../utils/rpcProvider'
 
 // Minimal TreasuryVault ABI (human-readable format)
 const TREASURY_VAULT_ABI = [
@@ -90,7 +91,7 @@ export function useTreasuryVault({ signer, provider, account } = {}) {
     if (provider) return provider
     // Create a fallback provider if none provided
     const rpcUrl = import.meta.env.VITE_RPC_URL || NETWORK_CONFIG.rpcUrl
-    return new ethers.JsonRpcProvider(rpcUrl)
+    return makeReadProvider(rpcUrl, NETWORK_CONFIG.chainId)
   }, [provider])
 
   // Get contract instance

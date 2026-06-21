@@ -8,6 +8,7 @@
 import { ethers } from 'ethers'
 import { getContractAddress, getContractAddressForChain, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRACTS } from '../config/contracts'
 import { getNetwork } from '../config/networks'
+import { makeReadProvider } from './rpcProvider'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { DEX_ADDRESSES } from '../constants/dex'
@@ -119,9 +120,9 @@ export function canUserViewMarket(market, userAddress) {
 export function getProvider(chainId) {
   if (chainId != null) {
     const net = getNetwork(chainId)
-    if (net?.rpcUrl) return new ethers.JsonRpcProvider(net.rpcUrl)
+    if (net?.rpcUrl) return makeReadProvider(net.rpcUrl, chainId)
   }
-  return new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+  return makeReadProvider(NETWORK_CONFIG.rpcUrl, NETWORK_CONFIG.chainId)
 }
 
 /**
