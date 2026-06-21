@@ -131,7 +131,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
       activity: { ...f.activity, status: 'refreshing' },
     }))
     try {
-      const repository = getDefaultWagerRepository()
+      const repository = getDefaultWagerRepository(chainId)
       const [loadedWagers, stable] = await Promise.all([
         loadAllWagers(repository, address),
         fetchStableBalance({

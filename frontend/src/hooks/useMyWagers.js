@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useChainId } from 'wagmi'
 import { getDefaultWagerRepository } from '../data/wagers/WagerRepository'
 import { WagerSortKey } from '../constants/wagerDefaults'
 
@@ -30,11 +31,19 @@ export function useMyWagers({
   filter = {},
   pageSize = DEFAULT_PAGE_SIZE,
   repository,
+  // Active chain — defaults to the wallet's connected chain so the data source
+  // (subgraph vs. RPC) is selected per network. Pass explicitly to override.
+  chainId,
   // Back-compat for callers that used the older naming
   initialSort,
   initialFilter,
 } = {}) {
-  const repo = useMemo(() => repository || getDefaultWagerRepository(), [repository])
+  const wagmiChainId = useChainId()
+  const activeChainId = chainId ?? wagmiChainId
+  const repo = useMemo(
+    () => repository || getDefaultWagerRepository(activeChainId),
+    [repository, activeChainId]
+  )
   const effectiveSort = sort ?? initialSort ?? WagerSortKey.CREATED
   const effectiveFilter = useMemo(
     () => filter ?? initialFilter ?? {},

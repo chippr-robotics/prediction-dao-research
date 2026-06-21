@@ -450,7 +450,7 @@ function Dashboard() {
   const { isConnected, account } = useWallet()
   const { connectWallet } = useWalletConnection()
   const { preferences: _preferences } = useUserPreferences()
-  const { hasRole } = useWalletRoles()
+  const { hasRole, blockchainSynced } = useWalletRoles()
   const { showModal, hideModal } = useModal()
   const navigate = useNavigate()
   const location = useLocation()
@@ -625,8 +625,11 @@ function Dashboard() {
         </div>
       </header>
 
-      {/* Membership CTA Banner */}
-      {isConnected && !bannerDismissed && !hasRole(ROLES.WAGER_PARTICIPANT) && (
+      {/* Membership CTA Banner — only shown once the wallet's roles have been
+          confirmed on-chain (blockchainSynced) so it doesn't linger for members
+          on networks where the role read is still resolving (e.g. the RPC-only
+          Mordor network, which has no subgraph). */}
+      {isConnected && blockchainSynced && !bannerDismissed && !hasRole(ROLES.WAGER_PARTICIPANT) && (
         <div className="dashboard-cta-banner">
           <div className="cta-banner-content">
             <strong>Get access to create and accept peer-to-peer wagers</strong>

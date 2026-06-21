@@ -31,10 +31,22 @@ describe('createReportDataSource.enumerateWagers (subgraph-based, no genesis sca
     }
   }
 
-  it('requires the subgraph and throws a clear error when it is not configured', async () => {
-    vi.stubEnv('VITE_SUBGRAPH_URL', '')
-    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: fakeRepo([]) })
-    await expect(ds.enumerateWagers({ account: USER })).rejects.toThrow(/requires the indexing subgraph/i)
+  it('enumerates over RPC (no throw) on a chain without a subgraph (e.g. Mordor)', async () => {
+    // Chain 63 (Mordor) has no subgraph, so the repository serves v2 wagers from
+    // RegistrySource (source: 'registry'). Reporting must still work.
+    const repo = fakeRepo([
+      {
+        source: 'registry',
+        hasMore: false,
+        nextCursor: null,
+        items: [
+          { id: '1', creator: USER, participants: [USER], stakeTokenAddress: '0xtok', stakeAmount: '100', createdAt: 0 },
+        ],
+      },
+    ])
+    const ds = createReportDataSource({ chainId: 63, provider: { getBlockNumber: async () => 1 }, repository: repo })
+    const wagers = await ds.enumerateWagers({ account: USER })
+    expect(wagers.map((w) => w.id)).toEqual(['1'])
   })
 
   it('enumerates the user\'s wagers from the subgraph repository (never scans logs)', async () => {
@@ -56,11 +68,29 @@ describe('createReportDataSource.enumerateWagers (subgraph-based, no genesis sca
     expect(repo.listMyWagers).toHaveBeenCalledWith(expect.objectContaining({ userAddress: USER, filter: { includeExpired: true } }))
   })
 
-  it('fails clearly if the repository falls back to the legacy events source', async () => {
-    vi.stubEnv('VITE_SUBGRAPH_URL', 'http://subgraph.example')
-    const repo = fakeRepo([{ source: 'subgraph-fallback', hasMore: false, nextCursor: null, items: [] }])
+  it('accepts the subgraph-fallback (RPC) source as valid v2 data', async () => {
+    // When the subgraph is unreachable on an indexed chain the repository now
+    // falls back to RegistrySource (RPC), tagged 'subgraph-fallback'. That is
+    // valid v2 data, so enumeration succeeds rather than erroring.
+    const repo = fakeRepo([
+      {
+        source: 'subgraph-fallback',
+        hasMore: false,
+        nextCursor: null,
+        items: [
+          { id: '9', creator: USER, participants: [USER], stakeTokenAddress: '0xtok', stakeAmount: '5', createdAt: 0 },
+        ],
+      },
+    ])
     const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: repo })
-    await expect(ds.enumerateWagers({ account: USER })).rejects.toThrow(/subgraph is unreachable/i)
+    const wagers = await ds.enumerateWagers({ account: USER })
+    expect(wagers.map((w) => w.id)).toEqual(['9'])
+  })
+
+  it('still rejects the retired legacy events source (cannot serve v2 reporting)', async () => {
+    const repo = fakeRepo([{ source: 'events', hasMore: false, nextCursor: null, items: [] }])
+    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 }, repository: repo })
+    await expect(ds.enumerateWagers({ account: USER })).rejects.toThrow(/temporarily unavailable/i)
   })
 
   it('returns [] without an account', async () => {
@@ -76,9 +106,10 @@ describe('createReportDataSource.listTransfers (subgraph WagerTransfer, no log s
     vi.unstubAllGlobals()
   })
 
-  it('returns null when no subgraph is configured (signals bounded-scan fallback)', async () => {
-    vi.stubEnv('VITE_SUBGRAPH_URL', '')
-    const ds = createReportDataSource({ chainId: 80002, provider: { getBlockNumber: async () => 1 } })
+  it('returns null on a chain without a subgraph (signals RPC/bounded-scan fallback)', async () => {
+    // Chain 63 (Mordor) has no subgraph endpoint, so the indexed transfer query
+    // is skipped and the caller falls back to enumerate + bounded scan.
+    const ds = createReportDataSource({ chainId: 63, provider: { getBlockNumber: async () => 1 } })
     expect(await ds.listTransfers({ account: USER })).toBeNull()
   })
 

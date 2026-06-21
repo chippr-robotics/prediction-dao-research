@@ -26,6 +26,7 @@ import { getContractAddressForChain, NETWORK_CONFIG, DEPLOYMENT_BLOCKS } from '.
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { getDefaultWagerRepository } from '../wagers/WagerRepository'
+import { getSubgraphUrl, hasSubgraph } from '../../config/networks'
 
 const INITIAL_CHUNK = 5000
 const MIN_CHUNK = 200
@@ -45,8 +46,11 @@ const V1 = {
   valueEvents: ['MarketCreatedPending', 'ParticipantAccepted', 'WinningsClaimed', 'StakeRefunded'],
 }
 
-function subgraphConfigured() {
-  return Boolean(import.meta.env?.VITE_SUBGRAPH_URL)
+// Whether the given chain is indexed by a subgraph. Resolved per-chain so a
+// network without an indexer (e.g. Mordor) transparently uses the RPC-backed
+// repository path instead.
+function subgraphConfigured(chainId) {
+  return hasSubgraph(chainId)
 }
 
 // GraphQL: a party's value movements, time-ordered, straight from the index
@@ -74,8 +78,8 @@ const WAGER_TRANSFERS_QUERY = `
   }
 `
 
-async function postSubgraph(query, variables) {
-  const url = import.meta.env?.VITE_SUBGRAPH_URL
+async function postSubgraph(url, query, variables) {
+  if (!url) throw new Error('No subgraph endpoint configured for this chain')
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -197,7 +201,8 @@ async function scanAdaptive(contract, filter, fromBlock, toBlock, label, budget)
 export function createReportDataSource(opts = {}) {
   const provider = getProvider(opts)
   const chainId = opts.chainId
-  const repository = opts.repository || getDefaultWagerRepository()
+  const repository = opts.repository || getDefaultWagerRepository(chainId)
+  const subgraphUrl = getSubgraphUrl(chainId)
   // wagerId → createdAt (unix seconds), captured during enumeration for windowing.
   const createdAtById = new Map()
 
@@ -234,12 +239,12 @@ export function createReportDataSource(opts = {}) {
      */
     async listTransfers({ account }) {
       if (!account) return []
-      if (!subgraphConfigured()) return null
+      if (!subgraphConfigured(chainId)) return null
       const party = String(account).toLowerCase()
       const all = []
       const pageSize = 1000
       for (let skip = 0; skip < 100_000; skip += pageSize) {
-        const data = await postSubgraph(WAGER_TRANSFERS_QUERY, { party, first: pageSize, skip })
+        const data = await postSubgraph(subgraphUrl, WAGER_TRANSFERS_QUERY, { party, first: pageSize, skip })
         const rows = data?.wagerTransfers || []
         all.push(...rows.map(transferToPreItem))
         if (rows.length < pageSize) break
@@ -249,11 +254,9 @@ export function createReportDataSource(opts = {}) {
 
     async enumerateWagers({ account }) {
       if (!account) return []
-      if (!subgraphConfigured()) {
-        throw new Error(
-          'Wager reporting requires the indexing subgraph (VITE_SUBGRAPH_URL) to be configured for this network.',
-        )
-      }
+      // No subgraph throw here: the repository enumerates v2 wagers over RPC
+      // (RegistrySource) on networks without an indexer, so reporting still
+      // works — just with on-chain event windowing instead of indexed rows.
       const all = []
       let cursor = null
       for (let page = 0; page < 200; page++) {
@@ -263,10 +266,11 @@ export function createReportDataSource(opts = {}) {
           pageSize: 100,
           filter: { includeExpired: true },
         })
-        // Guard against the repository's legacy EventsSource fallback (it targets
-        // the retired factory and cannot serve v2 reporting).
-        if (String(res.source || '').includes('fallback') || res.source === 'events') {
-          throw new Error('The reporting subgraph is unreachable right now. Please try again shortly.')
+        // Only the retired EventsSource (legacy FriendGroupMarketFactory) cannot
+        // serve v2 reporting. The 'registry' source and the 'subgraph-fallback'
+        // (which now resolves to RegistrySource over RPC) are both valid.
+        if (res.source === 'events') {
+          throw new Error('Wager reporting is temporarily unavailable for this network.')
         }
         all.push(...(res.items || []))
         if (!res.hasMore || !res.nextCursor) break

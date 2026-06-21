@@ -42,6 +42,13 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
+    // The Graph endpoint that indexes this chain's WagerRegistry. When present,
+    // the wager list/reports read from the subgraph; when null (see Mordor),
+    // the app falls back to direct RPC reads via RegistrySource. Override with
+    // VITE_SUBGRAPH_URL_AMOY.
+    subgraphUrl:
+      import.meta.env?.VITE_SUBGRAPH_URL_AMOY ||
+      'https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.2.0',
     // USDC on Amoy. Defaults to the Circle faucet USDC deployed alongside
     // our contracts (same as paymentToken in contracts.js). Override via
     // VITE_AMOY_USDC if a different token is needed.
@@ -95,6 +102,11 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'Ethereum Classic', symbol: 'ETC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_MORDOR || 'https://rpc.mordor.etccooperative.org',
     explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' },
+    // No hosted Graph indexer supports Ethereum Classic / Mordor, so there is no
+    // subgraph for this chain. The app reads wagers directly from the
+    // WagerRegistry over RPC (RegistrySource). Set VITE_SUBGRAPH_URL_MORDOR only
+    // if a self-hosted indexer (Goldsky/Ponder/Envio) is stood up later.
+    subgraphUrl: import.meta.env?.VITE_SUBGRAPH_URL_MORDOR || null,
     // Classic USD (USC) — Ethereum Classic's fiat-backed stablecoin (Brale-issued),
     // reused as-is (never a mock). Verify the canonical Mordor address + decimals
     // on-chain before relying on it (Spec 015, T001). Override via VITE_MORDOR_USC.
@@ -150,6 +162,11 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
+    // The Graph endpoint indexing the production WagerRegistry on Polygon.
+    // Override with VITE_SUBGRAPH_URL_POLYGON.
+    subgraphUrl:
+      import.meta.env?.VITE_SUBGRAPH_URL_POLYGON ||
+      'https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0',
     // Native USDC on Polygon (Circle-issued, USDC.e is the bridged variant
     // and is not used here). Decimals=6.
     stablecoin: {
@@ -190,6 +207,8 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrl: 'http://127.0.0.1:8545',
     explorer: { name: 'Local', baseUrl: '' },
+    // Local dev has no subgraph — reads go straight to the local node over RPC.
+    subgraphUrl: null,
     stablecoin: null,
     dex: null,
     contracts: {},
@@ -211,6 +230,29 @@ export function getNetwork(chainId) {
 
 export function isDexAvailable(chainId) {
   return Boolean(getNetwork(chainId)?.dex)
+}
+
+/**
+ * The Graph endpoint that indexes `chainId`, or null when no subgraph is
+ * deployed for that network. This is the single source of truth for the
+ * "does this chain have an indexer?" decision used to route wager reads
+ * between the subgraph and direct RPC (RegistrySource).
+ *
+ * Resolution is strictly per-chain so a subgraph URL configured for one
+ * network can never leak to another (e.g. a Polygon endpoint must not be
+ * queried while the wallet is on Mordor).
+ */
+export function getSubgraphUrl(chainId) {
+  const net = chainId != null ? NETWORKS[chainId] : null
+  return net?.subgraphUrl || null
+}
+
+/**
+ * Whether `chainId` is indexed by a subgraph. Networks that return false
+ * (e.g. Ethereum Classic Mordor) must be served from RPC reads instead.
+ */
+export function hasSubgraph(chainId) {
+  return Boolean(getSubgraphUrl(chainId))
 }
 
 /**
