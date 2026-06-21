@@ -54,5 +54,10 @@
     "mockPolymarketCTF": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-06-21T03:38:55.285Z"
+  "timestamp": "2026-06-21T03:38:55.285Z",
+  "deployBlocks": {
+    "wagerRegistry": 40521027,
+    "membershipManager": 40521018,
+    "membershipVoucher": 40521024
+  }
 }

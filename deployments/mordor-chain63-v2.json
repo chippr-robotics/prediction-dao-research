@@ -33,5 +33,10 @@
     "mockSanctionsOracle": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-06-21T03:31:32.666Z"
+  "timestamp": "2026-06-21T03:31:32.666Z",
+  "deployBlocks": {
+    "wagerRegistry": 16404317,
+    "membershipManager": 16404308,
+    "membershipVoucher": 16404315
+  }
 }

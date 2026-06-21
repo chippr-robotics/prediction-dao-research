@@ -7,14 +7,30 @@
   },
   "mordor": {
     "WagerRegistry": {
-      "address": "0xAE5b3148E1509973e4A03Dc809A78098215c5Eff",
-      "startBlock": 16376172
+      "address": "0x3ccB144d8aa838e8d4D695867cC72e548117830C",
+      "startBlock": 16404317
+    },
+    "MembershipVoucher": {
+      "address": "0xf514e0e342A898E4681bf51590B672aEC5620401",
+      "startBlock": 16404315
+    },
+    "MembershipManager": {
+      "address": "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541",
+      "startBlock": 16404308
     }
   },
   "polygon-amoy": {
     "WagerRegistry": {
-      "address": "0x916841aEe4832a2e9DD42470fa05a7329486e75a",
-      "startBlock": 40172425
+      "address": "0xA429CdaD3E1497e33BEA7D6FE7d6913fE880241b",
+      "startBlock": 40521027
+    },
+    "MembershipVoucher": {
+      "address": "0x33C8Ccacf6442Cf4238f01419e38C781cB859769",
+      "startBlock": 40521024
+    },
+    "MembershipManager": {
+      "address": "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465",
+      "startBlock": 40521018
     }
   }
 }
