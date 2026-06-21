@@ -17,6 +17,15 @@ proxy** delivered by **feature 027** (Upgradeable MembershipManager). 027 must b
 `MembershipManager` already inherits `UUPSManaged` with a trailing `__gap` on this branch, so `redeemVoucher`
 appends one slot (`voucher`) from that gap.
 
+**Implementation status (2026-06-21)**: **Contract core complete and green** — `IMembershipVoucher`,
+immutable `MembershipVoucher` (mint/burn/on-chain `tokenURI`/2.5%-cap-5% royalty), and the `redeemVoucher`
+append-only upgrade on `MembershipManager` (fail-closed redeemer screening, Terms recording, single-use atomic
+burn, CEI) are implemented with deploy/verify wiring. **281 passing / 5 pending / 0 failing** (17 new voucher/
+redeem/integration tests), `check:storage-layout` validates the `voucher` append. Remaining unchecked are
+**integration + environment-gated**: T016 (subgraph), T017–T019 (frontend mint/gift/redeem UI + sync), T020
+(docs), T021 (Slither CI), T022 (voucher Medusa harness), T023 (security-agent review), T024 (coverage CI),
+T026–T027 (Amoy/Polygon deploy via floppy keystore + sign-off).
+
 **Design decisions (research.md)**: voucher is **immutable** (NOT upgradeable, D1); redeem-to-self in v1
 (D2); mint price/treasury read live from `MembershipManager`, paid to treasury at mint (D3); manager-driven
 burn (D4); on-chain Base64 `tokenURI` (D5); ERC-2981 royalty 2.5% / 5% hard ceiling (D6); voucher snapshots
@@ -40,7 +49,7 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 **Purpose**: Confirm the OZ token toolchain is available. No new deps (ERC721/ERC2981/Base64/Strings ship in
 `@openzeppelin/contracts@5.4.0`, already present).
 
-- [ ] T001 Confirm `@openzeppelin/contracts@5.4.0` provides `token/ERC721/ERC721.sol`, `token/ERC721/extensions/ERC721Burnable.sol`, `token/common/ERC2981.sol`, `utils/Strings.sol`, `utils/Base64.sol`; run `npm run compile` baseline. (plan.md Technical Context)
+- [X] T001 Confirm `@openzeppelin/contracts@5.4.0` provides `token/ERC721/ERC721.sol`, `token/ERC721/extensions/ERC721Burnable.sol`, `token/common/ERC2981.sol`, `utils/Strings.sol`, `utils/Base64.sol`; run `npm run compile` baseline. (plan.md Technical Context)
 
 **Checkpoint**: Toolchain confirmed; no new dependencies.
 
@@ -52,7 +61,7 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 **⚠️ CRITICAL**: Depends on feature 027 (membership proxy) being in place. No user-story redemption work can begin until the interface exists.
 
-- [ ] T002 Create `contracts/interfaces/IMembershipVoucher.sol`: the subset the manager calls — `voucherInfo(uint256) returns (VoucherInfo{bytes32 role, IMembershipManager.Tier tier, uint32 durationDays})`, `burn(uint256)`, `ownerOf(uint256)`. (data-model.md; contracts/membership-voucher.md)
+- [X] T002 Create `contracts/interfaces/IMembershipVoucher.sol`: the subset the manager calls — `voucherInfo(uint256) returns (VoucherInfo{bytes32 role, IMembershipManager.Tier tier, uint32 durationDays})`, `burn(uint256)`, `ownerOf(uint256)`. (data-model.md; contracts/membership-voucher.md)
 
 **Checkpoint**: The manager↔voucher interface compiles.
 
@@ -68,12 +77,12 @@ confers no membership (`hasActiveRole` false), transfers/resells, and exposes th
 
 ### Tests for User Story 1 (write first, must fail) ⚠️
 
-- [ ] T003 [P] [US1] `test/access/MembershipVoucher.test.js`: mint pulls exactly `priceUSDC` USDC to treasury and snapshots `{role, tier, durationDays}`; minting an inactive/zero-price tier reverts; a held voucher confers no membership; transfer/resale moves the token with no membership effect; `royaltyInfo(id, price)` returns `(treasury, price*250/10000)`; `setRoyaltyBps(>500)` reverts (5% ceiling); `tokenURI` returns a non-empty `data:application/json;base64,` string; `burn` by non-manager/non-owner reverts. (FR-001..005b, FR-021/021a, SC-002/SC-009)
+- [X] T003 [P] [US1] `test/access/MembershipVoucher.test.js`: mint pulls exactly `priceUSDC` USDC to treasury and snapshots `{role, tier, durationDays}`; minting an inactive/zero-price tier reverts; a held voucher confers no membership; transfer/resale moves the token with no membership effect; `royaltyInfo(id, price)` returns `(treasury, price*250/10000)`; `setRoyaltyBps(>500)` reverts (5% ceiling); `tokenURI` returns a non-empty `data:application/json;base64,` string; `burn` by non-manager/non-owner reverts. (FR-001..005b, FR-021/021a, SC-002/SC-009)
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Implement `contracts/access/MembershipVoucher.sol` (immutable): `ERC721 + ERC721Burnable + ERC2981 + AccessControl`; immutable `membershipManager`; `mint(role, tier)` (read price+treasury from manager, `SafeERC20.safeTransferFrom` minter→treasury, snapshot `VoucherInfo`, `_safeMint`, `nonReentrant`, emit `VoucherMinted`); `voucherInfo`; `burn` restricted to manager-or-owner; on-chain `tokenURI` (Base64 JSON + SVG); `royaltyInfo` (2.5% default → treasury) + `setRoyaltyBps` (≤500 bps); `supportsInterface`. (contracts/membership-voucher.md; research.md D1/D3/D5/D6/D7)
-- [ ] T005 [US1] Add deploy wiring stub in `scripts/deploy/deploy.js`: deploy `MembershipVoucher` (immutable, constructor takes the membership proxy address); record `membershipVoucher` in `deployments`. (FR-026)
+- [X] T004 [US1] Implement `contracts/access/MembershipVoucher.sol` (immutable): `ERC721 + ERC721Burnable + ERC2981 + AccessControl`; immutable `membershipManager`; `mint(role, tier)` (read price+treasury from manager, `SafeERC20.safeTransferFrom` minter→treasury, snapshot `VoucherInfo`, `_safeMint`, `nonReentrant`, emit `VoucherMinted`); `voucherInfo`; `burn` restricted to manager-or-owner; on-chain `tokenURI` (Base64 JSON + SVG); `royaltyInfo` (2.5% default → treasury) + `setRoyaltyBps` (≤500 bps); `supportsInterface`. (contracts/membership-voucher.md; research.md D1/D3/D5/D6/D7)
+- [X] T005 [US1] Add deploy wiring stub in `scripts/deploy/deploy.js`: deploy `MembershipVoucher` (immutable, constructor takes the membership proxy address); record `membershipVoucher` in `deployments`. (FR-026)
 
 **Checkpoint**: Vouchers can be minted, gifted, resold; they confer no membership; royalty + on-chain art work. MVP of the tradable instrument.
 
@@ -89,15 +98,15 @@ reset counters, Terms recorded, and identical wager-gating behavior to a direct 
 
 ### Tests for User Story 2 (write first, must fail) ⚠️
 
-- [ ] T006 [P] [US2] `test/access/MembershipManager.redeem.test.js`: redeem burns the voucher and writes the `(role, tier)` membership (clock starts now, counters reset); Terms hash recorded for the redeemer; redeem grants the tier minted for even after tier config changes (price/limits/active) post-mint; double-redeem (burned token) reverts; `setVoucher` admin-gated. (FR-006..010, FR-013, SC-009)
-- [ ] T007 [P] [US2] `test/integration/voucher-redeem-membership.test.js`: a redeemed membership behaves identically to a directly purchased one across `WagerRegistry` create/accept + usage limits (FR-008/SC-003).
+- [X] T006 [P] [US2] `test/access/MembershipManager.redeem.test.js`: redeem burns the voucher and writes the `(role, tier)` membership (clock starts now, counters reset); Terms hash recorded for the redeemer; redeem grants the tier minted for even after tier config changes (price/limits/active) post-mint; double-redeem (burned token) reverts; `setVoucher` admin-gated. (FR-006..010, FR-013, SC-009)
+- [X] T007 [P] [US2] `test/integration/voucher-redeem-membership.test.js`: a redeemed membership behaves identically to a directly purchased one across `WagerRegistry` create/accept + usage limits (FR-008/SC-003).
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Extend `contracts/interfaces/IMembershipManager.sol`: add `setVoucher(address)`, `redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash)`, and `VoucherSet`/`MembershipRedeemed` events. (contracts/membership-manager-redeem-upgrade.md)
-- [ ] T009 [US2] Append to `contracts/access/MembershipManager.sol` (append-only — draws from the spec-027 `__gap`): `address public voucher`; `setVoucher(address) onlyRole(DEFAULT_ADMIN_ROLE)`; `redeemVoucher(voucherId, acceptedTermsHash) nonReentrant` implementing the CEI flow (own→!active→screen→burn→write membership→record Terms→emit). Reduce `__gap` by 1. No change to existing slots/signatures. (contracts/membership-manager-redeem-upgrade.md; FR-006..016, FR-024/025)
-- [ ] T010 [US2] Wire voucher↔manager in `scripts/deploy/deploy.js`: after deploying the voucher, call `MembershipManager.setVoucher(voucher)`; confirm the voucher's constructor points at the membership proxy. (FR-026)
-- [ ] T011 [US2] Run `npm run check:storage-layout` — the `voucher` append must validate as append-only on the membership proxy. (FR-024/SC of 027)
+- [X] T008 [US2] Extend `contracts/interfaces/IMembershipManager.sol`: add `setVoucher(address)`, `redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash)`, and `VoucherSet`/`MembershipRedeemed` events. (contracts/membership-manager-redeem-upgrade.md)
+- [X] T009 [US2] Append to `contracts/access/MembershipManager.sol` (append-only — draws from the spec-027 `__gap`): `address public voucher`; `setVoucher(address) onlyRole(DEFAULT_ADMIN_ROLE)`; `redeemVoucher(voucherId, acceptedTermsHash) nonReentrant` implementing the CEI flow (own→!active→screen→burn→write membership→record Terms→emit). Reduce `__gap` by 1. No change to existing slots/signatures. (contracts/membership-manager-redeem-upgrade.md; FR-006..016, FR-024/025)
+- [X] T010 [US2] Wire voucher↔manager in `scripts/deploy/deploy.js`: after deploying the voucher, call `MembershipManager.setVoucher(voucher)`; confirm the voucher's constructor points at the membership proxy. (FR-026)
+- [X] T011 [US2] Run `npm run check:storage-layout` — the `voucher` append must validate as append-only on the membership proxy. (FR-024/SC of 027)
 
 **Checkpoint**: A voucher redeems into a soulbound membership identical to a direct purchase; the append-only upgrade validates. Headline capability delivered.
 
@@ -113,11 +122,11 @@ relationship and no stored back-reference; UI states pseudonymity honestly. (spe
 
 ### Tests for User Story 3 (write first, must fail) ⚠️
 
-- [ ] T012 [P] [US3] In `test/access/MembershipManager.redeem.test.js`: redemption succeeds for any owner regardless of who minted (FR-017); the membership record stores no reference to the minting/selling wallet (FR-018); `redeemVoucher` keys only on `msg.sender` ownership (relayer-compatible, no caller assumptions beyond ownership — FR-019).
+- [X] T012 [P] [US3] In `test/access/MembershipManager.redeem.test.js`: redemption succeeds for any owner regardless of who minted (FR-017); the membership record stores no reference to the minting/selling wallet (FR-018); `redeemVoucher` keys only on `msg.sender` ownership (relayer-compatible, no caller assumptions beyond ownership — FR-019).
 
 ### Implementation for User Story 3
 
-- [ ] T013 [US3] Confirm `redeemVoucher` (T009) holds no back-reference and is `msg.sender`-keyed (no recipient param) — relayer/AA can be layered later without redesign. No code change expected beyond T009; this task verifies/locks the property. (FR-017/018/019)
+- [X] T013 [US3] Confirm `redeemVoucher` (T009) holds no back-reference and is `msg.sender`-keyed (no recipient param) — relayer/AA can be layered later without redesign. No code change expected beyond T009; this task verifies/locks the property. (FR-017/018/019)
 
 **Checkpoint**: Private redeem-to-fresh-wallet works; pseudonymity is real and disclosed.
 
@@ -133,11 +142,11 @@ reverts; minting is never screened. (spec US4)
 
 ### Tests for User Story 4 (write first, must fail) ⚠️
 
-- [ ] T014 [P] [US4] In `test/access/MembershipManager.redeem.test.js`: a blocked redeemer (mock sanctions guard) reverts and the voucher is NOT burned and remains owned (FR-012/015); a redeemer with an active membership for that role reverts, voucher intact (FR-011); after a failed redemption the voucher transfers to a new eligible buyer who redeems successfully (SC-006); minting is NOT screened (FR-014).
+- [X] T014 [P] [US4] In `test/access/MembershipManager.redeem.test.js`: a blocked redeemer (mock sanctions guard) reverts and the voucher is NOT burned and remains owned (FR-012/015); a redeemer with an active membership for that role reverts, voucher intact (FR-011); after a failed redemption the voucher transfers to a new eligible buyer who redeems successfully (SC-006); minting is NOT screened (FR-014).
 
 ### Implementation for User Story 4
 
-- [ ] T015 [US4] Confirm the CEI ordering in `redeemVoucher` (T009) screens BEFORE the burn so a blocked/failed redemption leaves the voucher intact; minting path performs no screening. Verify against T014. (FR-011/012/014/015)
+- [X] T015 [US4] Confirm the CEI ordering in `redeemVoucher` (T009) screens BEFORE the burn so a blocked/failed redemption leaves the voucher intact; minting path performs no screening. Verify against T014. (FR-011/012/014/015)
 
 **Checkpoint**: Redemption is fail-closed and failure-resilient; the recorded screening tradeoff holds.
 
@@ -172,7 +181,7 @@ reverts; minting is never screened. (spec US4)
 - [ ] T022 [P] Add a Medusa harness `contracts/test/MembershipVoucherFuzzTest.sol`: invariants — a held voucher never yields membership; redeem is single-use; mint conserves treasury accounting; royalty ≤ 5%. (Principle I)
 - [ ] T023 ⏳ REVIEW-GATED — smart-contract security-agent review (`.github/agents/`) of mint (fund handling) + redeemVoucher (fail-closed screening, least-privilege grant, single-use atomic burn, append-only storage). (Principle I)
 - [ ] T024 [P] Coverage — confirm new branches exercised by `test/access/MembershipVoucher.test.js` + `MembershipManager.redeem.test.js` + the integration test. (Principle II)
-- [ ] T025 Validate the quickstart locally (non-network parts): full existing membership + wager suites green; voucher mint/transfer/redeem scenarios pass; `check:storage-layout` passes the `voucher` append; redeemed membership == direct membership. (quickstart.md; SC-001..SC-010)
+- [X] T025 Validate the quickstart locally (non-network parts): full existing membership + wager suites green; voucher mint/transfer/redeem scenarios pass; `check:storage-layout` passes the `voucher` append; redeemed membership == direct membership. (quickstart.md; SC-001..SC-010)
 
 **Checkpoint**: Security gates pass; vouchers are safe and behavior-additive.
 

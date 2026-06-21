@@ -289,6 +289,23 @@ async function main() {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
   }
 
+  // -------- MembershipVoucher (immutable — spec 026) --------
+  // Transferable ERC-721 bearer voucher; redemption burns it and mints a soulbound membership via the
+  // MembershipManager proxy. Immutable by design (a bearer asset's rules must not change post-sale).
+  const voucherDeploy = await deployDeterministic(
+    "MembershipVoucher",
+    [deployer.address, mgrDeploy.address],
+    generateSalt(SALT_PREFIXES.V2 + "MembershipVoucher"),
+    deployer
+  );
+  deployments.membershipVoucher = voucherDeploy.address;
+  if ((await membershipManager.voucher()).toLowerCase() !== voucherDeploy.address.toLowerCase()) {
+    console.log("\nWiring MembershipVoucher into MembershipManager...");
+    const tx = await membershipManager.connect(deployer).setVoucher(voucherDeploy.address);
+    await tx.wait();
+    console.log("  ✓ redeemVoucher enabled (voucher rail live)");
+  }
+
   // -------- WagerRegistry (UUPS proxy — spec 025) --------
   // The registry is now upgradeable: deployed behind an ERC1967 UUPS proxy so future logic ships as an
   // in-place upgrade (stable address, preserved state) instead of a fresh address that strands wagers.
@@ -480,6 +497,7 @@ async function main() {
     // UUPS proxies (spec 025/027): implementations are verified with EMPTY constructor args (init data lives
     // in the proxy, not the implementation's constructor). verify.js verifies the implementation addresses.
     membershipManagerImpl: [],
+    membershipVoucher: [deployer.address, mgrDeploy.address],
     wagerRegistryImpl: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
@@ -507,6 +525,7 @@ async function main() {
       ...(flags.noPolymarket ? {} : { polymarketAdapter: adapterAddress }),
       membershipManager: mgrDeploy.address, // ERC1967 proxy (stable address)
       membershipManagerImpl: mgrProxy.implementation, // current implementation (changes on upgrade)
+      membershipVoucher: voucherDeploy.address, // immutable ERC-721 voucher (spec 026)
       wagerRegistry: regDeploy.address, // ERC1967 proxy (stable address)
       wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
       keyRegistry: keyDeploy.address,

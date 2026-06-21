@@ -28,10 +28,18 @@ interface IMembershipManager {
 
     event MembershipRevoked(address indexed user, bytes32 indexed role, address indexed by);
 
+    // Voucher rail (spec 026) — additive
+    event VoucherSet(address indexed voucher);
+    event MembershipRedeemed(address indexed user, bytes32 indexed role, Tier tier, uint256 indexed voucherId, uint64 expiresAt);
+
     // Hooks (authorized callers only)
     function checkCanCreate(address user, bytes32 role) external view returns (bool);
     function recordCreate(address user, bytes32 role) external;
     function recordClose(address user, bytes32 role) external;
+
+    // Voucher rail (spec 026)
+    function setVoucher(address voucher) external;
+    function redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash) external;
 
     // Role-manager surface (out-of-band grants / revokes)
     function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external;
