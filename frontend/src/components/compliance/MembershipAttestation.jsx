@@ -11,7 +11,7 @@ import { useState, useEffect } from 'react'
 
 const ATTESTATIONS = [
   { id: 'age', label: 'I am at least 21 years of age.' },
-  { id: 'jurisdiction', label: 'I am not a U.S. person and am not located, resident, or established in the United States or any Restricted Jurisdiction defined in the Terms.' },
+  { id: 'jurisdiction', label: 'I am not located, resident, or established in any Restricted Jurisdiction defined in the Terms.' },
   { id: 'sanctions', label: 'I am not, and do not act on behalf of, any person subject to sanctions or named on any restricted-party list (including the OFAC SDN list).' },
   { id: 'norecourse', label: 'I understand FairWins is not a registered exchange, broker, or regulated gambling operator, that there is no regulator or authority to which I can appeal a dispute, and that wager outcomes are settled by smart contract and the published dispute-resolution mechanism.' },
   { id: 'risk', label: 'I understand I may lose the entire amount of any wager, that I bear sole responsibility for my own tax reporting, and that I have sole control of my wallet and private keys.' },

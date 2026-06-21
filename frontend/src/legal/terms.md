@@ -10,7 +10,7 @@ Before you agree, understand the following in plain language. The full terms bel
 - **FairWins is software, not a bookmaker.** You wager directly against other people. FairWins is never the other side of your bet, never sets odds, never holds your money, and never takes a cut of any wager.
 - **Your membership fee buys access only.** It is not a bet, not a deposit, and not refundable.
 - **You can lose everything you wager.** There is no insurance and no regulator you can appeal to.
-- **You must qualify to use FairWins.** You must be at least 21, not a U.S. person, not located in a restricted jurisdiction, and not subject to sanctions.
+- **You must qualify to use FairWins.** You must be at least 21, not located in a restricted jurisdiction, and not subject to sanctions.
 - **You control your own wallet.** If you lose your keys, no one — including FairWins — can recover your funds or your account.
 - **Disputes with FairWins go to arbitration, individually.** You give up the right to a court trial and to class actions against us.
 
@@ -43,7 +43,6 @@ If any provision of a more specific step (membership attestation, signed message
 - **"Public Wager"** — a Wager broadcast for acceptance by any address.
 - **"Smart Contract"** — the FairWins protocol contracts deployed on the Polygon network.
 - **"Resolution Mechanism"** — the on-chain process, including any oracle and dispute procedure, by which the outcome of a Wager is determined and settled, as described in the Service documentation.
-- **"U.S. Person"** — any individual resident in the United States; any entity organized under U.S. law or with its principal place of business in the United States; and any person acting on behalf of any of the foregoing.
 - **"Restricted Jurisdiction"** — any jurisdiction listed in **Schedule A**, as amended from time to time.
 - **"Restricted Party"** — any person subject to sanctions administered by OFAC or any other applicable authority, or named on any government restricted-party or denied-persons list.
 
@@ -64,11 +63,10 @@ If any provision of a more specific step (membership attestation, signed message
 You may use the Service only if you meet **all** of the following at all times. By using the Service you represent and warrant that:
 
 - (a) you are at least **21 years of age** and of legal capacity to enter a binding contract;
-- (b) you are **not a U.S. Person** and are not located, resident, incorporated, or established in the United States;
-- (c) you are not located, resident, incorporated, or established in any **Restricted Jurisdiction**;
-- (d) you are **not a Restricted Party** and do not act on behalf of any Restricted Party;
-- (e) your access to and use of peer-to-peer wagering software is **lawful in the jurisdiction from which you access it**, and you bear sole responsibility for that determination; and
-- (f) you have **sole and exclusive control** of the wallet and private keys you use with the Service.
+- (b) you are not located, resident, incorporated, or established in any **Restricted Jurisdiction**;
+- (c) you are **not a Restricted Party** and do not act on behalf of any Restricted Party;
+- (d) your access to and use of peer-to-peer wagering software is **lawful in the jurisdiction from which you access it**, and you bear sole responsibility for that determination; and
+- (e) you have **sole and exclusive control** of the wallet and private keys you use with the Service.
 
 These representations are renewed each time you access the Service, purchase or renew a Membership Pass, sign a Service message, or enter a Wager.
 
@@ -218,7 +216,6 @@ Questions about these Terms: Howdy@fairwins.app.
 
 The Service is not available to persons located, resident, incorporated, or established in:
 
-- The **United States** of America and its territories;
 - **Cuba, Iran, North Korea, Syria**, and the **Crimea, Donetsk, and Luhansk** regions;
 - Any jurisdiction subject to comprehensive sanctions by OFAC or other applicable authority; and
 - Any jurisdiction in which peer-to-peer wagering, prediction markets, or the Service is unlawful, including without limitation.

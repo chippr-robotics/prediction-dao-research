@@ -25,7 +25,7 @@ import { ERC20_ABI } from '../abis/ERC20'
  */
 export function useVouchers() {
   const { account, signer, provider, chainId } = useWallet()
-  const [status, setStatus] = useState('idle') // idle | minting | redeeming | listing | success | error
+  const [status, setStatus] = useState('idle') // idle | minting | redeeming | transferring | listing | success | error
   const [error, setError] = useState(null)
   const [lastTxHash, setLastTxHash] = useState(null)
 
@@ -121,6 +121,40 @@ export function useVouchers() {
     [signer, account, voucherAvailable, batchMintAvailable, voucherAddress, managerAddress, batchMinterAddress, paymentTokenAddress]
   )
 
+  /**
+   * Transfer a voucher you hold to another address (e.g. a fresh wallet, or the person you're gifting
+   * it to). Uses ERC-721 `safeTransferFrom` so the destination is checked for receiver support. The
+   * recipient can then redeem it into their own soulbound membership.
+   */
+  const transferVoucher = useCallback(
+    async (tokenId, to) => {
+      if (!signer) throw new Error('Connect a wallet to transfer a voucher.')
+      if (!voucherAvailable) throw new Error('Membership vouchers are not available on this network yet.')
+      const dest = (to || '').trim()
+      if (!ethers.isAddress(dest)) throw new Error('Enter a valid recipient address.')
+      if (account && dest.toLowerCase() === account.toLowerCase()) {
+        throw new Error('That voucher is already in this wallet.')
+      }
+      setStatus('transferring')
+      setError(null)
+      setLastTxHash(null)
+      try {
+        const voucher = new ethers.Contract(voucherAddress, MEMBERSHIP_VOUCHER_ABI, signer)
+        // The voucher overloads safeTransferFrom; pick the 3-arg (no data) form explicitly.
+        const tx = await voucher['safeTransferFrom(address,address,uint256)'](account, dest, tokenId)
+        setLastTxHash(tx.hash)
+        await tx.wait()
+        setStatus('success')
+        return { tokenId, to: dest, txHash: tx.hash }
+      } catch (e) {
+        setStatus('error')
+        setError(e?.shortMessage || e?.message || 'Transfer failed.')
+        throw e
+      }
+    },
+    [signer, account, voucherAvailable, voucherAddress]
+  )
+
   /** Redeem voucher `tokenId` into a soulbound membership for the connected wallet. `termsHash` may be 0x0. */
   const redeemVoucher = useCallback(
     async (tokenId, termsHash) => {
@@ -196,6 +230,7 @@ export function useVouchers() {
     voucherAddress,
     mintVouchers,
     redeemVoucher,
+    transferVoucher,
     listMyVouchers,
     reset,
   }

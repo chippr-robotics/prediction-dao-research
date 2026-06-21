@@ -242,7 +242,7 @@ export const ELIGIBILITY_DISCLOSURE = {
   title: 'FairWins — Account Key Generation',
   facts: [
     'I am at least 21 years old.',
-    'I am not a U.S. person and am not located in a Restricted Jurisdiction.',
+    'I am not located in a Restricted Jurisdiction.',
     'I am not a sanctioned or restricted party.',
     'I have sole control of this wallet and its private keys, and I meet and continue to meet the eligibility requirements of the FairWins Terms & Conditions.',
   ],
