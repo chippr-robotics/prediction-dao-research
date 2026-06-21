@@ -35,9 +35,9 @@ The Graph indexer in `subgraph/`, deploy/sync utilities in `scripts/`.
 
 **Purpose**: Scaffolding and dependency confirmation. No behavior change. Builds on the existing repo.
 
-- [ ] T001 Create the claim-code module and test directories: `frontend/src/utils/claimCode/` and
+- [X] T001 Create the claim-code module and test directories: `frontend/src/utils/claimCode/` and
   `frontend/src/test/claimCode/` (empty placeholders are fine; files land in Phase 2).
-- [ ] T002 [P] Verify no new dependencies are needed (plan.md "No new dependencies"): confirm
+- [X] T002 [P] Verify no new dependencies are needed (plan.md "No new dependencies"): confirm
   `@openzeppelin/contracts` exposes `utils/cryptography/EIP712.sol` and `utils/cryptography/ECDSA.sol`,
   and that `frontend/package.json` already pins `ethers` (v6, bundled `LangEn`), `@noble/ciphers`, and
   `@noble/hashes`. Record the resolved versions in `specs/024-open-challenge-wagers/research.md` if any
@@ -240,17 +240,17 @@ cannot be reused by an observer, and a four-word brute force is impractical with
 
 ### Tests for User Story 2 (write first, must fail) ⚠️
 
-- [ ] T028 [P] [US2] Write FAILING signature/anti-front-run unit tests in
+- [X] T028 [P] [US2] Write FAILING signature/anti-front-run unit tests in
   `test/WagerRegistry.openChallenge.test.js`: a wrong-key signature → `BadClaimSignature`; a signature
   bound to a *different* `taker` or `wagerId` (replay/front-run attempt) → `BadClaimSignature`; a
   malleable-`s` signature is rejected by `ECDSA.recover`; an unset claim slot can never be satisfied by a
   forged accept. (FR-011/SC-006, research.md R1)
-- [ ] T029 [P] [US2] Write FAILING accept-gauntlet unit tests in `test/WagerRegistry.openChallenge.test.js`:
+- [X] T029 [P] [US2] Write FAILING accept-gauntlet unit tests in `test/WagerRegistry.openChallenge.test.js`:
   creator self-accept → `SelfWager`; named arbitrator accepting a ThirdParty open challenge →
   `ArbitratorCannotTake`; non-member taker → `MembershipDenied`; sanctioned taker / sanctioned creator →
   sanctions revert; frozen taker → revert; **a Bronze (lowest active tier) taker with the code SUCCEEDS** —
   participation has no tier floor (FR-005a/FR-013). (FR-013/014/015, SC-007)
-- [ ] T030 [P] [US2] Write FAILING create-guard unit tests in `test/WagerRegistry.openChallenge.test.js`:
+- [X] T030 [P] [US2] Write FAILING create-guard unit tests in `test/WagerRegistry.openChallenge.test.js`:
   `Creator` or `Opponent` resolution type → `OpenResolutionTypeNotAllowed`; zero `claimAuthority` →
   `ZeroClaimAuthority`; a second open wager reusing an already-`Open` authority → `ClaimAuthorityInUse`;
   (equal stakes are enforced by the single-`stake` param — assert `creatorStake == opponentStake`); a
@@ -263,13 +263,13 @@ cannot be reused by an observer, and a four-word brute force is impractical with
 
 ### Implementation for User Story 2
 
-- [ ] T032 [US2] Confirm and, if needed, tighten the US1 contract checks so every assertion in T028–T030
+- [X] T032 [US2] Confirm and, if needed, tighten the US1 contract checks so every assertion in T028–T030
   passes in `contracts/wagers/WagerRegistry.sol` (the CEI gauntlet from T016/T017 should already cover
   these; add any missing revert/branch). No new public surface.
 - [X] T033 [US2] Add the non-member buy-membership prompt to
   `frontend/src/components/fairwins/TakeChallengeModal.jsx`: when the taker lacks active membership, block
   acceptance and route to the existing membership-purchase flow (no open-challenge exemption). (FR-013)
-- [ ] T033a [US2] Ensure no "decline" affordance is shown for open challenges in the wager-management UI
+- [X] T033a [US2] Ensure no "decline" affordance is shown for open challenges in the wager-management UI
   (e.g. `frontend/src/components/fairwins/` wager views): an open challenge only ever exposes the creator's
   cancel/withdraw action while Open — never a decline button — mirroring the contract guard. (FR-023/FR-025)
 - [X] T034 [US2] Add the honest-state notices to
@@ -287,7 +287,7 @@ cannot be reused by an observer, and a four-word brute force is impractical with
   and show an upgrade prompt (mirrors the contract `InsufficientMembershipTier`). The take/accept flow is
   unaffected — any active tier may participate. Add a Vitest case asserting the option is hidden/disabled
   below Silver and enabled at Silver+. (FR-005a, SC honest-state)
-- [ ] T036 [US2] Ensure discovery indistinguishability in the frontend: open challenges are never listed or
+- [X] T036 [US2] Ensure discovery indistinguishability in the frontend: open challenges are never listed or
   rendered identifiably without the code (no public list endpoint reveals which entry is which); a holder
   reaches the wager only via `openWagerIdForClaim`. Verify in `frontend/src/hooks/useOpenChallengeAccept.js`
   and any wager-listing view. (FR-008)
@@ -307,14 +307,14 @@ the others revert, and the terms were readable to every code-holder. (spec US3 I
 
 ### Tests for User Story 3 (write first, must fail) ⚠️
 
-- [ ] T037 [P] [US3] Write a FAILING race/double-accept unit test in
+- [X] T037 [P] [US3] Write a FAILING race/double-accept unit test in
   `test/WagerRegistry.openChallenge.test.js`: two members submit valid code-derived signatures; exactly one
   binds as opponent, the second reverts `NotOpenChallenge` (status no longer `Open`), and no funds are
   taken from the loser. (SC-005, quickstart §1 "two members race")
 
 ### Implementation for User Story 3
 
-- [ ] T038 [US3] Add a public-challenge sharing affordance to
+- [X] T038 [US3] Add a public-challenge sharing affordance to
   `frontend/src/components/fairwins/FriendMarketsModal.jsx` (share-the-code openly / "anyone with the code
   can take" copy) and ensure the take flow handles a lost race gracefully ("already accepted" rather than a
   raw revert) in `frontend/src/components/fairwins/TakeChallengeModal.jsx`. (US3, FR-012/025)
@@ -339,7 +339,7 @@ this funds-bearing change can ship.
   `specs/024-open-challenge-wagers/research.md` that existing oracle fork coverage applies unchanged because
   post-accept behavior is identical to a named-opponent wager (FR-016). (Constitution II — fork tests where
   oracles are involved)
-- [ ] T041 Run the FULL existing contract suite (`npm test`) and confirm zero regressions in the
+- [X] T041 Run the FULL existing contract suite (`npm test`) and confirm zero regressions in the
   named-opponent create/accept/cancel/decline/resolve/draw/refund/claim flows. (FR-024, SC-008)
 - [ ] T042 [P] Run `npm run slither` and confirm no new high/critical findings on the changed paths;
   document EthTrust-SL ≥ L2 reasoning + the v1 residual-brute-force acceptance (FR-003a) in
@@ -368,13 +368,13 @@ frontend/subgraph repoint** (only the ABI gains the new fns/events). Until 025's
 024 cannot deploy there. Testnet (Amoy) first, mainnet (Polygon) after validation + sign-off. Mordor/ETC are
 legacy read-only and out of scope (spec Assumptions).
 
-- [ ] T047 Deploy 024 to **Amoy** (chainId 80002) as a **UUPS implementation upgrade** of the 025 proxy:
+- [X] T047 Deploy 024 to **Amoy** (chainId 80002) as a **UUPS implementation upgrade** of the 025 proxy:
   run the OZ storage-layout compatibility check, deploy the new `WagerRegistry` implementation, then
   `upgradeToAndCall` via the proxy admin role (floppy-keystore keys, 25 gwei floor) — the **proxy address
   does not change**. Update `deployments/amoy-chain80002-v2.json` with the new implementation address, run
   `npm run sync:frontend-contracts:amoy` (ABI gains the new fns/events; address unchanged) and
   `npm run verify:amoy`. (depends on 025 proxy live on Amoy)
-- [ ] T048 Deploy the v2 subgraph for Amoy with the new `OpenWagerCreated` handler (`fairwins-amoy`,
+- [X] T048 Deploy the v2 subgraph for Amoy with the new `OpenWagerCreated` handler (`fairwins-amoy`,
   Studio) and confirm it indexes open wagers with `opponent = null` / `status = open` and no indexing
   errors; smoke-test discovery against the Amoy deployment. (subgraph deploy flow, research.md R5)
 - [ ] T049 Validate on Amoy via quickstart §5 end-to-end (including the Silver+ create gate and the

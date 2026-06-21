@@ -160,7 +160,7 @@ reverts; minting is never screened. (spec US4)
 - [X] T016 [P] Subgraph: add a `Voucher` entity (`status: Held | Redeemed`) to `subgraph/schema.graphql` and index `VoucherMinted`, ERC-721 `Transfer`, and `MembershipRedeemed` in `subgraph/src/mappings/`. (FR-026)
 - [X] T017 [P] Frontend: mint flow (choose role+tier, approve+pay USDC) in `frontend/src/` consuming synced artifacts. (FR-001, Principle V)
 - [X] T018 [P] Frontend: redeem flow (connect redeeming wallet, accept Terms, screen, redeem-to-this-wallet) with an **honest privacy disclosure** banner (public mints/transfers; pseudonymity, not ZK) and royalty display. WCAG 2.1 AA. (FR-013/020, Principle III/V)
-- [ ] T019 Run `npm run sync:frontend-contracts:*` so the frontend resolves the voucher address/ABI from artifacts (never hand-copied). (FR-026, Principle V)
+- [X] T019 Run `npm run sync:frontend-contracts:*` so the frontend resolves the voucher address/ABI from artifacts (never hand-copied). (FR-026, Principle V)
 
 **Checkpoint**: Vouchers are indexed and mint/gift/redeem is usable with honest disclosure.
 
@@ -168,7 +168,7 @@ reverts; minting is never screened. (spec US4)
 
 ## Phase 8: Documentation
 
-- [ ] T020 [P] Add `docs/` coverage: how vouchers work (buy/gift/resell/redeem), the redeemer-only screening tradeoff (FR-014), the utility-not-investment framing, and the on-chain `tokenURI`/royalty. Update `CLAUDE.md` if the membership surface guidance needs the voucher rail noted.
+- [X] T020 [P] Add `docs/` coverage: how vouchers work (buy/gift/resell/redeem), the redeemer-only screening tradeoff (FR-014), the utility-not-investment framing, and the on-chain `tokenURI`/royalty. Update `CLAUDE.md` if the membership surface guidance needs the voucher rail noted.
 
 **Checkpoint**: Docs explain the voucher rail and its compliance posture.
 
