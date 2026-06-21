@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import LiveStats from './fairwins/LiveStats'
+import DeployedNetworks from './fairwins/DeployedNetworks'
 import Footer from './Footer'
 import { useChainTokens } from '../hooks/useChainTokens'
 import './LandingPage.css'
@@ -9,7 +10,7 @@ import './LandingPage.css'
 function LandingPage() {
   const navigate = useNavigate()
   const [visibleSections, setVisibleSections] = useState(new Set())
-  const { native: nativeSymbol, networkName } = useChainTokens()
+  const { native: nativeSymbol } = useChainTokens()
 
   const handleGetStarted = () => {
     navigate('/app')
@@ -50,10 +51,7 @@ function LandingPage() {
         </div>
 
         <div className="hero-content">
-          <div className="hero-badge">
-            <span className="hero-badge-dot" />
-            Built on {networkName || 'Polygon'}
-          </div>
+          <DeployedNetworks />
 
           <h1 className="hero-headline">
             Your Wager.<br />
