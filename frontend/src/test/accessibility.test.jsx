@@ -1,8 +1,24 @@
-import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import Button from '../components/ui/Button'
 import StatusIndicator from '../components/ui/StatusIndicator'
+
+// Mock the open-challenge flow hooks so OpenChallengeModal renders deterministically
+// for the accessibility checks below (no chain/IPFS). Mirrors
+// src/test/claimCode/OpenChallengeModal.test.jsx. vi.mock is hoisted above imports.
+const createOpenChallenge = vi.fn()
+const discover = vi.fn()
+const accept = vi.fn()
+vi.mock('../hooks/useOpenChallengeCreate', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, useOpenChallengeCreate: () => ({ createOpenChallenge, busy: false, error: null }) }
+})
+vi.mock('../hooks/useOpenChallengeAccept', () => ({
+  useOpenChallengeAccept: () => ({ discover, accept, busy: false, error: null }),
+}))
+
+import OpenChallengeModal from '../components/fairwins/OpenChallengeModal'
 
 /**
  * Accessibility tests for UI components
@@ -203,17 +219,71 @@ describe('Accessibility Compliance Tests', () => {
 
     it('never relies on color alone for status', () => {
       const statuses = ['active', 'pending', 'failed']
-      
+
       statuses.forEach(status => {
         const { container, unmount } = render(<StatusIndicator status={status} />)
-        
+
         // Each status should have an icon
         const icon = container.querySelector('[aria-hidden="true"]')
         expect(icon).not.toBeNull()
         expect(icon.textContent).not.toBe('')
-        
+
         unmount()
       })
     })
+  })
+})
+
+/**
+ * T044 — Open-challenge modal accessibility (WCAG 2.1 AA).
+ *
+ * Feature 024 introduces the OpenChallengeModal (Maker/Taker tabs). The take flow asks
+ * users to enter a four-word claim code and acknowledge a residual brute-force risk;
+ * those surfaces must be screen-reader accessible and must not rely on color alone.
+ */
+describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
+  beforeEach(() => { createOpenChallenge.mockReset(); discover.mockReset(); accept.mockReset() })
+
+  it('has no axe violations on the Taker tab', async () => {
+    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no axe violations on the Maker tab', async () => {
+    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('the four-word code input has an accessible label', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
+    // getByLabelText resolves the <label htmlFor> association — fails if the input is unlabeled.
+    const input = screen.getByLabelText(/word code/i)
+    expect(input).toBeInTheDocument()
+    expect(input.tagName).toBe('INPUT')
+  })
+
+  it('the residual-risk / save-your-code notice is conveyed as TEXT, not color alone', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
+    // Maker form residual-risk disclosure: text is present (not color-only signaling).
+    expect(
+      screen.getByText(/anyone you share the code with can take the other side/i)
+    ).toBeInTheDocument()
+
+    // Taker flow: the "save your code" guidance is rendered as readable text.
+    fireEvent.click(screen.getByRole('tab', { name: /take a challenge/i }))
+    expect(
+      screen.getByText(/Without it, an open challenge can.t be found or read/i)
+    ).toBeInTheDocument()
+  })
+
+  it('the modal exposes a dialog role and an accessible name', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    // aria-labelledby points at the visible title, giving the dialog an accessible name.
+    expect(dialog).toHaveAttribute('aria-labelledby', 'open-challenge-title')
+    expect(screen.getByText('Open Challenge')).toBeInTheDocument()
   })
 })

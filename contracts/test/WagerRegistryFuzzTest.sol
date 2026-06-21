@@ -30,6 +30,14 @@ contract WagerRegistryFuzzTest {
 
     uint256 private _previousWagerCount;
 
+    // ---------- open-challenge (024) tracking ----------
+    // Open wagers the harness created, plus the claim authority each was gated by. The harness cannot forge
+    // the EIP-712 acceptance signature for these authorities, so it exercises create/cancel/refund/slot-release
+    // without ever reaching a (signature-gated) accept.
+    uint256[] private _openWagerIds;
+    mapping(uint256 => address) private _openClaimAuthority;
+    uint256 private _openSalt;
+
     // Snapshot of per-wager status for forward-only state check.
     // Medusa calls property functions between arbitrary tx sequences, so we
     // record the last-seen status of each wager to detect backward transitions.
@@ -68,16 +76,18 @@ contract WagerRegistryFuzzTest {
         // 4. Authorize the WagerRegistry to call membership hooks
         membership.setAuthorizedCaller(address(registry), true);
 
-        // 5. Configure a Bronze tier so memberships can be purchased
+        // 5. Configure Bronze + Silver tiers. Silver is needed so the deployer can create OPEN challenges
+        //    (createOpenWager requires Silver+); Bronze remains configured for the named-opponent paths.
         IMembershipManager.Limits memory limits = IMembershipManager.Limits({
             monthlyMarketCreation: 1000,
             maxConcurrentMarkets: 100
         });
         membership.setTier(WAGER_PARTICIPANT_ROLE, IMembershipManager.Tier.Bronze, 1e6, 30, limits, true);
+        membership.setTier(WAGER_PARTICIPANT_ROLE, IMembershipManager.Tier.Silver, 2e6, 30, limits, true);
 
-        // 6. Fund deployer, approve, and purchase membership
+        // 6. Fund deployer, approve, and purchase Silver (covers both named-opponent and open-challenge create).
         token.approve(address(membership), type(uint256).max);
-        membership.purchaseTier(WAGER_PARTICIPANT_ROLE, IMembershipManager.Tier.Bronze);
+        membership.purchaseTier(WAGER_PARTICIPANT_ROLE, IMembershipManager.Tier.Silver);
         token.approve(address(registry), type(uint256).max);
 
         // 7. Fund and set up the opponent address
@@ -330,5 +340,94 @@ contract WagerRegistryFuzzTest {
         } catch {
             return true; // reverted as expected
         }
+    }
+
+    // ================================================================
+    //  OPEN-CHALLENGE (024) actions — let the fuzzer exercise the open path
+    // ================================================================
+
+    /// @notice Fuzzer action: create an open challenge gated by a fresh, deterministic claim authority.
+    function createOpenWagerAction(uint128 stakeSeed) public {
+        uint128 stake = uint128(_bound(stakeSeed, 1, 1e24));
+        _openSalt++;
+        address authority = address(uint160(uint256(keccak256(abi.encode("claim", _openSalt)))));
+
+        uint64 accept = uint64(block.timestamp + 1 days);
+        uint64 resolve = uint64(block.timestamp + 7 days);
+        // createOpenWager builds equal stakes by construction and only allows Either/ThirdParty/oracle.
+        try registry.createOpenWager(
+            authority,
+            address(0),
+            address(token),
+            stake,
+            accept,
+            resolve,
+            IWagerRegistry.ResolutionType.Either,
+            bytes32(0),
+            false,
+            keccak256("fuzz-open"),
+            "ipfs://fuzz-open"
+        ) returns (uint256 id) {
+            _openWagerIds.push(id);
+            _openClaimAuthority[id] = authority;
+        } catch {
+            // membership/limit/deadline reverts are fine — nothing to track.
+        }
+    }
+
+    /// @notice Fuzzer action: cancel one tracked open wager that is still Open (creator-only path).
+    ///         Exercises leaving Open -> claim-slot release without an accept.
+    function cancelOpenWagerAction(uint256 idxSeed) public {
+        if (_openWagerIds.length == 0) return;
+        uint256 id = _openWagerIds[idxSeed % _openWagerIds.length];
+        IWagerRegistry.Wager memory w = registry.getWager(id);
+        if (w.status != IWagerRegistry.Status.Open) return;
+        try registry.cancelOpen(id) {} catch {}
+    }
+
+    function _bound(uint256 x, uint256 lo, uint256 hi) internal pure returns (uint256) {
+        if (hi <= lo) return lo;
+        return lo + (x % (hi - lo + 1));
+    }
+
+    // ---- OPEN INVARIANT A: the discovery claim slot tracks Open-ness exactly ----
+    // openWagerIdForClaim(authority) == id while Open; == 0 once it has left Open (cancelled/refunded/etc).
+    function property_open_claim_slot_lifecycle() public view returns (bool) {
+        for (uint256 i = 0; i < _openWagerIds.length; i++) {
+            uint256 id = _openWagerIds[i];
+            address authority = _openClaimAuthority[id];
+            IWagerRegistry.Wager memory w = registry.getWager(id);
+            uint256 resolved = registry.openWagerIdForClaim(authority);
+            if (w.status == IWagerRegistry.Status.Open) {
+                if (resolved != id) return false;
+            } else if (resolved != 0) {
+                return false; // claim slot released on leaving Open
+            }
+        }
+        return true;
+    }
+
+    // ---- OPEN INVARIANT B: single-binding + equal stakes while Open ----
+    function property_open_no_opponent_and_equal_stakes_while_open() public view returns (bool) {
+        for (uint256 i = 0; i < _openWagerIds.length; i++) {
+            IWagerRegistry.Wager memory w = registry.getWager(_openWagerIds[i]);
+            if (w.status == IWagerRegistry.Status.Open) {
+                if (w.opponent != address(0)) return false;
+                if (w.creatorStake != w.opponentStake) return false;
+            }
+        }
+        return true;
+    }
+
+    // ---- OPEN INVARIANT C: no accept without a matching claim signature ----
+    // The harness holds no private key for any claim authority, so it can never produce a valid
+    // acceptOpenWager signature — none of its open wagers may ever reach Active. (With
+    // property_escrow_covers_active_stakes this also guards the open escrow path.)
+    function property_open_never_active_without_signature() public view returns (bool) {
+        for (uint256 i = 0; i < _openWagerIds.length; i++) {
+            IWagerRegistry.Wager memory w = registry.getWager(_openWagerIds[i]);
+            if (w.status == IWagerRegistry.Status.Active) return false;
+        }
+        return true;
     }
 }

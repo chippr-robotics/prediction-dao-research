@@ -139,3 +139,17 @@ dependency/licensing, rejected.
 checks-effects-interactions, reentrancy guard, audited signature library, documented invariants. Document
 the v1 residual brute-force acceptance (FR-003a) as a known, scoped limitation rather than a contract
 defect (it is an off-chain entropy choice, not an on-chain vulnerability).
+
+## Cross-cutting: Oracle fork coverage (FR-016, T040a)
+
+**Decision**: An open challenge differs from a named-opponent wager **only** in *creation* (`createOpenWager`
+records a `claimAuthority` instead of an opponent and enforces the Silver+ gate) and *acceptance*
+(`acceptOpenWager` binds the taker after verifying the code-derived EIP-712 signature, instead of the named
+opponent calling `acceptWager`). **Once accepted, the wager is the same `Wager` struct in the same `Active`
+state**, and every downstream path — `declareWinner`, the oracle adapters (`autoResolveFromPolymarket` /
+`autoResolveFromOracle`), draws, refunds, and `claimPayout` — executes identical code with no branch on how
+the opponent was bound. Therefore the **existing oracle fork tests under `test/fork/` apply unchanged** to
+oracle-resolved open challenges; no separate open-challenge fork test is required (the create/accept
+divergence is fully covered by `test/WagerRegistry.openChallenge.test.js` and the
+`test/integration/fairwins/openChallengeLifecycle.test.js` lifecycle). This satisfies Constitution II for the
+oracle paths via existing coverage (FR-016).
