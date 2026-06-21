@@ -8,6 +8,20 @@ import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
  * pure functions of their inputs — no React, no side effects.
  */
 
+const ZERO_ADDRESS_RE = /^0x0{40}$/i
+
+/**
+ * True if and only if a wager is an open challenge (feature 024): created with no named opponent.
+ * Named-opponent wagers always have a non-zero opponent at creation, so an absent/zero opponent uniquely
+ * identifies an open challenge (until a taker accepts, after which the opponent is bound and this returns false).
+ */
+export function isOpenChallengeMarket(market) {
+  if (!market) return false
+  // Match the literal zero address that toWagerShape / the subgraph write for an unaccepted open challenge.
+  // Don't treat a merely-missing opponent field as open — that would mislabel wagers from other data paths.
+  return typeof market.opponent === 'string' && ZERO_ADDRESS_RE.test(market.opponent)
+}
+
 /**
  * Display title for a wager, handling encrypted/private placeholders.
  */
@@ -34,6 +48,9 @@ export function getMarketDisplayTitle(market) {
     }
     // If encrypted/private, show stake and time info
     const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+    // Open challenges (feature 024) have no bound opponent — named wagers always do at creation — and their
+    // code-gated terms aren't decryptable here, so label them honestly as "Open Challenge" not "Private Bet".
+    if (isOpenChallengeMarket(market)) return `Open Challenge${stakeInfo ? ` - ${stakeInfo}` : ''}`
     return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
   }
 

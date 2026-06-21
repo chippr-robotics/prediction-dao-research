@@ -403,11 +403,25 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
 // (spec 012 T002 — Draw previously fell through to 'unknown').
 export const WAGER_STATUS_NAMES = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded', 'draw']
 
-function toWagerShape(id, w) {
+// Exported for regression testing (chain-aware stake-token decimals/symbol — a USDC wager on a non-default
+// chain must not render as "0.000000000001 tokens").
+export function toWagerShape(id, w, chainId) {
   const tokenAddr = w.token
-  const paymentToken = (DEPLOYED_CONTRACTS?.paymentToken || '').toLowerCase()
-  const isUSDC = tokenAddr && tokenAddr.toLowerCase() === paymentToken
+  // Resolve the stake token against the CONNECTED chain's config — not the build-time DEPLOYED_CONTRACTS
+  // (default chain 137). Otherwise a USDC wager on e.g. Mordor (63) fails the address match → defaults to
+  // 18 decimals + 'tokens', rendering "0.000000000001 tokens" instead of the real USDC amount.
+  const resolveToken = (name) =>
+    chainId != null ? getContractAddressForChain(name, chainId) : (DEPLOYED_CONTRACTS?.[name] || '')
+  const tl = tokenAddr ? tokenAddr.toLowerCase() : ''
+  const paymentToken = (resolveToken('paymentToken') || '').toLowerCase()
+  const wmatic = (resolveToken('wmatic') || '').toLowerCase()
+  const isUSDC = !!tl && tl === paymentToken
+  const isWrapped = !!tl && tl === wmatic
   const decimals = isUSDC ? 6 : 18
+  // USDC → "USDC"; the wrapped-native stake token's symbol differs by chain (WETC on ETC/Mordor 61/63,
+  // else WMATIC); anything else falls back to "tokens".
+  const isEtcChain = chainId != null && (Number(chainId) === 63 || Number(chainId) === 61)
+  const stakeTokenSymbol = isUSDC ? 'USDC' : (isWrapped ? (isEtcChain ? 'WETC' : 'WMATIC') : 'tokens')
 
   const metadataUri = w.metadataUri || ''
   const ipfsRef = parseEncryptedIpfsReference(metadataUri)
@@ -444,7 +458,7 @@ function toWagerShape(id, w) {
     stakeAmount: ethers.formatUnits(w.opponentStake, decimals),
     stakeToken: tokenAddr,
     stakeTokenAddress: tokenAddr,
-    stakeTokenSymbol: isUSDC ? 'USDC' : 'tokens',
+    stakeTokenSymbol,
     resolutionType: Number(w.resolutionType),
     status: WAGER_STATUS_NAMES[Number(w.status)] || 'unknown',
     winner: (w.winner && w.winner !== ethers.ZeroAddress) ? w.winner : null,
@@ -469,7 +483,7 @@ function toWagerShape(id, w) {
   }
 }
 
-async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
+async function fetchWagersForUserV2(userAddress, provider, registryAddress, chainId) {
   const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, provider)
 
   // O(N_user) read via the contract's per-user EnumerableSet.UintSet index.
@@ -487,7 +501,7 @@ async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
       registry.getUserWagers(userAddress, offset, limit),
     ])
     for (let i = 0; i < ids.length; i++) {
-      wagers.push(toWagerShape(String(ids[i]), structs[i]))
+      wagers.push(toWagerShape(String(ids[i]), structs[i], chainId))
     }
   }
   return wagers
@@ -514,7 +528,7 @@ export async function fetchFriendMarketsForUser(userAddress, chainId) {
     // v2 path: WagerRegistry event scan
     const registryAddress = resolve('wagerRegistry')
     if (registryAddress) {
-      return await fetchWagersForUserV2(userAddress, provider, registryAddress)
+      return await fetchWagersForUserV2(userAddress, provider, registryAddress, chainId)
     }
 
     const friendFactoryAddress = resolve('friendGroupMarketFactory')
