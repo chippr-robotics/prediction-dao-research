@@ -7,6 +7,8 @@ import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
+import OpenChallengeModal from './OpenChallengeModal'
+import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
@@ -127,6 +129,20 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
       ),
       title: 'Make an Offer',
       description: 'Offer odds and choose who settles — you or your friend'
+    },
+    {
+      id: 'open-challenge',
+      category: 'create',
+      tag: 'Code-gated',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+          <circle cx="12" cy="16" r="1" />
+        </svg>
+      ),
+      title: 'Open Challenge',
+      description: 'Post without naming an opponent — share a four-word code to create or take'
     }
   ]
 
@@ -449,6 +465,9 @@ function Dashboard() {
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
+  const [showOpenChallenge, setShowOpenChallenge] = useState(false)
+  const [openChallengeTab, setOpenChallengeTab] = useState('maker')
+  const [openChallengeInitialCode, setOpenChallengeInitialCode] = useState('')
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -484,6 +503,19 @@ function Dashboard() {
     navigate(location.pathname, { replace: true, state: {} })
   }, [routeWagerId, location.pathname, navigate])
 
+  // Open-challenge deep link (feature 024): a shared QR / link of the form
+  // /app?oc=take&code=<four words> opens the Open Challenge modal on the Taker tab with the code pre-filled.
+  // After consuming it we strip the query so it doesn't re-trigger on re-render or get bookmarked with the code.
+  useEffect(() => {
+    const code = parseTakeChallengeParams(location.search)
+    if (code) {
+      setOpenChallengeInitialCode(code)
+      setOpenChallengeTab('taker')
+      setShowOpenChallenge(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.search, location.pathname, navigate])
+
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
       case 'create-1v1-friends':
@@ -500,6 +532,10 @@ function Dashboard() {
         setCreateWagerType('offer')
         setCreateResolutionCategory('all')
         setShowCreateWager(true)
+        break
+      case 'open-challenge':
+        setOpenChallengeTab('maker')
+        setShowOpenChallenge(true)
         break
       case 'my-wagers':
         setShowMyWagers(true)
@@ -639,6 +675,19 @@ function Dashboard() {
         initialType={createWagerType}
         resolutionCategory={createResolutionCategory}
         initialPolymarketMarket={initialPolymarketMarket}
+      />
+
+      {/* Open Challenge (feature 024) — one modal, Maker/Taker tabs. key remounts for fresh state per open. */}
+      <OpenChallengeModal
+        key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
+        isOpen={showOpenChallenge}
+        initialTab={openChallengeTab}
+        initialCode={openChallengeInitialCode}
+        onClose={() => setShowOpenChallenge(false)}
+        onBuyMembership={() => {
+          setShowOpenChallenge(false)
+          showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
+        }}
       />
 
       {/* My Wagers Modal */}

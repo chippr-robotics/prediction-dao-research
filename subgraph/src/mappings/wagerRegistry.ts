@@ -1,6 +1,7 @@
-import { BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts'
+import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts'
 import {
   WagerCreated,
+  OpenWagerCreated,
   WagerAccepted,
   PayoutClaimed,
   WagerRefunded,
@@ -87,6 +88,39 @@ export function handleWagerCreated(event: WagerCreated): void {
     DEPOSIT,
     event.params.token,
     event.params.creatorStake,
+    event.params.creator,
+    event.address,
+  )
+}
+
+export function handleOpenWagerCreated(event: OpenWagerCreated): void {
+  // Open challenge (feature 024): no named opponent at creation. Equal stakes (single `stake`). The opponent
+  // is backfilled by handleWagerAccepted (which fires on acceptOpenWager). The `opponent` field is
+  // non-nullable, so it's the zero address until accept; an open challenge is `status == open && opponent ==
+  // 0x0`. We deliberately do NOT index `claimAuthority` — surfacing it would let scanners enumerate open
+  // challenges and defeat the code's discovery-indistinguishability (FR-008).
+  let id = event.params.wagerId.toString()
+  let wager = new Wager(id)
+  wager.creator = event.params.creator
+  wager.opponent = Address.zero()
+  wager.token = event.params.token
+  wager.creatorStake = event.params.stake
+  wager.opponentStake = event.params.stake
+  wager.resolutionType = event.params.resolutionType
+  wager.metadataHash = event.params.metadataHash
+  wager.metadataUri = event.params.metadataUri
+  wager.status = 'open'
+  wager.createdAt = event.block.timestamp
+  wager.save()
+
+  // Creator deposit: creator -> escrow (registry), amount = stake (event).
+  recordTransfer(
+    event,
+    id,
+    event.params.creator,
+    DEPOSIT,
+    event.params.token,
+    event.params.stake,
     event.params.creator,
     event.address,
   )

@@ -19,7 +19,7 @@ import { ml_kem768 } from '@noble/post-quantum/ml-kem'
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 import { sha3_256 } from '@noble/hashes/sha3'
-import { chacha20poly1305 } from '@noble/ciphers/chacha'
+import { chacha20poly1305, xchacha20poly1305 } from '@noble/ciphers/chacha'
 import { randomBytes } from '@noble/ciphers/webcrypto'
 import { bytesToHex, hexToBytes, utf8ToBytes, concatBytes } from '@noble/ciphers/utils'
 import { keccak256, toUtf8Bytes, getBytes } from 'ethers'
@@ -707,6 +707,74 @@ export function isXWingEnvelope(data) {
  */
 export function isX25519Envelope(data) {
   return data?.algorithm === 'x25519-chacha20poly1305'
+}
+
+// ==================== Code-keyed Envelope (feature 024 — open challenges) ====================
+// The terms of an open challenge are sealed directly under a symmetric key derived from the four-word claim
+// code (see utils/claimCode/deriveFromCode.js) — NOT to a registered recipient key, because the taker is
+// unknown at creation (FR-017/FR-018). Anyone holding the code derives `symKey` and can read; nobody else
+// can. Tamper-evident via XChaCha20-Poly1305 (FR-019); the on-chain metadataHash binds the bundle as usual.
+
+const CODE_ENVELOPE_ALGORITHM = 'code-xchacha20poly1305'
+
+/**
+ * Seal open-challenge terms under a code-derived symmetric key. No recipients list.
+ * @param {Object|string} data - terms (object is JSON-stringified)
+ * @param {Uint8Array} symKey - 32-byte key from deriveFromCode(code).symKey
+ * @param {{id?: string|null, hash: string}|null} termsVersion - optional governing-terms binding (AAD)
+ * @returns {Object} code-keyed envelope
+ */
+export function encryptEnvelopeCode(data, symKey, termsVersion = null) {
+  if (!(symKey instanceof Uint8Array) || symKey.length !== 32) {
+    throw new Error('encryptEnvelopeCode: symKey must be a 32-byte Uint8Array')
+  }
+  const plaintext = typeof data === 'string' ? utf8ToBytes(data) : utf8ToBytes(JSON.stringify(data))
+  const aad = termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, termsVersion.hash) : undefined
+  const nonce = randomBytes(24) // XChaCha20 — 24-byte nonce, safe under random generation
+  const cipher = xchacha20poly1305(symKey, nonce, aad)
+  const ciphertext = cipher.encrypt(plaintext)
+
+  return {
+    version: 'code-1.0',
+    algorithm: CODE_ENVELOPE_ALGORITHM,
+    mode: 'code',
+    ...(termsVersion?.hash ? { termsVersion: { id: termsVersion.id ?? null, hash: termsVersion.hash } } : {}),
+    content: {
+      nonce: bytesToHex(nonce),
+      ciphertext: bytesToHex(ciphertext)
+    }
+  }
+}
+
+/**
+ * Open a code-keyed envelope with the code-derived symmetric key. Throws on a wrong key or tampered bytes.
+ * @param {Object} envelope
+ * @param {Uint8Array} symKey
+ * @returns {Object|string} decrypted terms (parsed as JSON when possible)
+ */
+export function decryptEnvelopeCode(envelope, symKey) {
+  if (!isCodeEnvelope(envelope)) throw new Error('decryptEnvelopeCode: not a code-keyed envelope')
+  if (!(symKey instanceof Uint8Array) || symKey.length !== 32) {
+    throw new Error('decryptEnvelopeCode: symKey must be a 32-byte Uint8Array')
+  }
+  const nonce = hexToBytes(envelope.content.nonce)
+  const aad = envelope.termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, envelope.termsVersion.hash) : undefined
+  const cipher = xchacha20poly1305(symKey, nonce, aad)
+  const plaintext = cipher.decrypt(hexToBytes(envelope.content.ciphertext)) // throws on tamper / wrong key
+  const text = new TextDecoder().decode(plaintext)
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+/**
+ * @param {Object} data
+ * @returns {boolean} true iff `data` is a code-keyed envelope (mode === 'code').
+ */
+export function isCodeEnvelope(data) {
+  return data?.mode === 'code' && data?.algorithm === CODE_ENVELOPE_ALGORITHM && !!data?.content?.ciphertext
 }
 
 // ==================== Helper Functions ====================
