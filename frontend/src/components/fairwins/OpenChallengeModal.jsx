@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
+import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordlist.js'
 import WagerQRCode from '../ui/WagerQRCode'
@@ -77,11 +78,18 @@ function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'ma
               >
                 <span className="fm-resolution-tab-label">Take a challenge</span>
               </button>
+              <button
+                type="button" role="tab" aria-selected={tab === 'recover'}
+                className={`fm-resolution-tab ${tab === 'recover' ? 'active' : ''}`}
+                onClick={() => setTab('recover')}
+              >
+                <span className="fm-resolution-tab-label">Recover codes</span>
+              </button>
             </div>
 
-            {tab === 'maker'
-              ? <MakerPanel onClose={onClose} />
-              : <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} initialCode={initialCode} />}
+            {tab === 'maker' && <MakerPanel onClose={onClose} />}
+            {tab === 'taker' && <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} initialCode={initialCode} />}
+            {tab === 'recover' && <RecoverPanel />}
           </div>
         </div>
       </div>
@@ -108,6 +116,10 @@ function MakerPanel({ onClose }) {
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
+  // Encrypted, device-local code backup (feature 024 follow-up) so a forgotten code can be recovered.
+  const { saveCode, canUse: canBackup } = useOpenChallengeCodeVault()
+  const [backupState, setBackupState] = useState('idle') // idle | saving | saved | error
+  const [backupError, setBackupError] = useState(null)
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const arbitratorAddr = arbitratorResolved || arbitrator
@@ -150,6 +162,24 @@ function MakerPanel({ onClose }) {
     } catch { /* clipboard unavailable */ }
   }, [result])
 
+  const handleSaveBackup = useCallback(async () => {
+    if (!result) return
+    setBackupError(null)
+    setBackupState('saving')
+    try {
+      await saveCode({
+        code: result.code,
+        wagerId: result.wagerId != null ? String(result.wagerId) : null,
+        description: description.trim(),
+        stake,
+      })
+      setBackupState('saved')
+    } catch (err) {
+      setBackupState('error')
+      setBackupError(err?.message || 'Could not save the backup.')
+    }
+  }, [result, saveCode, description, stake])
+
   if (result) {
     return (
       <div className="fm-success">
@@ -169,7 +199,36 @@ function MakerPanel({ onClose }) {
 
         <div className="oc-notice oc-notice--warn" role="alert">
           <strong>Save this code now.</strong> It's the only way to take, read, or re-read this challenge — we
-          don't store it and it can't be recovered. Anyone with the code can take the other side.
+          don't store it server-side. Anyone with the code can take the other side.
+        </div>
+
+        {/* Encrypted backup (recovery) — stored only on this device, readable only with this wallet. */}
+        <div className="oc-backup">
+          {backupState === 'saved' ? (
+            <p className="oc-backup-ok" role="status">
+              <span aria-hidden="true">&#128274;</span> Encrypted backup saved to this device. Recover it
+              anytime from the <strong>Recover codes</strong> tab with this wallet.
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="fm-btn-secondary"
+                onClick={handleSaveBackup}
+                disabled={!canBackup || backupState === 'saving'}
+              >
+                {backupState === 'saving' ? 'Saving…' : 'Save encrypted backup to this device'}
+              </button>
+              <span className="fm-hint">
+                {canBackup
+                  ? 'Stores an encrypted copy of the code on this device so you can recover it later if you forget it. Readable only with this wallet.'
+                  : 'Connect your wallet to save a recoverable encrypted copy of this code.'}
+              </span>
+              {backupState === 'error' && backupError && (
+                <div className="fm-error-banner" role="alert">{backupError}</div>
+              )}
+            </>
+          )}
         </div>
         <p className="fm-hint">
           The four words resist casual guessing, but a determined attacker with specialized hardware could
@@ -441,6 +500,96 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
         <button type="submit" className="fm-btn-primary" disabled={!codeValid || busy}>{busy ? 'Looking up…' : 'Find challenge'}</button>
       </div>
     </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Recover codes — unlock the device-local encrypted backup of created codes
+// (feature 024 follow-up). Lets a creator recover a forgotten four-word code.
+// ---------------------------------------------------------------------------
+function RecoverPanel() {
+  const { canUse, recoverCodes, busy } = useOpenChallengeCodeVault()
+  const [entries, setEntries] = useState(null) // null = not unlocked yet
+  const [error, setError] = useState(null)
+  const [copiedCode, setCopiedCode] = useState(null)
+
+  const handleUnlock = useCallback(async () => {
+    setError(null)
+    try {
+      const list = await recoverCodes()
+      setEntries(list)
+    } catch (err) {
+      setError(err?.message || 'Could not unlock your saved codes.')
+    }
+  }, [recoverCodes])
+
+  const handleCopy = useCallback(async (code) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCode(code)
+      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000)
+    } catch { /* clipboard unavailable */ }
+  }, [])
+
+  if (!canUse) {
+    return (
+      <div className="fm-form">
+        <p className="fm-hint">Connect your wallet to recover the codes you saved on this device.</p>
+      </div>
+    )
+  }
+
+  if (entries == null) {
+    return (
+      <div className="fm-form">
+        <p className="fm-hint">
+          Codes you chose to back up are stored encrypted on this device, readable only with this wallet.
+          Unlock to recover a forgotten code. (Codes saved on other devices won&apos;t appear here.)
+        </p>
+        {error && <div className="fm-error-banner" role="alert">{error}</div>}
+        <div className="fm-success-actions">
+          <button type="button" className="fm-btn-primary" onClick={handleUnlock} disabled={busy}>
+            {busy ? 'Unlocking…' : 'Unlock my saved codes'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="fm-form">
+        <p className="fm-hint">
+          No saved codes on this device yet. When you create an open challenge, choose
+          <strong> Save encrypted backup</strong> to make it recoverable here.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fm-form">
+      <p className="fm-hint">Your saved codes — keep them private; anyone with a code can take that challenge.</p>
+      <ul className="oc-recover-list">
+        {entries.map((e) => (
+          <li key={e.code} className="oc-recover-item">
+            <div className="oc-recover-meta">
+              <span className="oc-recover-title">{e.description || 'Open challenge'}</span>
+              <span className="oc-recover-sub">
+                {e.wagerId != null ? `#${e.wagerId}` : 'Unsubmitted'}
+                {e.savedAt ? ` · saved ${new Date(e.savedAt).toLocaleDateString()}` : ''}
+              </span>
+            </div>
+            <div className="oc-code-display oc-recover-code">
+              <code className="oc-code">{e.code}</code>
+              <button type="button" className="fm-btn-secondary" onClick={() => handleCopy(e.code)}>
+                {copiedCode === e.code ? 'Copied ✓' : 'Copy'}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
