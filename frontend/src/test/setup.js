@@ -187,6 +187,10 @@ vi.mock('wagmi', () => ({
   useSwitchChain: vi.fn(() => ({
     switchChain: vi.fn()
   })),
+  // ENS resolution hooks (used by AddressInput). Default to "no resolution" so
+  // address fields render without a WagmiProvider/QueryClient in unit tests.
+  useEnsAddress: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
+  useEnsName: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
   useWalletClient: vi.fn(() => ({
     data: {
       account: { address: '0x1234567890123456789012345678901234567890' },

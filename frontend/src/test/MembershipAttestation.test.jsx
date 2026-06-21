@@ -43,7 +43,7 @@ describe('MembershipAttestation (T043)', () => {
   it('covers the required eligibility/risk attestations (FR-037)', () => {
     render(<MembershipAttestation onChange={() => {}} />)
     expect(screen.getByText(/at least 21 years/i)).toBeInTheDocument()
-    expect(screen.getByText(/not a U\.S\. person/i)).toBeInTheDocument()
+    expect(screen.getByText(/not located, resident, or established in any Restricted Jurisdiction/i)).toBeInTheDocument()
     expect(screen.getByText(/OFAC SDN/i)).toBeInTheDocument()
     expect(screen.getByText(/no regulator or authority/i)).toBeInTheDocument()
     expect(screen.getByText(/VPN, proxy/i)).toBeInTheDocument()

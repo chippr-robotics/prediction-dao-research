@@ -185,6 +185,35 @@
   border-color: #c77d11;
 }
 
+/* Gift / transfer address fields take the full row (single line) with the
+   address-book + QR buttons sitting next to the input. */
+.vch-field label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+/* Transfer-a-voucher block inside the redeem card */
+.vch-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary);
+}
+.vch-subhead {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vch-divider {
+  border-top: 1px solid var(--border-color);
+  margin: 0.5rem 0;
+}
+
 /* Held-voucher list for redemption */
 .vch-myvouchers-head {
   display: flex;

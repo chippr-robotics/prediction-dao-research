@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Mock the data hooks so we can render VouchersPage deterministically (spec 026).
@@ -37,6 +37,7 @@ const baseVouchers = {
   batchMintAvailable: true,
   mintVouchers: vi.fn(),
   redeemVoucher: vi.fn(),
+  transferVoucher: vi.fn().mockResolvedValue({ tokenId: '7', to: '0x2222222222222222222222222222222222222222', txHash: '0xabc' }),
   listMyVouchers: vi.fn().mockResolvedValue([]),
   reset: vi.fn(),
 }
@@ -94,6 +95,48 @@ describe('VouchersPage (spec 026)', () => {
     // Default state (qty 1, self) is fine; the block only appears once the order needs the helper.
     // Render asserts the buy section is present; the warning is exercised in interaction tests elsewhere.
     expect(screen.getByRole('heading', { name: /Buy a voucher/i })).toBeInTheDocument()
+  })
+
+  it('gives the gift field its own line with an address book and QR scan button', async () => {
+    useVouchers.mockReturnValue({ ...baseVouchers, listMyVouchers: vi.fn().mockResolvedValue([]) })
+    renderPage()
+    // The gift recipient is an AddressInput (id wired) rather than the old plain input.
+    expect(document.getElementById('vch-gift-to')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose from address book/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Scan recipient QR code/i })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/don’t have any vouchers to redeem/i)).toBeInTheDocument())
+  })
+
+  it('uses the same membership attestation block for redemption as for purchase', async () => {
+    useVouchers.mockReturnValue({ ...baseVouchers, listMyVouchers: vi.fn().mockResolvedValue([]) })
+    renderPage()
+    // The shared MembershipAttestation renders its discrete, individually-ticked eligibility checkboxes.
+    expect(screen.getByText(/Membership confirmation/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThanOrEqual(5)
+    await waitFor(() => expect(screen.getByText(/don’t have any vouchers to redeem/i)).toBeInTheDocument())
+  })
+
+  it('transfers a held voucher to another address via the transfer button', async () => {
+    const transferVoucher = vi.fn().mockResolvedValue({
+      tokenId: '7', to: '0x2222222222222222222222222222222222222222', txHash: '0xabc',
+    })
+    const listMyVouchers = vi.fn().mockResolvedValue([
+      { tokenId: '7', tier: 1, durationDays: 30, role: '0xrole' },
+    ])
+    useVouchers.mockReturnValue({ ...baseVouchers, transferVoucher, listMyVouchers })
+    renderPage()
+    await waitFor(() => expect(screen.getByText('#7')).toBeInTheDocument())
+
+    // Select the voucher, type a recipient, and transfer.
+    fireEvent.click(screen.getByRole('radio', { name: /membership|#7/i }))
+    fireEvent.change(document.getElementById('vch-transfer-to'), {
+      target: { value: '0x2222222222222222222222222222222222222222' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Transfer voucher/i }))
+
+    await waitFor(() =>
+      expect(transferVoucher).toHaveBeenCalledWith('7', '0x2222222222222222222222222222222222222222'),
+    )
   })
 
   it('shows an honest "not available on this network" notice when the voucher is undeployed', () => {

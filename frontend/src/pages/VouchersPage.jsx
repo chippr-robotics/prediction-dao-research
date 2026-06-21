@@ -7,6 +7,11 @@ import { useTierPrices } from '../hooks/useTierPrices'
 import { TIER_NAMES, TIER_COLORS } from '../hooks/useRoleDetails'
 import { MEMBERSHIP_VOUCHERS_TERMS_PATH } from '../constants/legalLinks'
 import Button from '../components/ui/Button'
+import AddressInput from '../components/ui/AddressInput'
+import AddressBookButton from '../components/ui/AddressBookButton'
+import QRScanner from '../components/ui/QRScanner'
+import MembershipAttestation from '../components/compliance/MembershipAttestation'
+import { extractAddressFromScan } from '../lib/addressBook/scanAddress'
 import './vouchers.css'
 
 const TIER_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
@@ -23,7 +28,7 @@ export default function VouchersPage() {
   const { getPrice, ROLE_HASHES, TIER_IDS } = useTierPrices()
   const {
     status, error, lastTxHash, voucherAvailable, batchMintAvailable,
-    mintVouchers, redeemVoucher, listMyVouchers,
+    mintVouchers, redeemVoucher, transferVoucher, listMyVouchers,
   } = useVouchers()
   const { hash } = useLocation()
 
@@ -38,6 +43,7 @@ export default function VouchersPage() {
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [quantity, setQuantity] = useState(1)
   const [recipient, setRecipient] = useState('')
+  const [recipientResolved, setRecipientResolved] = useState('')
   const [minted, setMinted] = useState(null)
 
   const [myVouchers, setMyVouchers] = useState([])
@@ -46,8 +52,18 @@ export default function VouchersPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [redeemed, setRedeemed] = useState(false)
 
+  // Transfer-a-voucher state (sends the selected held voucher to another wallet).
+  const [transferTo, setTransferTo] = useState('')
+  const [transferToResolved, setTransferToResolved] = useState('')
+  const [transferred, setTransferred] = useState(null)
+
+  // Shared QR scanner for the gift + transfer address fields. `qrTarget` says
+  // which field a successful scan should populate.
+  const [qrScannerOpen, setQrScannerOpen] = useState(false)
+  const [qrTarget, setQrTarget] = useState(null) // 'gift' | 'transfer'
+
   const role = ROLE_HASHES.WAGER_PARTICIPANT
-  const busy = status === 'minting' || status === 'redeeming'
+  const busy = status === 'minting' || status === 'redeeming' || status === 'transferring'
 
   // Deep links from the "Get Wager Access" modal (#vch-buy-h / #vch-redeem-h) scroll to the section.
   useEffect(() => {
@@ -79,8 +95,17 @@ export default function VouchersPage() {
 
   if (!isConnected) return <Navigate to="/" replace />
 
+  // Resolve the gift recipient: prefer the ENS-resolved address, else accept a
+  // directly-typed hex address. Empty when neither is valid yet.
+  const giftAddr = recipientResolved || (ethers.isAddress(recipient.trim()) ? recipient.trim() : '')
   const giftMode = recipient.trim().length > 0
-  const recipientValid = !giftMode || ethers.isAddress(recipient.trim())
+  const recipientValid = !giftMode || ethers.isAddress(giftAddr)
+
+  // Transfer recipient (same ENS-or-hex resolution as the gift field).
+  const transferAddr = transferToResolved || (ethers.isAddress(transferTo.trim()) ? transferTo.trim() : '')
+  const transferEntered = transferTo.trim().length > 0
+  const transferValid = ethers.isAddress(transferAddr) && transferAddr.toLowerCase() !== (account || '').toLowerCase()
+
   const qtyNum = Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number(quantity) || 1)))
   const unitPrice = getPrice('WAGER_PARTICIPANT', selectedTier)
   const totalPrice = unitPrice * qtyNum
@@ -88,13 +113,49 @@ export default function VouchersPage() {
   const needsHelper = qtyNum > 1 || giftMode
   const buyBlocked = needsHelper && !batchMintAvailable
 
+  function openQrScanner(target) {
+    setQrTarget(target)
+    setQrScannerOpen(true)
+  }
+
+  function handleQrScanSuccess(decodedText) {
+    const addr = extractAddressFromScan(decodedText)
+    if (addr) {
+      if (qrTarget === 'gift') {
+        setRecipient(addr)
+        setRecipientResolved(addr)
+      } else if (qrTarget === 'transfer') {
+        setTransferTo(addr)
+        setTransferToResolved(addr)
+      }
+    }
+    setQrScannerOpen(false)
+    setQrTarget(null)
+  }
+
   async function onBuy() {
     setMinted(null)
     try {
-      const res = await mintVouchers(role, TIER_IDS[selectedTier], qtyNum, recipient)
+      // Pass the resolved 0x address (ENS-resolved or directly typed) so the hook's
+      // address check passes for gifts entered as an ENS name.
+      const res = await mintVouchers(role, TIER_IDS[selectedTier], qtyNum, giftAddr || recipient)
       setMinted(res)
       // Holdings only change if you bought for yourself.
       if (!res.gift) refreshVouchers()
+    } catch {
+      /* error surfaced via hook state */
+    }
+  }
+
+  async function onTransfer() {
+    setTransferred(null)
+    if (!selectedVoucherId) return
+    try {
+      const res = await transferVoucher(selectedVoucherId, transferAddr || transferTo)
+      setTransferred(res)
+      setTransferTo('')
+      setTransferToResolved('')
+      refreshVouchers()
     } catch {
       /* error surfaced via hook state */
     }
@@ -185,19 +246,45 @@ export default function VouchersPage() {
               disabled={!voucherAvailable || busy}
             />
           </label>
-          <label className="vch-field vch-field-grow">
-            <span>Gift to address <em>(optional)</em></span>
-            <input
-              className={`vch-input ${giftMode && !recipientValid ? 'vch-input-error' : ''}`}
-              type="text"
-              spellCheck="false"
-              autoComplete="off"
-              placeholder="0x… — leave blank to buy for yourself"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
+        </div>
+
+        {/* Gift recipient on its own single line, with address-book + QR like the
+            wager opponent field (voucher testing feedback). Leave blank to buy
+            for yourself. */}
+        <div className="vch-field">
+          <label htmlFor="vch-gift-to">Gift to address <em>(optional)</em></label>
+          <div className="fm-input-with-action">
+            <div className="fm-address-input-wrap">
+              <AddressInput
+                id="vch-gift-to"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                onResolvedChange={(addr) => setRecipientResolved(addr || '')}
+                placeholder="0x… or ENS — leave blank to buy for yourself"
+                disabled={!voucherAvailable || busy}
+                error={giftMode && !recipientValid}
+              />
+            </div>
+            <AddressBookButton
               disabled={!voucherAvailable || busy}
+              onSelect={(entry) => {
+                setRecipient(entry.address)
+                setRecipientResolved(entry.address)
+              }}
             />
-          </label>
+            <button
+              type="button"
+              className="fm-scan-btn"
+              onClick={() => openQrScanner('gift')}
+              disabled={!voucherAvailable || busy}
+              title="Scan QR code"
+              aria-label="Scan recipient QR code"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
+              </svg>
+            </button>
+          </div>
         </div>
         {giftMode && !recipientValid && (
           <p className="vch-warn" role="status">That doesn’t look like a valid wallet address.</p>
@@ -288,19 +375,81 @@ export default function VouchersPage() {
           </fieldset>
         )}
 
-        <label className="vch-terms">
-          <input
-            type="checkbox"
-            checked={acceptedTerms}
-            onChange={(e) => setAcceptedTerms(e.target.checked)}
-            disabled={!voucherAvailable || busy || myVouchers.length === 0}
-          />
-          I accept the{' '}
+        {/* Transfer the selected voucher to someone else instead of redeeming it.
+            No membership is granted by transferring — the recipient redeems it
+            themselves. Same address entry / address book / QR as the gift field. */}
+        {myVouchers.length > 0 && (
+          <div className="vch-transfer">
+            <span className="vch-subhead">Transfer this voucher to someone else</span>
+            <p className="vch-help">
+              Send the selected voucher to another wallet — they can redeem it for their own membership.
+              Transferring doesn’t grant a membership here.
+            </p>
+            <div className="fm-input-with-action">
+              <div className="fm-address-input-wrap">
+                <AddressInput
+                  id="vch-transfer-to"
+                  value={transferTo}
+                  onChange={(e) => setTransferTo(e.target.value)}
+                  onResolvedChange={(addr) => setTransferToResolved(addr || '')}
+                  placeholder="0x… or ENS — who should receive it"
+                  disabled={!voucherAvailable || busy}
+                  error={transferEntered && !transferValid}
+                />
+              </div>
+              <AddressBookButton
+                disabled={!voucherAvailable || busy}
+                onSelect={(entry) => {
+                  setTransferTo(entry.address)
+                  setTransferToResolved(entry.address)
+                }}
+              />
+              <button
+                type="button"
+                className="fm-scan-btn"
+                onClick={() => openQrScanner('transfer')}
+                disabled={!voucherAvailable || busy}
+                title="Scan QR code"
+                aria-label="Scan recipient QR code"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
+                </svg>
+              </button>
+            </div>
+            {transferEntered && !transferValid && (
+              <p className="vch-warn" role="status">
+                Enter a valid wallet address that isn’t this one.
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              onClick={onTransfer}
+              loading={status === 'transferring'}
+              disabled={!voucherAvailable || !selectedVoucherId || !transferValid || busy}
+            >
+              {selectedVoucherId ? `Transfer voucher #${selectedVoucherId}` : 'Transfer voucher'}
+            </Button>
+            {transferred && (
+              <p className="vch-success" role="status">
+                Sent voucher #{transferred.tokenId} to {transferred.to.slice(0, 6)}…{transferred.to.slice(-4)}.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="vch-divider" role="separator" aria-hidden="true" />
+
+        {/* Terms acceptance for redemption uses the SAME attestation block as the
+            membership purchase flow (voucher testing feedback), so a redeemer
+            confirms the identical eligibility statements. */}
+        <MembershipAttestation onChange={setAcceptedTerms} />
+        <p className="vch-fineprint">
+          Redeeming is also governed by the{' '}
           <a href={MEMBERSHIP_VOUCHERS_TERMS_PATH} target="_blank" rel="noopener noreferrer">
-            Terms &amp; Conditions
-          </a>{' '}
-          (including the membership voucher terms) and confirm I’m eligible.
-        </label>
+            membership voucher terms
+          </a>.
+        </p>
 
         <Button
           variant="primary"
@@ -316,6 +465,12 @@ export default function VouchersPage() {
           </p>
         )}
       </section>
+
+      <QRScanner
+        isOpen={qrScannerOpen}
+        onClose={() => { setQrScannerOpen(false); setQrTarget(null) }}
+        onScanSuccess={handleQrScanSuccess}
+      />
     </div>
   )
 }

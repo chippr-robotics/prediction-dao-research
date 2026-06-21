@@ -12,7 +12,7 @@ describe('key-gen eligibility disclosure (T048)', () => {
   it('states the standing eligibility facts', () => {
     const text = ELIGIBILITY_DISCLOSURE.facts.join(' ')
     expect(text).toMatch(/21 years/i)
-    expect(text).toMatch(/not a U\.S\. person/i)
+    expect(text).toMatch(/not located in a Restricted Jurisdiction/i)
     expect(text).toMatch(/sanctioned/i)
     expect(text).toMatch(/sole control of this wallet/i)
   })
