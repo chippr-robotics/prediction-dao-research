@@ -7,14 +7,28 @@
  * is the only data fetched; encrypted envelopes round-trip as raw strings
  * and are decrypted client-side via useLazyMarketDecryption.
  *
- * Falls back to EventsSource if the subgraph endpoint is unreachable.
+ * The endpoint is resolved per-chain from networks.js. When a chain has no
+ * subgraph, or the endpoint is unreachable, reads fall back to RegistrySource
+ * (direct RPC reads of the v2 WagerRegistry) rather than the deprecated
+ * FriendGroupMarketFactory-backed EventsSource.
  */
 
 import { WagerSortKey } from '../../constants/wagerDefaults'
 import { upsertCache } from './cacheStore'
-import * as EventsSource from './EventsSource'
+import * as RegistrySource from './RegistrySource'
+import { getSubgraphUrl, getCurrentChainId } from '../../config/networks'
 
-const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
+// Legacy single-endpoint override. Honored only for the build-time active
+// chain so it can never leak to a different network at runtime; per-chain
+// `subgraphUrl` in networks.js is the preferred configuration.
+const LEGACY_SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
+
+function resolveSubgraphUrl(chainId) {
+  const perChain = getSubgraphUrl(chainId)
+  if (perChain) return perChain
+  if (chainId == null || chainId === getCurrentChainId()) return LEGACY_SUBGRAPH_URL
+  return ''
+}
 
 // v2 WagerRegistry has no on-chain trading/resolution deadlines in its events,
 // so "ends" sort falls back to createdAt; the detail view hydrates timing from
@@ -59,9 +73,9 @@ const PAGE_QUERY = `
   }
 `
 
-async function postGraphQL(query, variables) {
-  if (!SUBGRAPH_URL) throw new Error('VITE_SUBGRAPH_URL is not set')
-  const res = await fetch(SUBGRAPH_URL, {
+async function postGraphQL(url, query, variables) {
+  if (!url) throw new Error('No subgraph endpoint configured for this chain')
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
@@ -119,15 +133,22 @@ export async function listPage({
   pageSize = 25,
   sortKey = WagerSortKey.CREATED,
   filter,
+  chainId,
 }) {
   if (!userAddress) {
     return { items: [], nextCursor: null, hasMore: false, totalKnown: 0, source: 'subgraph' }
   }
-  if (!SUBGRAPH_URL) {
-    return EventsSource.listPage({ userAddress, cursor, pageSize, sortKey, filter }).then(r => ({
-      ...r,
-      source: 'subgraph-fallback',
-    }))
+  const subgraphUrl = resolveSubgraphUrl(chainId)
+  if (!subgraphUrl) {
+    const fallback = await RegistrySource.listPage({
+      userAddress,
+      cursor,
+      pageSize,
+      sortKey,
+      filter,
+      chainId,
+    })
+    return { ...fallback, source: 'subgraph-fallback' }
   }
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return { items: [], nextCursor: null, hasMore: false, totalKnown: 0, source: 'subgraph' }
@@ -142,7 +163,7 @@ export async function listPage({
   }
 
   try {
-    const data = await postGraphQL(PAGE_QUERY, variables)
+    const data = await postGraphQL(subgraphUrl, PAGE_QUERY, variables)
     const items = (data?.wagers || []).slice(0, pageSize).map(toWager)
     const hasMore = (data?.wagers || []).length > pageSize
     const nextCursor = hasMore && items.length
@@ -151,17 +172,26 @@ export async function listPage({
     if (items.length) upsertCache(userAddress, items)
     return { items, nextCursor, hasMore, totalKnown: items.length, source: 'subgraph' }
   } catch (err) {
-    console.warn('[SubgraphSource] falling back to EventsSource:', err?.message)
-    const fallback = await EventsSource.listPage({ userAddress, cursor, pageSize, sortKey, filter })
+    console.warn('[SubgraphSource] falling back to RegistrySource (RPC):', err?.message)
+    const fallback = await RegistrySource.listPage({
+      userAddress,
+      cursor,
+      pageSize,
+      sortKey,
+      filter,
+      chainId,
+    })
     return { ...fallback, source: 'subgraph-fallback' }
   }
 }
 
-export async function getById(id, userAddress) {
+export async function getById(id, userAddress, opts = {}) {
   if (!id || !userAddress) return null
-  if (!SUBGRAPH_URL) return EventsSource.getById(id, userAddress)
+  const subgraphUrl = resolveSubgraphUrl(opts.chainId)
+  if (!subgraphUrl) return RegistrySource.getById(id, userAddress, opts)
   try {
     const data = await postGraphQL(
+      subgraphUrl,
       `query($id: ID!) { wager(id: $id) { id status resolutionType creator opponent token creatorStake opponentStake winner createdAt resolvedAt metadataUri metadataHash } }`,
       { id: String(id) }
     )
@@ -169,7 +199,7 @@ export async function getById(id, userAddress) {
     if (wager) upsertCache(userAddress, [wager])
     return wager
   } catch (err) {
-    console.warn('[SubgraphSource] getById fallback:', err?.message)
-    return EventsSource.getById(id, userAddress)
+    console.warn('[SubgraphSource] getById fallback to RPC:', err?.message)
+    return RegistrySource.getById(id, userAddress, opts)
   }
 }

@@ -2,18 +2,18 @@
  * Spec 017 / FR-018: the "my wagers" SubgraphSource is migrated to the v2 Wager
  * schema (creator/opponent/token/creatorStake/opponentStake/status/createdAt),
  * mapping participants ⇐ [creator, opponent] and stakeToken ⇐ token. A GraphQL
- * field error degrades to the EventsSource (RPC) fallback rather than surfacing
- * broken data (constitution II + III).
+ * field error degrades to the RegistrySource (RPC) fallback rather than
+ * surfacing broken data (constitution II + III).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const USER = '0x1111111111111111111111111111111111111111'
 const OPP = '0x2222222222222222222222222222222222222222'
 
-// EventsSource is the RPC fallback; mock it so the fallback path is observable
-// without a provider.
-vi.mock('../data/wagers/EventsSource', () => ({
-  listPage: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false, totalKnown: 0, source: 'events' })),
+// RegistrySource is the RPC fallback (direct v2 WagerRegistry reads); mock it so
+// the fallback path is observable without a provider.
+vi.mock('../data/wagers/RegistrySource', () => ({
+  listPage: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false, totalKnown: 0, source: 'registry' })),
   getById: vi.fn(async () => null),
 }))
 // cacheStore.upsertCache touches localStorage indirectly; keep it inert.
@@ -65,7 +65,7 @@ describe('SubgraphSource v2 migration (FR-018)', () => {
     expect(w.needsRehydration).toBe(true) // R5: chain fills timing + description
   })
 
-  it('falls back to EventsSource when the subgraph returns a GraphQL field error', async () => {
+  it('falls back to RegistrySource (RPC) when the subgraph returns a GraphQL field error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({ errors: [{ message: "Type `Wager` has no field `marketType`" }] }),
