@@ -59,7 +59,7 @@ cd frontend && npm install && npm run dev
 ## Contract configuration
 
 Addresses come from `src/config/contracts.js`, keyed by chain ID (137 Polygon
-mainnet, 80002 Amoy, 1337 Hardhat, 63 legacy Mordor). The file is **generated**
+mainnet, 80002 Amoy, 1337 Hardhat, 63 Mordor/ETC). The file is **generated**
 from `deployments/` records:
 
 ```bash
@@ -85,12 +85,32 @@ is preceded by the same guards the contracts enforce:
 In-flight transactions are persisted to localStorage so a reload can resume
 the flow.
 
+### Writing: open challenges and voucher redemption
+
+Two feature flows mirror the same approve-then-call pattern but resolve the
+contract chain-aware (`getContractAddressForChain(name, chainId)`):
+
+- **Open challenges (024)** — `hooks/useOpenChallengeCreate.js` and
+  `hooks/useOpenChallengeAccept.js`, surfaced by
+  `components/fairwins/OpenChallengeModal.jsx`. Create generates a four-word
+  code client-side (`utils/claimCode/`), derives the on-chain `claimAuthority`,
+  seals the terms under a code-keyed envelope, and calls `createOpenWager`.
+  Take = `discover(code)` (read-only lookup + decrypt) then `accept(code,
+  wagerId)`, which **approves the stake, signs an EIP-712 acceptance, then
+  calls `acceptOpenWager`** — the approval step is mandatory (escrows the
+  matching stake) and is reported through a step checklist.
+- **Membership vouchers (026)** — `MembershipVoucher.mint` (USDC approval to
+  the voucher contract) and `MembershipManager.redeemVoucher`; the voucher is a
+  standard ERC-721, so transfer/gift uses normal wallet flows. ABIs:
+  `abis/MembershipVoucher.js` + the voucher functions on `abis/MembershipManager.js`.
+
 ### Reading: the wager cache
 
 `FriendMarketsContext` is the single source of truth for the user's wagers,
 cached per chain. It pulls from `data/wagers/EventsSource.js` (direct RPC event
-scans + `getUserWagers` pagination); `SubgraphSource.js` exists but the
-deployed subgraph indexes the legacy v1 factory, so RPC is the primary path.
+scans + `getUserWagers` pagination). `SubgraphSource.js` reads the **v2
+`WagerRegistry`** subgraph (spec 017) for features like draw proposals, but the
+wager grid stays direct-from-chain so a subgraph outage degrades gracefully.
 
 ### Encryption
 

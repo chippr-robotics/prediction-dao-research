@@ -47,6 +47,36 @@ await (await membership.purchaseTierWithTerms(ROLE, 1, acceptedTermsHash)).wait(
 usage against the tier's `Limits` — `createWager` reverts once either limit
 is hit.
 
+### Membership vouchers (feature 026)
+
+A `MembershipVoucher` is a transferable ERC-721 bearer claim — buy it with
+USDC, then hold, gift, or resell it. It confers **no** membership until it is
+**redeemed** (which burns it and writes a soulbound membership to the
+redeemer). Mint is on the voucher contract; redeem is on the manager.
+
+```javascript
+const voucher = new ethers.Contract(MEMBERSHIP_VOUCHER_ADDRESS, MembershipVoucherABI, signer);
+
+// Buy a voucher for a tier (USDC approval to the voucher contract first).
+const cfg = await membership.getTierConfig(ROLE, 2 /* Silver */);
+await (await usdc.approve(MEMBERSHIP_VOUCHER_ADDRESS, cfg.priceUSDC)).wait();
+const mintTx = await voucher.mint(ROLE, 2);
+const mintRc = await mintTx.wait();
+const tokenId = mintRc.logs
+    .map(l => { try { return voucher.interface.parseLog(l); } catch { return null; } })
+    .find(e => e?.name === "VoucherMinted").args.id;
+
+// Gift / resell: it's a standard ERC-721.
+await voucher.transferFrom(myAddress, recipientAddress, tokenId);
+
+// Redeem (the holder): burns the voucher, grants the (role, tier) it carries.
+await (await membership.redeemVoucher(tokenId, acceptedTermsHash)).wait();
+```
+
+Redemption screens the redeemer through `SanctionsGuard` (the minter is not
+screened — screening happens at redeem time). `MembershipVoucher` is immutable
+and carries a best-effort EIP-2981 royalty (default 2.5%, 5% cap).
+
 ## Creating a wager
 
 ```javascript
@@ -87,6 +117,43 @@ For oracle types, pass the registered condition ID and which side you're
 taking (`creatorIsYes`). For `ThirdParty`, pass a non-zero `arbitrator`.
 `createWagerWithTerms(...)` additionally binds the accepted terms-version
 hash on-chain.
+
+## Open challenges (feature 024)
+
+An open challenge is a wager posted with **no named opponent**, gated by a
+four-word claim code. The code derives an off-chain key whose address is the
+on-chain `claimAuthority`; the same code discovers the wager, decrypts its
+terms, and signs acceptance. **Silver+** membership is required to create one;
+**any active tier** may take it. Stakes are equal by construction.
+
+```javascript
+// Create — derive claimAuthority from the code off-chain, then post.
+// (See frontend/src/utils/claimCode/ for code generation + key derivation.)
+await (await usdc.approve(WAGER_REGISTRY_ADDRESS, stake)).wait();
+const tx = await registry.createOpenWager(
+    claimAuthority,             // address derived from the four-word code
+    ethers.ZeroAddress,         // arbitrator (required for ThirdParty)
+    USDC_ADDRESS, stake,
+    now + 48 * 3600,            // acceptDeadline
+    now + 9 * 86400,            // resolveDeadline
+    0,                          // ResolutionType.Either (or ThirdParty/oracle)
+    ethers.ZeroHash, true,
+    metadataHash, "ipfs://<cid>"
+);
+// wagerId from the OpenWagerCreated event.
+
+// Take — look the wager up by the code's authority, then accept with an
+// EIP-712 signature from the code key BOUND TO THE TAKER (not replayable).
+const wagerId = await registry.openWagerIdForClaim(claimAuthority); // 0 = no match
+const w = await registry.getWager(wagerId);
+await (await usdc.approve(WAGER_REGISTRY_ADDRESS, w.opponentStake)).wait();
+await (await registry.acceptOpenWager(wagerId, signature)).wait();
+```
+
+The taker MUST approve their stake before `acceptOpenWager` — it escrows the
+matching stake via `transferFrom`, so an un-approved call reverts with
+`ERC20: transfer amount exceeds allowance`. `isOpenChallenge(wagerId)`
+distinguishes an open challenge from a named-opponent wager.
 
 ## Accepting, declining, cancelling
 
@@ -162,11 +229,13 @@ registry.on(registry.filters.WagerCreated(null, creatorAddress), (id, creator, o
 ```
 
 Lifecycle events, in order of a typical happy path:
-`WagerCreated` → `WagerAccepted` → `WagerResolved` → `PayoutClaimed`.
-Other exits: `WagerCancelled`, `WagerDeclined`, `WagerRefunded`,
-`DrawProposed`/`DrawRevoked`/`WagerDrawn`. Oracle links emit
-`PolymarketLinked` / `OracleConditionLinked` at creation. Moderation emits
-`AccountFrozen` / `AccountUnfrozen`.
+`WagerCreated` (or `OpenWagerCreated` for open challenges) → `WagerAccepted` →
+`WagerResolved` → `PayoutClaimed`. Other exits: `WagerCancelled`,
+`WagerDeclined`, `WagerRefunded`, `DrawProposed`/`DrawRevoked`/`WagerDrawn`.
+Oracle links emit `PolymarketLinked` / `OracleConditionLinked` at creation.
+Membership emits `VoucherSet` / `MembershipRedeemed` (vouchers) and
+`MembershipRevoked`; the voucher contract emits `VoucherMinted`. Moderation
+emits `AccountFrozen` / `AccountUnfrozen`.
 
 ## Encryption keys
 
@@ -193,6 +262,8 @@ the [Envelope Encryption Spec](../developer-guide/envelope-encryption-spec.md).
 | Membership-related revert on create | No active tier, or monthly/concurrent limit reached |
 | ERC-20 `transferFrom` failure | Missing/insufficient USDC approval or balance |
 | `acceptWager` revert | Wrong address (named opponent only), deadline passed, or not `Open` |
+| `acceptOpenWager` revert | Bad/old claim signature, not an open challenge, expired, or you're the creator/arbitrator |
+| `transfer amount exceeds allowance` on accept | Approve your stake to the registry before `acceptWager`/`acceptOpenWager` |
 | `declareWinner` revert | Caller not authorized for the wager's resolution type, or wager not `Active` |
 | `claimPayout` revert | Caller is not the winner, or already paid |
 | `claimRefund` revert | Relevant deadline hasn't passed yet |

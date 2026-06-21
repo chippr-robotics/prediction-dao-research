@@ -18,13 +18,16 @@ a specific person who accepts your wager.
 
 ### Who is the counterparty?
 
-Always a specific person — usually someone you shared a QR code or link with.
-FairWins never takes the other side of a bet.
+Always a specific person — either someone you invited directly with a QR code
+or link, or, for an **open challenge**, whoever takes it using the four-word
+code you shared. FairWins never takes the other side of a bet.
 
 ### What does it cost?
 
 - A **membership tier** (Bronze → Platinum, priced in USDC) is required to
-  create and accept wagers, and sets your monthly/concurrent wager limits.
+  create and accept wagers, and sets your monthly/concurrent wager limits. You
+  can buy a tier directly or redeem a transferable
+  [membership voucher](membership-vouchers.md).
 - **Gas** on Polygon (paid in POL, typically a few cents per action).
 - There is no rake on the pot itself — the winner claims both stakes in full.
 
@@ -86,6 +89,51 @@ pays the winner directly when the wager resolves.
 You can cancel your own wager any time *before* it's accepted (and the invitee
 can decline it). After acceptance, there's no unilateral cancel — only
 resolution, mutual draw, or the deadline-based refund.
+
+### Can I post a wager without naming my opponent?
+
+Yes — that's an **open challenge**. You post the wager with no named opponent
+and get a **four-word code**; anyone you share the code with can take the other
+side. Creating one needs a **Silver** membership or above; taking one needs any
+active tier. Full guide: [Open Challenges](open-challenges.md).
+
+### What is the four-word code, and can I recover it?
+
+It's the key to your open challenge — it finds the challenge, decrypts its
+terms, and authorizes acceptance. It's generated in your browser and **cannot
+be recovered** if lost (we never store it). Save it as soon as it's shown, and
+share it only with people you want to be able to take the bet.
+
+### What does it take to accept an open challenge?
+
+Enter the four words, review the terms, then **approve** your stake token,
+**sign** to authorize acceptance, and **confirm** the transaction. Your matching
+stake is escrowed on confirmation. The app shows these as a checklist.
+
+## Memberships and vouchers
+
+### How do I get a membership?
+
+Two ways: buy a tier directly (it's soulbound to your wallet), or redeem a
+**membership voucher** someone bought or gave you. Both produce the same
+30-day, time-bound membership. See [Membership Vouchers](membership-vouchers.md).
+
+### What is a membership voucher?
+
+A transferable ERC-721 token you buy with USDC at a tier's price. Holding it
+gives you **no** membership — it's a bearer claim you can gift or resell, and
+whoever holds it can **redeem** it (which burns it) for the membership.
+
+### Can I buy a voucher as a gift?
+
+Yes. Buy the voucher, then send the NFT to the recipient's address; they redeem
+it for the membership. Because redemption is soulbound to the redeemer, let the
+recipient redeem it on the wallet they'll wager with.
+
+### Does holding a voucher let me create wagers?
+
+No — you must **redeem** it first. Redeeming burns the voucher and grants the
+soulbound membership that unlocks wagering.
 
 ## Privacy
 

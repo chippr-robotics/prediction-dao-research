@@ -6,6 +6,13 @@ against. Source of truth: `contracts/interfaces/` and
 [`deployments/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/deployments)
 and are tabulated in the [Smart Contracts guide](../developer-guide/smart-contracts.md#deployed-addresses).
 
+> **Upgradeability.** `WagerRegistry` (spec 025) and `MembershipManager`
+> (spec 027) are **UUPS proxies at stable addresses** — the address you
+> integrate against never changes; logic is swapped in place and state is
+> preserved (see [ADR-004](../adr/004-upgradeable-registry-uups.md)).
+> `MembershipVoucher` (spec 026) is **immutable by design** — a tradable
+> bearer asset whose rules must not change after purchase.
+
 ## IWagerRegistry
 
 `contracts/interfaces/IWagerRegistry.sol` — the full wager lifecycle.
@@ -51,6 +58,29 @@ interface IWagerRegistry {
     ) external returns (uint256 wagerId);
 
     function acceptWager(uint256 wagerId) external;
+
+    // Open challenges (feature 024): a wager with NO named opponent, gated by a
+    // code-derived claim authority. The four-word claim code discovers the wager,
+    // decrypts its terms, and signs acceptance. Silver+ to create; any active tier
+    // may take. `acceptOpenWager`'s signature must be the code key's EIP-712 sig
+    // bound to the taker. Equal stakes (creatorStake == opponentStake == stake).
+    function createOpenWager(
+        address claimAuthority_,
+        address arbitrator,
+        address token,
+        uint128 stake,
+        uint64 acceptDeadline,
+        uint64 resolveDeadline,
+        ResolutionType resolutionType,
+        bytes32 oracleConditionId,
+        bool creatorIsYes,
+        bytes32 metadataHash,
+        string calldata metadataUri
+    ) external returns (uint256 wagerId);
+    function acceptOpenWager(uint256 wagerId, bytes calldata signature) external;
+    function openWagerIdForClaim(address authority) external view returns (uint256);
+    function isOpenChallenge(uint256 wagerId) external view returns (bool);
+
     function cancelOpen(uint256 wagerId) external;
     function declineWager(uint256 wagerId) external;
     function declareWinner(uint256 wagerId, address winner) external;
@@ -81,6 +111,8 @@ interface IWagerRegistry {
         address token, uint128 creatorStake, uint128 opponentStake,
         ResolutionType resolutionType, bytes32 metadataHash, string metadataUri);
     event WagerAccepted(uint256 indexed wagerId, address indexed opponent);
+    event OpenWagerCreated(uint256 indexed wagerId, address indexed creator, address indexed claimAuthority,
+        address token, uint128 stake, ResolutionType resolutionType, bytes32 metadataHash, string metadataUri);
     event WagerCancelled(uint256 indexed wagerId);
     event WagerDeclined(uint256 indexed wagerId, address indexed opponent);
     event WagerResolved(uint256 indexed wagerId, address indexed winner, address indexed by);
@@ -140,6 +172,13 @@ interface IMembershipManager {
     function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external;
     function revokeMembership(address user, bytes32 role) external;
 
+    // Voucher rail (feature 026): redeem a MembershipVoucher ERC-721 for a
+    // soulbound membership. `setVoucher` wires the voucher contract (admin);
+    // `redeemVoucher` burns the caller's voucher and grants the (role, tier) it
+    // carries. Added to the proxy as the membership's first in-place upgrade.
+    function setVoucher(address voucher) external;
+    function redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash) external;
+
     // Views
     function hasActiveRole(address user, bytes32 role) external view returns (bool);
     function getActiveTier(address user, bytes32 role) external view returns (Tier);
@@ -147,6 +186,9 @@ interface IMembershipManager {
     function getTierConfig(bytes32 role, Tier tier) external view returns (TierConfig memory);
 
     event MembershipRevoked(address indexed user, bytes32 indexed role, address indexed by);
+    event VoucherSet(address indexed voucher);
+    event MembershipRedeemed(address indexed user, bytes32 indexed role, Tier tier,
+        uint256 indexed voucherId, uint64 expiresAt);
 }
 ```
 
@@ -162,6 +204,43 @@ function extendMembership(bytes32 role) external;
 
 The role for wager participation is
 `keccak256("WAGER_PARTICIPANT_ROLE")`.
+
+## IMembershipVoucher
+
+`contracts/interfaces/IMembershipVoucher.sol` — the redemption surface
+`MembershipManager` calls on the voucher (feature 026). `MembershipVoucher`
+(`contracts/access/MembershipVoucher.sol`) is a **transferable ERC-721 bearer
+claim** on a `(role, tier)` membership: it is minted for USDC at the tier's
+price (paid to the treasury at mint) and **confers no membership while held** —
+it exists to be held, gifted, or resold. Redeeming it through
+`MembershipManager.redeemVoucher` burns it and writes a soulbound membership to
+the redeemer. It is **immutable** (not upgradeable) by design and carries a
+best-effort EIP-2981 royalty (default 2.5%, 5% hard cap).
+
+```solidity
+interface IMembershipVoucher {
+    struct VoucherInfo {
+        bytes32 role;
+        IMembershipManager.Tier tier;
+        uint32  durationDays;
+    }
+
+    function voucherInfo(uint256 tokenId) external view returns (VoucherInfo memory);
+    function burn(uint256 tokenId) external;            // MembershipManager (redeem) or token owner
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+```
+
+The implementation additionally exposes the buyer-facing mint and is a full
+ERC-721 + ERC-2981:
+
+```solidity
+function mint(bytes32 role, IMembershipManager.Tier tier) external returns (uint256 id);
+function membershipManager() external view returns (address);   // immutable redemption authority
+
+event VoucherMinted(uint256 indexed id, address indexed minter, bytes32 indexed role,
+    IMembershipManager.Tier tier, uint32 durationDays, uint128 priceUSDC);
+```
 
 ## ISanctionsGuard
 

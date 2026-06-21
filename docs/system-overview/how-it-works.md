@@ -12,7 +12,9 @@ to payout, including every exit path.
 ```mermaid
 stateDiagram-v2
     [*] --> Open: createWager()<br/>creator stake escrowed
+    [*] --> Open: createOpenWager()<br/>open challenge — no named opponent
     Open --> Active: acceptWager()<br/>opponent stake escrowed
+    Open --> Active: acceptOpenWager()<br/>taken with a four-word code
     Open --> Refunded: cancelOpen() / declineWager() /<br/>acceptance deadline passes
     Active --> Resolved: declareWinner() or<br/>autoResolveFromPolymarket() /<br/>autoResolveFromOracle()
     Active --> Draw: declareDraw()<br/>(both parties consent,<br/>or arbitrator ruling)
@@ -60,6 +62,23 @@ If the opponent never accepts:
 
 The opponent can also explicitly `declineWager()`, which refunds the creator
 immediately.
+
+### Open challenges (no named opponent)
+
+A creator can instead post an **open challenge** with `createOpenWager()` —
+a wager with no opponent named up front, gated by a **four-word claim code**.
+The code is generated in the creator's browser and never leaves it; it both
+encrypts the terms and derives the on-chain *claim authority* recorded with the
+wager. The creator shares the code out-of-band (text, QR, or deep link), and
+**anyone who has it** can look the challenge up, read its terms, and take the
+other side by calling `acceptOpenWager()` with a one-time signature derived
+from the code and bound to their address. Stakes are equal by construction.
+
+Creating an open challenge requires a **Silver** membership or above; **any**
+active tier can take one. Because the opponent is unknown at creation, an open
+challenge must resolve via *Either side*, a named *third-party arbitrator*, or
+an *oracle* — not single-party self-resolution. The code is the only way to
+find, read, or take the challenge and **cannot be recovered if lost**.
 
 ## 3. Resolution (`Active → Resolved` / `Draw`)
 
@@ -148,13 +167,22 @@ sequenceDiagram
 
 ## Memberships and limits
 
-Wager participation requires an active membership purchased through
-`MembershipManager` (`purchaseTier()` / `purchaseTierWithTerms()`), priced in
-USDC. Each tier — Bronze, Silver, Gold, Platinum — sets a monthly creation
-allowance and a cap on concurrently open wagers. The registry calls
-`recordCreate` / `recordClose` hooks so the limits track actual usage. Admins
-can also grant or revoke memberships out of band. Full details:
-[Roles and Tiers](roles-and-tiers.md).
+Wager participation requires an active membership. The default starting tier is
+**None** (no participation); the paid tiers — Bronze, Silver, Gold, Platinum —
+each set a monthly creation allowance and a cap on concurrently open wagers.
+There are two ways to get one:
+
+- **Buy a tier directly** through `MembershipManager` (`purchaseTier()` /
+  `purchaseTierWithTerms()`), priced in USDC — the membership is **soulbound**
+  (non-transferable) and time-bound.
+- **Redeem a voucher.** A `MembershipVoucher` is a transferable ERC-721 bought
+  with USDC at a tier's price. It confers no membership while held — so it can
+  be **gifted or resold** — and is redeemed (`redeemVoucher`), which burns it
+  and writes the soulbound membership to the redeemer.
+
+The registry calls `recordCreate` / `recordClose` hooks so the limits track
+actual usage. Admins can also grant or revoke memberships out of band. Full
+details: [Roles and Tiers](roles-and-tiers.md).
 
 ## What keeps it honest
 

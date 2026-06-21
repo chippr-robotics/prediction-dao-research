@@ -121,11 +121,17 @@ In the create UI these settlers appear as **Me**, **Them**, **A Friend**, and
 
 | Contract | Role |
 |----------|------|
-| `WagerRegistry` | Wager lifecycle and stake escrow (create, accept, resolve, claim, refund) |
-| `MembershipManager` | Tiered memberships (Bronze → Platinum) with creation rate limits |
+| `WagerRegistry` | Wager lifecycle and stake escrow (create, accept, resolve, claim, refund), including open challenges. **UUPS proxy** — upgradeable at a stable address (spec 025) |
+| `MembershipManager` | Tiered memberships (Bronze → Platinum) with creation rate limits and voucher redemption. **UUPS proxy** (spec 027) |
+| `MembershipVoucher` | Transferable ERC-721 bearer claim on a membership; bought with USDC, redeemed (burned) for a soulbound membership (spec 026). **Immutable** by design |
 | `SanctionsGuard` | Non-bypassable sanctions screening (Chainalysis oracle + deny list) |
 | `KeyRegistry` | Public encryption keys for private wager terms |
 | Oracle adapters | `PolymarketOracleAdapter`, `ChainlinkDataFeedOracleAdapter`, `ChainlinkFunctionsOracleAdapter`, `UMAOptimisticOracleV3Adapter` |
+
+The two value-bearing core contracts (`WagerRegistry`, `MembershipManager`)
+are **UUPS upgradeable proxies** — logic is swapped in place while state and
+addresses are preserved — so features ship without stranding wagers or
+memberships (see [ADR-004](adr/004-upgradeable-registry-uups.md)).
 
 The earlier futarchy/DAO-governance research (ClearPath, friend-group market
 factories, conditional-token markets) has been superseded by this P2P design;

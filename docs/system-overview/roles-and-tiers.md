@@ -8,23 +8,37 @@ enforced via OpenZeppelin AccessControl.
 
 ### `WAGER_PARTICIPANT_ROLE`
 
-The one paid role. Required to call `WagerRegistry.createWager`. Sold by
-`MembershipManager` in USDC.
+The one paid role. Required to create or accept wagers. Sold by
+`MembershipManager` in USDC. The default state is the **None** tier — no
+membership, no participation.
 
-Four tiers, all valid for **30 days**, anchored at $2 Bronze:
+Four paid tiers, all valid for **30 days**, anchored at $2 Bronze:
 
 | Tier | Price (USDC) | Wagers / month | Open wagers at once |
 |------|--------------|----------------|---------------------|
+| None     | —    | 0         | 0         |
 | Bronze   | $2   | 15        | 5         |
 | Silver   | $8   | 30        | 10        |
 | Gold     | $25  | 100       | 30        |
 | Platinum | $100 | Unlimited | Unlimited |
 
 The two limits (`monthlyMarketCreation`, `maxConcurrentMarkets`) are the
-**only** on-chain restrictions. Stake size, resolution type (Either /
-Creator / Opponent / ThirdParty / Polymarket), and token choice (USDC or
-WMATIC) are not gated by tier — Bronze gets the same feature set as Platinum,
-just lower throughput.
+**only** throughput restrictions. Stake size, resolution type (Either /
+Creator / Opponent / ThirdParty / Polymarket / Chainlink / UMA), and token
+choice (USDC or WMATIC) are not gated by tier — Bronze gets the same feature
+set as Platinum, just lower throughput. One exception: creating an **open
+challenge** (`createOpenWager`, a code-gated wager with no named opponent)
+requires **Silver or above**, though *taking* one needs only any active tier.
+
+### Two ways to get a membership
+
+- **Buy a tier directly** — `purchaseTier` / `purchaseTierWithTerms` in USDC.
+  The resulting membership is **soulbound** (non-transferable) and time-bound.
+- **Redeem a voucher** — a `MembershipVoucher` is a transferable ERC-721 bought
+  with USDC at a tier's price (see spec 026). It confers no membership while
+  held, so it can be **gifted or resold**; redeeming it (`redeemVoucher`) burns
+  the voucher and writes the soulbound membership to the redeemer. The voucher
+  contract is immutable; redemption screens the redeemer through `SanctionsGuard`.
 
 Membership rolls in a 30-day window: the monthly counter resets the first
 time you create a wager after 30 days have elapsed since the last reset.

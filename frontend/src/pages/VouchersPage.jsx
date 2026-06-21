@@ -27,6 +27,14 @@ export default function VouchersPage() {
   } = useVouchers()
   const { hash } = useLocation()
 
+  // Deep links from the "Get Wager Access" modal (#vch-buy-h / #vch-redeem-h)
+  // scroll to the relevant section.
+  useEffect(() => {
+    if (!hash) return
+    const el = document.getElementById(hash.slice(1))
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }, [hash])
+
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [quantity, setQuantity] = useState(1)
   const [recipient, setRecipient] = useState('')

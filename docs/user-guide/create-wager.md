@@ -25,6 +25,7 @@ you're on the wrong network the app offers a one-click switch.
 | **Friends Decide (1v1)** | Even-money wager you and your opponent settle yourselves |
 | **Oracle Settles (1v1)** | Wager pegged to an external source (Polymarket, Chainlink, UMA) |
 | **Make an Offer** | Asymmetric stakes at odds you set — whoever settles puts up the majority stake (e.g. your 30 USDC vs. their 10) |
+| **Open Challenge** | A wager with **no named opponent**, gated by a four-word code anyone you share it with can take. Requires a **Silver** membership or above. See [Open Challenges](open-challenges.md) |
 
 ### 3. Fill in the wager details
 
