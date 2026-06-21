@@ -222,6 +222,7 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
   const [phase, setPhase] = useState('enter') // enter | found | accepted
   const [found, setFound] = useState(null)
   const [error, setError] = useState(null)
+  const [progress, setProgress] = useState(null)
   const [txHash, setTxHash] = useState(null)
 
   const codeValid = isValidCode(code)
@@ -241,11 +242,13 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
   const handleAccept = useCallback(async () => {
     setError(null)
     try {
-      const { txHash: hash } = await accept(code, found.wagerId)
+      const { txHash: hash } = await accept(code, found.wagerId, (p) => setProgress(p))
       setTxHash(hash)
       setPhase('accepted')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setProgress(null)
     }
   }, [accept, code, found])
 
@@ -291,11 +294,18 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
           </>
         ) : (
           <>
-            <p className="fm-hint">Accepting binds you as the opponent and escrows your equal stake. Save your code to re-read the terms later.</p>
+            <p className="fm-hint">Accepting binds you as the opponent and escrows your equal stake. This takes a few steps:</p>
+            <ol className="oc-steps">
+              <li className={stepClass(progress?.step, 'approve')}>Approve the stake token (lets the wager contract escrow your stake)</li>
+              <li className={stepClass(progress?.step, 'sign')}>Sign to authorize acceptance with your code</li>
+              <li className={stepClass(progress?.step, 'accept')}>Confirm acceptance — your stake is escrowed</li>
+            </ol>
+            {progress && <p className="fm-hint" role="status">{progress.message}</p>}
             {error && <div className="fm-error-banner" role="alert">{error}</div>}
+            <p className="fm-hint">Save your code to re-read the terms later.</p>
             <div className="fm-success-actions">
-              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? 'Accepting…' : 'Accept challenge'}</button>
-              <button type="button" className="fm-btn-secondary" onClick={() => { setPhase('enter'); setFound(null) }}>Back</button>
+              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
+              <button type="button" className="fm-btn-secondary" onClick={() => { setPhase('enter'); setFound(null); setProgress(null) }} disabled={busy}>Back</button>
             </div>
           </>
         )}
@@ -320,6 +330,24 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
       </div>
     </form>
   )
+}
+
+// Full step order the accept flow walks through (the visible list omits the quick "check" read).
+const ACCEPT_STEP_ORDER = ['check', 'approve', 'sign', 'accept']
+const STEP_LABELS = { check: 'Checking', approve: 'Approving', sign: 'Signing', accept: 'Confirming' }
+
+/** Mark a list step done (a later step is active), active (current), or pending — for the take-flow checklist. */
+function stepClass(current, step) {
+  if (!current) return 'oc-step'
+  const ci = ACCEPT_STEP_ORDER.indexOf(current)
+  const si = ACCEPT_STEP_ORDER.indexOf(step)
+  if (ci > si) return 'oc-step oc-step--done'
+  if (ci === si) return 'oc-step oc-step--active'
+  return 'oc-step'
+}
+
+function stepLabel(step) {
+  return STEP_LABELS[step] || 'Accepting'
 }
 
 function formatTerms(terms) {
