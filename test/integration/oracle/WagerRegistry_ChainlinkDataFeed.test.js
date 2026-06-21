@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("../../helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("../../helpers/proxy");
 
 const Tier = { None: 0, Bronze: 1 };
 const Resolution = {
@@ -33,8 +33,7 @@ describe("WagerRegistry + ChainlinkDataFeedOracleAdapter (integration)", functio
     const clAdapter = await ClAdapter.deploy(admin.address);
     await clAdapter.setFeedAllowed(await feed.getAddress(), true);
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.connect(admin).setTier(
       WAGER_PARTICIPANT_ROLE, Tier.Bronze,
       usdc(50), 30,

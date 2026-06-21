@@ -17,7 +17,10 @@ const fs = require("fs");
 const path = require("path");
 
 // Upgradeable contracts and the deployments key holding their PROXY address (impl is `<key>Impl`).
-const UPGRADEABLE_CONTRACTS = [{ name: "WagerRegistry", deploymentsKey: "wagerRegistry" }];
+const UPGRADEABLE_CONTRACTS = [
+  { name: "WagerRegistry", deploymentsKey: "wagerRegistry" },
+  { name: "MembershipManager", deploymentsKey: "membershipManager" }, // spec 027 — second adopter of UUPSManaged
+];
 
 function loadDeployedImpl(deploymentsKey) {
   const dir = path.join(process.cwd(), "deployments");

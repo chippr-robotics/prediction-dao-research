@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { deployMembershipManager } = require("../helpers/proxy");
 
 // Upgrade lifecycle for the real WagerRegistry behind a UUPS proxy (spec 025 US1/US2/US3):
 // deploy with current logic, then an in-place upgrade preserves the address AND all wager state; only the
@@ -21,8 +22,7 @@ async function setup() {
   const usdcToken = await MockERC20.deploy("USD Coin", "USDC", 0);
   await usdcToken.waitForDeployment();
 
-  const MembershipManager = await ethers.getContractFactory("MembershipManager");
-  const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+  const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
   await mgr.waitForDeployment();
   await mgr.connect(admin).setTier(
     WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30,

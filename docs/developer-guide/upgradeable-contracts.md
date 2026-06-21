@@ -77,11 +77,12 @@ function (state that defaults to 0 needs none).
 
 ## The membership → voucher path (worked example)
 
-1. **MembershipManager** (sibling spec): inherit `UUPSManaged`; convert `constructor(admin, paymentToken_,
-   treasury_)` → `initialize`; keep `_tiers / _memberships / authorizedCallers / paymentToken / treasury /
-   accruedFees / memberTermsHash` append-only with a `__gap`; deploy via `deployProxy`; register in the
-   storage-layout check. Behavior-neutral cutover (memberships are 30-day time-bound, so the legacy
-   coexistence window drains in ~a month).
+1. **MembershipManager** (spec 027 — ✅ implemented): inherits `UUPSManaged`; `constructor(admin, paymentToken_,
+   treasury_)` converted → `initialize`; `_tiers / _memberships / authorizedCallers / paymentToken / treasury /
+   accruedFees / sanctionsGuard / memberTermsHash` kept append-only with a trailing `__gap`; deployed via
+   `deployProxy` and registered in the storage-layout check (`{ name: "MembershipManager", deploymentsKey:
+   "membershipManager" }`). Behavior-neutral cutover (memberships are 30-day time-bound, so the legacy
+   coexistence window drains in ~a month); `WagerRegistry` is repointed via `setMembershipManager(proxy)`.
 2. **Voucher redemption** (new feature): ships as the membership proxy's **first in-place upgrade** — append
    the voucher state, add the redemption functions, `upgradeProxy({ name: "MembershipManager", proxyAddress })`.
    No membership redeploy, no state migration, no broad role grant — exactly mirroring how feature 024 lands

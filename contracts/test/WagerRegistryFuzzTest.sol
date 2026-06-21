@@ -43,8 +43,14 @@ contract WagerRegistryFuzzTest {
         // 1. Deploy MockERC20 with large supply
         token = new MockERC20("FuzzCoin", "FUZZ", 1e30);
 
-        // 2. Deploy MembershipManager
-        membership = new MembershipManager(deployer, address(token), TREASURY);
+        // 2. Deploy MembershipManager (now UUPS-upgradeable — spec 027: deploy impl behind an ERC1967 proxy
+        //    and initialize through it, exactly as production does).
+        MembershipManager membershipImpl = new MembershipManager();
+        bytes memory mgrInit = abi.encodeCall(
+            MembershipManager.initialize,
+            (deployer, address(token), TREASURY)
+        );
+        membership = MembershipManager(address(new ERC1967Proxy(address(membershipImpl), mgrInit)));
 
         // 3. Deploy WagerRegistry (no polymarket adapter, single token).
         //    Now UUPS-upgradeable: deploy the implementation behind an ERC1967 proxy (the implementation's

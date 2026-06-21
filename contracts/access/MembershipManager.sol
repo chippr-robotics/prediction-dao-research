@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {UUPSManaged} from "../upgradeable/UUPSManaged.sol";
 import "../interfaces/IMembershipManager.sol";
 import "../interfaces/ISanctionsGuard.sol";
 
@@ -15,7 +15,7 @@ import "../interfaces/ISanctionsGuard.sol";
 ///           DEFAULT_ADMIN_ROLE     — treasury, tier config, role administration
 ///           ROLE_MANAGER_ROLE      — grant / revoke memberships out-of-band
 ///           authorizedCallers map  — kept for the WagerRegistry hook surface
-contract MembershipManager is IMembershipManager, AccessControl {
+contract MembershipManager is IMembershipManager, UUPSManaged {
     using SafeERC20 for IERC20;
 
     uint64 private constant ROLLING_WINDOW = 30 days;
@@ -37,6 +37,11 @@ contract MembershipManager is IMembershipManager, AccessControl {
     /// @notice Accepted T&C version hash recorded at membership purchase/upgrade
     ///         (Spec 007, FR-039): user => role => SHA-256 of the in-force Terms.
     mapping(address => mapping(bytes32 => bytes32)) public memberTermsHash;
+
+    /// @dev Trailing reserve so future upgrades (spec 026's voucher redemption) can append state
+    ///      append-only without shifting layout (spec 027 — UUPS migration). Validated by
+    ///      `npm run check:storage-layout`. Never insert/reorder/remove the state above.
+    uint256[50] private __gap;
 
     event TierSet(bytes32 indexed role, Tier indexed tier, uint128 priceUSDC, uint32 durationDays, bool active);
     event TreasuryUpdated(address indexed treasury);
@@ -69,11 +74,16 @@ contract MembershipManager is IMembershipManager, AccessControl {
         _;
     }
 
-    constructor(address admin, address paymentToken_, address treasury_) {
+    /// @notice One-time initializer that replaces the constructor for the UUPS proxy (spec 027).
+    /// @dev    Same args/effects as the former constructor. `__UUPSManaged_init` is called FIRST and grants
+    ///         DEFAULT_ADMIN_ROLE + UPGRADER_ROLE to `admin`; ROLE_MANAGER_ROLE is re-granted here to preserve
+    ///         the prior behavior. The bare implementation's initializers are disabled by UUPSManaged's
+    ///         constructor, so only the proxy can be initialized — and only once.
+    function initialize(address admin, address paymentToken_, address treasury_) external initializer {
         if (admin == address(0) || paymentToken_ == address(0) || treasury_ == address(0)) revert ZeroAddress();
+        __UUPSManaged_init(admin);
         paymentToken = IERC20(paymentToken_);
         treasury = treasury_;
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ROLE_MANAGER_ROLE, admin);
     }
 

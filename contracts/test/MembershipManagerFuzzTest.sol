@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "../access/MembershipManager.sol";
 import "../mocks/MockERC20.sol";
 import "../interfaces/IMembershipManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title MembershipManagerFuzzTest
 /// @notice Medusa fuzz test contract for MembershipManager invariants.
@@ -25,7 +26,14 @@ contract MembershipManagerFuzzTest {
         deployer = address(this);
 
         token = new MockERC20("FuzzCoin", "FUZZ", 1e30);
-        membership = new MembershipManager(deployer, address(token), TREASURY);
+        // UUPS-upgradeable (spec 027): deploy the implementation behind an ERC1967 proxy and initialize
+        // through it (the implementation's own initializers are disabled by UUPSManaged).
+        MembershipManager membershipImpl = new MembershipManager();
+        bytes memory mgrInit = abi.encodeCall(
+            MembershipManager.initialize,
+            (deployer, address(token), TREASURY)
+        );
+        membership = MembershipManager(address(new ERC1967Proxy(address(membershipImpl), mgrInit)));
 
         // Configure all four tiers with increasing prices
         IMembershipManager.Limits memory bronzeLimits = IMembershipManager.Limits({
@@ -227,5 +235,19 @@ contract MembershipManagerFuzzTest {
         if (gold.limits.maxConcurrentMarkets > plat.limits.maxConcurrentMarkets) return false;
 
         return true;
+    }
+
+    // ================================================================
+    //  PROPERTY 10: The one-time initializer can never be called again
+    //  (spec 027 FR-013): no attacker can re-initialize to seize roles
+    //  or reset state on the proxy.
+    // ================================================================
+
+    function property_cannot_reinitialize() public returns (bool) {
+        try membership.initialize(deployer, address(token), TREASURY) {
+            return false; // re-initialization succeeded — invariant VIOLATED
+        } catch {
+            return true; // reverted as expected
+        }
     }
 }

@@ -56,11 +56,12 @@ For the full role / privilege matrix, see [Roles and Tiers](roles-and-tiers.md).
 
 ## Contract upgradeability
 
-The core value-bearing contracts (starting with `WagerRegistry`) are
-UUPS-upgradeable. The frontend and subgraph always point at a **stable proxy
-address**; the logic implementation behind it can be replaced without changing
-that address or moving escrowed state. Future logic ships as an in-place
-upgrade, never a fresh redeploy that would strand existing wagers.
+The core value-bearing contracts — `WagerRegistry` (spec 025) and
+`MembershipManager` (spec 027) — are UUPS-upgradeable. The frontend and subgraph
+always point at a **stable proxy address**; the logic implementation behind it
+can be replaced without changing that address or moving escrowed state (wagers or
+memberships/accrued fees). Future logic ships as an in-place upgrade, never a
+fresh redeploy that would strand existing wagers or memberships.
 
 Upgrades are governed under least privilege:
 

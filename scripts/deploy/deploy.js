@@ -264,14 +264,23 @@ async function main() {
     deployments.polymarketAdapter = adapter.address;
   }
 
-  // -------- MembershipManager --------
-  const mgrDeploy = await deployDeterministic(
-    "MembershipManager",
-    [deployer.address, usdc, treasury],
-    generateSalt(SALT_PREFIXES.V2 + "MembershipManager"),
-    deployer
-  );
-  deployments.membershipManager = mgrDeploy.address;
+  // -------- MembershipManager (UUPS proxy — spec 027) --------
+  // The membership authority is now upgradeable: deployed behind an ERC1967 UUPS proxy so future logic
+  // (immediately, spec 026's voucher redemption) ships as an in-place upgrade — stable address, preserved
+  // state — instead of a fresh address that strands memberships. The PROXY is recorded under
+  // `membershipManager` (stable); the implementation under `membershipManagerImpl` (changes on upgrade).
+  // NOTE: unlike the prior CREATE2 deploy this is NOT idempotent — re-running mints a new proxy; to change
+  // logic on an existing deployment, run an upgrade (lib/upgradeable.js `upgradeProxy`), not this script.
+  console.log("\nDeploying MembershipManager behind a UUPS proxy...");
+  const mgrProxy = await deployProxy({
+    name: "MembershipManager",
+    initArgs: [deployer.address, usdc, treasury],
+  });
+  // Re-sync the client-side NonceManager after the plugin's raw-signer txs (see WagerRegistry note below).
+  if (typeof deployer.reset === "function") deployer.reset();
+  const mgrDeploy = { address: mgrProxy.proxy, contract: mgrProxy.contract, alreadyDeployed: false };
+  deployments.membershipManager = mgrProxy.proxy;
+  deployments.membershipManagerImpl = mgrProxy.implementation;
   const membershipManager = mgrDeploy.contract;
 
   if (!mgrDeploy.alreadyDeployed || process.env.FORCE_SEED_TIERS === "true") {
@@ -468,9 +477,9 @@ async function main() {
   // between this deploy and a later standalone `verify.js` run). These are read
   // in the SAME process as the deploy, so they equal the deploy-time values.
   const constructorArgs = {
-    membershipManager: [deployer.address, usdc, treasury],
-    // UUPS proxy: the implementation is verified with EMPTY constructor args (init data lives in the proxy,
-    // not the implementation's constructor). verify.js verifies the implementation address below.
+    // UUPS proxies (spec 025/027): implementations are verified with EMPTY constructor args (init data lives
+    // in the proxy, not the implementation's constructor). verify.js verifies the implementation addresses.
+    membershipManagerImpl: [],
     wagerRegistryImpl: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
@@ -496,7 +505,8 @@ async function main() {
       // polymarketAdapter is omitted on core-only networks (zero adapter) so the
       // frontend capability tag does not falsely report it as deployed.
       ...(flags.noPolymarket ? {} : { polymarketAdapter: adapterAddress }),
-      membershipManager: mgrDeploy.address,
+      membershipManager: mgrDeploy.address, // ERC1967 proxy (stable address)
+      membershipManagerImpl: mgrProxy.implementation, // current implementation (changes on upgrade)
       wagerRegistry: regDeploy.address, // ERC1967 proxy (stable address)
       wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
       keyRegistry: keyDeploy.address,

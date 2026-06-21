@@ -4,7 +4,7 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
 const { seedLocal } = require("../../scripts/operations/seed-local");
 const { ROLE_HASHES } = require("../../scripts/deploy/lib/constants");
-const { deployWagerRegistry } = require("../helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("../helpers/proxy");
 
 const ROLE = ROLE_HASHES.WAGER_PARTICIPANT_ROLE;
 
@@ -24,12 +24,11 @@ describe("Local Dev Environment — seedLocal invariants", function () {
     const wmatic = await MockERC20.deploy("Wrapped Matic", "WMATIC", 0);
     await wmatic.waitForDeployment();
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mm = await MembershipManager.deploy(
+    const mm = await deployMembershipManager([
       walletZero.address,
       await usdc.getAddress(),
       treasury.address
-    );
+    ]);
     await mm.waitForDeployment();
 
     const reg = await deployWagerRegistry([

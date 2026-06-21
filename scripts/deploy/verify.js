@@ -129,9 +129,18 @@ async function main() {
     plan.push({ name, address, args, fqn });
   };
 
-  add("MembershipManager", c.membershipManager, "membershipManager",
-    [deployer, record.paymentToken, treasury],
-    "contracts/access/MembershipManager.sol:MembershipManager");
+  // MembershipManager is a UUPS proxy (spec 027): verify the IMPLEMENTATION (no constructor args — init data
+  // lives in the proxy). Explorers detect the ERC1967 proxy and link it to this verified implementation.
+  // Older (pre-027, non-proxy) records have no membershipManagerImpl: fall back to verifying the address under
+  // `membershipManager` with the legacy constructor args.
+  if (isAddr(c.membershipManagerImpl)) {
+    add("MembershipManager", c.membershipManagerImpl, "membershipManagerImpl", [],
+      "contracts/access/MembershipManager.sol:MembershipManager");
+  } else {
+    add("MembershipManager", c.membershipManager, "membershipManager",
+      [deployer, record.paymentToken, treasury],
+      "contracts/access/MembershipManager.sol:MembershipManager");
+  }
   // WagerRegistry is a UUPS proxy: verify the IMPLEMENTATION (no constructor args — init data lives in the
   // proxy). Explorers detect the ERC1967 proxy and link it to this verified implementation automatically.
   // Older (pre-025, non-proxy) records have no wagerRegistryImpl: fall back to verifying the address under

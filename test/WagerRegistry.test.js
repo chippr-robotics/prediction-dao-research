@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployWagerRegistry } = require("./helpers/proxy");
+const { deployWagerRegistry, deployMembershipManager } = require("./helpers/proxy");
 
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const Resolution = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4 };
@@ -30,8 +30,7 @@ describe("WagerRegistry", function () {
     const adapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
     await adapter.waitForDeployment();
 
-    const MembershipManager = await ethers.getContractFactory("MembershipManager");
-    const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
+    const mgr = await deployMembershipManager([admin.address, await usdcToken.getAddress(), treasury.address]);
     await mgr.waitForDeployment();
     // Bronze: monthly=100, concurrent=10 — generous for tests
     await mgr.connect(admin).setTier(

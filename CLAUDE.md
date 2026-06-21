@@ -45,17 +45,19 @@ artifacts live under `specs/<feature>/`.
   Slither/Medusa, and get a security review (`.github/agents/`).
 - Never commit secrets or private keys; admin keys use the floppy keystore flow.
 - CI fails loudly — don't add `continue-on-error` to lint/test/build/security.
-- **Upgradeable contracts (UUPS, spec 025):** `WagerRegistry` (and, going forward,
-  other value-bearing contracts like `MembershipManager`) is a **UUPS proxy at a
-  stable address** — logic is swappable, state is preserved. New upgradeable
+- **Upgradeable contracts (UUPS, specs 025 + 027):** both `WagerRegistry` (spec 025)
+  and `MembershipManager` (spec 027) are **UUPS proxies at stable addresses** — logic
+  is swappable, state is preserved. New upgradeable
   contracts MUST inherit `contracts/upgradeable/UUPSManaged.sol` (do not re-roll
   the proxy/auth wiring), replace the constructor with a one-time `initialize`
   (move any inline state initializers into it), and keep storage **append-only**
   with a trailing `__gap` (never insert/reorder/remove existing state). Run
   `npm run check:storage-layout` (gating in CI) before any upgrade; ship logic
   changes as in-place upgrades (`scripts/deploy/lib/upgradeable.js`), never a
-  fresh redeploy. `deployments/` records the proxy (`wagerRegistry`) and the
-  current implementation (`wagerRegistryImpl`). See
+  fresh redeploy. `deployments/` records each proxy (`wagerRegistry`,
+  `membershipManager`) and its current implementation (`wagerRegistryImpl`,
+  `membershipManagerImpl`). Spec 026's voucher redemption ships as the first
+  in-place upgrade of the `membershipManager` proxy. See
   `docs/developer-guide/upgradeable-contracts.md` and
   `docs/runbooks/contract-upgrades.md`.
 - **Active wager contract is `wagerRegistry` (v2 `WagerRegistry` ABI/events:
