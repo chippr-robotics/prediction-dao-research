@@ -31,6 +31,18 @@
     "MembershipManager": {
       "address": "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465",
       "startBlock": 40521018
+    },
+    "ChainlinkDataFeedOracleAdapter": {
+      "address": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
+      "startBlock": 38841810
+    },
+    "ChainlinkFunctionsOracleAdapter": {
+      "address": "0x074fC18C1E322a7537b53B8B2Bf0762629E3b532",
+      "startBlock": 38841814
+    },
+    "UMAOptimisticOracleV3Adapter": {
+      "address": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88",
+      "startBlock": 38841817
     }
   }
 }

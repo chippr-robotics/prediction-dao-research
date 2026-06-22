@@ -119,3 +119,92 @@ dataSources:
         - event: MembershipRedeemed(indexed address,indexed bytes32,uint8,indexed uint256,uint64)
           handler: handleMembershipRedeemed
       file: ./src/mappings/membershipVoucher.ts
+
+  # ---------------------------------------------------------------------------
+  # Oracle adapter conditions (issue #751). Indexes each adapter's
+  # ConditionRegistered / MarketLinked / ConditionResolved events into
+  # OracleCondition + OracleMarketLink so the create-wager flow can list
+  # registered conditions without an eth_getLogs scan. Schema + handlers
+  # (./src/mappings/oracleAdapters.ts) ship with the manifest; defaults target
+  # Amoy. The adapters are deployed on Amoy (80002) and Polygon mainnet (137)
+  # ONLY — Mordor has no oracle adapters (oracle resolution is out of scope on
+  # ETC per spec 015), so `graph build --network mordor` does not carry these
+  # data sources. Per-network address + startBlock live in networks.json.
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: ChainlinkDataFeedOracleAdapter
+    network: polygon-amoy
+    source:
+      address: "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23"
+      abi: ChainlinkDataFeedOracleAdapter
+      startBlock: 38841810
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OracleCondition
+        - OracleMarketLink
+      abis:
+        - name: ChainlinkDataFeedOracleAdapter
+          file: ../frontend/src/abis/ChainlinkDataFeedOracleAdapter.json
+      eventHandlers:
+        - event: ConditionRegistered(indexed bytes32,string,uint256)
+          handler: handleDataFeedConditionRegistered
+        - event: MarketLinked(indexed uint256,indexed bytes32)
+          handler: handleDataFeedMarketLinked
+        - event: ConditionResolved(indexed bytes32,bool,uint256,uint256)
+          handler: handleDataFeedConditionResolved
+      file: ./src/mappings/oracleAdapters.ts
+
+  - kind: ethereum
+    name: ChainlinkFunctionsOracleAdapter
+    network: polygon-amoy
+    source:
+      address: "0x074fC18C1E322a7537b53B8B2Bf0762629E3b532"
+      abi: ChainlinkFunctionsOracleAdapter
+      startBlock: 38841814
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OracleCondition
+        - OracleMarketLink
+      abis:
+        - name: ChainlinkFunctionsOracleAdapter
+          file: ../frontend/src/abis/ChainlinkFunctionsOracleAdapter.json
+      eventHandlers:
+        - event: ConditionRegistered(indexed bytes32,string,uint256)
+          handler: handleFunctionsConditionRegistered
+        - event: MarketLinked(indexed uint256,indexed bytes32)
+          handler: handleFunctionsMarketLinked
+        - event: ConditionResolved(indexed bytes32,bool,uint256,uint256)
+          handler: handleFunctionsConditionResolved
+      file: ./src/mappings/oracleAdapters.ts
+
+  - kind: ethereum
+    name: UMAOptimisticOracleV3Adapter
+    network: polygon-amoy
+    source:
+      address: "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88"
+      abi: UMAOptimisticOracleV3Adapter
+      startBlock: 38841817
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OracleCondition
+        - OracleMarketLink
+      abis:
+        - name: UMAOptimisticOracleV3Adapter
+          file: ../frontend/src/abis/UMAOptimisticOracleV3Adapter.json
+      eventHandlers:
+        - event: ConditionRegistered(indexed bytes32,string,uint256)
+          handler: handleUmaConditionRegistered
+        - event: MarketLinked(indexed uint256,indexed bytes32)
+          handler: handleUmaMarketLinked
+        - event: ConditionResolved(indexed bytes32,bool,uint256,uint256)
+          handler: handleUmaConditionResolved
+      file: ./src/mappings/oracleAdapters.ts
