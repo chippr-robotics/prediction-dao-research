@@ -48,7 +48,7 @@ const NETWORKS = {
     // VITE_SUBGRAPH_URL_AMOY.
     subgraphUrl:
       import.meta.env?.VITE_SUBGRAPH_URL_AMOY ||
-      'https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.2.0',
+      'https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.3.0',
     // USDC on Amoy. Defaults to the Circle faucet USDC deployed alongside
     // our contracts (same as paymentToken in contracts.js). Override via
     // VITE_AMOY_USDC if a different token is needed.
