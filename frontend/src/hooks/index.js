@@ -65,9 +65,6 @@ export {
   ROLE_BYTES32
 } from './useRoleDetails'
 
-// Admin hooks
-export { useAdminContracts } from './useAdminContracts'
-
 // ENS Resolution hooks
 export {
   useEnsResolution,
