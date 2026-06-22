@@ -43,6 +43,9 @@ Each ADR follows a consistent structure:
 |-----|-------|--------|------|----------|
 | [001](./001-trail-of-bits-toolchain.md) | Adoption of Trail of Bits Security Testing Toolchain | Accepted | 2024-06-15 | Security |
 | [002](./002-integration-testing-strategy.md) | Integration Testing Strategy for E2E Workflows | Accepted | 2025-12-23 | Testing |
+| [003](./003-xwing-post-quantum-encryption.md) | X-Wing Post-Quantum Encryption for Private Markets | Accepted | 2026-01-24 | Security |
+| [004](./004-upgradeable-registry-uups.md) | Upgradeable contracts via UUPS proxies | Accepted | 2026-06-20 | Architecture |
+| [005](./005-remove-unused-x3dh-messaging-layer.md) | Remove the unused X3DH/Double-Ratchet messaging layer | Accepted | 2026-06-22 | Security |
 
 ### Superseded ADRs
 

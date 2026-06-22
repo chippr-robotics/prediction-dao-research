@@ -47,24 +47,3 @@ export {
   bytesToHex,
   hexToBytes
 } from './primitives.js'
-
-// Double Ratchet (available but not primary)
-// Use for ongoing messaging if needed in future
-export {
-  initializeSessionAsInitiator,
-  initializeSessionAsRecipient,
-  ratchetEncrypt,
-  ratchetDecrypt,
-  serializeSession,
-  deserializeSession
-} from './doubleRatchet.js'
-
-// Group Sessions with Sender Keys
-export { GroupSession } from './senderKeys.js'
-
-// Session Manager (combines X3DH + Double Ratchet)
-export {
-  SessionManager,
-  getSessionManager,
-  clearSessionManager
-} from './sessionManager.js'
