@@ -25,7 +25,7 @@ const MAX_QUANTITY = 50
  */
 export default function VouchersPage() {
   const { account, isConnected } = useWallet()
-  const { getPrice, ROLE_HASHES, TIER_IDS } = useTierPrices()
+  const { getPrice, ROLE_HASHES, TIER_IDS, usingFallbackPrices } = useTierPrices()
   const {
     status, error, lastTxHash, voucherAvailable, batchMintAvailable,
     mintVouchers, redeemVoucher, transferVoucher, listMyVouchers,
@@ -231,6 +231,14 @@ export default function VouchersPage() {
             )
           })}
         </fieldset>
+
+        {usingFallbackPrices && (
+          <p className="vch-warn" role="status">
+            ⚠ Estimated pricing — live tier prices couldn’t be loaded, so these are
+            fallback estimates and may differ from the on-chain price. Confirm the
+            exact amount in your wallet.
+          </p>
+        )}
 
         <div className="vch-buy-row">
           <label className="vch-field">

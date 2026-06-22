@@ -42,6 +42,12 @@ export function useTierPrices() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+  // True whenever the displayed prices include the hardcoded FALLBACK_PRICES
+  // (no MembershipManager on this chain, or a per-tier read failed) rather than
+  // being fully sourced on-chain. Starts true (initial state IS the fallback)
+  // and is flipped to false only after a clean on-chain fetch. Lets the UI warn
+  // that prices for a real-money product may be estimates / out of sync.
+  const [usingFallbackPrices, setUsingFallbackPrices] = useState(true)
 
   // Resolve the MembershipManager + provider for the wallet's connected chain so
   // tier prices/limits reflect the network the user is actually on, not the
@@ -62,6 +68,7 @@ export function useTierPrices() {
       // whatever was fetched for a previously-connected network.
       setTierPrices(FALLBACK_PRICES)
       setTierLimits({})
+      setUsingFallbackPrices(true)
       setError('MembershipManager not deployed')
       setIsLoading(false)
       return
@@ -71,6 +78,7 @@ export function useTierPrices() {
     try {
       const prices = { BRONZE: {}, SILVER: {}, GOLD: {}, PLATINUM: {} }
       const limits = { BRONZE: {}, SILVER: {}, GOLD: {}, PLATINUM: {} }
+      let usedFallback = false
       for (const [roleKey, roleHash] of Object.entries(ROLE_HASHES)) {
         for (const [tierName, tierId] of Object.entries(TIER_IDS)) {
           try {
@@ -84,11 +92,13 @@ export function useTierPrices() {
             }
           } catch {
             prices[tierName][roleKey] = FALLBACK_PRICES[tierName]?.[roleKey] ?? 0
+            usedFallback = true
           }
         }
       }
       setTierPrices(prices)
       setTierLimits(limits)
+      setUsingFallbackPrices(usedFallback)
       setLastUpdated(new Date())
     } catch (err) {
       console.error('Error fetching tier prices:', err)
@@ -126,6 +136,7 @@ export function useTierPrices() {
     isLoading,
     error,
     lastUpdated,
+    usingFallbackPrices,
     fetchPrices,
     getPrice,
     getTotalPrice,
