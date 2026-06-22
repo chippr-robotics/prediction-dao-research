@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import WalletButton from './wallet/WalletButton'
 import ThemeToggle from './ui/ThemeToggle'
 import NotificationBell from './notifications/NotificationBell'
+import NetworkCrawler from './fairwins/NetworkCrawler'
 import './Header.css'
 
 function Header({ hideWalletButton = false, appMode = false }) {
@@ -122,6 +123,9 @@ function Header({ hideWalletButton = false, appMode = false }) {
           )}
         </div>
       </div>
+
+      {/* Subtle deployed-networks ticker (landing/marketing pages only). */}
+      {!appMode && <NetworkCrawler />}
 
       {/* Mobile Navigation - landing page only */}
       {!appMode && (

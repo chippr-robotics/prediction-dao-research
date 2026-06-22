@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { getDeployedNetworks } from '../config/contracts'
-import DeployedNetworks from '../components/fairwins/DeployedNetworks'
+import NetworkCrawler from '../components/fairwins/NetworkCrawler'
 
 describe('getDeployedNetworks()', () => {
   it('lists every chain with a live wagerRegistry, excluding local Hardhat', () => {
@@ -23,27 +23,30 @@ describe('getDeployedNetworks()', () => {
     }
   })
 
-  it('links each chip to the deployed escrow on the chain explorer', () => {
+  it('links each item to the deployed escrow on the chain explorer', () => {
     const polygon = getDeployedNetworks().find((n) => n.chainId === 137)
     expect(polygon.contractUrl).toMatch(/^https:\/\/polygonscan\.com\/address\/0x/)
   })
 })
 
-describe('<DeployedNetworks />', () => {
-  it('renders a "Deployed on" label and a chip per deployed network', () => {
-    render(<DeployedNetworks />)
-    expect(screen.getByText('Deployed on')).toBeInTheDocument()
+describe('<NetworkCrawler />', () => {
+  it('renders a "Deployed on" label', () => {
+    render(<NetworkCrawler />)
+    expect(screen.getAllByText('Deployed on').length).toBeGreaterThan(0)
+  })
 
-    const list = screen.getByLabelText(/deployed on/i)
-    const expected = getDeployedNetworks()
-    expected.forEach((net) => {
-      expect(within(list).getByText(net.name)).toBeInTheDocument()
+  it('shows each deployed network once for assistive tech (the loop clone is aria-hidden)', () => {
+    render(<NetworkCrawler />)
+    const content = screen.getByTestId('network-crawler-content')
+    getDeployedNetworks().forEach((net) => {
+      expect(within(content).getByText(net.name)).toBeInTheDocument()
     })
   })
 
-  it('flags testnets with a Testnet tag', () => {
-    render(<DeployedNetworks />)
+  it('flags testnets', () => {
+    render(<NetworkCrawler />)
+    const content = screen.getByTestId('network-crawler-content')
     const testnetCount = getDeployedNetworks().filter((n) => n.isTestnet).length
-    expect(screen.getAllByText('Testnet')).toHaveLength(testnetCount)
+    expect(within(content).getAllByText('testnet')).toHaveLength(testnetCount)
   })
 })
