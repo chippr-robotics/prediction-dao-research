@@ -28,4 +28,14 @@ describe('useTierPrices — chain-aware resolution', () => {
       expect(resolver).toHaveBeenCalledWith('membershipManager', 80002)
     )
   })
+
+  it('flags usingFallbackPrices when no MembershipManager is deployed (#752)', async () => {
+    const { result } = renderHook(() => useTierPrices())
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    // No contract on this chain → prices are the hardcoded fallback ladder, and
+    // the hook must say so rather than presenting them as authoritative.
+    expect(result.current.usingFallbackPrices).toBe(true)
+    expect(result.current.error).toBe('MembershipManager not deployed')
+    expect(result.current.getPrice('WAGER_PARTICIPANT', 'BRONZE')).toBe(2)
+  })
 })

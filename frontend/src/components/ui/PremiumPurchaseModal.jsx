@@ -92,7 +92,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { grantRole, loadRoles } = useRoles()
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { showNotification } = useNotification()
-  const { getPrice, getLimits } = useTierPrices()
+  const { getPrice, getLimits, usingFallbackPrices } = useTierPrices()
   const { ensureInitialized } = useEncryption()
   const flow = usePurchaseFlow()
   const navigate = useNavigate()
@@ -541,6 +541,13 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                       <span>Total</span>
                       <span>${selectedPrice.toFixed(2)} USDC</span>
                     </div>
+                    {usingFallbackPrices && (
+                      <p className="ppm-price-estimate" role="status">
+                        ⚠ Estimated price — live pricing couldn’t be loaded from the
+                        membership contract, so this is a fallback estimate. Confirm
+                        the exact amount in your wallet before approving.
+                      </p>
+                    )}
                   </div>
 
                   <TierLimits tierName={selectedTier} chainLimits={chainLimits} />

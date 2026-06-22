@@ -635,6 +635,15 @@
   line-height: 1.4;
 }
 
+/* Shown when tier prices fall back to hardcoded estimates (MembershipManager
+   unreachable / per-tier read failed) so the amount may not match on-chain. */
+.ppm-price-estimate {
+  font-size: 0.8125rem;
+  color: #c77d11;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
 .ppm-error {
   color: #e53e3e;
   font-size: 0.8125rem;
