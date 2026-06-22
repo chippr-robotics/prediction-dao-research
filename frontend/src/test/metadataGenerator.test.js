@@ -8,8 +8,7 @@ import {
   generateTokenMetadata,
   generateProposalMetadata,
   generateDAOMetadata,
-  validateMetadata,
-  convertMockMarketToMetadata
+  validateMetadata
 } from '../utils/metadataGenerator'
 
 describe('generateMarketMetadata', () => {
@@ -394,54 +393,5 @@ describe('validateMetadata', () => {
 
     const result = validateMetadata(metadata)
     expect(result.valid).toBe(true)
-  })
-})
-
-describe('convertMockMarketToMetadata', () => {
-  it('should convert mock market data to metadata format', () => {
-    const mockMarket = {
-      id: 11,
-      proposalTitle: 'Bitcoin reaches $100K in 2025',
-      description: 'Will Bitcoin reach $100,000 USD in 2025?',
-      category: 'crypto',
-      subcategory: 'price',
-      passTokenPrice: '0.59',
-      failTokenPrice: '0.41',
-      totalLiquidity: '245600',
-      tradingEndTime: '2025-07-19T00:00:00Z',
-      status: 'Active',
-      correlationGroupId: 'btc-2025-milestones'
-    }
-
-    const metadata = convertMockMarketToMetadata(mockMarket)
-
-    expect(metadata.name).toBe('Bitcoin reaches $100K in 2025')
-    expect(metadata.description).toBe('Will Bitcoin reach $100,000 USD in 2025?')
-    expect(metadata.properties.market_id).toBe(11)
-    expect(metadata.properties.correlation_group_id).toBe('btc-2025-milestones')
-    expect(metadata.properties.tags).toContain('crypto')
-    expect(metadata.properties.tags).toContain('price')
-    
-    // Check on-chain data attributes
-    const statusAttr = metadata.attributes.find(a => a.trait_type === 'Status')
-    expect(statusAttr.value).toBe('Active')
-    
-    const liquidityAttr = metadata.attributes.find(a => a.trait_type === 'Total Liquidity')
-    expect(liquidityAttr.value).toBe(245600)
-  })
-
-  it('should handle missing optional fields', () => {
-    const mockMarket = {
-      id: 1,
-      proposalTitle: 'Test Market',
-      description: 'Test',
-      category: 'test',
-      status: 'Active'
-    }
-
-    const metadata = convertMockMarketToMetadata(mockMarket)
-
-    expect(metadata.name).toBe('Test Market')
-    expect(metadata.properties.tags).toEqual(['test'])
   })
 })

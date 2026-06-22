@@ -481,27 +481,3 @@ function isValidUrl(url) {
     return false
   }
 }
-
-/**
- * Convert mock data market to IPFS metadata format
- * @param {Object} mockMarket - Market from mock-data.json
- * @returns {Object} IPFS metadata object
- */
-export function convertMockMarketToMetadata(mockMarket) {
-  return generateMarketMetadata({
-    marketId: mockMarket.id,
-    name: mockMarket.proposalTitle,
-    description: mockMarket.description,
-    category: mockMarket.category,
-    subcategory: mockMarket.subcategory,
-    correlationGroupId: mockMarket.correlationGroupId,
-    tags: [mockMarket.category, mockMarket.subcategory].filter(Boolean),
-    onChainData: {
-      status: mockMarket.status,
-      totalLiquidity: mockMarket.totalLiquidity,
-      passTokenPrice: mockMarket.passTokenPrice,
-      failTokenPrice: mockMarket.failTokenPrice,
-      tradingEndTime: mockMarket.tradingEndTime
-    }
-  })
-}
