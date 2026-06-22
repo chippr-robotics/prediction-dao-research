@@ -72,5 +72,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/027-upgradeable-membership/plan.md
+at specs/028-multi-stablecoin-support/plan.md
 <!-- SPECKIT END -->
