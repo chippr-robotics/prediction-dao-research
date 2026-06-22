@@ -36,11 +36,19 @@ a valid, fully-featured subgraph. `matic` carries `WagerRegistry` only until the
 voucher + redemption manager ship to mainnet, so `graph build --network matic`
 fails by design (`'MembershipVoucher' was not found in the 'matic' configuration`).
 
-| Network (manifest id) | chainId | WagerRegistry | MembershipVoucher | MembershipManager |
-|-----------------------|--------:|--------------:|------------------:|------------------:|
-| matic (Polygon mainnet) | 137 | 88118344 | — (deferred) | — (deferred) |
-| mordor | 63 | 16404317 | 16404315 | 16404308 |
-| polygon-amoy | 80002 | 40521027 | 40521024 | 40521018 |
+| Network (manifest id) | chainId | WagerRegistry | MembershipVoucher | MembershipManager | Oracle adapters¹ |
+|-----------------------|--------:|--------------:|------------------:|------------------:|-----------------:|
+| matic (Polygon mainnet) | 137 | 88118344 | — (deferred) | — (deferred) | — (deferred) |
+| mordor | 63 | 16404317 | 16404315 | 16404308 | n/a (no adapters) |
+| polygon-amoy | 80002 | 40521027 | 40521024 | 40521018 | 38841810 / 38841814 / 38841817 |
+
+¹ **Oracle adapters** (issue #751): `ChainlinkDataFeedOracleAdapter`,
+`ChainlinkFunctionsOracleAdapter`, `UMAOptimisticOracleV3Adapter`, indexed into
+`OracleCondition` + `OracleMarketLink`. They are deployed on Amoy + Polygon
+mainnet only — **Mordor has no oracle adapters** (oracle resolution is out of
+scope on ETC per spec 015), so `graph build --network mordor` does not carry
+these data sources. On `matic` they are deferred alongside the voucher/manager
+until the mainnet UUPS migration lands.
 
 ## Build, test, deploy
 
@@ -87,6 +95,14 @@ Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
   gifts/resales via ERC-721 `Transfer`, and flipped to `redeemed` (or `burned`)
   when `MembershipManager.MembershipRedeemed` fires. On-chain/public by nature;
   no contract calls in the handlers.
+- **OracleCondition** (issue #751) — an outcome condition pre-registered with an
+  oracle adapter, keyed by `<adapterType>-<conditionId>`. Upserted on
+  `ConditionRegistered`, flipped to `resolved` (with `outcome`/`confidence`) on
+  `ConditionResolved`. Lets the create-wager flow list available conditions per
+  adapter without an `eth_getLogs` scan.
+- **OracleMarketLink** (immutable, issue #751) — one row per `MarketLinked`,
+  associating a `marketId` with an `OracleCondition`. The three adapter handlers
+  (`oracleAdapters.ts`) make no contract calls.
 
 See `schema.graphql` and `specs/017-subgraph-v2-wager-transfers/` for the full
 contract.

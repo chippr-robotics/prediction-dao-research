@@ -120,3 +120,55 @@ type Voucher @entity(immutable: false) {
   redeemedAt: BigInt
   redeemTxHash: Bytes
 }
+
+"The oracle adapters wired into WagerRegistry v2 that can settle a wager (issue #751)."
+enum OracleAdapterType {
+  chainlinkDataFeed
+  chainlinkFunctions
+  uma
+}
+
+"""
+An outcome condition pre-registered with an oracle adapter (issue #751). Indexed
+from each adapter's ConditionRegistered / ConditionResolved events so the
+create-wager flow can list available conditions without an eth_getLogs scan.
+On-chain and public by nature; the mappings make no contract calls.
+"""
+type OracleCondition @entity(immutable: false) {
+  "<adapterType>-<conditionId> (a conditionId could in principle be reused across adapters)"
+  id: ID!
+  "the oracle adapter that holds this condition"
+  adapter: OracleAdapterType!
+  "adapter contract address"
+  adapterAddress: Bytes!
+  "the on-chain condition id (bytes32)"
+  conditionId: Bytes!
+  "human description: empty for Chainlink (not stored on-chain), the UMA claim for UMA"
+  description: String!
+  "expected resolution time (unix seconds); 0 when not tracked on-chain"
+  expectedResolutionTime: BigInt!
+  registeredAt: BigInt!
+  registeredTxHash: Bytes!
+  "true once a ConditionResolved event has been seen"
+  resolved: Boolean!
+  "settled outcome (null until resolved)"
+  outcome: Boolean
+  "confidence (basis points) reported at resolution (null until resolved)"
+  confidence: BigInt
+  resolvedAt: BigInt
+  "markets linked to this condition via linkMarket"
+  links: [OracleMarketLink!]! @derivedFrom(field: "condition")
+}
+
+"A link between a market id and an oracle condition (issue #751), one per MarketLinked event."
+type OracleMarketLink @entity(immutable: true) {
+  "txHash-logIndex (unique even when several links share one transaction)"
+  id: ID!
+  condition: OracleCondition!
+  "the market id passed to linkMarket (the adapter's friendMarketId param)"
+  marketId: BigInt!
+  conditionId: Bytes!
+  adapter: OracleAdapterType!
+  linkedAt: BigInt!
+  linkedTxHash: Bytes!
+}
