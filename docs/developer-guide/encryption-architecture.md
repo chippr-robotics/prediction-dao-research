@@ -301,3 +301,18 @@ The current system detects legacy envelopes and handles them transparently. New 
 | `frontend/src/hooks/useEncryption.js` | React hook with session management and key derivation |
 | `frontend/src/abis/ZKKeyManager.js` | ZKKeyManager contract ABI |
 | `frontend/src/config/contracts.js` | Deployed contract addresses |
+
+## Scope and Non-Goals
+
+The crypto module is **envelope encryption only** — it protects wager content at
+rest and in transit to invited participants. It is **not** a secure-messaging
+system: there is no in-app direct/group messaging, and therefore no X3DH key
+agreement, Double Ratchet, or session-management layer.
+
+An unused, hand-rolled Signal-style messaging stack (`x3dh.js`,
+`doubleRatchet.js`, `senderKeys.js`, `sessionManager.js`) previously lived in
+this module but was never wired into the app and shipped placeholder signatures;
+it was removed. See
+[ADR-005](../adr/005-remove-unused-x3dh-messaging-layer.md). If encrypted
+messaging is ever required, it must be built on a vetted, audited library rather
+than re-rolled, and recorded in a new ADR.
