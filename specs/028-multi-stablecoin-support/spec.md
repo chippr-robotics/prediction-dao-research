@@ -80,6 +80,8 @@ A member browses wagers and account views where amounts are shown in a mix of st
 
 - **FR-001**: The platform MUST support multiple stablecoins for wager staking and settlement, with USDC remaining the platform-wide default for any member who has not chosen otherwise.
 - **FR-002**: The set of stablecoins offered MUST be a curated allow-list limited to (a) major stablecoins deployed on the platform's supported networks (Polygon mainnet being the primary mainnet), and (b) stablecoins that would be permissible under the GENIUS Act, including non-US-dollar-backed stablecoins that meet that bar.
+- **FR-002a**: The first release MUST support at minimum USDC (default), USDT, and one euro-backed stablecoin (e.g., EURC) on Polygon mainnet; the curated set MUST remain extensible by curation without code changes to add further GENIUS-Act-permissible coins later.
+- **FR-002b**: The curated set MUST be limited to standard ERC-20 stablecoins that do not rebase and do not charge transfer fees, so the amount escrowed for a wager always equals the amount staked; rebasing or fee-on-transfer tokens MUST NOT be admitted.
 - **FR-003**: The supported-stablecoin list MUST be governed/curated by the platform (not arbitrarily extensible by ordinary members); only curated stablecoins may be used to create or accept wagers.
 - **FR-004**: A wager MUST be denominated in exactly one stablecoin, chosen at creation by the creator from the supported, member-visible set; the counterparty MUST stake the same stablecoin.
 - **FR-005**: Stake escrow, payouts, refunds, draws, and any settlement MUST occur in the wager's denominating stablecoin, with amounts honoring that stablecoin's decimal precision.
@@ -91,6 +93,7 @@ A member browses wagers and account views where amounts are shown in a mix of st
 - **FR-011**: A member's "hidden" preference MUST filter only the member's own selection surfaces; it MUST NOT prevent the member from accepting, claiming, or refunding a wager that a counterparty denominated in a hidden stablecoin.
 - **FR-012**: All monetary amounts shown anywhere in the app MUST be labeled with their stablecoin and rendered at that stablecoin's correct decimal precision.
 - **FR-013**: Aggregate or summary figures spanning multiple stablecoins MUST be presented per-stablecoin (grouped/labeled) and MUST NOT sum amounts across different stablecoins as if interchangeable.
+- **FR-013a**: Tax reports and P&L/account-stats views MUST report amounts strictly per-stablecoin and MUST NOT convert non-USD stablecoin amounts to USD or any common reference currency; no FX/price data source is introduced by this feature.
 - **FR-014**: The supported-stablecoin set MUST be network-scoped; only stablecoins available on the connected network are offered, and preferences degrade gracefully when a stored choice is unavailable on the active network.
 - **FR-015**: Attempting to create or accept a wager in a stablecoin outside the curated supported set MUST be rejected with a clear, member-facing explanation.
 - **FR-016**: Removing a stablecoin from the supported set MUST NOT block settlement of pre-existing wagers already denominated in it; such wagers remain claimable/refundable while the stablecoin is withdrawn from new-wager selectors.
@@ -113,6 +116,8 @@ A member browses wagers and account views where amounts are shown in a mix of st
 - **SC-005**: Every stablecoin offered for new wagers is justifiably on the curated list (GENIUS-Act-permissible and available on the active network), with zero stablecoins offered that fail either criterion.
 - **SC-006**: 100% of wagers denominated in a stablecoin that is later removed from the supported set remain claimable/refundable by their participants.
 - **SC-007**: Stablecoins with decimal precision other than six are entered, displayed, and settled at their correct precision in 100% of tested cases.
+- **SC-008**: The first release offers USDC, USDT, and a euro-backed stablecoin on Polygon mainnet, and a full create→accept→settle cycle succeeds in each of the three.
+- **SC-009**: For every supported stablecoin, the amount escrowed equals the amount staked (no fee-on-transfer/rebasing discrepancy) in 100% of tested cases.
 
 ## Assumptions
 
@@ -120,7 +125,7 @@ A member browses wagers and account views where amounts are shown in a mix of st
 - **The curated supported-stablecoin list is maintained by platform governance/admins**, surfaced to members as a read-only set; members curate only their personal visibility/default, not the platform list itself. The on-chain token allow-list already supports admin-controlled add/remove of stake tokens, and this feature builds on that mechanism.
 - **The wager creator selects the denomination** and the acceptor must match it; the platform does not attempt cross-stablecoin conversion or mixed-denomination wagers.
 - **Polygon mainnet is the primary target** for the expanded stablecoin set; testnets and other networks continue to use their network-appropriate stablecoin configuration, and the supported set is always network-scoped.
-- **"Major stablecoins deployed on Polygon mainnet"** is interpreted as the well-established, liquid stablecoins on Polygon (e.g., USDC as default, plus additional fiat-pegged tokens such as USDT and a euro-backed option), filtered by GENIUS-Act permissibility. The exact admitted list is a curation decision finalized during planning/implementation, not hard-coded by this spec.
+- **"Major stablecoins deployed on Polygon mainnet"** is interpreted as the well-established, liquid stablecoins on Polygon, filtered by GENIUS-Act permissibility. The confirmed first-release set is USDC (default) + USDT + one euro-backed stablecoin (e.g., EURC) — see Clarifications Q2 — with the curated list extensible thereafter without code changes. The exact euro-coin choice and any further additions are curation decisions finalized during planning, subject to compliance sign-off.
 - **GENIUS-Act permissibility** is the gating compliance criterion: only payment stablecoins from permitted/registered issuers (including non-USD stablecoins from comparable, recognized regimes) are admitted; algorithmic or non-compliant stablecoins are excluded. Final eligibility determinations require legal/compliance sign-off during planning.
 - **Member preferences persist locally per wallet** consistent with how existing member preferences are stored today; no new server-side account system is introduced by this feature.
 - **Existing USDC behavior is preserved** as the zero-configuration default so current members see no change unless they opt in.
@@ -131,9 +136,15 @@ A member browses wagers and account views where amounts are shown in a mix of st
 - Automatic conversion/swapping between stablecoins, or wagers with two different denominations.
 - Adding brand-new networks; this feature operates within the platform's already-supported networks.
 - A member-facing mechanism to add arbitrary tokens to the platform's supported list (curation stays with platform governance).
+- USD-equivalent valuation, FX conversion, or any cross-currency totals in reports/stats (amounts stay strictly per-stablecoin).
+- Cross-device/synced preferences (preferences stay client-side per wallet); rebasing or fee-on-transfer stablecoins.
 
 ## Clarifications
 
 ### Session 2026-06-22
 
 - **Q1 (Scope — membership payments)**: Should multi-stablecoin support extend to membership purchases (paying membership fees in a non-USDC stablecoin), or is it limited to wager staking/settlement plus member display preferences? → **A: Wagers + preferences only.** Membership fees stay USDC-only; `MembershipManager` keeps its single global payment token and is not changed by this feature.
+- **Q2 (Initial supported set)**: What stablecoins should the first release support beyond USDC? → **A: USDC (default) + USDT + one euro-backed stablecoin** (e.g., EURC) on Polygon mainnet. This proves both the USD-majors and the non-USD path in the first release; the set remains extensible via curation thereafter.
+- **Q3 (Non-USD reporting/valuation)**: How should non-USD stablecoin amounts appear in tax reports and P&L/account stats that currently assume USD? → **A: Strictly per-currency, no FX conversion.** Amounts are grouped/totaled per stablecoin and never converted to or summed as USD. No price/FX data-source dependency is introduced.
+- **Q4 (Token safety constraint)**: What constraint applies to which ERC-20 stablecoins may be curated? → **A: Standard ERC-20 only.** The curated set is limited to standard, non-rebasing, non-fee-on-transfer stablecoins so the amount escrowed always equals the amount staked.
+- **Q5 (Preference persistence)**: Where do a member's default/visible-stablecoin preferences live? → **A: Client-side, per wallet** (consistent with existing preference storage). Preferences are per-device and not synced across browsers/devices; no contract or backend storage change is introduced.
