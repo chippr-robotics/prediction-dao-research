@@ -172,3 +172,28 @@ type OracleMarketLink @entity(immutable: true) {
   linkedAt: BigInt!
   linkedTxHash: Bytes!
 }
+
+"""
+A token created through the spec-028 TokenFactory (issue #761). Indexed from the
+factory's TokenCreated event so discovery and an issuer's admin list work without
+an eth_getLogs scan. On subgraph-less networks (Mordor/ETC) the frontend falls
+back to on-chain factory-registry reads. Network-scoped by deployment; the
+factory's clone templates are immutable. The permissioned ERC-3643 standard (3)
+is reserved (deferred) — only standards 0/1/2 are issued today.
+"""
+type Token @entity(immutable: false) {
+  "deployed token address (lowercased hex)"
+  id: ID!
+  "registry id allocated by the factory (decimal string mirror of `registryId`)"
+  registryId: BigInt!
+  "TokenStandard enum index: 0=OPEN_ERC20, 1=OPEN_ERC721, 2=RESTRICTED_ERC1404, 3=PERMISSIONED_ERC3643"
+  standard: Int!
+  "deployed token contract address"
+  tokenAddress: Bytes!
+  "issuer / initial owner"
+  issuer: Bytes!
+  name: String!
+  symbol: String!
+  createdAt: BigInt!
+  createdTxHash: Bytes!
+}

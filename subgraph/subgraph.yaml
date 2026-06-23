@@ -208,3 +208,39 @@ dataSources:
         - event: ConditionResolved(indexed bytes32,bool,uint256,uint256)
           handler: handleUmaConditionResolved
       file: ./src/mappings/oracleAdapters.ts
+
+  # ---------------------------------------------------------------------------
+  # TokenFactory — spec 028 token issuance (issue #761). Indexes TokenCreated so
+  # token discovery + an issuer's admin list avoid an eth_getLogs scan. On
+  # subgraph-less networks (Mordor/ETC) the frontend reads the factory registry
+  # over RPC instead (the same fallback used elsewhere).
+  #
+  # PENDING DEPLOYMENT: TokenFactory is not yet deployed to a subgraph-enabled
+  # network. The inline `address` below is a PLACEHOLDER (sentinel 0x..0028) with a
+  # recent, NON-genesis startBlock so a default `graph build` (CI codegen/build/
+  # matchstick) stays green and indexes nothing if accidentally deployed. Before
+  # deploying for real, add a `TokenFactory` entry (real address + deploy block) to
+  # networks.json for polygon-amoy / mordor and replace the inline default. Until
+  # then `graph build --network <net>` defers TokenFactory by design (like matic).
+  # NEVER set startBlock 0 / address 0x0 (issue #703/#704 genesis-flood).
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: TokenFactory
+    network: polygon-amoy
+    source:
+      address: "0x0000000000000000000000000000000000000028"
+      abi: TokenFactory
+      startBlock: 40521027
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Token
+      abis:
+        - name: TokenFactory
+          file: ../frontend/src/abis/TokenFactory.json
+      eventHandlers:
+        - event: TokenCreated(indexed uint256,indexed uint8,indexed address,address,string,string)
+          handler: handleTokenCreated
+      file: ./src/mappings/tokenFactory.ts

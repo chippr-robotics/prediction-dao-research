@@ -90,7 +90,7 @@ implemented until this phase is complete.**
 - [X] T018 [P] [US1] Implement `contracts/tokens/templates/OpenERC721.sol` (OZ `ERC721`+`ERC721URIStorage`(+`ERC721Burnable`) + `Ownable`, initializable clone) with owner `mint(to,uri)` and the `SanctionsGuard` transfer-hook check
 - [X] T019 [US1] Add `createOpenERC20(...)` and `createOpenERC721(...)` to `contracts/tokens/TokenFactory.sol` (clone the matching template, `initialize` with `msg.sender` as owner + the guard, `_recordToken`) — depends on T008, T017, T018
 - [X] T020 [US1] Extend `scripts/deploy/deploy.js` to deploy the open ERC-20 (4 variants) and ERC-721 (2 variants) implementation templates, pass them to `TokenFactory.initialize`, and record their addresses in `deployments/*.json`
-- [ ] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`) for subgraph-enabled networks (Amoy/Polygon); ensure the frontend reads fall back to on-chain factory-registry RPC reads on subgraph-less networks (Mordor)
+- [X] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`) for subgraph-enabled networks (Amoy/Polygon); ensure the frontend reads fall back to on-chain factory-registry RPC reads on subgraph-less networks (Mordor)
 - [X] T022 [US1] Build the open-token creation wizard step in `frontend/src/components/tokens/CreateTokenWizard.jsx` (choose ERC-20/721, configure name/symbol/decimals/supply/burnable/pausable, submit real tx) with honest pending/confirmed/failed state (no finalized-before-confirm) — uses `useTokenFactory`
 - [X] T023 [US1] Render the issuer's token list in `frontend/src/components/tokens/TokenList.jsx` from the subgraph + on-chain reads, showing only the active network's tokens and never a token before its tx confirms
 - [X] T024 [US1] Run `npm run sync:frontend-contracts` and wire the `TokenFactory`/template ABIs+addresses into the frontend via the synced artifacts (no hand-copied addresses)
@@ -179,13 +179,13 @@ implemented until this phase is complete.**
 ### Tests for User Story 5 ⚠️
 
 - [ ] T048 [P] [US5] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenDetail.test.jsx`: detail view renders standard/metadata/live supply + rule summary from real data; network switch filters tokens; unsupported network shows disabled state (no mock list)
-- [ ] T049 [P] [US5] `subgraph` test/query check that `Token` entities are network-scoped and queryable by issuer and standard
+- [X] T049 [P] [US5] `subgraph` test/query check that `Token` entities are network-scoped and queryable by issuer and standard
 
 ### Implementation for User Story 5
 
 - [ ] T050 [US5] Implement the token detail view `frontend/src/components/tokens/TokenDetail.jsx` (standard, name/symbol, metadata, live supply via on-chain read, and for compliant tokens a truthful governing-rule summary) — reuses subgraph + `useTokenFactory`
 - [ ] T051 [US5] Finalize discovery in `TokenList.jsx`: issuer-administered list + public browse, standard badges, strict active-network scoping and unsupported-network disable (FR-023/FR-025)
-- [ ] T052 [P] [US5] Extend the subgraph mapping to populate live supply/rule-summary fields needed for discovery (or document the on-chain read path where indexing isn't appropriate)
+- [X] T052 [P] [US5] Extend the subgraph mapping to populate live supply/rule-summary fields needed for discovery (or document the on-chain read path where indexing isn't appropriate)
 
 **Checkpoint**: All five user stories independently functional.
 
