@@ -237,3 +237,96 @@ proxy machinery. All frontend ABIs/addresses arrive via `sync:frontend-contracts
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|--------------------------------------|
 | New core dependency: ERC-3643 reference suite (`@tokenysolutions/t-rex`) + ONCHAINID (`@onchain-id/solidity`) | The spec mandates T-REX/ERC-3643 permissioned security tokens (User Story 4, FR-005/FR-011–017): on-chain identity registry, verified claims from trusted issuers, modular compliance, and agent/owner administration. These are the canonical, audited implementations of exactly that standard. | Hand-rolling an identity registry, claim-verification, trusted-issuer, and modular-compliance framework would create a large, novel, unaudited security surface handling regulated-asset transfers — a direct conflict with Principle I ("secure patterns", "no new high/critical findings"). Vendoring the audited reference is the lower-risk, standard-conformant path. Scoping T-REX out entirely was rejected because it is an explicit, central requirement of this feature. |
+
+---
+
+## Expansion plan — administration portal (US6–US13)
+
+Builds on the shipped, live MVP (TokenFactory + v1 templates + deploy/verify + subgraph
+`TokenCreated` + theme-aware Tokens tab, on Mordor). Constraints unchanged: **OZ 5.4.0**
+(ETC/Mordor pre-Cancun), reuse platform primitives, **T-REX/ERC-3643 (US4) deferred**.
+Phase-0 decisions in research R9–R16; entities in data-model "Expansion" section;
+interfaces in `contracts/roles-controls-caps.md` + `contracts/indexing-and-frontend.md`.
+
+### Technical approach
+
+- **v2 role-based token templates** (`AccessControlEnumerableUpgradeable`): MINTER/
+  PAUSER/BURNER/COMPLIANCE roles + DEFAULT_ADMIN owner; optional `ERC20Capped` cap
+  (0 ⇒ uncapped); shared transfer-policy `_update` (sanctions→paused→frozen→eligibility,
+  detector-parity); enumerable freeze set; bounded `batchTransfer`/`batchMint`; settable
+  default restriction message; ownership transfer/renounce via role grant/renounce.
+  Registered as **new factory template slots** — new tokens use v2; existing immutable
+  v1 `Ownable` tokens are untouched; the frontend detects the model per token.
+- **TokenFactory**: new/extended `create*` params (cap, options) + template slots for the
+  v2 impls; storage stays append-only with `__gap`; `check:storage-layout` gates it.
+- **Subgraph**: a per-token **data-source template** instantiated on `TokenCreated`
+  indexes `Transfer` → `Holder` (cap table) and admin events → `TokenActivity`; v2
+  templates emit the needed events. Subgraph-less networks degrade truthfully.
+- **Frontend**: theme-aware module mapped onto `theme.css` variables (light/dark), IBM
+  Plex scoped, structured as My Tokens / Create / Explorer + per-token detail sub-tabs
+  inside the Account Center Tokens tab; capability-gated; real tx + honest state.
+- **Snapshots/dividends: OUT OF SCOPE** (OZ 5.x removed `ERC20Snapshot` — research R15).
+
+### New/changed dependencies
+
+**None.** All on OZ 5.4.0 (`ERC20Capped`, `AccessControlEnumerable`, `Multicall`,
+`ERC721Enumerable`) + the existing subgraph toolchain. No new core technology.
+
+### Constitution re-check (expansion)
+
+- **I. Security-First (NON-NEGOTIABLE)**: v2 templates keep `_disableInitializers` +
+  one-time init + CEI + non-bypassable fail-closed sanctions; roles are least-privilege
+  via audited `AccessControlEnumerable`; caps via audited `ERC20Capped`; batch loops are
+  **bounded** (`MAX_BATCH`, no unbounded shipped loop); detector/enforcement parity
+  preserved; no re-rolled crypto; Slither/Medusa + security-agent review before merge;
+  EthTrust-SL ≥ L2. Existing immutable tokens are never force-migrated. **PASS.**
+- **II. Test-First (NON-NEGOTIABLE)**: unit (each v2 template + roles/caps/controls/
+  batch), integration (per-class create→administer with role/cap/freeze paths), upgrade-
+  lifecycle (factory only), Matchstick (holder/activity indexing), Vitest (portal +
+  capability gating + truthful disable). Both authorized + unauthorized paths per action
+  (SC-009/SC-011). **PASS.**
+- **III. Honest State / No Mocks**: holders/activity from real indexed data with truthful
+  disable on subgraph-less nets (FR-043/SC-012); every action a real tx with honest
+  state; capability-gated controls (SC-014); labels off-chain but clearly metadata. **PASS.**
+- **IV. Fail Loudly in CI**: new suites + Matchstick + `check:storage-layout` + Slither/
+  Medusa all gate. **PASS.**
+- **V. Accessible, theme-consistent frontend**: WCAG 2.1 AA; maps onto app theme vars
+  (light/dark); ESLint blocks; addresses/ABIs via `sync:frontend-contracts`. **PASS.**
+
+### Complexity Tracking (expansion)
+
+| Item | Why needed | Mitigation / why acceptable |
+|------|-----------|-----------------------------|
+| Dual token models (v1 Ownable already-deployed vs v2 AccessControl new) | Issued tokens are immutable clones — cannot upgrade live tokens to roles | Frontend detects model per token; v2 is additive (new template slots); no migration of existing tokens. Documented. |
+| Subgraph data-source templates per issued token | Holder/activity need per-token Transfer/event indexing without per-token manifest edits | Standard Graph factory pattern; truthful disable where no Graph node (Mordor). |
+| Bounded batch loop in a token | Batch airdrop (FR-040) | Hard `MAX_BATCH` cap; over-limit reverts (no unbounded shipped loop). |
+
+No new-core-technology deviation (the only standing one remains the deferred T-REX suite).
+
+### Project structure additions
+
+```text
+contracts/tokens/templates/      # v2 role-based variants (AccessControl + Capped + policy + batch)
+  OpenERC20V2.sol / OpenERC721V2.sol / RestrictedERC20V2.sol   # (names TBD in tasks)
+contracts/tokens/lib/            # shared transfer-policy mixin (sanctions/pause/freeze/eligibility)
+contracts/tokens/TokenFactory.sol # EDIT: v2 template slots + create* params (cap/options); append-only storage
+test/tokens/ + test/integration/tokens/  # v2 template + roles/caps/controls/batch suites
+subgraph/                        # EDIT: token data-source template (Holder, TokenActivity) spawned on TokenCreated
+frontend/src/components/tokens/  # EDIT: portal IA (tabs + detail sub-tabs), capability detection, real-tx panels
+frontend/src/components/tokens/tokens.css  # NEW: theme-aware (maps design → theme.css vars), IBM Plex scoped
+```
+
+### Phasing (incremental delivery, by spec priority)
+
+1. **P2-a Supply & caps + role-based v2 templates** (US6, US9 foundation): v2 templates,
+   caps, role model, ownership transfer/renounce; factory v2 slots; tests; deploy.
+2. **P2-b Transfer controls + compliance** (US7, US8): pause/freeze-list, generalized
+   restriction policy, allowlist mgmt + default message; tests.
+3. **P2-c Roles UI + portal IA + theme-aware frontend** (US9 UI, FR-027/028/045): tabs,
+   detail sub-tabs, capability detection, create flow, theme-aware styling.
+4. **P3-a Batch distribute** (US11): bounded batchTransfer/batchMint + airdrop UI.
+5. **P3-b Holders + activity (indexing)** (US10, US12): subgraph data-source templates;
+   cap table + activity UI with truthful fallback.
+6. **P3-c Contract surface** (US13): metadata/verification/deployments UI.
+
+Each phase ships independently (tests + deploy/sync), mirroring the MVP's flow.

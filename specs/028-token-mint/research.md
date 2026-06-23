@@ -158,3 +158,138 @@ III & V), and reuses the 025/027 upgrade tooling unchanged.
 | Sanctions across classes | Transfer-hook check (open/1404) + compliance module (3643), fail-closed (R5) |
 | Deployment / indexing / UI | Reuse 025/027 tooling; subgraph TokenCreated; rebuilt real-Web3 UI (R7) |
 | DEX listing / governance token | Out of scope (R8) |
+
+---
+
+# Phase 0 Research — Administration portal expansion (US6–US13)
+
+Resolves the design decisions for the expanded scope. Same constraints: **OZ 5.4.0**
+(ETC/Mordor pre-Cancun — no `mcopy`), reuse platform primitives, T-REX (US4) deferred.
+
+## R9. Role-based token administration (US9)
+
+**Decision**: Evolve the issued-token templates from `OwnableUpgradeable` to
+**`AccessControlEnumerableUpgradeable`** with named roles: `DEFAULT_ADMIN_ROLE`
+(the owner/super-admin), `MINTER_ROLE`, `PAUSER_ROLE`, `BURNER_ROLE`, and (restricted
+class) `COMPLIANCE_ROLE`. At `initialize` the factory grants **all** roles to the
+issuer, so "owner-as-admin" remains the default. Ownership transfer = grant
+`DEFAULT_ADMIN_ROLE` to the new owner then renounce it from the old; renounce
+ownership = renounce `DEFAULT_ADMIN_ROLE` (irreversible). `AccessControlEnumerable`
+gives the on-chain roles table (`getRoleMember`/`getRoleMemberCount`).
+
+**Rationale**: Least-privilege delegation (FR-037) and safe hand-off (FR-038) require
+real role separation; `AccessControlEnumerable` is the audited OZ primitive and is
+already used across this repo (`UUPSManaged`, `MembershipManager`).
+
+**Immutability handling (critical)**: Issued tokens are **immutable clones** — the
+open/restricted tokens already deployed on Mordor are `Ownable` and **cannot** be
+upgraded. So the role model ships as **new template versions** (`OpenERC20`/
+`OpenERC721`/`RestrictedERC20` v2 on AccessControl). The factory's template slots are
+swappable (`setTemplate`), so **newly created** tokens use the v2 templates; existing
+tokens keep `Ownable`. The frontend admin surface **detects the model per token**
+(probe `hasRole`/`getRoleMember` vs `owner()`) and renders the matching controls.
+*Alternatives rejected*: upgrading existing tokens (impossible — immutable clones);
+one mega-template with both models (storage bloat, ambiguous auth).
+
+## R10. Optional supply caps (US6)
+
+**Decision**: Add **`ERC20CappedUpgradeable`** to the fungible v2 templates. Cap is a
+create-time parameter; **`cap == 0` ⇒ uncapped** (the template skips the capped
+`_update` branch / initializes cap to `type(uint256).max`). Mint over the cap reverts
+with OZ's `ERC20ExceededCap`. The frontend shows supply-vs-cap progress + headroom
+only when capped (FR-031).
+
+**Rationale**: `ERC20Capped` enforces the cap in `_update` (audited); no re-roll.
+
+## R11. Transfer controls — generalized restriction policy (US7)
+
+**Decision**: Factor the restriction logic into a shared **transfer-policy mixin**
+used by the v2 templates: `paused` (OZ Pausable), per-address `frozen`, and (restricted
+class) eligibility — plus the non-bypassable `SanctionsGuard` Check, all evaluated in
+`_update` with the **same** `_detect`-style code the ERC-1404 detector returns (parity
+preserved, SC-003). Freeze gains a tracked list/count for the UI; pause/unpause and
+freeze/unfreeze are `PAUSER_ROLE`/`COMPLIANCE_ROLE` gated. "Toggleable rules" are
+modeled as policy flags on the token (e.g. enable/disable freeze enforcement), kept
+minimal and on-chain.
+
+**Rationale**: One policy path keeps detector/enforcement in agreement and avoids
+divergent logic across classes.
+
+## R12. Compliance allowlist + messages (US8)
+
+**Decision**: Extend the restricted template: `setEligible`/`setEligibleBatch`
+(exists), a settable **default restriction message** string, and the fixed
+restriction-code→message map (exists). **Per-address labels are off-chain UI metadata**
+(stored in the subgraph/frontend, not on-chain) — an on-chain string per address is
+gas-prohibitive and not consensus-critical. CSV import is a frontend convenience that
+batches into `setEligibleBatch`.
+
+**Rationale**: Keep consensus-critical eligibility on-chain; keep human labels off-chain
+(documented assumption). Bulk ops use the existing bounded batch setter.
+
+## R13. Holder cap table & activity history via subgraph (US10/US12)
+
+**Decision**: Index per-issued-token events with a **subgraph data-source template**
+(`graph` `templates:`) instantiated from the `TokenCreated` handler — so every token
+the factory creates gets its `Transfer` (→ `Holder` balances/cap table) and admin
+events (mint/pause/freeze/role-grant → `Activity`) indexed without editing the manifest
+per token. Holder = running balance per (token, address); cap-table % derived from
+indexed `totalSupply`. **Subgraph-less networks (Mordor/ETC)**: holder enumeration is
+impossible from chain alone, so the cap table + activity views **fall back to a
+truthful "requires indexing / unavailable on this network" disabled state** (the
+connected user's own balance can still be shown via `balanceOf`); never fabricate rows
+(FR-043, SC-012).
+
+**Rationale**: Dynamic data-source templates are the standard Graph pattern for
+factory-spawned contracts; matches the repo's existing subgraph approach. The Mordor
+deployment is for contract testing; holder/activity views there degrade honestly.
+
+## R14. Batch distribute / airdrop (US11)
+
+**Decision**: Add a **bounded `batchTransfer(address[] recipients, uint256[] amounts)`**
+(and an issuer `batchMint` where minting) to the fungible v2 templates, capped at a
+`MAX_BATCH` per call (e.g. ~200) to stay within block gas; over-limit lists are
+surfaced to the caller to split (no silent truncation, FR-040). The frontend computes
+recipient count/total and previews before signing.
+
+**Rationale**: A single in-token batch entrypoint is simplest and avoids an allowance
+dance; the bound keeps gas safe (Constitution I, no unbounded loops in a shipped path).
+
+## R15. Snapshots / dividends — OUT OF SCOPE
+
+**Decision**: **Dropped.** OpenZeppelin 5.x **removed `ERC20Snapshot`**, so there is no
+audited snapshot primitive within the repo's OZ 5.4.0 pin, and re-rolling balance
+checkpoints + a dividend distributor is a large, novel surface (conflicts with
+Constitution I). Revisit separately if needed (e.g. an indexer-computed snapshot +
+merkle distributor). `ERC20Votes` checkpoints were considered and rejected: they track
+*voting units* via delegation, not plain transferable balances, and would mislead.
+
+## R16. Theme-aware frontend (US1/US5 + all)
+
+**Decision**: Implement the imported `TokenMint.dc.html` look by **mapping it onto the
+app's existing theme variables** in `frontend/src/theme.css` (`--brand-primary`,
+`--surface-color`, `--text-primary/secondary/muted`, `--border-color`, `--semantic-*`,
+`--radius-*`, `--shadow-*`, `--transition-*`) via a scoped `tokens.css`, so the module
+**respects light/dark mode** rather than hardcoding the mockup's light-only hexes. IBM
+Plex is introduced as a scoped font for the token module (serif headings / sans body /
+mono addresses) without changing global typography. The module is structured as the
+**My Tokens / Create / Explorer** sub-tabs + a per-token detail with sub-tabs, **inside
+the My Account → Tokens tab** (no standalone page chrome — the app header/nav/footer
+already exist). Every action stays a real on-chain tx with honest state; unsupported
+sub-tabs (by standard/authority/network) are hidden or truthfully disabled.
+
+**Rationale**: Theme variables are the only way to honor the app's dark mode; the design
+is a visual language to adapt, not a page to transplant.
+
+## Summary of resolved unknowns (expansion)
+
+| Unknown | Resolution |
+|---------|------------|
+| Role-based admin | AccessControlEnumerable v2 templates; owner gets all roles; new tokens only; frontend detects model (R9) |
+| Supply caps | `ERC20Capped`, cap==0 ⇒ uncapped (R10) |
+| Transfer controls | Shared policy mixin: pause + freeze(+list) + eligibility + sanctions, detector parity (R11) |
+| Allowlist + labels | On-chain eligibility + default message; labels off-chain (R12) |
+| Holders / activity | Subgraph data-source templates per token; truthful disable on subgraph-less nets (R13) |
+| Batch distribute | Bounded in-token batchTransfer/batchMint, surfaced limit (R14) |
+| Snapshots / dividends | OUT OF SCOPE — OZ 5.x removed ERC20Snapshot (R15) |
+| Theme-aware UI | Map design onto app theme vars; IBM Plex scoped; tabs inside Account Center (R16) |

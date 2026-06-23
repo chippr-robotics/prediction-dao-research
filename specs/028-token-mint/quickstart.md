@@ -89,3 +89,46 @@ npm run test:frontend          # Vitest for token module logic
 **Done when**: every scenario above passes against real on-chain state, all four standards enforce sanctions,
 admin actions succeed only for authorized actors, no phantom/mock entries appear, and the full suite + security
 gates are green.
+
+---
+
+## Expansion validation — administration portal (US6–US13)
+
+Validates the v2 role-based tokens + portal against real chain state (snapshots/dividends
+are out of scope — OZ 5.x removed ERC20Snapshot). Run on local (1337) + Mordor (63).
+
+### A. Role-based admin + caps (US6/US9)
+1. Create a v2 capped ERC-20 (cap = N). Confirm the issuer holds DEFAULT_ADMIN/MINTER/
+   PAUSER/BURNER roles (getRoleMember).
+2. Mint up to the cap (progress/headroom update); a mint over the cap reverts
+   (`ERC20ExceededCap`). An uncapped (cap 0) token mints freely.
+3. Grant MINTER to a second wallet → it can mint; revoke → it cannot. A non-role caller
+   is rejected for every role-gated action.
+4. Transfer ownership → DEFAULT_ADMIN_ROLE moves; prior owner loses authority. Renounce →
+   no admin remains (irreversible; UI confirms first).
+
+### B. Transfer controls + compliance (US7/US8)
+1. Pause → all transfers/mints/burns revert; unpause resumes.
+2. Freeze an address → it cannot send/receive; it appears in the frozen list; unfreeze →
+   restored.
+3. Restricted token: add/remove eligibility (single + batch), set default restriction
+   message; `detectTransferRestriction` matches the actual transfer outcome in every case.
+
+### C. Batch distribute (US11)
+1. `batchTransfer`/`batchMint` to several recipients in one tx → every balance updates;
+   the UI preview's count/total match the result. Over `MAX_BATCH` reverts (no silent
+   truncation).
+
+### D. Holders + activity (US10/US12) — indexing-dependent
+1. On a subgraph network: after transfers + admin actions, the cap table lists ranked
+   holders with balances/percentages matching chain, and the activity feed shows the
+   events (type/actor/tx/time).
+2. On Mordor (no subgraph): the cap table + activity views show a truthful "unavailable on
+   this network" state (may show the connected user's own balance) — **no fabricated rows**.
+
+### E. Portal IA + theme (US1/US5/US13)
+1. In My Account → **Tokens**: My Tokens / Create / Explorer tabs work; the per-token
+   detail shows only sub-tabs valid for the token's standard + your authority.
+2. Toggle app dark mode → the token module restyles via theme variables (no hardcoded
+   light-only colors).
+3. Contract sub-tab shows real metadata/verification/deployments; copy address/ABI work.

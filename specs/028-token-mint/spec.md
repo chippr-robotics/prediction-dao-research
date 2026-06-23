@@ -336,28 +336,32 @@ matches the displayed data.
 
 ---
 
-### User Story 11 - Distribute and snapshot (Priority: P3)
+### User Story 11 - Batch distribute / airdrop (Priority: P3)
 
 An issuer distributes tokens to many recipients in a single batched transaction
-(airdrop) with computed recipient count, total, and estimated cost; takes balance
-snapshots; and distributes dividends based on a snapshot.
+(airdrop) with a pre-submission preview of recipient count, total amount, and
+estimated cost.
 
-**Why this priority**: Batch distribution and snapshot-based dividends are powerful
-but advanced operational tools that build on the core supply/holder machinery.
+**Why this priority**: Batch distribution is a powerful operational tool that builds
+on the core supply machinery.
 
 **Independent Test**: Submit a batch distribution to several recipients and confirm
-each balance increases by the specified amount in one transaction; take a snapshot
-and confirm holder balances are captured at that block for a subsequent dividend.
+each balance increases by the specified amount in one transaction, and the
+preview's count/total match the on-chain result.
 
 **Acceptance Scenarios**:
 
 1. **Given** a list of recipients and amounts, **When** the issuer submits a batch
    distribution, **Then** every recipient's balance increases accordingly in a
    single confirmed transaction, and the preview's count/total matched the result.
-2. **Given** a token, **When** the issuer takes a snapshot, **Then** holder
-   balances at that block are recorded and referenceable.
-3. **Given** a snapshot, **When** a dividend is distributed against it, **Then**
-   each holder's entitlement is computed from their snapshot balance.
+2. **Given** an over-large recipient list, **When** it would exceed the per-call
+   batch bound, **Then** the system surfaces the limit and the caller splits it
+   across batches (no silent truncation).
+
+> **Out of scope:** balance *snapshots* and snapshot-based *dividend distribution*
+> are **not** included — OpenZeppelin 5.x removed `ERC20Snapshot`, so there is no
+> audited primitive to build on within the repo's OZ pin. Revisit separately if a
+> non-snapshot approach (e.g. an indexer-computed merkle distributor) is desired.
 
 ---
 
@@ -585,16 +589,15 @@ and explorer; copy the address and ABI and confirm they are correct.
   on-chain balances/indexed data.
 - **FR-040**: The system MUST allow an authorized actor to distribute tokens to many
   recipients in a single batched transaction, with a pre-submission preview of
-  recipient count, total amount, and estimated cost.
-- **FR-041**: The system MUST allow an authorized actor to take balance snapshots
-  and to distribute dividends computed from a snapshot's balances.
+  recipient count and total amount, and MUST surface (not silently truncate) the
+  per-call recipient bound.
 - **FR-042**: The system MUST present a per-token on-chain event history (type,
   detail, actor, transaction, time) with category filtering, sourced from indexed
   on-chain events.
-- **FR-043**: Where holder/activity/snapshot data depends on indexing that is
-  unavailable on a network (e.g. subgraph-less networks), the system MUST fall back
-  to on-chain reads where feasible or disable the affected view with a truthful
-  explanation — it MUST NOT display fabricated holders, events, or balances.
+- **FR-043**: Where holder/activity data depends on indexing that is unavailable on
+  a network (e.g. subgraph-less networks), the system MUST fall back to on-chain
+  reads where feasible or disable the affected view with a truthful explanation — it
+  MUST NOT display fabricated holders, events, or balances.
 
 **Contract surface (US13)**
 
@@ -646,10 +649,8 @@ and explorer; copy the address and ABI and confirm they are correct.
 - **Holder / Cap-table Entry**: A token holder with balance, percentage of supply,
   optional label, and holding-since — the basis of the holder cap table and
   distribution summary (from indexed on-chain balances).
-- **Snapshot**: A recorded set of holder balances at a block, referenceable for
-  dividend distribution.
 - **Distribution / Airdrop**: A batched transfer of a token to many recipients in a
-  single transaction; and snapshot-based dividend distributions.
+  single transaction.
 - **Activity Event**: An indexed on-chain event for a token (type, detail, actor,
   transaction, time) powering the activity history.
 - **Contract Metadata**: A token's compiler/license/deploy info, verification
@@ -686,7 +687,7 @@ and explorer; copy the address and ABI and confirm they are correct.
   high/critical findings.
 - **SC-009**: Every administration-portal action (mint, burn, pause/unpause,
   freeze/unfreeze, allowlist add/revoke, role grant/revoke, ownership
-  transfer/renounce, batch distribute, snapshot) is a real on-chain transaction
+  transfer/renounce, batch distribute) is a real on-chain transaction
   with honest pending/confirmed/failed state and succeeds only for an authorized
   actor — verified by tests covering both the authorized and unauthorized paths.
 - **SC-010**: A capped token never exceeds its cap: 100% of over-cap mint attempts
@@ -757,11 +758,13 @@ and explorer; copy the address and ABI and confirm they are correct.
   delegated least-privilege; the exact role set and contract base are a planning
   decision. This is an in-place evolution of the open/restricted templates and must
   preserve the existing owner-as-admin behavior as the default.
-- **Caps, snapshots, batch distribution**: Optional supply caps, balance snapshots,
-  snapshot-based dividends, and batch distribution are new on-chain capabilities to
-  be designed in planning (e.g. capped/snapshot extensions, a batch-distribute
-  entrypoint). Snapshots/dividends and the full holder cap table are advanced and
-  may ship after the core supply/transfer/role controls.
+- **Caps & batch distribution**: Optional supply caps and batch distribution are new
+  on-chain capabilities to be designed in planning (e.g. an OZ `ERC20Capped`
+  extension and a bounded batch-distribute entrypoint). The full holder cap table is
+  advanced (indexing-dependent) and may ship after the core supply/transfer/role
+  controls. **Snapshots / snapshot-based dividends are out of scope** — OpenZeppelin
+  5.x removed `ERC20Snapshot`, so there is no audited primitive within the repo's OZ
+  pin; revisit separately (e.g. an indexer-computed merkle distributor) if desired.
 - **Indexing dependency**: The holder cap table (US10) and activity history (US12)
   depend on indexed on-chain data (e.g. a subgraph indexing Transfer and admin
   events). On subgraph-less networks (Mordor/ETC) these views fall back to on-chain

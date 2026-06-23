@@ -125,3 +125,57 @@ that is registered to the **same** identity; recovery to a wallet without it is 
   confirmed.
 - **Append-only factory storage** (FR-026): new fields only at the end before `__gap`; gated by
   `check:storage-layout`.
+
+---
+
+## Expansion data model — administration portal (US6–US13)
+
+The portal capabilities evolve the **issued-token** model and add **off-chain
+indexed** entities. The `TokenFactory` itself is unchanged except for new `create*`
+parameters/entrypoints and additional template slots (the v2, role-based templates).
+Issued tokens remain **immutable clones**; the v2 model applies to newly created
+tokens (existing Ownable tokens keep their behavior — see research R9).
+
+### Entity: Issued Token v2 (role-based, on-chain)
+
+Replaces the v1 `Ownable` templates for **new** tokens. On
+`AccessControlEnumerableUpgradeable` (+ class-specific bases).
+
+**Roles**: `DEFAULT_ADMIN_ROLE` (owner/super-admin; granted all roles at init),
+`MINTER_ROLE`, `PAUSER_ROLE`, `BURNER_ROLE`, and `COMPLIANCE_ROLE` (restricted class).
+
+| Field / behavior | Type | Notes |
+|------------------|------|-------|
+| `cap` | `uint256` | Max supply; `0` ⇒ uncapped (ERC20Capped). Enforced in `_update`. |
+| `frozen` | `mapping(address=>bool)` | Per-address freeze; movement blocked while frozen. |
+| frozen index | enumerable set / count | Powers the "currently frozen" list (FR-033). |
+| `eligible` | `mapping(address=>bool)` | Restricted class only (eligibility allowlist). |
+| `defaultRestrictionMessage` | `string` | Restricted class; settable (FR-036). |
+| `sanctionsGuard` | `ISanctionsGuard` | Non-bypassable screen (unchanged). |
+| `MAX_BATCH` | `uint256` constant | Bound for `batchTransfer`/`batchMint` (FR-040). |
+
+**Behaviors**: role-gated `mint` (MINTER), `pause`/`unpause` (PAUSER), `burn`
+(BURNER/holder), `setEligible[Batch]`/`setFrozen`/`setDefaultRestrictionMessage`
+(COMPLIANCE), `batchTransfer`/`batchMint` (bounded). `_update` evaluates the shared
+policy (sanctions → paused → frozen → eligibility) — same code the ERC-1404 detector
+returns (parity). Ownership transfer/renounce via `DEFAULT_ADMIN_ROLE` grant/renounce.
+
+**State transitions**: `Active ↔ Paused`; per-address `Unfrozen ↔ Frozen`; supply via
+mint/burn bounded by `cap`; role set mutated by grant/revoke.
+
+### Off-chain / indexed entities (subgraph data-source templates — R13)
+
+| Entity | Source | Fields |
+|--------|--------|--------|
+| `Holder` | per-token `Transfer` index | token, address, balance, firstHeldAt; cap-table %, rank derived |
+| `TokenActivity` | per-token admin + Transfer events | token, type (mint/burn/pause/freeze/role/transfer), actor, tx, timestamp, detail |
+| Address label | frontend/subgraph metadata | optional human label for an allowlist/holder address (NOT on-chain — R12) |
+
+On **subgraph-less networks** these are unavailable; the cap-table/activity views
+disable with a truthful message (the connected user's own `balanceOf` may still show).
+
+### Off-chain entities (additions)
+
+| Entity | Store | Notes |
+|--------|-------|-------|
+| Token capability profile | frontend (derived) | Per token: model (Ownable v1 vs AccessControl v2), standard, flags (burnable/pausable/capped), detected via on-chain probes — drives which detail sub-tabs/controls render (FR-028, SC-014). |
