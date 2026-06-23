@@ -34,6 +34,7 @@ const MORDOR_CONTRACTS = {
   wmatic: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
   membershipVoucher: '0xf514e0e342A898E4681bf51590B672aEC5620401',
   voucherBatchMinter: '0xc26F02da923263e2c9CFB722006e0B8Da2F952B2',
+  tokenFactory: '0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
