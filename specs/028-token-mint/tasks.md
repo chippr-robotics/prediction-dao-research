@@ -325,7 +325,7 @@ reverts), grant/revoke MINTER, transfer + renounce ownership — all role-gated.
 - [X] T067 [US6] Extend `contracts/tokens/TokenFactory.sol`: append-only v2 template slots (`openERC20V2Impl`/`openERC721V2Impl`/`restrictedERC20V2Impl`, reducing `__gap`), `setTemplate` v2 cases, and `createOpenERC20V2/createOpenERC721V2/createRestrictedERC20V2(... cap, options ...)` entrypoints (clone+init owner-as-admin, `_recordToken`) — keep v1 entrypoints intact; depends on T008/T064/T065/T066
 - [X] T068 [P] [US6] `test/integration/tokens/v2-create-admin.test.js`: factory creates each v2 class, issuer holds all roles, cap enforced, ownership transfer/renounce, unauthorized + sanctioned-issuer rejected (no registry write)
 - [X] T069 [US6] Verify `npm run check:storage-layout` passes for the extended `TokenFactory` (append-only) and update `test/upgradeable/TokenFactory.upgrade.test.js` to cover the new slots — depends on T067
-- [ ] T070 [US6] Extend `scripts/deploy/deploy-token-factory.js` + `scripts/deploy/deploy.js` + `verify.js` to deploy/register/verify the three v2 templates and record their addresses; deploy to Mordor and `npm run sync:frontend-contracts`
+- [X] T070 [US6] Extend `scripts/deploy/deploy-token-factory.js` + `scripts/deploy/deploy.js` + `verify.js` to deploy/register/verify the three v2 templates and record their addresses; deploy to Mordor and `npm run sync:frontend-contracts`
 
 **Checkpoint**: v2 role-based capped tokens issue + administer on a real chain (Mordor).
 

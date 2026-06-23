@@ -16,10 +16,13 @@
     "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3",
     "voucherBatchMinter": "0xc26F02da923263e2c9CFB722006e0B8Da2F952B2",
     "tokenFactory": "0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62",
-    "tokenFactoryImpl": "0x5C045845E4765cfA365ff6fa68eB91EA5d87c76f",
+    "tokenFactoryImpl": "0x135108EB6f81e361b6cF131d2Cb9A01E92Cd8ED9",
     "openERC20Impl": "0xd8E67C6C058a6D35E69c691B44b8D5f858591971",
     "openERC721Impl": "0x02819fd0d338F4C3FC58E6d9aF299ACA75d624BB",
-    "restrictedERC20Impl": "0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444"
+    "restrictedERC20Impl": "0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444",
+    "openERC20V2Impl": "0x92169007926fBc8Ac90cdD311dD3C2557158C395",
+    "openERC721V2Impl": "0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE",
+    "restrictedERC20V2Impl": "0x30D62a339aE6b6bC08004f7b68E9520A6bF8CC7E"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -43,7 +46,10 @@
     "tokenFactoryImpl": [],
     "openERC20Impl": [],
     "openERC721Impl": [],
-    "restrictedERC20Impl": []
+    "restrictedERC20Impl": [],
+    "openERC20V2Impl": [],
+    "openERC721V2Impl": [],
+    "restrictedERC20V2Impl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -53,5 +59,6 @@
     "membershipVoucher": 16404315,
     "voucherBatchMinter": 16407208
   },
-  "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z"
+  "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
+  "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z"
 }
