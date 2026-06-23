@@ -67,12 +67,6 @@ function Header({ hideWalletButton = false, appMode = false }) {
                 Dashboard
               </button>
               <button
-                onClick={() => navigate('/tokens')}
-                className={`nav-link nav-button ${location.pathname === '/tokens' ? 'active' : ''}`}
-              >
-                Tokens
-              </button>
-              <button
                 onClick={() => navigate('/wallet')}
                 className={`nav-link nav-button ${location.pathname === '/wallet' ? 'active' : ''}`}
               >
