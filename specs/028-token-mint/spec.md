@@ -198,6 +198,219 @@ metadata, and supply match real on-chain values.
 
 ---
 
+### User Story 6 - Manage supply with optional caps (Priority: P2)
+
+An issuer mints new supply to a recipient and burns supply from a treasury wallet.
+At creation they may set an optional **maximum supply cap**; for capped tokens the
+admin surface shows supply-vs-cap progress and remaining headroom, and minting that
+would exceed the cap is rejected.
+
+**Why this priority**: Supply control is the most-used post-issuance action; caps
+are a common requirement for fixed-supply assets and must be enforced on-chain.
+
+**Independent Test**: Create a capped token, mint up to the cap (progress and
+headroom update), then attempt a mint over the cap and confirm it is rejected
+on-chain; burn some supply and confirm circulating supply decreases.
+
+**Acceptance Scenarios**:
+
+1. **Given** a capped token below its cap, **When** the owner mints within the
+   remaining headroom, **Then** supply increases and the progress/headroom update.
+2. **Given** a capped token, **When** a mint would exceed the cap, **Then** it is
+   rejected on-chain with a clear reason.
+3. **Given** a burnable token, **When** supply is burned from a holding wallet,
+   **Then** circulating supply decreases and the change is irreversible.
+4. **Given** an uncapped token, **When** the admin surface is shown, **Then** no
+   supply-vs-cap progress is presented (only circulating supply).
+
+---
+
+### User Story 7 - Configure transfer controls (Priority: P2)
+
+An issuer pauses/unpauses all transfers, toggles configurable transfer-restriction
+rules evaluated on-chain before every transfer, and freezes/unfreezes specific
+addresses, seeing the list of currently frozen wallets.
+
+**Why this priority**: Pausing and freezing are core incident-response and
+compliance controls for any administered token.
+
+**Independent Test**: Pause a token and confirm transfers are blocked; freeze an
+address and confirm it cannot send or receive while frozen, then unfreeze and
+confirm transfers resume; toggle a restriction rule and confirm enforcement.
+
+**Acceptance Scenarios**:
+
+1. **Given** a paused token, **When** any transfer/mint/burn is attempted, **Then**
+   it is blocked at the contract level until the token is resumed.
+2. **Given** a frozen address, **When** it tries to send or receive, **Then** the
+   transfer is rejected; the frozen balance remains on-chain but cannot move.
+3. **Given** the freeze list, **When** the owner unfreezes an address, **Then** it
+   can transact again and the list updates.
+4. **Given** a configurable restriction rule, **When** the owner enables/disables
+   it, **Then** the on-chain transfer check reflects the change.
+
+---
+
+### User Story 8 - Administer compliance allowlist (ERC-1404) (Priority: P2)
+
+For a restricted token, a compliance administrator manages an eligibility allowlist
+(add individually, import in bulk, revoke), each entry carrying an optional label
+and status; views the restriction-code table with human-readable messages; and sets
+a default restriction message.
+
+**Why this priority**: The allowlist is the operational heart of a compliant
+restricted token; it must be manageable at scale with truthful reason reporting.
+
+**Independent Test**: Add several addresses to the allowlist (one with a label),
+confirm an allowlisted recipient can receive and a non-allowlisted one is rejected
+with the matching restriction code/message; revoke an address and confirm it can no
+longer receive.
+
+**Acceptance Scenarios**:
+
+1. **Given** a restricted token, **When** the admin adds/imports addresses to the
+   allowlist, **Then** those addresses become eligible and appear in the list with
+   their label and status.
+2. **Given** an allowlisted address, **When** the admin revokes it, **Then** it
+   becomes ineligible and transfers to it are rejected with the matching reason.
+3. **Given** the restriction-code table, **When** a transfer would be blocked,
+   **Then** the returned code maps to the displayed human-readable message.
+4. **Given** a configurable default restriction message, **When** the admin updates
+   it, **Then** future eligibility checks surface the updated message.
+
+---
+
+### User Story 9 - Administer roles & ownership (Priority: P2)
+
+A token owner grants and revokes scoped administrative roles (e.g. Minter, Pauser,
+Compliance officer, Burner) to other wallets, views the current role holders and
+when each was granted, transfers ownership to a new wallet, or permanently
+renounces ownership.
+
+**Why this priority**: Delegated, least-privilege administration and safe ownership
+hand-off are required for real organizations operating a token.
+
+**Independent Test**: Grant the Minter role to a second wallet and confirm only it
+(and the owner) can mint; revoke it and confirm minting is again blocked; transfer
+ownership and confirm the prior owner loses authority.
+
+**Acceptance Scenarios**:
+
+1. **Given** a token, **When** the owner grants a role to an address, **Then** that
+   address can perform exactly the actions the role authorizes, and nothing more.
+2. **Given** a role holder, **When** the owner revokes the role, **Then** the
+   address can no longer perform that action.
+3. **Given** ownership transfer, **When** the owner assigns a new owner, **Then**
+   full admin authority moves to the new owner and the prior owner loses it.
+4. **Given** renounce ownership, **When** the owner confirms, **Then** no address
+   can ever administer the token again (irreversible), surfaced with a clear warning.
+5. **Given** any role-gated action, **When** an unauthorized caller attempts it,
+   **Then** it is rejected on-chain with a surfaced reason.
+
+---
+
+### User Story 10 - Inspect the holder cap table (Priority: P3)
+
+Any user inspecting a token can view its holder cap table — ranked holders with
+address, optional label, balance, percentage of supply, and holding-since — a
+supply-distribution bar, and can export the cap table.
+
+**Why this priority**: Holder visibility builds trust and supports compliance
+reporting, but it is read-only and depends on holder-enumeration indexing.
+
+**Independent Test**: For a token with several holders, open its cap table and
+confirm ranked holders, balances, and percentages match real on-chain balances,
+and the distribution bar reflects the same totals; export and confirm the export
+matches the displayed data.
+
+**Acceptance Scenarios**:
+
+1. **Given** a token with holders, **When** the cap table is opened, **Then** it
+   lists holders ranked by balance with truthful balance, percentage, and
+   holding-since values from chain/index.
+2. **Given** the cap table, **When** the user exports it, **Then** the export
+   contains the same holders and balances shown.
+3. **Given** a network without holder indexing, **When** the cap table is opened,
+   **Then** the view falls back to on-chain reads or is disabled with a truthful
+   explanation — never fabricated holders.
+
+---
+
+### User Story 11 - Distribute and snapshot (Priority: P3)
+
+An issuer distributes tokens to many recipients in a single batched transaction
+(airdrop) with computed recipient count, total, and estimated cost; takes balance
+snapshots; and distributes dividends based on a snapshot.
+
+**Why this priority**: Batch distribution and snapshot-based dividends are powerful
+but advanced operational tools that build on the core supply/holder machinery.
+
+**Independent Test**: Submit a batch distribution to several recipients and confirm
+each balance increases by the specified amount in one transaction; take a snapshot
+and confirm holder balances are captured at that block for a subsequent dividend.
+
+**Acceptance Scenarios**:
+
+1. **Given** a list of recipients and amounts, **When** the issuer submits a batch
+   distribution, **Then** every recipient's balance increases accordingly in a
+   single confirmed transaction, and the preview's count/total matched the result.
+2. **Given** a token, **When** the issuer takes a snapshot, **Then** holder
+   balances at that block are recorded and referenceable.
+3. **Given** a snapshot, **When** a dividend is distributed against it, **Then**
+   each holder's entitlement is computed from their snapshot balance.
+
+---
+
+### User Story 12 - Review activity & event history (Priority: P3)
+
+Any user reviewing a token can see its on-chain event history — event type, detail,
+actor, transaction, and time — filterable by category (e.g. supply, admin).
+
+**Why this priority**: An auditable activity trail is important for trust and
+operations but is read-only and depends on event indexing.
+
+**Independent Test**: Perform a mint and a pause on a token, then open its activity
+history and confirm both events appear with the correct actor, transaction, and
+time, and that category filters narrow the list correctly.
+
+**Acceptance Scenarios**:
+
+1. **Given** a token with on-chain actions, **When** the activity view is opened,
+   **Then** each event shows its type, detail, actor, transaction reference, and
+   time from indexed on-chain data.
+2. **Given** the activity view, **When** the user filters by category, **Then**
+   only matching events are shown.
+3. **Given** a network without event indexing, **When** the activity view is
+   opened, **Then** it falls back to on-chain log reads or is disabled with a
+   truthful message — never fabricated events.
+
+---
+
+### User Story 13 - Inspect the contract surface (Priority: P3)
+
+Any user can view a token's contract surface: metadata (compiler, license, deployed
+date, address), source-verification status with links to the block explorer and
+source, and the per-network deployment list; and can copy the address or ABI.
+
+**Why this priority**: Transparency about the underlying contract supports trust and
+integration, and is read-only.
+
+**Independent Test**: Open a token's contract view and confirm the displayed
+metadata, verification status, and deployment address match the recorded deployment
+and explorer; copy the address and ABI and confirm they are correct.
+
+**Acceptance Scenarios**:
+
+1. **Given** a deployed token, **When** the contract view is opened, **Then** its
+   metadata, verification status, and per-network deployments reflect the real
+   recorded deployment and explorer state.
+2. **Given** the contract view, **When** the user copies the address or ABI,
+   **Then** the copied value matches the deployed contract.
+3. **Given** an unverified contract, **When** the view is shown, **Then**
+   verification status is reported truthfully (not implied as verified).
+
+---
+
 ### Edge Cases
 
 - **Duplicate / invalid metadata**: empty name/symbol, zero or absurd decimals,
@@ -313,6 +526,91 @@ metadata, and supply match real on-chain values.
   upgrades. *(Whether individual issued tokens are themselves upgradeable is a
   design decision deferred to planning — see Assumptions.)*
 
+**Administration portal & discovery (US5/US10/US12/US13)**
+
+- **FR-027**: The system MUST present a management view of the tokens an issuer
+  administers, including a summary of tokens administered, total holders across
+  them, networks in use, and a count of tokens needing attention (e.g. paused),
+  with filtering by standard/status and search by name/symbol/address.
+- **FR-028**: The system MUST present a per-token detail view organized into
+  sections (overview, supply, transfer controls, compliance, holders,
+  distributions, roles & ownership, activity, contract) showing **only** the
+  sections valid for that token's standard and the caller's authority.
+- **FR-029**: The system MUST provide a public explorer of all tokens on the active
+  network, openable by any user for read-only details, network-scoped (FR-023).
+
+**Supply & caps (US6)**
+
+- **FR-030**: The system MUST allow an authorized actor to mint supply to a
+  recipient and to burn supply, with circulating supply reflecting both.
+- **FR-031**: The system MUST allow an OPTIONAL maximum supply cap to be set at
+  creation; for capped tokens it MUST enforce the cap on-chain (rejecting mints
+  that would exceed it) and surface supply-vs-cap progress and remaining headroom.
+
+**Transfer controls (US7)**
+
+- **FR-032**: The system MUST allow an authorized actor to pause and unpause all
+  transfers/mints/burns at the contract level.
+- **FR-033**: The system MUST allow an authorized actor to freeze and unfreeze
+  specific addresses and MUST present the list of currently frozen addresses;
+  frozen balances remain on-chain but cannot move.
+- **FR-034**: The system MUST evaluate configurable transfer-restriction rules
+  on-chain before every transfer and allow an authorized actor to toggle them.
+
+**Compliance allowlist (US8)**
+
+- **FR-035**: For restricted tokens, the system MUST allow a compliance
+  administrator to add (individually and in bulk), label, and revoke allowlist
+  entries, each with a status, and MUST reject transfers to non-eligible parties
+  with the matching restriction code and human-readable message.
+- **FR-036**: The system MUST present the restriction-code table mapping each code
+  to its human-readable message and MUST allow a configurable default restriction
+  message.
+
+**Roles & ownership (US9)**
+
+- **FR-037**: The system MUST allow a token owner to grant and revoke scoped
+  administrative roles (e.g. minter, pauser, compliance, burner) to addresses, and
+  MUST present current role holders and their grant time; each role MUST authorize
+  only its specific actions (least privilege), enforced on-chain.
+- **FR-038**: The system MUST allow an owner to transfer ownership and to renounce
+  ownership permanently (irreversible), with renounce surfaced behind a clear
+  warning.
+
+**Holders, distributions & activity (US10/US11/US12)**
+
+- **FR-039**: The system MUST present a per-token holder cap table (ranked holders
+  with address, optional label, balance, percentage of supply, holding-since), a
+  supply-distribution summary, and an export of the cap table, sourced from real
+  on-chain balances/indexed data.
+- **FR-040**: The system MUST allow an authorized actor to distribute tokens to many
+  recipients in a single batched transaction, with a pre-submission preview of
+  recipient count, total amount, and estimated cost.
+- **FR-041**: The system MUST allow an authorized actor to take balance snapshots
+  and to distribute dividends computed from a snapshot's balances.
+- **FR-042**: The system MUST present a per-token on-chain event history (type,
+  detail, actor, transaction, time) with category filtering, sourced from indexed
+  on-chain events.
+- **FR-043**: Where holder/activity/snapshot data depends on indexing that is
+  unavailable on a network (e.g. subgraph-less networks), the system MUST fall back
+  to on-chain reads where feasible or disable the affected view with a truthful
+  explanation — it MUST NOT display fabricated holders, events, or balances.
+
+**Contract surface (US13)**
+
+- **FR-044**: The system MUST present a token's contract metadata (compiler,
+  license, deployed date, address), source-verification status with explorer/source
+  links, and per-network deployment list, and MUST allow copying the address and
+  ABI — all reflecting the real recorded deployment and explorer state.
+
+**Create flow (US1 enhancement)**
+
+- **FR-045**: The creation flow MUST let the issuer choose a standard, configure its
+  parameters (name, symbol, decimals/initial supply for fungible, base URI for
+  ERC-721, initial eligible list for ERC-1404), select feature options (e.g.
+  burnable, pausable, capped), and review a deployment summary (standard, network,
+  owner, estimated cost) before signing the real on-chain deployment.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Token**: A deployed token contract created through the feature. Attributes:
@@ -333,6 +631,29 @@ metadata, and supply match real on-chain values.
   when it is not.
 - **Token Registry/List**: The per-network record of tokens created through the
   feature, used for discovery and the issuer's administration list.
+- **Supply Cap**: An optional per-token maximum supply set at creation; bounds total
+  supply and drives supply-vs-cap progress/headroom for capped tokens.
+- **Administrative Role**: A scoped authority over a token (e.g. minter, pauser,
+  compliance, burner) granted to an address; tracked with its grant time and the
+  actions it authorizes (least privilege).
+- **Allowlist Entry**: For restricted tokens, an eligible address with an optional
+  label and status; governs whether the address may hold/receive the token.
+- **Restriction Policy / Rule**: The configurable on-chain rules (eligibility,
+  freeze, sanctions, toggleable rules) evaluated before each transfer, plus the
+  restriction-code→message map and default restriction message.
+- **Frozen Address**: An address blocked from sending/receiving a token; its balance
+  remains on-chain but cannot move until unfrozen.
+- **Holder / Cap-table Entry**: A token holder with balance, percentage of supply,
+  optional label, and holding-since — the basis of the holder cap table and
+  distribution summary (from indexed on-chain balances).
+- **Snapshot**: A recorded set of holder balances at a block, referenceable for
+  dividend distribution.
+- **Distribution / Airdrop**: A batched transfer of a token to many recipients in a
+  single transaction; and snapshot-based dividend distributions.
+- **Activity Event**: An indexed on-chain event for a token (type, detail, actor,
+  transaction, time) powering the activity history.
+- **Contract Metadata**: A token's compiler/license/deploy info, verification
+  status, ABI, and per-network deployment addresses.
 
 ## Success Criteria *(mandatory)*
 
@@ -363,6 +684,26 @@ metadata, and supply match real on-chain values.
   external protocols/oracles or identity infrastructure are involved — fork
   tests) passes in CI, with security static analysis and fuzzing reporting no new
   high/critical findings.
+- **SC-009**: Every administration-portal action (mint, burn, pause/unpause,
+  freeze/unfreeze, allowlist add/revoke, role grant/revoke, ownership
+  transfer/renounce, batch distribute, snapshot) is a real on-chain transaction
+  with honest pending/confirmed/failed state and succeeds only for an authorized
+  actor — verified by tests covering both the authorized and unauthorized paths.
+- **SC-010**: A capped token never exceeds its cap: 100% of over-cap mint attempts
+  are rejected on-chain, and supply-vs-cap progress/headroom match real supply.
+- **SC-011**: Scoped roles enforce least privilege: a role holder can perform
+  exactly the actions its role authorizes and is rejected on-chain for all others,
+  in 100% of tested cases.
+- **SC-012**: Holder cap table, activity history, and distribution data shown to
+  users match real on-chain balances/events (no fabricated rows); on networks
+  without the required indexing the affected view falls back to on-chain reads or is
+  disabled with a truthful message in 100% of cases.
+- **SC-013**: A batch distribution updates every listed recipient's balance in a
+  single confirmed transaction, and the pre-submission preview's recipient count and
+  total match the on-chain result.
+- **SC-014**: The per-token detail view exposes only the sections/controls valid for
+  that token's standard and the caller's authority — no control is shown that the
+  contract would reject for that standard.
 
 ## Assumptions
 
@@ -404,3 +745,30 @@ metadata, and supply match real on-chain values.
   `FairWinsToken` use case) is **out of scope** here; this feature provides the
   issuance machinery, and any specific governance token would be a separate spec
   (and relates to the forthcoming DAO-manager feature).
+- **Design reference**: The administration-portal information architecture and
+  visual language follow the imported design `TokenMint.dc.html` (Claude Design
+  project "Token administration portal design"). The frontend adapts it to the
+  app's existing component patterns and theme (theme-aware: mapped onto the app's
+  CSS theme variables so it respects light/dark mode) rather than transplanting the
+  mockup's standalone page chrome.
+- **Role-based token administration**: The advanced admin surface (US9) assumes
+  issued tokens move from plain single-owner control to a role-based access model
+  (scoped roles such as minter/pauser/compliance/burner) so authority can be
+  delegated least-privilege; the exact role set and contract base are a planning
+  decision. This is an in-place evolution of the open/restricted templates and must
+  preserve the existing owner-as-admin behavior as the default.
+- **Caps, snapshots, batch distribution**: Optional supply caps, balance snapshots,
+  snapshot-based dividends, and batch distribution are new on-chain capabilities to
+  be designed in planning (e.g. capped/snapshot extensions, a batch-distribute
+  entrypoint). Snapshots/dividends and the full holder cap table are advanced and
+  may ship after the core supply/transfer/role controls.
+- **Indexing dependency**: The holder cap table (US10) and activity history (US12)
+  depend on indexed on-chain data (e.g. a subgraph indexing Transfer and admin
+  events). On subgraph-less networks (Mordor/ETC) these views fall back to on-chain
+  reads where feasible or are disabled with a truthful message; they never show
+  fabricated data (Constitution III).
+- **Phasing**: These portal capabilities extend the already-shipped open ERC-20/721
+  + ERC-1404 issuance/admin/discovery; they are expected to land incrementally by
+  priority (P2 supply/transfer-controls/compliance/roles before P3 holders/
+  distributions/activity/contract surface). The T-REX/ERC-3643 class (US4) remains
+  deferred (OZ-4.x/Solidity-0.8.17 incompatibility with the repo's OZ 5.4.0 pin).

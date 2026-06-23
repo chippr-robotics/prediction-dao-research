@@ -31,6 +31,13 @@
 
 ## Notes
 
+- **Expanded 2026-06-23** (`/speckit-specify`): added the full token-administration
+  portal scope (US6–US13: supply & caps, transfer controls, compliance allowlist,
+  roles & ownership, holder cap table, distributions/snapshots, activity history,
+  contract surface; FR-027–FR-045; SC-009–SC-014). Re-validated — all checklist
+  items still pass; no `[NEEDS CLARIFICATION]` markers introduced. New capabilities
+  are stated as testable behaviors with measurable success criteria; contract/
+  indexer/frontend design is deferred to `/speckit-plan`.
 - Standards (ERC-1404, ERC-3643/T-REX) are named in the user input as binding
   scope; they are referenced as target *behaviors* in requirements, not as
   implementation mandates, keeping the spec stakeholder-readable.
