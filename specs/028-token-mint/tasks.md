@@ -294,3 +294,134 @@ After Phase 2: Dev A → US1→US2 (open + admin); Dev B → US3 (ERC-1404); Dev
 - Issued tokens are immutable clones (open/1404); only `TokenFactory` is upgradeable (append-only storage, gated by `check:storage-layout`).
 - Frontend addresses/ABIs come only from `sync:frontend-contracts`.
 - Commit after each task or logical group; stop at any checkpoint to validate independently.
+
+---
+
+# EXPANSION — Administration portal (US6–US13)
+
+> Appended 2026-06-23 (`/speckit-tasks`). Builds on the live MVP (T001–T059). Plan:
+> `plan.md` "Expansion plan"; design: research R9–R16, `contracts/roles-controls-caps.md`,
+> `contracts/indexing-and-frontend.md`. **OZ 5.4.0**, reuse platform primitives, no new
+> deps. **Snapshots/dividends OUT OF SCOPE** (OZ 5.x removed ERC20Snapshot); **T-REX
+> (US4) deferred**. Six independently-shippable phases, P2 before P3. v2 role-based
+> templates are NEW (existing immutable v1 tokens are untouched; frontend detects model).
+
+## Phase 9: P2-a — Role-based v2 templates + caps + factory slots (US6, US9 foundation)
+
+**Goal**: New tokens issue on `AccessControlEnumerable` with optional `ERC20Capped` caps,
+a shared transfer-policy, bounded batch ops, and role-based ownership — registered as new
+factory template slots; existing v1 tokens unchanged.
+
+**Independent test**: Create a v2 capped ERC-20 on a real chain; mint to cap (over-cap
+reverts), grant/revoke MINTER, transfer + renounce ownership — all role-gated.
+
+- [ ] T060 [P] [US6] Define the shared transfer-policy + roles interface in `contracts/tokens/lib/TransferPolicy.sol` (eval order sanctions→paused→frozen→eligibility, restriction-code enum) and `contracts/tokens/interfaces/ITokenRolesV2.sol` (role ids, events) per `contracts/roles-controls-caps.md`
+- [ ] T061 [P] [US6] `test/tokens/OpenERC20V2.test.js`: role gating (minter/pauser/burner), `ERC20Capped` over-cap revert + uncapped(cap 0), `batchTransfer`/`batchMint` happy path + `MAX_BATCH` revert, sanctions hook both directions, ownership transfer/renounce, clone/template re-init lockout — write first, ensure fail
+- [ ] T062 [P] [US6] `test/tokens/OpenERC721V2.test.js`: roles, `mint(to,uri)`, holder/burner burn, batch mint bound, sanctions hook, lockout
+- [ ] T063 [P] [US6] `test/tokens/RestrictedERC20V2.test.js`: COMPLIANCE-gated eligibility/freeze, detector⇄`_update` parity for every code, settable default message, caps, batch, roles
+- [ ] T064 [US6] Implement `contracts/tokens/templates/OpenERC20V2.sol` (`AccessControlEnumerableUpgradeable` + `ERC20CappedUpgradeable` + `ERC20PausableUpgradeable` + `ERC20BurnableUpgradeable` + TransferPolicy + bounded batch; `_disableInitializers`; one-time `initialize` granting all roles to owner) — depends on T060
+- [ ] T065 [US6] Implement `contracts/tokens/templates/OpenERC721V2.sol` (AccessControlEnumerable + ERC721URIStorage(+Burnable) + policy + bounded batchMint) — depends on T060
+- [ ] T066 [US6] Implement `contracts/tokens/templates/RestrictedERC20V2.sol` (OpenERC20V2 + IERC1404 detector/message + COMPLIANCE eligibility/freeze + default message) — depends on T060, T064
+- [ ] T067 [US6] Extend `contracts/tokens/TokenFactory.sol`: append-only v2 template slots (`openERC20V2Impl`/`openERC721V2Impl`/`restrictedERC20V2Impl`, reducing `__gap`), `setTemplate` v2 cases, and `createOpenERC20V2/createOpenERC721V2/createRestrictedERC20V2(... cap, options ...)` entrypoints (clone+init owner-as-admin, `_recordToken`) — keep v1 entrypoints intact; depends on T008/T064/T065/T066
+- [ ] T068 [P] [US6] `test/integration/tokens/v2-create-admin.test.js`: factory creates each v2 class, issuer holds all roles, cap enforced, ownership transfer/renounce, unauthorized + sanctioned-issuer rejected (no registry write)
+- [ ] T069 [US6] Verify `npm run check:storage-layout` passes for the extended `TokenFactory` (append-only) and update `test/upgradeable/TokenFactory.upgrade.test.js` to cover the new slots — depends on T067
+- [ ] T070 [US6] Extend `scripts/deploy/deploy-token-factory.js` + `scripts/deploy/deploy.js` + `verify.js` to deploy/register/verify the three v2 templates and record their addresses; deploy to Mordor and `npm run sync:frontend-contracts`
+
+**Checkpoint**: v2 role-based capped tokens issue + administer on a real chain (Mordor).
+
+## Phase 10: P2-b — Transfer controls + compliance admin (US7, US8)
+
+**Goal**: Pause + an enumerable freeze list, and full ERC-1404 allowlist management with a
+configurable default restriction message — on the v2 templates.
+
+**Independent test**: Pause blocks transfers; freeze an address (appears in the list) then
+unfreeze; add/revoke allowlist entries and confirm detector parity + the default message.
+
+- [ ] T071 [US7] Add an enumerable frozen-address set + views (`frozenList`/`frozenCount`) to `contracts/tokens/lib/TransferPolicy.sol` / the v2 templates so the UI can list currently-frozen wallets (FR-033) — depends on T064
+- [ ] T072 [P] [US7] `test/tokens/v2-transfer-controls.test.js`: pause/unpause gating (PAUSER), freeze/unfreeze gating (COMPLIANCE) + frozen-list view, frozen balance cannot move, both authorized + unauthorized paths
+- [ ] T073 [US8] Finalize compliance setters on `RestrictedERC20V2.sol`: `setEligible`/`setEligibleBatch` (COMPLIANCE), `setDefaultRestrictionMessage`, fixed restriction-code map — depends on T066
+- [ ] T074 [P] [US8] `test/integration/tokens/v2-compliance.test.js`: allowlist add/batch/revoke changes eligibility; ineligible transfer reverts with code+message; default message settable; sanctions dominates eligibility
+- [ ] T075 [US8] Run Slither/Medusa locally where available (else document for CI) over the v2 templates + policy lib; resolve/justify any high/critical — no new high/critical
+
+**Checkpoint**: v2 transfer controls + compliance fully enforced on-chain with tests.
+
+## Phase 11: P2-c — Portal IA + capability detection + create flow + theme-aware UI (US9 UI, FR-027/028/045)
+
+**Goal**: Restructure the Tokens tab to the My Tokens / Create / Explorer IA with a
+per-token detail (sub-tabs gated by standard + authority + model), the standard-cards
+create flow, and theme-aware styling mapped onto the app theme variables.
+
+**Independent test**: In dark + light mode, the Tokens tab renders the tabs + detail
+sub-tabs; only valid controls show per token; creating a v2 capped token works end-to-end.
+
+- [ ] T076 [US9] Add `frontend/src/components/tokens/tokens.css`: map the imported design (forest-green + IBM Plex, scoped) onto `theme.css` variables (`--brand-primary`, `--surface-color`, `--text-*`, `--border-color`, `--semantic-*`, `--radius-*`, `--shadow-*`) so it respects light/dark (R16)
+- [ ] T077 [US9] Extend `frontend/src/components/tokens/useTokenFactory.js` with per-token **capability detection** (probe v2 `hasRole`/`getRoleMember` vs v1 `owner()`, standard, flags, cap) → a capability profile driving control gating (FR-028, SC-014)
+- [ ] T078 [US9] Restructure `frontend/src/components/tokens/TokensPanel.jsx` into My Tokens / Create / Explorer sub-tabs + summary metric strip (FR-027) using `tokens.css`
+- [ ] T079 [US9] Rebuild `frontend/src/components/tokens/CreateTokenWizard.jsx` to the standard-cards + parameters + options (burnable/pausable/capped) + deployment-summary-rail flow calling the v2 `create*` entrypoints (real tx, honest state) (FR-045)
+- [ ] T080 [US9] Rebuild `frontend/src/components/tokens/TokenDetail.jsx` (or a new `TokenDetailPanel`) into the identity header + stat cards + capability-gated sub-tabs (Overview, Supply, Transfer Controls, Compliance, Roles & Ownership, Contract) — only sub-tabs valid for the token render
+- [ ] T081 [US9] Implement the Roles & Ownership sub-tab: role grant/revoke table (from `getRoleMember`), transfer ownership, renounce (confirm-gated) — real tx; non-admin controls disabled with surfaced reason
+- [ ] T082 [US9] Implement the Supply + Transfer-Controls sub-tabs: mint/burn (+ cap progress/headroom), pause/unpause, freeze list + freeze/unfreeze, ERC-1404 eligibility + default message + pre-check — wiring the v2 contract calls
+- [ ] T083 [P] [US9] `frontend` Vitest `frontend/src/components/tokens/__tests__/TokenDetailPanel.test.jsx`: capability-gated sub-tab rendering (v1 Ownable vs v2 roles; restricted vs open; capped vs uncapped), unauthorized controls disabled, theme tokens resolve in light + dark
+- [ ] T084 [P] [US9] `frontend` Vitest for the rebuilt CreateTokenWizard (standard cards, capped option, summary rail, real-tx pending/confirmed/failed, no phantom on reject)
+
+**Checkpoint**: full theme-aware portal IA over the v2 tokens; capability-gated, dark-mode-aware.
+
+## Phase 12: P3-a — Batch distribute / airdrop UI (US11)
+
+**Goal**: An airdrop UI over the v2 `batchTransfer`/`batchMint` with a pre-submission
+preview; honest handling of the `MAX_BATCH` bound.
+
+**Independent test**: Paste recipients+amounts; preview shows count/total; submit updates
+all balances in one tx; over-limit lists surface the bound (no silent truncation).
+
+- [ ] T085 [US11] Implement the Distributions sub-tab `frontend/src/components/tokens/DistributePanel.jsx`: recipients+amounts input, computed count/total preview, `MAX_BATCH` surfaced, real `batchTransfer`/`batchMint` tx with honest state
+- [ ] T086 [P] [US11] `frontend` Vitest: preview math, over-`MAX_BATCH` surfaces the limit (no truncation), pending→confirmed transitions
+
+**Checkpoint**: batch airdrop usable end-to-end against a v2 token.
+
+## Phase 13: P3-b — Holder cap table + activity via indexing (US10, US12)
+
+**Goal**: Index per-token Transfer + admin events into Holder/TokenActivity and surface the
+cap table + activity feed, with truthful disable on subgraph-less networks.
+
+**Independent test**: On a subgraph network, the cap table + activity reflect real
+balances/events; on Mordor they show a truthful "unavailable" state (no fabricated rows).
+
+- [ ] T087 [US10] Add `Holder` + `TokenActivity` entities to `subgraph/schema.graphql` and a per-token **data-source template** in `subgraph/subgraph.yaml` (`templates:`) for the v2 token ABI
+- [ ] T088 [US10] Add `subgraph/src/mappings/token.ts`: spawn the template from the `TokenCreated` handler; handle `Transfer` → `Holder` balances/firstHeldAt and admin events (mint/burn/Paused/Unpaused/Frozen/RoleGranted/RoleRevoked) → `TokenActivity`
+- [ ] T089 [P] [US10] Matchstick `subgraph/tests/token.test.ts`: Transfer builds Holder balances + cap-table %; admin events build TokenActivity; codegen + build + matchstick green
+- [ ] T090 [US10] Frontend Holders sub-tab `frontend/src/components/tokens/HoldersPanel.jsx`: ranked cap table (address/label/balance/%/since) + distribution bar + CSV export from the subgraph; truthful disabled state on subgraph-less nets (own `balanceOf` may show) — no fabricated rows
+- [ ] T091 [US12] Frontend Activity sub-tab `frontend/src/components/tokens/ActivityPanel.jsx`: event feed (type/detail/actor/tx/time) with category filter from the subgraph; truthful disable where unindexed
+- [ ] T092 [P] [US10] [US12] `frontend` Vitest: cap table + activity render from indexed data; truthful disabled state when indexing absent (assert no fabricated rows)
+
+**Checkpoint**: holders + activity live where indexed; honest fallback elsewhere.
+
+## Phase 14: P3-c — Contract surface (US13)
+
+**Goal**: A read-only contract sub-tab: metadata, verification status + explorer links,
+per-network deployments, copy address/ABI.
+
+**Independent test**: The contract sub-tab shows real metadata/verification/deployments for
+a deployed token; copy address + ABI produce correct values.
+
+- [ ] T093 [US13] Implement the Contract sub-tab `frontend/src/components/tokens/ContractPanel.jsx`: metadata (standard, decimals, cap, deployed address), verification status + block-explorer/source links (from network config), per-network deployment list, copy address + copy ABI — all from synced artifacts/real reads
+- [ ] T094 [P] [US13] `frontend` Vitest: contract metadata renders; verification reported truthfully (not implied verified); copy address/ABI correct
+
+## Phase 15: Polish & cross-cutting (expansion)
+
+- [ ] T095 [P] Update `docs/developer-guide/token-mint.md` for the v2 role model, caps, transfer controls, batch, holders/activity indexing, and the portal IA; note snapshots out-of-scope + T-REX deferred
+- [ ] T096 [P] Run Slither (clone/proxy/AccessControl/cap detectors) + Medusa across the v2 contracts; axe/Lighthouse over the rebuilt portal (WCAG 2.1 AA, light + dark); resolve/justify findings — no new high/critical
+- [ ] T097 Execute `quickstart.md` "Expansion validation" (A–E) on local + Mordor; confirm every scenario against real chain state and the truthful subgraph-less fallbacks
+- [ ] T098 Confirm `npm test`, `npm run test:frontend`, `npm run check:storage-layout`, and subgraph codegen+build+matchstick are green in CI with no `continue-on-error` on test/lint/build/security (Principle IV)
+
+---
+
+## Expansion dependencies & MVP
+
+- **Phase 9 (P2-a)** is the foundation for all expansion phases (v2 templates + factory
+  slots). **Phase 10 (P2-b)** extends the same contracts. **Phase 11 (P2-c)** needs 9 (and
+  reads 10's controls). **P3-a/b/c (12–14)** depend on 9/11; P3-b also needs the subgraph.
+- **Expansion MVP = Phase 9 + Phase 11** (issue/administer v2 role-based capped tokens
+  through the new portal IA). P2-b folds in immediately after.
+- `[P]` = different files, no incomplete-task dependency. Each phase ships with tests +
+  (where on-chain) a targeted Mordor deploy + `sync:frontend-contracts`.
