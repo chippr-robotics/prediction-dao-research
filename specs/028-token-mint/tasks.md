@@ -195,13 +195,20 @@ implemented until this phase is complete.**
 
 **Purpose**: Hardening, docs, and the constitution gates that span all stories.
 
-- [ ] T053 [P] Add a developer guide `docs/developer-guide/token-mint.md` (standards supported, issuance flow, admin surfaces, sanctions integration, upgrade/deploy notes) and link it from the docs index
+> **Status (2026-06-23):** T053 (dev guide) + T059 (CI gates) done. T054 (Slither/Medusa), T056 (axe/
+> Lighthouse), T057 (gas report) are **CI/tooling-gated** — Slither/Medusa/Lighthouse aren't installed locally;
+> they run in CI (`test:gas` for gas). An adversarial multi-agent security review of the new contracts found
+> **0 confirmed findings** (substitutes for, but does not replace, the `.github/agents` review in T055).
+> T058's quickstart was validated on a **local** in-process deploy; Amoy/Mordor need the floppy key + RPC.
+> Issuance gas is low by construction (EIP-1167 clones: one CREATE + initialize).
+
+- [X] T053 [P] Add a developer guide `docs/developer-guide/token-mint.md` (standards supported, issuance flow, admin surfaces, sanctions integration, upgrade/deploy notes) and link it from the docs index
 - [ ] T054 [P] Run Slither (clone/proxy/UUPS detectors) and Medusa fuzzing across `contracts/tokens/`; resolve or document (with rationale) any high/critical finding — no new high/critical may remain
 - [ ] T055 Complete the smart-contract security-agent review (`.github/agents/`) for the token contracts and record EthTrust-SL ≥ L2 reasoning in plan/contract NatSpec
 - [ ] T056 [P] Run axe/Lighthouse accessibility audits on the token module (WCAG 2.1 AA) and fix violations; ensure ESLint passes with no errors
 - [ ] T057 [P] Add a gas report for issuance/admin paths (`npm run test:gas`) and confirm clone-based issuance stays within target (SC-001 < 3 min end-to-end)
 - [ ] T058 Execute the full `specs/028-token-mint/quickstart.md` validation on local + Amoy + Mordor and confirm every scenario passes against real chain state (on Mordor, confirm discovery reads the factory registry over RPC since there is no subgraph)
-- [ ] T059 [P] Verify `npm test`, `npm run test:fork`, `npm run test:frontend`, and `npm run check:storage-layout` are green in CI with no `continue-on-error` on test/lint/build/security steps (Principle IV)
+- [X] T059 [P] Verify `npm test`, `npm run test:fork`, `npm run test:frontend`, and `npm run check:storage-layout` are green in CI with no `continue-on-error` on test/lint/build/security steps (Principle IV)
 
 ---
 
