@@ -486,6 +486,55 @@ async function main() {
   );
   deployments.keyRegistry = keyDeploy.address;
 
+  // -------- TokenFactory + token templates (UUPS proxy — spec 028) --------
+  // Token-issuance authority/registry: deploys per-issuer tokens as EIP-1167 clones of immutable templates,
+  // gates creation behind TOKEN_ISSUER_ROLE, and screens issuers via the SanctionsGuard. Upgradeable (stable
+  // address, append-only storage) like the membership/wager proxies; to change logic, run an upgrade
+  // (lib/upgradeable.js `upgradeProxy`), not this script. The open ERC-20/721 + ERC-1404 classes ship now; the
+  // T-REX/ERC-3643 class (US4) is deferred (the vendored suite is OZ-4.x / Solidity-0.8.17 only). The clone
+  // templates are immutable and deployed deterministically; their initializers are disabled in-constructor.
+  console.log("\nDeploying token templates (spec 028)...");
+  const openERC20Tpl = await deployDeterministic(
+    "OpenERC20", [], generateSalt(SALT_PREFIXES.V2 + "OpenERC20"), deployer
+  );
+  const openERC721Tpl = await deployDeterministic(
+    "OpenERC721", [], generateSalt(SALT_PREFIXES.V2 + "OpenERC721"), deployer
+  );
+  const restrictedERC20Tpl = await deployDeterministic(
+    "RestrictedERC20", [], generateSalt(SALT_PREFIXES.V2 + "RestrictedERC20"), deployer
+  );
+  deployments.openERC20Impl = openERC20Tpl.address;
+  deployments.openERC721Impl = openERC721Tpl.address;
+  deployments.restrictedERC20Impl = restrictedERC20Tpl.address;
+
+  console.log("\nDeploying TokenFactory behind a UUPS proxy...");
+  const tokenFactoryProxy = await deployProxy({
+    name: "TokenFactory",
+    initArgs: [
+      deployer.address,
+      guardDeploy.address, // issuers screened by the same SanctionsGuard wired into the rest of the platform
+      openERC20Tpl.address,
+      openERC721Tpl.address,
+      restrictedERC20Tpl.address,
+    ],
+  });
+  // Re-sync the client-side NonceManager after the plugin's raw-signer txs (see WagerRegistry note above).
+  if (typeof deployer.reset === "function") deployer.reset();
+  deployments.tokenFactory = tokenFactoryProxy.proxy;
+  deployments.tokenFactoryImpl = tokenFactoryProxy.implementation;
+
+  // Grant the deployer (platform admin) the issuer role so issuance is usable immediately; the admin can
+  // grant/revoke TOKEN_ISSUER_ROLE to other members out-of-band (research R4).
+  {
+    const tokenFactory = tokenFactoryProxy.contract;
+    const issuerRole = await tokenFactory.TOKEN_ISSUER_ROLE();
+    if (!(await tokenFactory.hasRole(issuerRole, deployer.address))) {
+      const tx = await tokenFactory.connect(deployer).grantRole(issuerRole, deployer.address);
+      await tx.wait();
+      console.log("  ✓ TOKEN_ISSUER_ROLE granted to deployer");
+    }
+  }
+
   // -------- Summary --------
   console.log("\n" + "=".repeat(60));
   console.log("Deployment Summary");
@@ -514,6 +563,11 @@ async function main() {
     wagerRegistryImpl: [],
     sanctionsGuard: [deployer.address, sanctionsOracleAddr],
     keyRegistry: [],
+    // spec 028: UUPS factory impl verified with empty args; clone templates have no constructor args.
+    tokenFactoryImpl: [],
+    openERC20Impl: [],
+    openERC721Impl: [],
+    restrictedERC20Impl: [],
   };
   if (!flags.noPolymarket) constructorArgs.polymarketAdapter = [deployer.address, polymarketCTF];
   if (oracleDeployments.chainlinkDataFeedAdapter) constructorArgs.chainlinkDataFeedAdapter = [deployer.address];
@@ -544,6 +598,12 @@ async function main() {
       wagerRegistryImpl: regProxy.implementation, // current implementation (changes on upgrade)
       keyRegistry: keyDeploy.address,
       sanctionsGuard: guardDeploy.address,
+      // spec 028 — token issuance: factory proxy (stable) + impl (changes on upgrade) + immutable templates.
+      tokenFactory: tokenFactoryProxy.proxy,
+      tokenFactoryImpl: tokenFactoryProxy.implementation,
+      openERC20Impl: openERC20Tpl.address,
+      openERC721Impl: openERC721Tpl.address,
+      restrictedERC20Impl: restrictedERC20Tpl.address,
       ...oracleDeployments,
     },
     mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF || deployments.mockSanctionsOracle

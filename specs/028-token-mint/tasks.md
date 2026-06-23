@@ -45,7 +45,7 @@ indexing in `subgraph/`, UI in `frontend/src/`.
 - [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T001 Add the vendored ERC-3643 suite (`@tokenysolutions/t-rex`) and ONCHAINID (`@onchain-id/solidity`) as pinned dependencies in `package.json` and run install (sole new core dependency per plan Complexity Tracking)
 - [X] T002 [P] Create the `contracts/tokens/` package skeleton (`interfaces/`, `templates/`, `compliance/`) with SPDX/pragma `^0.8.24` headers matching repo style
 - [X] T003 [P] Add `{ name: "TokenFactory", deploymentsKey: "tokenFactory" }` to the contract list in `scripts/deploy/check-storage-layout.js`
-- [ ] T004 [P] Scaffold the frontend token module directory `frontend/src/components/tokens/` and a lazy route stub wired into the app shell (no logic yet)
+- [X] T004 [P] Scaffold the frontend token module directory `frontend/src/components/tokens/` and a lazy route stub wired into the app shell (no logic yet)
 
 **Checkpoint**: Package compiles empty; tooling recognizes the new contract + module.
 
@@ -64,9 +64,9 @@ implemented until this phase is complete.**
 - [X] T008 Implement the shared issuance internals in `contracts/tokens/TokenFactory.sol`: a sanctions-screening check on `msg.sender` (fail-closed via `ISanctionsGuard`, `address(0)` disables), an append-only `_recordToken(...)` helper (CEI — write only after successful deploy) emitting `TokenCreated`, and the registry views (`getToken`, `getTokensByIssuer`, `getTokenIdByAddress`, `tokenCount`)
 - [X] T009 [P] Write `test/tokens/TokenFactory.test.js`: role/sanctions gating on a stub `create`, registry append/views, network-scoped reads, no-write-on-revert (CEI), admin-setter authorization
 - [X] T010 [P] Write `test/upgradeable/TokenFactory.upgrade.test.js`: deploy proxy → upgrade → state preserved → non-`UPGRADER_ROLE` rejected → re-init rejected → storage-incompatible impl rejected by OZ `validateUpgrade`
-- [ ] T011 Extend `scripts/deploy/deploy.js` to deploy `TokenFactory` as proxy+impl via `scripts/deploy/lib/upgradeable.js`, grant `TOKEN_ISSUER_ROLE`/wire `SanctionsGuard`, and record `tokenFactory` + `tokenFactoryImpl` in `deployments/*.json` (template/suite addresses filled by later phases)
+- [X] T011 Extend `scripts/deploy/deploy.js` to deploy `TokenFactory` as proxy+impl via `scripts/deploy/lib/upgradeable.js`, grant `TOKEN_ISSUER_ROLE`/wire `SanctionsGuard`, and record `tokenFactory` + `tokenFactoryImpl` in `deployments/*.json` (template/suite addresses filled by later phases)
 - [X] T012 [P] Verify `npm run check:storage-layout` passes for the `TokenFactory` baseline and document the EthTrust-SL ≥ L2 reasoning stub in `contracts/tokens/TokenFactory.sol` NatSpec
-- [ ] T013 [P] Add a frontend network-gating utility in `frontend/src/components/tokens/useTokenFactory.js` that resolves the `tokenFactory` address from synced artifacts for the active chain and disables the feature when absent (FR-023)
+- [X] T013 [P] Add a frontend network-gating utility in `frontend/src/components/tokens/useTokenFactory.js` that resolves the `tokenFactory` address from synced artifacts for the active chain and disables the feature when absent (FR-023)
 
 **Checkpoint**: `TokenFactory` deploys, upgrades safely, gates issuance by role + sanctions, and records tokens — ready for per-class entrypoints.
 
@@ -89,12 +89,12 @@ implemented until this phase is complete.**
 - [X] T017 [P] [US1] Implement `contracts/tokens/templates/OpenERC20.sol` (OZ `ERC20`/`ERC20Burnable`/`ERC20Pausable` + `Ownable`, initializable clone, `_initialized` lockout) with owner `mint`, `pause`/`unpause`, and a fail-closed `SanctionsGuard` check in `_update` per `contracts/open-tokens.md`
 - [X] T018 [P] [US1] Implement `contracts/tokens/templates/OpenERC721.sol` (OZ `ERC721`+`ERC721URIStorage`(+`ERC721Burnable`) + `Ownable`, initializable clone) with owner `mint(to,uri)` and the `SanctionsGuard` transfer-hook check
 - [X] T019 [US1] Add `createOpenERC20(...)` and `createOpenERC721(...)` to `contracts/tokens/TokenFactory.sol` (clone the matching template, `initialize` with `msg.sender` as owner + the guard, `_recordToken`) — depends on T008, T017, T018
-- [ ] T020 [US1] Extend `scripts/deploy/deploy.js` to deploy the open ERC-20 (4 variants) and ERC-721 (2 variants) implementation templates, pass them to `TokenFactory.initialize`, and record their addresses in `deployments/*.json`
+- [X] T020 [US1] Extend `scripts/deploy/deploy.js` to deploy the open ERC-20 (4 variants) and ERC-721 (2 variants) implementation templates, pass them to `TokenFactory.initialize`, and record their addresses in `deployments/*.json`
 - [ ] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`) for subgraph-enabled networks (Amoy/Polygon); ensure the frontend reads fall back to on-chain factory-registry RPC reads on subgraph-less networks (Mordor)
-- [ ] T022 [US1] Build the open-token creation wizard step in `frontend/src/components/tokens/CreateTokenWizard.jsx` (choose ERC-20/721, configure name/symbol/decimals/supply/burnable/pausable, submit real tx) with honest pending/confirmed/failed state (no finalized-before-confirm) — uses `useTokenFactory`
-- [ ] T023 [US1] Render the issuer's token list in `frontend/src/components/tokens/TokenList.jsx` from the subgraph + on-chain reads, showing only the active network's tokens and never a token before its tx confirms
-- [ ] T024 [US1] Run `npm run sync:frontend-contracts` and wire the `TokenFactory`/template ABIs+addresses into the frontend via the synced artifacts (no hand-copied addresses)
-- [ ] T025 [P] [US1] `frontend` Vitest in `frontend/src/components/tokens/__tests__/CreateTokenWizard.test.jsx`: form validation (empty name/symbol, bad decimals/supply), pending→confirmed UI transitions, no phantom token on reject
+- [X] T022 [US1] Build the open-token creation wizard step in `frontend/src/components/tokens/CreateTokenWizard.jsx` (choose ERC-20/721, configure name/symbol/decimals/supply/burnable/pausable, submit real tx) with honest pending/confirmed/failed state (no finalized-before-confirm) — uses `useTokenFactory`
+- [X] T023 [US1] Render the issuer's token list in `frontend/src/components/tokens/TokenList.jsx` from the subgraph + on-chain reads, showing only the active network's tokens and never a token before its tx confirms
+- [X] T024 [US1] Run `npm run sync:frontend-contracts` and wire the `TokenFactory`/template ABIs+addresses into the frontend via the synced artifacts (no hand-copied addresses)
+- [X] T025 [P] [US1] `frontend` Vitest in `frontend/src/components/tokens/__tests__/CreateTokenWizard.test.jsx`: form validation (empty name/symbol, bad decimals/supply), pending→confirmed UI transitions, no phantom token on reject
 
 **Checkpoint**: An authorized user can mint an open ERC-20/721 end-to-end against real chain state and see it listed — MVP deployable.
 
@@ -113,8 +113,8 @@ implemented until this phase is complete.**
 ### Implementation for User Story 2
 
 - [X] T027 [US2] Confirm/extend ownership-transfer support on the open templates in `contracts/tokens/templates/OpenERC20.sol` and `OpenERC721.sol` (OZ `Ownable` transfer; emit on transfer) — depends on T017/T018
-- [ ] T028 [US2] Build the per-token admin surface `frontend/src/components/tokens/TokenAdminPanel.jsx` that reads the token's standard/capabilities and renders **only** valid controls (mint always; pause/unpause if pausable; burn note if burnable; transfer ownership), each as a real tx with honest state
-- [ ] T029 [P] [US2] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenAdminPanel.test.jsx`: capability-gated rendering (no pause control for non-pausable), unauthorized action surfaces the on-chain rejection reason
+- [X] T028 [US2] Build the per-token admin surface `frontend/src/components/tokens/TokenAdminPanel.jsx` that reads the token's standard/capabilities and renders **only** valid controls (mint always; pause/unpause if pausable; burn note if burnable; transfer ownership), each as a real tx with honest state
+- [X] T029 [P] [US2] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenAdminPanel.test.jsx`: capability-gated rendering (no pause control for non-pausable), unauthorized action surfaces the on-chain rejection reason
 
 **Checkpoint**: US1 + US2 give a complete open-token issue→administer lifecycle.
 
@@ -136,9 +136,9 @@ implemented until this phase is complete.**
 - [X] T032 [P] [US3] Define the Simple Restricted Token interface in `contracts/tokens/interfaces/IERC1404.sol` (`detectTransferRestriction`, `messageForTransferRestriction`)
 - [X] T033 [US3] Implement `contracts/tokens/templates/RestrictedERC20.sol` per `contracts/erc1404-restricted.md`: eligibility + freeze + `SanctionsGuard` policy, fixed reason enum, detector and `_update` evaluating the **same** policy (sanctions→frozen→eligibility), owner admin (`setEligible[Batch]`, `setFrozen`, `mint`) — depends on T032
 - [X] T034 [US3] Add `createRestrictedERC20(...)` to `contracts/tokens/TokenFactory.sol` (clone template, init with initial eligibility + guard, `_recordToken`) — depends on T008, T033
-- [ ] T035 [US3] Extend `scripts/deploy/deploy.js` to deploy the `RestrictedERC20` template and record its address; add the `RESTRICTED_ERC1404` standard to the subgraph mapping
-- [ ] T036 [US3] Add the restricted-token path to `CreateTokenWizard.jsx` and a policy admin section (eligibility list, freeze) plus an **eligibility pre-check** display calling `detectTransferRestriction` in `frontend/src/components/tokens/TokenAdminPanel.jsx`
-- [ ] T037 [P] [US3] `frontend` Vitest covering the eligibility pre-check display matching on-chain restriction codes/messages
+- [X] T035 [US3] Extend `scripts/deploy/deploy.js` to deploy the `RestrictedERC20` template and record its address; add the `RESTRICTED_ERC1404` standard to the subgraph mapping
+- [X] T036 [US3] Add the restricted-token path to `CreateTokenWizard.jsx` and a policy admin section (eligibility list, freeze) plus an **eligibility pre-check** display calling `detectTransferRestriction` in `frontend/src/components/tokens/TokenAdminPanel.jsx`
+- [X] T037 [P] [US3] `frontend` Vitest covering the eligibility pre-check display matching on-chain restriction codes/messages
 
 **Checkpoint**: US1–US3 functional; compliant transfer restrictions with honest reasons.
 
