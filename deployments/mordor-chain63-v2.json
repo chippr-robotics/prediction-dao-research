@@ -22,7 +22,7 @@
     "restrictedERC20Impl": "0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444",
     "openERC20V2Impl": "0x92169007926fBc8Ac90cdD311dD3C2557158C395",
     "openERC721V2Impl": "0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE",
-    "restrictedERC20V2Impl": "0x30D62a339aE6b6bC08004f7b68E9520A6bF8CC7E"
+    "restrictedERC20V2Impl": "0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -60,5 +60,6 @@
     "voucherBatchMinter": 16407208
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
-  "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z"
+  "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
+  "tokenV2TemplatesSyncedAt": "2026-06-23T23:32:04.921Z"
 }

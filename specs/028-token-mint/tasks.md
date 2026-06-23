@@ -337,11 +337,11 @@ configurable default restriction message — on the v2 templates.
 **Independent test**: Pause blocks transfers; freeze an address (appears in the list) then
 unfreeze; add/revoke allowlist entries and confirm detector parity + the default message.
 
-- [ ] T071 [US7] Add an enumerable frozen-address set + views (`frozenList`/`frozenCount`) to `contracts/tokens/lib/TransferPolicy.sol` / the v2 templates so the UI can list currently-frozen wallets (FR-033) — depends on T064
-- [ ] T072 [P] [US7] `test/tokens/v2-transfer-controls.test.js`: pause/unpause gating (PAUSER), freeze/unfreeze gating (COMPLIANCE) + frozen-list view, frozen balance cannot move, both authorized + unauthorized paths
-- [ ] T073 [US8] Finalize compliance setters on `RestrictedERC20V2.sol`: `setEligible`/`setEligibleBatch` (COMPLIANCE), `setDefaultRestrictionMessage`, fixed restriction-code map — depends on T066
-- [ ] T074 [P] [US8] `test/integration/tokens/v2-compliance.test.js`: allowlist add/batch/revoke changes eligibility; ineligible transfer reverts with code+message; default message settable; sanctions dominates eligibility
-- [ ] T075 [US8] Run Slither/Medusa locally where available (else document for CI) over the v2 templates + policy lib; resolve/justify any high/critical — no new high/critical
+- [X] T071 [US7] Add an enumerable frozen-address set + views (`frozenList`/`frozenCount`) to `contracts/tokens/lib/TransferPolicy.sol` / the v2 templates so the UI can list currently-frozen wallets (FR-033) — depends on T064
+- [X] T072 [P] [US7] `test/tokens/v2-transfer-controls.test.js`: pause/unpause gating (PAUSER), freeze/unfreeze gating (COMPLIANCE) + frozen-list view, frozen balance cannot move, both authorized + unauthorized paths
+- [X] T073 [US8] Finalize compliance setters on `RestrictedERC20V2.sol`: `setEligible`/`setEligibleBatch` (COMPLIANCE), `setDefaultRestrictionMessage`, fixed restriction-code map — depends on T066
+- [X] T074 [P] [US8] `test/integration/tokens/v2-compliance.test.js`: allowlist add/batch/revoke changes eligibility; ineligible transfer reverts with code+message; default message settable; sanctions dominates eligibility
+- [X] T075 [US8] Run Slither/Medusa locally where available (else document for CI) over the v2 templates + policy lib; resolve/justify any high/critical — no new high/critical
 
 **Checkpoint**: v2 transfer controls + compliance fully enforced on-chain with tests.
 

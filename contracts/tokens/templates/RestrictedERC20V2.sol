@@ -14,8 +14,13 @@ contract RestrictedERC20V2 is OpenERC20V2, IERC1404 {
 
     mapping(address => bool) public eligible;
     string public defaultRestrictionMessage;
+    /// @notice Toggleable transfer-restriction rule (FR-034): when false, the eligibility allowlist is NOT
+    ///         enforced (sanctions, pause, and freeze still apply — those are non-toggleable). COMPLIANCE-gated;
+    ///         defaults to true (allowlist enforced).
+    bool public eligibilityEnforced;
 
     event EligibilityUpdated(address indexed account, bool eligible);
+    event EligibilityEnforcementUpdated(bool enforced);
 
     /// @notice One-time clone initializer. Sets up the OpenERC20V2 bases + roles, grants COMPLIANCE_ROLE to the
     ///         owner, marks the owner + `initialEligible` eligible, and sets a default restriction message.
@@ -38,6 +43,7 @@ contract RestrictedERC20V2 is OpenERC20V2, IERC1404 {
             eligible[initialEligible[i]] = true;
         }
         defaultRestrictionMessage = "Transfer not permitted by token policy";
+        eligibilityEnforced = true;
 
         // Mint after eligibility is seeded so the owner (eligible) passes the policy in _update.
         if (initialSupply > 0) _mint(owner_, initialSupply);
@@ -78,6 +84,13 @@ contract RestrictedERC20V2 is OpenERC20V2, IERC1404 {
         emit DefaultRestrictionMessageUpdated(message);
     }
 
+    /// @notice Toggle whether the eligibility allowlist is enforced on transfers (FR-034). Sanctions, pause, and
+    ///         freeze remain enforced regardless.
+    function setEligibilityEnforced(bool enforced) external onlyRole(COMPLIANCE_ROLE) {
+        eligibilityEnforced = enforced;
+        emit EligibilityEnforcementUpdated(enforced);
+    }
+
     /// @dev Freeze is a compliance action here (override the base's DEFAULT_ADMIN gate to COMPLIANCE_ROLE).
     function setFrozen(address account, bool isFrozen) public override onlyRole(COMPLIANCE_ROLE) {
         _setFrozenInternal(account, isFrozen);
@@ -108,6 +121,7 @@ contract RestrictedERC20V2 is OpenERC20V2, IERC1404 {
 
     /// @dev Eligibility extension to the shared policy (sender/recipient must be eligible).
     function _extraRestrictionCode(address from, address to) internal view override returns (uint8) {
+        if (!eligibilityEnforced) return SUCCESS; // FR-034: allowlist rule toggled off (sanctions/freeze still apply)
         if (from != address(0) && !eligible[from]) return SENDER_NOT_ELIGIBLE;
         if (to != address(0) && !eligible[to]) return RECIPIENT_NOT_ELIGIBLE;
         return SUCCESS;
