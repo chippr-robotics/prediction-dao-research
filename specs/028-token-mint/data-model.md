@@ -11,11 +11,14 @@ addresses, and the network's token registry.
 | Field | Type | Notes |
 |-------|------|-------|
 | `sanctionsGuard` | `ISanctionsGuard` | Screening for issuers + injected into issued tokens. `address(0)` disables (mirrors `MembershipManager`). |
-| `openERC20Impl` / `openERC20BurnableImpl` / `openERC20PausableImpl` / `openERC20BurnablePausableImpl` | `address` | Immutable clone templates (set once at init/deploy). |
-| `openERC721Impl` / `openERC721BurnableImpl` | `address` | Clone templates. |
+| `openERC20Impl` | `address` | Immutable ERC-20 clone template (burnable/pausable are **init flags**, not separate impls — see note). |
+| `openERC721Impl` | `address` | Immutable ERC-721 clone template (burnable is an init flag). |
 | `restrictedERC20Impl` | `address` | ERC-1404 clone template. |
-| `trexGateway` | `address` | Entry point to the vendored T-REX suite deployment path. |
-| `sanctionsComplianceModule` | `address` | ERC-3643 compliance module delegating to `sanctionsGuard`. |
+| ~~`trexGateway` / `sanctionsComplianceModule`~~ | `address` | **DEFERRED (US4/T-REX).** Not yet declared; will be appended from `__gap` when the OZ-4-only ERC-3643 class is unblocked. |
+
+> **As-built note (2026-06-23):** one clone impl **per standard** (not per burnable/pausable variant); the
+> capability flags live on the template and a disabled capability reverts. The T-REX/ERC-3643 fields are
+> reserved but not yet in storage (deferred — OZ 4.x / Solidity 0.8.17 incompatibility).
 | `tokenCount` | `uint256` | Monotonic id allocator. |
 | `tokens` | `mapping(uint256 => TokenRecord)` | Registry by id. |
 | `issuerTokens` | `mapping(address => uint256[])` | Issuer → token ids (admin list). |

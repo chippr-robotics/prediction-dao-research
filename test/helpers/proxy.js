@@ -38,4 +38,51 @@ async function deployMembershipManager(initArgs) {
   return Impl.attach(await proxy.getAddress());
 }
 
-module.exports = { deployWagerRegistry, deployMembershipManager };
+/// Deploy the three OZ-5-native clone implementation templates (spec 028) and return their addresses.
+async function deployTokenTemplates() {
+  const OpenERC20 = await ethers.getContractFactory("OpenERC20");
+  const openERC20Impl = await OpenERC20.deploy();
+  await openERC20Impl.waitForDeployment();
+
+  const OpenERC721 = await ethers.getContractFactory("OpenERC721");
+  const openERC721Impl = await OpenERC721.deploy();
+  await openERC721Impl.waitForDeployment();
+
+  const RestrictedERC20 = await ethers.getContractFactory("RestrictedERC20");
+  const restrictedERC20Impl = await RestrictedERC20.deploy();
+  await restrictedERC20Impl.waitForDeployment();
+
+  return {
+    openERC20Impl: await openERC20Impl.getAddress(),
+    openERC721Impl: await openERC721Impl.getAddress(),
+    restrictedERC20Impl: await restrictedERC20Impl.getAddress(),
+  };
+}
+
+/// Deploy TokenFactory behind an ERC1967 UUPS proxy (spec 028) with freshly-deployed templates, and return the
+/// contract bound to the proxy address. `opts.admin` is required; `opts.sanctionsGuard` defaults to zero
+/// (screening disabled). Same manual-proxy rationale as the helpers above.
+async function deployTokenFactory({ admin, sanctionsGuard = ethers.ZeroAddress } = {}) {
+  const templates = await deployTokenTemplates();
+
+  const Impl = await ethers.getContractFactory("TokenFactory");
+  const impl = await Impl.deploy();
+  await impl.waitForDeployment();
+
+  const initArgs = [
+    admin,
+    sanctionsGuard,
+    templates.openERC20Impl,
+    templates.openERC721Impl,
+    templates.restrictedERC20Impl,
+  ];
+  const initData = Impl.interface.encodeFunctionData("initialize", initArgs);
+  const Proxy = await ethers.getContractFactory("ERC1967Proxy");
+  const proxy = await Proxy.deploy(await impl.getAddress(), initData);
+  await proxy.waitForDeployment();
+
+  const factory = Impl.attach(await proxy.getAddress());
+  return { factory, templates };
+}
+
+module.exports = { deployWagerRegistry, deployMembershipManager, deployTokenTemplates, deployTokenFactory };

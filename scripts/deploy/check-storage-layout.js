@@ -20,6 +20,7 @@ const path = require("path");
 const UPGRADEABLE_CONTRACTS = [
   { name: "WagerRegistry", deploymentsKey: "wagerRegistry" },
   { name: "MembershipManager", deploymentsKey: "membershipManager" }, // spec 027 — second adopter of UUPSManaged
+  { name: "TokenFactory", deploymentsKey: "tokenFactory" }, // spec 028 — token-issuance authority/registry
 ];
 
 function loadDeployedImpl(deploymentsKey) {

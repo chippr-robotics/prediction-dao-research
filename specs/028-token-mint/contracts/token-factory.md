@@ -1,5 +1,17 @@
 # Contract: TokenFactory (platform authority / registry)
 
+> **Implementation note (2026-06-23 — `/speckit-implement`).** Shipped on **OpenZeppelin 5.4.0** (the latest
+> ETC/Mordor-compatible OZ; OZ ≥5.5 needs the Cancun `mcopy` opcode that pre-Cancun ETC lacks). Two deviations
+> from the sketch below, both within the spec's stated allowances:
+> 1. **One clone impl per standard**, not per variant: `openERC20Impl`, `openERC721Impl`, `restrictedERC20Impl`.
+>    Burnable/pausable are init **flags** on a single `OpenERC20` template (a disabled capability reverts), so
+>    `setTemplate(TokenStandard standard, address impl)` drops the `variant` arg. (open-tokens.md explicitly
+>    permits the flag form.)
+> 2. **T-REX / ERC-3643 (createPermissionedERC3643, gateway, compliance module) is DEFERRED** — the canonical
+>    suite only supports OZ 4.x + Solidity 0.8.17. `TokenStandard.PERMISSIONED_ERC3643` + `TokenRecord.suite`
+>    are reserved so the registry shape stays forward-stable; the gateway/module storage will be appended (from
+>    `__gap`) when the class lands.
+
 UUPS-upgradeable. Inherits `contracts/upgradeable/UUPSManaged.sol` (UUPS + AccessControl + non-brickable upgrade
 gate + impl-init lockout) and `ReentrancyGuardUpgradeable`. The only state-bearing platform contract; issued
 tokens are separate. Maps to FR-001–007, FR-018–026.

@@ -15,6 +15,16 @@ integration + (for external protocols) fork tests written alongside behavior. Th
 **Organization**: Tasks are grouped by user story (US1–US5 from spec.md) for independent implementation and
 testing.
 
+> **Implementation status (2026-06-23 — `/speckit-implement`).** The OZ-5-native contract layer is built and
+> green: `TokenFactory` (UUPS, role+sanctions-gated, registry) + `OpenERC20`/`OpenERC721`/`RestrictedERC20`
+> clone templates + interfaces + upgrade/bad-layout mocks, with 49 passing Hardhat tests (unit + integration +
+> upgrade-lifecycle) and the factory registered in `check:storage-layout`. **Built on OpenZeppelin 5.4.0** —
+> the user's "latest OZ across all features" directive resolves to *latest ETC-compatible* OZ (5.4.0), because
+> OZ ≥5.5 pulls in the Cancun `mcopy` opcode (`EnumerableSet`→`Arrays`) and Mordor/ETC is pre-Cancun.
+> **US4 (T-REX / ERC-3643) is DEFERRED** (T001 + T038–T047): the canonical T-REX suite only supports OZ 4.x +
+> Solidity 0.8.17, incompatible with the repo's OZ pin. Remaining OZ-5-native work: deploy-script wiring,
+> subgraph datasource, and the frontend module (wizard/list/admin + Vitest).
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
@@ -32,9 +42,9 @@ indexing in `subgraph/`, UI in `frontend/src/`.
 
 **Purpose**: Project initialization and scaffolding shared by all stories.
 
-- [ ] T001 Add the vendored ERC-3643 suite (`@tokenysolutions/t-rex`) and ONCHAINID (`@onchain-id/solidity`) as pinned dependencies in `package.json` and run install (sole new core dependency per plan Complexity Tracking)
-- [ ] T002 [P] Create the `contracts/tokens/` package skeleton (`interfaces/`, `templates/`, `compliance/`) with SPDX/pragma `^0.8.24` headers matching repo style
-- [ ] T003 [P] Add `{ name: "TokenFactory", deploymentsKey: "tokenFactory" }` to the contract list in `scripts/deploy/check-storage-layout.js`
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T001 Add the vendored ERC-3643 suite (`@tokenysolutions/t-rex`) and ONCHAINID (`@onchain-id/solidity`) as pinned dependencies in `package.json` and run install (sole new core dependency per plan Complexity Tracking)
+- [X] T002 [P] Create the `contracts/tokens/` package skeleton (`interfaces/`, `templates/`, `compliance/`) with SPDX/pragma `^0.8.24` headers matching repo style
+- [X] T003 [P] Add `{ name: "TokenFactory", deploymentsKey: "tokenFactory" }` to the contract list in `scripts/deploy/check-storage-layout.js`
 - [ ] T004 [P] Scaffold the frontend token module directory `frontend/src/components/tokens/` and a lazy route stub wired into the app shell (no logic yet)
 
 **Checkpoint**: Package compiles empty; tooling recognizes the new contract + module.
@@ -48,14 +58,14 @@ implemented until this phase is complete.**
 
 **⚠️ CRITICAL**: Blocks US1–US5.
 
-- [ ] T005 [P] Define `TokenStandard` enum and `TokenRecord`/`TrexSuiteRef` structs and the `ITokenFactory` surface (events, create signatures, views) in `contracts/tokens/interfaces/ITokenFactory.sol` per `contracts/token-factory.md`
-- [ ] T006 Implement `TokenFactory` shell in `contracts/tokens/TokenFactory.sol`: inherit `UUPSManaged` + `ReentrancyGuardUpgradeable`; define `TOKEN_ISSUER_ROLE`; append-only storage (guard, template/gateway/module addresses, `tokenCount`, `tokens`, `issuerTokens`, `tokenAddressToId`) with trailing `__gap`; constructor disables initializers via base
-- [ ] T007 Implement `TokenFactory.initialize(admin, sanctionsGuard_, …)` (calls `__UUPSManaged_init` first, then `__ReentrancyGuard_init`; one-time `initializer`) and the `onlyRole(DEFAULT_ADMIN_ROLE)` admin setters (`setSanctionsGuard`, `setTemplate`, `setTrexGateway`, `setSanctionsComplianceModule`) in `contracts/tokens/TokenFactory.sol`
-- [ ] T008 Implement the shared issuance internals in `contracts/tokens/TokenFactory.sol`: a sanctions-screening check on `msg.sender` (fail-closed via `ISanctionsGuard`, `address(0)` disables), an append-only `_recordToken(...)` helper (CEI — write only after successful deploy) emitting `TokenCreated`, and the registry views (`getToken`, `getTokensByIssuer`, `getTokenIdByAddress`, `tokenCount`)
-- [ ] T009 [P] Write `test/tokens/TokenFactory.test.js`: role/sanctions gating on a stub `create`, registry append/views, network-scoped reads, no-write-on-revert (CEI), admin-setter authorization
-- [ ] T010 [P] Write `test/upgradeable/TokenFactory.upgrade.test.js`: deploy proxy → upgrade → state preserved → non-`UPGRADER_ROLE` rejected → re-init rejected → storage-incompatible impl rejected by OZ `validateUpgrade`
+- [X] T005 [P] Define `TokenStandard` enum and `TokenRecord`/`TrexSuiteRef` structs and the `ITokenFactory` surface (events, create signatures, views) in `contracts/tokens/interfaces/ITokenFactory.sol` per `contracts/token-factory.md`
+- [X] T006 Implement `TokenFactory` shell in `contracts/tokens/TokenFactory.sol`: inherit `UUPSManaged` + `ReentrancyGuardUpgradeable`; define `TOKEN_ISSUER_ROLE`; append-only storage (guard, template/gateway/module addresses, `tokenCount`, `tokens`, `issuerTokens`, `tokenAddressToId`) with trailing `__gap`; constructor disables initializers via base
+- [X] T007 Implement `TokenFactory.initialize(admin, sanctionsGuard_, …)` (calls `__UUPSManaged_init` first, then `__ReentrancyGuard_init`; one-time `initializer`) and the `onlyRole(DEFAULT_ADMIN_ROLE)` admin setters (`setSanctionsGuard`, `setTemplate`, `setTrexGateway`, `setSanctionsComplianceModule`) in `contracts/tokens/TokenFactory.sol`
+- [X] T008 Implement the shared issuance internals in `contracts/tokens/TokenFactory.sol`: a sanctions-screening check on `msg.sender` (fail-closed via `ISanctionsGuard`, `address(0)` disables), an append-only `_recordToken(...)` helper (CEI — write only after successful deploy) emitting `TokenCreated`, and the registry views (`getToken`, `getTokensByIssuer`, `getTokenIdByAddress`, `tokenCount`)
+- [X] T009 [P] Write `test/tokens/TokenFactory.test.js`: role/sanctions gating on a stub `create`, registry append/views, network-scoped reads, no-write-on-revert (CEI), admin-setter authorization
+- [X] T010 [P] Write `test/upgradeable/TokenFactory.upgrade.test.js`: deploy proxy → upgrade → state preserved → non-`UPGRADER_ROLE` rejected → re-init rejected → storage-incompatible impl rejected by OZ `validateUpgrade`
 - [ ] T011 Extend `scripts/deploy/deploy.js` to deploy `TokenFactory` as proxy+impl via `scripts/deploy/lib/upgradeable.js`, grant `TOKEN_ISSUER_ROLE`/wire `SanctionsGuard`, and record `tokenFactory` + `tokenFactoryImpl` in `deployments/*.json` (template/suite addresses filled by later phases)
-- [ ] T012 [P] Verify `npm run check:storage-layout` passes for the `TokenFactory` baseline and document the EthTrust-SL ≥ L2 reasoning stub in `contracts/tokens/TokenFactory.sol` NatSpec
+- [X] T012 [P] Verify `npm run check:storage-layout` passes for the `TokenFactory` baseline and document the EthTrust-SL ≥ L2 reasoning stub in `contracts/tokens/TokenFactory.sol` NatSpec
 - [ ] T013 [P] Add a frontend network-gating utility in `frontend/src/components/tokens/useTokenFactory.js` that resolves the `tokenFactory` address from synced artifacts for the active chain and disables the feature when absent (FR-023)
 
 **Checkpoint**: `TokenFactory` deploys, upgrades safely, gates issuance by role + sanctions, and records tokens — ready for per-class entrypoints.
@@ -70,15 +80,15 @@ implemented until this phase is complete.**
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T014 [P] [US1] `test/tokens/OpenERC20.test.js`: each variant (basic/burnable/pausable/burnable+pausable) initializes once, mints initial supply to owner, exposes only selected options; template itself cannot be re-initialized
-- [ ] T015 [P] [US1] `test/tokens/OpenERC721.test.js`: basic/burnable collection init, owner `mint(to,uri)`, holder `burn` (burnable only)
-- [ ] T016 [P] [US1] `test/integration/tokens/open-token-create.test.js`: `createOpenERC20`/`createOpenERC721` happy path (event, deployed token, single registry record, issuer list), unauthorized caller rejected, sanctioned issuer rejected (no registry write)
+- [X] T014 [P] [US1] `test/tokens/OpenERC20.test.js`: each variant (basic/burnable/pausable/burnable+pausable) initializes once, mints initial supply to owner, exposes only selected options; template itself cannot be re-initialized
+- [X] T015 [P] [US1] `test/tokens/OpenERC721.test.js`: basic/burnable collection init, owner `mint(to,uri)`, holder `burn` (burnable only)
+- [X] T016 [P] [US1] `test/integration/tokens/open-token-create.test.js`: `createOpenERC20`/`createOpenERC721` happy path (event, deployed token, single registry record, issuer list), unauthorized caller rejected, sanctioned issuer rejected (no registry write)
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Implement `contracts/tokens/templates/OpenERC20.sol` (OZ `ERC20`/`ERC20Burnable`/`ERC20Pausable` + `Ownable`, initializable clone, `_initialized` lockout) with owner `mint`, `pause`/`unpause`, and a fail-closed `SanctionsGuard` check in `_update` per `contracts/open-tokens.md`
-- [ ] T018 [P] [US1] Implement `contracts/tokens/templates/OpenERC721.sol` (OZ `ERC721`+`ERC721URIStorage`(+`ERC721Burnable`) + `Ownable`, initializable clone) with owner `mint(to,uri)` and the `SanctionsGuard` transfer-hook check
-- [ ] T019 [US1] Add `createOpenERC20(...)` and `createOpenERC721(...)` to `contracts/tokens/TokenFactory.sol` (clone the matching template, `initialize` with `msg.sender` as owner + the guard, `_recordToken`) — depends on T008, T017, T018
+- [X] T017 [P] [US1] Implement `contracts/tokens/templates/OpenERC20.sol` (OZ `ERC20`/`ERC20Burnable`/`ERC20Pausable` + `Ownable`, initializable clone, `_initialized` lockout) with owner `mint`, `pause`/`unpause`, and a fail-closed `SanctionsGuard` check in `_update` per `contracts/open-tokens.md`
+- [X] T018 [P] [US1] Implement `contracts/tokens/templates/OpenERC721.sol` (OZ `ERC721`+`ERC721URIStorage`(+`ERC721Burnable`) + `Ownable`, initializable clone) with owner `mint(to,uri)` and the `SanctionsGuard` transfer-hook check
+- [X] T019 [US1] Add `createOpenERC20(...)` and `createOpenERC721(...)` to `contracts/tokens/TokenFactory.sol` (clone the matching template, `initialize` with `msg.sender` as owner + the guard, `_recordToken`) — depends on T008, T017, T018
 - [ ] T020 [US1] Extend `scripts/deploy/deploy.js` to deploy the open ERC-20 (4 variants) and ERC-721 (2 variants) implementation templates, pass them to `TokenFactory.initialize`, and record their addresses in `deployments/*.json`
 - [ ] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`) for subgraph-enabled networks (Amoy/Polygon); ensure the frontend reads fall back to on-chain factory-registry RPC reads on subgraph-less networks (Mordor)
 - [ ] T022 [US1] Build the open-token creation wizard step in `frontend/src/components/tokens/CreateTokenWizard.jsx` (choose ERC-20/721, configure name/symbol/decimals/supply/burnable/pausable, submit real tx) with honest pending/confirmed/failed state (no finalized-before-confirm) — uses `useTokenFactory`
@@ -98,11 +108,11 @@ implemented until this phase is complete.**
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T026 [P] [US2] `test/integration/tokens/open-token-admin.test.js`: owner `mint` increases balance/supply (non-owner rejected); `pause` blocks transfers, `unpause` resumes; non-pausable token has no pause; ownership transfer moves authority (FR-018/FR-019/FR-020)
+- [X] T026 [P] [US2] `test/integration/tokens/open-token-admin.test.js`: owner `mint` increases balance/supply (non-owner rejected); `pause` blocks transfers, `unpause` resumes; non-pausable token has no pause; ownership transfer moves authority (FR-018/FR-019/FR-020)
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Confirm/extend ownership-transfer support on the open templates in `contracts/tokens/templates/OpenERC20.sol` and `OpenERC721.sol` (OZ `Ownable` transfer; emit on transfer) — depends on T017/T018
+- [X] T027 [US2] Confirm/extend ownership-transfer support on the open templates in `contracts/tokens/templates/OpenERC20.sol` and `OpenERC721.sol` (OZ `Ownable` transfer; emit on transfer) — depends on T017/T018
 - [ ] T028 [US2] Build the per-token admin surface `frontend/src/components/tokens/TokenAdminPanel.jsx` that reads the token's standard/capabilities and renders **only** valid controls (mint always; pause/unpause if pausable; burn note if burnable; transfer ownership), each as a real tx with honest state
 - [ ] T029 [P] [US2] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenAdminPanel.test.jsx`: capability-gated rendering (no pause control for non-pausable), unauthorized action surfaces the on-chain rejection reason
 
@@ -118,14 +128,14 @@ implemented until this phase is complete.**
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T030 [P] [US3] `test/tokens/RestrictedERC20.test.js`: detector/transfer parity for SUCCESS/SENDER_NOT_ELIGIBLE/RECIPIENT_NOT_ELIGIBLE/SENDER_FROZEN/SANCTIONED; `messageForTransferRestriction` strings; sanctions dominates eligibility; eligibility/freeze admin owner-only
-- [ ] T031 [P] [US3] `test/integration/tokens/restricted-token.test.js`: `createRestrictedERC20` happy path + record; eligible↔eligible transfer succeeds; ineligible transfer reverts with reason
+- [X] T030 [P] [US3] `test/tokens/RestrictedERC20.test.js`: detector/transfer parity for SUCCESS/SENDER_NOT_ELIGIBLE/RECIPIENT_NOT_ELIGIBLE/SENDER_FROZEN/SANCTIONED; `messageForTransferRestriction` strings; sanctions dominates eligibility; eligibility/freeze admin owner-only
+- [X] T031 [P] [US3] `test/integration/tokens/restricted-token.test.js`: `createRestrictedERC20` happy path + record; eligible↔eligible transfer succeeds; ineligible transfer reverts with reason
 
 ### Implementation for User Story 3
 
-- [ ] T032 [P] [US3] Define the Simple Restricted Token interface in `contracts/tokens/interfaces/IERC1404.sol` (`detectTransferRestriction`, `messageForTransferRestriction`)
-- [ ] T033 [US3] Implement `contracts/tokens/templates/RestrictedERC20.sol` per `contracts/erc1404-restricted.md`: eligibility + freeze + `SanctionsGuard` policy, fixed reason enum, detector and `_update` evaluating the **same** policy (sanctions→frozen→eligibility), owner admin (`setEligible[Batch]`, `setFrozen`, `mint`) — depends on T032
-- [ ] T034 [US3] Add `createRestrictedERC20(...)` to `contracts/tokens/TokenFactory.sol` (clone template, init with initial eligibility + guard, `_recordToken`) — depends on T008, T033
+- [X] T032 [P] [US3] Define the Simple Restricted Token interface in `contracts/tokens/interfaces/IERC1404.sol` (`detectTransferRestriction`, `messageForTransferRestriction`)
+- [X] T033 [US3] Implement `contracts/tokens/templates/RestrictedERC20.sol` per `contracts/erc1404-restricted.md`: eligibility + freeze + `SanctionsGuard` policy, fixed reason enum, detector and `_update` evaluating the **same** policy (sanctions→frozen→eligibility), owner admin (`setEligible[Batch]`, `setFrozen`, `mint`) — depends on T032
+- [X] T034 [US3] Add `createRestrictedERC20(...)` to `contracts/tokens/TokenFactory.sol` (clone template, init with initial eligibility + guard, `_recordToken`) — depends on T008, T033
 - [ ] T035 [US3] Extend `scripts/deploy/deploy.js` to deploy the `RestrictedERC20` template and record its address; add the `RESTRICTED_ERC1404` standard to the subgraph mapping
 - [ ] T036 [US3] Add the restricted-token path to `CreateTokenWizard.jsx` and a policy admin section (eligibility list, freeze) plus an **eligibility pre-check** display calling `detectTransferRestriction` in `frontend/src/components/tokens/TokenAdminPanel.jsx`
 - [ ] T037 [P] [US3] `frontend` Vitest covering the eligibility pre-check display matching on-chain restriction codes/messages
@@ -142,19 +152,19 @@ implemented until this phase is complete.**
 
 ### Tests for User Story 4 ⚠️ (fork + integration — vendored suite)
 
-- [ ] T038 [P] [US4] `test/tokens/erc3643/SanctionsComplianceModule.test.js`: `moduleCheck`/`canTransfer` deny when `SanctionsGuard` denies sender or recipient; no-op hooks; fail-closed
-- [ ] T039 [P] [US4] `test/fork/erc3643-permissioned.test.js`: identity/claim enforcement (verified↔verified succeeds; missing claim reverts); compliance-rule rejection
-- [ ] T040 [P] [US4] `test/fork/erc3643-admin.test.js`: agent freeze (full + partial), forced transfer, recovery to same-identity wallet (and rejection without it), mint/burn, pause; non-agent/owner rejected; sanctioned holder blocked via module despite valid claims
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T038 [P] [US4] `test/tokens/erc3643/SanctionsComplianceModule.test.js`: `moduleCheck`/`canTransfer` deny when `SanctionsGuard` denies sender or recipient; no-op hooks; fail-closed
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T039 [P] [US4] `test/fork/erc3643-permissioned.test.js`: identity/claim enforcement (verified↔verified succeeds; missing claim reverts); compliance-rule rejection
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T040 [P] [US4] `test/fork/erc3643-admin.test.js`: agent freeze (full + partial), forced transfer, recovery to same-identity wallet (and rejection without it), mint/burn, pause; non-agent/owner rejected; sanctioned holder blocked via module despite valid claims
 
 ### Implementation for User Story 4
 
-- [ ] T041 [P] [US4] Implement `contracts/tokens/compliance/SanctionsComplianceModule.sol` implementing the T-REX Modular Compliance `IModule` interface, delegating `moduleCheck`/`canTransfer` to `ISanctionsGuard.isAllowed` (fail-closed), per `contracts/erc3643-trex.md`
-- [ ] T042 [US4] Add T-REX suite deployment wiring to `scripts/deploy/deploy.js` (deploy/configure the TREX gateway/factory + ONCHAINID infra, deploy `SanctionsComplianceModule`, record gateway/module/suite addresses in `deployments/*.json`); pass gateway+module to `TokenFactory.initialize`
-- [ ] T043 [US4] Add `createPermissionedERC3643(TrexParams)` to `contracts/tokens/TokenFactory.sol`: deploy the per-token suite via the gateway with issuer as owner + requested claim topics/trusted issuers, bind `sanctionsComplianceModule` to the token's Modular Compliance, `_recordToken` with suite refs — depends on T008, T041, T042
-- [ ] T044 [US4] Add the `PERMISSIONED_ERC3643` standard + suite refs to the subgraph schema/mapping
-- [ ] T045 [US4] Add the permissioned-token path to `CreateTokenWizard.jsx` (configure claim topics, trusted issuers, compliance options) with real tx + honest state
-- [ ] T046 [US4] Build the permissioned admin surface in `frontend/src/components/tokens/PermissionedAdminPanel.jsx`: agent actions (freeze/unfreeze full+partial, forced transfer, recovery, mint/burn, pause) and registry management (register identity, claim topics, trusted issuers), each gated to the connected actor's authority
-- [ ] T047 [P] [US4] `frontend` Vitest for capability/authority-gated rendering of the permissioned admin surface (agent-only controls hidden/blocked for non-agents)
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T041 [P] [US4] Implement `contracts/tokens/compliance/SanctionsComplianceModule.sol` implementing the T-REX Modular Compliance `IModule` interface, delegating `moduleCheck`/`canTransfer` to `ISanctionsGuard.isAllowed` (fail-closed), per `contracts/erc3643-trex.md`
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T042 [US4] Add T-REX suite deployment wiring to `scripts/deploy/deploy.js` (deploy/configure the TREX gateway/factory + ONCHAINID infra, deploy `SanctionsComplianceModule`, record gateway/module/suite addresses in `deployments/*.json`); pass gateway+module to `TokenFactory.initialize`
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T043 [US4] Add `createPermissionedERC3643(TrexParams)` to `contracts/tokens/TokenFactory.sol`: deploy the per-token suite via the gateway with issuer as owner + requested claim topics/trusted issuers, bind `sanctionsComplianceModule` to the token's Modular Compliance, `_recordToken` with suite refs — depends on T008, T041, T042
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T044 [US4] Add the `PERMISSIONED_ERC3643` standard + suite refs to the subgraph schema/mapping
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T045 [US4] Add the permissioned-token path to `CreateTokenWizard.jsx` (configure claim topics, trusted issuers, compliance options) with real tx + honest state
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T046 [US4] Build the permissioned admin surface in `frontend/src/components/tokens/PermissionedAdminPanel.jsx`: agent actions (freeze/unfreeze full+partial, forced transfer, recovery, mint/burn, pause) and registry management (register identity, claim topics, trusted issuers), each gated to the connected actor's authority
+- [ ] ⏸️ **DEFERRED (US4/T-REX — OZ-4 incompatible):** T047 [P] [US4] `frontend` Vitest for capability/authority-gated rendering of the permissioned admin surface (agent-only controls hidden/blocked for non-agents)
 
 **Checkpoint**: US1–US4 functional; institutional-grade compliant tokens with full agent administration.
 

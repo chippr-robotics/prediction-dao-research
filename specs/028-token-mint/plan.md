@@ -4,6 +4,15 @@
 
 **Input**: Feature specification from `specs/028-token-mint/spec.md`
 
+> **Status (2026-06-23 — partial `/speckit-implement`).** Contract layer built & green on **OpenZeppelin 5.4.0**
+> (pinned: OZ ≥5.5 needs the Cancun `mcopy` opcode via `EnumerableSet`→`Arrays`, and Mordor/ETC is pre-Cancun —
+> the "latest OZ across all features" directive resolves to *latest ETC-compatible* OZ). `TokenFactory` +
+> open/restricted clone templates + 49 passing tests + `check:storage-layout`. **US4 (T-REX / ERC-3643) is
+> DEFERRED**: the canonical suite (`@tokenysolutions/t-rex`, `@onchain-id/solidity`) only supports OZ 4.x +
+> Solidity 0.8.17 — no OZ-5 release exists, so it cannot enter this repo's tree. Revisit when an OZ-5-native
+> ERC-3643 ships or a decision is made to isolate the OZ-4 suite in a separate build. Remaining OZ-5 work:
+> deploy-script wiring, subgraph datasource, frontend module.
+
 ## Summary
 
 Add a **token issuance and administration layer** to FairWins: an authorized issuer can create, mint, and
