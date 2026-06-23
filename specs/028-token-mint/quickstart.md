@@ -1,8 +1,9 @@
 # Quickstart & Validation: Token Mint & Compliant Token Administration
 
-End-to-end validation that the feature works against real on-chain state. Run on a local Hardhat chain (1337)
-or Amoy (80002). No mock data anywhere. See `contracts/` docs for interface detail and `data-model.md` for
-entities.
+End-to-end validation that the feature works against real on-chain state. Run on a local Hardhat chain (1337),
+Amoy (80002), or Mordor (63). No mock data anywhere. On Mordor (no subgraph) the token list/detail is served
+from on-chain RPC reads instead of the subgraph — validate discovery there reads the factory registry directly.
+See `contracts/` docs for interface detail and `data-model.md` for entities.
 
 ## Prerequisites
 

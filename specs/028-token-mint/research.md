@@ -128,7 +128,9 @@ for no platform benefit; holders generally prefer immutable open tokens.
   the floppy admin; record all addresses in `deployments/*.json` (`tokenFactory`, `tokenFactoryImpl`, template
   addresses, suite addresses). Register `TokenFactory` in `check:storage-layout`.
 - **Index**: a subgraph datasource on `TokenFactory.TokenCreated` provides network-scoped discovery and the
-  issuer's admin list.
+  issuer's admin list on networks with a subgraph (Amoy, Polygon). **Mordor (ETC) has no subgraph**, so on
+  Mordor the token list/detail is served from on-chain RPC reads of the factory registry — the same
+  subgraph-less fallback the platform already uses for wager reads (specs 015/023).
 - **Frontend**: rebuild as a creation wizard, a token list (subgraph + on-chain reads), and a per-token admin
   surface that reads the token's standard/capabilities and renders only valid controls. All addresses/ABIs from
   `sync:frontend-contracts`; honest pending/confirmed/failed tx state; network-scoped; disabled on unsupported

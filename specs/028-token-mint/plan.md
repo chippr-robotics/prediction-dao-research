@@ -67,8 +67,10 @@ identity infrastructure interact; an upgrade-lifecycle suite for the factory (de
 state-preserved → auth → re-init → storage-incompat). Frontend logic via Vitest. Slither (clone/proxy/UUPS
 detectors) + Medusa with no new high/critical; OZ `validateUpgrade` in CI (`check:storage-layout`).
 
-**Target Platform**: Amoy testnet (80002) first, then Polygon mainnet (137); local (1337) for dev. Feature is
-disabled on networks where the factory/suite is not deployed (FR-023).
+**Target Platform**: Amoy testnet (80002) and Mordor testnet (63) first, then Polygon mainnet (137); local
+(1337) for dev. Mordor (ETC) has no subgraph, so on Mordor discovery falls back to on-chain RPC reads — the
+existing platform pattern for subgraph-less networks (see specs 015/023). Feature is disabled on networks where
+the factory/suite is not deployed (FR-023).
 
 **Project Type**: Web3 monorepo — Solidity contracts + JS deploy/CI tooling + React frontend + Graph subgraph.
 
@@ -84,7 +86,8 @@ every implementation/clone template and on the factory impl, one-time `initializ
 L2. The vendored T-REX/ONCHAINID code is used **as published** (audited), not forked, to avoid re-rolling
 identity/compliance crypto.
 
-**Scale/Scope**: 1–2 live chains; 5 user stories; 26 functional requirements; 4 token classes. Adds
+**Scale/Scope**: 2–3 live chains (Amoy, Mordor, Polygon); 5 user stories; 26 functional requirements; 4 token
+classes. Adds
 `contracts/tokens/` (factory + interfaces + per-class templates + sanctions compliance module), vendored T-REX
 wiring, one `check:storage-layout` entry, deploy-script + `deployments/` changes, a subgraph datasource, and a
 rebuilt frontend token module. Provides the issuance machinery that a later governance-token / DAO-manager

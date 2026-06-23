@@ -80,7 +80,7 @@ implemented until this phase is complete.**
 - [ ] T018 [P] [US1] Implement `contracts/tokens/templates/OpenERC721.sol` (OZ `ERC721`+`ERC721URIStorage`(+`ERC721Burnable`) + `Ownable`, initializable clone) with owner `mint(to,uri)` and the `SanctionsGuard` transfer-hook check
 - [ ] T019 [US1] Add `createOpenERC20(...)` and `createOpenERC721(...)` to `contracts/tokens/TokenFactory.sol` (clone the matching template, `initialize` with `msg.sender` as owner + the guard, `_recordToken`) — depends on T008, T017, T018
 - [ ] T020 [US1] Extend `scripts/deploy/deploy.js` to deploy the open ERC-20 (4 variants) and ERC-721 (2 variants) implementation templates, pass them to `TokenFactory.initialize`, and record their addresses in `deployments/*.json`
-- [ ] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`)
+- [ ] T021 [P] [US1] Add the `TokenCreated` handler + `Token` entity (id, standard, address, issuer, name, symbol, createdAt) to `subgraph/` (schema + mapping + manifest datasource on `TokenFactory`) for subgraph-enabled networks (Amoy/Polygon); ensure the frontend reads fall back to on-chain factory-registry RPC reads on subgraph-less networks (Mordor)
 - [ ] T022 [US1] Build the open-token creation wizard step in `frontend/src/components/tokens/CreateTokenWizard.jsx` (choose ERC-20/721, configure name/symbol/decimals/supply/burnable/pausable, submit real tx) with honest pending/confirmed/failed state (no finalized-before-confirm) — uses `useTokenFactory`
 - [ ] T023 [US1] Render the issuer's token list in `frontend/src/components/tokens/TokenList.jsx` from the subgraph + on-chain reads, showing only the active network's tokens and never a token before its tx confirms
 - [ ] T024 [US1] Run `npm run sync:frontend-contracts` and wire the `TokenFactory`/template ABIs+addresses into the frontend via the synced artifacts (no hand-copied addresses)
@@ -190,7 +190,7 @@ implemented until this phase is complete.**
 - [ ] T055 Complete the smart-contract security-agent review (`.github/agents/`) for the token contracts and record EthTrust-SL ≥ L2 reasoning in plan/contract NatSpec
 - [ ] T056 [P] Run axe/Lighthouse accessibility audits on the token module (WCAG 2.1 AA) and fix violations; ensure ESLint passes with no errors
 - [ ] T057 [P] Add a gas report for issuance/admin paths (`npm run test:gas`) and confirm clone-based issuance stays within target (SC-001 < 3 min end-to-end)
-- [ ] T058 Execute the full `specs/028-token-mint/quickstart.md` validation on local + Amoy and confirm every scenario passes against real chain state
+- [ ] T058 Execute the full `specs/028-token-mint/quickstart.md` validation on local + Amoy + Mordor and confirm every scenario passes against real chain state (on Mordor, confirm discovery reads the factory registry over RPC since there is no subgraph)
 - [ ] T059 [P] Verify `npm test`, `npm run test:fork`, `npm run test:frontend`, and `npm run check:storage-layout` are green in CI with no `continue-on-error` on test/lint/build/security steps (Principle IV)
 
 ---
