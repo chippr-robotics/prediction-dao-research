@@ -178,13 +178,13 @@ implemented until this phase is complete.**
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T048 [P] [US5] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenDetail.test.jsx`: detail view renders standard/metadata/live supply + rule summary from real data; network switch filters tokens; unsupported network shows disabled state (no mock list)
+- [X] T048 [P] [US5] `frontend` Vitest in `frontend/src/components/tokens/__tests__/TokenDetail.test.jsx`: detail view renders standard/metadata/live supply + rule summary from real data; network switch filters tokens; unsupported network shows disabled state (no mock list)
 - [X] T049 [P] [US5] `subgraph` test/query check that `Token` entities are network-scoped and queryable by issuer and standard
 
 ### Implementation for User Story 5
 
-- [ ] T050 [US5] Implement the token detail view `frontend/src/components/tokens/TokenDetail.jsx` (standard, name/symbol, metadata, live supply via on-chain read, and for compliant tokens a truthful governing-rule summary) — reuses subgraph + `useTokenFactory`
-- [ ] T051 [US5] Finalize discovery in `TokenList.jsx`: issuer-administered list + public browse, standard badges, strict active-network scoping and unsupported-network disable (FR-023/FR-025)
+- [X] T050 [US5] Implement the token detail view `frontend/src/components/tokens/TokenDetail.jsx` (standard, name/symbol, metadata, live supply via on-chain read, and for compliant tokens a truthful governing-rule summary) — reuses subgraph + `useTokenFactory`
+- [X] T051 [US5] Finalize discovery in `TokenList.jsx`: issuer-administered list + public browse, standard badges, strict active-network scoping and unsupported-network disable (FR-023/FR-025)
 - [X] T052 [P] [US5] Extend the subgraph mapping to populate live supply/rule-summary fields needed for discovery (or document the on-chain read path where indexing isn't appropriate)
 
 **Checkpoint**: All five user stories independently functional.
