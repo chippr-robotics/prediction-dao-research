@@ -85,4 +85,39 @@ async function deployTokenFactory({ admin, sanctionsGuard = ethers.ZeroAddress }
   return { factory, templates };
 }
 
-module.exports = { deployWagerRegistry, deployMembershipManager, deployTokenTemplates, deployTokenFactory };
+/// Deploy the three role-based v2 clone templates (spec 028 expansion) and return their addresses.
+async function deployTokenTemplatesV2() {
+  const out = {};
+  for (const [name, key] of [
+    ["OpenERC20V2", "openERC20V2Impl"],
+    ["OpenERC721V2", "openERC721V2Impl"],
+    ["RestrictedERC20V2", "restrictedERC20V2Impl"],
+  ]) {
+    const C = await ethers.getContractFactory(name);
+    const c = await C.deploy();
+    await c.waitForDeployment();
+    out[key] = await c.getAddress();
+  }
+  return out;
+}
+
+/// Deploy TokenFactory with BOTH v1 and v2 templates registered (admin sets the v2 slots). `admin` must be the
+/// proxy admin signer so setV2Template is authorized. Returns { factory, templates, v2 }.
+async function deployTokenFactoryV2({ adminSigner, sanctionsGuard = ethers.ZeroAddress } = {}) {
+  const { factory, templates } = await deployTokenFactory({ admin: adminSigner.address, sanctionsGuard });
+  const v2 = await deployTokenTemplatesV2();
+  const Standard = { OPEN_ERC20: 0, OPEN_ERC721: 1, RESTRICTED_ERC1404: 2 };
+  await factory.connect(adminSigner).setV2Template(Standard.OPEN_ERC20, v2.openERC20V2Impl);
+  await factory.connect(adminSigner).setV2Template(Standard.OPEN_ERC721, v2.openERC721V2Impl);
+  await factory.connect(adminSigner).setV2Template(Standard.RESTRICTED_ERC1404, v2.restrictedERC20V2Impl);
+  return { factory, templates, v2 };
+}
+
+module.exports = {
+  deployWagerRegistry,
+  deployMembershipManager,
+  deployTokenTemplates,
+  deployTokenFactory,
+  deployTokenTemplatesV2,
+  deployTokenFactoryV2,
+};

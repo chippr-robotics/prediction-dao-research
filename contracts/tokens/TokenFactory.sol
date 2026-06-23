@@ -10,6 +10,9 @@ import {ITokenFactory} from "./interfaces/ITokenFactory.sol";
 import {OpenERC20} from "./templates/OpenERC20.sol";
 import {OpenERC721} from "./templates/OpenERC721.sol";
 import {RestrictedERC20} from "./templates/RestrictedERC20.sol";
+import {OpenERC20V2} from "./templates/OpenERC20V2.sol";
+import {OpenERC721V2} from "./templates/OpenERC721V2.sol";
+import {RestrictedERC20V2} from "./templates/RestrictedERC20V2.sol";
 
 /// @title TokenFactory — platform token-issuance authority & registry (spec 028)
 /// @notice The single upgradeable, state-bearing platform contract for token issuance. It gates creation behind
@@ -46,9 +49,17 @@ contract TokenFactory is ITokenFactory, UUPSManaged, ReentrancyGuardUpgradeable 
     /// @notice Reverse lookup: deployed token address -> registry id (0 == unknown).
     mapping(address => uint256) public tokenAddressToId;
 
-    /// @dev Trailing reserve for append-only upgrades. The deferred ERC-3643 class will append its gateway +
-    ///      compliance-module addresses here (consuming gap slots) — never insert/reorder existing state above.
-    uint256[50] private __gap;
+    // ---- Spec 028 expansion (US6–US9): role-based v2 clone templates (appended; consume 3 __gap slots) ----
+    /// @notice Role-based v2 implementation templates (AccessControl + caps + transfer controls + batch). Set by
+    ///         the admin via {setV2Template} after the upgrade; new tokens issue from these. Existing v1 tokens
+    ///         (immutable clones) are unaffected. address(0) ⇒ that v2 class is not yet available.
+    address public openERC20V2Impl;
+    address public openERC721V2Impl;
+    address public restrictedERC20V2Impl;
+
+    /// @dev Trailing reserve for append-only upgrades. Reduced 50 → 47 when the three v2 template slots above
+    ///      were appended. The deferred ERC-3643 class will append further here. Never insert/reorder above.
+    uint256[47] private __gap;
 
     /// @notice One-time initializer (UUPS proxy). Grants DEFAULT_ADMIN_ROLE + UPGRADER_ROLE to `admin` (via the
     ///         base) and TOKEN_ISSUER_ROLE is granted out-of-band by the admin afterwards.
@@ -87,6 +98,22 @@ contract TokenFactory is ITokenFactory, UUPSManaged, ReentrancyGuardUpgradeable 
             restrictedERC20Impl = impl;
         } else {
             revert TemplateNotSet(standard); // PERMISSIONED_ERC3643 has no clone template (deferred)
+        }
+        emit TemplateUpdated(standard, impl);
+    }
+
+    /// @notice Set a role-based v2 clone template (spec 028 expansion). Separate from {setTemplate} so v1 tokens
+    ///         keep issuing from their templates until/after the admin opts new issuance into v2.
+    function setV2Template(TokenStandard standard, address impl) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (impl == address(0)) revert ZeroAddress();
+        if (standard == TokenStandard.OPEN_ERC20) {
+            openERC20V2Impl = impl;
+        } else if (standard == TokenStandard.OPEN_ERC721) {
+            openERC721V2Impl = impl;
+        } else if (standard == TokenStandard.RESTRICTED_ERC1404) {
+            restrictedERC20V2Impl = impl;
+        } else {
+            revert TemplateNotSet(standard);
         }
         emit TemplateUpdated(standard, impl);
     }
@@ -152,6 +179,61 @@ contract TokenFactory is ITokenFactory, UUPSManaged, ReentrancyGuardUpgradeable 
             initialEligible
         );
         id = _recordToken(TokenStandard.RESTRICTED_ERC1404, token, name, symbol, metadataURI, false, false);
+    }
+
+    // ---- Issuance v2 (role-based templates; spec 028 expansion US6–US9) ----
+
+    /// @notice Create a role-based v2 open ERC-20 with an optional supply cap (`cap == 0` ⇒ uncapped). The issuer
+    ///         receives all token roles (owner-as-admin). v2 tokens always support mint/pause/burn (role-gated).
+    function createOpenERC20V2(
+        string calldata name,
+        string calldata symbol,
+        uint8 decimals,
+        uint256 initialSupply,
+        uint256 cap,
+        string calldata metadataURI
+    ) external onlyRole(TOKEN_ISSUER_ROLE) nonReentrant returns (uint256 id, address token) {
+        _beforeCreate(name, symbol, openERC20V2Impl, TokenStandard.OPEN_ERC20);
+        token = Clones.clone(openERC20V2Impl);
+        OpenERC20V2(token).initialize(name, symbol, decimals, initialSupply, cap, msg.sender, address(sanctionsGuard));
+        id = _recordToken(TokenStandard.OPEN_ERC20, token, name, symbol, metadataURI, true, true);
+    }
+
+    /// @notice Create a role-based v2 open ERC-721 collection.
+    function createOpenERC721V2(
+        string calldata name,
+        string calldata symbol,
+        string calldata baseURI
+    ) external onlyRole(TOKEN_ISSUER_ROLE) nonReentrant returns (uint256 id, address token) {
+        _beforeCreate(name, symbol, openERC721V2Impl, TokenStandard.OPEN_ERC721);
+        token = Clones.clone(openERC721V2Impl);
+        OpenERC721V2(token).initialize(name, symbol, baseURI, msg.sender, address(sanctionsGuard));
+        id = _recordToken(TokenStandard.OPEN_ERC721, token, name, symbol, baseURI, true, true);
+    }
+
+    /// @notice Create a role-based v2 ERC-1404 restricted token with an optional supply cap.
+    function createRestrictedERC20V2(
+        string calldata name,
+        string calldata symbol,
+        uint8 decimals,
+        uint256 initialSupply,
+        uint256 cap,
+        string calldata metadataURI,
+        address[] calldata initialEligible
+    ) external onlyRole(TOKEN_ISSUER_ROLE) nonReentrant returns (uint256 id, address token) {
+        _beforeCreate(name, symbol, restrictedERC20V2Impl, TokenStandard.RESTRICTED_ERC1404);
+        token = Clones.clone(restrictedERC20V2Impl);
+        RestrictedERC20V2(token).initializeRestricted(
+            name,
+            symbol,
+            decimals,
+            initialSupply,
+            cap,
+            msg.sender,
+            address(sanctionsGuard),
+            initialEligible
+        );
+        id = _recordToken(TokenStandard.RESTRICTED_ERC1404, token, name, symbol, metadataURI, true, true);
     }
 
     // ---- Views ----
