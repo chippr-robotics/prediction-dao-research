@@ -354,15 +354,15 @@ create flow, and theme-aware styling mapped onto the app theme variables.
 **Independent test**: In dark + light mode, the Tokens tab renders the tabs + detail
 sub-tabs; only valid controls show per token; creating a v2 capped token works end-to-end.
 
-- [ ] T076 [US9] Add `frontend/src/components/tokens/tokens.css`: map the imported design (forest-green + IBM Plex, scoped) onto `theme.css` variables (`--brand-primary`, `--surface-color`, `--text-*`, `--border-color`, `--semantic-*`, `--radius-*`, `--shadow-*`) so it respects light/dark (R16)
-- [ ] T077 [US9] Extend `frontend/src/components/tokens/useTokenFactory.js` with per-token **capability detection** (probe v2 `hasRole`/`getRoleMember` vs v1 `owner()`, standard, flags, cap) → a capability profile driving control gating (FR-028, SC-014)
-- [ ] T078 [US9] Restructure `frontend/src/components/tokens/TokensPanel.jsx` into My Tokens / Create / Explorer sub-tabs + summary metric strip (FR-027) using `tokens.css`
-- [ ] T079 [US9] Rebuild `frontend/src/components/tokens/CreateTokenWizard.jsx` to the standard-cards + parameters + options (burnable/pausable/capped) + deployment-summary-rail flow calling the v2 `create*` entrypoints (real tx, honest state) (FR-045)
-- [ ] T080 [US9] Rebuild `frontend/src/components/tokens/TokenDetail.jsx` (or a new `TokenDetailPanel`) into the identity header + stat cards + capability-gated sub-tabs (Overview, Supply, Transfer Controls, Compliance, Roles & Ownership, Contract) — only sub-tabs valid for the token render
-- [ ] T081 [US9] Implement the Roles & Ownership sub-tab: role grant/revoke table (from `getRoleMember`), transfer ownership, renounce (confirm-gated) — real tx; non-admin controls disabled with surfaced reason
-- [ ] T082 [US9] Implement the Supply + Transfer-Controls sub-tabs: mint/burn (+ cap progress/headroom), pause/unpause, freeze list + freeze/unfreeze, ERC-1404 eligibility + default message + pre-check — wiring the v2 contract calls
-- [ ] T083 [P] [US9] `frontend` Vitest `frontend/src/components/tokens/__tests__/TokenDetailPanel.test.jsx`: capability-gated sub-tab rendering (v1 Ownable vs v2 roles; restricted vs open; capped vs uncapped), unauthorized controls disabled, theme tokens resolve in light + dark
-- [ ] T084 [P] [US9] `frontend` Vitest for the rebuilt CreateTokenWizard (standard cards, capped option, summary rail, real-tx pending/confirmed/failed, no phantom on reject)
+- [X] T076 [US9] Add `frontend/src/components/tokens/tokens.css`: map the imported design (forest-green + IBM Plex, scoped) onto `theme.css` variables (`--brand-primary`, `--surface-color`, `--text-*`, `--border-color`, `--semantic-*`, `--radius-*`, `--shadow-*`) so it respects light/dark (R16)
+- [X] T077 [US9] Extend `frontend/src/components/tokens/useTokenFactory.js` with per-token **capability detection** (probe v2 `hasRole`/`getRoleMember` vs v1 `owner()`, standard, flags, cap) → a capability profile driving control gating (FR-028, SC-014)
+- [X] T078 [US9] Restructure `frontend/src/components/tokens/TokensPanel.jsx` into My Tokens / Create / Explorer sub-tabs + summary metric strip (FR-027) using `tokens.css`
+- [X] T079 [US9] Rebuild `frontend/src/components/tokens/CreateTokenWizard.jsx` to the standard-cards + parameters + options (burnable/pausable/capped) + deployment-summary-rail flow calling the v2 `create*` entrypoints (real tx, honest state) (FR-045)
+- [X] T080 [US9] Rebuild `frontend/src/components/tokens/TokenDetail.jsx` (or a new `TokenDetailPanel`) into the identity header + stat cards + capability-gated sub-tabs (Overview, Supply, Transfer Controls, Compliance, Roles & Ownership, Contract) — only sub-tabs valid for the token render
+- [X] T081 [US9] Implement the Roles & Ownership sub-tab: role grant/revoke table (from `getRoleMember`), transfer ownership, renounce (confirm-gated) — real tx; non-admin controls disabled with surfaced reason
+- [X] T082 [US9] Implement the Supply + Transfer-Controls sub-tabs: mint/burn (+ cap progress/headroom), pause/unpause, freeze list + freeze/unfreeze, ERC-1404 eligibility + default message + pre-check — wiring the v2 contract calls
+- [X] T083 [P] [US9] `frontend` Vitest `frontend/src/components/tokens/__tests__/TokenDetailPanel.test.jsx`: capability-gated sub-tab rendering (v1 Ownable vs v2 roles; restricted vs open; capped vs uncapped), unauthorized controls disabled, theme tokens resolve in light + dark
+- [X] T084 [P] [US9] `frontend` Vitest for the rebuilt CreateTokenWizard (standard cards, capped option, summary rail, real-tx pending/confirmed/failed, no phantom on reject)
 
 **Checkpoint**: full theme-aware portal IA over the v2 tokens; capability-gated, dark-mode-aware.
 

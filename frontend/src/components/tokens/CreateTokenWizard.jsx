@@ -1,46 +1,32 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useTokenFactory } from './useTokenFactory'
-import { TOKEN_STANDARD } from '../../abis/tokenFactory'
+
+// Spec 028 (US1 + US6 + FR-045) — create flow for role-based v2 tokens: pick a standard, configure it, optionally
+// cap supply, review a deployment summary, and submit a REAL on-chain transaction with honest pending/confirmed/
+// failed state. Only controls valid for the chosen standard are shown.
 
 const STANDARDS = [
-  { value: 'erc20', label: 'Fungible (ERC-20)' },
-  { value: 'erc721', label: 'Non-fungible (ERC-721)' },
-  { value: 'restricted', label: 'Restricted (ERC-1404)' },
+  { value: 'erc20', label: 'Fungible (ERC-20)', tag: 'ERC-20', tagClass: 'tm-badge-erc20', desc: 'Standard fungible token with roles (mint, pause, burn), optional supply cap, and batch distribution.' },
+  { value: 'erc721', label: 'Non-fungible (ERC-721)', tag: 'ERC-721', tagClass: 'tm-badge-erc721', desc: 'NFT collection with per-token metadata, role-based minting, pause, and freeze.' },
+  { value: 'restricted', label: 'Restricted (ERC-1404)', tag: 'ERC-1404', tagClass: 'tm-badge-erc1404', desc: 'Compliance token: eligibility allowlist, human-readable restriction reasons, freeze, optional cap.' },
 ]
-
 const MAX_DECIMALS = 36
 
-/**
- * Spec 028 — token creation wizard (US1 + US3). Pick a standard, configure it, and submit a REAL on-chain
- * transaction. State is honest: nothing is presented as finalized before the chain confirms (FR-006/FR-024).
- * Only controls valid for the chosen standard are shown (FR-018). `onCreated` fires after confirmation so the
- * caller can refresh the token list.
- */
 export default function CreateTokenWizard({ onCreated }) {
-  const { isSupported, canIssue, createOpenERC20, createOpenERC721, createRestrictedERC20, status, error, lastTxHash } =
+  const { isSupported, canIssue, createOpenERC20V2, createOpenERC721V2, createRestrictedERC20V2, status, error, lastTxHash } =
     useTokenFactory()
 
   const [standard, setStandard] = useState('erc20')
   const [form, setForm] = useState({
-    name: '',
-    symbol: '',
-    decimals: '18',
-    initialSupply: '',
-    baseURI: '',
-    metadataURI: '',
-    burnable: false,
-    pausable: false,
-    initialEligible: '',
+    name: '', symbol: '', decimals: '18', initialSupply: '', cap: '', baseURI: '', metadataURI: '', initialEligible: '',
   })
   const [formError, setFormError] = useState(null)
 
-  const set = (k) => (e) => {
-    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value
-    setForm((f) => ({ ...f, [k]: v }))
-  }
-
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const isFungible = standard === 'erc20' || standard === 'restricted'
+  const selStd = STANDARDS.find((s) => s.value === standard)
+  const parseList = (raw) => raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
 
   function validate() {
     if (!form.name.trim()) return 'Name is required.'
@@ -49,199 +35,132 @@ export default function CreateTokenWizard({ onCreated }) {
       const d = Number(form.decimals)
       if (!Number.isInteger(d) || d < 0 || d > MAX_DECIMALS) return `Decimals must be 0–${MAX_DECIMALS}.`
       if (form.initialSupply !== '' && Number(form.initialSupply) < 0) return 'Initial supply cannot be negative.'
+      if (form.cap !== '' && Number(form.cap) < 0) return 'Cap cannot be negative.'
+      if (form.cap !== '' && form.initialSupply !== '' && Number(form.cap) > 0 && Number(form.initialSupply) > Number(form.cap))
+        return 'Initial supply exceeds the cap.'
     }
-    if (standard === 'restricted') {
-      const bad = parseEligible(form.initialEligible).some((a) => !ethers.isAddress(a))
-      if (bad) return 'Initial eligible list contains an invalid address.'
-    }
+    if (standard === 'restricted' && parseList(form.initialEligible).some((a) => !ethers.isAddress(a)))
+      return 'Initial eligible list contains an invalid address.'
     return null
-  }
-
-  function parseEligible(raw) {
-    return raw
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setFormError(null)
     const v = validate()
-    if (v) {
-      setFormError(v)
-      return
-    }
+    if (v) return setFormError(v)
     try {
+      const common = { name: form.name.trim(), symbol: form.symbol.trim() }
       let result
       if (standard === 'erc20') {
-        result = await createOpenERC20({
-          name: form.name.trim(),
-          symbol: form.symbol.trim(),
-          decimals: form.decimals,
-          initialSupply: form.initialSupply || '0',
-          metadataURI: form.metadataURI.trim(),
-          burnable: form.burnable,
-          pausable: form.pausable,
-        })
+        result = await createOpenERC20V2({ ...common, decimals: form.decimals, initialSupply: form.initialSupply || '0', cap: form.cap || '0', metadataURI: form.metadataURI.trim() })
       } else if (standard === 'erc721') {
-        result = await createOpenERC721({
-          name: form.name.trim(),
-          symbol: form.symbol.trim(),
-          baseURI: form.baseURI.trim(),
-          burnable: form.burnable,
-        })
+        result = await createOpenERC721V2({ ...common, baseURI: form.baseURI.trim() })
       } else {
-        result = await createRestrictedERC20({
-          name: form.name.trim(),
-          symbol: form.symbol.trim(),
-          decimals: form.decimals,
-          initialSupply: form.initialSupply || '0',
-          metadataURI: form.metadataURI.trim(),
-          initialEligible: parseEligible(form.initialEligible),
-        })
+        result = await createRestrictedERC20V2({ ...common, decimals: form.decimals, initialSupply: form.initialSupply || '0', cap: form.cap || '0', metadataURI: form.metadataURI.trim(), initialEligible: parseList(form.initialEligible) })
       }
       if (onCreated) onCreated(result)
     } catch {
-      /* error surfaced via hook `error`/`status` */
+      /* surfaced via hook error/status */
     }
   }
 
   if (!isSupported) {
-    return (
-      <div className="token-wizard token-feature-disabled" role="status">
-        Token issuance isn’t deployed on this network yet. Switch to a supported network to create tokens.
-      </div>
-    )
+    return <div className="tm-feature-disabled" role="status">Token issuance isn’t deployed on this network yet.</div>
   }
 
   const busy = status === 'creating'
 
   return (
-    <form className="token-wizard" onSubmit={handleSubmit} aria-busy={busy} noValidate>
-      <h3>Create a token</h3>
-
-      {!canIssue && (
-        <div className="token-notice" role="status">
-          Your connected wallet isn’t authorized to issue tokens (needs the issuer role). You can review the form,
-          but creation will be blocked until an admin grants you issuance access.
-        </div>
-      )}
-
-      <fieldset>
-        <legend>Standard</legend>
-        {STANDARDS.map((s) => (
-          <label key={s.value} className="token-radio">
-            <input
-              type="radio"
-              name="token-standard"
-              value={s.value}
-              checked={standard === s.value}
-              onChange={() => setStandard(s.value)}
-            />
-            {s.label}
-          </label>
-        ))}
-      </fieldset>
-
-      <div className="token-field">
-        <label htmlFor="tk-name">Name</label>
-        <input id="tk-name" value={form.name} onChange={set('name')} required aria-required="true" />
-      </div>
-
-      <div className="token-field">
-        <label htmlFor="tk-symbol">Symbol</label>
-        <input id="tk-symbol" value={form.symbol} onChange={set('symbol')} required aria-required="true" />
-      </div>
-
-      {isFungible && (
-        <>
-          <div className="token-field">
-            <label htmlFor="tk-decimals">Decimals</label>
-            <input
-              id="tk-decimals"
-              type="number"
-              min="0"
-              max={MAX_DECIMALS}
-              value={form.decimals}
-              onChange={set('decimals')}
-            />
+    <form className="tm-create-layout" onSubmit={handleSubmit} aria-busy={busy} noValidate>
+      <div>
+        <h3>Choose a token standard</h3>
+        {!canIssue && (
+          <div className="tm-notice" role="status">
+            Your connected wallet isn’t authorized to issue tokens (needs the issuer role). Creation is blocked
+            until an admin grants you access.
           </div>
-          <div className="token-field">
-            <label htmlFor="tk-supply">Initial supply</label>
-            <input
-              id="tk-supply"
-              type="number"
-              min="0"
-              value={form.initialSupply}
-              onChange={set('initialSupply')}
-              placeholder="0"
-            />
-          </div>
-        </>
-      )}
-
-      {standard === 'erc721' && (
-        <div className="token-field">
-          <label htmlFor="tk-baseuri">Collection base URI (optional)</label>
-          <input id="tk-baseuri" value={form.baseURI} onChange={set('baseURI')} placeholder="ipfs://…" />
-        </div>
-      )}
-
-      {standard === 'restricted' && (
-        <div className="token-field">
-          <label htmlFor="tk-eligible">Initial eligible addresses (optional)</label>
-          <textarea
-            id="tk-eligible"
-            value={form.initialEligible}
-            onChange={set('initialEligible')}
-            placeholder="0x… one per line or comma-separated"
-            rows={3}
-          />
-        </div>
-      )}
-
-      {standard !== 'restricted' && (
-        <fieldset>
-          <legend>Options</legend>
-          <label className="token-checkbox">
-            <input type="checkbox" checked={form.burnable} onChange={set('burnable')} /> Burnable
-          </label>
-          {standard === 'erc20' && (
-            <label className="token-checkbox">
-              <input type="checkbox" checked={form.pausable} onChange={set('pausable')} /> Pausable
-            </label>
-          )}
+        )}
+        <fieldset style={{ border: 'none', padding: 0, margin: '0.75rem 0 0' }}>
+          <legend className="sr-only">Standard</legend>
+          {STANDARDS.map((s) => (
+            <button
+              type="button"
+              key={s.value}
+              className={`tm-std-card ${standard === s.value ? 'selected' : ''}`}
+              aria-pressed={standard === s.value}
+              onClick={() => setStandard(s.value)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="tm-std-name">{s.label}</span>
+                <span className={`tm-badge ${s.tagClass}`}>{s.tag}</span>
+              </div>
+              <span className="tm-std-desc">{s.desc}</span>
+            </button>
+          ))}
         </fieldset>
-      )}
 
-      {formError && (
-        <div className="token-error" role="alert">
-          {formError}
+        <h4 style={{ margin: '1.25rem 0 0.75rem' }}>Token parameters</h4>
+        <div className="tm-field">
+          <label className="tm-label" htmlFor="tk-name">Name</label>
+          <input id="tk-name" className="tm-input" value={form.name} onChange={set('name')} aria-required="true" />
         </div>
-      )}
-      {error && (
-        <div className="token-error" role="alert">
-          {error}
+        <div className="tm-field">
+          <label className="tm-label" htmlFor="tk-symbol">Symbol</label>
+          <input id="tk-symbol" className="tm-input tm-mono" value={form.symbol} onChange={set('symbol')} aria-required="true" />
         </div>
-      )}
+        {isFungible && (
+          <>
+            <div className="tm-field">
+              <label className="tm-label" htmlFor="tk-decimals">Decimals</label>
+              <input id="tk-decimals" className="tm-input tm-mono" type="number" min="0" max={MAX_DECIMALS} value={form.decimals} onChange={set('decimals')} />
+            </div>
+            <div className="tm-field">
+              <label className="tm-label" htmlFor="tk-supply">Initial supply</label>
+              <input id="tk-supply" className="tm-input tm-mono" type="number" min="0" value={form.initialSupply} onChange={set('initialSupply')} placeholder="0" />
+            </div>
+            <div className="tm-field">
+              <label className="tm-label" htmlFor="tk-cap">Max supply cap (optional — 0 = uncapped)</label>
+              <input id="tk-cap" className="tm-input tm-mono" type="number" min="0" value={form.cap} onChange={set('cap')} placeholder="0" />
+            </div>
+          </>
+        )}
+        {standard === 'erc721' && (
+          <div className="tm-field">
+            <label className="tm-label" htmlFor="tk-baseuri">Collection base URI (optional)</label>
+            <input id="tk-baseuri" className="tm-input tm-mono" value={form.baseURI} onChange={set('baseURI')} placeholder="ipfs://…" />
+          </div>
+        )}
+        {standard === 'restricted' && (
+          <div className="tm-field">
+            <label className="tm-label" htmlFor="tk-eligible">Initial eligible addresses (optional)</label>
+            <textarea id="tk-eligible" className="tm-textarea tm-mono" rows={3} value={form.initialEligible} onChange={set('initialEligible')} placeholder="0x… one per line or comma-separated" />
+          </div>
+        )}
 
-      {busy && (
-        <div className="token-pending" role="status">
-          Submitting transaction… {lastTxHash ? `(${lastTxHash.slice(0, 10)}…)` : ''} Awaiting confirmation.
-        </div>
-      )}
-      {status === 'success' && (
-        <div className="token-success" role="status">
-          Token created and confirmed on-chain.
-        </div>
-      )}
+        {formError && <div className="tm-error" role="alert">{formError}</div>}
+        {error && <div className="tm-error" role="alert">{error}</div>}
+      </div>
 
-      <button type="submit" className="btn btn-primary" disabled={busy || !canIssue}>
-        {busy ? 'Creating…' : 'Create token'}
-      </button>
+      {/* Deployment summary rail */}
+      <div className="tm-rail">
+        <div className="tm-card">
+          <h4 style={{ marginBottom: '0.75rem' }}>Deployment summary</h4>
+          <div className="tm-kv"><span className="k">Standard</span><span className={`tm-badge ${selStd.tagClass}`}>{selStd.tag}</span></div>
+          <div className="tm-kv"><span className="k">Name</span><span>{form.name || '—'}</span></div>
+          <div className="tm-kv"><span className="k">Symbol</span><span className="tm-mono">{form.symbol || '—'}</span></div>
+          {isFungible && <div className="tm-kv"><span className="k">Supply cap</span><span className="tm-mono">{form.cap && Number(form.cap) > 0 ? form.cap : 'Uncapped'}</span></div>}
+          <div className="tm-kv"><span className="k">Admin model</span><span>Role-based (you = owner)</span></div>
+
+          {busy && <div className="tm-pending" role="status">Submitting… {lastTxHash ? `(${lastTxHash.slice(0, 10)}…)` : ''} awaiting confirmation.</div>}
+          {status === 'success' && <div className="tm-success" role="status">Token created and confirmed on-chain.</div>}
+
+          <button type="submit" className="tm-btn tm-btn-primary" style={{ width: '100%', marginTop: '0.9rem' }} disabled={busy || !canIssue}>
+            {busy ? 'Creating…' : 'Review & deploy'}
+          </button>
+          <p className="tm-std-desc" style={{ textAlign: 'center', marginTop: '0.6rem' }}>You’ll sign the deployment in your connected wallet.</p>
+        </div>
+      </div>
     </form>
   )
 }
-
-export { TOKEN_STANDARD }

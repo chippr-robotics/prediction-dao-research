@@ -7,8 +7,25 @@ import {
   OPEN_ERC20_ABI,
   OPEN_ERC721_ABI,
   RESTRICTED_ERC20_ABI,
+  OPEN_ERC20_V2_ABI,
+  OPEN_ERC721_V2_ABI,
+  RESTRICTED_ERC20_V2_ABI,
   TOKEN_STANDARD,
 } from '../../abis/tokenFactory'
+
+/** The role-based v2 ABI for a token of the given standard. */
+export function v2AbiForStandard(standard) {
+  if (standard === TOKEN_STANDARD.OPEN_ERC721) return OPEN_ERC721_V2_ABI
+  if (standard === TOKEN_STANDARD.RESTRICTED_ERC1404) return RESTRICTED_ERC20_V2_ABI
+  return OPEN_ERC20_V2_ABI
+}
+
+/** The v1 (Ownable) ABI for a token of the given standard. */
+export function v1AbiForStandard(standard) {
+  if (standard === TOKEN_STANDARD.OPEN_ERC721) return OPEN_ERC721_ABI
+  if (standard === TOKEN_STANDARD.RESTRICTED_ERC1404) return RESTRICTED_ERC20_ABI
+  return OPEN_ERC20_ABI
+}
 
 /**
  * Spec 028 — token-mint hook. Resolves the per-chain `tokenFactory` deployment, exposes whether the feature is
@@ -126,6 +143,87 @@ export function useTokenFactory() {
     [reader]
   )
 
+  /**
+   * Detect a token's administration model + the connected account's authority (US9, FR-028/SC-014). Probes the
+   * deployed token: role-based v2 (AccessControlEnumerable) vs legacy v1 (Ownable). Returns a capability profile
+   * the detail UI uses to render ONLY valid, authorized controls. Read-only; never assumes — every flag is from
+   * chain.
+   */
+  const detectCapabilities = useCallback(
+    async (record) => {
+      if (!reader || !record) return null
+      const std = record.standard
+      const v2 = new ethers.Contract(record.tokenAddress, v2AbiForStandard(std), reader)
+      const base = {
+        model: 'v1',
+        standard: std,
+        isAdmin: false,
+        roles: { admin: false, minter: false, pauser: false, burner: false, compliance: false },
+        capped: false,
+        cap: null,
+        paused: false,
+        decimals: 18,
+      }
+      try {
+        // v2-only: AccessControlEnumerable enumeration. Reverts on v1 (Ownable).
+        await v2.getRoleMemberCount(ethers.ZeroHash)
+        base.model = 'v2'
+      } catch {
+        base.model = 'v1'
+      }
+
+      if (base.model === 'v2') {
+        const [adminRole, minterRole, pauserRole, burnerRole] = await Promise.all([
+          v2.DEFAULT_ADMIN_ROLE(),
+          v2.MINTER_ROLE(),
+          v2.PAUSER_ROLE(),
+          v2.BURNER_ROLE(),
+        ])
+        const acct = account || ethers.ZeroAddress
+        const [admin, minter, pauser, burner] = await Promise.all([
+          v2.hasRole(adminRole, acct),
+          v2.hasRole(minterRole, acct),
+          v2.hasRole(pauserRole, acct),
+          v2.hasRole(burnerRole, acct),
+        ])
+        base.roles = { admin, minter, pauser, burner, compliance: false }
+        base.isAdmin = admin
+        try {
+          base.paused = await v2.paused()
+        } catch {
+          base.paused = false
+        }
+        if (std !== TOKEN_STANDARD.OPEN_ERC721) {
+          const [cap, capped, decimals] = await Promise.all([v2.cap(), v2.capped(), v2.decimals()])
+          base.capped = Boolean(capped)
+          base.cap = cap
+          base.decimals = Number(decimals)
+        }
+        if (std === TOKEN_STANDARD.RESTRICTED_ERC1404) {
+          const complianceRole = await v2.COMPLIANCE_ROLE()
+          base.roles.compliance = await v2.hasRole(complianceRole, acct)
+        }
+      } else {
+        // v1 Ownable
+        const v1 = new ethers.Contract(record.tokenAddress, v1AbiForStandard(std), reader)
+        const owner = await v1.owner()
+        base.isAdmin = Boolean(account) && owner.toLowerCase() === account.toLowerCase()
+        base.owner = owner
+        base.burnable = record.isBurnable
+        base.pausable = record.isPausable
+        if (std !== TOKEN_STANDARD.OPEN_ERC721) {
+          try {
+            base.decimals = Number(await v1.decimals())
+          } catch {
+            base.decimals = 18
+          }
+        }
+      }
+      return base
+    },
+    [reader, account]
+  )
+
   // Shared write wrapper: enforces support + signer, tracks honest tx state, returns the created token address.
   const runCreate = useCallback(
     async (fn) => {
@@ -190,6 +288,36 @@ export function useTokenFactory() {
     [runCreate]
   )
 
+  // --- v2 create (role-based + optional cap; cap '' or 0 ⇒ uncapped) ---
+
+  const createOpenERC20V2 = useCallback(
+    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '' }) =>
+      runCreate((factory) => {
+        const d = Number(decimals)
+        const supply = ethers.parseUnits(String(initialSupply || '0'), d)
+        const capWei = ethers.parseUnits(String(cap || '0'), d) // 0 ⇒ uncapped (contract stores max)
+        return factory.createOpenERC20V2(name, symbol, d, supply, capWei, metadataURI)
+      }),
+    [runCreate]
+  )
+
+  const createOpenERC721V2 = useCallback(
+    ({ name, symbol, baseURI = '' }) => runCreate((factory) => factory.createOpenERC721V2(name, symbol, baseURI)),
+    [runCreate]
+  )
+
+  const createRestrictedERC20V2 = useCallback(
+    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '', initialEligible = [] }) =>
+      runCreate((factory) => {
+        const d = Number(decimals)
+        const supply = ethers.parseUnits(String(initialSupply || '0'), d)
+        const capWei = ethers.parseUnits(String(cap || '0'), d)
+        const eligible = initialEligible.filter((a) => ethers.isAddress(a))
+        return factory.createRestrictedERC20V2(name, symbol, d, supply, capWei, metadataURI, eligible)
+      }),
+    [runCreate]
+  )
+
   return {
     // network/feature state
     isSupported,
@@ -203,10 +331,17 @@ export function useTokenFactory() {
     listMyTokens,
     listAllTokens,
     readTokenLive,
-    // writes
+    detectCapabilities,
+    reader,
+    signer,
+    // writes (v1)
     createOpenERC20,
     createOpenERC721,
     createRestrictedERC20,
+    // writes (v2 role-based)
+    createOpenERC20V2,
+    createOpenERC721V2,
+    createRestrictedERC20V2,
     // tx state
     status,
     error,
@@ -215,7 +350,15 @@ export function useTokenFactory() {
 }
 
 // Re-export the per-standard ABIs so admin components can attach to issued tokens without another import hop.
-export { OPEN_ERC20_ABI, OPEN_ERC721_ABI, RESTRICTED_ERC20_ABI, TOKEN_STANDARD }
+export {
+  OPEN_ERC20_ABI,
+  OPEN_ERC721_ABI,
+  RESTRICTED_ERC20_ABI,
+  OPEN_ERC20_V2_ABI,
+  OPEN_ERC721_V2_ABI,
+  RESTRICTED_ERC20_V2_ABI,
+  TOKEN_STANDARD,
+}
 
 /**
  * A truthful, human-readable summary of the rules governing a token (US5, FR-025). Derived from the registry
