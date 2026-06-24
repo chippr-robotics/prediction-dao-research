@@ -374,8 +374,8 @@ preview; honest handling of the `MAX_BATCH` bound.
 **Independent test**: Paste recipients+amounts; preview shows count/total; submit updates
 all balances in one tx; over-limit lists surface the bound (no silent truncation).
 
-- [ ] T085 [US11] Implement the Distributions sub-tab `frontend/src/components/tokens/DistributePanel.jsx`: recipients+amounts input, computed count/total preview, `MAX_BATCH` surfaced, real `batchTransfer`/`batchMint` tx with honest state
-- [ ] T086 [P] [US11] `frontend` Vitest: preview math, over-`MAX_BATCH` surfaces the limit (no truncation), pending→confirmed transitions
+- [X] T085 [US11] Implement the Distributions sub-tab `frontend/src/components/tokens/DistributePanel.jsx`: recipients+amounts input, computed count/total preview, `MAX_BATCH` surfaced, real `batchTransfer`/`batchMint` tx with honest state
+- [X] T086 [P] [US11] `frontend` Vitest: preview math, over-`MAX_BATCH` surfaces the limit (no truncation), pending→confirmed transitions
 
 **Checkpoint**: batch airdrop usable end-to-end against a v2 token.
 

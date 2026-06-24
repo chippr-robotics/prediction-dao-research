@@ -10,6 +10,7 @@ import {
   v1AbiForStandard,
   TOKEN_STANDARD,
 } from './useTokenFactory'
+import DistributePanel from './DistributePanel'
 
 // Spec 028 (US2/US6–US9, FR-028/SC-014) — per-token detail + administration. Detects the token's model (v2
 // role-based vs v1 Ownable) + the caller's authority, and renders ONLY valid, authorized controls across
@@ -89,6 +90,7 @@ export default function TokenDetailView({ token, onBack }) {
   const tabs = useMemo(() => {
     const t = [{ id: 'overview', label: 'Overview' }]
     if (!isErc721) t.push({ id: 'supply', label: 'Supply' })
+    if (!isErc721) t.push({ id: 'distribute', label: 'Distribute' })
     t.push({ id: 'controls', label: 'Transfer controls' })
     if (isRestricted) t.push({ id: 'compliance', label: 'Compliance' })
     t.push({ id: 'roles', label: 'Roles & ownership' })
@@ -164,6 +166,10 @@ export default function TokenDetailView({ token, onBack }) {
 
       {tab === 'supply' && !isErc721 && (
         <SupplyPanel caps={caps} live={live} run={run} busy={busy} canMint={caps?.model === 'v2' ? roles.minter : isAdmin} canBurn={caps?.model === 'v2' ? roles.burner : isAdmin} />
+      )}
+
+      {tab === 'distribute' && !isErc721 && (
+        <DistributePanel caps={caps} run={run} busy={busy} canMint={caps?.model === 'v2' ? roles.minter : isAdmin} />
       )}
 
       {tab === 'controls' && (
