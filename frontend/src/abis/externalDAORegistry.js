@@ -26,6 +26,12 @@ export const GOVERNOR_READ_ABI = [
   'function quorum(uint256 timepoint) view returns (uint256)',
   'function state(uint256 proposalId) view returns (uint8)',
   'function supportsInterface(bytes4 interfaceId) view returns (bool)',
+  // Spec 031 — per-user vote eligibility + execute timing for the activity system. Standard OZ IGovernor
+  // views (reads only; no contract change). A Governor that omits one degrades honestly (see daoSource).
+  'function hasVoted(uint256 proposalId, address account) view returns (bool)',
+  'function getVotes(address account, uint256 timepoint) view returns (uint256)',
+  'function proposalEta(uint256 proposalId) view returns (uint256)',
+  'function proposalSnapshot(uint256 proposalId) view returns (uint256)',
 ]
 
 /** Minimal ERC-20/721 metadata read for a Governor's voting token. */
