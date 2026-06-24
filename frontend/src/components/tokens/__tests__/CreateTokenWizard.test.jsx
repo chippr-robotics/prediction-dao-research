@@ -7,10 +7,13 @@ import CreateTokenWizard from '../CreateTokenWizard'
 // summary rail. Mock the data hook so form/validation/gating logic is tested in isolation.
 const hook = vi.hoisted(() => ({
   state: {},
+  showNotification: vi.fn(),
   createOpenERC20V2: vi.fn().mockResolvedValue({ id: '1', tokenAddress: '0xtok' }),
   createOpenERC721V2: vi.fn().mockResolvedValue({ id: '1', tokenAddress: '0xtok' }),
   createRestrictedERC20V2: vi.fn().mockResolvedValue({ id: '1', tokenAddress: '0xtok' }),
 }))
+
+vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: hook.showNotification }) }))
 
 vi.mock('../useTokenFactory', () => ({
   useTokenFactory: () => ({
@@ -70,6 +73,8 @@ describe('CreateTokenWizard (v2)', () => {
     await waitFor(() => expect(hook.createOpenERC20V2).toHaveBeenCalledTimes(1))
     expect(hook.createOpenERC20V2.mock.calls[0][0]).toMatchObject({ name: 'Acme', symbol: 'ACME', initialSupply: '500', cap: '1000' })
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
+    // fires the cohesive app-level notification on success
+    await waitFor(() => expect(hook.showNotification).toHaveBeenCalledWith(expect.stringMatching(/created on-chain/i), 'success'))
   })
 
   it('selecting ERC-721 switches the create entrypoint + fields', async () => {

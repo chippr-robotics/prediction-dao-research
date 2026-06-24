@@ -26,6 +26,8 @@ vi.mock('../../../hooks/useWalletManagement', () => ({
   useWallet: () => ({ account: '0xowner', signer: {} }),
 }))
 
+vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
+
 const restrictedToken = { id: '1', standard: STD.RESTRICTED_ERC1404, tokenAddress: '0x00000000000000000000000000000000000000a1', issuer: '0x00000000000000000000000000000000000000bb', name: 'Meridian', symbol: 'MRDN' }
 
 function adminV2Caps(over = {}) {

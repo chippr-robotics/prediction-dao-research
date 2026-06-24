@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
+import { useNotification } from '../../hooks/useUI'
 import { useTokenFactory } from './useTokenFactory'
 
 // Spec 028 (US1 + US6 + FR-045) — create flow for role-based v2 tokens: pick a standard, configure it, optionally
@@ -14,8 +15,9 @@ const STANDARDS = [
 const MAX_DECIMALS = 36
 
 export default function CreateTokenWizard({ onCreated, onViewMine }) {
-  const { isSupported, canIssue, createOpenERC20V2, createOpenERC721V2, createRestrictedERC20V2, status, error, lastTxHash } =
+  const { isSupported, canIssue, createOpenERC20V2, createOpenERC721V2, createRestrictedERC20V2, status, lastTxHash } =
     useTokenFactory()
+  const { showNotification } = useNotification()
 
   const [created, setCreated] = useState(null)
   const [standard, setStandard] = useState('erc20')
@@ -62,9 +64,10 @@ export default function CreateTokenWizard({ onCreated, onViewMine }) {
         result = await createRestrictedERC20V2({ ...common, decimals: form.decimals, initialSupply: form.initialSupply || '0', cap: form.cap || '0', metadataURI: form.metadataURI.trim(), initialEligible: parseList(form.initialEligible) })
       }
       setCreated(result)
+      showNotification(`${form.symbol.trim() || 'Token'} created on-chain`, 'success')
       if (onCreated) onCreated(result)
-    } catch {
-      /* surfaced via hook error/status */
+    } catch (e) {
+      showNotification(e?.shortMessage || e?.reason || e?.message || 'Token creation failed', 'error')
     }
   }
 
@@ -142,7 +145,7 @@ export default function CreateTokenWizard({ onCreated, onViewMine }) {
         )}
 
         {formError && <div className="tm-error" role="alert">{formError}</div>}
-        {error && <div className="tm-error" role="alert">{error}</div>}
+        {/* transaction errors surface as an app-level notification (cohesive alert system) */}
       </div>
 
       {/* Deployment summary rail */}

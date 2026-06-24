@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
+import { useNotification } from '../../hooks/useUI'
 import { TOKEN_STANDARD_LABEL } from '../../abis/tokenFactory'
 import {
   useTokenFactory,
@@ -25,13 +26,13 @@ const ROLE_LABELS = [
 export default function TokenDetailView({ token, onBack }) {
   const { signer } = useWallet()
   const { detectCapabilities, readTokenLive, reader } = useTokenFactory()
+  const { showNotification } = useNotification()
 
   const [caps, setCaps] = useState(null)
   const [live, setLive] = useState(null)
   const [tab, setTab] = useState('overview')
   const [status, setStatus] = useState('idle')
-  const [error, setError] = useState(null)
-  const [notice, setNotice] = useState(null)
+  const [error, setError] = useState(null) // mount/load read failures (inline)
   const [refresh, setRefresh] = useState(0)
 
   const std = token?.standard
@@ -68,22 +69,21 @@ export default function TokenDetailView({ token, onBack }) {
 
   const run = useCallback(
     async (label, fn) => {
-      if (!signer) return setError('Connect a wallet to administer this token.')
+      if (!signer) return showNotification('Connect a wallet to administer this token.', 'warning')
       setStatus('working')
-      setError(null)
-      setNotice(null)
       try {
         const tx = await fn(contractFor(true))
+        showNotification(`${label} submitted — awaiting confirmation…`, 'info')
         await tx.wait()
         setStatus('idle')
-        setNotice(`${label} confirmed.`)
+        showNotification(`${label} confirmed.`, 'success')
         setRefresh((n) => n + 1)
       } catch (e) {
-        setStatus('error')
-        setError(e?.shortMessage || e?.reason || e?.message || `${label} failed.`)
+        setStatus('idle')
+        showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
       }
     },
-    [signer, contractFor]
+    [signer, contractFor, showNotification]
   )
 
   const tabs = useMemo(() => {
@@ -132,7 +132,6 @@ export default function TokenDetailView({ token, onBack }) {
         <div className="tm-notice" role="status">You’re viewing this token read-only — administrative actions require the appropriate role and are rejected on-chain otherwise.</div>
       )}
       {error && <div className="tm-error" role="alert">{error}</div>}
-      {notice && <div className="tm-success" role="status">{notice}</div>}
 
       {/* Sub-tabs */}
       <div className="tm-detail-tabs" role="tablist">
