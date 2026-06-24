@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 import { DAO_FRAMEWORK } from '../../abis/externalDAORegistry'
 import { validateGovernor } from './governorConnector'
+import CpAddressField from './CpAddressField'
 
 // Spec 030 (US3) — register an existing DAO deployed by another platform. Validates client-side (a fast mirror
 // of the on-chain ERC-165/IGovernor check) before the real register tx; the contract is the source of truth.
@@ -43,10 +44,7 @@ export default function RegisterExternalDao({ reader, register, onRegistered }) 
         Track and (where authorized) act on a DAO deployed by another platform — e.g. an OpenZeppelin Governor DAO
         like Olympia. ClearPath takes no custody or authority; you sign every action. Requires a Silver+ membership.
       </p>
-      <div className="cp-field">
-        <label className="cp-label" htmlFor="cp-dao-addr">Governor address</label>
-        <input id="cp-dao-addr" className="cp-input cp-mono" value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="0x…" />
-      </div>
+      <CpAddressField id="cp-dao-addr" label="Governor address" value={addr} onChange={setAddr} disabled={busy} />
       <div className="cp-field">
         <label className="cp-label" htmlFor="cp-dao-label">Label (optional)</label>
         <input id="cp-dao-label" className="cp-input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Olympia DAO" />

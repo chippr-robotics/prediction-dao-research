@@ -36,6 +36,10 @@ vi.mock('../components/clearpath/governorConnector', () => ({
 vi.mock('../config/networks', () => ({
   getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' }, nativeCurrency: { symbol: 'ETC' } }),
 }))
+// CpAddressField → AddressBookButton → useWallet would throw without a WalletProvider if a register/tracking
+// view mounts; stub the wallet-scoped hooks so the address fields render under axe.
+vi.mock('../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
+vi.mock('../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
 
 describe('ClearPath accessibility (WCAG 2.1 AA)', () => {
   beforeEach(() => {

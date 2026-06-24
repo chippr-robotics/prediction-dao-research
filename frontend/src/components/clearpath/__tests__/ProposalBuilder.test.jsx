@@ -12,6 +12,11 @@ import { ACTION_TYPE, newAction, assemble, predictProposalId } from '../proposal
 const proposeAction = vi.fn()
 vi.mock('../governorConnector', () => ({ proposeAction: (...a) => proposeAction(...a) }))
 
+// CpAddressField (recipient/target inputs) pulls in AddressBookButton → useWallet, which throws without a
+// WalletProvider. Stub the wallet-scoped hooks so the builder renders with the real fields in tests.
+vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
+vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
+
 const USDC = '0x00000000000000000000000000000000000000dc'
 const TO = '0x00000000000000000000000000000000000000a1'
 const TRANSFER = new ethers.Interface(['function transfer(address to, uint256 amount)'])
@@ -106,6 +111,16 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     await user.type(screen.getByLabelText(/amount/i), '100')
     expect(await screen.findByText(/this exact proposal already exists/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /submit proposal/i })).toBeDisabled()
+  })
+
+  it('exposes address-book + QR-scan affordances on the recipient field', async () => {
+    const user = userEvent.setup()
+    renderBuilder()
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    // default action is "Send USDC / token" → its recipient is a CpAddressField
+    expect(screen.getByLabelText(/recipient/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /choose from address book/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /scan qr code/i })).toBeInTheDocument()
   })
 
   it('warns (non-blocking) when an action exceeds the treasury balance', async () => {

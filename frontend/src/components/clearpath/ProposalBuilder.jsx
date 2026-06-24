@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { ERC20_BALANCE_ABI } from '../../abis/externalDAORegistry'
 import { proposeAction } from './governorConnector'
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from './proposalEncoding'
+import CpAddressField from './CpAddressField'
 
 // Spec 030 (US5, FR-023/024/025) — rich Governor proposal builder. Compose a proposal from named action types
 // (send native / send token / custom call), multiple actions, asset-aware human amounts — no hand-written
@@ -211,7 +212,7 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
 
       {a.type === ACTION_TYPE.NATIVE && (
         <>
-          <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-nto`}>Recipient</label><input id={`f-${a.id}-nto`} className="cp-input cp-mono" value={a.nativeTo} onChange={(e) => onChange({ nativeTo: e.target.value })} placeholder="0x…" /></div>
+          <CpAddressField id={`f-${a.id}-nto`} label="Recipient" value={a.nativeTo} onChange={(v) => onChange({ nativeTo: v })} />
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-namt`}>Amount<span className="cp-suffix">{nativeSymbol}</span></label><input id={`f-${a.id}-namt`} className="cp-input cp-mono" value={a.nativeAmount} onChange={(e) => onChange({ nativeAmount: e.target.value })} placeholder="0.0" /></div>
         </>
       )}
@@ -225,8 +226,8 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
               <option value="other">Other ERC-20…</option>
             </select>
           </div>
-          {!useDefaultUsdc && <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-taddr`}>Token address</label><input id={`f-${a.id}-taddr`} className="cp-input cp-mono" value={a.tokenAddress} onChange={(e) => onChange({ tokenAddress: e.target.value })} placeholder="0x…" /></div>}
-          <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-tto`}>Recipient</label><input id={`f-${a.id}-tto`} className="cp-input cp-mono" value={a.tokenTo} onChange={(e) => onChange({ tokenTo: e.target.value })} placeholder="0x…" /></div>
+          {!useDefaultUsdc && <CpAddressField id={`f-${a.id}-taddr`} label="Token address" value={a.tokenAddress} onChange={(v) => onChange({ tokenAddress: v })} hint="The ERC-20 contract to transfer (not the recipient)." />}
+          <CpAddressField id={`f-${a.id}-tto`} label="Recipient" value={a.tokenTo} onChange={(v) => onChange({ tokenTo: v })} />
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-tamt`}>Amount<span className="cp-suffix">{tokenSym}</span></label><input id={`f-${a.id}-tamt`} className="cp-input cp-mono" value={a.tokenAmount} onChange={(e) => onChange({ tokenAmount: e.target.value })} placeholder="0.0" /></div>
         </>
       )}
@@ -234,7 +235,7 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
       {a.type === ACTION_TYPE.CUSTOM && (
         <>
           <p className="cp-row-sub">Advanced — encode the call yourself.</p>
-          <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-ctgt`}>Target contract</label><input id={`f-${a.id}-ctgt`} className="cp-input cp-mono" value={a.customTarget} onChange={(e) => onChange({ customTarget: e.target.value })} placeholder="0x…" /></div>
+          <CpAddressField id={`f-${a.id}-ctgt`} label="Target contract" value={a.customTarget} onChange={(v) => onChange({ customTarget: v })} />
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-cval`}>Value<span className="cp-suffix">{nativeSymbol}</span></label><input id={`f-${a.id}-cval`} className="cp-input cp-mono" value={a.customValue} onChange={(e) => onChange({ customValue: e.target.value })} placeholder="0" /></div>
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-ccd`}>Calldata</label><input id={`f-${a.id}-ccd`} className="cp-input cp-mono" value={a.customCalldata} onChange={(e) => onChange({ customCalldata: e.target.value })} placeholder="0x" /></div>
         </>

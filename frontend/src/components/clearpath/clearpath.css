@@ -82,3 +82,28 @@
 .clearpath .cp-section:first-child { border-top: none; padding-top: 0; }
 .clearpath .cp-disabled { color: var(--cp-text-2); text-align: center; padding: 2rem; }
 .clearpath .cp-empty { color: var(--cp-text-3); text-align: center; padding: 1.5rem; }
+
+/* Address field with address-book + QR-scan affordances (CpAddressField).
+   `.fm-scan-btn` is the shared icon-button box from the wager form (FriendMarketsModal.css), which the reused
+   AddressBookButton hardcodes; that stylesheet isn't loaded in the ClearPath surface, so mirror the sizing here
+   (scoped under .clearpath) so the address-book button and the scan button render as matched square icons. */
+.clearpath .cp-addr-row { display: flex; gap: 0.5rem; align-items: stretch; }
+.clearpath .cp-addr-row > .cp-input { flex: 1; min-width: 0; }
+.clearpath .cp-addr-row .ab-book-btn-wrap { display: inline-flex; align-self: stretch; }
+.clearpath .fm-scan-btn,
+.clearpath .cp-icon-btn {
+  display: flex; align-items: center; justify-content: center; align-self: stretch;
+  width: 42px; min-width: 42px; box-sizing: border-box;
+  background: var(--cp-canvas); border: 1px solid var(--cp-border); border-radius: var(--cp-radius);
+  color: var(--cp-text-2); cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.clearpath .cp-addr-row .ab-book-btn-wrap .fm-scan-btn { height: 100%; }
+.clearpath .fm-scan-btn svg,
+.clearpath .cp-icon-btn svg { width: 20px; height: 20px; flex: none; }
+.clearpath .fm-scan-btn:hover:not(:disabled),
+.clearpath .cp-icon-btn:hover:not(:disabled) {
+  border-color: var(--cp-accent); color: var(--cp-accent);
+  background: color-mix(in srgb, var(--cp-accent) 10%, transparent);
+}
+.clearpath .fm-scan-btn:disabled,
+.clearpath .cp-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
