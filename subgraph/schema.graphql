@@ -197,3 +197,40 @@ type Token @entity(immutable: false) {
   createdAt: BigInt!
   createdTxHash: Bytes!
 }
+
+"""
+Per-token fungible holder balance (spec 028 expansion, US10). Indexed from each issued fungible token's Transfer
+events via the TokenInstance data-source template (spawned on TokenCreated). Powers the cap table. ERC-721
+holders are out of scope here (different Transfer encoding). On subgraph-less networks the frontend disables the
+cap table truthfully.
+"""
+type Holder @entity(immutable: false) {
+  "<tokenAddress>-<holderAddress>"
+  id: ID!
+  "issued token contract"
+  token: Bytes!
+  "holder address"
+  account: Bytes!
+  "current balance (raw, token decimals)"
+  balance: BigInt!
+  firstHeldAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+"""
+Per-token on-chain activity (spec 028 expansion, US12). Indexed from each fungible token's Transfer + admin
+events. type ∈ mint | burn | transfer | pause | unpause | freeze | unfreeze | role_granted | role_revoked.
+"""
+type TokenActivity @entity(immutable: true) {
+  "<txHash>-<logIndex>"
+  id: ID!
+  token: Bytes!
+  type: String!
+  actor: Bytes!
+  from: Bytes
+  to: Bytes
+  amount: BigInt
+  detail: String!
+  timestamp: BigInt!
+  txHash: Bytes!
+}

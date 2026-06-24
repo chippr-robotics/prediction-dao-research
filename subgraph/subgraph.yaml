@@ -244,3 +244,41 @@ dataSources:
         - event: TokenCreated(indexed uint256,indexed uint8,indexed address,address,string,string)
           handler: handleTokenCreated
       file: ./src/mappings/tokenFactory.ts
+
+# ---------------------------------------------------------------------------
+# Per-token indexing template (spec 028 expansion, US10/US12). Instantiated from
+# the TokenFactory.handleTokenCreated handler for each FUNGIBLE issued token
+# (ERC-20 / ERC-1404) — ERC-721 is skipped (different Transfer encoding). Indexes
+# Transfer → Holder balances (cap table) and Transfer + admin events → TokenActivity.
+# Dynamic data source: no address here (supplied at TokenInstance.create()).
+# ---------------------------------------------------------------------------
+templates:
+  - kind: ethereum/contract
+    name: TokenInstance
+    network: polygon-amoy
+    source:
+      abi: TokenInstance
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Holder
+        - TokenActivity
+      abis:
+        - name: TokenInstance
+          file: ../frontend/src/abis/TokenInstance.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: Paused(address)
+          handler: handlePaused
+        - event: Unpaused(address)
+          handler: handleUnpaused
+        - event: Frozen(indexed address,bool)
+          handler: handleFrozen
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+      file: ./src/mappings/token.ts

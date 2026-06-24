@@ -387,12 +387,12 @@ cap table + activity feed, with truthful disable on subgraph-less networks.
 **Independent test**: On a subgraph network, the cap table + activity reflect real
 balances/events; on Mordor they show a truthful "unavailable" state (no fabricated rows).
 
-- [ ] T087 [US10] Add `Holder` + `TokenActivity` entities to `subgraph/schema.graphql` and a per-token **data-source template** in `subgraph/subgraph.yaml` (`templates:`) for the v2 token ABI
-- [ ] T088 [US10] Add `subgraph/src/mappings/token.ts`: spawn the template from the `TokenCreated` handler; handle `Transfer` → `Holder` balances/firstHeldAt and admin events (mint/burn/Paused/Unpaused/Frozen/RoleGranted/RoleRevoked) → `TokenActivity`
-- [ ] T089 [P] [US10] Matchstick `subgraph/tests/token.test.ts`: Transfer builds Holder balances + cap-table %; admin events build TokenActivity; codegen + build + matchstick green
-- [ ] T090 [US10] Frontend Holders sub-tab `frontend/src/components/tokens/HoldersPanel.jsx`: ranked cap table (address/label/balance/%/since) + distribution bar + CSV export from the subgraph; truthful disabled state on subgraph-less nets (own `balanceOf` may show) — no fabricated rows
-- [ ] T091 [US12] Frontend Activity sub-tab `frontend/src/components/tokens/ActivityPanel.jsx`: event feed (type/detail/actor/tx/time) with category filter from the subgraph; truthful disable where unindexed
-- [ ] T092 [P] [US10] [US12] `frontend` Vitest: cap table + activity render from indexed data; truthful disabled state when indexing absent (assert no fabricated rows)
+- [X] T087 [US10] Add `Holder` + `TokenActivity` entities to `subgraph/schema.graphql` and a per-token **data-source template** in `subgraph/subgraph.yaml` (`templates:`) for the v2 token ABI
+- [X] T088 [US10] Add `subgraph/src/mappings/token.ts`: spawn the template from the `TokenCreated` handler; handle `Transfer` → `Holder` balances/firstHeldAt and admin events (mint/burn/Paused/Unpaused/Frozen/RoleGranted/RoleRevoked) → `TokenActivity`
+- [X] T089 [P] [US10] Matchstick `subgraph/tests/token.test.ts`: Transfer builds Holder balances + cap-table %; admin events build TokenActivity; codegen + build + matchstick green
+- [X] T090 [US10] Frontend Holders sub-tab `frontend/src/components/tokens/HoldersPanel.jsx`: ranked cap table (address/label/balance/%/since) + distribution bar + CSV export from the subgraph; truthful disabled state on subgraph-less nets (own `balanceOf` may show) — no fabricated rows
+- [X] T091 [US12] Frontend Activity sub-tab `frontend/src/components/tokens/ActivityPanel.jsx`: event feed (type/detail/actor/tx/time) with category filter from the subgraph; truthful disable where unindexed
+- [X] T092 [P] [US10] [US12] `frontend` Vitest: cap table + activity render from indexed data; truthful disabled state when indexing absent (assert no fabricated rows)
 
 **Checkpoint**: holders + activity live where indexed; honest fallback elsewhere.
 
