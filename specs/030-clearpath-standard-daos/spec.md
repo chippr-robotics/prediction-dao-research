@@ -55,9 +55,18 @@ accessible, runs entirely within the platform's **no-backend** footprint, and sh
 - Q: How are registered external DAOs stored / discovered? → A: A lightweight **on-chain, network-scoped `ExternalDAORegistry`** records `(address, framework, label)` for shared discovery + subgraph indexing (fits the no-backend footprint); ClearPath still holds **no authority** over the external DAO.
 - Q: What's in the first external-DAO deliverable — track-only or also management? → A: **Include signed native management actions** (create proposal / vote / queue / execute via the connector, user-signed) **from the start**, alongside read-only tracking — not deferred to a later phase.
 
+### Session 2026-06-24 (expansion — as-built alignment)
+
+- External-first sequencing: OpenZeppelin 5.4.0 `GovernorUpgradeable` transitively uses the Cancun `mcopy` opcode (via `SignatureChecker` → `Bytes.sol`), so **native OZ-Governor DAOs cannot compile/deploy on pre-Cancun ETC/Mordor**. Per the user's decision, the **external-DAO connector ships first** (Mordor + Amoy); **native ClearPath DAOs (US1, US4, US6) are DEFERRED** pending a governance-base choice (OZ Governor on Cancun chains / a custom paris-safe governor / vendor OZ 5.1). The external connector is unaffected — the on-chain `ExternalDAORegistry` imports only the `IGovernor` *interface*, so it is paris-safe; reads/actions go through the `IGovernor` ABI.
+- Subgraph-less networks get **limited live on-chain indexing** (a bounded, chunked `eth_getLogs` scan of `ProposalCreated`, enriched with live `state()`/`proposalVotes()`) — the concrete realization of the truthful-fallback requirement, with truthful empty / partial / error states (never fabricated).
+- Treasury tracking surfaces the Governor's **timelock AND known extra vaults** (e.g. the real OlympiaTreasury on Mordor) with **native + per-network USDC** balances.
+- The proposal builder is a **rich, no-calldata-required** composer (named action types, multiple actions, asset-aware amounts, encoded-call preview, pre-sign guards) over the existing `IGovernor.propose()` — **no new contract**.
+
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Launch a standard DAO (Priority: P1)
+### User Story 1 - Launch a standard DAO (Priority: P1) — ⏸️ DEFERRED (native)
+
+> **Deferred (2026-06-24):** native OZ-Governor DAOs can't run on pre-Cancun ETC/Mordor (the `mcopy` blocker). Implement after the external-DAO pillar, once the governance base is chosen. Requirements retained below unchanged.
 
 An authorized member creates a native standard DAO, choosing its name, purpose,
 voting-weight source (a governance token or a membership NFT), a USDC treasury, and
@@ -151,7 +160,7 @@ membership shown match the external DAO's real on-chain state — with a truthfu
 
 ---
 
-### User Story 4 - Run a proposal on a native DAO (Priority: P2)
+### User Story 4 - Run a proposal on a native DAO (Priority: P2) — ⏸️ DEFERRED (native)
 
 A member of a native standard DAO submits a proposal (a USDC treasury action or a
 parameter change), other members vote during the voting period, and after the
@@ -210,9 +219,32 @@ action is rejected by the external DAO's own rules.
    requested, **Then** ClearPath tracks read-only and offers a truthful deep-link to
    the external app rather than a broken action.
 
+**Rich proposal builder (expanded)** — the create-proposal surface MUST let a member
+compose a proposal without hand-writing calldata:
+
+5. **Given** the proposal builder, **When** a member adds a "Send native" or "Send
+   USDC/ERC-20" action with a recipient and a human amount, **Then** the system
+   encodes the correct on-chain call (native: value + empty calldata; token: a
+   `transfer` call with `value` 0 and the amount scaled by the token's decimals) — the
+   member never types hex.
+6. **Given** the builder, **When** a member adds multiple actions, **Then** they are
+   submitted as one proposal with parallel `targets`/`values`/`calldatas` arrays of
+   equal length, and the builder shows a live preview of each encoded call plus the
+   exact `targets`/`values`/`calldatas`/`description` (and `descriptionHash`) that will
+   be submitted.
+7. **Given** an action that would send more than the treasury holds, **When** the
+   member reviews it, **Then** a **non-blocking** warning is shown (the proposal can
+   still be created; execution would revert if unfunded) — it does not fake success.
+8. **Given** invalid input (bad address, unparseable amount, malformed custom
+   calldata, empty title/description, or zero actions), **When** the member tries to
+   submit, **Then** submit is blocked with a truthful field-level reason.
+9. **Given** the connected wallet is not authorized by the DAO's own rules (e.g. below
+   the proposer threshold), **When** the member submits, **Then** the DAO's revert
+   reason is surfaced — ClearPath does not imply success.
+
 ---
 
-### User Story 6 - Administer a DAO: roles, parameters & ownership (Priority: P2)
+### User Story 6 - Administer a DAO: roles, parameters & ownership (Priority: P2) — ⏸️ DEFERRED (native)
 
 A native-DAO administrator grants/revokes scoped roles (e.g. proposer, treasurer,
 canceller), configures governance parameters, and transfers or renounces
@@ -314,6 +346,16 @@ explorer; copy an address/ABI and confirm correctness.
 - **Network without support / subgraph-less**: the feature self-disables truthfully,
   and tracking falls back to on-chain reads or a truthful "unavailable" state — never
   fabricated rows.
+- **Duplicate proposal**: composing an action set + description identical to an
+  existing proposal yields the same proposal id; the builder detects this and warns
+  ("this exact proposal already exists") instead of paying gas for a guaranteed revert.
+- **ERC-20 transfer with a native value**: the builder forces `value` = 0 for token
+  transfers so native coin is never stranded in the executor.
+- **Description edited after submit**: changing the description string changes its hash
+  and thus the proposal id; the stored exact string is reused for queue/execute so the
+  ids line up (a near-identical description is a *different* proposal).
+- **Proposer below threshold / votes not yet snapshotted**: surfaced pre-sign where the
+  threshold is readable; otherwise the DAO's own revert reason is surfaced.
 
 ## Requirements *(mandatory)*
 
@@ -416,6 +458,38 @@ explorer; copy an address/ABI and confirm correctness.
   disable** on subgraph-less networks (Mordor/ETC) — it MUST NOT display fabricated
   DAOs, proposals, members, or events.
 
+**Live indexing, treasury & proposal builder (expansion)**
+
+- **FR-021**: On subgraph-less networks the system MUST provide **limited live
+  on-chain indexing** of a Governor's proposals — a bounded, chunked scan of
+  `ProposalCreated` events enriched with live proposal `state` and vote tallies — and
+  MUST present truthful empty / partial (RPC-limited) / error states; it MUST NOT
+  fabricate proposals.
+- **FR-022**: The system MUST present a tracked DAO's treasury holdings across its
+  Governor **timelock and any known extra vault** (e.g. OlympiaTreasury), showing
+  **native and per-network USDC** balances read from chain.
+- **FR-023**: The proposal builder MUST let a member compose a Governor proposal
+  **without hand-writing calldata**: named action types (send native, send a
+  USDC/ERC-20 token by address, and a custom-call escape hatch), **multiple actions in
+  one proposal**, **asset-aware human amounts** (scaled by the token's decimals), and a
+  **live preview** of each encoded call plus the exact `targets`/`values`/`calldatas`/
+  `description`/`descriptionHash` that will be submitted.
+- **FR-024**: The builder MUST apply **field-level validation** (valid addresses,
+  parseable amounts, well-formed custom calldata, non-empty description, at least one
+  action) and **pre-sign guards**: a **non-blocking** warning when an action exceeds
+  the treasury's balance (the proposal may still be created; execution would revert),
+  and surfacing the DAO's **own authorization/threshold revert** rather than implying
+  success.
+- **FR-025**: The system MUST preserve Governor proposal **correctness invariants**:
+  the **exact description string** is reused byte-for-byte across propose → queue →
+  execute (so `descriptionHash` matches and the proposal id resolves); ERC-20 transfer
+  actions carry **`value` = 0** (the amount is in calldata; the executing
+  timelock/treasury holds the funds, not the proposer); `targets`/`values`/`calldatas`
+  arrays are equal length and non-empty; and a **duplicate proposal** (identical
+  targets/values/calldatas/descriptionHash) is detected and surfaced truthfully
+  ("this exact proposal already exists") rather than reverting blindly. Proposal
+  building is pure client-side ABI encoding (paris-safe; no Cancun dependency).
+
 ### Key Entities *(include if feature involves data)*
 
 - **Standard DAO (native)**: A traditional-governance DAO created through the
@@ -482,6 +556,13 @@ explorer; copy an address/ABI and confirm correctness.
 - **SC-012**: The full automated test suite (contract unit + integration +
   upgrade-lifecycle, subgraph Matchstick, frontend Vitest incl. axe) passes in CI,
   and security static analysis/fuzzing report no new high/critical findings.
+- **SC-013**: A member can compose a multi-action Governor proposal (e.g. send native +
+  send USDC) entirely through the builder **without writing any calldata**, and the
+  encoded `targets`/`values`/`calldatas` exactly match the chosen actions (token amounts
+  scaled by the correct decimals; ERC-20 `value` = 0) — verified by tests.
+- **SC-014**: On a subgraph-less network, the live indexer shows a DAO's real proposals
+  (with live state + tallies) or a truthful empty/partial/error state — never fabricated
+  rows — verified against a real Governor DAO.
 
 ## Assumptions
 
@@ -532,3 +613,16 @@ explorer; copy an address/ABI and confirm correctness.
   depend on subgraph indexing; on subgraph-less networks (Mordor/ETC) they fall back
   to on-chain reads where feasible or disable truthfully — never fabricated
   (Constitution III).
+- **External-first sequencing (clarified 2026-06-24)**: native OZ-Governor DAOs are
+  blocked on pre-Cancun ETC/Mordor by the OZ-5.4.0 `mcopy` dependency, so US1/US4/US6
+  are **deferred**; the external-DAO pillar (US2/US3/US5) ships first on Mordor + Amoy.
+  Revisit native DAOs with one of: OZ Governor on Cancun chains, a custom paris-safe
+  governor, or a vendored OZ 5.1 Governor.
+- **Live indexing**: the subgraph-less proposal fallback is a **bounded, chunked
+  `eth_getLogs` scan** of `ProposalCreated` enriched with live `state`/`proposalVotes`;
+  it is best-effort (truthful partial/error states) and not a full historical index.
+- **Proposal builder**: it is a **pure client-side ABI-encoding layer** over the
+  existing `IGovernor.propose()` — **no new contract**. It composes named action types
+  (send native / send token / custom) into the parallel arrays; token decimals are read
+  live; the description string is treated as opaque bytes and reused verbatim for
+  queue/execute so the proposal id resolves.

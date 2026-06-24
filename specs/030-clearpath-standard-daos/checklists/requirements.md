@@ -52,3 +52,11 @@
   Governor v5.1 there, so it is expected to work — verify in research); and the exact
   "recognized governance contract" validation probe (ERC-165 / IGovernor function
   probe). Membership tier defaults mirror spec 028.
+- **Expansion — as-built alignment (2026-06-24):** the spec was expanded **in place**
+  (no new spec dir) to match the build: external-first sequencing (native US1/US4/US6
+  deferred — the OZ-5.4.0 `mcopy` blocker, resolved during implementation, not a code
+  regression), limited live on-chain indexing (FR-021), treasury+USDC enrichment
+  (FR-022), and the **rich proposal builder** (FR-023/FR-024) with Governor correctness
+  invariants (FR-025) + new acceptance scenarios (US5 #5–9), edge cases, and SC-013/014.
+  No new contract — the builder composes the existing `IGovernor.propose()`. All items
+  re-validated: still passing (16/16).
