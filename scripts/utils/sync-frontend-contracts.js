@@ -188,6 +188,7 @@ function main() {
         keyRegistry: deployed.keyRegistry,
         sanctionsGuard: deployed.sanctionsGuard,
         tokenFactory: deployed.tokenFactory, // spec 028 — token issuance (only present where deployed)
+        externalDAORegistry: deployed.externalDAORegistry, // spec 030 — ClearPath external-DAO registry
         polymarketAdapter: deployed.polymarketAdapter,
         chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
         chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,
