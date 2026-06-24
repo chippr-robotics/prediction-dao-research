@@ -11,8 +11,8 @@ import {
   castVote,
   queueProposal,
   executeProposal,
-  proposeAction,
 } from './governorConnector'
+import ProposalBuilder from './ProposalBuilder'
 
 // Spec 030 (US3 + US5) — tracking + management view for a registered external DAO (e.g. Olympia). Reads the
 // DAO's LIVE state via the standard IGovernor connector, its treasuries (timelock + known vaults) native+USDC,
@@ -202,53 +202,17 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
           </div>
         ))}
 
-        <ProposeForm record={record} signer={signer} run={run} busy={busy} />
-      </div>
-    </div>
-  )
-}
-
-// Minimal "new proposal" form (US5) — a single treasury/parameter action the member signs. Advanced; the DAO's
-// own rules (e.g. proposal threshold / membership) gate acceptance on-chain.
-function ProposeForm({ record, signer, run, busy }) {
-  const [open, setOpen] = useState(false)
-  const [target, setTarget] = useState('')
-  const [value, setValue] = useState('0')
-  const [calldata, setCalldata] = useState('0x')
-  const [description, setDescription] = useState('')
-
-  if (!open) {
-    return (
-      <div style={{ marginTop: '0.8rem' }}>
-        <button type="button" className="cp-btn-link" onClick={() => setOpen(true)}>+ New proposal</button>
-      </div>
-    )
-  }
-
-  const valid =
-    ethers.isAddress(target.trim()) && description.trim().length > 0 && /^0x([0-9a-fA-F]{2})*$/.test(calldata.trim())
-
-  function submit() {
-    run('Propose', () =>
-      proposeAction(signer, record.dao, {
-        targets: [target.trim()],
-        values: [ethers.parseEther(String(value || '0'))],
-        calldatas: [calldata.trim()],
-        description: description.trim(),
-      })
-    ).then(() => { setOpen(false); setTarget(''); setValue('0'); setCalldata('0x'); setDescription('') })
-  }
-
-  return (
-    <div className="cp-card" style={{ marginTop: '0.8rem', background: 'var(--cp-canvas)' }}>
-      <h4 style={{ marginBottom: '0.5rem' }}>New proposal</h4>
-      <div className="cp-field"><label className="cp-label">Target contract</label><input className="cp-input cp-mono" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="0x…" /></div>
-      <div className="cp-field"><label className="cp-label">Value (native)</label><input className="cp-input cp-mono" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" /></div>
-      <div className="cp-field"><label className="cp-label">Calldata</label><input className="cp-input cp-mono" value={calldata} onChange={(e) => setCalldata(e.target.value)} placeholder="0x" /></div>
-      <div className="cp-field"><label className="cp-label">Description</label><input className="cp-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this proposal does" /></div>
-      <div className="cp-row-actions">
-        <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy} onClick={submit}>Submit proposal</button>
-        <button type="button" className="cp-btn" onClick={() => setOpen(false)}>Cancel</button>
+        <ProposalBuilder
+          record={record}
+          signer={signer}
+          reader={reader}
+          usdcAddress={usdcAddress}
+          nativeSymbol={net?.nativeCurrency?.symbol}
+          treasuries={treasuries}
+          run={run}
+          busy={busy}
+          onSubmitted={loadProposals}
+        />
       </div>
     </div>
   )
