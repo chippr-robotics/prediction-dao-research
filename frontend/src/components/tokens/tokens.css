@@ -1,0 +1,296 @@
+/*
+ * Spec 028 — Token Mint module styling (Phase 11 / T076).
+ * Adapts the imported "TokenMint.dc.html" design (IBM Plex + a calm, card-based admin portal) onto the app's
+ * own theme variables (frontend/src/theme.css), so the module respects light/dark mode rather than hardcoding
+ * the mockup's light-only palette. Everything is scoped under `.token-mint`; IBM Plex is loaded only here.
+ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap');
+
+.token-mint {
+  /* Local tokens derived from the app theme so light/dark both work. */
+  --tm-accent: var(--brand-primary);
+  --tm-surface: var(--surface-color);
+  --tm-canvas: var(--bg-primary);
+  --tm-text: var(--text-primary);
+  --tm-text-2: var(--text-secondary);
+  --tm-text-3: var(--text-muted);
+  --tm-border: var(--border-color);
+  --tm-radius: var(--radius-md, 8px);
+  --tm-radius-lg: var(--radius-lg, 12px);
+  --tm-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));
+  --tm-serif: 'IBM Plex Serif', Georgia, serif;
+  --tm-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --tm-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  font-family: var(--tm-sans);
+  color: var(--tm-text);
+}
+
+.token-mint h1,
+.token-mint h2,
+.token-mint h3,
+.token-mint h4 {
+  font-family: var(--tm-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.token-mint code,
+.token-mint .tm-mono {
+  font-family: var(--tm-mono);
+  font-size: 0.85em;
+}
+
+.token-mint .tm-intro {
+  color: var(--tm-text-2);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0.25rem 0 1.25rem;
+  max-width: 60ch;
+}
+
+/* ---- Top tabs (My Tokens / Create / Explorer) ---- */
+.token-mint .tm-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--tm-border);
+  margin-bottom: 1.25rem;
+}
+.token-mint .tm-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--tm-sans);
+  font-size: 0.9rem;
+  color: var(--tm-text-2);
+  cursor: pointer;
+}
+.token-mint .tm-tab:hover { color: var(--tm-text); }
+.token-mint .tm-tab.active {
+  color: var(--tm-accent);
+  font-weight: 600;
+  border-bottom-color: var(--tm-accent);
+}
+
+/* ---- Cards + summary strip ---- */
+.token-mint .tm-card {
+  background: var(--tm-surface);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-lg);
+  box-shadow: var(--tm-shadow);
+  padding: 1.25rem;
+}
+.token-mint .tm-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+.token-mint .tm-stat {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  padding: 0.9rem 1rem;
+  background: var(--tm-surface);
+}
+.token-mint .tm-stat-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tm-text-3);
+}
+.token-mint .tm-stat-value {
+  font-family: var(--tm-mono);
+  font-size: 1.4rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+}
+
+/* ---- Table / list ---- */
+.token-mint .tm-table { border: 1px solid var(--tm-border); border-radius: var(--tm-radius-lg); overflow: hidden; }
+.token-mint .tm-thead,
+.token-mint .tm-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr 36px;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.7rem 1rem;
+}
+.token-mint .tm-thead {
+  background: var(--tm-canvas);
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tm-text-3);
+}
+.token-mint .tm-row { border-bottom: 1px solid var(--tm-border); cursor: pointer; background: var(--tm-surface); }
+.token-mint .tm-row:last-child { border-bottom: none; }
+.token-mint .tm-row:hover { background: color-mix(in srgb, var(--tm-accent) 6%, var(--tm-surface)); }
+.token-mint .tm-row-name { font-weight: 600; font-size: 0.9rem; }
+.token-mint .tm-row-sub { font-family: var(--tm-mono); font-size: 0.72rem; color: var(--tm-text-3); }
+
+/* ---- Badges + monogram ---- */
+.token-mint .tm-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 5px;
+  padding: 0.15rem 0.5rem;
+}
+.token-mint .tm-badge-erc20 { color: var(--tm-accent); background: color-mix(in srgb, var(--tm-accent) 14%, transparent); }
+.token-mint .tm-badge-erc721 { color: var(--semantic-active, #4C9AFF); background: color-mix(in srgb, var(--semantic-active, #4C9AFF) 14%, transparent); }
+.token-mint .tm-badge-erc1404 { color: var(--semantic-warning, #F5A623); background: color-mix(in srgb, var(--semantic-warning, #F5A623) 16%, transparent); }
+.token-mint .tm-monogram {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--tm-mono); font-weight: 600; font-size: 0.8rem;
+  color: var(--tm-accent);
+  background: color-mix(in srgb, var(--tm-accent) 12%, var(--tm-surface));
+}
+
+/* ---- Buttons ---- */
+.token-mint .tm-btn {
+  appearance: none;
+  font-family: var(--tm-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--tm-radius);
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s), border-color var(--transition-fast, 0.15s);
+}
+.token-mint .tm-btn:hover:not(:disabled) { border-color: var(--tm-accent); }
+.token-mint .tm-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.token-mint .tm-btn-primary { background: var(--tm-accent); border-color: var(--tm-accent); color: #fff; }
+.token-mint .tm-btn-primary:hover:not(:disabled) { filter: brightness(0.94); }
+.token-mint .tm-btn-danger { color: var(--semantic-loss, #c0492f); border-color: color-mix(in srgb, var(--semantic-loss, #c0492f) 40%, var(--tm-border)); }
+.token-mint .tm-btn-link { background: none; border: none; color: var(--tm-accent); padding: 0.25rem 0; font-weight: 600; cursor: pointer; }
+
+/* ---- Forms ---- */
+.token-mint .tm-field { margin-bottom: 0.9rem; }
+.token-mint .tm-label { display: block; font-size: 0.75rem; color: var(--tm-text-2); margin-bottom: 0.35rem; }
+.token-mint .tm-input,
+.token-mint .tm-textarea {
+  width: 100%; box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  font-family: var(--tm-sans);
+  font-size: 0.9rem;
+}
+.token-mint .tm-input:focus,
+.token-mint .tm-textarea:focus { outline: 2px solid color-mix(in srgb, var(--tm-accent) 50%, transparent); outline-offset: 1px; }
+.token-mint .tm-input.tm-mono { font-family: var(--tm-mono); }
+.token-mint .tm-checkbox { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-right: 1rem; }
+
+/* ---- Standard cards (create) + deployment rail ---- */
+.token-mint .tm-std-card {
+  text-align: left; width: 100%;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  padding: 0.85rem 0.95rem;
+  background: var(--tm-surface);
+  cursor: pointer;
+  margin-bottom: 0.7rem;
+}
+.token-mint .tm-std-card.selected { border-color: var(--tm-accent); box-shadow: 0 0 0 1px var(--tm-accent) inset; }
+.token-mint .tm-std-card .tm-std-name { font-family: var(--tm-serif); font-weight: 600; }
+.token-mint .tm-std-card .tm-std-desc { font-size: 0.78rem; color: var(--tm-text-3); margin-top: 0.35rem; }
+.token-mint .tm-create-layout { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.25rem; }
+.token-mint .tm-rail { position: sticky; top: 1rem; }
+@media (max-width: 820px) { .token-mint .tm-create-layout { grid-template-columns: 1fr; } }
+
+/* ---- Detail view ---- */
+.token-mint .tm-detail-head {
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  border: 1px solid var(--tm-border); border-radius: var(--tm-radius-lg);
+  padding: 1.1rem 1.2rem; background: var(--tm-surface);
+}
+.token-mint .tm-detail-tabs {
+  display: flex; gap: 0.2rem; overflow-x: auto;
+  border-bottom: 1px solid var(--tm-border);
+  margin: 1.25rem 0;
+}
+.token-mint .tm-detail-tab {
+  appearance: none; background: none; border: none; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 0.6rem 0.8rem; font-size: 0.85rem; color: var(--tm-text-2); cursor: pointer;
+}
+.token-mint .tm-detail-tab.active { color: var(--tm-accent); font-weight: 600; border-bottom-color: var(--tm-accent); }
+.token-mint .tm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+@media (max-width: 720px) { .token-mint .tm-grid-2 { grid-template-columns: 1fr; } }
+.token-mint .tm-kv { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--tm-border); font-size: 0.85rem; }
+.token-mint .tm-kv:last-child { border-bottom: none; }
+.token-mint .tm-kv .k { color: var(--tm-text-3); }
+
+/* ---- Cap progress ---- */
+.token-mint .tm-progress { height: 9px; border-radius: 6px; background: color-mix(in srgb, var(--tm-accent) 12%, var(--tm-surface)); overflow: hidden; }
+.token-mint .tm-progress > span { display: block; height: 100%; background: var(--tm-accent); }
+
+/* ---- Status messages ---- */
+.token-mint .tm-notice,
+.token-mint .tm-error,
+.token-mint .tm-pending,
+.token-mint .tm-success {
+  border-radius: var(--tm-radius);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.83rem;
+  margin: 0.6rem 0;
+}
+.token-mint .tm-notice { background: color-mix(in srgb, var(--semantic-warning, #F5A623) 12%, var(--tm-surface)); color: var(--tm-text); }
+.token-mint .tm-error { background: color-mix(in srgb, var(--semantic-loss, #c0492f) 12%, var(--tm-surface)); color: var(--tm-text); }
+.token-mint .tm-pending { background: color-mix(in srgb, var(--semantic-active, #4C9AFF) 12%, var(--tm-surface)); color: var(--tm-text); }
+.token-mint .tm-success { background: color-mix(in srgb, var(--tm-accent) 12%, var(--tm-surface)); color: var(--tm-text); }
+.token-mint .tm-feature-disabled { color: var(--tm-text-2); padding: 2rem; text-align: center; }
+.token-mint .tm-empty { color: var(--tm-text-3); padding: 1.5rem; text-align: center; }
+
+.token-mint .tm-section { margin-top: 1.25rem; }
+.token-mint .tm-section + .tm-section { border-top: 1px solid var(--tm-border); padding-top: 1.1rem; }
+.token-mint .tm-row-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ---- Holders cap table + activity feed (spec 028 expansion, US10/US12) ---- */
+.token-mint .tm-table-wrap { overflow-x: auto; border: 1px solid var(--tm-border); border-radius: var(--tm-radius-lg); }
+.token-mint .tm-data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.token-mint .tm-data-table thead th {
+  text-align: left;
+  background: var(--tm-canvas);
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--tm-text-3);
+  font-weight: 600;
+  padding: 0.6rem 0.8rem;
+  white-space: nowrap;
+}
+.token-mint .tm-data-table tbody td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--tm-border); }
+.token-mint .tm-data-table tbody tr:last-child td { border-bottom: none; }
+.token-mint .tm-data-table tbody tr:hover { background: color-mix(in srgb, var(--tm-accent) 5%, var(--tm-surface)); }
+
+.token-mint .tm-distribution { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--tm-canvas); }
+.token-mint .tm-distribution-seg { display: block; height: 100%; background: var(--tm-accent); min-width: 2px; }
+.token-mint .tm-distribution-seg:nth-child(even) { background: color-mix(in srgb, var(--tm-accent) 70%, var(--tm-text-3)); }
+
+.token-mint .tm-filter-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.token-mint .tm-chip {
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text-2);
+  cursor: pointer;
+}
+.token-mint .tm-chip:hover { border-color: var(--tm-accent); }
+.token-mint .tm-chip.active { background: var(--tm-accent); color: #fff; border-color: var(--tm-accent); }

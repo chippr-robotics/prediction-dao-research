@@ -164,6 +164,18 @@ async function main() {
   add("SanctionsGuard", c.sanctionsGuard, "sanctionsGuard", [deployer, sanctionsOracle],
     "contracts/access/SanctionsGuard.sol:SanctionsGuard");
 
+  // TokenFactory (spec 028) is a UUPS proxy: verify the IMPLEMENTATION (no constructor args — init data lives in
+  // the proxy). The clone templates are immutable with no constructor args. Present only once the factory is
+  // deployed on this network.
+  add("TokenFactory", c.tokenFactoryImpl, "tokenFactoryImpl", [],
+    "contracts/tokens/TokenFactory.sol:TokenFactory");
+  add("OpenERC20", c.openERC20Impl, "openERC20Impl", [],
+    "contracts/tokens/templates/OpenERC20.sol:OpenERC20");
+  add("OpenERC721", c.openERC721Impl, "openERC721Impl", [],
+    "contracts/tokens/templates/OpenERC721.sol:OpenERC721");
+  add("RestrictedERC20", c.restrictedERC20Impl, "restrictedERC20Impl", [],
+    "contracts/tokens/templates/RestrictedERC20.sol:RestrictedERC20");
+
   // Oracle adapters — present only on Polymarket/Chainlink/UMA-enabled networks.
   add("PolymarketOracleAdapter", c.polymarketAdapter, "polymarketAdapter", [deployer, record.polymarketCTF],
     "contracts/oracles/PolymarketOracleAdapter.sol:PolymarketOracleAdapter");

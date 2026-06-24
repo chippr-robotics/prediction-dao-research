@@ -8,6 +8,7 @@ import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
+import TokensPanel from '../components/tokens/TokensPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
@@ -27,6 +28,7 @@ const WALLET_TABS = [
   { id: 'security', label: 'Security' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'reports', label: 'Reporting' },
+  { id: 'tokens', label: 'Tokens' },
   { id: 'swap', label: 'Swap' },
 ]
 
@@ -448,6 +450,11 @@ function WalletPage() {
                   </div>
                 )}
 
+                {activeTab === 'tokens' && (
+                  <div className="tokens-section" role="tabpanel">
+                    <TokensPanel />
+                  </div>
+                )}
                 {activeTab === 'swap' && (
                   <div className="swap-section" role="tabpanel">
                     <SwapPanel />

@@ -187,6 +187,7 @@ function main() {
         voucherBatchMinter: deployed.voucherBatchMinter,
         keyRegistry: deployed.keyRegistry,
         sanctionsGuard: deployed.sanctionsGuard,
+        tokenFactory: deployed.tokenFactory, // spec 028 — token issuance (only present where deployed)
         polymarketAdapter: deployed.polymarketAdapter,
         chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
         chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,

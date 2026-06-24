@@ -124,6 +124,7 @@ In the create UI these settlers appear as **Me**, **Them**, **A Friend**, and
 | `WagerRegistry` | Wager lifecycle and stake escrow (create, accept, resolve, claim, refund), including open challenges. **UUPS proxy** — upgradeable at a stable address (spec 025) |
 | `MembershipManager` | Tiered memberships (Bronze → Platinum) with creation rate limits and voucher redemption. **UUPS proxy** (spec 027) |
 | `MembershipVoucher` | Transferable ERC-721 bearer claim on a membership; bought with USDC, redeemed (burned) for a soulbound membership (spec 026). **Immutable** by design |
+| `TokenFactory` | Role-gated, sanctions-screened issuance of open ERC-20/721 and restricted ERC-1404 tokens as immutable clones (spec 028). **UUPS proxy**. See the [Token Mint guide](developer-guide/token-mint.md) |
 | `SanctionsGuard` | Non-bypassable sanctions screening (Chainalysis oracle + deny list) |
 | `KeyRegistry` | Public encryption keys for private wager terms |
 | Oracle adapters | `PolymarketOracleAdapter`, `ChainlinkDataFeedOracleAdapter`, `ChainlinkFunctionsOracleAdapter`, `UMAOptimisticOracleV3Adapter` |

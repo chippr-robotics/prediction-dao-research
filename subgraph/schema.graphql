@@ -172,3 +172,65 @@ type OracleMarketLink @entity(immutable: true) {
   linkedAt: BigInt!
   linkedTxHash: Bytes!
 }
+
+"""
+A token created through the spec-028 TokenFactory (issue #761). Indexed from the
+factory's TokenCreated event so discovery and an issuer's admin list work without
+an eth_getLogs scan. On subgraph-less networks (Mordor/ETC) the frontend falls
+back to on-chain factory-registry reads. Network-scoped by deployment; the
+factory's clone templates are immutable. The permissioned ERC-3643 standard (3)
+is reserved (deferred) — only standards 0/1/2 are issued today.
+"""
+type Token @entity(immutable: false) {
+  "deployed token address (lowercased hex)"
+  id: ID!
+  "registry id allocated by the factory (decimal string mirror of `registryId`)"
+  registryId: BigInt!
+  "TokenStandard enum index: 0=OPEN_ERC20, 1=OPEN_ERC721, 2=RESTRICTED_ERC1404, 3=PERMISSIONED_ERC3643"
+  standard: Int!
+  "deployed token contract address"
+  tokenAddress: Bytes!
+  "issuer / initial owner"
+  issuer: Bytes!
+  name: String!
+  symbol: String!
+  createdAt: BigInt!
+  createdTxHash: Bytes!
+}
+
+"""
+Per-token fungible holder balance (spec 028 expansion, US10). Indexed from each issued fungible token's Transfer
+events via the TokenInstance data-source template (spawned on TokenCreated). Powers the cap table. ERC-721
+holders are out of scope here (different Transfer encoding). On subgraph-less networks the frontend disables the
+cap table truthfully.
+"""
+type Holder @entity(immutable: false) {
+  "<tokenAddress>-<holderAddress>"
+  id: ID!
+  "issued token contract"
+  token: Bytes!
+  "holder address"
+  account: Bytes!
+  "current balance (raw, token decimals)"
+  balance: BigInt!
+  firstHeldAt: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+"""
+Per-token on-chain activity (spec 028 expansion, US12). Indexed from each fungible token's Transfer + admin
+events. type ∈ mint | burn | transfer | pause | unpause | freeze | unfreeze | role_granted | role_revoked.
+"""
+type TokenActivity @entity(immutable: true) {
+  "<txHash>-<logIndex>"
+  id: ID!
+  token: Bytes!
+  type: String!
+  actor: Bytes!
+  from: Bytes
+  to: Bytes
+  amount: BigInt
+  detail: String!
+  timestamp: BigInt!
+  txHash: Bytes!
+}

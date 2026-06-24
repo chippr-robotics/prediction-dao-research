@@ -17,6 +17,10 @@
     "MembershipManager": {
       "address": "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541",
       "startBlock": 16404308
+    },
+    "TokenFactory": {
+      "address": "0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62",
+      "startBlock": 16422550
     }
   },
   "polygon-amoy": {
