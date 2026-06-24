@@ -149,7 +149,12 @@ export default function TokensPanel() {
               <TokenTable mode="mine" refreshKey={refreshKey} onOpen={setSelected} />
             </>
           )}
-          {tab === 'create' && <CreateTokenWizard onCreated={() => { setRefreshKey((k) => k + 1); setTab('mine') }} />}
+          {tab === 'create' && (
+            <CreateTokenWizard
+              onCreated={() => setRefreshKey((k) => k + 1)}
+              onViewMine={() => { setRefreshKey((k) => k + 1); setTab('mine') }}
+            />
+          )}
           {tab === 'explorer' && <TokenTable mode="explorer" refreshKey={refreshKey} onOpen={setSelected} />}
         </>
       )}

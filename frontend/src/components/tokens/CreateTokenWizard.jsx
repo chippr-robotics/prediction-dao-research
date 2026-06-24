@@ -13,10 +13,11 @@ const STANDARDS = [
 ]
 const MAX_DECIMALS = 36
 
-export default function CreateTokenWizard({ onCreated }) {
+export default function CreateTokenWizard({ onCreated, onViewMine }) {
   const { isSupported, canIssue, createOpenERC20V2, createOpenERC721V2, createRestrictedERC20V2, status, error, lastTxHash } =
     useTokenFactory()
 
+  const [created, setCreated] = useState(null)
   const [standard, setStandard] = useState('erc20')
   const [form, setForm] = useState({
     name: '', symbol: '', decimals: '18', initialSupply: '', cap: '', baseURI: '', metadataURI: '', initialEligible: '',
@@ -47,6 +48,7 @@ export default function CreateTokenWizard({ onCreated }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setFormError(null)
+    setCreated(null)
     const v = validate()
     if (v) return setFormError(v)
     try {
@@ -59,6 +61,7 @@ export default function CreateTokenWizard({ onCreated }) {
       } else {
         result = await createRestrictedERC20V2({ ...common, decimals: form.decimals, initialSupply: form.initialSupply || '0', cap: form.cap || '0', metadataURI: form.metadataURI.trim(), initialEligible: parseList(form.initialEligible) })
       }
+      setCreated(result)
       if (onCreated) onCreated(result)
     } catch {
       /* surfaced via hook error/status */
@@ -153,7 +156,19 @@ export default function CreateTokenWizard({ onCreated }) {
           <div className="tm-kv"><span className="k">Admin model</span><span>Role-based (you = owner)</span></div>
 
           {busy && <div className="tm-pending" role="status">Submitting… {lastTxHash ? `(${lastTxHash.slice(0, 10)}…)` : ''} awaiting confirmation.</div>}
-          {status === 'success' && <div className="tm-success" role="status">Token created and confirmed on-chain.</div>}
+          {status === 'success' && created && (
+            <div className="tm-success" role="status">
+              <strong>Token created and confirmed on-chain.</strong>
+              {created.tokenAddress && (
+                <div className="tm-mono" style={{ marginTop: '0.35rem', wordBreak: 'break-all' }}>{created.tokenAddress}</div>
+              )}
+              {onViewMine && (
+                <button type="button" className="tm-btn-link" style={{ marginTop: '0.4rem' }} onClick={onViewMine}>
+                  View in My Tokens →
+                </button>
+              )}
+            </div>
+          )}
 
           <button type="submit" className="tm-btn tm-btn-primary" style={{ width: '100%', marginTop: '0.9rem' }} disabled={busy || !canIssue}>
             {busy ? 'Creating…' : 'Review & deploy'}

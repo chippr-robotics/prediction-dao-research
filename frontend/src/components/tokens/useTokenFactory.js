@@ -119,26 +119,35 @@ export function useTokenFactory() {
   const readTokenLive = useCallback(
     async (record) => {
       if (!reader || !record) return null
+      // Use a MINIMAL ABI with only functions present on BOTH v1 (Ownable) and v2 (AccessControl) tokens.
+      // `owner()` exists only on v1 — calling it on a v2 token returns empty data ("missing revert data"),
+      // so it must not be read here. Live owner/roles come from detectCapabilities instead.
       if (record.standard === TOKEN_STANDARD.OPEN_ERC721) {
-        const c = new ethers.Contract(record.tokenAddress, OPEN_ERC721_ABI, reader)
-        return { owner: await c.owner(), supplyDisplay: 'NFT collection', paused: false }
-      }
-      const abi = record.standard === TOKEN_STANDARD.RESTRICTED_ERC1404 ? RESTRICTED_ERC20_ABI : OPEN_ERC20_ABI
-      const c = new ethers.Contract(record.tokenAddress, abi, reader)
-      const [supply, decimals, owner] = await Promise.all([c.totalSupply(), c.decimals(), c.owner()])
-      let paused = false
-      if (record.standard === TOKEN_STANDARD.OPEN_ERC20 && record.isPausable) {
+        let paused = false
         try {
-          paused = await c.paused()
+          paused = await new ethers.Contract(record.tokenAddress, ['function paused() view returns (bool)'], reader).paused()
         } catch {
-          paused = false
+          paused = false // v1 ERC-721 has no pause
         }
+        return { supplyDisplay: 'NFT collection', paused }
       }
-      return {
-        owner,
-        supplyDisplay: `${ethers.formatUnits(supply, decimals)} ${record.symbol}`,
-        paused,
+      const c = new ethers.Contract(
+        record.tokenAddress,
+        [
+          'function totalSupply() view returns (uint256)',
+          'function decimals() view returns (uint8)',
+          'function paused() view returns (bool)',
+        ],
+        reader
+      )
+      const [supply, decimals] = await Promise.all([c.totalSupply(), c.decimals()])
+      let paused = false
+      try {
+        paused = await c.paused()
+      } catch {
+        paused = false
       }
+      return { supplyDisplay: `${ethers.formatUnits(supply, decimals)} ${record.symbol}`, paused }
     },
     [reader]
   )
