@@ -12,6 +12,16 @@ over external DAOs (manage = user-signed actions). `[P]` = parallelizable (diffe
 Phase ↔ plan mapping: Setup/Foundational → scaffolding · US1 → plan A · US2/US3 → plan B · US4/US5 → plan C ·
 US6 → plan D · US7/US8 → plan E · Polish → plan F.
 
+> **PIVOT (2026-06-24) — external-first; native DAOs deferred.** Implementing US1 surfaced a hard blocker:
+> OZ 5.4.0 `GovernorUpgradeable` → `SignatureChecker` → `Bytes.sol` uses the Cancun `mcopy` opcode, so native
+> OZ-Governor DAOs **cannot compile/deploy on pre-Cancun ETC/Mordor** (see memory `oz-governor-mcopy-mordor`).
+> Per the user's decision, the **external-DAO connector ships first** (US3/US5 — `ExternalDAORegistry` is
+> paris-safe: it imports only the `IGovernor` interface, no implementation; tracks Olympia + any Governor DAO on
+> Mordor + Amoy). **Native DAO tasks (US1/US4/US6 — T010–T025, T039–T045, T050–T052) are DEFERRED** pending a
+> governance-base choice (OZ Governor on Cancun chains / a custom paris-safe governor / vendor OZ 5.1). The
+> drafted native OZ-Governor contracts were removed; their design remains in this spec's plan/contracts. New
+> implementation order: **US3 (register/track) → US5 (manage) → US2 (unified discovery) → US7/US8 → polish.**
+
 ## Phase 1: Setup
 
 - [ ] T001 Create the contract package skeleton `contracts/clearpath/` with subdirs `governance/`, `voting/`, `external/`, `interfaces/` and a short `contracts/clearpath/README.md` (purpose + "archive is reference-only")
@@ -68,9 +78,9 @@ and appear in My DAOs — no mock data.
 **Independent test**: Register Olympia on Mordor; treasury/proposals/membership shown match its on-chain state;
 an EOA/non-Governor address is rejected; unreadable source → truthful "unavailable".
 
-- [ ] T031 [US3] `contracts/clearpath/external/ExternalDAORegistry.sol` — UUPS (`UUPSManaged`), `registerExternalDAO(dao, framework, label)` with ERC-165 `IGovernor` validation (+ defensive `COUNTING_MODE()`/`votingPeriod()` staticcalls), network-scoped, tier-gated, `ExternalDAORegistered`, duplicates rejected, NO authority over `dao`, `__gap`
+- [X] T031 [US3] `contracts/clearpath/external/ExternalDAORegistry.sol` — UUPS (`UUPSManaged`), `registerExternalDAO(dao, framework, label)` with ERC-165 `IGovernor` validation (+ defensive `COUNTING_MODE()`/`votingPeriod()` staticcalls), network-scoped, tier-gated, `ExternalDAORegistered`, duplicates rejected, NO authority over `dao`, `__gap`
 - [ ] T032 [US3] Register `ExternalDAORegistry` in `check:storage-layout`; add to `deploy-clearpath.js`; deploy Mordor + Amoy; sync
-- [ ] T033 [P] [US3] Unit tests `test/clearpath/ExternalDAORegistry.test.js` — register valid Governor, reject EOA / non-Governor / duplicate / cross-network; tier gate; confers no authority (INV-4)
+- [X] T033 [P] [US3] Unit tests `test/clearpath/ExternalDAORegistry.test.js` — register valid Governor, reject EOA / non-Governor / duplicate / cross-network; tier gate; confers no authority (INV-4)
 - [ ] T034 [US3] Subgraph: `ExternalDAORegistry` datasource + `src/mappings/externalRegistry.ts` (`ExternalDAORegistered` → `ExternalDAO`); codegen + build
 - [ ] T035 [P] [US3] Matchstick: extend `clearpath.test.ts` — `ExternalDAORegistered` indexes an `ExternalDAO`
 - [ ] T036 [US3] `frontend/src/components/clearpath/connectors/governorConnector.js` — IGovernor read path (`state`, `proposalVotes`, `proposalDeadline`, `quorum`, voting token, timelock/treasury balance) + Olympia labeled addresses resolved per network (Mordor/ETC), verified not hardcoded blind
