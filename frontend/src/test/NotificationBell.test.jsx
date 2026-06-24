@@ -1,9 +1,9 @@
 /**
- * NotificationBell + ActivityFeed tests (spec 012, tasks T014–T016).
+ * NotificationBell + ActivityFeed tests (spec 031; generalizes spec 012).
  *
- * Read semantics under test (FR-004): opening the feed does NOT mark entries
- * read; acknowledging an entry (click) or the explicit "Mark all read"
- * control does.
+ * The bell/feed now consume the unified ActivityProvider context (useActivity). Read semantics (FR-013):
+ * opening the feed does NOT mark entries read; acknowledging an entry (click) or "Mark all read" does. The
+ * bell surfaces unread AND a distinct action-needed indicator (FR-011).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -14,13 +14,13 @@ const { ctx, walletState, navigateSpy } = vi.hoisted(() => {
   const ctx = {
     entries: [],
     unreadCount: 0,
+    actionNeededCount: 0,
+    actionNeededByDomain: {},
     isPolling: false,
     lastPolledAt: null,
     markEntryRead: vi.fn(),
-    markWagerRead: vi.fn(),
+    markRefRead: vi.fn(),
     markAllRead: vi.fn(),
-    actionNeededByWagerId: {},
-    actionNeededCount: 0,
     refresh: vi.fn(),
   }
   return {
@@ -30,9 +30,9 @@ const { ctx, walletState, navigateSpy } = vi.hoisted(() => {
   }
 })
 
-vi.mock('../hooks/useWagerActivity', () => ({
-  useWagerActivity: () => ctx,
-  useWagerActivityOptional: () => (walletState.providerAbsent ? null : ctx),
+vi.mock('../hooks/useActivity', () => ({
+  useActivity: () => ctx,
+  useActivityOptional: () => (walletState.providerAbsent ? null : ctx),
 }))
 
 vi.mock('../hooks/useWalletManagement', () => ({
@@ -49,13 +49,17 @@ import NotificationBell from '../components/notifications/NotificationBell'
 const NOW = 1765000000000
 
 function entry(overrides = {}) {
+  const wagerId = overrides.wagerId || '1'
   return {
     id: '1:accepted',
+    domain: 'wagers',
+    refId: wagerId,
     type: 'accepted',
-    wagerId: '1',
+    wagerId,
     message: "0xbbbb…0002 accepted 'Lakers in 6' — it's live",
     severity: 'success',
     actionable: false,
+    link: { to: '/app', state: { openWagerId: wagerId } },
     createdAt: NOW - 60_000,
     read: false,
     ...overrides,
@@ -75,9 +79,10 @@ beforeEach(() => {
   vi.setSystemTime(NOW)
   ctx.entries = []
   ctx.unreadCount = 0
+  ctx.actionNeededCount = 0
   ctx.lastPolledAt = NOW
   ctx.markEntryRead.mockClear()
-  ctx.markWagerRead.mockClear()
+  ctx.markRefRead.mockClear()
   ctx.markAllRead.mockClear()
   navigateSpy.mockClear()
   walletState.isConnected = true
@@ -88,7 +93,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('NotificationBell visibility + a11y (T014/T015)', () => {
+describe('NotificationBell visibility + a11y', () => {
   it('renders a button whose aria-label announces the unread count', () => {
     ctx.unreadCount = 3
     renderBell()
@@ -103,12 +108,16 @@ describe('NotificationBell visibility + a11y (T014/T015)', () => {
     const { rerender } = renderBell()
     expect(screen.queryByTestId('bell-count')).toBeNull()
     ctx.unreadCount = 5
-    rerender(
-      <MemoryRouter>
-        <NotificationBell />
-      </MemoryRouter>
-    )
+    rerender(<MemoryRouter><NotificationBell /></MemoryRouter>)
     expect(screen.getByTestId('bell-count').textContent).toBe('5')
+  })
+
+  it('surfaces a distinct action-needed indicator in the aria-label and a dot (FR-011)', () => {
+    ctx.unreadCount = 2
+    ctx.actionNeededCount = 2
+    renderBell()
+    expect(screen.getByRole('button', { name: 'Notifications, 2 unread, 2 need action' })).toBeInTheDocument()
+    expect(screen.getByTestId('bell-action')).toBeInTheDocument()
   })
 
   it('renders nothing when the wallet is disconnected', () => {
@@ -124,8 +133,8 @@ describe('NotificationBell visibility + a11y (T014/T015)', () => {
   })
 })
 
-describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
-  it('opens the feed without marking anything read (FR-004)', () => {
+describe('ActivityFeed open/close + read semantics', () => {
+  it('opens the feed without marking anything read (FR-013)', () => {
     ctx.entries = [entry()]
     ctx.unreadCount = 1
     renderBell()
@@ -133,10 +142,7 @@ describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
     expect(screen.getByRole('dialog', { name: /activity/i })).toBeInTheDocument()
     expect(ctx.markAllRead).not.toHaveBeenCalled()
     expect(ctx.markEntryRead).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /Notifications/ })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    )
+    expect(screen.getByRole('button', { name: /Notifications/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('closes on Escape', () => {
@@ -148,7 +154,7 @@ describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
     expect(screen.queryByRole('dialog', { name: /activity/i })).toBeNull()
   })
 
-  it('renders entries in the order provided (newest first) with unread styling', () => {
+  it('renders entries in the order provided (newest first) with unread styling + domain tag', () => {
     ctx.entries = [
       entry({ id: '2:won-claimable', wagerId: '2', message: 'You won! Claim 50 USDC', read: false }),
       entry({ id: '1:accepted', wagerId: '1', read: true }),
@@ -159,9 +165,10 @@ describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
     expect(items.length).toBe(2)
     expect(items[0].textContent).toContain('You won! Claim 50 USDC')
     expect(items[1].textContent).toContain('accepted')
+    expect(items[0].textContent).toContain('Wager') // domain tag
   })
 
-  it('acknowledging an entry marks it read, navigates to the wager, and closes', () => {
+  it('acknowledging an entry marks it read, navigates via its link, and closes', () => {
     ctx.entries = [entry()]
     renderBell()
     fireEvent.click(screen.getByRole('button', { name: /Notifications/ }))
@@ -181,6 +188,20 @@ describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
     expect(screen.getByRole('dialog', { name: /activity/i })).toBeInTheDocument()
   })
 
+  it('filters the feed by domain when more than one domain is present (FR-025)', () => {
+    ctx.entries = [
+      entry({ id: 'w1', wagerId: '1', message: 'wager thing', domain: 'wagers' }),
+      { id: 'd1', domain: 'dao', refId: '0xdao#5', type: 'voting-open', message: 'DAO vote open', severity: 'info', actionable: true, link: null, createdAt: NOW, read: false },
+    ]
+    renderBell()
+    fireEvent.click(screen.getByRole('button', { name: /Notifications/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'DAO', pressed: false }))
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(1)
+    expect(items[0].textContent).toContain('DAO vote open')
+  })
+
   it('shows the empty state when there are no entries', () => {
     renderBell()
     fireEvent.click(screen.getByRole('button', { name: /Notifications/ }))
@@ -196,8 +217,7 @@ describe('ActivityFeed open/close + read semantics (T014/T016)', () => {
   })
 })
 
-describe('accessibility audit (T030 / FR-014)', () => {
-  // axe needs real timers — it times out internally under vi.useFakeTimers.
+describe('accessibility audit (FR-023)', () => {
   beforeEach(() => {
     vi.useRealTimers()
   })
@@ -208,13 +228,14 @@ describe('accessibility audit (T030 / FR-014)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('open feed with entries has no axe violations', async () => {
+  it('open feed (multi-domain, filtered) has no axe violations', async () => {
     ctx.entries = [
       entry(),
       entry({ id: '2:won-claimable', wagerId: '2', message: 'You won! Claim 50 USDC', severity: 'success', actionable: true }),
-      entry({ id: '3:warn-acceptance', wagerId: '3', message: "Expires in 10h — accept before it's gone", severity: 'warning', read: true }),
+      { id: 'd1', domain: 'dao', refId: '0xdao#5', type: 'voting-open', message: 'A proposal is open for your vote', severity: 'warning', actionable: true, link: null, createdAt: NOW, read: true },
     ]
     ctx.unreadCount = 2
+    ctx.actionNeededCount = 2
     const { container } = renderBell()
     fireEvent.click(screen.getByRole('button', { name: /Notifications/ }))
     expect(await axe(container)).toHaveNoViolations()

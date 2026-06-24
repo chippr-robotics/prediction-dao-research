@@ -1,0 +1,102 @@
+/**
+ * membershipSource tests (spec 031, FR-029) — tier/expiry snapshot-diff (granted/upgraded/expired),
+ * expiring-soon (action: renew, once/day), voucher redeemable (action: redeem), ok:false on read failure.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const m = vi.hoisted(() => ({ fns: {} }))
+
+vi.mock('../../utils/blockchainService', () => ({ getProvider: () => ({}) }))
+vi.mock('../../config/contracts', () => ({
+  getContractAddressForChain: () => '0x000000000000000000000000000000000000abcd',
+  getDeploymentBlockForChain: () => 0,
+}))
+vi.mock('ethers', async (orig) => {
+  const actual = await orig()
+  function FakeContract() {
+    return new Proxy(
+      { filters: { Transfer: () => ({}) } },
+      {
+        get(target, prop) {
+          if (prop === 'then') return undefined
+          if (prop in target) return target[prop]
+          return (...args) => {
+            const fn = m.fns[prop]
+            if (!fn) throw new Error('unmocked contract method: ' + String(prop))
+            return fn(...args)
+          }
+        },
+      }
+    )
+  }
+  return { ...actual, ethers: { ...actual.ethers, Contract: vi.fn(FakeContract) } }
+})
+
+import { membershipSource } from '../../data/notifications/sources/membershipSource'
+
+const ACCT = '0x00000000000000000000000000000000000000ac'
+const NOW = 1_700_000_000_000 // ms
+const NOW_S = Math.floor(NOW / 1000)
+const DAY = 86400
+
+beforeEach(() => {
+  m.fns = {
+    getMembership: () => ({ tier: 2n, expiresAt: BigInt(NOW_S + 30 * DAY) }), // Silver, 30d out
+    queryFilter: () => [], // no vouchers
+    ownerOf: () => ACCT,
+  }
+})
+
+const detect = (prior = { snapshots: {}, aux: {} }, nowMs = NOW) =>
+  membershipSource.detect({ account: ACCT, chainId: 137, nowMs, prior })
+
+describe('membershipSource (spec 031)', () => {
+  it('first sight records tier/expiry + voucher snapshots and emits no entries', async () => {
+    const res = await detect()
+    expect(res.ok).toBe(true)
+    expect(res.entries).toEqual([])
+    expect(res.nextSnapshots.membership).toMatchObject({ tier: 2 })
+    expect(res.nextSnapshots.voucher).toMatchObject({ count: 0 })
+    expect(res.actionNeededById.membership).toBeUndefined() // not expiring soon
+  })
+
+  it('emits membership-upgraded on a tier increase', async () => {
+    m.fns.getMembership = () => ({ tier: 3n, expiresAt: BigInt(NOW_S + 30 * DAY) })
+    const res = await detect({ snapshots: { membership: { tier: 1, expiresAt: NOW_S } }, aux: {} })
+    expect(res.entries.map((e) => e.type)).toEqual(['membership-upgraded'])
+    expect(res.entries[0].message).toMatch(/Gold/)
+  })
+
+  it('emits membership-expired when the tier drops to None', async () => {
+    m.fns.getMembership = () => ({ tier: 0n, expiresAt: BigInt(NOW_S - 10) })
+    const res = await detect({ snapshots: { membership: { tier: 2, expiresAt: NOW_S - 10 } }, aux: {} })
+    expect(res.entries.map((e) => e.type)).toEqual(['membership-expired'])
+  })
+
+  it('flags expiring-soon as action:renew and emits once per day', async () => {
+    m.fns.getMembership = () => ({ tier: 2n, expiresAt: BigInt(NOW_S + 3 * DAY) }) // 3 days left
+    const res = await detect()
+    expect(res.actionNeededById.membership).toBe('renew')
+    expect(res.entries.map((e) => e.type)).toContain('membership-expiring')
+    // same UTC day → no second expiring entry
+    const dayBucket = Math.floor(NOW / 86_400_000)
+    const res2 = await detect({ snapshots: { membership: { tier: 2, expiresAt: NOW_S + 3 * DAY } }, aux: { expiringDay: dayBucket } })
+    expect(res2.entries.map((e) => e.type)).not.toContain('membership-expiring')
+    expect(res2.actionNeededById.membership).toBe('renew') // action still surfaced
+  })
+
+  it('flags a redeemable voucher as action:redeem and emits on 0→N transition', async () => {
+    m.fns.queryFilter = () => [{ args: { tokenId: 1n } }, { args: { tokenId: 2n } }]
+    m.fns.ownerOf = () => ACCT // both still held
+    const res = await detect({ snapshots: { membership: { tier: 2, expiresAt: NOW_S + 30 * DAY }, voucher: { count: 0 } }, aux: {} })
+    expect(res.actionNeededById.voucher).toBe('redeemVoucher')
+    expect(res.entries.map((e) => e.type)).toContain('voucher-redeemable')
+    expect(res.nextSnapshots.voucher.count).toBe(2)
+  })
+
+  it('returns ok:false when the membership read fails', async () => {
+    m.fns.getMembership = () => { throw new Error('rpc down') }
+    const res = await detect()
+    expect(res.ok).toBe(false)
+  })
+})

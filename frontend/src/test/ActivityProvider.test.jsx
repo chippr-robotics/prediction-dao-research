@@ -69,6 +69,24 @@ describe('ActivityProvider (spec 031)', () => {
     expect(h.showNotification).toHaveBeenCalledTimes(4) // 3 entries + 1 summary, capped
   })
 
+  it('caps toasts ONCE across MULTIPLE sources merged on a live poll', async () => {
+    let call = 0
+    const srcA = mockSource(async () => {
+      call += 1
+      return { ok: true, entries: call === 1 ? [] : [entry('a1'), entry('a2')], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }
+    })
+    const srcB = { key: 'mockB', label: 'B', detect: vi.fn(async () => {
+      return { ok: true, entries: call === 1 ? [] : [entry('b1'), entry('b2')], nextSnapshots: {}, nextAux: {}, currentIds: [], actionNeededById: {} }
+    }) }
+    render(<ActivityProvider sources={[srcA, srcB]}><Probe /></ActivityProvider>)
+    await tick(0) // catch-up (empty)
+    await tick(30_000) // live: 2 from A + 2 from B = 4 fresh
+    expect(captured.entries).toHaveLength(4)
+    // 3 toasts + 1 summary, capped once over the merged cross-source list
+    expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('+1 more updates'), 'info', 6000)
+    expect(h.showNotification).toHaveBeenCalledTimes(4)
+  })
+
   it('read-state survives a subsequent poll (dedup keeps the read copy)', async () => {
     const src = mockSource(async () => ({ ok: true, entries: [entry('e1')], nextSnapshots: {}, nextAux: {}, currentIds: ['e1'], actionNeededById: {} }))
     render(<ActivityProvider sources={[src]}><Probe /></ActivityProvider>)

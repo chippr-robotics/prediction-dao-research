@@ -118,9 +118,59 @@
   line-height: 1.4;
 }
 
+.activity-feed-entry .entry-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.activity-feed-entry .entry-domain {
+  align-self: flex-start;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+}
+
 .activity-feed-entry .entry-message {
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+/* Per-domain view filter (spec 031, FR-025). */
+.activity-feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.activity-feed-filter {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+}
+
+.activity-feed-filter.active {
+  color: #fff;
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.activity-feed-filter:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
 }
 
 .activity-feed-entry .entry-time {

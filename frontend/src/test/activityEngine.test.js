@@ -61,4 +61,13 @@ describe('activityEngine.detectAll (spec 031)', () => {
     expect(countActionNeeded({ a: { x: 'vote', y: null }, b: { z: 'renew' } })).toBe(2)
     expect(countActionNeeded({})).toBe(0)
   })
+
+  it('extensibility: a brand-new source object flows through with no engine changes (SC-004)', async () => {
+    // A future domain implemented purely as { key, detect } — the engine consumes it unchanged.
+    const future = { key: 'futarchy', label: 'Futarchy', detect: vi.fn().mockResolvedValue({ ok: true, entries: [{ id: 'f1' }], nextSnapshots: { p: 1 }, currentIds: ['p'], actionNeededById: { p: 'decide' } }) }
+    const r = await detectAll({ ...ctx, sources: [future], priorStore: defaultStore() })
+    expect(r.fresh.map((e) => e.id)).toEqual(['f1'])
+    expect(r.sliceUpdates.futarchy.snapshots).toEqual({ p: 1 })
+    expect(r.actionNeededByDomain.futarchy).toEqual({ p: 'decide' })
+  })
 })

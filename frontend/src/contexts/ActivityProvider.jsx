@@ -80,10 +80,15 @@ export function ActivityProvider({ children, sources = activitySources }) {
 
       // Re-read the latest store AFTER awaits: a markRead that landed while this poll was in flight must
       // survive. Source slices are poll-owned (polls never overlap), so the freshly computed values win.
-      let next = storeRef.current
+      const base = storeRef.current
+      let next = base
       for (const [key, slice] of Object.entries(sliceUpdates)) next = setSourceSlice(next, key, slice)
       next = appendEntries(next, fresh)
       next = { ...next, lastPolledAt: nowMs }
+      // Toast only the entries actually accepted by appendEntries (global id-dedup, existing wins) — not raw
+      // `fresh` — so a deduped entry never re-toasts.
+      const baseIds = new Set((base.entries || []).map((e) => e.id))
+      const added = fresh.filter((e) => e && !baseIds.has(e.id))
       saveStore(account, chainId, next)
       storeRef.current = next
       setStore(next)
@@ -95,12 +100,12 @@ export function ActivityProvider({ children, sources = activitySources }) {
       // so a returning user is not toast-stormed. Cap is applied ONCE over the merged cross-source list.
       const isCatchUp = firstPollRef.current
       firstPollRef.current = false
-      if (!isCatchUp && fresh.length > 0) {
-        for (const entry of fresh.slice(0, MAX_TOASTS_PER_CYCLE)) {
+      if (!isCatchUp && added.length > 0) {
+        for (const entry of added.slice(0, MAX_TOASTS_PER_CYCLE)) {
           showNotification(entry.message, entry.severity, TOAST_DURATION_MS)
         }
-        if (fresh.length > MAX_TOASTS_PER_CYCLE) {
-          showNotification(`+${fresh.length - MAX_TOASTS_PER_CYCLE} more updates in activity`, 'info', TOAST_DURATION_MS)
+        if (added.length > MAX_TOASTS_PER_CYCLE) {
+          showNotification(`+${added.length - MAX_TOASTS_PER_CYCLE} more updates in activity`, 'info', TOAST_DURATION_MS)
         }
       }
       if (anyFailure && !failureNoticedRef.current) {

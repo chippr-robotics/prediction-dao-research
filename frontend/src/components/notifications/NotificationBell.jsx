@@ -1,29 +1,31 @@
 import { useState } from 'react'
 import { useWallet } from '../../hooks/useWalletManagement'
-import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
+import { useActivityOptional } from '../../hooks/useActivity'
 import ActivityFeed from './ActivityFeed'
 import './NotificationBell.css'
 
 /**
- * Header bell — the single unread indicator for wager activity (spec 012,
- * FR-002/FR-004/FR-016). Renders nothing when disconnected or outside the
- * WagerActivityProvider (e.g. landing pages), so it can sit unconditionally
- * in the header actions.
+ * Header bell — the single indicator for platform-wide activity (spec 031; generalizes spec 012). Shows the
+ * cross-domain unread count and, distinctly, an action-needed indicator. Renders nothing when disconnected or
+ * outside the ActivityProvider (e.g. landing pages), so it can sit unconditionally in the header actions.
  */
 function NotificationBell() {
   const { isConnected } = useWallet()
-  const activity = useWagerActivityOptional()
+  const activity = useActivityOptional()
   const [open, setOpen] = useState(false)
 
   if (!activity || !isConnected) return null
-  const { unreadCount } = activity
+  const { unreadCount, actionNeededCount = 0 } = activity
+
+  const ariaLabel =
+    `Notifications, ${unreadCount} unread` + (actionNeededCount > 0 ? `, ${actionNeededCount} need action` : '')
 
   return (
     <div className="notification-bell-wrap">
       <button
         type="button"
-        className={`notification-bell${unreadCount > 0 ? ' has-unread' : ''}`}
-        aria-label={`Notifications, ${unreadCount} unread`}
+        className={`notification-bell${unreadCount > 0 ? ' has-unread' : ''}${actionNeededCount > 0 ? ' has-action' : ''}`}
+        aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -47,6 +49,9 @@ function NotificationBell() {
           <span className="notification-bell-count" data-testid="bell-count" aria-hidden="true">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
+        )}
+        {actionNeededCount > 0 && (
+          <span className="notification-bell-action" data-testid="bell-action" aria-hidden="true" />
         )}
       </button>
       {open && <ActivityFeed onClose={() => setOpen(false)} />}
