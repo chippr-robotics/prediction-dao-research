@@ -1,0 +1,109 @@
+/*
+ * Spec 030 — ClearPath module styling. Scoped under `.clearpath`; mapped onto the app theme variables
+ * (frontend/src/theme.css) so light/dark both work — no hardcoded palette.
+ */
+.clearpath {
+  --cp-accent: var(--brand-primary);
+  --cp-surface: var(--surface-color);
+  --cp-canvas: var(--bg-primary);
+  --cp-text: var(--text-primary);
+  --cp-text-2: var(--text-secondary);
+  --cp-text-3: var(--text-muted);
+  --cp-border: var(--border-color);
+  --cp-radius: var(--radius-md, 8px);
+  --cp-radius-lg: var(--radius-lg, 12px);
+  --cp-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  color: var(--cp-text);
+}
+
+.clearpath h2, .clearpath h3, .clearpath h4 { margin: 0; font-weight: 600; }
+.clearpath .cp-mono, .clearpath code { font-family: var(--cp-mono); font-size: 0.82rem; }
+.clearpath .cp-intro { color: var(--cp-text-2); margin: 0 0 0.9rem; }
+
+.clearpath .cp-tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.clearpath .cp-tab {
+  padding: 0.4rem 0.9rem; border-radius: 999px; border: 1px solid var(--cp-border);
+  background: var(--cp-surface); color: var(--cp-text-2); cursor: pointer; font-weight: 600; font-size: 0.85rem;
+}
+.clearpath .cp-tab:hover { border-color: var(--cp-accent); }
+.clearpath .cp-tab.active { background: var(--cp-accent); color: #fff; border-color: var(--cp-accent); }
+
+.clearpath .cp-card {
+  border: 1px solid var(--cp-border); border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface); padding: 1rem; margin-bottom: 1rem;
+}
+.clearpath .cp-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+
+.clearpath .cp-kv { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; border-bottom: 1px solid var(--cp-border); }
+.clearpath .cp-kv:last-child { border-bottom: none; }
+.clearpath .cp-kv .k { color: var(--cp-text-3); font-size: 0.8rem; }
+
+.clearpath .cp-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.7rem 0.9rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius);
+  background: var(--cp-surface); cursor: pointer; margin-bottom: 0.5rem;
+}
+.clearpath .cp-row:hover { border-color: var(--cp-accent); }
+.clearpath .cp-row-name { font-weight: 600; }
+.clearpath .cp-row-sub { color: var(--cp-text-3); font-family: var(--cp-mono); font-size: 0.74rem; }
+
+.clearpath .cp-badge {
+  font-size: 0.68rem; font-weight: 700; border-radius: 5px; padding: 0.15rem 0.5rem;
+  color: var(--cp-accent); background: color-mix(in srgb, var(--cp-accent) 14%, transparent);
+}
+.clearpath .cp-badge-ext { color: var(--text-secondary); background: color-mix(in srgb, var(--text-secondary) 14%, transparent); }
+
+.clearpath .cp-field { margin-bottom: 0.7rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.clearpath .cp-label { font-size: 0.8rem; color: var(--cp-text-2); }
+.clearpath .cp-input {
+  padding: 0.55rem 0.7rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius);
+  background: var(--cp-canvas); color: var(--cp-text); font-size: 0.9rem; width: 100%; box-sizing: border-box;
+}
+.clearpath .cp-btn {
+  padding: 0.5rem 0.9rem; border-radius: var(--cp-radius); border: 1px solid var(--cp-border);
+  background: var(--cp-surface); color: var(--cp-text); cursor: pointer; font-weight: 600; font-size: 0.85rem;
+}
+.clearpath .cp-btn:hover:not(:disabled) { border-color: var(--cp-accent); }
+.clearpath .cp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.clearpath .cp-btn-primary { background: var(--cp-accent); border-color: var(--cp-accent); color: #fff; }
+.clearpath .cp-btn-link { background: none; border: none; color: var(--cp-accent); cursor: pointer; padding: 0; font-weight: 600; }
+.clearpath .cp-row-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.clearpath .cp-error { color: var(--semantic-loss, #c0492f); background: color-mix(in srgb, var(--semantic-loss, #c0492f) 10%, transparent); padding: 0.6rem 0.8rem; border-radius: var(--cp-radius); margin: 0.6rem 0; font-size: 0.85rem; }
+.clearpath .cp-notice { color: var(--cp-text-2); background: var(--cp-canvas); padding: 0.6rem 0.8rem; border-radius: var(--cp-radius); margin: 0.6rem 0; font-size: 0.85rem; }
+.clearpath .cp-ok { color: var(--semantic-win, #2e7d32); font-size: 0.85rem; }
+.clearpath .cp-textarea { resize: vertical; min-height: 4.5rem; font-family: inherit; }
+.clearpath .cp-select { appearance: auto; }
+.clearpath .cp-suffix { color: var(--cp-text-3); font-size: 0.8rem; margin-left: 0.4rem; }
+.clearpath .cp-preview { margin-top: 0.5rem; padding: 0.5rem 0.7rem; border-radius: var(--cp-radius); background: var(--cp-canvas); font-size: 0.82rem; color: var(--cp-text-2); }
+.clearpath .cp-warn { color: var(--semantic-warning, #b8860b); background: color-mix(in srgb, var(--semantic-warning, #b8860b) 12%, transparent); padding: 0.6rem 0.8rem; border-radius: var(--cp-radius); margin: 0.5rem 0; font-size: 0.85rem; }
+.clearpath .cp-action-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.clearpath .cp-section { border-top: 1px solid var(--cp-border); padding-top: 0.5rem; }
+.clearpath .cp-section:first-child { border-top: none; padding-top: 0; }
+.clearpath .cp-disabled { color: var(--cp-text-2); text-align: center; padding: 2rem; }
+.clearpath .cp-empty { color: var(--cp-text-3); text-align: center; padding: 1.5rem; }
+
+/* Address field with address-book + QR-scan affordances (CpAddressField).
+   `.fm-scan-btn` is the shared icon-button box from the wager form (FriendMarketsModal.css), which the reused
+   AddressBookButton hardcodes; that stylesheet isn't loaded in the ClearPath surface, so mirror the sizing here
+   (scoped under .clearpath) so the address-book button and the scan button render as matched square icons. */
+.clearpath .cp-addr-row { display: flex; gap: 0.5rem; align-items: stretch; }
+.clearpath .cp-addr-row > .cp-input { flex: 1; min-width: 0; }
+.clearpath .cp-addr-row .ab-book-btn-wrap { display: inline-flex; align-self: stretch; }
+.clearpath .fm-scan-btn,
+.clearpath .cp-icon-btn {
+  display: flex; align-items: center; justify-content: center; align-self: stretch;
+  width: 42px; min-width: 42px; box-sizing: border-box;
+  background: var(--cp-canvas); border: 1px solid var(--cp-border); border-radius: var(--cp-radius);
+  color: var(--cp-text-2); cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.clearpath .cp-addr-row .ab-book-btn-wrap .fm-scan-btn { height: 100%; }
+.clearpath .fm-scan-btn svg,
+.clearpath .cp-icon-btn svg { width: 20px; height: 20px; flex: none; }
+.clearpath .fm-scan-btn:hover:not(:disabled),
+.clearpath .cp-icon-btn:hover:not(:disabled) {
+  border-color: var(--cp-accent); color: var(--cp-accent);
+  background: color-mix(in srgb, var(--cp-accent) 10%, transparent);
+}
+.clearpath .fm-scan-btn:disabled,
+.clearpath .cp-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -22,7 +22,9 @@
     "restrictedERC20Impl": "0x0dD67E2af8Ad301a3B5308c2AD41CCb2220b0444",
     "openERC20V2Impl": "0x92169007926fBc8Ac90cdD311dD3C2557158C395",
     "openERC721V2Impl": "0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE",
-    "restrictedERC20V2Impl": "0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B"
+    "restrictedERC20V2Impl": "0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B",
+    "externalDAORegistry": "0xcEE0fb2e1407f0A0d19Bcf4Fee2726A3005FA3C0",
+    "externalDAORegistryImpl": "0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -49,7 +51,8 @@
     "restrictedERC20Impl": [],
     "openERC20V2Impl": [],
     "openERC721V2Impl": [],
-    "restrictedERC20V2Impl": []
+    "restrictedERC20V2Impl": [],
+    "externalDAORegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -61,5 +64,6 @@
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
-  "tokenV2TemplatesSyncedAt": "2026-06-23T23:32:04.921Z"
+  "tokenV2TemplatesSyncedAt": "2026-06-23T23:32:04.921Z",
+  "clearpathDeployedAt": "2026-06-24T13:16:39.566Z"
 }
