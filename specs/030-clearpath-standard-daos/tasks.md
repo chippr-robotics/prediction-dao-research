@@ -25,7 +25,7 @@ US6 → plan D · US7/US8 → plan E · Polish → plan F.
 ## Phase 1: Setup
 
 - [ ] T001 Create the contract package skeleton `contracts/clearpath/` with subdirs `governance/`, `voting/`, `external/`, `interfaces/` and a short `contracts/clearpath/README.md` (purpose + "archive is reference-only")
-- [ ] T002 [P] Create the frontend module skeleton `frontend/src/components/clearpath/` (empty `clearpath.css` scoped under `.clearpath`, mapped onto `theme.css` variables) and `frontend/src/abis/` placeholders (`clearPathDAOFactory.js`, `externalDAORegistry.js`, `iGovernor.js`)
+- [X] T002 [P] Create the frontend module skeleton `frontend/src/components/clearpath/` (empty `clearpath.css` scoped under `.clearpath`, mapped onto `theme.css` variables) and `frontend/src/abis/` placeholders (`clearPathDAOFactory.js`, `externalDAORegistry.js`, `iGovernor.js`)
 - [ ] T003 [P] Confirm OZ 5.4.0 governance availability + paris-safety: add a compile smoke contract `contracts/clearpath/governance/_GovImports.sol` importing `GovernorUpgradeable`/`TimelockControllerUpgradeable`/`ERC721VotesUpgradeable`/`ERC20VotesUpgradeable`; `npm run compile` green (delete after)
 
 ## Phase 2: Foundational (blocking prerequisites)
@@ -33,8 +33,8 @@ US6 → plan D · US7/US8 → plan E · Polish → plan F.
 - [ ] T004 Add `contracts/clearpath/interfaces/IClearPathDAOFactory.sol` and `IExternalDAORegistry.sol` per `contracts/contracts.md` (events, structs, enums: `VotingKind`, `Framework`)
 - [ ] T005 Add `DAO_MEMBER_ROLE = keccak256("DAO_MEMBER_ROLE")` gating helper usage notes; confirm `IMembershipManager.checkCanCreate/getActiveTier/recordCreate` + `ISanctionsGuard.checkBlocked` signatures wired (no new contract; reference `WagerRegistry` pattern)
 - [ ] T006 [P] Extend `scripts/deploy/lib/upgradeable.js` usage in a new `scripts/deploy/deploy-clearpath.js` skeleton (resolve SanctionsGuard + MembershipManager + USDC from `deployments/<net>.json`; no deploy yet)
-- [ ] T007 [P] Add the ClearPath tab scaffold: register `{ id: 'clearpath', label: 'ClearPath' }` in `frontend/src/pages/WalletPage.jsx` `WALLET_TABS` + render a placeholder `<ClearPathPanel/>`; create `frontend/src/components/clearpath/ClearPathPanel.jsx` (self-disables via `useClearPath` when unsupported)
-- [ ] T008 [P] Add `frontend/src/components/clearpath/useClearPath.js` skeleton: per-chain factory/registry resolution via `getContractAddressForChain`, `isSupported`, honest tx-state wrapper, `useNotification` wiring (mirror `useTokenFactory`)
+- [X] T007 [P] Add the ClearPath tab scaffold: register `{ id: 'clearpath', label: 'ClearPath' }` in `frontend/src/pages/WalletPage.jsx` `WALLET_TABS` + render a placeholder `<ClearPathPanel/>`; create `frontend/src/components/clearpath/ClearPathPanel.jsx` (self-disables via `useClearPath` when unsupported)
+- [X] T008 [P] Add `frontend/src/components/clearpath/useClearPath.js` skeleton: per-chain factory/registry resolution via `getContractAddressForChain`, `isSupported`, honest tx-state wrapper, `useNotification` wiring (mirror `useTokenFactory`)
 - [ ] T009 [P] Add subgraph base: append `DAO`, `ExternalDAO`, `Proposal`, `Vote`, `Member`, `GovernanceActivity` entities to `subgraph/schema.graphql` (no datasources yet)
 
 ## Phase 3: User Story 1 — Launch a native standard DAO (Priority: P1) 🎯 MVP
@@ -83,9 +83,9 @@ an EOA/non-Governor address is rejected; unreadable source → truthful "unavail
 - [X] T033 [P] [US3] Unit tests `test/clearpath/ExternalDAORegistry.test.js` — register valid Governor, reject EOA / non-Governor / duplicate / cross-network; tier gate; confers no authority (INV-4)
 - [ ] T034 [US3] Subgraph: `ExternalDAORegistry` datasource + `src/mappings/externalRegistry.ts` (`ExternalDAORegistered` → `ExternalDAO`); codegen + build
 - [ ] T035 [P] [US3] Matchstick: extend `clearpath.test.ts` — `ExternalDAORegistered` indexes an `ExternalDAO`
-- [ ] T036 [US3] `frontend/src/components/clearpath/connectors/governorConnector.js` — IGovernor read path (`state`, `proposalVotes`, `proposalDeadline`, `quorum`, voting token, timelock/treasury balance) + Olympia labeled addresses resolved per network (Mordor/ETC), verified not hardcoded blind
-- [ ] T037 [US3] `frontend/src/components/clearpath/RegisterExternalDao.jsx` (validate + register tx + `showNotification`) + `ExternalDaoView.jsx` (read-only tracking: treasury/proposals/members) + `clearpathSubgraph.js` (`fetchExternalDAOs`, truthful `{available:false}` fallback)
-- [ ] T038 [P] [US3] Vitest `__tests__/RegisterExternalDao.test.jsx` + `ExternalDaoView.test.jsx` — validation reject paths, tracked reads from mocked connector/subgraph, truthful disable (no fabricated rows)
+- [X] T036 [US3] `frontend/src/components/clearpath/connectors/governorConnector.js` — IGovernor read path (`state`, `proposalVotes`, `proposalDeadline`, `quorum`, voting token, timelock/treasury balance) + Olympia labeled addresses resolved per network (Mordor/ETC), verified not hardcoded blind
+- [X] T037 [US3] `frontend/src/components/clearpath/RegisterExternalDao.jsx` (validate + register tx + `showNotification`) + `ExternalDaoView.jsx` (read-only tracking: treasury/proposals/members) + `clearpathSubgraph.js` (`fetchExternalDAOs`, truthful `{available:false}` fallback)
+- [X] T038 [P] [US3] Vitest `__tests__/RegisterExternalDao.test.jsx` + `ExternalDaoView.test.jsx` — validation reject paths, tracked reads from mocked connector/subgraph, truthful disable (no fabricated rows)
 
 ## Phase 6: User Story 4 — Run a proposal on a native DAO (Priority: P2)
 
@@ -138,7 +138,7 @@ external DAOs labeled "externally deployed".
 
 ## Phase 11: Polish & cross-cutting
 
-- [ ] T057 [P] `frontend/src/test/clearpath.accessibility.test.jsx` — vitest-axe over ClearPath surfaces (CreateDaoWizard, DaoDetailView, ProposalView, ExternalDaoView, ContractPanel) — no violations; named to hit the gating CI a11y step
+- [X] T057 [P] `frontend/src/test/clearpath.accessibility.test.jsx` — vitest-axe over ClearPath surfaces (CreateDaoWizard, DaoDetailView, ProposalView, ExternalDaoView, ContractPanel) — no violations; named to hit the gating CI a11y step
 - [ ] T058 [P] `docs/developer-guide/clearpath-dao.md` (NEW) — native standard DAOs (OZ Governor/Timelock/Votes), external registry + connectors (Olympia/IGovernor), Account Center IA, no-authority posture, deploy/sync; note futarchy (spec 029) is the follow-on
 - [ ] T059 [P] Update `docs/system-overview/governance.md` — "no DAO" → ClearPath as an opt-in module (native standard DAOs + external tracking)
 - [ ] T060 Run Slither (proxy/clone/AccessControl/Governor detectors) + Medusa across `contracts/clearpath/`; axe/Lighthouse over the portal; resolve/justify — no new high/critical; record in `specs/030-clearpath-standard-daos/security-analysis.md`

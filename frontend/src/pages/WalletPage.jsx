@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
+import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
@@ -29,6 +30,7 @@ const WALLET_TABS = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'reports', label: 'Reporting' },
   { id: 'tokens', label: 'Tokens' },
+  { id: 'clearpath', label: 'ClearPath' },
   { id: 'swap', label: 'Swap' },
 ]
 
@@ -453,6 +455,11 @@ function WalletPage() {
                 {activeTab === 'tokens' && (
                   <div className="tokens-section" role="tabpanel">
                     <TokensPanel />
+                  </div>
+                )}
+                {activeTab === 'clearpath' && (
+                  <div className="clearpath-section" role="tabpanel">
+                    <ClearPathPanel />
                   </div>
                 )}
                 {activeTab === 'swap' && (
