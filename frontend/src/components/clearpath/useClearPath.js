@@ -5,6 +5,10 @@ import { useNotification } from '../../hooks/useUI'
 import { getContractAddressForChain } from '../../config/contracts'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../abis/externalDAORegistry'
 
+// Upper bound on awaiting a confirmation — a broadcast-but-dropped tx must not hang wait() forever (it would
+// orphan the persistent in-flight toast). 120s is well beyond a normal confirmation on the live networks.
+const CONFIRM_TIMEOUT_MS = 120000
+
 /**
  * Spec 030 — ClearPath hook (external-DAO pillar). Resolves the per-chain ExternalDAORegistry, exposes whether
  * the feature is available on the active network (FR-016/FR-020: truthful self-disable when absent), reads the
@@ -58,13 +62,22 @@ export function useClearPath() {
       }
       const reg = new ethers.Contract(registryAddress, EXTERNAL_DAO_REGISTRY_ABI, signer)
       try {
+        // Persistent (duration 0) wallet + mining toasts so the user stays aware across the whole on-chain
+        // activity; each is replaced by the next, ending in a confirmed (with tx hash) / failed toast.
+        showNotification('Register DAO: confirm in your wallet…', 'info', 0)
         const tx = await reg.registerExternalDAO(dao, framework, label)
-        showNotification('Register DAO submitted — awaiting confirmation…', 'info')
-        const receipt = await tx.wait()
-        showNotification(`Registered ${label || 'DAO'}.`, 'success')
+        showNotification('Register DAO submitted — awaiting confirmation…', 'info', 0)
+        const receipt = await tx.wait(1, CONFIRM_TIMEOUT_MS)
+        const ref = tx?.hash ? ` · tx ${tx.hash.slice(0, 6)}…${tx.hash.slice(-4)}` : ''
+        showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
         return receipt
       } catch (e) {
-        showNotification(e?.shortMessage || e?.reason || e?.message || 'Register failed.', 'error')
+        // Timeout ≠ confirmed failure — the register may still mine; say so honestly rather than "failed".
+        if (e?.code === 'TIMEOUT') {
+          showNotification('Register DAO is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.', 'warning', 0)
+        } else {
+          showNotification(e?.shortMessage || e?.reason || e?.message || 'Register failed.', 'error')
+        }
         throw e
       }
     },

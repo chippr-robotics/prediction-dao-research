@@ -20,6 +20,12 @@ import ProposalBuilder from './ProposalBuilder'
 // authorized by the DAO's own rules, the member can vote / queue / execute / propose — user-signed; ClearPath
 // holds no authority. No mock data.
 
+// Upper bound on awaiting a confirmation. A tx that broadcasts but is then silently dropped from the mempool
+// (never mined, never replaced) would otherwise leave tx.wait() pending forever — orphaning the persistent
+// in-flight toast AND the busy lock (the finally never runs). 120s is far longer than a normal confirmation on
+// the live ClearPath networks (Mordor ~15s blocks), so it only ever trips on a genuinely stuck/dropped tx.
+const CONFIRM_TIMEOUT_MS = 120000
+
 function short(a) {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
 }
@@ -91,8 +97,13 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
   }, [reader, record.dao])
   useEffect(() => { loadProposals() }, [loadProposals])
 
-  // Returns true ONLY when the tx actually confirmed, so callers can gate success-only UI (e.g. the proposal
-  // builder must not reset/close on a reverted propose — that would imply a success the chain didn't give).
+  // Surfaces the whole on-chain activity to the app notification system so the user stays aware end-to-end:
+  // a persistent "confirm in your wallet" prompt during signing, a persistent "awaiting confirmation" toast
+  // while the tx mines (block times on subgraph-less chains like Mordor exceed the 5s default auto-dismiss, so
+  // a non-sticky toast would vanish mid-flight), then a terminal confirmed (with the tx hash for traceability)
+  // or failed toast. Each REPLACES the previous in the single-slot toast. Returns true ONLY when the tx actually
+  // confirmed, so callers can gate success-only UI (e.g. the proposal builder must not reset/close on a reverted
+  // propose — that would imply a success the chain didn't give).
   async function run(label, makeTx) {
     if (!signer) {
       showNotification('Connect a wallet to act on this DAO.', 'warning')
@@ -100,14 +111,21 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
     }
     setBusy(true)
     try {
+      showNotification(`${label}: confirm in your wallet…`, 'info', 0)
       const tx = await makeTx()
-      showNotification(`${label} submitted — awaiting confirmation…`, 'info')
-      await tx.wait()
-      showNotification(`${label} confirmed.`, 'success')
+      showNotification(`${label} submitted — awaiting confirmation…`, 'info', 0)
+      await tx.wait(1, CONFIRM_TIMEOUT_MS)
+      showNotification(`${label} confirmed${tx?.hash ? ` · tx ${short(tx.hash)}` : ''}.`, 'success')
       await loadProposals()
       return true
     } catch (e) {
-      showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
+      // A timeout is NOT a confirmed revert — the tx may still mine. Surface that honestly (and dismissably)
+      // rather than claiming failure; busy is released by finally so the user can Refresh once it lands.
+      if (e?.code === 'TIMEOUT') {
+        showNotification(`${label} is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.`, 'warning', 0)
+      } else {
+        showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
+      }
       return false
     } finally {
       setBusy(false)
