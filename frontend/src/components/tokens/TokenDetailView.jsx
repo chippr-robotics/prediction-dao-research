@@ -13,6 +13,7 @@ import {
 import DistributePanel from './DistributePanel'
 import HoldersPanel from './HoldersPanel'
 import ActivityPanel from './ActivityPanel'
+import ContractPanel from './ContractPanel'
 
 // Spec 028 (US2/US6–US9, FR-028/SC-014) — per-token detail + administration. Detects the token's model (v2
 // role-based vs v1 Ownable) + the caller's authority, and renders ONLY valid, authorized controls across
@@ -53,6 +54,9 @@ export default function TokenDetailView({ token, onBack }) {
           setLive(l)
         }
       } catch (e) {
+        // Passive read on mount / post-tx refresh: surface inline (role="alert" below), NOT as a toast — a toast
+        // here would double up with the inline banner and, on the post-tx refresh bump, collide with run()'s
+        // "<action> confirmed." toast and read as if the succeeded action had failed.
         if (!cancelled) setError(e?.shortMessage || e?.message || 'Could not read token state.')
       }
     }
@@ -192,7 +196,7 @@ export default function TokenDetailView({ token, onBack }) {
       )}
 
       {tab === 'compliance' && isRestricted && (
-        <CompliancePanel token={token} caps={caps} contractFor={contractFor} run={run} busy={busy} canManage={caps?.model === 'v2' ? roles.compliance : isAdmin} />
+        <CompliancePanel token={token} caps={caps} contractFor={contractFor} run={run} busy={busy} showNotification={showNotification} canManage={caps?.model === 'v2' ? roles.compliance : isAdmin} />
       )}
 
       {tab === 'roles' && (
@@ -200,7 +204,7 @@ export default function TokenDetailView({ token, onBack }) {
       )}
 
       {tab === 'contract' && (
-        <ContractPanel token={token} caps={caps} />
+        <ContractPanel token={token} caps={caps} chainId={chainId} />
       )}
     </div>
   )
@@ -319,7 +323,7 @@ function ControlsPanel({ caps, contractFor, run, busy, isErc721, isRestricted, c
   )
 }
 
-function CompliancePanel({ contractFor, run, busy, canManage }) {
+function CompliancePanel({ contractFor, run, busy, canManage, showNotification }) {
   const [addr, setAddr] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -331,7 +335,12 @@ function CompliancePanel({ contractFor, run, busy, canManage }) {
       const code = Number(await c.detectTransferRestriction(from, to, 1))
       const m = await c.messageForTransferRestriction(code)
       setCheck({ code, m })
-    } catch (e) { setCheck({ code: -1, m: e?.shortMessage || 'check failed' }) }
+      showNotification?.(code === 0 ? 'Transfer would be allowed.' : `Transfer blocked (code ${code}): ${m}`, code === 0 ? 'success' : 'warning')
+    } catch (e) {
+      const m = e?.shortMessage || e?.reason || e?.message || 'Eligibility check failed.'
+      setCheck({ code: -1, m })
+      showNotification?.(m, 'error')
+    }
   }
   return (
     <div role="tabpanel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -433,28 +442,3 @@ function RolesPanel({ caps, contractFor, run, busy, isAdmin }) {
   )
 }
 
-function ContractPanel({ token, caps }) {
-  const [copied, setCopied] = useState('')
-  function copy(text, what) {
-    try { navigator.clipboard?.writeText(text); setCopied(what) } catch { /* ignore */ }
-  }
-  return (
-    <div className="tm-grid-2" role="tabpanel">
-      <div className="tm-card">
-        <h4 style={{ marginBottom: '0.6rem' }}>Contract metadata</h4>
-        <div className="tm-kv"><span className="k">Standard</span><span>{TOKEN_STANDARD_LABEL[token.standard]}</span></div>
-        <div className="tm-kv"><span className="k">Address</span><code>{token.tokenAddress}</code></div>
-        <div className="tm-kv"><span className="k">Model</span><span>{caps?.model === 'v2' ? 'Role-based (AccessControl)' : 'Owner-managed (Ownable)'}</span></div>
-        {caps && !caps.standard === TOKEN_STANDARD.OPEN_ERC721 && <div className="tm-kv"><span className="k">Decimals</span><span className="tm-mono">{caps.decimals}</span></div>}
-        {caps?.capped && <div className="tm-kv"><span className="k">Cap</span><span className="tm-mono">{ethers.formatUnits(caps.cap, caps.decimals)}</span></div>}
-      </div>
-      <div className="tm-card">
-        <h4 style={{ marginBottom: '0.6rem' }}>Copy</h4>
-        <div className="tm-row-actions">
-          <button type="button" className="tm-btn" onClick={() => copy(token.tokenAddress, 'address')}>Copy address</button>
-        </div>
-        {copied && <p className="tm-row-sub" role="status" style={{ marginTop: '0.5rem' }}>Copied {copied}.</p>}
-      </div>
-    </div>
-  )
-}

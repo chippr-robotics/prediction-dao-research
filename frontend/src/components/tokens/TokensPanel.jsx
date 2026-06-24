@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import './tokens.css'
 import { TOKEN_STANDARD, TOKEN_STANDARD_LABEL } from '../../abis/tokenFactory'
+import { useNotification } from '../../hooks/useUI'
 import { useTokenFactory } from './useTokenFactory'
 import CreateTokenWizard from './CreateTokenWizard'
 import TokenDetailView from './TokenDetailView'
@@ -25,6 +26,7 @@ const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 function TokenTable({ mode, onOpen, refreshKey }) {
   const { isSupported, isConnected, listMyTokens, listAllTokens, readTokenLive } = useTokenFactory()
+  const { showNotification } = useNotification()
   const [rows, setRows] = useState([])
   const [supply, setSupply] = useState({})
   const [meta, setMeta] = useState({ total: 0, truncated: false })
@@ -53,11 +55,13 @@ function TokenTable({ mode, onOpen, refreshKey }) {
       }))
       setSupply(Object.fromEntries(entries))
     } catch (e) {
-      setError(e?.shortMessage || e?.message || 'Could not load tokens.')
+      const m = e?.shortMessage || e?.message || 'Could not load tokens.'
+      setError(m)
+      showNotification(m, 'error')
     } finally {
       setLoading(false)
     }
-  }, [isSupported, isConnected, mode, listMyTokens, listAllTokens, readTokenLive])
+  }, [isSupported, isConnected, mode, listMyTokens, listAllTokens, readTokenLive, showNotification])
 
   useEffect(() => { load() }, [load, refreshKey])
 

@@ -404,8 +404,8 @@ per-network deployments, copy address/ABI.
 **Independent test**: The contract sub-tab shows real metadata/verification/deployments for
 a deployed token; copy address + ABI produce correct values.
 
-- [ ] T093 [US13] Implement the Contract sub-tab `frontend/src/components/tokens/ContractPanel.jsx`: metadata (standard, decimals, cap, deployed address), verification status + block-explorer/source links (from network config), per-network deployment list, copy address + copy ABI — all from synced artifacts/real reads
-- [ ] T094 [P] [US13] `frontend` Vitest: contract metadata renders; verification reported truthfully (not implied verified); copy address/ABI correct
+- [X] T093 [US13] Implement the Contract sub-tab `frontend/src/components/tokens/ContractPanel.jsx`: metadata (standard, decimals, cap, deployed address), verification status + block-explorer/source links (from network config), per-network deployment list, copy address + copy ABI — all from synced artifacts/real reads
+- [X] T094 [P] [US13] `frontend` Vitest: contract metadata renders; verification reported truthfully (not implied verified); copy address/ABI correct
 
 ## Phase 15: Polish & cross-cutting (expansion)
 

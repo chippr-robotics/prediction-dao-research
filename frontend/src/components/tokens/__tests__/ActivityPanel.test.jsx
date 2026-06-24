@@ -8,6 +8,7 @@ import { fetchActivity } from '../tokenSubgraph'
 // truthfully on subgraph-less networks (FR-043).
 
 vi.mock('../tokenSubgraph', () => ({ fetchHolders: vi.fn(), fetchActivity: vi.fn() }))
+vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 vi.mock('../../../config/networks', () => ({
   getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { baseUrl: 'https://explorer.test' } }),
 }))
@@ -33,7 +34,7 @@ describe('ActivityPanel', () => {
     expect(screen.getByText('Transfer')).toBeInTheDocument()
 
     // Filter to Admin — neither row is an admin event, so the empty state shows.
-    await user.click(screen.getByRole('tab', { name: /admin/i }))
+    await user.click(screen.getByRole('radio', { name: /admin/i }))
     expect(screen.getByText(/no admin activity indexed yet/i)).toBeInTheDocument()
     expect(screen.queryByText('Mint')).not.toBeInTheDocument()
   })

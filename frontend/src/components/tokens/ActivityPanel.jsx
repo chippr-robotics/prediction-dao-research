@@ -44,6 +44,8 @@ export default function ActivityPanel({ token, caps, chainId }) {
   const explorer = getNetwork(chainId)?.explorer?.baseUrl || ''
   const loading = state.key !== reqKey
 
+  // Passive background load (fires on tab-open and on token/chain navigation). A failure is surfaced inline as a
+  // role="alert" banner below — NOT as a toast, which would double-feedback and spam on navigation.
   useEffect(() => {
     let cancelled = false
     fetchActivity(chainId, token.tokenAddress)
@@ -51,8 +53,7 @@ export default function ActivityPanel({ token, caps, chainId }) {
         if (!cancelled) setState({ key: reqKey, available: res.available, activity: res.activity, error: null })
       })
       .catch((e) => {
-        if (!cancelled)
-          setState({ key: reqKey, available: true, activity: [], error: e?.message || 'Could not load activity.' })
+        if (!cancelled) setState({ key: reqKey, available: true, activity: [], error: e?.message || 'Could not load activity.' })
       })
     return () => {
       cancelled = true
@@ -96,9 +97,9 @@ export default function ActivityPanel({ token, caps, chainId }) {
       <div className="tm-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
           <h4 style={{ margin: 0 }}>Activity</h4>
-          <div className="tm-filter-row" role="tablist" aria-label="Filter activity">
+          <div className="tm-filter-row" role="radiogroup" aria-label="Filter activity">
             {FILTERS.map((f) => (
-              <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`tm-chip ${filter === f.id ? 'active' : ''}`} onClick={() => setFilter(f.id)}>
+              <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} className={`tm-chip ${filter === f.id ? 'active' : ''}`} onClick={() => setFilter(f.id)}>
                 {f.label}
               </button>
             ))}

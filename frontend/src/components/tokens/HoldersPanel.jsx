@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
+import { useNotification } from '../../hooks/useUI'
 import { fetchHolders } from './tokenSubgraph'
 
 // Spec 028 expansion (US10, FR-039/FR-043) — the per-token holder cap table. Sourced from the subgraph
@@ -19,11 +20,15 @@ function fmtDate(unixSeconds) {
 }
 
 export default function HoldersPanel({ token, caps, chainId }) {
+  const { showNotification } = useNotification()
   const reqKey = `${chainId}-${token.tokenAddress}`
   const [state, setState] = useState({ key: null, available: true, holders: [], error: null })
   const decimals = caps?.decimals ?? 18
   const loading = state.key !== reqKey
 
+  // Passive background load (fires on tab-open and on token/chain navigation). A failure is surfaced inline as a
+  // role="alert" banner below — NOT as a toast, which would double-feedback and spam on navigation. Toasts here
+  // are reserved for the user-initiated CSV export.
   useEffect(() => {
     let cancelled = false
     fetchHolders(chainId, token.tokenAddress)
@@ -31,8 +36,7 @@ export default function HoldersPanel({ token, caps, chainId }) {
         if (!cancelled) setState({ key: reqKey, available: res.available, holders: res.holders, error: null })
       })
       .catch((e) => {
-        if (!cancelled)
-          setState({ key: reqKey, available: true, holders: [], error: e?.message || 'Could not load holders.' })
+        if (!cancelled) setState({ key: reqKey, available: true, holders: [], error: e?.message || 'Could not load holders.' })
       })
     return () => {
       cancelled = true
@@ -60,19 +64,24 @@ export default function HoldersPanel({ token, caps, chainId }) {
   }, [state.holders, decimals])
 
   function exportCsv() {
-    const header = 'rank,address,balance,percent,holding_since\n'
-    const body = ranked.rows
-      .map((r) => `${r.rank},${r.account},${r.balanceDisplay},${r.pct},${r.since}`)
-      .join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${token.symbol || 'token'}-holders.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    try {
+      const header = 'rank,address,balance,percent,holding_since\n'
+      const body = ranked.rows
+        .map((r) => `${r.rank},${r.account},${r.balanceDisplay},${r.pct},${r.since}`)
+        .join('\n')
+      const blob = new Blob([header + body], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${token.symbol || 'token'}-holders.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showNotification(`Exported ${ranked.rows.length} holders to CSV.`, 'success')
+    } catch (e) {
+      showNotification(e?.message || 'CSV export failed.', 'error')
+    }
   }
 
   if (!state.available) {

@@ -6,12 +6,12 @@ import TokenDetailView from '../TokenDetailView'
 // valid sub-tabs/controls (FR-028/SC-014). Mock the data hook so gating is tested in isolation; sub-panel
 // contract reads degrade gracefully under the global ethers mock.
 const STD = { OPEN_ERC20: 0, OPEN_ERC721: 1, RESTRICTED_ERC1404: 2, PERMISSIONED_ERC3643: 3 }
-const h = vi.hoisted(() => ({ caps: {}, live: { owner: '0xowner', supplyDisplay: '500.0 REG', paused: false } }))
+const h = vi.hoisted(() => ({ caps: {}, live: { owner: '0xowner', supplyDisplay: '500.0 REG', paused: false }, fail: null }))
 
 vi.mock('../useTokenFactory', () => ({
   useTokenFactory: () => ({
-    detectCapabilities: vi.fn().mockResolvedValue(h.caps),
-    readTokenLive: vi.fn().mockResolvedValue(h.live),
+    detectCapabilities: vi.fn(() => (h.fail ? Promise.reject(new Error(h.fail)) : Promise.resolve(h.caps))),
+    readTokenLive: vi.fn(() => (h.fail ? Promise.reject(new Error(h.fail)) : Promise.resolve(h.live))),
     reader: {},
     signer: {},
   }),
@@ -35,7 +35,7 @@ function adminV2Caps(over = {}) {
 }
 
 describe('TokenDetailView — capability gating (FR-028/SC-014)', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => { vi.clearAllMocks(); h.fail = null })
 
   it('v2 restricted admin: header, model badge, and all valid sub-tabs render', async () => {
     h.caps = adminV2Caps()
@@ -65,6 +65,13 @@ describe('TokenDetailView — capability gating (FR-028/SC-014)', () => {
     h.caps = adminV2Caps({ isAdmin: false, roles: { admin: false, minter: false, pauser: false, burner: false, compliance: false } })
     render(<TokenDetailView token={restrictedToken} onBack={() => {}} />)
     expect(await screen.findByText(/viewing this token read-only/i)).toBeInTheDocument()
+  })
+
+  it('mount-load read failure surfaces an inline alert (not a toast)', async () => {
+    h.fail = 'rpc down'
+    render(<TokenDetailView token={restrictedToken} onBack={() => {}} />)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('rpc down')
   })
 
   it('v1 Ownable token: model is owner-managed and Roles tab explains no scoped roles', async () => {
