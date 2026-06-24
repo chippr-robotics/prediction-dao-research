@@ -47,6 +47,14 @@ non-bypassably on value-moving actions, is **theme-aware** (light/dark) and
 accessible, runs entirely within the platform's **no-backend** footprint, and shows
 **real on-chain state only** — never mock data.
 
+## Clarifications
+
+### Session 2026-06-24
+
+- Q: For native standard DAOs, what determines voting power? → A: **Both, selectable at creation** — a governance token (`ERC20Votes`, may reuse the spec-028 token factory) or a membership NFT (1 member = 1 vote); the **default presented option is membership-NFT** (mirrors Olympia).
+- Q: How are registered external DAOs stored / discovered? → A: A lightweight **on-chain, network-scoped `ExternalDAORegistry`** records `(address, framework, label)` for shared discovery + subgraph indexing (fits the no-backend footprint); ClearPath still holds **no authority** over the external DAO.
+- Q: What's in the first external-DAO deliverable — track-only or also management? → A: **Include signed native management actions** (create proposal / vote / queue / execute via the connector, user-signed) **from the start**, alongside read-only tracking — not deferred to a later phase.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Launch a standard DAO (Priority: P1)
@@ -314,10 +322,11 @@ explorer; copy an address/ABI and confirm correctness.
 **Native standard DAOs (US1/US4)**
 
 - **FR-001**: The system MUST allow an authorized member to create a native standard
-  DAO specifying at least name, purpose, voting-weight source (governance token or
-  membership NFT), a USDC treasury, and governance parameters (voting delay, voting
-  period, quorum, timelock delay), deploying the governance + treasury contracts
-  on-chain.
+  DAO specifying at least name, purpose, a **voting-weight source selectable at
+  creation — a governance token (`ERC20Votes`) or a membership NFT (1 member = 1
+  vote), defaulting to membership-NFT** — a USDC treasury, and governance parameters
+  (voting delay, voting period, quorum, timelock delay), deploying the governance +
+  treasury contracts on-chain.
 - **FR-002**: A native DAO MUST support a standard proposal lifecycle — submit a
   proposal (a USDC treasury action or a parameter change), vote during the voting
   period, and (after the timelock) queue and execute a passed proposal — with vote
@@ -332,9 +341,11 @@ explorer; copy an address/ABI and confirm correctness.
 **External DAO registry & connectors (US3/US5)**
 
 - **FR-005**: The system MUST allow a member to register an existing external DAO by
-  (network, address, framework/type) with an optional label, MUST validate that the
-  address is a recognized governance contract (e.g. responds to the standard
-  IGovernor interface) before adding, and MUST reject unrecognized/invalid addresses.
+  (network, address, framework/type) with an optional label into a lightweight
+  **on-chain, network-scoped registry** (shared discovery + subgraph-indexable), MUST
+  validate that the address is a recognized governance contract (e.g. responds to the
+  standard IGovernor interface) before adding, and MUST reject unrecognized/invalid
+  addresses. The registry grants ClearPath **no authority** over the external DAO.
 - **FR-006**: The system MUST track a registered external DAO **read-only** — its
   treasury balance, proposals + vote tallies + proposal states, and membership —
   sourced from the external DAO's on-chain state/indexing, strictly network-scoped
@@ -493,7 +504,9 @@ explorer; copy an address/ABI and confirm correctness.
   DAO's own access control; ClearPath holds no keys, roles, or custody, and offers a
   deep-link to the external app as a fallback. A lightweight on-chain registry records
   registered external DAOs (network-scoped, for shared discovery + indexing) but
-  grants ClearPath no power over them.
+  grants ClearPath no power over them. **Signed management actions are in scope for
+  this spec from the start** (clarified 2026-06-24) — not deferred to a later phase —
+  alongside read-only tracking.
 - **Reuse of platform infrastructure**: Integrates with the existing
   `MembershipManager` (authorization) and `SanctionsGuard` (screening) and reuses the
   per-network **USDC** as the native treasury asset, `UUPSManaged`,

@@ -42,8 +42,13 @@
   interoperate-with* requirements and recorded defaults — not prescribed internal
   implementation. This mirrors spec 028's accepted convention. Concrete contract
   design is deferred to `plan.md`.
-- **Worth pressure-testing in `/speckit-clarify` before planning:** the native voting
-  source default (membership-NFT vs token-weighted); whether the external registry is
-  on-chain vs frontend-only; the validation method for "recognized governance
-  contract" (ERC-165 / IGovernor probe); and confirming OZ Governor builds on OZ
-  5.4.0 / `paris` for ETC/Mordor.
+- **`/speckit-clarify` session 2026-06-24 (complete)** resolved: native voting source =
+  **both selectable, default membership-NFT**; external registry = **on-chain,
+  network-scoped**; first external deliverable = **includes signed management actions**
+  (not read-only first). Recorded in the spec's `## Clarifications` and integrated into
+  FR-001 / FR-005 + Assumptions.
+- **Deferred to planning (technical, not a user decision):** confirm OZ Governor +
+  Timelock build/deploy on OZ 5.4.0 / EVM `paris` for ETC/Mordor (Olympia runs OZ
+  Governor v5.1 there, so it is expected to work — verify in research); and the exact
+  "recognized governance contract" validation probe (ERC-165 / IGovernor function
+  probe). Membership tier defaults mirror spec 028.
