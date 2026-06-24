@@ -16,6 +16,7 @@ export function useClearPath() {
   const { showNotification } = useNotification()
 
   const registryAddress = getContractAddressForChain('externalDAORegistry', chainId)
+  const usdcAddress = getContractAddressForChain('paymentToken', chainId) // per-network USDC for treasury balances
   const isSupported = ethers.isAddress(registryAddress || '')
   const reader = provider || signer?.provider || null
 
@@ -73,6 +74,7 @@ export function useClearPath() {
   return {
     isSupported,
     registryAddress,
+    usdcAddress,
     chainId,
     account,
     isConnected,

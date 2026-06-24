@@ -19,7 +19,7 @@ const TABS = [
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 export default function ClearPathPanel() {
-  const { isSupported, chainId, reader, listExternalDAOs, registerExternalDAO } = useClearPath()
+  const { isSupported, chainId, reader, signer, usdcAddress, listExternalDAOs, registerExternalDAO } = useClearPath()
   const [tab, setTab] = useState('daos')
   const [loading, setLoading] = useState(true)
   const [daos, setDaos] = useState([])
@@ -66,7 +66,7 @@ export default function ClearPathPanel() {
   if (selected) {
     return (
       <div className="clearpath">
-        <ExternalDaoView record={selected} reader={reader} chainId={chainId} onBack={() => setSelected(null)} />
+        <ExternalDaoView record={selected} reader={reader} signer={signer} chainId={chainId} usdcAddress={usdcAddress} onBack={() => setSelected(null)} />
       </div>
     )
   }

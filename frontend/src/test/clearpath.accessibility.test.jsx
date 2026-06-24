@@ -16,6 +16,7 @@ const cp = {
   registerExternalDAO: vi.fn(),
 }
 vi.mock('../components/clearpath/useClearPath', () => ({ useClearPath: () => cp }))
+vi.mock('../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 vi.mock('../components/clearpath/governorConnector', () => ({
   validateGovernor: vi.fn(),
   readGovernorSummary: vi.fn().mockResolvedValue({
@@ -24,6 +25,13 @@ vi.mock('../components/clearpath/governorConnector', () => ({
     treasuryNative: 0n, votingDelay: '1', votingPeriod: '100', proposalThreshold: '0',
     countingMode: 'support=bravo', clockMode: 'mode=blocknumber',
   }),
+  extraTreasuries: () => [],
+  readTreasuries: vi.fn().mockResolvedValue([]),
+  fetchGovernorProposals: vi.fn().mockResolvedValue({ ok: true, proposals: [], scannedFrom: 0, scannedTo: 1, partial: false }),
+  castVote: vi.fn(),
+  queueProposal: vi.fn(),
+  executeProposal: vi.fn(),
+  proposeAction: vi.fn(),
 }))
 vi.mock('../config/networks', () => ({
   getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' }, nativeCurrency: { symbol: 'ETC' } }),

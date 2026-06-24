@@ -72,5 +72,7 @@
 .clearpath .cp-error { color: var(--semantic-loss, #c0492f); background: color-mix(in srgb, var(--semantic-loss, #c0492f) 10%, transparent); padding: 0.6rem 0.8rem; border-radius: var(--cp-radius); margin: 0.6rem 0; font-size: 0.85rem; }
 .clearpath .cp-notice { color: var(--cp-text-2); background: var(--cp-canvas); padding: 0.6rem 0.8rem; border-radius: var(--cp-radius); margin: 0.6rem 0; font-size: 0.85rem; }
 .clearpath .cp-ok { color: var(--semantic-win, #2e7d32); font-size: 0.85rem; }
+.clearpath .cp-section { border-top: 1px solid var(--cp-border); padding-top: 0.5rem; }
+.clearpath .cp-section:first-child { border-top: none; padding-top: 0; }
 .clearpath .cp-disabled { color: var(--cp-text-2); text-align: center; padding: 2rem; }
 .clearpath .cp-empty { color: var(--cp-text-3); text-align: center; padding: 1.5rem; }

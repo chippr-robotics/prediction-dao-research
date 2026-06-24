@@ -17,11 +17,19 @@ const cp = {
   registerExternalDAO: vi.fn(),
 }
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
+vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 
-const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn() }
+const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn() }
 vi.mock('../governorConnector', () => ({
   validateGovernor: (...a) => conn.validateGovernor(...a),
   readGovernorSummary: (...a) => conn.readGovernorSummary(...a),
+  readTreasuries: (...a) => conn.readTreasuries(...a),
+  extraTreasuries: () => [{ label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf' }],
+  fetchGovernorProposals: (...a) => conn.fetchGovernorProposals(...a),
+  castVote: vi.fn(),
+  queueProposal: vi.fn(),
+  executeProposal: vi.fn(),
+  proposeAction: vi.fn(),
 }))
 
 vi.mock('../../../config/networks', () => ({
@@ -40,6 +48,8 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     vi.clearAllMocks()
     cp.isSupported = true
     cp.listExternalDAOs.mockResolvedValue([olympiaRecord])
+    conn.fetchGovernorProposals.mockResolvedValue({ ok: true, proposals: [], scannedFrom: 16000000, scannedTo: 16500000, partial: false })
+    conn.readTreasuries.mockResolvedValue([])
   })
 
   it('self-disables truthfully on an unsupported network', async () => {
@@ -68,13 +78,39 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
       countingMode: 'support=bravo&quorum=for,abstain',
       clockMode: 'mode=blocknumber&from=default',
     })
+    conn.readTreasuries.mockResolvedValue([
+      { label: 'Timelock', address: '0x0000000000000000000000000000000000000222', native: 0n, usdc: 1500000n, usdcSymbol: 'cUSD', usdcDecimals: 6 },
+      { label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf', native: 2147152000000000000n, usdc: 0n, usdcSymbol: 'cUSD', usdcDecimals: 6 },
+    ])
     const user = userEvent.setup()
     render(<ClearPathPanel />)
     await user.click(await screen.findByText('Olympia DAO'))
     expect(await screen.findByText('OlympiaGovernor')).toBeInTheDocument()
     expect(screen.getByText(/Olympia Member \(OLYM\)/)).toBeInTheDocument()
-    // proposals truthfully disabled (no indexing on this network)
-    expect(screen.getByText(/Proposal history requires event indexing/i)).toBeInTheDocument()
+    // treasury enrichment: the OlympiaTreasury vault + USDC balance render
+    expect(await screen.findByText('Olympia Treasury')).toBeInTheDocument()
+    expect(screen.getByText('1.5')).toBeInTheDocument() // 1500000 cUSD @ 6 decimals
+    // live indexer: empty range shows a truthful state (not a fabricated list)
+    expect(await screen.findByText(/No proposals found in the scanned range/i)).toBeInTheDocument()
+  })
+
+  it('renders a live proposal with vote actions when one is in range', async () => {
+    conn.fetchGovernorProposals.mockResolvedValue({
+      ok: true,
+      partial: false,
+      scannedFrom: 16000000,
+      scannedTo: 16500000,
+      proposals: [
+        { id: '42', proposer: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', description: 'Fund core dev', targets: [], values: [], calldatas: [], descriptionHash: '0x', voteStart: '1', voteEnd: '2', state: 1, votes: { for: '3', against: '1', abstain: '0' } },
+      ],
+    })
+    const user = userEvent.setup()
+    render(<ClearPathPanel />)
+    await user.click(await screen.findByText('Olympia DAO'))
+    expect(await screen.findByText('Fund core dev')).toBeInTheDocument()
+    expect(screen.getByText('Active')).toBeInTheDocument()
+    // US5: an Active proposal offers vote actions
+    expect(screen.getByRole('button', { name: /vote for/i })).toBeInTheDocument()
   })
 
   it('validates then registers a new external DAO', async () => {

@@ -107,7 +107,7 @@ own rules authorize the wallet; ClearPath holds no authority; deep-link fallback
 **Independent test**: On a registered Olympia DAO, as a member-NFT holder, cast a vote through ClearPath (recorded
 on Olympia); an unauthorized wallet is rejected by Olympia's rules.
 
-- [ ] T046 [US5] Extend `ExternalDaoView.jsx` + `governorConnector.js` — user-signed `propose`/`castVote`/`queue`/`execute` against the external DAO; surface the external DAO's rejection reason; deep-link to the external app for unsupported frameworks
+- [X] T046 [US5] Extend `ExternalDaoView.jsx` + `governorConnector.js` — user-signed `propose`/`castVote`/`queue`/`execute` against the external DAO; surface the external DAO's rejection reason; deep-link to the external app for unsupported frameworks
 - [ ] T047 [US5] Sanctions on ClearPath-mediated external value moves (where applicable) + clear "externally deployed, ClearPath holds no authority" labeling (INV-4)
 - [ ] T048 [P] [US5] Integration test `test/integration/clearpath/external-governor.test.js` — deploy a real OZ Governor (stand-in for Olympia), register it, cast a user-signed vote (authorized) and confirm it records on that governor; unauthorized wallet rejected by the governor; ClearPath holds no role on it
 - [ ] T049 [P] [US5] Vitest `__tests__/ExternalDaoView.test.jsx` — management actions via mocked connector (authorized/rejected), deep-link fallback, no implied success
