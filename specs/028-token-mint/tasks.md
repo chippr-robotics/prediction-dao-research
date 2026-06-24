@@ -409,10 +409,10 @@ a deployed token; copy address + ABI produce correct values.
 
 ## Phase 15: Polish & cross-cutting (expansion)
 
-- [ ] T095 [P] Update `docs/developer-guide/token-mint.md` for the v2 role model, caps, transfer controls, batch, holders/activity indexing, and the portal IA; note snapshots out-of-scope + T-REX deferred
-- [ ] T096 [P] Run Slither (clone/proxy/AccessControl/cap detectors) + Medusa across the v2 contracts; axe/Lighthouse over the rebuilt portal (WCAG 2.1 AA, light + dark); resolve/justify findings — no new high/critical
-- [ ] T097 Execute `quickstart.md` "Expansion validation" (A–E) on local + Mordor; confirm every scenario against real chain state and the truthful subgraph-less fallbacks
-- [ ] T098 Confirm `npm test`, `npm run test:frontend`, `npm run check:storage-layout`, and subgraph codegen+build+matchstick are green in CI with no `continue-on-error` on test/lint/build/security (Principle IV)
+- [X] T095 [P] Update `docs/developer-guide/token-mint.md` for the v2 role model, caps, transfer controls, batch, holders/activity indexing, and the portal IA; note snapshots out-of-scope + T-REX deferred
+- [X] T096 [P] Run Slither (clone/proxy/AccessControl/cap detectors) + Medusa across the v2 contracts; axe/Lighthouse over the rebuilt portal (WCAG 2.1 AA, light + dark); resolve/justify findings — no new high/critical
+- [X] T097 Execute `quickstart.md` "Expansion validation" (A–E) on local + Mordor; confirm every scenario against real chain state and the truthful subgraph-less fallbacks
+- [X] T098 Confirm `npm test`, `npm run test:frontend`, `npm run check:storage-layout`, and subgraph codegen+build+matchstick are green in CI with no `continue-on-error` on test/lint/build/security (Principle IV)
 
 ---
 
