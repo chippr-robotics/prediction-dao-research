@@ -91,8 +91,13 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
   }, [reader, record.dao])
   useEffect(() => { loadProposals() }, [loadProposals])
 
+  // Returns true ONLY when the tx actually confirmed, so callers can gate success-only UI (e.g. the proposal
+  // builder must not reset/close on a reverted propose — that would imply a success the chain didn't give).
   async function run(label, makeTx) {
-    if (!signer) return showNotification('Connect a wallet to act on this DAO.', 'warning')
+    if (!signer) {
+      showNotification('Connect a wallet to act on this DAO.', 'warning')
+      return false
+    }
     setBusy(true)
     try {
       const tx = await makeTx()
@@ -100,8 +105,10 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
       await tx.wait()
       showNotification(`${label} confirmed.`, 'success')
       await loadProposals()
+      return true
     } catch (e) {
       showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
+      return false
     } finally {
       setBusy(false)
     }
@@ -209,6 +216,7 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
           usdcAddress={usdcAddress}
           nativeSymbol={net?.nativeCurrency?.symbol}
           treasuries={treasuries}
+          proposals={props.proposals}
           run={run}
           busy={busy}
           onSubmitted={loadProposals}

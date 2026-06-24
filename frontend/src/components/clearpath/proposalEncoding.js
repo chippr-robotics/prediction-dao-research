@@ -73,6 +73,7 @@ export function encodeAction(a, { usdcAddress, meta }) {
     requireAddress(token, 'Token')
     requireAddress(a.tokenTo, 'Recipient')
     const m = meta ? meta(token) : null
+    if (m && m.unreadable) throw new Error('Could not read this token (decimals/symbol). Check the address.')
     if (!m) {
       const e = new Error('Reading token decimals…')
       e.pending = true
@@ -121,8 +122,7 @@ export function assemble({ title, body, actions, usdcAddress, meta }) {
 
 /**
  * Predict the OZ Governor proposalId for a payload (same hashing the contract uses) — for the duplicate
- * pre-check. hashProposal = keccak256(abi.encode(targets, values, keccak256(calldatas...), descriptionHash))...
- * OZ uses keccak256(abi.encode(targets, values, calldatas, descriptionHash)).
+ * pre-check. OZ: proposalId = uint256(keccak256(abi.encode(targets, values, calldatas, descriptionHash))).
  */
 export function predictProposalId(targets, values, calldatas, descHash) {
   const coder = ethers.AbiCoder.defaultAbiCoder()

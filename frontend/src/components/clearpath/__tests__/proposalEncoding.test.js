@@ -51,6 +51,15 @@ describe('proposalEncoding', () => {
     try { encodeAction(a, { usdcAddress: USDC, meta: () => null }) } catch (e) { expect(e.pending).toBe(true) }
   })
 
+  it('reports an unreadable token as a real error, not a perpetual pending', () => {
+    const a = { ...newAction(ACTION_TYPE.TOKEN), tokenMode: 'other', tokenAddress: '0x00000000000000000000000000000000000000ee', tokenTo: TO, tokenAmount: '5' }
+    let thrown
+    try { encodeAction(a, { usdcAddress: USDC, meta: () => ({ unreadable: true }) }) } catch (e) { thrown = e }
+    expect(thrown).toBeTruthy()
+    expect(thrown.pending).toBeFalsy() // NOT a fake "still loading" state
+    expect(thrown.message).toMatch(/could not read this token/i)
+  })
+
   it('validates a custom call and rejects malformed hex', () => {
     const ok = { ...newAction(ACTION_TYPE.CUSTOM), customTarget: TO, customValue: '0', customCalldata: '0xabcd' }
     expect(encodeAction(ok, { usdcAddress: USDC, meta: usdcMeta }).calldata).toBe('0xabcd')

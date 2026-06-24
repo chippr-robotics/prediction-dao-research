@@ -12,7 +12,7 @@ import { ACTION_TYPE, newAction, assemble, predictProposalId } from './proposalE
 const ERC20_TRANSFER_IFACE = new ethers.Interface(['function transfer(address to, uint256 amount)'])
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—')
 
-export default function ProposalBuilder({ record, signer, reader, usdcAddress, nativeSymbol, treasuries, run, busy, onSubmitted }) {
+export default function ProposalBuilder({ record, signer, reader, usdcAddress, nativeSymbol, treasuries = [], proposals = [], run, busy, onSubmitted }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -24,9 +24,10 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
   const metaFn = useCallback(
     (addr) => {
       const lc = String(addr).toLowerCase()
-      if (tokenMeta[lc]) return tokenMeta[lc].unreadable ? null : tokenMeta[lc]
-      if (usdcAddress && lc === usdcAddress.toLowerCase() && treasuries[0]) {
-        return { decimals: treasuries[0].usdcDecimals ?? 6, symbol: treasuries[0].usdcSymbol ?? 'USDC' }
+      if (tokenMeta[lc]) return tokenMeta[lc] // { decimals, symbol } OR { unreadable:true } → encoder shows a real error
+      if (usdcAddress && lc === usdcAddress.toLowerCase()) {
+        const u = treasuries.find((t) => t.usdcDecimals != null) // any vault carries the USDC meta (stamped identically)
+        if (u) return { decimals: u.usdcDecimals, symbol: u.usdcSymbol || 'USDC' }
       }
       return null
     },
@@ -73,7 +74,7 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
   const anyPending = A.perAction.some((p) => p.pending)
   const valid = A.ok && !anyPending
 
-  // Pre-sign guards: over-treasury (warn, allow) + duplicate proposal (warn, block-by-choice).
+  // Pre-sign guards: over-treasury (warn, allow) + duplicate proposal (block submit — it would revert).
   const timelock = treasuries.find((t) => t.label === 'Timelock') || treasuries[0]
   let nativeTotal = 0n
   let usdcTotal = 0n
@@ -87,6 +88,8 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
   const overNative = valid && timelock?.native != null && nativeTotal > timelock.native
   const overUsdc = valid && timelock?.usdc != null && usdcTotal > timelock.usdc
   const dupId = valid ? predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash) : null
+  // FR-025 duplicate pre-check: an identical action set + description hashes to the same id as a live proposal.
+  const isDuplicate = !!dupId && proposals.some((p) => p.id === dupId)
 
   function setAction(id, patch) {
     setActions((arr) => arr.map((a) => (a.id === id ? { ...a, ...patch } : a)))
@@ -101,9 +104,10 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
     setTitle(''); setBody(''); setActions([newAction(ACTION_TYPE.TOKEN)]); setShowPayload(false)
   }
   function submit() {
+    // Only reset/close/reload on a CONFIRMED tx — a reverted propose must not look like success (US5 #9).
     run('Propose', () =>
       proposeAction(signer, record.dao, { targets: A.targets, values: A.values, calldatas: A.calldatas, description: A.description })
-    ).then(() => { reset(); setOpen(false); onSubmitted?.() })
+    ).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
   }
 
   if (!open) {
@@ -154,6 +158,7 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
         <div className="cp-kv"><span className="k">Total native value</span><span className="cp-mono">{ethers.formatEther(nativeTotal)} {nativeSymbol || ''}</span></div>
         {overNative && <div className="cp-warn" role="status">Sends more {nativeSymbol} than the treasury holds. The proposal can still be created; execution will revert if not funded by then.</div>}
         {overUsdc && <div className="cp-warn" role="status">Sends more {timelock?.usdcSymbol || 'USDC'} than the treasury holds. The proposal can still be created; execution will revert if not funded.</div>}
+        {isDuplicate && <div className="cp-error" role="alert">This exact proposal already exists (id {dupId.length > 14 ? `${dupId.slice(0, 8)}…${dupId.slice(-4)}` : dupId}). Submitting it would revert — change an action or the description.</div>}
         {!valid && <p className="cp-row-sub">{anyPending ? 'Reading token details…' : 'Add a title/description and at least one valid action to submit.'}</p>}
 
         <details className="cp-section" open={showPayload} onToggle={(e) => setShowPayload(e.target.open)}>
@@ -169,7 +174,7 @@ ${dupId ? `proposalId: ${dupId}` : ''}`}
 
         <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
           {signer ? (
-            <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy} aria-disabled={!valid || busy} onClick={submit}>Submit proposal</button>
+            <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy || isDuplicate} aria-disabled={!valid || busy || isDuplicate} onClick={submit}>Submit proposal</button>
           ) : (
             <span className="cp-notice">Connect a wallet to propose.</span>
           )}
@@ -197,7 +202,7 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
     <div className="cp-card" style={{ background: 'var(--cp-surface)' }}>
       <div className="cp-action-head">
         <span className="cp-badge">#{index + 1}</span>
-        <label className="cp-label" htmlFor={`cp-act-type-${a.id}`} style={{ position: 'absolute', left: '-9999px' }}>Action {index + 1} type</label>
+        <label className="sr-only" htmlFor={`cp-act-type-${a.id}`}>Action {index + 1} type</label>
         <select id={`cp-act-type-${a.id}`} className="cp-input cp-select" value={a.type} onChange={(e) => onChange({ type: e.target.value })} style={{ maxWidth: '14rem' }}>
           {TYPE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
         </select>

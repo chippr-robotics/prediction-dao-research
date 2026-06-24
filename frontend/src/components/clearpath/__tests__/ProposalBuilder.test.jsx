@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { ethers } from 'ethers'
 import ProposalBuilder from '../ProposalBuilder'
+import { ACTION_TYPE, newAction, assemble, predictProposalId } from '../proposalEncoding'
 
 // Spec 030 (US5, FR-023/024) — the rich proposal builder: compose a Governor proposal without hand-writing
 // calldata, multi-action, asset-aware, with validation + the correct submitted payload.
@@ -87,6 +88,24 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     expect(screen.getByText('1 action')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /\+ add action/i }))
     expect(screen.getByText('2 actions')).toBeInTheDocument()
+  })
+
+  it('detects a duplicate proposal and blocks submit (FR-025)', async () => {
+    // Compute the id the builder will derive for a 100-USDC transfer to TO titled "Fund dev"…
+    const A = assemble({
+      title: 'Fund dev', body: '',
+      actions: [{ ...newAction(ACTION_TYPE.TOKEN), tokenTo: TO, tokenAmount: '100' }],
+      usdcAddress: USDC, meta: () => ({ decimals: 6, symbol: 'cUSD' }),
+    })
+    const dupId = predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash)
+    const user = userEvent.setup()
+    renderBuilder({ proposals: [{ id: dupId }] }) // …and feed it as an already-existing proposal
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    await user.type(screen.getByLabelText(/^title$/i), 'Fund dev')
+    await user.type(screen.getByLabelText(/recipient/i), TO)
+    await user.type(screen.getByLabelText(/amount/i), '100')
+    expect(await screen.findByText(/this exact proposal already exists/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /submit proposal/i })).toBeDisabled()
   })
 
   it('warns (non-blocking) when an action exceeds the treasury balance', async () => {
