@@ -12,6 +12,30 @@ function short(a) {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
 }
 
+// Humanize the standard IGovernor COUNTING_MODE() string, e.g.
+// "support=bravo&quorum=for,abstain" → "For / Against / Abstain · quorum counts For + Abstain".
+function humanizeCounting(mode) {
+  if (!mode) return '—'
+  const support = /support=([^&]+)/.exec(mode)?.[1]
+  const quorum = /quorum=([^&]+)/.exec(mode)?.[1]
+  const cap = (w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)
+  const options = support === 'bravo' ? 'For / Against / Abstain' : support === 'basic' ? 'For / Against' : support || 'custom'
+  const q = quorum ? ` · quorum counts ${quorum.split(',').map(cap).join(' + ')}` : ''
+  return options + q
+}
+
+// Humanize the EIP-6372 CLOCK_MODE() string → a plain clock label + the unit for delays/periods.
+function humanizeClock(mode) {
+  if (!mode || /blocknumber/.test(mode)) return 'Block number'
+  if (/timestamp/.test(mode)) return 'Timestamp'
+  return mode
+}
+function clockUnit(mode) {
+  if (!mode || /blocknumber/.test(mode)) return 'blocks'
+  if (/timestamp/.test(mode)) return 'seconds'
+  return ''
+}
+
 export default function ExternalDaoView({ record, reader, chainId, onBack }) {
   const [state, setState] = useState({ key: null, summary: null, error: null })
   const net = getNetwork(chainId)
@@ -59,11 +83,11 @@ export default function ExternalDaoView({ record, reader, chainId, onBack }) {
             <h4 style={{ marginBottom: '0.5rem' }}>Governance</h4>
             <div className="cp-kv"><span className="k">On-chain name</span><span>{s.name || '—'}</span></div>
             <div className="cp-kv"><span className="k">Voting token</span><span>{s.tokenName ? `${s.tokenName}${s.tokenSymbol ? ` (${s.tokenSymbol})` : ''}` : short(s.tokenAddr)}</span></div>
-            <div className="cp-kv"><span className="k">Voting delay</span><span className="cp-mono">{s.votingDelay ?? '—'}</span></div>
-            <div className="cp-kv"><span className="k">Voting period</span><span className="cp-mono">{s.votingPeriod ?? '—'}</span></div>
+            <div className="cp-kv"><span className="k">Voting delay</span><span className="cp-mono">{s.votingDelay != null ? `${s.votingDelay} ${clockUnit(s.clockMode)}`.trim() : '—'}</span></div>
+            <div className="cp-kv"><span className="k">Voting period</span><span className="cp-mono">{s.votingPeriod != null ? `${s.votingPeriod} ${clockUnit(s.clockMode)}`.trim() : '—'}</span></div>
             <div className="cp-kv"><span className="k">Proposal threshold</span><span className="cp-mono">{s.proposalThreshold ?? '—'}</span></div>
-            <div className="cp-kv"><span className="k">Counting</span><span className="cp-mono" style={{ fontSize: '0.7rem' }}>{s.countingMode || '—'}</span></div>
-            <div className="cp-kv"><span className="k">Clock</span><span className="cp-mono" style={{ fontSize: '0.7rem' }}>{s.clockMode || 'blocks'}</span></div>
+            <div className="cp-kv"><span className="k">Voting</span><span title={s.countingMode || ''}>{humanizeCounting(s.countingMode)}</span></div>
+            <div className="cp-kv"><span className="k">Clock</span><span title={s.clockMode || ''}>{humanizeClock(s.clockMode)}</span></div>
           </div>
 
           <div className="cp-card">
