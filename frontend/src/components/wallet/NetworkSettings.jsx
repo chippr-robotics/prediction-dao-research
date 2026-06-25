@@ -127,16 +127,16 @@ function NetworkSettings() {
                       </dd>
                     </div>
                   )}
-                  {net.capabilities?.dex && net.resources?.dexUrl && (
+                  {net.capabilities?.dex && net.dexProvider?.url && (
                     <div className="network-doc-row">
                       <dt>Swap</dt>
                       <dd>
                         <a
-                          href={net.resources.dexUrl}
+                          href={net.dexProvider.url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          {`Swap into ${net.stablecoin?.symbol || 'tokens'}`}
+                          {`Open ${net.dexProvider.name} ↗`}
                         </a>
                       </dd>
                     </div>

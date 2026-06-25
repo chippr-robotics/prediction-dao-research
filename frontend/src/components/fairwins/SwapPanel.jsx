@@ -22,10 +22,17 @@ function SwapPanel() {
     setSlippage,
     addresses,
     isDexAvailable,
+    dexProvider,
+    network,
   } = useDex()
 
   const { isConnected, chainId } = useWallet()
   const { native: nativeSymbol, stable: stableSymbol } = useChainTokens()
+
+  // Network-aware DEX provider identity (ETC family → ETCswap; else Uniswap).
+  const providerName = dexProvider?.name || 'the DEX'
+  const providerUrl = dexProvider?.url || null
+  const networkName = network?.name || 'this network'
 
   const wnativeSymbol = nativeSymbol ? `W${nativeSymbol}` : 'WNATIVE'
   const labelFor = (key) => {
@@ -156,14 +163,13 @@ function SwapPanel() {
       <div className="swap-panel">
         <div className="swap-header">
           <h2>Swap</h2>
-          <p className="subtitle">DEX is not available on this network</p>
+          <p className="subtitle">Swaps are not available on {networkName}</p>
         </div>
         <div className="connect-message">
           <p>
-            Uniswap V3 is wired on Polygon Mainnet. Switch to Mainnet from the
-            Testnet/Mainnet toggle to swap, or supply community Uniswap V3
-            addresses via the <code>VITE_AMOY_UNISWAP_*</code> env vars to
-            enable swaps on Amoy.
+            {dexProvider
+              ? `${providerName} is not configured on ${networkName}. Switch to a network with a configured DEX, or supply the ${providerName} contract addresses for ${networkName} to enable in-app swaps.`
+              : `No DEX is configured on ${networkName}. Switch to a network with a configured DEX to enable in-app swaps.`}
           </p>
         </div>
       </div>
@@ -180,7 +186,7 @@ function SwapPanel() {
     <div className="swap-panel">
       <div className="swap-header">
         <h2>Swap</h2>
-        <p className="subtitle">Wrap, unwrap, and swap on the active chain</p>
+        <p className="subtitle">Wrap, unwrap, and swap via {providerName}</p>
       </div>
 
       <div className="mode-selector" role="tablist" aria-label="Swap mode">
@@ -360,8 +366,18 @@ function SwapPanel() {
             rel="noopener noreferrer"
             className="contract-link"
           >
-            Swap Router ↗
+            {providerName} Router ↗
           </a>
+          {providerUrl && (
+            <a
+              href={providerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="contract-link"
+            >
+              Open {providerName} ↗
+            </a>
+          )}
         </div>
       </div>
     </div>

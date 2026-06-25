@@ -84,6 +84,11 @@ const NETWORKS = {
       // same Gamma instance for testnet listings.
       gammaApiUrl: import.meta.env?.VITE_POLYMARKET_GAMMA_URL || 'https://gamma-api.polymarket.com',
     },
+    // DEX provider identity — non-ETC networks route through Uniswap (Spec 033).
+    dexProvider: {
+      name: 'Uniswap',
+      url: 'https://app.uniswap.org/swap',
+    },
     get capabilities() {
       return {
         polymarketSidebets: true,
@@ -142,7 +147,70 @@ const NETWORKS = {
     // (or update the default) once confirmed; the card hides the row when empty.
     resources: {
       faucet: import.meta.env?.VITE_MORDOR_FAUCET || '',
-      dexUrl: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
+    },
+    // DEX provider identity — the ETC family routes through ETCswap (Spec 033).
+    // Declared at the network level so the swap UI can name the provider even
+    // when `dex` is env-unconfigured (keeps the disabled-state message honest).
+    dexProvider: {
+      name: 'ETCswap',
+      url: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
+    },
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: Boolean(this.dex),
+        friendMarkets: true,
+      }
+    },
+  },
+  61: {
+    chainId: 61,
+    name: 'Ethereum Classic',
+    isTestnet: false,
+    isPrimary: false,
+    // Surfaced in the My Account → Network tab as a user-switchable network.
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ethereum Classic', symbol: 'ETC' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_ETC || 'https://etc.rivet.link',
+    explorer: { name: 'Blockscout', baseUrl: 'https://etc.blockscout.com' },
+    // No hosted Graph indexer supports Ethereum Classic, so wager reads go
+    // straight to the WagerRegistry over RPC (RegistrySource). ETC mainnet is
+    // wager-legacy (read-only); Spec 033 enables only the swap surface here.
+    subgraphUrl: import.meta.env?.VITE_SUBGRAPH_URL_ETC || null,
+    // Classic USD (USC) — the same Brale-issued token deployed at a deterministic
+    // address on ETC mainnet and Mordor; verified on etc.blockscout.com
+    // (Spec 033 research R2). Override via VITE_ETC_USC.
+    stablecoin: {
+      address: import.meta.env?.VITE_ETC_USC || '0xDE093684c796204224BC081f937aa059D903c52a',
+      symbol: 'USC',
+      name: 'Classic USD',
+      decimals: 6,
+    },
+    // ETCswap V3 (a Uniswap V3 deployment on Ethereum Classic). Addresses are the
+    // on-chain-verified canonical deployment (Spec 033 research R1); override via
+    // VITE_ETC_ETCSWAP_* + VITE_ETC_WETC. Gated like every chain: if an override
+    // blanks a required address the DEX flips off — no mock DEX.
+    dex: (() => {
+      const factory = import.meta.env?.VITE_ETC_ETCSWAP_FACTORY || '0x2624E907BcC04f93C8f29d7C7149a8700Ceb8cDC'
+      const router = import.meta.env?.VITE_ETC_ETCSWAP_SWAP_ROUTER || '0xEd88EDD995b00956097bF90d39C9341BBde324d1'
+      const quoter = import.meta.env?.VITE_ETC_ETCSWAP_QUOTER || '0x4d8c163400CB87Cbe1bae76dBf36A09FED85d39B'
+      const positionManager = import.meta.env?.VITE_ETC_ETCSWAP_POSITION_MANAGER || '0x3CEDe6562D6626A04d7502CC35720901999AB699'
+      const wnative = import.meta.env?.VITE_ETC_WETC || '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a'
+      if (!factory || !router || !quoter || !wnative) return null
+      return {
+        factory,
+        swapRouter: router,
+        quoter,
+        positionManager: positionManager || null,
+        wnative,
+      }
+    })(),
+    contracts: {}, // ETC mainnet has no v2 wager deployment (wager-legacy)
+    polymarket: null, // no Polymarket on Ethereum Classic
+    // DEX provider identity — the ETC family routes through ETCswap (Spec 033).
+    dexProvider: {
+      name: 'ETCswap',
+      url: import.meta.env?.VITE_ETC_ETCSWAP_URL || 'https://v3.etcswap.org',
     },
     get capabilities() {
       return {
@@ -189,6 +257,11 @@ const NETWORKS = {
       ctf: import.meta.env?.VITE_POLYGON_POLYMARKET_CTF || '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045',
       gammaApiUrl: import.meta.env?.VITE_POLYMARKET_GAMMA_URL || 'https://gamma-api.polymarket.com',
     },
+    // DEX provider identity — non-ETC networks route through Uniswap (Spec 033).
+    dexProvider: {
+      name: 'Uniswap',
+      url: 'https://app.uniswap.org/swap?chain=polygon',
+    },
     get capabilities() {
       return {
         polymarketSidebets: true,
@@ -230,6 +303,18 @@ export function getNetwork(chainId) {
 
 export function isDexAvailable(chainId) {
   return Boolean(getNetwork(chainId)?.dex)
+}
+
+/**
+ * The DEX provider descriptor (`{ name, url }`) for `chainId`, or null when the
+ * network has no DEX provider (e.g. local Hardhat). Declared per network so the
+ * mapping — ETC family (61, 63) → ETCswap; all others → Uniswap — is explicit
+ * and survives an unconfigured `dex`: the swap UI can still name the provider
+ * for honest disabled-state copy (Spec 033). Resolution is strictly per-chain so
+ * a provider identity never leaks across networks.
+ */
+export function getDexProvider(chainId) {
+  return getNetwork(chainId)?.dexProvider ?? null
 }
 
 /**

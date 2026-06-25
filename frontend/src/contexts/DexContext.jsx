@@ -14,10 +14,11 @@ import logger from '../utils/logger'
 const ZERO = '0x0000000000000000000000000000000000000000'
 
 /**
- * Per-chain DEX wiring. Reads the active chain at runtime so the Testnet/
- * Mainnet toggle (wagmi.switchChain) transparently re-targets the right
- * Uniswap V3 deployment. Components that surface swap UI should branch on
- * `isDexAvailable` from the returned context.
+ * Per-chain DEX wiring. Reads the active chain at runtime so switching networks
+ * (wagmi.switchChain) transparently re-targets the right DEX deployment — Uniswap
+ * on Polygon-family chains, ETCswap on the Ethereum Classic family (Spec 033).
+ * Components that surface swap UI should branch on `isDexAvailable` and name the
+ * provider via `dexProvider` from the returned context.
  */
 export function DexProvider({ children }) {
   const { provider, signer, address, isConnected } = useWallet()
@@ -30,6 +31,11 @@ export function DexProvider({ children }) {
   const nativeConfig = network?.nativeCurrency || null
 
   const isDexAvailable = Boolean(dexConfig)
+
+  // Provider identity for the active chain (ETC family → ETCswap; else Uniswap).
+  // Independent of `dexConfig` so the swap UI can name the provider even when the
+  // DEX is unconfigured on this network (Spec 033).
+  const dexProvider = network?.dexProvider || null
 
   const addresses = useMemo(() => ({
     FACTORY: dexConfig?.factory || ZERO,
@@ -315,6 +321,7 @@ export function DexProvider({ children }) {
     tokens,
     addresses,
     isDexAvailable,
+    dexProvider,
     chainId,
     network,
   }
