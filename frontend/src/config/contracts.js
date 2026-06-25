@@ -36,6 +36,7 @@ const MORDOR_CONTRACTS = {
   voucherBatchMinter: '0xc26F02da923263e2c9CFB722006e0B8Da2F952B2',
   tokenFactory: '0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62',
   externalDAORegistry: '0xcEE0fb2e1407f0A0d19Bcf4Fee2726A3005FA3C0',
+  backupPointerRegistry: '0x664ACAd4d604c626A6160948Df9C10FE38010E11',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.

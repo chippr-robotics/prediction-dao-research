@@ -1,0 +1,45 @@
+/* Spec 032 — Data backup panel. Theme-variable driven (light/dark) — no hardcoded palette. */
+.backup-panel { color: var(--text-primary); }
+.backup-title { margin: 0 0 0.5rem; font-weight: 600; }
+.backup-intro { color: var(--text-secondary); margin: 0 0 1rem; font-size: 0.9rem; line-height: 1.5; }
+
+.backup-notice {
+  color: var(--text-secondary); background: var(--bg-secondary);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 0.6rem 0.8rem; margin: 0.6rem 0; font-size: 0.85rem;
+}
+
+.backup-status {
+  margin: 0 0 1rem; border: 1px solid var(--border-color); border-radius: 8px;
+  background: var(--surface-color, var(--bg-secondary)); padding: 0.5rem 0.8rem;
+}
+.backup-status-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.3rem 0; }
+.backup-status-row + .backup-status-row { border-top: 1px solid var(--border-color); }
+.backup-status dt { color: var(--text-muted, var(--text-secondary)); font-size: 0.8rem; }
+.backup-status dd { margin: 0; font-size: 0.85rem; }
+
+.backup-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0 0.3rem; }
+.backup-btn {
+  padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--border-color);
+  background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font-weight: 600; font-size: 0.85rem;
+}
+.backup-btn:hover:not(:disabled) { border-color: var(--brand-primary); }
+.backup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.backup-btn:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 1px; }
+.backup-btn-primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+.backup-btn-danger { color: var(--semantic-loss, #c0492f); border-color: var(--semantic-loss, #c0492f); background: transparent; }
+
+.backup-cost { color: var(--text-muted, var(--text-secondary)); font-size: 0.78rem; margin: 0.3rem 0 0; }
+
+.backup-restore {
+  margin-top: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px;
+  background: var(--bg-secondary); padding: 0.8rem;
+}
+.backup-restore-q { margin: 0 0 0.5rem; font-weight: 600; font-size: 0.88rem; }
+.backup-radio { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.35rem 0; font-size: 0.85rem; line-height: 1.4; }
+.backup-radio input { margin-top: 0.2rem; }
+.backup-warn {
+  color: var(--semantic-warning, #b8860b);
+  background: color-mix(in srgb, var(--semantic-warning, #b8860b) 12%, transparent);
+  border-radius: 8px; padding: 0.5rem 0.7rem; margin: 0.5rem 0; font-size: 0.83rem;
+}
