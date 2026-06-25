@@ -90,4 +90,27 @@ describe('NetworkSettings — relocated network selector', () => {
     expect(explorer).toHaveAttribute('rel', expect.stringContaining('noopener'))
     expect(within(card).getByText('Classic USD (USC)')).toBeInTheDocument()
   })
+
+  // Spec 033 — the Network tab DEX link comes from the per-network dexProvider.
+  it('lists Ethereum Classic (mainnet, chainId 61) as a selectable network', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Ethereum Classic').closest('.network-card')
+    expect(card).toBeInTheDocument()
+    expect(within(card).getByText('Mainnet')).toBeInTheDocument()
+  })
+
+  it('shows the ETCswap provider link on the Ethereum Classic card', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Ethereum Classic').closest('.network-card')
+    const link = within(card).getByRole('link', { name: /Open ETCswap/ })
+    expect(link).toHaveAttribute('href', 'https://v3.etcswap.org')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('shows the Uniswap provider link on the Polygon card', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Polygon').closest('.network-card')
+    const link = within(card).getByRole('link', { name: /Open Uniswap/ })
+    expect(link).toHaveAttribute('href', expect.stringContaining('app.uniswap.org'))
+  })
 })

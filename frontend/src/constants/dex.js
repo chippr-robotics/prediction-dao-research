@@ -1,10 +1,13 @@
 /**
- * Uniswap V3 DEX addresses and token metadata for the active chain.
+ * DEX addresses and token metadata for the active chain.
  *
- * Derives from frontend/src/config/networks.js. Polygon Mainnet has the
- * canonical V3 deployment; Polygon Amoy is wired via VITE_AMOY_UNISWAP_*
- * env vars when a community deployment is available. Consumers should gate
- * any DEX-aware UI on `isDexAvailable`.
+ * Derives from frontend/src/config/networks.js. The active chain's DEX is
+ * Uniswap V3 on Polygon-family chains and ETCswap (a Uniswap V3 deployment) on
+ * the Ethereum Classic family (Spec 033). Polygon Mainnet has the canonical
+ * Uniswap deployment; Polygon Amoy is wired via VITE_AMOY_UNISWAP_* env vars
+ * when a community deployment is available. Consumers should gate any DEX-aware
+ * UI on `isDexAvailable` and name the provider via the active network's
+ * `dexProvider` (see DexContext).
  */
 
 import { NETWORKS, getCurrentChainId, getNetwork } from '../config/networks'

@@ -66,7 +66,7 @@ export const NETWORK_FEATURES = [
   {
     key: 'swap',
     label: 'Token Swap',
-    description: 'In-app token swaps via Uniswap V3.',
+    description: 'In-app token swaps via the network’s DEX (Uniswap or ETCswap).',
     deployed: (chainId) => Boolean(getNetwork(chainId)?.capabilities?.dex),
   },
 ]
