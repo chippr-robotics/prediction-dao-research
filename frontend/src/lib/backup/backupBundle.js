@@ -49,6 +49,13 @@ function assertNetworkTagged(key, val) {
       }
     }
   }
+  if (key === 'tokens') {
+    for (const entry of val?.entries || []) {
+      if (typeof entry?.chainId !== 'number') {
+        throw new Error(`Network-scoped element missing chainId in ${key}`)
+      }
+    }
+  }
 }
 
 /** Apply a (validated) bundle to local data. mode: 'merge' (additive, default) | 'replace'. */

@@ -64,3 +64,22 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
     expect(connectSrc).not.toContain('127.0.0.1')
   })
 })
+
+// Spec 034 — the watchlist fetches token registries directly from these pinned hosts;
+// they must be in connect-src or the fetch is blocked by CSP (same failure mode as RPCs).
+const REQUIRED_TOKENLIST_HOSTS = [
+  'https://tokens.uniswap.org', // Uniswap default list (Polygon 137)
+  'https://raw.githubusercontent.com', // ETCswap list (61 + 63)
+]
+
+describe('nginx CSP connect-src token-list allowlist', () => {
+  it.each(CONFIGS)('%s allowlists every pinned token-list host', (path) => {
+    const conf = readFileSync(path, 'utf8')
+    const cspLine = conf.split('\n').find((l) => l.includes('add_header Content-Security-Policy'))
+    const connectSrc = cspLine.match(/connect-src\s+([^;]*)/)?.[1]
+    expect(connectSrc, `${path} CSP has no connect-src directive`).toBeTruthy()
+    for (const host of REQUIRED_TOKENLIST_HOSTS) {
+      expect(connectSrc, `${path} connect-src is missing ${host}`).toContain(host)
+    }
+  })
+})

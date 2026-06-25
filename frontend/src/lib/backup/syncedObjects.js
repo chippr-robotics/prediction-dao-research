@@ -3,6 +3,7 @@
 // (tokens, DAOs) = one entry here with networkScoped set truthfully — no backup/restore redesign (FR-016).
 
 import { loadAddressBook, saveAddressBook, mergeBook } from '../addressBook/addressBookStore'
+import { loadWatchlist, saveWatchlist, mergeWatchlists } from '../tokens/tokenWatchlistStore'
 import { getUserPreference, saveUserPreference } from '../../utils/userStorage'
 
 const PREF_KEYS = {
@@ -31,6 +32,24 @@ export const syncedObjects = [
       return { conflicts }
     },
     merge: (current, incoming) => mergeBook(current, incoming),
+  },
+  {
+    key: 'tokens',
+    label: 'Token watchlist',
+    networkScoped: true, // every WatchlistEntry carries chainId; identity is (address, chainId) — Spec 034
+    load: (account) => loadWatchlist(account),
+    // mode: 'replace' overwrites; 'merge' is an idempotent union by (address, chainId).
+    // The watchlist is a reference set with no editable per-entry field, so there are never conflicts.
+    apply: (account, value, mode) => {
+      if (mode === 'replace') {
+        saveWatchlist(account, value)
+        return { conflicts: [] }
+      }
+      const { value: merged } = mergeWatchlists(loadWatchlist(account), value)
+      saveWatchlist(account, merged)
+      return { conflicts: [] }
+    },
+    merge: (current, incoming) => mergeWatchlists(current, incoming),
   },
   {
     key: 'preferences',

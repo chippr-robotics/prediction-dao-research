@@ -5,14 +5,20 @@ import { useNotification } from '../../hooks/useUI'
 import { useTokenFactory } from './useTokenFactory'
 import CreateTokenWizard from './CreateTokenWizard'
 import TokenDetailView from './TokenDetailView'
+import WatchedTokensPanel from './WatchedTokensPanel'
 
 // Spec 028 (US1/US5/US9, FR-027/028/029) — Token Mint portal, embedded as the My Account "Tokens" tab.
 // Information architecture from the imported design: My Tokens / Create / Explorer + a per-token detail view.
 // Theme-aware (tokens.css maps the design onto the app theme variables). Real Web3 only; self-disables on
 // networks without a deployed factory (FR-023).
 
+// Spec 034: "My Tokens" is now the watched-assets view (registry + custom tokens,
+// with balances); the former issuer view is relabeled "Issued" (id 'mine' kept
+// internally). Issue/Create/Explorer still depend on the token factory; the
+// watchlist does not, so the factory gate applies per-tab, not panel-wide.
 const TABS = [
-  { id: 'mine', label: 'My Tokens' },
+  { id: 'watched', label: 'My Tokens' },
+  { id: 'mine', label: 'Issued' },
   { id: 'create', label: 'Create' },
   { id: 'explorer', label: 'Explorer' },
 ]
@@ -108,7 +114,7 @@ function TokenTable({ mode, onOpen, refreshKey }) {
 
 export default function TokensPanel() {
   const { isSupported, listMyTokens, isConnected } = useTokenFactory()
-  const [tab, setTab] = useState('mine')
+  const [tab, setTab] = useState('watched')
   const [selected, setSelected] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [mineCount, setMineCount] = useState(null)
@@ -123,17 +129,19 @@ export default function TokensPanel() {
     return () => { cancelled = true }
   }, [isSupported, isConnected, listMyTokens, refreshKey])
 
-  if (!isSupported) {
-    return (
-      <div className="token-mint">
-        <div className="tm-feature-disabled" role="status">Token Mint isn’t deployed on this network. Switch to a supported network to issue and administer tokens.</div>
-      </div>
-    )
-  }
+  // The token factory may not be deployed on every chain; only the issuer-facing
+  // tabs (Issued / Create / Explorer) require it. The watchlist ("My Tokens")
+  // does not — it has its own membership gate (Spec 034).
+  const factoryDisabled = (
+    <div className="tm-feature-disabled" role="status">
+      Token issuance isn’t deployed on this network yet. Switch to a supported network to issue
+      and administer tokens.
+    </div>
+  )
 
   return (
     <div className="token-mint">
-      <p className="tm-intro">Issue and administer your own tokens — open ERC-20 / ERC-721 and restricted ERC-1404 — directly on-chain.</p>
+      <p className="tm-intro">Track the tokens you hold and issue or administer your own — all on-chain and network-aware.</p>
 
       {selected ? (
         <TokenDetailView token={selected} onBack={() => { setSelected(null); setRefreshKey((k) => k + 1) }} />
@@ -141,25 +149,27 @@ export default function TokensPanel() {
         <>
           <div className="tm-tabs" role="tablist">
             {TABS.map((t) => (
-              <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`tm-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+              <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`tm-tab ${tab === t.id ? 'active' : ''}`} onClick={() => { setSelected(null); setTab(t.id) }}>{t.label}</button>
             ))}
           </div>
 
-          {tab === 'mine' && (
+          {tab === 'watched' && <WatchedTokensPanel />}
+
+          {tab === 'mine' && (isSupported ? (
             <>
               <div className="tm-summary">
                 <div className="tm-stat"><div className="tm-stat-label">Tokens administered</div><div className="tm-stat-value">{mineCount ?? '—'}</div></div>
               </div>
               <TokenTable mode="mine" refreshKey={refreshKey} onOpen={setSelected} />
             </>
-          )}
-          {tab === 'create' && (
+          ) : factoryDisabled)}
+          {tab === 'create' && (isSupported ? (
             <CreateTokenWizard
               onCreated={() => setRefreshKey((k) => k + 1)}
               onViewMine={() => { setRefreshKey((k) => k + 1); setTab('mine') }}
             />
-          )}
-          {tab === 'explorer' && <TokenTable mode="explorer" refreshKey={refreshKey} onOpen={setSelected} />}
+          ) : factoryDisabled)}
+          {tab === 'explorer' && (isSupported ? <TokenTable mode="explorer" refreshKey={refreshKey} onOpen={setSelected} /> : factoryDisabled)}
         </>
       )}
     </div>
