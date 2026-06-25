@@ -60,14 +60,14 @@ are both P1 and together form the MVP.
 
 ### Tests (write first)
 
-- [ ] T015 [P] [US1] Tests for `useDataBackup.backup()` — happy path (build→encrypt→pin→writePointer; success only after BOTH confirm), honest failure (pin error / tx reject → local unchanged, not shown "backed up"), ~1 MB size-warn, no-gas-on-canonical guard (mock ipfsService + backupRegistry) in `frontend/src/test/backup/useDataBackup.backup.test.jsx`.
+- [x] T015 [P] [US1] Tests for `useDataBackup.backup()` — happy path (build→encrypt→pin→writePointer; success only after BOTH confirm), honest failure (pin error / tx reject → local unchanged, not shown "backed up"), ~1 MB size-warn, no-gas-on-canonical guard (mock ipfsService + backupRegistry) in `frontend/src/test/backup/useDataBackup.backup.test.jsx`.
 
 ### Implementation
 
-- [ ] T016 [US1] Implement `backup()` in `frontend/src/hooks/useDataBackup.js` — derive key (sign once/session), `buildBundle`, `encryptBundle`, `uploadJson` (await pin), `writePointer` (await tx), honest status, ~1 MB warn, prompt network-switch to canonical + cost notice, block clearly with no gas.
-- [ ] T017 [US1] `frontend/src/components/account/BackupPanel.jsx` (+ CSS) — "Back up my data" control, status (exists / last-backup / pending / error), pre-sign cost notice.
-- [ ] T018 [US1] Mount `BackupPanel` as an Account-Center tab in `frontend/src/pages/WalletPage.jsx`.
-- [ ] T019 [P] [US1] Accessibility test (axe, WCAG 2.1 AA) for the backup controls + status in `frontend/src/test/backup/BackupPanel.accessibility.test.jsx`.
+- [x] T016 [US1] Implement `backup()` in `frontend/src/hooks/useDataBackup.js` — derive key (sign once/session), `buildBundle`, `encryptBundle`, `uploadJson` (await pin), `writePointer` (await tx), honest status, ~1 MB warn, prompt network-switch to canonical + cost notice, block clearly with no gas.
+- [x] T017 [US1] `frontend/src/components/account/BackupPanel.jsx` (+ CSS) — "Back up my data" control, status (exists / last-backup / pending / error), pre-sign cost notice.
+- [x] T018 [US1] Mount `BackupPanel` as an Account-Center tab in `frontend/src/pages/WalletPage.jsx`.
+- [x] T019 [P] [US1] Accessibility test (axe, WCAG 2.1 AA) for the backup controls + status in `frontend/src/test/backup/BackupPanel.accessibility.test.jsx`.
 
 **Checkpoint**: a member can back up their data with honest confirmation.
 
@@ -81,13 +81,13 @@ are both P1 and together form the MVP.
 
 ### Tests (write first)
 
-- [ ] T020 [P] [US2] Tests for `useDataBackup.restore()` — readPointer→fetch→decrypt→apply; no pointer ⇒ "nothing to restore" (local untouched); corrupt/undecryptable ⇒ "no usable backup" (local untouched); wrong wallet cannot decrypt (mock registry+ipfs) in `frontend/src/test/backup/useDataBackup.restore.test.jsx`.
-- [ ] T021 [P] [US2] Network-aware restore test — a bundle with contacts on two chains + the same address saved on both restores to the correct `chainId`s as two distinct entries (FR-015a / SC-012a) in `frontend/src/test/backup/networkAwareRestore.test.js`.
+- [x] T020 [P] [US2] Tests for `useDataBackup.restore()` — readPointer→fetch→decrypt→apply; no pointer ⇒ "nothing to restore" (local untouched); corrupt/undecryptable ⇒ "no usable backup" (local untouched); wrong wallet cannot decrypt (mock registry+ipfs) in `frontend/src/test/backup/useDataBackup.restore.test.jsx`.
+- [x] T021 [P] [US2] Network-aware restore test — a bundle with contacts on two chains + the same address saved on both restores to the correct `chainId`s as two distinct entries (FR-015a / SC-012a) in `frontend/src/test/backup/networkAwareRestore.test.js`.
 
 ### Implementation
 
-- [ ] T022 [US2] Implement `restore()` in `frontend/src/hooks/useDataBackup.js` — `readPointer` (free), `fetchByCid`, derive key, `decryptBundle`, hand to `applyBundle`; honest, non-destructive on every failure.
-- [ ] T023 [US2] Add "Restore my data" control + restore states to `frontend/src/components/account/BackupPanel.jsx`.
+- [x] T022 [US2] Implement `restore()` in `frontend/src/hooks/useDataBackup.js` — `readPointer` (free), `fetchByCid`, derive key, `decryptBundle`, hand to `applyBundle`; honest, non-destructive on every failure.
+- [x] T023 [US2] Add "Restore my data" control + restore states to `frontend/src/components/account/BackupPanel.jsx`.
 
 **Checkpoint**: MVP — back up on one device, restore on another, trustlessly, network-aware.
 
@@ -101,11 +101,11 @@ are both P1 and together form the MVP.
 
 ### Tests (write first)
 
-- [ ] T024 [P] [US3] Tests — `applyBundle` merge keeps both (additive by `(address, chainId)`; prefs LWW) vs replace overwrites; replace warns; cancel is a no-op in `frontend/src/test/backup/restoreMergeReplace.test.jsx`.
+- [x] T024 [P] [US3] Tests — `applyBundle` merge keeps both (additive by `(address, chainId)`; prefs LWW) vs replace overwrites; replace warns; cancel is a no-op in `frontend/src/test/backup/restoreMergeReplace.test.jsx`.
 
 ### Implementation
 
-- [ ] T025 [US3] Implement merge/replace choice + confirmation: `applyBundle` modes in `frontend/src/lib/backup/backupBundle.js` (reuse `mergeBook`/`applyConflictResolutions`) and the confirmation modal in `frontend/src/components/account/BackupPanel.jsx`.
+- [x] T025 [US3] Implement merge/replace choice + confirmation: `applyBundle` modes in `frontend/src/lib/backup/backupBundle.js` (reuse `mergeBook`/`applyConflictResolutions`) and the confirmation modal in `frontend/src/components/account/BackupPanel.jsx`.
 
 **Checkpoint**: restore is non-destructive and member-controlled.
 
@@ -119,11 +119,11 @@ are both P1 and together form the MVP.
 
 ### Tests (write first)
 
-- [ ] T026 [P] [US4] Tests — opt-in (no publish without an explicit backup); status reflects exists/last-backup; remove (`writePointer("")` → `hasPointer` false); local data unaffected by removal in `frontend/src/test/backup/privacyControl.test.jsx`.
+- [x] T026 [P] [US4] Tests — opt-in (no publish without an explicit backup); status reflects exists/last-backup; remove (`writePointer("")` → `hasPointer` false); local data unaffected by removal in `frontend/src/test/backup/privacyControl.test.jsx`.
 
 ### Implementation
 
-- [ ] T027 [US4] Implement status + "Remove my backup" (`writePointer("")`) in `frontend/src/hooks/useDataBackup.js` and surface in `frontend/src/components/account/BackupPanel.jsx`; ensure no implicit/automatic publish anywhere.
+- [x] T027 [US4] Implement status + "Remove my backup" (`writePointer("")`) in `frontend/src/hooks/useDataBackup.js` and surface in `frontend/src/components/account/BackupPanel.jsx`; ensure no implicit/automatic publish anywhere.
 
 **Checkpoint**: member controls and can see/remove their backup.
 
@@ -137,11 +137,11 @@ are both P1 and together form the MVP.
 
 ### Tests (write first)
 
-- [ ] T028 [P] [US5] Tests — offline backup/restore fail clearly + non-destructively; mid-operation failure never partially overwrites; retry succeeds on reconnect in `frontend/src/test/backup/resilience.test.jsx`.
+- [x] T028 [P] [US5] Tests — offline backup/restore fail clearly + non-destructively; mid-operation failure never partially overwrites; retry succeeds on reconnect in `frontend/src/test/backup/resilience.test.jsx`.
 
 ### Implementation
 
-- [ ] T029 [US5] Harden `frontend/src/hooks/useDataBackup.js` for offline/failure paths — clear "try again online" state, atomic non-destructive apply (no partial writes).
+- [x] T029 [US5] Harden `frontend/src/hooks/useDataBackup.js` for offline/failure paths — clear "try again online" state, atomic non-destructive apply (no partial writes).
 
 **Checkpoint**: feature never degrades the core local experience.
 
@@ -149,10 +149,10 @@ are both P1 and together form the MVP.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T030 [P] Full accessibility audit (axe, WCAG 2.1 AA) over `BackupPanel` incl. the merge/replace modal in `frontend/src/test/backup/BackupPanel.accessibility.test.jsx` (extend).
-- [ ] T031 [P] Run the full backup test suite + `eslint` (frontend) and the contract suite + Slither/Medusa; fix any failures (no `continue-on-error`).
+- [x] T030 [P] Full accessibility audit (axe, WCAG 2.1 AA) over `BackupPanel` incl. the merge/replace modal in `frontend/src/test/backup/BackupPanel.accessibility.test.jsx` (extend).
+- [x] T031 [P] Run the full backup test suite + `eslint` (frontend) and the contract suite + Slither/Medusa; fix any failures (no `continue-on-error`).
 - [ ] T032 Execute `quickstart.md` scenarios V1–V9 (local Hardhat for the contract, or a test-network deploy) and record results.
-- [ ] T033 [P] Update docs/memory: the backup feature + canonical-network (Polygon 137) choice; evaluate adding the **open-challenge code vault** (`fairwins.ocCodeVault.<addr>`) as a synced object (irrecoverable-if-lost — high-value) via `frontend/src/lib/backup/syncedObjects.js`.
+- [x] T033 [P] Update docs/memory: the backup feature + canonical-network (Polygon 137) choice; evaluate adding the **open-challenge code vault** (`fairwins.ocCodeVault.<addr>`) as a synced object (irrecoverable-if-lost — high-value) via `frontend/src/lib/backup/syncedObjects.js`.
 - [ ] T034 Production deploy `BackupPointerRegistry` to canonical **Polygon mainnet** (+ Amoy/Mordor for test) via the floppy keystore flow; record in `deployments/` and run `npm run verify:<net>`.
 
 ---

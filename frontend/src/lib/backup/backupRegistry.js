@@ -19,7 +19,11 @@ export function isBackupAvailable() {
   return !!addr && ethers.isAddress(addr)
 }
 
-/** Read a wallet's latest backup pointer (CID), or "" if none/unavailable. Free (read-only provider). */
+/**
+ * Read a wallet's latest backup pointer (CID). Returns "" when there is genuinely no pointer (or the registry
+ * isn't configured), and `null` when the read could not be completed (RPC unreachable) — so callers can tell
+ * "no backup" apart from "couldn't check" (honest state). Free (read-only provider).
+ */
 export async function readPointer(owner) {
   if (!isBackupAvailable() || !owner) return ''
   try {
@@ -27,7 +31,7 @@ export async function readPointer(owner) {
     const c = new ethers.Contract(registryAddress(), BACKUP_POINTER_REGISTRY_ABI, reader)
     return await c.getPointer(owner)
   } catch {
-    return ''
+    return null // inconclusive read — not the same as "no pointer"
   }
 }
 

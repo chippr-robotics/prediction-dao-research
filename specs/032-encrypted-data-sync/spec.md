@@ -213,9 +213,13 @@ can be retried successfully.
   single unified per-wallet payload, encrypts it client-side with a key derivable only from their wallet, and
   stores the encrypted payload on IPFS.
 - **FR-001a**: The encryption key MUST be derived from the wallet's signature of a fixed app message (no
-  separate passphrase). Because this requires the wallet to reproduce the same signature on any device, the
-  system MUST detect a wallet that cannot produce a deterministic signature and fail honestly (block backup/
-  restore with a clear message) rather than create an unrestorable backup or silently overwrite local data.
+  separate passphrase). This relies on the wallet reproducing the same signature on any device (standard for
+  RFC-6979 ECDSA wallets). A wallet that cannot reproduce its signature MUST fail honestly: the resulting
+  restore decrypts to nothing and is surfaced as "no usable backup" (FR-013), leaving local data untouched —
+  it MUST never silently corrupt or overwrite local data. (A wrong key only ever yields an AEAD authentication
+  failure, never a partial/garbage restore.) The system MAY additionally re-derive and compare at backup time
+  to warn a non-deterministic signer early; this early warning is optional, the honest-failure-on-restore
+  guarantee is mandatory.
 - **FR-002**: After the encrypted payload is stored, the system MUST record a pointer to it in the on-chain
   per-wallet backup registry (FR-005a), and MUST show an honest success state (including a last-backup time)
   only once both the stored copy is confirmed persisted AND the on-chain pointer update is confirmed.

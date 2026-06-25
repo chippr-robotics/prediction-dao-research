@@ -12,6 +12,7 @@ import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import AddressBookPanel from '../components/account/AddressBookPanel'
+import BackupPanel from '../components/account/BackupPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import PortalNav from '../components/ui/PortalNav'
@@ -24,6 +25,7 @@ import './WalletPage.css'
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'addressbook', label: 'Address Book' },
+  { id: 'backup', label: 'Backup' },
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
   { id: 'security', label: 'Security' },
@@ -298,6 +300,12 @@ function WalletPage() {
                 {activeTab === 'addressbook' && (
                   <div className="addressbook-section" role="tabpanel">
                     <AddressBookPanel address={address} />
+                  </div>
+                )}
+
+                {activeTab === 'backup' && (
+                  <div className="backup-section" role="tabpanel">
+                    <BackupPanel />
                   </div>
                 )}
 
