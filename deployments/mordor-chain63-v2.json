@@ -24,7 +24,8 @@
     "openERC721V2Impl": "0xEeaBC05214FF0C42cbA42b365aB400b7ca4311cE",
     "restrictedERC20V2Impl": "0x664d87bed13ea4D50Cd3da8e0aC5A8D70A302A0B",
     "externalDAORegistry": "0xcEE0fb2e1407f0A0d19Bcf4Fee2726A3005FA3C0",
-    "externalDAORegistryImpl": "0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A"
+    "externalDAORegistryImpl": "0x28270cB71E87D2D6C662e61CFE6eD02d05d43B7A",
+    "backupPointerRegistry": "0x664ACAd4d604c626A6160948Df9C10FE38010E11"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -52,7 +53,8 @@
     "openERC20V2Impl": [],
     "openERC721V2Impl": [],
     "restrictedERC20V2Impl": [],
-    "externalDAORegistryImpl": []
+    "externalDAORegistryImpl": [],
+    "backupPointerRegistry": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -60,7 +62,8 @@
     "wagerRegistry": 16404317,
     "membershipManager": 16404308,
     "membershipVoucher": 16404315,
-    "voucherBatchMinter": 16407208
+    "voucherBatchMinter": 16407208,
+    "backupPointerRegistry": 16430733
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
