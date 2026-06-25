@@ -294,3 +294,37 @@
 }
 .token-mint .tm-chip:hover { border-color: var(--tm-accent); }
 .token-mint .tm-chip.active { background: var(--tm-accent); color: #fff; border-color: var(--tm-accent); }
+
+/* --- Spec 034: Token watchlist ("My Tokens" assets) --- */
+.token-mint .tm-watchlist { display: flex; flex-direction: column; gap: 0.75rem; }
+.token-mint .tm-watch-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.token-mint .tm-watch-table .tm-watch-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  cursor: default;
+}
+.token-mint .tm-watch-ident { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.token-mint .tm-logo { width: 28px; height: 28px; border-radius: 999px; object-fit: cover; flex: 0 0 auto; background: var(--tm-canvas); }
+.token-mint .tm-row-addr { font-family: var(--tm-mono); font-size: 0.68rem; color: var(--tm-text-3); }
+.token-mint .tm-balance { font-family: var(--tm-mono); color: var(--tm-text); white-space: nowrap; }
+.token-mint .tm-unverified-badge {
+  margin-left: 0.45rem;
+  font-family: var(--tm-sans);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid color-mix(in srgb, #d97706 50%, var(--tm-border));
+  color: #b45309;
+  background: color-mix(in srgb, #f59e0b 14%, var(--tm-surface));
+  vertical-align: middle;
+}
+.token-mint .tm-add-token { border: 1px solid var(--tm-border); border-radius: var(--tm-radius-lg); padding: 0.8rem; background: var(--tm-canvas); }
+.token-mint .tm-add-results { display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; margin-top: 0.5rem; border: 1px solid var(--tm-border); border-radius: var(--tm-radius); }
+.token-mint .tm-add-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; cursor: default; padding: 0.5rem 0.7rem; }
+.token-mint .tm-add-custom { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }

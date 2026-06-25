@@ -89,6 +89,10 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap',
     },
+    // Token watchlist catalog source (Spec 034). Amoy has no maintained upstream
+    // token registry, so it is custom-add-only; getTokenListSource still returns
+    // a small seed (the stablecoin) so the catalog is never empty.
+    tokenList: { sourceType: 'custom-only', url: null },
     get capabilities() {
       return {
         polymarketSidebets: true,
@@ -155,6 +159,14 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
     },
+    // Token watchlist catalog source (Spec 034) — the ETCswap list carries both
+    // ETC mainnet (61) and Mordor (63) tokens in one file; we filter per chain.
+    tokenList: {
+      sourceType: 'remote',
+      url:
+        import.meta.env?.VITE_TOKENLIST_URL_MORDOR ||
+        'https://raw.githubusercontent.com/etcswap/tokens/main/ethereum-classic/all.json',
+    },
     get capabilities() {
       return {
         polymarketSidebets: false,
@@ -212,6 +224,13 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_ETC_ETCSWAP_URL || 'https://v3.etcswap.org',
     },
+    // Token watchlist catalog source (Spec 034) — shared ETCswap list (61 + 63).
+    tokenList: {
+      sourceType: 'remote',
+      url:
+        import.meta.env?.VITE_TOKENLIST_URL_ETC ||
+        'https://raw.githubusercontent.com/etcswap/tokens/main/ethereum-classic/all.json',
+    },
     get capabilities() {
       return {
         polymarketSidebets: false,
@@ -262,6 +281,12 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap?chain=polygon',
     },
+    // Token watchlist catalog source (Spec 034) — the canonical Uniswap Labs
+    // default list (carries Polygon 137 tokens; we filter per chain).
+    tokenList: {
+      sourceType: 'remote',
+      url: import.meta.env?.VITE_TOKENLIST_URL_POLYGON || 'https://tokens.uniswap.org',
+    },
     get capabilities() {
       return {
         polymarketSidebets: true,
@@ -286,6 +311,9 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
+    // Local dev has no token registry and no membership manager — the watchlist
+    // is custom-add-only here (and effectively hidden behind the membership gate).
+    tokenList: { sourceType: 'custom-only', url: null },
     capabilities: { polymarketSidebets: false, dex: false, friendMarkets: true },
   },
 }
@@ -315,6 +343,45 @@ export function isDexAvailable(chainId) {
  */
 export function getDexProvider(chainId) {
   return getNetwork(chainId)?.dexProvider ?? null
+}
+
+/**
+ * The token watchlist catalog source for `chainId` (Spec 034), or null when the
+ * network declares none. Returns `{ sourceType, url, seed }` where:
+ *   - sourceType: 'remote' (fetch a token list) | 'custom-only' (no curated list)
+ *   - url: the pinned token-list URL for 'remote', else null
+ *   - seed: a tiny in-repo fallback derived from THIS network's own stablecoin +
+ *     wrapped-native config (never fabricated addresses), so the catalog is never
+ *     empty and the app degrades honestly when a remote list is unavailable.
+ * Resolution is strictly per-chain so a catalog never leaks across networks.
+ */
+export function getTokenListSource(chainId) {
+  const net = getNetwork(chainId)
+  if (!net?.tokenList) return null
+  const seed = []
+  if (net.stablecoin?.address) {
+    seed.push({
+      chainId: net.chainId,
+      address: net.stablecoin.address,
+      symbol: net.stablecoin.symbol,
+      name: net.stablecoin.name,
+      decimals: net.stablecoin.decimals,
+    })
+  }
+  if (net.dex?.wnative && net.nativeCurrency) {
+    seed.push({
+      chainId: net.chainId,
+      address: net.dex.wnative,
+      symbol: `W${net.nativeCurrency.symbol}`,
+      name: `Wrapped ${net.nativeCurrency.name}`,
+      decimals: 18,
+    })
+  }
+  return {
+    sourceType: net.tokenList.sourceType,
+    url: net.tokenList.url ?? null,
+    seed,
+  }
 }
 
 /**
