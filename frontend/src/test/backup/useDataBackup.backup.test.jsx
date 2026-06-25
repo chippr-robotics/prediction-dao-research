@@ -71,7 +71,7 @@ describe('useDataBackup.backup', () => {
     expect(ok).toBe(false)
     expect(h.uploadJson).not.toHaveBeenCalled()
     expect(h.writePointer).not.toHaveBeenCalled()
-    expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('switch to Polygon'), 'warning')
+    expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('switch to that network'), 'warning')
   })
 
   it('warns when offline / registry unavailable', async () => {

@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useWallet } from './useWalletManagement'
 import { useNotification } from './useUI'
+import { getNetwork } from '../config/networks'
 import { uploadJson, fetchByCid } from '../utils/ipfsService'
 import { getUserPreference, saveUserPreference, removeUserPreference } from '../utils/userStorage'
 import { deriveKey, encryptBundle, decryptBundle } from '../lib/backup/backupCrypto'
@@ -48,6 +49,7 @@ export function useDataBackup() {
 
   const available = isBackupAvailable()
   const onCanonical = Number(chainId) === CANONICAL_CHAIN_ID
+  const canonicalName = getNetwork(CANONICAL_CHAIN_ID)?.name || `chain ${CANONICAL_CHAIN_ID}`
 
   // Per-(account) status refresh: local last-backup time + whether an on-chain pointer exists. Honest reads.
   const refreshStatus = useCallback(async () => {
@@ -83,10 +85,10 @@ export function useDataBackup() {
 
   const requireCanonical = useCallback(() => {
     if (onCanonical) return true
-    showNotification(`Backing up records a pointer on Polygon (chain ${CANONICAL_CHAIN_ID}) — switch to Polygon to continue.`, 'warning')
+    showNotification(`Backing up records a pointer on ${canonicalName} (chain ${CANONICAL_CHAIN_ID}) — switch to that network to continue.`, 'warning')
     try { switchNetwork?.(CANONICAL_CHAIN_ID) } catch { /* member can switch manually */ }
     return false
-  }, [onCanonical, switchNetwork, showNotification])
+  }, [onCanonical, switchNetwork, showNotification, canonicalName])
 
   const backup = useCallback(async () => {
     if (!signer || !account) { showNotification('Connect a wallet to back up.', 'warning'); return false }
@@ -192,6 +194,7 @@ export function useDataBackup() {
     isConnected,
     onCanonical,
     canonicalChainId: CANONICAL_CHAIN_ID,
+    canonicalName,
     status,
     lastBackupAt,
     hasRemote,

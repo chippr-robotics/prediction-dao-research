@@ -8,7 +8,7 @@ import './BackupPanel.css'
  * on-chain pointer. Back up / restore (merge or replace) / remove, with honest status. No backend.
  */
 function BackupPanel() {
-  const { available, isConnected, onCanonical, canonicalChainId, status, lastBackupAt, hasRemote, refreshStatus, backup, restore, remove } = useDataBackup()
+  const { available, isConnected, onCanonical, canonicalChainId, canonicalName, status, lastBackupAt, hasRemote, refreshStatus, backup, restore, remove } = useDataBackup()
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [mode, setMode] = useState('merge')
 
@@ -52,8 +52,8 @@ function BackupPanel() {
 
           {!onCanonical && (
             <p className="backup-notice" role="status">
-              Backing up records a pointer on Polygon (chain {canonicalChainId}). You’ll be asked to switch
-              networks; restoring works from any network.
+              Backing up records a pointer on {canonicalName} (chain {canonicalChainId}). You’ll be asked to
+              switch networks; restoring works from any network.
             </p>
           )}
 
