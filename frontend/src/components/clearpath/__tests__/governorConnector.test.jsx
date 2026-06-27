@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { getLogsRange } from '../governorConnector'
+import { ethers } from 'ethers'
+import { getLogsRange, parseProposalLog } from '../governorConnector'
 
 // Spec 030 (US5) — the subgraph-less proposal indexer must survive RPC block-range caps. ETC/Mordor public
 // nodes (and many wallet RPC backends) reject an `eth_getLogs` window wider than a provider-specific limit;
@@ -46,5 +47,40 @@ describe('getLogsRange (spec 030 — RPC range-cap resilience)', () => {
   it('throws if even a minSpan-wide window is rejected (caller decides partial vs fail)', async () => {
     const reader = cappedReader(100) // smaller than the 2000-block minSpan floor → unrecoverable
     await expect(getLogsRange(reader, GOV, 1, 50000, 2000)).rejects.toThrow()
+  })
+})
+
+describe('parseProposalLog (spec 030 — ProposalCreated decode)', () => {
+  const EVENT_ABI = [
+    'event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)',
+  ]
+  const enc = new ethers.Interface(EVENT_ABI)
+  const frag = enc.getEvent('ProposalCreated')
+  const A1 = '0x0000000000000000000000000000000000000a01'
+  const A2 = '0x0000000000000000000000000000000000000a02'
+  const PROPOSER = '0x0000000000000000000000000000000000000b01'
+
+  // Regression: the event's 4th arg is named `values`, which on an ethers v6 Result shadows
+  // Array.prototype.values — `args.values.map(...)` threw "values.map is not a function", aborting the whole
+  // proposal scan (list stuck on "Indexing…", error toast on submit). A multi-action proposal (native ETC +
+  // token USDC) exercises that exact path.
+  it('decodes a multi-action (native + token) proposal without the values name-collision', () => {
+    const targets = [A1, A2]
+    const values = [ethers.parseEther('1'), 0n] // ETC action carries native value; the USDC action carries 0
+    const signatures = ['', '']
+    const calldatas = ['0x', '0xabcdef']
+    const { data, topics } = enc.encodeEventLog(frag, [
+      123n, PROPOSER, targets, values, signatures, calldatas, 10n, 110n, '# Multi-action',
+    ])
+
+    const p = parseProposalLog({ data, topics })
+
+    expect(p.id).toBe('123')
+    expect(p.proposer.toLowerCase()).toBe(PROPOSER)
+    expect(p.values).toEqual(['1000000000000000000', '0']) // the previously-throwing line
+    expect(p.targets.map((t) => t.toLowerCase())).toEqual([A1, A2])
+    expect(p.calldatas).toEqual(['0x', '0xabcdef'])
+    expect(p.description).toBe('# Multi-action')
+    expect(p.descriptionHash).toBe(ethers.id('# Multi-action'))
   })
 })
