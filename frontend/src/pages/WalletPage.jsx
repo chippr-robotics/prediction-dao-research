@@ -79,7 +79,12 @@ function WalletPage() {
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('account')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // On phones the section nav is a slide-over drawer that overlays the content,
+  // so it starts closed; on wider screens it stays docked open like a portal.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  )
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -177,6 +182,35 @@ function WalletPage() {
     }
   }, [activeTab, isConnected, keyRegistered, handleCheckKeyStatus])
 
+  // Track viewport so the section nav can dock (desktop) or slide over (mobile).
+  // Crossing the breakpoint resets the drawer to its natural state for that size.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handleChange = (event) => {
+      setIsMobile(event.matches)
+      setSidebarOpen(!event.matches)
+    }
+    mq.addEventListener('change', handleChange)
+    return () => mq.removeEventListener('change', handleChange)
+  }, [])
+
+  // Close the slide-over drawer on Escape (mobile only).
+  useEffect(() => {
+    if (!isMobile || !sidebarOpen) return
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isMobile, sidebarOpen])
+
+  // Jumping to a section closes the drawer on mobile so the content is visible.
+  const handleSelectTab = useCallback((id) => {
+    setActiveTab(id)
+    if (isMobile) setSidebarOpen(false)
+  }, [isMobile])
+
   const selectedPolymarketCategories = useMemo(
     () => preferences?.polymarketCategories || [],
     [preferences?.polymarketCategories],
@@ -254,7 +288,10 @@ function WalletPage() {
             </div>
           ) : (
             <div className={`wallet-portal portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
-              <aside className="portal-sidebar wallet-portal-sidebar">
+              <aside
+                id="wallet-portal-nav"
+                className="portal-sidebar wallet-portal-sidebar"
+              >
                 <div className="wallet-portal-identity">
                   <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
                   <span className="wallet-address-display">{shortenAddress(address)}</span>
@@ -263,10 +300,20 @@ function WalletPage() {
                 <PortalNav
                   items={WALLET_TABS}
                   activeId={activeTab}
-                  onSelect={setActiveTab}
+                  onSelect={handleSelectTab}
                   ariaLabel="Account sections"
                 />
               </aside>
+
+              {/* Mobile only: dim + dismiss the slide-over drawer by tapping outside it. */}
+              {isMobile && sidebarOpen && (
+                <button
+                  type="button"
+                  className="wallet-portal-backdrop"
+                  aria-label="Close menu"
+                  onClick={() => setSidebarOpen(false)}
+                />
+              )}
 
               <div className="portal-main wallet-portal-main">
                 <div className="wallet-portal-topbar">
@@ -274,7 +321,8 @@ function WalletPage() {
                     type="button"
                     className="portal-sidebar-toggle"
                     aria-expanded={sidebarOpen}
-                    aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                    aria-controls="wallet-portal-nav"
+                    aria-label={sidebarOpen ? 'Hide menu' : 'Show menu'}
                     onClick={() => setSidebarOpen((o) => !o)}
                   >
                     <span aria-hidden="true">{'☰'}</span>

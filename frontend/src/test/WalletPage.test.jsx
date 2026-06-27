@@ -156,3 +156,83 @@ describe('WalletPage — address QR entry point', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
+
+describe('WalletPage — section nav slide-over drawer', () => {
+  // matchMedia defaults to matches:false (desktop) in setup.js. Force a mobile
+  // match so the section nav behaves as an overlay drawer.
+  const setViewport = (isMobile) => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: isMobile,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  }
+
+  it('docks the nav open on desktop (no backdrop)', () => {
+    setViewport(false)
+    renderPage(connectedWalletContext)
+
+    expect(
+      screen.getByRole('button', { name: /hide menu/i })
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.queryByRole('button', { name: /close menu/i })
+    ).not.toBeInTheDocument()
+  })
+
+  it('starts closed on mobile and toggles open with a backdrop', () => {
+    setViewport(true)
+    renderPage(connectedWalletContext)
+
+    const toggle = screen.getByRole('button', { name: /show menu/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      screen.queryByRole('button', { name: /close menu/i })
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(
+      screen.getByRole('button', { name: /hide menu/i })
+    ).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.getByRole('button', { name: /close menu/i })
+    ).toBeInTheDocument()
+  })
+
+  it('closes the drawer after a section is selected on mobile', () => {
+    setViewport(true)
+    renderPage(connectedWalletContext)
+
+    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
+    expect(
+      screen.getByRole('button', { name: /close menu/i })
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Membership' }))
+
+    expect(
+      screen.queryByRole('button', { name: /close menu/i })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /show menu/i })
+    ).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('dismisses the drawer when the backdrop is tapped on mobile', () => {
+    setViewport(true)
+    renderPage(connectedWalletContext)
+
+    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
+    fireEvent.click(screen.getByRole('button', { name: /close menu/i }))
+
+    expect(
+      screen.getByRole('button', { name: /show menu/i })
+    ).toHaveAttribute('aria-expanded', 'false')
+  })
+})
