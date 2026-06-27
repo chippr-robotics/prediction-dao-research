@@ -34,3 +34,8 @@ export function getPool(address, runner) {
 }
 
 export const POOL_STATE = ['JoiningOpen', 'JoiningClosed', 'Resolved', 'Cancelled']
+
+/** The pool's fixed claim scope: keccak256(abi.encodePacked(pool, "ZKPOOL_CLAIM")) — matches the contract. */
+export function poolClaimScope(poolAddress) {
+  return BigInt(ethers.keccak256(ethers.solidityPacked(['address', 'string'], [poolAddress, 'ZKPOOL_CLAIM'])))
+}
