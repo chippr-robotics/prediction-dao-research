@@ -103,7 +103,7 @@ export default function PoolResolutionActions({ summary, pools, onChanged }) {
       {/* Creator: build + propose the payout outcome (while resolving) */}
       {summary.isCreator && summary.state === 1 && summary.withinResolutionWindow && (
         <div className="pool-propose" data-testid="propose-builder">
-          <h3>Propose the payout</h3>
+          <h2>Propose the payout</h2>
           <p>
             Enter each winner&apos;s claim code and amount. The total must equal the escrow (
             {ethers.formatUnits(escrow, decimals)} {summary.tokenSymbol}).
@@ -151,7 +151,7 @@ export default function PoolResolutionActions({ summary, pools, onChanged }) {
       {/* Resolved: winners claim by pasting the shared matrix */}
       {summary.state === 2 && (
         <div className="pool-claim" data-testid="claim-form">
-          <h3>Claim your winnings</h3>
+          <h2>Claim your winnings</h2>
           <label htmlFor="claim-matrix">Payout matrix (shared by the creator)</label>
           <textarea id="claim-matrix" value={matrixText} onChange={(e) => setMatrixText(e.target.value)} rows={3} />
           <label htmlFor="claim-index">Your row index</label>
