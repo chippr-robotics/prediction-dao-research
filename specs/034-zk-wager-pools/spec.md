@@ -32,6 +32,7 @@ for existing one-to-one wagers in a future feature (out of scope here).
 
 - Q: Is the resolution threshold an absolute approval count or a fraction, and measured against what? → A: A **fraction of the members who actually joined** (denominator = the joined-participant count captured when resolution opens), not an absolute count and not a fraction of maximum slots.
 - Q: When does joining close and the threshold denominator freeze? → A: When the pool **fills to max OR the creator explicitly closes it OR a creator-set join deadline passes** (whichever comes first); joins after close are rejected and the pool enters its resolution phase.
+- Q: What is the maximum group size per pool? → A: A protocol cap of **~1,000 members per pool** (fixed anonymity-set capacity); the creator's chosen max members must not exceed it.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -217,6 +218,10 @@ standings by nickname in near real time with no member transaction required.
 - **FR-002**: Each pool MUST have **isolated state** so that one pool's data and
   funds cannot be affected by another pool, and so total on-chain footprint stays
   bounded regardless of how many pools exist.
+- **FR-002a**: The protocol MUST enforce a maximum of **~1,000 members per pool**
+  (a fixed anonymity-set capacity); a creator's chosen maximum members MUST NOT
+  exceed this cap. Per-proof verification cost MUST remain constant regardless of
+  how many members (up to the cap) have joined.
 - **FR-003**: On creation, the system MUST generate a **unique four-word phrase**
   drawn from the BIP-39 wordlist that maps to exactly one pool, with guaranteed
   uniqueness among active pools.
@@ -394,6 +399,8 @@ standings by nickname in near real time with no member transaction required.
   the change within a few seconds and never sends a transaction to do so.
 - **SC-011**: On-chain storage per pool stays bounded — the cost of operating the
   system does not grow without limit as the number of pools increases.
+- **SC-012**: A single pool supports up to ~1,000 members, and the cost to verify
+  a member's vote does not increase as more members join (constant per-proof cost).
 
 ## Assumptions
 
