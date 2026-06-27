@@ -19,7 +19,7 @@ const cp = {
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 
-const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn() }
+const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn() }
 vi.mock('../governorConnector', () => ({
   validateGovernor: (...a) => conn.validateGovernor(...a),
   readGovernorSummary: (...a) => conn.readGovernorSummary(...a),
@@ -27,6 +27,8 @@ vi.mock('../governorConnector', () => ({
   extraTreasuries: () => [{ label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf' }],
   fetchGovernorProposals: (...a) => conn.fetchGovernorProposals(...a),
   readVoterState: (...a) => conn.readVoterState(...a),
+  readProposalEta: (...a) => conn.readProposalEta(...a),
+  explainTxError: (e) => e?.shortMessage || e?.reason || e?.message || 'Transaction failed.',
   castVote: vi.fn(),
   queueProposal: vi.fn(),
   executeProposal: vi.fn(),
@@ -58,6 +60,7 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     conn.fetchGovernorProposals.mockResolvedValue({ ok: true, proposals: [], scannedFrom: 16000000, scannedTo: 16500000, partial: false })
     conn.readTreasuries.mockResolvedValue([])
     conn.readVoterState.mockResolvedValue({ hasVoted: false, votingPower: null, support: null })
+    conn.readProposalEta.mockResolvedValue(null)
   })
 
   it('self-disables truthfully on an unsupported network', async () => {
@@ -137,6 +140,36 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     expect(await screen.findByText(/You voted: For/i)).toBeInTheDocument()
     // having voted, the vote buttons are not offered again
     expect(screen.queryByRole('button', { name: /vote for/i })).not.toBeInTheDocument()
+  })
+
+  it('disables Execute and shows a countdown until the timelock ETA elapses', async () => {
+    conn.fetchGovernorProposals.mockResolvedValue({
+      ok: true, partial: false, scannedFrom: 16000000, scannedTo: 16500000,
+      proposals: [
+        { id: '7', proposer: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', description: 'Queued prop', targets: [], values: [], calldatas: [], descriptionHash: '0x', voteStart: '1', voteEnd: '2', state: 5, votes: { for: '3', against: '0', abstain: '0' } },
+      ],
+    })
+    conn.readProposalEta.mockResolvedValue(Math.floor(Date.now() / 1000) + 3600) // ETA 1h in the future
+    const user = userEvent.setup()
+    render(<ClearPathPanel />)
+    await user.click(await screen.findByText('Olympia DAO'))
+    expect(await screen.findByText(/Executable in/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /execute/i })).toBeDisabled()
+  })
+
+  it('copies the full proposal id when the id is clicked', async () => {
+    conn.fetchGovernorProposals.mockResolvedValue({
+      ok: true, partial: false, scannedFrom: 16000000, scannedTo: 16500000,
+      proposals: [
+        { id: '123456789012345678', proposer: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', description: 'Copy me', targets: [], values: [], calldatas: [], descriptionHash: '0x', voteStart: '1', voteEnd: '2', state: 1, votes: { for: '0', against: '0', abstain: '0' } },
+      ],
+    })
+    const user = userEvent.setup()
+    render(<ClearPathPanel />)
+    await user.click(await screen.findByText('Olympia DAO'))
+    await user.click(await screen.findByRole('button', { name: /copy proposal id/i }))
+    expect(await screen.findByText(/copied/i)).toBeInTheDocument()
+    expect(await navigator.clipboard.readText()).toBe('123456789012345678')
   })
 
   it('validates then registers a new external DAO', async () => {

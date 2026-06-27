@@ -163,3 +163,13 @@
 .clearpath .cp-voted.is-for { color: var(--semantic-win, #2e7d32); background: color-mix(in srgb, var(--semantic-win, #2e7d32) 14%, transparent); }
 .clearpath .cp-voted.is-against { color: var(--semantic-loss, #c0492f); background: color-mix(in srgb, var(--semantic-loss, #c0492f) 14%, transparent); }
 .clearpath .cp-vote-note { color: var(--cp-text-3); font-size: 0.8rem; }
+
+/* Click-to-copy proposal id. */
+.clearpath .cp-copy-id {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.1rem 0.35rem;
+  background: none; border: 1px solid transparent; border-radius: 6px;
+  color: var(--cp-text-3); cursor: pointer; font: inherit;
+}
+.clearpath .cp-copy-id:hover { border-color: var(--cp-border); color: var(--cp-accent); }
+.clearpath .cp-copy-id svg { flex: none; opacity: 0.8; }
+.clearpath .cp-copied { color: var(--semantic-win, #2e7d32); font-weight: 600; font-size: 0.72rem; }

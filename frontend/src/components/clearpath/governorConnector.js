@@ -293,6 +293,45 @@ export async function fetchGovernorProposals(reader, governor, { lookbackBlocks 
   return { ok: true, proposals, scannedFrom, scannedTo: current, partial }
 }
 
+/**
+ * The timelock execution ETA for a queued proposal (unix seconds), or null if unavailable / not queued. A
+ * queued OZ-Governor proposal can only be executed once `block.timestamp >= eta`; executing earlier reverts
+ * with the timelock's `TimelockUnexpectedOperationState` custom error.
+ */
+export async function readProposalEta(reader, governor, proposalId) {
+  try {
+    const gov = new ethers.Contract(governor, GOVERNOR_READ_ABI, reader)
+    const eta = await gov.proposalEta(proposalId)
+    const n = Number(eta)
+    return Number.isFinite(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
+// Custom-error selectors the frontend ABI doesn't carry, so a revert shows as "unknown custom error". Map the
+// ones a member realistically hits when voting/queuing/executing to a plain explanation. (selector = first 4
+// bytes of keccak256 of the error signature.)
+const TX_ERROR_BY_SELECTOR = {
+  '0x5ead8eb5': 'The timelock delay hasn’t elapsed yet — this proposal can only be executed after its execution time (ETA).',
+  '0x31b75e4d': 'The proposal isn’t in a state that allows this action (it may already be executed/defeated, or not yet queued).',
+  '0xe450d38c': 'The executing treasury (timelock) doesn’t hold enough token balance to fund this proposal.',
+  '0xcd786059': 'The executing treasury (timelock) doesn’t hold enough native balance to fund this proposal.',
+  '0x1425ea42': 'An inner call failed during execution — most often the executing treasury (timelock) can’t fund the transfer.',
+  '0x6ad06075': 'No such proposal on this Governor.',
+}
+
+/**
+ * Turn a tx/call error into a human message, decoding the known Governor/Timelock custom errors that otherwise
+ * surface as "execution reverted (unknown custom error)". Falls back to ethers' own message.
+ */
+export function explainTxError(e) {
+  const data = e?.data ?? e?.info?.error?.data ?? e?.error?.data
+  const sel = typeof data === 'string' && data.length >= 10 ? data.slice(0, 10).toLowerCase() : null
+  if (sel && TX_ERROR_BY_SELECTOR[sel]) return TX_ERROR_BY_SELECTOR[sel]
+  return e?.shortMessage || e?.reason || e?.message || 'Transaction failed.'
+}
+
 // --- US5: user-signed management actions (the member signs; the external DAO's own rules gate authorization) ---
 
 function writeContract(signer, governor) {
