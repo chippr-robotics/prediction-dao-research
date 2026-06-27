@@ -26,6 +26,12 @@ converge with the wider wager ecosystem later. The anonymous-identity and
 nickname layer is designed as a **reusable module** that could improve privacy
 for existing one-to-one wagers in a future feature (out of scope here).
 
+## Clarifications
+
+### Session 2026-06-27
+
+- Q: Is the resolution threshold an absolute approval count or a fraction, and measured against what? → A: A **fraction of the members who actually joined** (denominator = the joined-participant count captured when resolution opens), not an absolute count and not a fraction of maximum slots.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create and join a group pool with four words (Priority: P1)
@@ -203,7 +209,8 @@ standings by nickname in near real time with no member transaction required.
 
 - **FR-001**: The system MUST let a member create a group wager pool by
   specifying at least a buy-in amount, a buy-in currency, a maximum number of
-  members, and the consensus threshold required to resolve.
+  members, and the consensus threshold required to resolve, expressed as a
+  **fraction/percentage of the members who have joined** (not an absolute count).
 - **FR-002**: Each pool MUST have **isolated state** so that one pool's data and
   funds cannot be affected by another pool, and so total on-chain footprint stays
   bounded regardless of how many pools exist.
@@ -235,8 +242,11 @@ standings by nickname in near real time with no member transaction required.
 #### Resolution by anonymous consensus
 
 - **FR-013**: Each pool MUST support resolution by **m-of-n anonymous consensus**,
-  where a configured threshold of members must independently agree on the same
-  payout outcome for it to take effect.
+  where the threshold is a configured **fraction of the members who have joined**:
+  the denominator is the joined-participant count captured when resolution opens,
+  and at least that fraction of members must independently approve the same payout
+  outcome for it to take effect. (E.g. a 60% threshold in a pool with 10 joined
+  members requires 6 approvals.)
 - **FR-014**: Each member MUST be able to vote on a payout outcome **exactly once**
   per outcome; repeat votes MUST be rejected (no double-voting).
 - **FR-015**: A member's vote MUST be verifiable as coming from a legitimate pool
