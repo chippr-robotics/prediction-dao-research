@@ -37,5 +37,14 @@
   - **FR-021** — compliance: **full parity with one-to-one wagers** — sanctions
     screening + membership gating are paramount and enforced on the real wallet at
     join/creation; anonymity covers the governance footprint, not compliance.
-- All quality items pass. Spec is ready for `/speckit-plan` (or `/speckit-clarify`
-  if further refinement is desired).
+- `/speckit-clarify` session (2026-06-27) resolved four further mechanics, now
+  recorded in the spec's `## Clarifications` section:
+  - Resolution threshold = **fraction of joined members** (denominator frozen when
+    resolution opens), not an absolute count.
+  - Joining closes (denominator freezes) on **full / creator-close / join-deadline**,
+    whichever first; late joins rejected.
+  - Protocol cap of **~1,000 members per pool** (fixed anonymity set, constant
+    per-proof cost).
+  - Payout matrix assigns shares to **anonymous in-pool identities**; winners claim
+    to **any address**, preserving anonymity through payout.
+- All quality items pass (16/16). Spec is ready for `/speckit-plan`.

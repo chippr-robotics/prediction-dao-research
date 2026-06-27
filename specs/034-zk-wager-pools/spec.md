@@ -33,6 +33,7 @@ for existing one-to-one wagers in a future feature (out of scope here).
 - Q: Is the resolution threshold an absolute approval count or a fraction, and measured against what? → A: A **fraction of the members who actually joined** (denominator = the joined-participant count captured when resolution opens), not an absolute count and not a fraction of maximum slots.
 - Q: When does joining close and the threshold denominator freeze? → A: When the pool **fills to max OR the creator explicitly closes it OR a creator-set join deadline passes** (whichever comes first); joins after close are rejected and the pool enters its resolution phase.
 - Q: What is the maximum group size per pool? → A: A protocol cap of **~1,000 members per pool** (fixed anonymity-set capacity); the creator's chosen max members must not exceed it.
+- Q: How are payout recipients designated, and how do winners claim while staying anonymous? → A: The payout outcome assigns shares to **anonymous in-pool identities/nicknames**; a winner proves ownership of a winning identity and is paid to **any address they choose**, so payout never links back to their join wallet.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -266,10 +267,14 @@ standings by nickname in near real time with no member transaction required.
   member without revealing which member or which wallet cast it.
 - **FR-016**: When the consensus threshold is reached for an outcome, the pool
   MUST lock that outcome as final and prevent further changes to the result.
-- **FR-017**: After resolution, members entitled to a payout MUST be able to claim
-  their share, and MUST NOT be able to claim more than once.
+- **FR-017**: After resolution, a member entitled to a payout MUST be able to
+  claim their share by **proving ownership of a winning in-pool identity**, and be
+  paid to **any address they choose** (which need not be their join wallet), so the
+  payout does not link to their wallet. Each winning share MUST be claimable at
+  most once.
 - **FR-018**: The payout outcome MUST encode how the escrowed pot is divided among
-  recipients, and claims MUST be validated against the locked outcome.
+  recipients **identified by their anonymous in-pool identity/nickname** (not by
+  wallet address), and claims MUST be validated against the locked outcome.
 - **FR-019**: The system MUST define a fallback for pools that never reach
   consensus within a bounded time, allowing members to recover their buy-in
   (refund/timeout path) so funds are never permanently stuck.
@@ -362,8 +367,10 @@ standings by nickname in near real time with no member transaction required.
 - **Two-Word Nickname**: A stable, friendly label representing a member within one
   pool, decoupled from their wallet address.
 - **Payout Outcome (Proposal)**: A proposed division of the escrowed pot among
-  recipients, identified by a fixed reference that members vote on; becomes the
-  locked result when it reaches consensus.
+  recipients **identified by anonymous in-pool identity/nickname** (not wallet
+  address), identified by a fixed reference that members approve; becomes the
+  locked result when it reaches consensus. Each winning share is claimed by
+  proving ownership of the corresponding in-pool identity and paid to any address.
 - **Vote**: A single, anonymous, member-authenticated endorsement of a payout
   outcome, counted at most once per member per outcome.
 - **Word-List Language Preference**: A per-member account setting selecting which
@@ -401,6 +408,9 @@ standings by nickname in near real time with no member transaction required.
   system does not grow without limit as the number of pools increases.
 - **SC-012**: A single pool supports up to ~1,000 members, and the cost to verify
   a member's vote does not increase as more members join (constant per-proof cost).
+- **SC-013**: A winner can receive their payout at an address unlinked to their
+  join wallet; on-chain data alone does not reveal which join wallet a payout
+  belongs to.
 
 ## Assumptions
 
