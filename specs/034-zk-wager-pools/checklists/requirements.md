@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,12 +31,11 @@
 
 ## Notes
 
-- Two `[NEEDS CLARIFICATION]` markers remain, both intentionally surfaced for the
-  user because no safe default exists:
-  - **FR-020** — payout-proposal authorship & competing-proposal model (scope).
-  - **FR-021** — how sanctions screening / membership gating apply to anonymous,
-    relayer-submitted pool joins (security/compliance; genuine tension with the
-    existing per-wager screening model).
-- Resolve these via `/speckit-clarify` (or direct answers) before `/speckit-plan`.
-- All other quality items pass. Items marked incomplete require spec updates
-  before `/speckit-plan`.
+- Both open clarifications are now **resolved** (answered by the user 2026-06-27):
+  - **FR-020** — payout-proposal model: **creator proposes a single outcome,
+    members approve to an m-of-n threshold** (no competing member proposals).
+  - **FR-021** — compliance: **full parity with one-to-one wagers** — sanctions
+    screening + membership gating are paramount and enforced on the real wallet at
+    join/creation; anonymity covers the governance footprint, not compliance.
+- All quality items pass. Spec is ready for `/speckit-plan` (or `/speckit-clarify`
+  if further refinement is desired).

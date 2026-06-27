@@ -179,9 +179,10 @@ standings by nickname in near real time with no member transaction required.
 - **Under-quorum pool**: A pool that never reaches its consensus threshold (too
   few members vote) needs a defined outcome — e.g. a timeout that allows members
   to recover their buy-in.
-- **Tie / competing outcomes**: If members split across two different payout
-  outcomes and neither reaches the threshold, the pool must remain unresolved
-  until one outcome reaches quorum or the timeout path triggers.
+- **Contested proposal**: If members withhold approval from the creator's
+  proposed outcome and the approval threshold is never reached, the pool remains
+  unresolved until the creator revises to an outcome the group will approve to
+  threshold, or the timeout/refund path triggers.
 - **Creator abandonment**: A pool whose creator disappears (P3 leaderboard never
   finalized) must still allow the group to resolve or recover funds.
 - **Nickname collision**: Two members deriving the same two-word nickname within
@@ -249,20 +250,35 @@ standings by nickname in near real time with no member transaction required.
 - **FR-019**: The system MUST define a fallback for pools that never reach
   consensus within a bounded time, allowing members to recover their buy-in
   (refund/timeout path) so funds are never permanently stuck.
-- **FR-020**: Who may propose a payout outcome, and whether multiple competing
-  outcomes may be voted on simultaneously, MUST be defined.
-  [NEEDS CLARIFICATION: Can any member submit a candidate payout outcome (so the
-  group votes among competing proposals), or only the creator proposes and members
-  approve/reject a single outcome?]
+- **FR-020**: The **pool creator is the sole proposer** of the payout outcome.
+  The group resolves by members anonymously **approving** that single proposed
+  outcome; when approvals reach the consensus threshold (m-of-n), the outcome
+  locks (per FR-016). Competing member-submitted proposals are NOT supported.
+- **FR-020a**: If a proposed outcome has not yet locked, the creator MAY revise
+  and re-propose; revising resets the approval tally for that pool so members
+  approve the current proposal, never a superseded one.
+- **FR-020b**: If the creator's proposal never reaches the approval threshold
+  within the resolution window, the timeout/refund path (FR-019) applies so funds
+  are recoverable; the creator MUST NOT be able to force a payout without member
+  approval reaching the threshold.
 
 #### Compliance, membership & funds safety
 
-- **FR-021**: Pool participation MUST respect the platform's existing compliance
-  posture. [NEEDS CLARIFICATION: Anonymous, relayer-submitted joins are in tension
-  with the existing per-wager sanctions screening and membership gating
-  (`WagerRegistry` screens both parties and enforces membership limits). Which
-  controls apply at pool join — sanctions screening of the joining wallet,
-  membership-tier gating, both, or a different model for pools?]
+- **FR-021**: Pool participation MUST enforce the platform's compliance posture
+  **at full parity with one-to-one wagers**: both sanctions screening and
+  membership gating are paramount and MUST apply. Specifically:
+  - **FR-021a**: Every joining wallet MUST pass sanctions screening before its
+    buy-in is accepted; a screened-out wallet cannot join and no funds move.
+  - **FR-021b**: Pool participation MUST be gated by the member's membership
+    tier/limits exactly as `WagerRegistry` gates wager participation.
+  - **FR-021c**: The creator MUST pass the same sanctions and membership checks at
+    pool creation.
+  - **FR-021d**: These checks are performed against the **real wallet at
+    join/creation time** (before the member's in-pool identity is anonymized).
+    Anonymity protects a member's votes, nickname, and standing from other members
+    and on-chain observers — it MUST NOT be used to bypass sanctions or membership
+    controls. Even in the gasless/relayer flow (P2), the relayer MUST NOT submit a
+    join for a wallet that has not passed these checks.
 - **FR-022**: Escrowed funds MUST only ever be released via a resolved payout
   claim or a refund/cancellation path; there MUST be no path for the creator or
   any party to unilaterally withdraw other members' stakes.
@@ -384,6 +400,14 @@ standings by nickname in near real time with no member transaction required.
   resolution timeout window are set when the pool is created.
 - **Network**: Pools target the platform's standard L2 deployment networks, with
   data strictly scoped per active network.
+- **Compliance is paramount and enforced on the wallet**: Sanctions screening and
+  membership gating apply to every joining wallet (and the creator) at full parity
+  with one-to-one wagers, checked against the real wallet at join/creation time.
+- **Privacy boundary (honest scope)**: Anonymity decouples a member's *votes,
+  nickname, and standing* from their wallet within the pool — it does NOT
+  necessarily hide that a given wallet joined a given pool, since the join is
+  screened against the real wallet. The privacy claim is about the governance
+  footprint (who voted how), not about concealing pool membership from compliance.
 - **Gasless is additive (P2)**: P1 pools are fully usable with members paying their
   own gas; the gasless relayer is a P2 enhancement, not a P1 dependency.
 - **Leaderboard authority (P3)**: The pool creator is the off-chain authority for
@@ -404,8 +428,8 @@ standings by nickname in near real time with no member transaction required.
 ## Dependencies
 
 - The platform's existing membership and compliance/sanctions screening surfaces
-  (for the shared interfaces referenced in FR-021), pending the clarification on
-  how they apply to anonymous pool joins.
+  (FR-021): pool join and creation reuse these at full parity with one-to-one
+  wagers, enforced on the real wallet at join/creation time.
 - The dashboard quick-action surface (for the new pool button).
 - The My Account settings surface (for the word-list language selector).
 - Per-network address/config sync used by the frontend (pool data must come from
