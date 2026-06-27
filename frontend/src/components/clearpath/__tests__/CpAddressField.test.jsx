@@ -57,6 +57,17 @@ describe('CpAddressField (spec 030)', () => {
     expect(onChange).toHaveBeenCalledWith(A_SCAN)
   })
 
+  it('shows a "Self" button only when selfAddress is given, filling the field with it', async () => {
+    const SELF = '0x00000000000000000000000000000000000000c3'
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const { rerender } = render(<CpAddressField id="f1" label="Recipient" value="" onChange={onChange} />)
+    expect(screen.queryByRole('button', { name: /^self$/i })).not.toBeInTheDocument()
+    rerender(<CpAddressField id="f1" label="Recipient" value="" onChange={onChange} selfAddress={SELF} />)
+    await user.click(screen.getByRole('button', { name: /^self$/i }))
+    expect(onChange).toHaveBeenCalledWith(SELF)
+  })
+
   it('disables the input and affordances when disabled', () => {
     render(<CpAddressField id="f1" label="Recipient" value="" onChange={() => {}} disabled />)
     expect(screen.getByLabelText('Recipient')).toBeDisabled()

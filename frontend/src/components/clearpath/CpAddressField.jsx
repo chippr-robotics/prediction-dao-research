@@ -15,6 +15,7 @@ export default function CpAddressField({
   placeholder = '0x…',
   disabled = false,
   hint,
+  selfAddress = null,
 }) {
   const [scanOpen, setScanOpen] = useState(false)
 
@@ -43,6 +44,17 @@ export default function CpAddressField({
           autoComplete="off"
           spellCheck="false"
         />
+        {selfAddress && (
+          <button
+            type="button"
+            className="cp-self-btn"
+            onClick={() => onChange(selfAddress)}
+            disabled={disabled}
+            title="Use my connected wallet address"
+          >
+            Self
+          </button>
+        )}
         <AddressBookButton disabled={disabled} onSelect={(entry) => onChange(entry.address)} />
         <button
           type="button"

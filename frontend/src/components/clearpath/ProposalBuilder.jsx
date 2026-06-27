@@ -4,6 +4,7 @@ import { ERC20_BALANCE_ABI } from '../../abis/externalDAORegistry'
 import { proposeAction } from './governorConnector'
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from './proposalEncoding'
 import CpAddressField from './CpAddressField'
+import CpBottomSheet from './CpBottomSheet'
 
 // Spec 030 (US5, FR-023/024/025) — rich Governor proposal builder. Compose a proposal from named action types
 // (send native / send token / custom call), multiple actions, asset-aware human amounts — no hand-written
@@ -13,7 +14,7 @@ import CpAddressField from './CpAddressField'
 const ERC20_TRANSFER_IFACE = new ethers.Interface(['function transfer(address to, uint256 amount)'])
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—')
 
-export default function ProposalBuilder({ record, signer, reader, usdcAddress, nativeSymbol, treasuries = [], proposals = [], run, busy, onSubmitted }) {
+export default function ProposalBuilder({ record, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], proposals = [], run, busy, onSubmitted }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -120,18 +121,13 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
     ).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
   }
 
-  if (!open) {
-    return (
-      <div style={{ marginTop: '0.8rem' }}>
-        <button type="button" className="cp-btn-link" onClick={() => setOpen(true)}>+ New proposal</button>
-      </div>
-    )
-  }
-
   return (
-    <section className="cp-card" style={{ marginTop: '0.8rem', background: 'var(--cp-canvas)' }} aria-label="New proposal">
-      <h4 style={{ marginBottom: '0.6rem' }}>New proposal</h4>
+    <>
+      <div style={{ marginBottom: '0.8rem' }}>
+        <button type="button" className="cp-btn cp-btn-primary" onClick={() => setOpen(true)}>+ New proposal</button>
+      </div>
 
+      <CpBottomSheet open={open} onClose={() => { reset(); setOpen(false) }} title="New proposal">
       <div className="cp-field">
         <label className="cp-label" htmlFor="cp-prop-title">Title</label>
         <input id="cp-prop-title" className="cp-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Fund core development" />
@@ -157,6 +153,7 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
           usdcAddress={usdcAddress}
           nativeSymbol={nativeSymbol}
           canRemove={actions.length > 1}
+          account={account}
           onChange={(patch) => setAction(a.id, patch)}
           onRemove={() => removeAction(a.id)}
         />
@@ -191,7 +188,8 @@ ${dupId ? `proposalId: ${dupId}` : ''}`}
           <button type="button" className="cp-btn" onClick={() => { reset(); setOpen(false) }}>Cancel</button>
         </div>
       </div>
-    </section>
+      </CpBottomSheet>
+    </>
   )
 }
 
@@ -201,7 +199,7 @@ const TYPE_OPTIONS = [
   { v: ACTION_TYPE.CUSTOM, label: 'Custom call (advanced)' },
 ]
 
-function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canRemove, onChange, onRemove }) {
+function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canRemove, account, onChange, onRemove }) {
   const a = action
   const useDefaultUsdc = a.tokenMode !== 'other'
   const tokenAddr = useDefaultUsdc ? (usdcAddress || '') : a.tokenAddress.trim()
@@ -221,7 +219,7 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
 
       {a.type === ACTION_TYPE.NATIVE && (
         <>
-          <CpAddressField id={`f-${a.id}-nto`} label="Recipient" value={a.nativeTo} onChange={(v) => onChange({ nativeTo: v })} />
+          <CpAddressField id={`f-${a.id}-nto`} label="Recipient" value={a.nativeTo} onChange={(v) => onChange({ nativeTo: v })} selfAddress={account} />
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-namt`}>Amount<span className="cp-suffix">{nativeSymbol}</span></label><input id={`f-${a.id}-namt`} className="cp-input cp-mono" value={a.nativeAmount} onChange={(e) => onChange({ nativeAmount: e.target.value })} placeholder="0.0" /></div>
         </>
       )}
@@ -236,7 +234,7 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
             </select>
           </div>
           {!useDefaultUsdc && <CpAddressField id={`f-${a.id}-taddr`} label="Token address" value={a.tokenAddress} onChange={(v) => onChange({ tokenAddress: v })} hint="The ERC-20 contract to transfer (not the recipient)." />}
-          <CpAddressField id={`f-${a.id}-tto`} label="Recipient" value={a.tokenTo} onChange={(v) => onChange({ tokenTo: v })} />
+          <CpAddressField id={`f-${a.id}-tto`} label="Recipient" value={a.tokenTo} onChange={(v) => onChange({ tokenTo: v })} selfAddress={account} />
           <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-tamt`}>Amount<span className="cp-suffix">{tokenSym}</span></label><input id={`f-${a.id}-tamt`} className="cp-input cp-mono" value={a.tokenAmount} onChange={(e) => onChange({ tokenAmount: e.target.value })} placeholder="0.0" /></div>
         </>
       )}
