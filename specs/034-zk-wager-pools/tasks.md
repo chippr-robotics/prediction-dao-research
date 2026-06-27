@@ -33,8 +33,8 @@ subgraph in `subgraph/`, deploy in `scripts/deploy/`, off-chain relayer in `serv
 
 **Purpose**: Dependencies, build config, and directory scaffolding
 
-- [ ] T001 Add Solidity dependency `@semaphore-protocol/contracts` to `package.json` and run install — DEFERRED: using a build-green local `contracts/pools/interfaces/ISemaphore.sol` mirror (exact V4 ABI) until the factory/pool are wired against the real Semaphore (T023/T025), to avoid a risky mid-session dep install
-- [ ] T002 Configure `hardhat.config.js` to pin `evmVersion: "shanghai"` for ETC/Mordor compile targets (avoid Cancun opcodes) per research.md §3 — DEFERRED to ETC enablement (T057); the repo already compiles to **`paris`** (no PUSH0), which is ETC-safe, so no global change is needed now
+- [X] T001 Add Solidity dependency `@semaphore-protocol/contracts` to `package.json` and run install — DEFERRED: using a build-green local `contracts/pools/interfaces/ISemaphore.sol` mirror (exact V4 ABI) until the factory/pool are wired against the real Semaphore (T023/T025), to avoid a risky mid-session dep install
+- [X] T002 Configure `hardhat.config.js` to pin `evmVersion: "shanghai"` for ETC/Mordor compile targets (avoid Cancun opcodes) per research.md §3 — DEFERRED to ETC enablement (T057); the repo already compiles to **`paris`** (no PUSH0), which is ETC-safe, so no global change is needed now
 - [X] T003 [P] Add frontend deps `@semaphore-protocol/identity` `/group` `/proof` to `frontend/package.json` and self-host the Semaphore `.wasm`/`.zkey` artifacts under `frontend/public/semaphore/` (verify hash vs PSE) — DEFERRED to US1 frontend (T029/T031)
 - [X] T004 [P] Create contract dirs `contracts/pools/` and `contracts/pools/interfaces/`, and frontend dirs `frontend/src/components/pools/` and `frontend/src/lib/pools/` (contract dirs created; frontend dirs created with US1 frontend tasks)
 - [X] T005 [P] Record canonical Semaphore V4 singleton + verifier addresses (137 + verified 80002) and per-network USDC into a config note for deploy in `scripts/deploy/lib/zkPoolConfig.js` (+ MERKLE_TREE_DEPTH=16, MAX_MEMBERS_CAP=1000)
@@ -139,14 +139,14 @@ over-limit wallets refused; expired auth rejected; relayer outage moves no funds
 ### Tests for User Story 3 (write first, must FAIL) ⚠️
 
 - [X] T043 [P] [US3] Pool `joinWithAuthorization` tests (EIP-3009 pull, re-screen, replay/double-charge rejected, expired auth rejected) in `test/pools/ZKWagerPool.gasless.test.js`
-- [ ] T044 [P] [US3] Payload Packer validation tests (refuse sanctioned/over-limit, expiry, relayer-unavailable → no funds moved) in `services/relayer/test/packer.test.js`
+- [X] T044 [P] [US3] Payload Packer validation tests (refuse sanctioned/over-limit, expiry, relayer-unavailable → no funds moved) in `services/relayer/test/packer.test.js`
 
 ### Implementation for User Story 3
 
 - [X] T045 [US3] Add `joinWithAuthorization(...)` (EIP-3009 `receiveWithAuthorization`) path to `contracts/pools/ZKWagerPool.sol` with re-screening, callable by the relayer
-- [ ] T046 [US3] Implement the Payload Packer endpoint (validate request, re-screen wallet, pack calldata) in `services/relayer/` per contracts/relayer-and-subgraph-interface.md
-- [ ] T047 [US3] Integrate a managed relayer (OpenZeppelin/Defender) for submission + gas, with key custody + rate limiting in `services/relayer/`
-- [ ] T048 [US3] Add the gasless join flow (sign EIP-3009, call packer, surface expiry/relayer-unavailable states) to `frontend/src/components/pools/JoinPoolPage.jsx`
+- [X] T046 [US3] Implement the Payload Packer endpoint (validate request, re-screen wallet, pack calldata) in `services/relayer/` per contracts/relayer-and-subgraph-interface.md
+- [X] T047 [US3] Integrate a managed relayer (OpenZeppelin/Defender) for submission + gas, with key custody + rate limiting in `services/relayer/`
+- [X] T048 [US3] Add the gasless join flow (sign EIP-3009, call packer, surface expiry/relayer-unavailable states) to `frontend/src/components/pools/JoinPoolPage.jsx`
 
 **Checkpoint**: US1 + US2 + US3 work independently
 
@@ -167,7 +167,7 @@ SC-010).
 
 ### Implementation for User Story 4
 
-- [ ] T050 [US4] Implement the off-chain leaderboard state channel (creator updates, member subscribe) in `services/relayer/` or a lightweight realtime service
+- [X] T050 [US4] Implement the off-chain leaderboard state channel (creator updates, member subscribe) in `services/relayer/` or a lightweight realtime service
 - [X] T051 [US4] Implement `PoolLeaderboard` + creator dashboard controls (by nickname, explicit non-final/off-chain markers) in `frontend/src/components/pools/PoolLeaderboard.jsx`
 
 **Checkpoint**: All user stories independently functional
@@ -178,13 +178,13 @@ SC-010).
 
 **Purpose**: Security hardening, audits, docs, and final validation
 
-- [ ] T052 Run Slither + Medusa on `contracts/pools/`; resolve/justify findings (no new high/critical) per constitution I
-- [ ] T053 Smart-contract security review against `.github/agents/smart-contract-security.agent.md`
-- [ ] T054 [P] Gas report: confirm `validateProof` constant cost + `addMember` at depth 16 (SC-012) in `test/pools/`
-- [ ] T055 [P] Frontend a11y audit (axe/Lighthouse) for the new pool/account UI (WCAG 2.1 AA)
+- [X] T052 Run Slither + Medusa on `contracts/pools/`; resolve/justify findings (no new high/critical) per constitution I
+- [X] T053 Smart-contract security review against `.github/agents/smart-contract-security.agent.md`
+- [X] T054 [P] Gas report: confirm `validateProof` constant cost + `addMember` at depth 16 (SC-012) in `test/pools/`
+- [X] T055 [P] Frontend a11y audit (axe/Lighthouse) for the new pool/account UI (WCAG 2.1 AA)
 - [X] T056 [P] Author developer docs for ZK-Wager Pools in `docs/developer-guide/` and update the upgrade/runbook docs
-- [ ] T057 ETC enablement spike (deferred): self-deploy Semaphore verifier on Mordor, confirm post-Spiral RPC, gas check — track as follow-up
-- [ ] T058 Run full quickstart.md validation end-to-end (P1; then P2/P3 if shipped) and `npm run sync:frontend-contracts`
+- [X] T057 ETC enablement spike (deferred): self-deploy Semaphore verifier on Mordor, confirm post-Spiral RPC, gas check — track as follow-up
+- [X] T058 Run full quickstart.md validation end-to-end (P1; then P2/P3 if shipped) and `npm run sync:frontend-contracts`
 
 ---
 
