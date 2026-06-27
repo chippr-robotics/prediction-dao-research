@@ -19,13 +19,14 @@ const cp = {
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 
-const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn() }
+const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn() }
 vi.mock('../governorConnector', () => ({
   validateGovernor: (...a) => conn.validateGovernor(...a),
   readGovernorSummary: (...a) => conn.readGovernorSummary(...a),
   readTreasuries: (...a) => conn.readTreasuries(...a),
   extraTreasuries: () => [{ label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf' }],
   fetchGovernorProposals: (...a) => conn.fetchGovernorProposals(...a),
+  readVoterState: (...a) => conn.readVoterState(...a),
   castVote: vi.fn(),
   queueProposal: vi.fn(),
   executeProposal: vi.fn(),
@@ -53,8 +54,10 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     vi.clearAllMocks()
     cp.isSupported = true
     cp.listExternalDAOs.mockResolvedValue([olympiaRecord])
+    conn.readGovernorSummary.mockResolvedValue({ clockMode: 'mode=blocknumber' })
     conn.fetchGovernorProposals.mockResolvedValue({ ok: true, proposals: [], scannedFrom: 16000000, scannedTo: 16500000, partial: false })
     conn.readTreasuries.mockResolvedValue([])
+    conn.readVoterState.mockResolvedValue({ hasVoted: false, votingPower: null, support: null })
   })
 
   it('self-disables truthfully on an unsupported network', async () => {
@@ -113,9 +116,27 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     render(<ClearPathPanel />)
     await user.click(await screen.findByText('Olympia DAO'))
     expect(await screen.findByText('Fund core dev')).toBeInTheDocument()
-    expect(screen.getByText('Active')).toBeInTheDocument()
+    expect(screen.getByText('Active', { selector: '.cp-badge' })).toBeInTheDocument()
+    // the proposal timeline surfaces the voting window position
+    expect(screen.getByLabelText('Proposal timeline')).toBeInTheDocument()
     // US5: an Active proposal offers vote actions
     expect(screen.getByRole('button', { name: /vote for/i })).toBeInTheDocument()
+  })
+
+  it('shows the user vote receipt and hides vote buttons once they have voted', async () => {
+    conn.fetchGovernorProposals.mockResolvedValue({
+      ok: true, partial: false, scannedFrom: 16000000, scannedTo: 16500000,
+      proposals: [
+        { id: '42', proposer: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', description: 'Fund core dev', targets: [], values: [], calldatas: [], descriptionHash: '0x', voteStart: '1', voteEnd: '16500001', state: 1, votes: { for: '3', against: '1', abstain: '0' } },
+      ],
+    })
+    conn.readVoterState.mockResolvedValue({ hasVoted: true, votingPower: '5', support: 1 /* For */ })
+    const user = userEvent.setup()
+    render(<ClearPathPanel />)
+    await user.click(await screen.findByText('Olympia DAO'))
+    expect(await screen.findByText(/You voted: For/i)).toBeInTheDocument()
+    // having voted, the vote buttons are not offered again
+    expect(screen.queryByRole('button', { name: /vote for/i })).not.toBeInTheDocument()
   })
 
   it('validates then registers a new external DAO', async () => {

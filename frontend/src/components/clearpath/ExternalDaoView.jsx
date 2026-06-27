@@ -8,6 +8,7 @@ import {
   readTreasuries,
   extraTreasuries,
   fetchGovernorProposals,
+  readVoterState,
   castVote,
   queueProposal,
   executeProposal,
@@ -53,7 +54,33 @@ function fmtUsdc(bal, decimals) {
   try { return ethers.formatUnits(bal, decimals) } catch { return '—' }
 }
 
-export default function ExternalDaoView({ record, reader, signer, chainId, usdcAddress, onBack }) {
+const SUPPORT_LABEL = { 0: 'Against', 1: 'For', 2: 'Abstain' }
+const SECONDS_PER_BLOCK = 15 // ETC/Mordor ~15s blocks; only used to humanize block deltas in the timeline.
+
+function humanizeDelta(units, isTimestamp) {
+  const secs = Math.max(0, Math.round(isTimestamp ? units : units * SECONDS_PER_BLOCK))
+  if (secs < 60) return `~${secs}s`
+  const m = Math.round(secs / 60)
+  if (m < 60) return `~${m}m`
+  const h = Math.floor(m / 60); const rm = m % 60
+  if (h < 24) return rm ? `~${h}h ${rm}m` : `~${h}h`
+  const d = Math.floor(h / 24); const rh = h % 24
+  return rh ? `~${d}d ${rh}h` : `~${d}d`
+}
+
+// Proposal timeline relative to "now" (current block, or wall-clock for timestamp-clock Governors). Honest: if
+// the voting window can't be parsed, say so rather than inventing a phase.
+function describeProposalTiming(p, currentBlock, clockMode) {
+  const isTs = /timestamp/.test(clockMode || '')
+  const snapshot = Number(p.voteStart); const deadline = Number(p.voteEnd)
+  const now = isTs ? Math.floor(Date.now() / 1000) : Number(currentBlock)
+  if (![snapshot, deadline, now].every(Number.isFinite)) return { label: 'Voting window unavailable', phase: 'unknown' }
+  if (now < snapshot) return { label: `Voting opens in ${humanizeDelta(snapshot - now, isTs)}${isTs ? '' : ` (${snapshot - now} blocks)`}`, phase: 'pending' }
+  if (now <= deadline) return { label: `Voting ends in ${humanizeDelta(deadline - now, isTs)}${isTs ? '' : ` (${deadline - now} blocks)`}`, phase: 'open' }
+  return { label: 'Voting closed', phase: 'closed' }
+}
+
+export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
   const { showNotification } = useNotification()
   const net = getNetwork(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
@@ -64,6 +91,7 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
   const [props, setProps] = useState({ key: null, ok: true, proposals: [], scannedFrom: null, partial: false, error: null })
   const propsLoading = props.key !== record.dao
   const [busy, setBusy] = useState(false)
+  const [voterStates, setVoterStates] = useState({}) // proposalId → { hasVoted, votingPower, support }
   const s = sum.summary
 
   // Summary + treasuries (timelock + known extra vaults), native + USDC.
@@ -96,6 +124,23 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
     setProps({ key: record.dao, ...res })
   }, [reader, record.dao])
   useEffect(() => { loadProposals() }, [loadProposals])
+
+  // Per-user voting state (have I voted, my power at the snapshot, how I voted) for each listed proposal, keyed
+  // by proposal id. Only attempted with a connected wallet; missing Governor views degrade to null (honest).
+  useEffect(() => {
+    if (!reader || !account || !props.ok || props.key !== record.dao || !props.proposals.length) {
+      setVoterStates({})
+      return undefined
+    }
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(
+        props.proposals.map(async (p) => [p.id, await readVoterState(reader, record.dao, p, account)])
+      )
+      if (!cancelled) setVoterStates(Object.fromEntries(entries))
+    })()
+    return () => { cancelled = true }
+  }, [reader, account, record.dao, props.key, props.ok, props.proposals])
 
   // Surfaces the whole on-chain activity to the app notification system so the user stays aware end-to-end:
   // a persistent "confirm in your wallet" prompt during signing, a persistent "awaiting confirmation" toast
@@ -189,6 +234,20 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
           gated by the DAO's own rules.
         </p>
 
+        <ProposalBuilder
+          record={record}
+          signer={signer}
+          reader={reader}
+          account={account}
+          usdcAddress={usdcAddress}
+          nativeSymbol={net?.nativeCurrency?.symbol}
+          treasuries={treasuries}
+          proposals={props.proposals}
+          run={run}
+          busy={busy}
+          onSubmitted={loadProposals}
+        />
+
         {propsLoading && <div className="cp-notice" role="status">Indexing proposals on-chain…</div>}
         {!propsLoading && !props.ok && (
           <div className="cp-error" role="alert">Couldn’t load proposals from this RPC: {props.error}</div>
@@ -200,45 +259,62 @@ export default function ExternalDaoView({ record, reader, signer, chainId, usdcA
           <p className="cp-row-sub">Showing the most recent proposals; older ones may exist beyond the scanned range.</p>
         )}
 
-        {props.proposals.map((p) => (
-          <div key={p.id} className="cp-card" style={{ background: 'var(--cp-canvas)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span className="cp-row-name">{p.description ? p.description.slice(0, 80) : `Proposal ${short(p.id)}`}</span>
-              <span className="cp-badge">{PROPOSAL_STATE_LABEL[p.state] ?? 'Unknown'}</span>
-            </div>
-            <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>#{p.id.length > 12 ? short(p.id) : p.id} · by {short(p.proposer)}</div>
-            {p.votes && (
-              <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>
-                For {p.votes.for} · Against {p.votes.against} · Abstain {p.votes.abstain}
+        {props.proposals.map((p) => {
+          const vs = voterStates[p.id]
+          const timing = describeProposalTiming(p, props.scannedTo, s?.clockMode)
+          const noPower = vs?.votingPower === '0'
+          const canVote = p.state === 1 && !vs?.hasVoted && !noPower
+          return (
+            <div key={p.id} className="cp-card" style={{ background: 'var(--cp-canvas)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="cp-row-name">{p.description ? p.description.slice(0, 80) : `Proposal ${short(p.id)}`}</span>
+                <span className="cp-badge">{PROPOSAL_STATE_LABEL[p.state] ?? 'Unknown'}</span>
               </div>
-            )}
-            <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
-              {p.state === 1 && (
-                <>
-                  <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.For))}>Vote For</button>
-                  <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against))}>Against</button>
-                  <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain))}>Abstain</button>
-                </>
-              )}
-              {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => queueProposal(signer, record.dao, p))}>Queue</button>}
-              {p.state === 5 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Execute', () => executeProposal(signer, record.dao, p))}>Execute</button>}
-              {explorerBase && <a className="cp-btn-link" href={`${explorerBase}/address/${record.dao}`} target="_blank" rel="noreferrer">Details ↗</a>}
-            </div>
-          </div>
-        ))}
+              <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>#{p.id.length > 12 ? short(p.id) : p.id} · by {short(p.proposer)}</div>
 
-        <ProposalBuilder
-          record={record}
-          signer={signer}
-          reader={reader}
-          usdcAddress={usdcAddress}
-          nativeSymbol={net?.nativeCurrency?.symbol}
-          treasuries={treasuries}
-          proposals={props.proposals}
-          run={run}
-          busy={busy}
-          onSubmitted={loadProposals}
-        />
+              {/* Timeline: proposed → voting window → outcome, with the live relative position. */}
+              <div className="cp-timeline" aria-label="Proposal timeline">
+                <span className="t is-done"><span className="dot" />Proposed</span>
+                <span className={`t ${timing.phase === 'open' ? 'is-now' : timing.phase === 'closed' ? 'is-done' : ''}`}><span className="dot" />{timing.label}</span>
+                <span className={`t ${p.state >= 2 && p.state !== 5 ? 'is-done' : ''}`}><span className="dot" />{PROPOSAL_STATE_LABEL[p.state] ?? '—'}</span>
+              </div>
+
+              {p.votes && (
+                <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>
+                  For {p.votes.for} · Against {p.votes.against} · Abstain {p.votes.abstain}
+                </div>
+              )}
+
+              {/* Per-user voting state: receipt if voted, no-power note, or current voting power when eligible. */}
+              {vs?.hasVoted && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <span className={`cp-voted ${vs.support === 1 ? 'is-for' : vs.support === 0 ? 'is-against' : ''}`}>
+                    ✓ You voted{vs.support != null ? `: ${SUPPORT_LABEL[vs.support]}` : ''}
+                  </span>
+                </div>
+              )}
+              {p.state === 1 && !vs?.hasVoted && noPower && (
+                <p className="cp-vote-note" style={{ marginTop: '0.5rem' }}>You had no voting power at the snapshot, so you can’t vote on this proposal.</p>
+              )}
+              {canVote && vs?.votingPower != null && vs.votingPower !== '0' && (
+                <p className="cp-vote-note" style={{ marginTop: '0.5rem' }}>Your voting power: {vs.votingPower}</p>
+              )}
+
+              <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
+                {canVote && (
+                  <>
+                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.For))}>Vote For</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against))}>Against</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain))}>Abstain</button>
+                  </>
+                )}
+                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => queueProposal(signer, record.dao, p))}>Queue</button>}
+                {p.state === 5 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Execute', () => executeProposal(signer, record.dao, p))}>Execute</button>}
+                {explorerBase && <a className="cp-btn-link" href={`${explorerBase}/address/${record.dao}`} target="_blank" rel="noreferrer">Details ↗</a>}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

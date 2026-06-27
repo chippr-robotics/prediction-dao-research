@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ethers } from 'ethers'
-import { getLogsRange, parseProposalLog } from '../governorConnector'
+import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport } from '../governorConnector'
 
 // Spec 030 (US5) — the subgraph-less proposal indexer must survive RPC block-range caps. ETC/Mordor public
 // nodes (and many wallet RPC backends) reject an `eth_getLogs` window wider than a provider-specific limit;
@@ -82,5 +82,32 @@ describe('parseProposalLog (spec 030 — ProposalCreated decode)', () => {
     expect(p.calldatas).toEqual(['0x', '0xabcdef'])
     expect(p.description).toBe('# Multi-action')
     expect(p.descriptionHash).toBe(ethers.id('# Multi-action'))
+  })
+})
+
+describe('readVoterState / readVoteSupport (spec 030 — per-user voting state)', () => {
+  const VOTER = '0x00000000000000000000000000000000000000c3'
+  const VOTE_ABI = ['event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 weight, string reason)']
+  const vc = new ethers.Interface(VOTE_ABI)
+  const frag = vc.getEvent('VoteCast')
+
+  it('returns all-null without an account (no fabricated state)', async () => {
+    expect(await readVoterState({}, GOV, { id: '42', voteStart: '1', voteEnd: '2' }, null)).toEqual({
+      hasVoted: null, votingPower: null, support: null,
+    })
+  })
+
+  it('recovers HOW a voter voted from their VoteCast receipt', async () => {
+    const { data, topics } = vc.encodeEventLog(frag, [VOTER, 42n, 1 /* For */, 100n, ''])
+    const reader = { getLogs: vi.fn(async () => [{ data, topics }]) }
+    const support = await readVoteSupport(reader, GOV, { id: '42', voteStart: '1', voteEnd: '100' }, VOTER)
+    expect(support).toBe(1)
+  })
+
+  it('returns null when no VoteCast matches the proposal (honest degradation)', async () => {
+    const { data, topics } = vc.encodeEventLog(frag, [VOTER, 99n /* different proposal */, 0, 100n, ''])
+    const reader = { getLogs: vi.fn(async () => [{ data, topics }]) }
+    const support = await readVoteSupport(reader, GOV, { id: '42', voteStart: '1', voteEnd: '100' }, VOTER)
+    expect(support).toBeNull()
   })
 })

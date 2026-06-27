@@ -157,4 +157,23 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     await user.type(screen.getByLabelText(/amount/i), '51') // > 50 cUSD total
     expect(await screen.findByText(/more cUSD than the treasury holds/i)).toBeInTheDocument()
   })
+
+  it('fills the recipient with the connected wallet via the Self button', async () => {
+    const user = userEvent.setup()
+    renderBuilder({ account: TO }) // TO doubles as the connected address here
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    await user.click(screen.getByRole('button', { name: /^self$/i }))
+    expect(screen.getByLabelText(/recipient/i)).toHaveValue(TO)
+  })
+
+  it('opens the builder in a bottom-sheet dialog and keeps the trigger visible', async () => {
+    const user = userEvent.setup()
+    renderBuilder()
+    // the trigger is always present (it sits above the proposal list)
+    const trigger = screen.getByRole('button', { name: /\+ new proposal/i })
+    expect(trigger).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(trigger)
+    expect(screen.getByRole('dialog', { name: /new proposal/i })).toBeInTheDocument()
+  })
 })

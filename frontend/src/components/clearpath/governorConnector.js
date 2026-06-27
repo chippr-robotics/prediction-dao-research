@@ -176,15 +176,65 @@ export function parseProposalLog(log) {
  * few smaller requests instead of losing the whole scan. Throws only if even a `minSpan`-wide window is
  * rejected, letting the caller decide partial-vs-fail. Exported for unit testing.
  */
-export async function getLogsRange(reader, governor, from, to, minSpan = 2000) {
+export async function getLogsRange(reader, governor, from, to, minSpan = 2000, topics = [PROPOSAL_CREATED_TOPIC]) {
   try {
-    return await reader.getLogs({ address: governor, topics: [PROPOSAL_CREATED_TOPIC], fromBlock: from, toBlock: to })
+    return await reader.getLogs({ address: governor, topics, fromBlock: from, toBlock: to })
   } catch (e) {
     if (to - from + 1 <= minSpan) throw e
     const mid = Math.floor((from + to) / 2)
-    const left = await getLogsRange(reader, governor, from, mid, minSpan)
-    const right = await getLogsRange(reader, governor, mid + 1, to, minSpan)
+    const left = await getLogsRange(reader, governor, from, mid, minSpan, topics)
+    const right = await getLogsRange(reader, governor, mid + 1, to, minSpan, topics)
     return [...left, ...right]
+  }
+}
+
+const VOTE_CAST_TOPIC = ethers.id('VoteCast(address,uint256,uint8,uint256,string)')
+const VOTE_CAST_IFACE = new ethers.Interface([
+  'event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 weight, string reason)',
+])
+
+/**
+ * Per-user voting state for one proposal, for the member-facing view: whether they've voted, their voting power
+ * at the proposal snapshot, and (if they voted) HOW. Standard OZ IGovernor reads with honest degradation — a
+ * Governor missing a given view yields `null` for that field (never a fabricated value); `account` null ⇒ all
+ * null. Exported for unit testing.
+ */
+export async function readVoterState(reader, governor, proposal, account) {
+  if (!account || !reader) return { hasVoted: null, votingPower: null, support: null }
+  const gov = new ethers.Contract(governor, GOVERNOR_READ_ABI, reader)
+  const safe = async (p) => { try { return await p } catch { return null } }
+  const hasVoted = await safe(gov.hasVoted(proposal.id, account))
+  // Voting power is measured at the snapshot (voteStart, in the Governor's clock units).
+  const power = proposal.voteStart != null ? await safe(gov.getVotes(account, proposal.voteStart)) : null
+  let support = null
+  if (hasVoted) support = await readVoteSupport(reader, governor, proposal, account)
+  return {
+    hasVoted: hasVoted == null ? null : Boolean(hasVoted),
+    votingPower: power == null ? null : power.toString(),
+    support,
+  }
+}
+
+/**
+ * Recover HOW `account` voted by scanning the proposal's `VoteCast` events (voter is indexed; proposalId is not,
+ * so filter client-side), bounded to the voting window via the adaptive range scanner. Returns the support
+ * value (0 Against / 1 For / 2 Abstain) or null if not found / unreadable (honest degradation).
+ */
+export async function readVoteSupport(reader, governor, proposal, account) {
+  try {
+    const from = Number(proposal.voteStart)
+    const to = Number(proposal.voteEnd)
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return null
+    const voterTopic = ethers.zeroPadValue(ethers.getAddress(account), 32)
+    const logs = await getLogsRange(reader, governor, from, to, 2000, [VOTE_CAST_TOPIC, voterTopic])
+    for (const log of logs) {
+      let parsed
+      try { parsed = VOTE_CAST_IFACE.parseLog(log) } catch { continue }
+      if (parsed.args.proposalId.toString() === proposal.id) return Number(parsed.args.support)
+    }
+    return null
+  } catch {
+    return null
   }
 }
 

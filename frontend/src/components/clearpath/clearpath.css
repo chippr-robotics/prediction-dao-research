@@ -107,3 +107,59 @@
 }
 .clearpath .fm-scan-btn:disabled,
 .clearpath .cp-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* "Self" affordance on an address row — fills the field with the connected wallet address. */
+.clearpath .cp-self-btn {
+  align-self: stretch; padding: 0 0.7rem; min-width: 44px; box-sizing: border-box;
+  background: var(--cp-canvas); border: 1px solid var(--cp-border); border-radius: var(--cp-radius);
+  color: var(--cp-text-2); cursor: pointer; font-weight: 600; font-size: 0.8rem;
+}
+.clearpath .cp-self-btn:hover:not(:disabled) {
+  border-color: var(--cp-accent); color: var(--cp-accent);
+  background: color-mix(in srgb, var(--cp-accent) 10%, transparent);
+}
+.clearpath .cp-self-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Bottom sheet (CpBottomSheet) — centered card on desktop, sheet from the bottom on mobile (My Wagers pattern). */
+.cp-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.cp-sheet {
+  width: 100%; max-width: 540px; max-height: 92vh; overflow-y: auto;
+  background: var(--bg-primary, #fff); color: var(--text-primary, #111);
+  border: 1px solid var(--border-color); border-radius: var(--radius-lg, 12px);
+  padding: 1rem 1.1rem 1.3rem; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  animation: cpSheetUp 0.18s ease-out;
+}
+@keyframes cpSheetUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.cp-sheet-handle { display: none; }
+.cp-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
+.cp-sheet-title { margin: 0; font-weight: 600; font-size: 1.05rem; }
+.cp-sheet-close { width: 38px; min-width: 38px; height: 38px; }
+@media (max-width: 768px) {
+  .cp-sheet-backdrop { align-items: flex-end; padding: 0; }
+  .cp-sheet {
+    max-width: 100%; max-height: 95vh; border-radius: 20px 20px 0 0;
+    padding-bottom: calc(1.3rem + env(safe-area-inset-bottom, 0px));
+  }
+  .cp-sheet-handle {
+    display: block; width: 40px; height: 4px; border-radius: 999px;
+    background: var(--border-color); margin: 0 auto 0.7rem;
+  }
+}
+
+/* Proposal timeline + per-user voting state. */
+.clearpath .cp-timeline { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin: 0.5rem 0; font-size: 0.78rem; color: var(--cp-text-2); }
+.clearpath .cp-timeline .t { display: inline-flex; align-items: center; gap: 0.3rem; }
+.clearpath .cp-timeline .t .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cp-text-3); }
+.clearpath .cp-timeline .t.is-now .dot { background: var(--cp-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cp-accent) 22%, transparent); }
+.clearpath .cp-timeline .t.is-done .dot { background: var(--semantic-win, #2e7d32); }
+.clearpath .cp-voted {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600;
+  padding: 0.25rem 0.6rem; border-radius: 6px;
+  color: var(--cp-accent); background: color-mix(in srgb, var(--cp-accent) 14%, transparent);
+}
+.clearpath .cp-voted.is-for { color: var(--semantic-win, #2e7d32); background: color-mix(in srgb, var(--semantic-win, #2e7d32) 14%, transparent); }
+.clearpath .cp-voted.is-against { color: var(--semantic-loss, #c0492f); background: color-mix(in srgb, var(--semantic-loss, #c0492f) 14%, transparent); }
+.clearpath .cp-vote-note { color: var(--cp-text-3); font-size: 0.8rem; }
