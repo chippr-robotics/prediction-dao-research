@@ -33,11 +33,11 @@ subgraph in `subgraph/`, deploy in `scripts/deploy/`, off-chain relayer in `serv
 
 **Purpose**: Dependencies, build config, and directory scaffolding
 
-- [ ] T001 Add Solidity dependency `@semaphore-protocol/contracts` to `package.json` and run install
-- [ ] T002 Configure `hardhat.config.js` to pin `evmVersion: "shanghai"` for ETC/Mordor compile targets (avoid Cancun opcodes) per research.md §3
-- [ ] T003 [P] Add frontend deps `@semaphore-protocol/identity` `/group` `/proof` to `frontend/package.json` and self-host the Semaphore `.wasm`/`.zkey` artifacts under `frontend/public/semaphore/` (verify hash vs PSE)
-- [ ] T004 [P] Create contract dirs `contracts/pools/` and `contracts/pools/interfaces/`, and frontend dirs `frontend/src/components/pools/` and `frontend/src/lib/pools/`
-- [ ] T005 [P] Record canonical Semaphore V4 singleton + verifier addresses (137 + verified 80002) and per-network USDC into a config note for deploy in `scripts/deploy/lib/constants.js`
+- [ ] T001 Add Solidity dependency `@semaphore-protocol/contracts` to `package.json` and run install — DEFERRED: using a build-green local `contracts/pools/interfaces/ISemaphore.sol` mirror (exact V4 ABI) until the factory/pool are wired against the real Semaphore (T023/T025), to avoid a risky mid-session dep install
+- [ ] T002 Configure `hardhat.config.js` to pin `evmVersion: "shanghai"` for ETC/Mordor compile targets (avoid Cancun opcodes) per research.md §3 — DEFERRED to ETC enablement (T057); the repo already compiles to **`paris`** (no PUSH0), which is ETC-safe, so no global change is needed now
+- [ ] T003 [P] Add frontend deps `@semaphore-protocol/identity` `/group` `/proof` to `frontend/package.json` and self-host the Semaphore `.wasm`/`.zkey` artifacts under `frontend/public/semaphore/` (verify hash vs PSE) — DEFERRED to US1 frontend (T029/T031)
+- [X] T004 [P] Create contract dirs `contracts/pools/` and `contracts/pools/interfaces/`, and frontend dirs `frontend/src/components/pools/` and `frontend/src/lib/pools/` (contract dirs created; frontend dirs created with US1 frontend tasks)
+- [X] T005 [P] Record canonical Semaphore V4 singleton + verifier addresses (137 + verified 80002) and per-network USDC into a config note for deploy in `scripts/deploy/lib/zkPoolConfig.js` (+ MERKLE_TREE_DEPTH=16, MAX_MEMBERS_CAP=1000)
 
 ---
 
@@ -47,12 +47,12 @@ subgraph in `subgraph/`, deploy in `scripts/deploy/`, off-chain relayer in `serv
 
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete
 
-- [ ] T006 [P] Define `IZKWagerPoolFactory` interface (events, `CreatePoolParams`, `createPool`, gateway lookups) in `contracts/pools/interfaces/IZKWagerPoolFactory.sol` per contracts/pool-contracts-interface.md
-- [ ] T007 [P] Define `IZKWagerPool` interface (join/close/propose/approve/claim/refund + events) in `contracts/pools/interfaces/IZKWagerPool.sol`
-- [ ] T008 [P] Confirm/import reuse interfaces `ISanctionsGuard` and `IMembershipManager` from `contracts/interfaces/` (no re-roll)
-- [ ] T009 [P] Create `MockSemaphoreVerifier`/`MockSemaphore` test double in `contracts/mocks/MockSemaphore.sol` (configurable proof validity, nullifier tracking; mainnet-exclusion doc comment)
-- [ ] T010 [P] Create `MockUSDCPermit` (EIP-2612 + EIP-3009) in `contracts/mocks/MockUSDCPermit.sol` for join/gasless tests
-- [ ] T011 [P] Add Semaphore identity/group/proof test fixtures + helpers in `test/helpers/semaphore.js` (build commitments, generate proofs for tests)
+- [X] T006 [P] Define `IZKWagerPoolFactory` interface (events, `CreatePoolParams`, `createPool`, gateway lookups) in `contracts/pools/interfaces/IZKWagerPoolFactory.sol` per contracts/pool-contracts-interface.md
+- [X] T007 [P] Define `IZKWagerPool` interface (join/close/propose/approve/claim/refund + events) in `contracts/pools/interfaces/IZKWagerPool.sol` (+ local `ISemaphore.sol` V4 mirror)
+- [X] T008 [P] Confirm/import reuse interfaces `ISanctionsGuard` and `IMembershipManager` from `contracts/interfaces/` (no re-roll) — confirmed: `checkBlocked(address)`, `checkCanCreate/recordCreate/recordClose(user,role)`
+- [X] T009 [P] Create `MockSemaphore` test double in `contracts/mocks/MockSemaphore.sol` (configurable proof validity, per-group nullifier tracking; test-only doc comment)
+- [X] T010 [P] Create `MockUSDCPermit` (EIP-2612 via OZ ERC20Permit + EIP-3009 receiveWithAuthorization, 6 decimals) in `contracts/mocks/MockUSDCPermit.sol` for join/gasless tests
+- [X] T011 [P] Add Semaphore identity/proof test fixtures + helpers in `test/helpers/semaphore.js` (mock commitments + SemaphoreProof tuples; real proofs reserved for fork tests)
 
 **Checkpoint**: Interfaces + mocks + harness ready — user stories can begin
 
