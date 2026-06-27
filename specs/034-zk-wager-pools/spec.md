@@ -31,6 +31,7 @@ for existing one-to-one wagers in a future feature (out of scope here).
 ### Session 2026-06-27
 
 - Q: Is the resolution threshold an absolute approval count or a fraction, and measured against what? → A: A **fraction of the members who actually joined** (denominator = the joined-participant count captured when resolution opens), not an absolute count and not a fraction of maximum slots.
+- Q: When does joining close and the threshold denominator freeze? → A: When the pool **fills to max OR the creator explicitly closes it OR a creator-set join deadline passes** (whichever comes first); joins after close are rejected and the pool enters its resolution phase.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -196,8 +197,9 @@ standings by nickname in near real time with no member transaction required.
 - **Lost identity secret**: A member who loses the local secret behind their
   anonymous identity may be unable to vote; the consequences (and any recovery)
   must be made clear.
-- **Late join during resolution**: Attempting to join after voting/resolution has
-  begun must be handled deterministically (rejected or clearly scoped).
+- **Late join during resolution**: Once joining has closed (pool full,
+  creator-closed, or join deadline passed), any further join attempt MUST be
+  rejected; resolution operates on the frozen member set.
 - **Refund/cancellation**: A pool cancelled before it fills must return every
   member's buy-in.
 
@@ -209,8 +211,9 @@ standings by nickname in near real time with no member transaction required.
 
 - **FR-001**: The system MUST let a member create a group wager pool by
   specifying at least a buy-in amount, a buy-in currency, a maximum number of
-  members, and the consensus threshold required to resolve, expressed as a
-  **fraction/percentage of the members who have joined** (not an absolute count).
+  members, a **join deadline**, and the consensus threshold required to resolve,
+  expressed as a **fraction/percentage of the members who have joined** (not an
+  absolute count).
 - **FR-002**: Each pool MUST have **isolated state** so that one pool's data and
   funds cannot be affected by another pool, and so total on-chain footprint stays
   bounded regardless of how many pools exist.
@@ -225,6 +228,11 @@ standings by nickname in near real time with no member transaction required.
   escrowing that stake until the pool resolves, refunds, or is cancelled.
 - **FR-007**: The system MUST reject joins to a pool that is full, resolved, or
   cancelled, with a clear reason.
+- **FR-007a**: A pool's joining phase MUST close — freezing the joined-member
+  count used as the resolution denominator (FR-013) — when the pool **fills to its
+  maximum members**, the **creator explicitly closes it**, or the **join deadline
+  passes**, whichever occurs first. After joining closes, further joins MUST be
+  rejected and the pool enters its resolution phase.
 - **FR-008**: The new pool flow MUST be launchable from a **new quick-action
   button** on the dashboard alongside the existing quick actions.
 
@@ -332,10 +340,11 @@ standings by nickname in near real time with no member transaction required.
 ### Key Entities *(include if data involved)*
 
 - **Wager Pool**: An isolated group wager. Attributes: buy-in amount and currency,
-  maximum members, current member count, consensus threshold, lifecycle state
-  (open / full / resolving / resolved / cancelled), creation time, escrowed
-  balance, and the locked payout outcome once resolved. Has exactly one four-word
-  phrase while active.
+  maximum members, current member count, join deadline, consensus threshold (as a
+  fraction of joined members), the frozen joined-member denominator once joining
+  closes, lifecycle state (joining-open / joining-closed (resolving) / resolved /
+  cancelled), creation time, escrowed balance, and the locked payout outcome once
+  resolved. Has exactly one four-word phrase while active.
 - **Four-Word Phrase**: A human-readable identifier drawn from a BIP-39 wordlist
   that maps one-to-one to an active pool. Language-independent in identity; can be
   rendered in any supported language's wordlist.
