@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
 import Button from '../components/ui/Button'
+import PoolLeaderboard from '../components/pools/PoolLeaderboard'
 import './pools.css'
 
 /**
@@ -17,6 +18,18 @@ export default function PoolPage() {
   const [error, setError] = useState(null)
   const [nickname, setNickname] = useState(null)
   const [notice, setNotice] = useState(null)
+
+  // Off-chain interim leaderboard (US4). Local to this session until the sync channel ships (T050);
+  // PoolLeaderboard marks it non-final/off-chain so this is honest.
+  const [standings, setStandings] = useState([])
+  const lbId = useRef(0)
+  const addPlayer = (nick) =>
+    setStandings((s) => [...s, { id: `p${lbId.current++}`, nickname: nick, score: 0, eliminated: false }])
+  const scoreChange = (id, score) =>
+    setStandings((s) => s.map((e) => (e.id === id ? { ...e, score } : e)))
+  const toggleEliminate = (id) =>
+    setStandings((s) => s.map((e) => (e.id === id ? { ...e, eliminated: !e.eliminated } : e)))
+  const removePlayer = (id) => setStandings((s) => s.filter((e) => e.id !== id))
 
   const reload = useCallback(async () => {
     try {
@@ -146,6 +159,19 @@ export default function PoolPage() {
             {status === 'refunding' ? 'Refunding…' : `Refund my ${summary.buyInFormatted} ${summary.tokenSymbol}`}
           </Button>
         </section>
+      )}
+
+      {/* Live unresolved leaderboard for multi-round formats (US4); hidden once cancelled */}
+      {summary.state !== 3 && (
+        <PoolLeaderboard
+          entries={standings}
+          isCreator={summary.isCreator}
+          isFinal={summary.state === 2}
+          onScoreChange={scoreChange}
+          onToggleEliminate={toggleEliminate}
+          onAddPlayer={addPlayer}
+          onRemovePlayer={removePlayer}
+        />
       )}
 
       {notice && <p role="alert" className="form-error" data-testid="pool-notice">{notice}</p>}

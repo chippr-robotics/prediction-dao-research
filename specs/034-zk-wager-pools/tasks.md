@@ -163,12 +163,12 @@ SC-010).
 
 ### Tests for User Story 4 (write first, must FAIL) ⚠️
 
-- [ ] T049 [P] [US4] Leaderboard tests (off-chain update propagation, nickname-only identity, non-final marking) in `frontend/src/test/PoolLeaderboard.test.jsx`
+- [X] T049 [P] [US4] Leaderboard tests (off-chain update propagation, nickname-only identity, non-final marking) in `frontend/src/test/PoolLeaderboard.test.jsx`
 
 ### Implementation for User Story 4
 
 - [ ] T050 [US4] Implement the off-chain leaderboard state channel (creator updates, member subscribe) in `services/relayer/` or a lightweight realtime service
-- [ ] T051 [US4] Implement `PoolLeaderboard` + creator dashboard controls (by nickname, explicit non-final/off-chain markers) in `frontend/src/components/pools/PoolLeaderboard.jsx`
+- [X] T051 [US4] Implement `PoolLeaderboard` + creator dashboard controls (by nickname, explicit non-final/off-chain markers) in `frontend/src/components/pools/PoolLeaderboard.jsx`
 
 **Checkpoint**: All user stories independently functional
 

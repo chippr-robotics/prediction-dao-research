@@ -92,3 +92,70 @@
 .pool-closed-note {
   color: var(--text-muted, #5a6472);
 }
+
+/* Live leaderboard (US4) */
+.pool-leaderboard {
+  margin: 1.5rem 0;
+}
+
+.leaderboard-interim {
+  font-size: 0.9rem;
+  color: var(--text-muted, #5a6472);
+  background: var(--surface-2, #fff8e6);
+  border-left: 3px solid var(--warning, #d9a400);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border-color, #e6e9ee);
+}
+
+.leaderboard-row.eliminated {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.lb-rank {
+  width: 1.5rem;
+  text-align: right;
+  color: var(--text-muted, #5a6472);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-nick {
+  flex: 1;
+  font-weight: 600;
+}
+
+.lb-score,
+.lb-score-input {
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-score-input {
+  width: 4.5rem;
+}
+
+.lb-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.leaderboard-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
