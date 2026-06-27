@@ -297,12 +297,74 @@
 }
 
 @media (max-width: 768px) {
+  /* On phones the section nav becomes a slide-over drawer that overlays the
+     content instead of a docked column that pushes it down. The drawer is
+     anchored to the wallet card and animates in/out from the left edge. */
   .wallet-portal.portal-shell {
     min-height: 0;
+    position: relative;
   }
 
   .wallet-portal-current {
     font-size: 14px;
+  }
+
+  .wallet-portal-sidebar.portal-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    display: flex;
+    width: 80%;
+    max-width: 300px;
+    flex-basis: auto;
+    overflow-y: auto;
+    border-right: 1px solid var(--color-border);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+  }
+
+  /* Open state: slide in and become focusable. */
+  .wallet-portal.portal-shell:not(.portal-collapsed) .wallet-portal-sidebar.portal-sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.25s ease, visibility 0s;
+  }
+
+  /* Closed state: keep it rendered (override the shared display:none) so it can
+     animate back out rather than vanish. */
+  .wallet-portal.portal-shell.portal-collapsed .wallet-portal-sidebar.portal-sidebar {
+    display: flex;
+  }
+
+  .wallet-portal-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.4);
+    animation: wallet-portal-backdrop-fade 0.2s ease;
+  }
+}
+
+@keyframes wallet-portal-backdrop-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-portal-sidebar.portal-sidebar,
+  .wallet-portal.portal-shell:not(.portal-collapsed) .wallet-portal-sidebar.portal-sidebar {
+    transition: visibility 0s;
+  }
+
+  .wallet-portal-backdrop {
+    animation: none;
   }
 }
 
