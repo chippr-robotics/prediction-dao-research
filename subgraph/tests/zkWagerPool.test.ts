@@ -5,6 +5,7 @@ import {
   clearStore,
   afterEach,
   newMockEvent,
+  dataSourceMock,
 } from 'matchstick-as/assembly/index'
 import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts'
 import { PoolCreated } from '../generated/ZKWagerPoolFactory/ZKWagerPoolFactory'
@@ -65,6 +66,8 @@ function poolCreated(poolId: i32): PoolCreated {
 describe('ZKWagerPoolFactory.PoolCreated (spec 034 / T022)', () => {
   afterEach(() => {
     clearStore()
+    // Reset the data-source template-create counter so each test starts from 0 (it is cumulative).
+    dataSourceMock.resetValues()
   })
 
   test('handlePoolCreated indexes a Pool with its public fields and JoiningOpen state', () => {
