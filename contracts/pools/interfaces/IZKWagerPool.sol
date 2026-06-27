@@ -11,6 +11,15 @@ enum PoolState {
     Cancelled
 }
 
+/// @notice One row of the payout matrix (FR-018). A winner is identified by their **claim-scope
+///         Semaphore nullifier** (= a deterministic function of their identity secret under the
+///         pool's fixed claim scope), so only the secret-holder can claim the matching share, and
+///         no wallet/commitment is revealed. The matrix preimage hashes to the locked outcome.
+struct PayoutEntry {
+    uint256 claimNullifier;
+    uint256 amount;
+}
+
 /// @title IZKWagerPool
 /// @notice Surface for an isolated, immutable group-wager pool clone (spec 034). Members buy in with
 ///         USDC and join a per-pool Semaphore group; the creator proposes a payout outcome that members
@@ -60,7 +69,19 @@ interface IZKWagerPool {
     function approve(ISemaphore.SemaphoreProof calldata proof) external;
 
     // ---- Payout / refund ----
-    function claim(bytes calldata winShareProof, address recipient) external;
+    /// @notice Claim a winning share to any `recipient`. The caller proves ownership of the winning
+    ///         in-pool identity with a Semaphore proof under the pool's claim scope whose `message`
+    ///         binds `recipient` (anti-front-run) and whose `nullifier` equals `entries[index]
+    ///         .claimNullifier` (binds the claimant to their share). Semaphore's nullifier-reuse rule
+    ///         prevents double-claims. `entries` is the payout-matrix preimage; its hash MUST equal
+    ///         `lockedOutcome`. Pays to an address unlinked to the join wallet (FR-017/SC-013).
+    function claim(
+        PayoutEntry[] calldata entries,
+        uint256 index,
+        ISemaphore.SemaphoreProof calldata proof,
+        address recipient
+    ) external;
+
     function refund() external;
     function cancel() external; // onlyCreator, while JoiningOpen
 

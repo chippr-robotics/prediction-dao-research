@@ -69,11 +69,11 @@ attributable to a wallet (quickstart.md P1).
 
 ### Tests for User Story 1 (write first, must FAIL) ⚠️
 
-- [ ] T012 [P] [US1] Factory tests (create, creator sanctions+`POOL_PARTICIPANT_ROLE` screening, **revert when sanctions guard unset on a value-bearing network**, phrase uniqueness/collision, clone+registry, `PoolCreated`) in `test/pools/ZKWagerPoolFactory.test.js`
-- [ ] T013 [P] [US1] Pool join/close tests (escrow, `addMember`, full/deadline close, frozen denominator, sanctioned/over-limit rejection, late-join rejection) in `test/pools/ZKWagerPool.test.js`
-- [ ] T014 [P] [US1] Resolution tests (creator proposes, approve once per nullifier, revise resets tally, threshold = ceil(frozenDenominator*bips/1e4) locks, double-vote reverts) in `test/pools/ZKWagerPool.resolution.test.js`
-- [ ] T015 [P] [US1] Payout/refund tests (claim to fresh address, no double-claim, under-quorum timeout refund, cancel-before-fill refund, no escrow path outside claim/refund) in `test/pools/ZKWagerPool.payout.test.js`
-- [ ] T016 [P] [US1] Factory upgrade + storage-layout safety test in `test/upgradeable/ZKWagerPoolFactory.upgrade.test.js`
+- [X] T012 [P] [US1] Factory tests (create, creator sanctions+`POOL_PARTICIPANT_ROLE` screening, **revert when sanctions guard unset on a value-bearing network**, phrase uniqueness/collision, clone+registry, `PoolCreated`) in `test/pools/ZKWagerPoolFactory.test.js`
+- [X] T013 [P] [US1] Pool join/close tests (escrow, `addMember`, full/deadline close, frozen denominator, sanctioned/over-limit rejection, late-join rejection) in `test/pools/ZKWagerPool.test.js`
+- [X] T014 [P] [US1] Resolution tests (creator proposes, approve once per nullifier, revise resets tally, threshold = ceil(frozenDenominator*bips/1e4) locks, double-vote reverts) in `test/pools/ZKWagerPool.resolution.test.js`
+- [X] T015 [P] [US1] Payout/refund tests (claim to fresh address, no double-claim, under-quorum timeout refund, cancel-before-fill refund, no escrow path outside claim/refund) in `test/pools/ZKWagerPool.payout.test.js`
+- [X] T016 [P] [US1] Factory upgrade + storage-layout safety test in `test/upgradeable/ZKWagerPoolFactory.upgrade.test.js`
 - [ ] T017 [P] [US1] Integration lifecycle test with real MembershipManager + SanctionsGuard gating in `test/pools/integration/pool-lifecycle.test.js`
 - [ ] T018 [P] [US1] Fork test against the Amoy Semaphore singleton in `test/fork/Semaphore.fork.test.js`
 - [ ] T019 [P] [US1] Frontend gateway tests (phrase↔indices parse/render, resolvePool, invalid/stale handling) in `frontend/src/test/poolGateway.test.js`
@@ -83,10 +83,10 @@ attributable to a wallet (quickstart.md P1).
 
 ### Implementation for User Story 1
 
-- [ ] T023 [US1] Implement `ZKWagerPool.sol` (immutable clone: `initialize`, `join`, `closeJoining`/`pokeDeadline`, `proposeOutcome`, `approve` via Semaphore, `claim`, `refund`, `cancel`; CEI + reentrancy guards; bounded state) in `contracts/pools/ZKWagerPool.sol`
-- [ ] T024 [US1] Resolve the `claim` winning-share proof design spike (second Semaphore proof vs Merkle proof against `lockedOutcome`) and finalize in `ZKWagerPool.sol` + note in research.md
-- [ ] T025 [US1] Implement `ZKWagerPoolFactory.sol` (UUPSManaged proxy: `createPool` with sanctions screening — **guard required on value-bearing networks, revert if unset (FR-021a)** — + `POOL_PARTICIPANT_ROLE` membership gating (FR-021b), 4-word index assignment+collision check, Semaphore `createGroup` as admin, `cloneDeterministicWithImmutableArgs`, phrase↔pool registry, `PoolCreated`; append-only storage + `__gap`) in `contracts/pools/ZKWagerPoolFactory.sol`
-- [ ] T026 [US1] Register the factory in `scripts/deploy/check-storage-layout.js` (CI gate)
+- [X] T023 [US1] Implement `ZKWagerPool.sol` (immutable clone: `initialize`, `join`, `closeJoining`/`pokeDeadline`, `proposeOutcome`, `approve` via Semaphore, `claim`, `refund`, `cancel`; CEI + reentrancy guards; bounded state) in `contracts/pools/ZKWagerPool.sol`
+- [X] T024 [US1] Resolved the `claim` winning-share proof spike: payout matrix maps each winner's **claim-scope Semaphore nullifier → share**; claim binds `recipient` into the proof message (anti front-run) and requires `proof.nullifier == entries[index].claimNullifier`, so only the secret-holder claims their share, paid to any address, with Semaphore nullifier-reuse blocking double-claims — no custom circuit (see `ZKWagerPool.claim` + `PayoutEntry`)
+- [X] T025 [US1] Implement `ZKWagerPoolFactory.sol` (UUPSManaged proxy: `createPool` with sanctions screening — **guard required on value-bearing networks, revert if unset (FR-021a)** — + `POOL_PARTICIPANT_ROLE` membership gating (FR-021b), 4-word index assignment+collision check, Semaphore `createGroup` as admin, `cloneDeterministicWithImmutableArgs`, phrase↔pool registry, `PoolCreated`; append-only storage + `__gap`) in `contracts/pools/ZKWagerPoolFactory.sol`
+- [X] T026 [US1] Register the factory in `scripts/deploy/check-storage-layout.js` (CI gate)
 - [ ] T027 [US1] Write deploy script `scripts/deploy/deploy-zk-wager-pool-factory.js` (deterministic `poolImpl`, `deployProxy` factory, reuse sanctionsGuard/membershipManager, append to `deployments/*-v2.json`) mirroring `deploy-token-factory.js`
 - [ ] T028 [P] [US1] Add `frontend/src/abis/ZKWagerPoolFactory.js` and `ZKWagerPool.js` ABI modules (sync emits `.json`)
 - [ ] T029 [P] [US1] Implement BIP-39 gateway lib `frontend/src/lib/pools/gateway.js` (`phraseToIndices`, `indicesToPhrase`, `resolvePool` via `getContractAddressForChain('zkWagerPoolFactory', chainId)`)
