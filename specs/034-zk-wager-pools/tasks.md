@@ -78,7 +78,7 @@ attributable to a wallet (quickstart.md P1).
 - [ ] T018 [P] [US1] Fork test against the Amoy Semaphore singleton in `test/fork/Semaphore.fork.test.js`
 - [X] T019 [P] [US1] Frontend gateway tests (phrase↔indices parse/render, resolvePool, invalid/stale handling) in `frontend/src/test/poolGateway.test.js`
 - [X] T020 [P] [US1] Frontend nickname determinism test (derived from public commitment, reproducible by any member, never on-chain) in `frontend/src/test/poolNickname.test.js`
-- [ ] T021 [P] [US1] Frontend create/join UI tests (quick action dispatch, pool summary before funds) in `frontend/src/test/PoolPages.test.jsx`
+- [X] T021 [P] [US1] Frontend create/join UI tests (quick action dispatch, pool summary before funds) in `frontend/src/test/PoolPages.test.jsx`
 - [ ] T022 [P] [US1] Subgraph matchstick test: `handlePoolCreated` instantiates the `ZKWagerPool` template; assert entities are network-scoped and no nickname/wallet→vote data is indexed (FR-032/FR-033/FR-010) in `subgraph/tests/zkWagerPool.test.ts`
 
 ### Implementation for User Story 1
@@ -88,12 +88,12 @@ attributable to a wallet (quickstart.md P1).
 - [X] T025 [US1] Implement `ZKWagerPoolFactory.sol` (UUPSManaged proxy: `createPool` with sanctions screening — **guard required on value-bearing networks, revert if unset (FR-021a)** — + `POOL_PARTICIPANT_ROLE` membership gating (FR-021b), 4-word index assignment+collision check, Semaphore `createGroup` as admin, `cloneDeterministicWithImmutableArgs`, phrase↔pool registry, `PoolCreated`; append-only storage + `__gap`) in `contracts/pools/ZKWagerPoolFactory.sol`
 - [X] T026 [US1] Register the factory in `scripts/deploy/check-storage-layout.js` (CI gate)
 - [ ] T027 [US1] Write deploy script `scripts/deploy/deploy-zk-wager-pool-factory.js` (deterministic `poolImpl`, `deployProxy` factory, reuse sanctionsGuard/membershipManager, append to `deployments/*-v2.json`) mirroring `deploy-token-factory.js`
-- [ ] T028 [P] [US1] Add `frontend/src/abis/ZKWagerPoolFactory.js` and `ZKWagerPool.js` ABI modules (sync emits `.json`)
+- [X] T028 [P] [US1] Add `frontend/src/abis/ZKWagerPoolFactory.js` and `ZKWagerPool.js` ABI modules (sync emits `.json`)
 - [X] T029 [P] [US1] Implement BIP-39 gateway lib `frontend/src/lib/pools/gateway.js` (`phraseToIndices`, `indicesToPhrase`, `resolvePool` via `getContractAddressForChain('zkWagerPoolFactory', chainId)`)
 - [X] T030 [P] [US1] Implement nickname lib `frontend/src/lib/pools/nickname.js` (derive from the **public identity commitment** so any member can render it; versioned adjective/noun arrays; in-pool disambiguation; never written on-chain)
 - [ ] T031 [P] [US1] Implement in-browser proof lib `frontend/src/lib/pools/semaphoreProof.js` (lazy-load artifacts, `generateApprovalProof`)
-- [ ] T032 [US1] Add `create-pool`/`join-pool` quick action tiles + dispatch in `frontend/src/components/fairwins/Dashboard.jsx` and routes `/pools/create|join|:poolId` in `frontend/src/App.jsx`
-- [ ] T033 [US1] Implement `CreatePoolPage`, `JoinPoolPage`, `PoolPage` in `frontend/src/components/pools/` (create form, four-word join, pool summary, approve/claim/refund actions, honest state surfacing)
+- [X] T032 [US1] Add `create-pool`/`join-pool` quick action tiles + dispatch in `frontend/src/components/fairwins/Dashboard.jsx` and routes `/pools/create|join|:poolId` in `frontend/src/App.jsx`
+- [X] T033 [US1] Implement `CreatePoolPage`, `JoinPoolPage`, `PoolPage` in `frontend/src/components/pools/` (create form, four-word join, pool summary, approve/claim/refund actions, honest state surfacing)
 - [ ] T034 [US1] Add subgraph factory data source + `ZKWagerPool` template to `subgraph/subgraph.yaml`, entities to `subgraph/schema.graphql`, placeholders to `subgraph/networks.json`
 - [ ] T035 [US1] Implement subgraph mappings `subgraph/src/mappings/zkWagerPoolFactory.ts` (`handlePoolCreated` → `Pool.create`) and `zkWagerPool.ts` (join/propose/approve/lock/claim handlers); index commitments/nullifiers/shares only — **no nickname, no wallet→vote link** (FR-010)
 - [X] T036 [US1] Update `CLAUDE.md` Guardrails with the parallel-system carve-out + new deployment keys (`zkWagerPoolFactory`, `zkWagerPoolFactoryImpl`, `poolImpl`)
@@ -118,7 +118,7 @@ under another (quickstart.md P1 frontend / SC-008).
 
 ### Implementation for User Story 2
 
-- [ ] T039 [P] [US2] Implement `frontend/src/utils/wordListLanguage.js` (device pref, curated enum ≥4 langs, validated, default `en`) following the `qrColorPreference.js` precedent
+- [X] T039 [P] [US2] Implement `frontend/src/utils/wordListLanguage.js` (device pref, curated enum ≥4 langs, validated, default `en`) following the `qrColorPreference.js` precedent
 - [ ] T040 [P] [US2] Bundle the supported BIP-39 wordlists and a per-language lookup in `frontend/src/lib/pools/bip39Lists.js`
 - [ ] T041 [US2] Wire the language into `gateway.js` rendering/parsing (use selected language list)
 - [ ] T042 [US2] Add the word-list language selector control to `frontend/src/components/account/WalletUtilitiesPanel.jsx` (WCAG 2.1 AA, accessible label)

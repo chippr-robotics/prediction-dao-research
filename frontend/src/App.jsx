@@ -20,6 +20,9 @@ import Footer from './components/Footer'
 import WalletPage from './pages/WalletPage'
 import VouchersPage from './pages/VouchersPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
+import CreatePoolPage from './pages/CreatePoolPage'
+import JoinPoolPage from './pages/JoinPoolPage'
+import PoolPage from './pages/PoolPage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
@@ -117,6 +120,9 @@ function AppContent() {
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
+          <Route path="/pools/create" element={<CreatePoolPage />} />
+          <Route path="/pools/join" element={<JoinPoolPage />} />
+          <Route path="/pools/:address" element={<PoolPage />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Route>
 
