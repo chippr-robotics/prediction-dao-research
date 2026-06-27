@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../hooks/useWalletManagement'
 import { usePools } from '../hooks/usePools'
 import Button from '../components/ui/Button'
+import './pools.css'
 
 /**
  * CreatePoolPage (spec 034) — open a group wager pool and get a shareable four-word phrase. The phrase
@@ -21,8 +22,19 @@ export default function CreatePoolPage() {
     resolutionDays: '3',
   })
   const [result, setResult] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const copyPhrase = async () => {
+    try {
+      await navigator.clipboard?.writeText(result.phrase)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard unavailable — no-op */
+    }
+  }
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -44,6 +56,7 @@ export default function CreatePoolPage() {
           {result.phrase}
         </p>
         <div className="pool-actions">
+          <Button onClick={copyPhrase} data-testid="copy-phrase">{copied ? 'Copied' : 'Copy words'}</Button>
           <Button onClick={() => navigate(`/pools/${result.pool}`)}>Open pool</Button>
           <Button variant="secondary" onClick={() => setResult(null)}>Create another</Button>
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AddressQRModal from '../ui/AddressQRModal'
+import WordListLanguageSelector from '../pools/WordListLanguageSelector'
 import './WalletUtilitiesPanel.css'
 
 /**
@@ -30,6 +31,7 @@ function WalletUtilitiesPanel({ address, onDisconnect }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
+      <WordListLanguageSelector />
       <div className="account-utilities-actions">
         <button type="button" className="account-utilities-btn" onClick={() => setQROpen(true)}>
           Show QR Code
