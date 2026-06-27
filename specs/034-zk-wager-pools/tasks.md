@@ -35,7 +35,7 @@ subgraph in `subgraph/`, deploy in `scripts/deploy/`, off-chain relayer in `serv
 
 - [ ] T001 Add Solidity dependency `@semaphore-protocol/contracts` to `package.json` and run install — DEFERRED: using a build-green local `contracts/pools/interfaces/ISemaphore.sol` mirror (exact V4 ABI) until the factory/pool are wired against the real Semaphore (T023/T025), to avoid a risky mid-session dep install
 - [ ] T002 Configure `hardhat.config.js` to pin `evmVersion: "shanghai"` for ETC/Mordor compile targets (avoid Cancun opcodes) per research.md §3 — DEFERRED to ETC enablement (T057); the repo already compiles to **`paris`** (no PUSH0), which is ETC-safe, so no global change is needed now
-- [ ] T003 [P] Add frontend deps `@semaphore-protocol/identity` `/group` `/proof` to `frontend/package.json` and self-host the Semaphore `.wasm`/`.zkey` artifacts under `frontend/public/semaphore/` (verify hash vs PSE) — DEFERRED to US1 frontend (T029/T031)
+- [X] T003 [P] Add frontend deps `@semaphore-protocol/identity` `/group` `/proof` to `frontend/package.json` and self-host the Semaphore `.wasm`/`.zkey` artifacts under `frontend/public/semaphore/` (verify hash vs PSE) — DEFERRED to US1 frontend (T029/T031)
 - [X] T004 [P] Create contract dirs `contracts/pools/` and `contracts/pools/interfaces/`, and frontend dirs `frontend/src/components/pools/` and `frontend/src/lib/pools/` (contract dirs created; frontend dirs created with US1 frontend tasks)
 - [X] T005 [P] Record canonical Semaphore V4 singleton + verifier addresses (137 + verified 80002) and per-network USDC into a config note for deploy in `scripts/deploy/lib/zkPoolConfig.js` (+ MERKLE_TREE_DEPTH=16, MAX_MEMBERS_CAP=1000)
 
