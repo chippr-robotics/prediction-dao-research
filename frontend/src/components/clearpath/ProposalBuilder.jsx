@@ -76,7 +76,15 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
   const valid = A.ok && !anyPending
 
   // Pre-sign guards: over-treasury (warn, allow) + duplicate proposal (block submit — it would revert).
-  const timelock = treasuries.find((t) => t.label === 'Timelock') || treasuries[0]
+  // Measure the spend against the DAO's TOTAL holdings across ALL known treasuries (timelock + vaults), not
+  // just the timelock. A Governor's funds commonly live in a separate vault while its timelock holds ~0, so a
+  // timelock-only check false-warns on every spend (it reads 0 and flags any positive amount). USDC meta is
+  // stamped identically across vaults, so summing `usdc` is apples-to-apples.
+  const nativeHeld = treasuries.reduce((sum, t) => sum + (t.native ?? 0n), 0n)
+  const usdcHeld = treasuries.reduce((sum, t) => sum + (t.usdc ?? 0n), 0n)
+  const anyNativeKnown = treasuries.some((t) => t.native != null)
+  const anyUsdcKnown = treasuries.some((t) => t.usdc != null)
+  const usdcSymbol = treasuries.find((t) => t.usdcSymbol)?.usdcSymbol || 'USDC'
   let nativeTotal = 0n
   let usdcTotal = 0n
   for (const p of A.perAction) {
@@ -86,8 +94,9 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
       try { const [, amt] = ERC20_TRANSFER_IFACE.decodeFunctionData('transfer', p.encoded.calldata); usdcTotal += amt } catch { /* not a transfer */ }
     }
   }
-  const overNative = valid && timelock?.native != null && nativeTotal > timelock.native
-  const overUsdc = valid && timelock?.usdc != null && usdcTotal > timelock.usdc
+  // Only warn once balances are known, and only when the spend truly exceeds total DAO holdings.
+  const overNative = valid && anyNativeKnown && nativeTotal > nativeHeld
+  const overUsdc = valid && anyUsdcKnown && usdcTotal > usdcHeld
   const dupId = valid ? predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash) : null
   // FR-025 duplicate pre-check: an identical action set + description hashes to the same id as a live proposal.
   const isDuplicate = !!dupId && proposals.some((p) => p.id === dupId)
@@ -158,7 +167,7 @@ export default function ProposalBuilder({ record, signer, reader, usdcAddress, n
         <div className="cp-kv"><span className="k">Actions</span><span>{actions.length}</span></div>
         <div className="cp-kv"><span className="k">Total native value</span><span className="cp-mono">{ethers.formatEther(nativeTotal)} {nativeSymbol || ''}</span></div>
         {overNative && <div className="cp-warn" role="status">Sends more {nativeSymbol} than the treasury holds. The proposal can still be created; execution will revert if not funded by then.</div>}
-        {overUsdc && <div className="cp-warn" role="status">Sends more {timelock?.usdcSymbol || 'USDC'} than the treasury holds. The proposal can still be created; execution will revert if not funded.</div>}
+        {overUsdc && <div className="cp-warn" role="status">Sends more {usdcSymbol} than the treasury holds. The proposal can still be created; execution will revert if not funded.</div>}
         {isDuplicate && <div className="cp-error" role="alert">This exact proposal already exists (id {dupId.length > 14 ? `${dupId.slice(0, 8)}…${dupId.slice(-4)}` : dupId}). Submitting it would revert — change an action or the description.</div>}
         {!valid && <p className="cp-row-sub">{anyPending ? 'Reading token details…' : 'Add a title/description and at least one valid action to submit.'}</p>}
 
