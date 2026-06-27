@@ -204,12 +204,44 @@ export function usePools() {
     }
   }, [requireSigner])
 
+  /**
+   * Read the full set of member identity commitments from the pool's Joined events over RPC. This is the
+   * group the prover reconstructs to generate an approval/claim proof — read directly from chain so the
+   * resolution loop does NOT depend on the subgraph (the subgraph is for discovery/listing only).
+   */
+  const getMemberCommitments = useCallback(async (poolAddress) => {
+    const { signer: s } = await requireSigner()
+    const pool = getPool(poolAddress, s)
+    const events = await pool.queryFilter(pool.filters.Joined())
+    return events.map((e) => BigInt(e.args.identityCommitment))
+  }, [requireSigner])
+
   /** Derive the connected member's anonymous nickname for a pool (signs to seed the local identity). */
   const getMyNickname = useCallback(async (poolAddress) => {
     const { signer: s } = await requireSigner()
     const { commitment } = await createPoolIdentity(s, poolAddress)
     return deriveNickname(commitment, poolAddress)
   }, [requireSigner])
+
+  /**
+   * Reveal the connected member's "claim code" — their claim-scope Semaphore nullifier. The member shares
+   * this off-chain with the creator, who places it (with an amount) in the payout matrix. It is unlinkable
+   * to the wallet, and is the value the contract matches at claim time. Returns a decimal string.
+   */
+  const getMyClaimCode = useCallback(async (poolAddress) => {
+    const { signer: s } = await requireSigner()
+    const memberCommitments = await getMemberCommitments(poolAddress)
+    const { identity } = await createPoolIdentity(s, poolAddress)
+    // The nullifier is a deterministic function of (claimScope, identity); message/group-validity don't
+    // affect it, so this matches the nullifier the real claim proof will produce.
+    const proof = await generatePoolProof({
+      identity,
+      memberCommitments,
+      message: 0n,
+      scope: poolClaimScope(poolAddress),
+    })
+    return proof.nullifier.toString()
+  }, [requireSigner, getMemberCommitments])
 
   /** Creator: close joining early (freezes the denominator). */
   const closeJoining = useCallback(async (poolAddress) => {
@@ -236,13 +268,14 @@ export function usePools() {
    * Member: anonymously approve the current proposal. Needs the full member-commitment set to build the
    * prover's group (read from the subgraph once available).
    */
-  const vote = useCallback(async (poolAddress, { memberCommitments }) => {
+  const vote = useCallback(async (poolAddress) => {
     setStatus('voting')
     setError(null)
     try {
       const { signer: s } = await requireSigner()
       const pool = getPool(poolAddress, s)
       const proposalId = await pool.currentProposalId()
+      const memberCommitments = await getMemberCommitments(poolAddress)
       const { identity } = await createPoolIdentity(s, poolAddress)
       const proof = await generatePoolProof({
         identity,
@@ -259,15 +292,16 @@ export function usePools() {
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner])
+  }, [requireSigner, getMemberCommitments])
 
-  /** Winner: claim a share to `recipient`. `entries` is the payout matrix preimage. */
-  const claimWinnings = useCallback(async (poolAddress, { entries, index, recipient, memberCommitments }) => {
+  /** Winner: claim a share to `recipient`. `entries` is the payout matrix preimage (shared by the creator). */
+  const claimWinnings = useCallback(async (poolAddress, { entries, index, recipient }) => {
     setStatus('claiming')
     setError(null)
     try {
       const { signer: s } = await requireSigner()
       const pool = getPool(poolAddress, s)
+      const memberCommitments = await getMemberCommitments(poolAddress)
       const { identity } = await createPoolIdentity(s, poolAddress)
       const proof = await generatePoolProof({
         identity,
@@ -284,7 +318,7 @@ export function usePools() {
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner])
+  }, [requireSigner, getMemberCommitments])
 
   /** Member: recover the buy-in after a timeout or cancellation. */
   const refund = useCallback(async (poolAddress) => {
@@ -310,7 +344,9 @@ export function usePools() {
     resolvePhrase,
     getPoolSummary,
     joinPool,
+    getMemberCommitments,
     getMyNickname,
+    getMyClaimCode,
     closeJoining,
     cancelPool,
     proposeOutcome,

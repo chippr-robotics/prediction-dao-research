@@ -8,6 +8,7 @@ import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
+import GroupPoolModal from './GroupPoolModal'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -495,6 +496,8 @@ function Dashboard() {
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
+  const [showGroupPool, setShowGroupPool] = useState(false)
+  const [groupPoolTab, setGroupPoolTab] = useState('create')
   const [openChallengeTab, setOpenChallengeTab] = useState('maker')
   const [openChallengeInitialCode, setOpenChallengeInitialCode] = useState('')
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
@@ -567,10 +570,12 @@ function Dashboard() {
         setShowOpenChallenge(true)
         break
       case 'create-pool':
-        navigate('/pools/create')
+        setGroupPoolTab('create')
+        setShowGroupPool(true)
         break
       case 'join-pool':
-        navigate('/pools/join')
+        setGroupPoolTab('join')
+        setShowGroupPool(true)
         break
       case 'my-wagers':
         setShowMyWagers(true)
@@ -726,6 +731,14 @@ function Dashboard() {
           setShowOpenChallenge(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
         }}
+      />
+
+      {/* Group Pool (spec 034) — one modal, Create/Join tabs, matching the wager bottom-sheet UX. */}
+      <GroupPoolModal
+        key={showGroupPool ? 'gp-open' : 'gp-closed'}
+        isOpen={showGroupPool}
+        initialTab={groupPoolTab}
+        onClose={() => setShowGroupPool(false)}
       />
 
       {/* My Wagers Modal */}

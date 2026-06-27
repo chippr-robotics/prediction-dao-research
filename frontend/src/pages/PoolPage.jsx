@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
 import Button from '../components/ui/Button'
 import PoolLeaderboard from '../components/pools/PoolLeaderboard'
+import PoolResolutionActions from '../components/pools/PoolResolutionActions'
 import './pools.css'
 
 /**
@@ -132,7 +133,7 @@ export default function PoolPage() {
               {summary.hasJoined && (
                 <Button
                   data-testid="approve-outcome"
-                  onClick={() => run(() => vote(address, { memberCommitments: summary.memberCommitments || [] }))}
+                  onClick={() => run(() => vote(address))}
                   disabled={status === 'voting'}
                 >
                   {status === 'voting' ? 'Approving…' : 'Approve the proposed outcome'}
@@ -151,6 +152,11 @@ export default function PoolPage() {
         <section className="pool-resolved" aria-label="Resolved">
           <p data-testid="pool-resolved">This pool is resolved. Winners can claim their share to any address.</p>
         </section>
+      )}
+
+      {/* Reveal-claim-code, creator propose-builder, and winner claim (US1 resolution loop) */}
+      {(summary.hasJoined || summary.isCreator || summary.state === 2) && summary.state !== 3 && (
+        <PoolResolutionActions summary={summary} pools={pools} onChanged={reload} />
       )}
 
       {summary.refundEligible && (

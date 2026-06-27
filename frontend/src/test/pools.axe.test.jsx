@@ -10,8 +10,7 @@ vi.mock('../hooks/usePools', () => ({ usePools: vi.fn() }))
 
 import { useWallet } from '../hooks/useWalletManagement'
 import { usePools } from '../hooks/usePools'
-import CreatePoolPage from '../pages/CreatePoolPage'
-import JoinPoolPage from '../pages/JoinPoolPage'
+import GroupPoolModal from '../components/fairwins/GroupPoolModal'
 import PoolPage from '../pages/PoolPage'
 import PoolLeaderboard from '../components/pools/PoolLeaderboard'
 import WordListLanguageSelector from '../components/pools/WordListLanguageSelector'
@@ -53,13 +52,13 @@ describe('ZK-Wager Pool UI accessibility', () => {
     usePools.mockReturnValue(poolsMock())
   })
 
-  it('CreatePoolPage has no a11y violations', async () => {
-    const { container } = render(<MemoryRouter><CreatePoolPage /></MemoryRouter>)
+  it('GroupPoolModal (create tab) has no a11y violations', async () => {
+    const { container } = render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} initialTab="create" /></MemoryRouter>)
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('JoinPoolPage has no a11y violations', async () => {
-    const { container } = render(<MemoryRouter><JoinPoolPage /></MemoryRouter>)
+  it('GroupPoolModal (join tab) has no a11y violations', async () => {
+    const { container } = render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} initialTab="join" /></MemoryRouter>)
     expect(await axe(container)).toHaveNoViolations()
   })
 
