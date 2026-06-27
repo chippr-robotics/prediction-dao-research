@@ -144,6 +144,25 @@ const PROPOSAL_CREATED_TOPIC = ethers.id(
 const PROPOSAL_IFACE = new ethers.Interface(GOVERNOR_PROPOSAL_ABI)
 
 /**
+ * `eth_getLogs` over [from, to] that is resilient to RPC block-range caps. Public ETC/Mordor nodes (and many
+ * wallet RPC backends) reject a `getLogs` window wider than some provider-specific limit. On any failure we
+ * bisect the range and retry each half, down to `minSpan` blocks — so a single oversized chunk degrades to a
+ * few smaller requests instead of losing the whole scan. Throws only if even a `minSpan`-wide window is
+ * rejected, letting the caller decide partial-vs-fail. Exported for unit testing.
+ */
+export async function getLogsRange(reader, governor, from, to, minSpan = 2000) {
+  try {
+    return await reader.getLogs({ address: governor, topics: [PROPOSAL_CREATED_TOPIC], fromBlock: from, toBlock: to })
+  } catch (e) {
+    if (to - from + 1 <= minSpan) throw e
+    const mid = Math.floor((from + to) / 2)
+    const left = await getLogsRange(reader, governor, from, mid, minSpan)
+    const right = await getLogsRange(reader, governor, mid + 1, to, minSpan)
+    return [...left, ...right]
+  }
+}
+
+/**
  * Limited LIVE on-chain indexing for chains without a subgraph (Mordor/ETC): a bounded, chunked `eth_getLogs`
  * scan of the Governor's `ProposalCreated` events, newest-first, enriched with live `state` + `proposalVotes`.
  * Resilient: if the RPC rejects a chunk it stops and returns what it has (marked `partial`) rather than failing
@@ -166,7 +185,7 @@ export async function fetchGovernorProposals(reader, governor, { lookbackBlocks 
   for (let to = current; to >= floor; to -= chunk) {
     const from = Math.max(floor, to - chunk + 1)
     try {
-      const logs = await reader.getLogs({ address: governor, topics: [PROPOSAL_CREATED_TOPIC], fromBlock: from, toBlock: to })
+      const logs = await getLogsRange(reader, governor, from, to)
       raw.push(...logs)
       scannedFrom = from
       firstChunk = false

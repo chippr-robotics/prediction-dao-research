@@ -134,4 +134,27 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     // still submittable (execution, not proposal, would revert)
     await waitFor(() => expect(screen.getByRole('button', { name: /submit proposal/i })).toBeEnabled())
   })
+
+  // Regression: a Governor whose Timelock holds ~0 but whose funds live in a separate vault must NOT
+  // false-warn on a spend the DAO can actually cover. The over-treasury guard measures total holdings
+  // across ALL treasuries (timelock + vaults), not just the (commonly empty) timelock.
+  it('does not false-warn when the timelock is empty but a vault holds the funds', async () => {
+    const splitTreasuries = [
+      { label: 'Timelock', address: '0x0000000000000000000000000000000000000222', native: 0n, usdc: 0n, usdcSymbol: 'cUSD', usdcDecimals: 6 },
+      { label: 'Olympia Treasury', address: '0x0000000000000000000000000000000000000333', native: ethers.parseEther('2'), usdc: 50_000000n, usdcSymbol: 'cUSD', usdcDecimals: 6 },
+    ]
+    const user = userEvent.setup()
+    renderBuilder({ treasuries: splitTreasuries })
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    await user.type(screen.getByLabelText(/^title$/i), 'Small spend')
+    await user.type(screen.getByLabelText(/recipient/i), TO)
+    await user.type(screen.getByLabelText(/amount/i), '1') // 1 cUSD ≤ 50 cUSD held in the vault
+    const submit = screen.getByRole('button', { name: /submit proposal/i })
+    await waitFor(() => expect(submit).toBeEnabled())
+    expect(screen.queryByText(/than the treasury holds/i)).not.toBeInTheDocument()
+    // but a spend beyond the DAO's total holdings still warns
+    await user.clear(screen.getByLabelText(/amount/i))
+    await user.type(screen.getByLabelText(/amount/i), '51') // > 50 cUSD total
+    expect(await screen.findByText(/more cUSD than the treasury holds/i)).toBeInTheDocument()
+  })
 })
