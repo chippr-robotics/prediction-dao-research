@@ -234,3 +234,85 @@ type TokenActivity @entity(immutable: true) {
   timestamp: BigInt!
   txHash: Bytes!
 }
+
+# ---------------------------------------------------------------------------
+# ZK-Wager Pools (spec 034). Privacy: we index in-pool identity references
+# (commitments, nullifiers) and payout shares only — NEVER a nickname or a
+# wallet->vote link (FR-010). Nicknames are derived client-side from the public
+# commitment. Network-scoped per deployment.
+# ---------------------------------------------------------------------------
+type Pool @entity(immutable: false) {
+  "pool clone address (lowercased hex)"
+  id: ID!
+  "sequential registry id from the factory"
+  poolId: BigInt!
+  "pool creator (sole payout proposer)"
+  creator: Bytes!
+  "buy-in token (USDC)"
+  token: Bytes!
+  "per-member buy-in"
+  buyIn: BigInt!
+  maxMembers: Int!
+  "approval threshold in basis points of joined members"
+  thresholdBips: Int!
+  joinDeadline: BigInt!
+  "the four BIP-39 word indices identifying the pool (language-independent)"
+  wordIndices: [Int!]!
+  "0=JoiningOpen 1=JoiningClosed 2=Resolved 3=Cancelled (mirrors on-chain reads; events advance it)"
+  state: Int!
+  memberCount: Int!
+  "locked payout-matrix hash once resolved (else null)"
+  lockedOutcome: Bytes
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+  createdTxHash: Bytes!
+  joins: [PoolJoin!]! @derivedFrom(field: "pool")
+  proposals: [PoolProposal!]! @derivedFrom(field: "pool")
+  payouts: [PoolPayout!]! @derivedFrom(field: "pool")
+}
+
+type PoolJoin @entity(immutable: true) {
+  "pool-commitment"
+  id: ID!
+  pool: Pool!
+  "Semaphore identity commitment (the nickname is derived from this client-side)"
+  identityCommitment: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type PoolProposal @entity(immutable: false) {
+  "pool-proposalId"
+  id: ID!
+  pool: Pool!
+  proposalId: Bytes!
+  approvalCount: Int!
+  "block timestamp the outcome locked, or null while unresolved"
+  lockedAt: BigInt
+}
+
+type PoolVote @entity(immutable: true) {
+  "pool-nullifier"
+  id: ID!
+  pool: Pool!
+  proposalId: Bytes!
+  "anonymous nullifier (unlinkable to wallet/commitment)"
+  nullifier: BigInt!
+  "vote choice carried in the Semaphore message"
+  message: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type PoolPayout @entity(immutable: true) {
+  "pool-nullifier"
+  id: ID!
+  pool: Pool!
+  "claim-scope nullifier of the winning share"
+  shareRef: Bytes!
+  "recipient address chosen at claim (unlinked to the join wallet)"
+  recipient: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
