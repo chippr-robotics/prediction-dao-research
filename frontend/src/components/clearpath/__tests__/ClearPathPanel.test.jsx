@@ -19,12 +19,13 @@ const cp = {
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 
-const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn() }
+const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn(), detectTreasuryFunding: vi.fn() }
 vi.mock('../governorConnector', () => ({
   validateGovernor: (...a) => conn.validateGovernor(...a),
   readGovernorSummary: (...a) => conn.readGovernorSummary(...a),
   readTreasuries: (...a) => conn.readTreasuries(...a),
   extraTreasuries: () => [{ label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf' }],
+  detectTreasuryFunding: (...a) => conn.detectTreasuryFunding(...a),
   fetchGovernorProposals: (...a) => conn.fetchGovernorProposals(...a),
   readVoterState: (...a) => conn.readVoterState(...a),
   readProposalEta: (...a) => conn.readProposalEta(...a),
@@ -61,6 +62,7 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     conn.readTreasuries.mockResolvedValue([])
     conn.readVoterState.mockResolvedValue({ hasVoted: false, votingPower: null, support: null })
     conn.readProposalEta.mockResolvedValue(null)
+    conn.detectTreasuryFunding.mockResolvedValue(null)
   })
 
   it('self-disables truthfully on an unsupported network', async () => {

@@ -7,6 +7,7 @@ import {
   readGovernorSummary,
   readTreasuries,
   extraTreasuries,
+  detectTreasuryFunding,
   fetchGovernorProposals,
   readVoterState,
   readProposalEta,
@@ -140,7 +141,15 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
         if (vaults.length) {
           try {
             const t = await readTreasuries(reader, vaults, usdcAddress)
-            if (!cancelled) setTreasuries(t)
+            // Detect the executor-gated funding pattern per vault (ECIP-1112/1113) so the UI can both label it
+            // and offer the correct "Fund from treasury" proposal action. Plain timelock vaults stay funding=null.
+            const enriched = await Promise.all(
+              t.map(async (entry) => {
+                const funding = await detectTreasuryFunding(reader, entry.address, summary?.timelock)
+                return funding ? { ...entry, funding } : entry
+              })
+            )
+            if (!cancelled) setTreasuries(enriched)
           } catch { /* treasury balances are best-effort */ }
         }
       })
@@ -267,9 +276,13 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
             {treasuries.length === 0 && <p className="cp-row-sub">Reading balances…</p>}
             {treasuries.map((t) => (
               <div key={t.address} className="cp-section" style={{ marginBottom: '0.5rem' }}>
-                <div className="cp-kv"><span className="k">{t.label}</span><code className="cp-mono">{short(t.address)}</code></div>
+                <div className="cp-kv">
+                  <span className="k">{t.label}{t.funding && <span className="cp-badge" style={{ marginLeft: '0.4rem' }} title="Spendable by proposal via its on-chain executor">Governable</span>}</span>
+                  <code className="cp-mono">{short(t.address)}</code>
+                </div>
                 <div className="cp-kv"><span className="k">Native</span><span className="cp-mono">{t.native != null ? `${ethers.formatEther(t.native)} ${net?.nativeCurrency?.symbol || ''}` : '—'}</span></div>
                 <div className="cp-kv"><span className="k">{t.usdcSymbol || 'USDC'}</span><span className="cp-mono">{fmtUsdc(t.usdc, t.usdcDecimals)}</span></div>
+                {t.funding && <p className="cp-row-sub" style={{ marginTop: '0.2rem' }}>Fundable through a proposal (native {net?.nativeCurrency?.symbol || ''} only) — “Fund from treasury”.</p>}
                 {explorerBase && <a className="cp-btn-link" href={`${explorerBase}/address/${t.address}`} target="_blank" rel="noreferrer">View ↗</a>}
               </div>
             ))}
@@ -295,6 +308,9 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
           usdcAddress={usdcAddress}
           nativeSymbol={net?.nativeCurrency?.symbol}
           treasuries={treasuries}
+          fundingSources={treasuries
+            .filter((t) => t.funding)
+            .map((t) => ({ executor: t.funding.executor, label: t.label, address: t.address, native: t.native }))}
           proposals={props.proposals}
           run={run}
           busy={busy}

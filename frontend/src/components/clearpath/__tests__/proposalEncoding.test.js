@@ -27,6 +27,20 @@ describe('proposalEncoding', () => {
     expect(descriptionHash(d)).toBe(ethers.id(d))
   })
 
+  it('encodes a "fund from treasury" action as executeTreasury(recipient, amount) on the executor', () => {
+    const EXECUTOR = '0x00000000000000000000000000000000000000e1'
+    const EXEC_IFACE = new ethers.Interface(['function executeTreasury(address recipient, uint256 amount)'])
+    const enc = encodeAction(
+      { ...newAction(ACTION_TYPE.TREASURY), treasuryExecutor: EXECUTOR, treasuryTo: TO, treasuryAmount: '1.5' },
+      { usdcAddress: USDC, meta: usdcMeta }
+    )
+    expect(enc.target).toBe(EXECUTOR) // target is the executor, NOT the recipient or the vault
+    expect(enc.value).toBe(0n) // the call carries no value — the executor pulls from the vault
+    const [to, amount] = EXEC_IFACE.decodeFunctionData('executeTreasury', enc.calldata)
+    expect(to.toLowerCase()).toBe(TO)
+    expect(amount).toBe(ethers.parseEther('1.5')) // native (18 decimals)
+  })
+
   it('encodes a native send (value + empty calldata)', () => {
     const a = { ...newAction(ACTION_TYPE.NATIVE), nativeTo: TO, nativeAmount: '1.5' }
     const enc = encodeAction(a, { usdcAddress: USDC, meta: usdcMeta })

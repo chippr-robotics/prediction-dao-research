@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ethers } from 'ethers'
-import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport, explainTxError } from '../governorConnector'
+import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport, explainTxError, detectTreasuryFunding } from '../governorConnector'
 
 // Spec 030 (US5) — the subgraph-less proposal indexer must survive RPC block-range caps. ETC/Mordor public
 // nodes (and many wallet RPC backends) reject an `eth_getLogs` window wider than a provider-specific limit;
@@ -127,5 +127,19 @@ describe('explainTxError (spec 030 — decode opaque custom-error reverts)', () 
   it('falls back to the ethers message for unknown selectors', () => {
     expect(explainTxError({ shortMessage: 'user rejected' })).toBe('user rejected')
     expect(explainTxError({ data: '0xdeadbeef', message: 'boom' })).toBe('boom')
+  })
+})
+
+describe('detectTreasuryFunding (spec 030 — executor-gated treasury detection)', () => {
+  it('returns null on missing reader or non-address inputs (never guesses)', async () => {
+    expect(await detectTreasuryFunding(null, GOV, GOV)).toBeNull()
+    expect(await detectTreasuryFunding({}, 'not-an-address', GOV)).toBeNull()
+    expect(await detectTreasuryFunding({}, GOV, 'not-an-address')).toBeNull()
+  })
+
+  it('returns null when the vault has no executor() (a plain timelock vault)', async () => {
+    // A reader whose call() always reverts mimics a vault without the executor() getter.
+    const reader = { call: async () => { throw new Error('execution reverted') } }
+    expect(await detectTreasuryFunding(reader, GOV, GOV)).toBeNull()
   })
 })
