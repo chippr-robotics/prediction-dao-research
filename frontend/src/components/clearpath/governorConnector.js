@@ -144,6 +144,32 @@ const PROPOSAL_CREATED_TOPIC = ethers.id(
 const PROPOSAL_IFACE = new ethers.Interface(GOVERNOR_PROPOSAL_ABI)
 
 /**
+ * Decode a `ProposalCreated` log into a plain proposal object (without the live state/votes enrichment).
+ *
+ * Uses POSITIONAL destructuring, never named field access: the event's 4th argument is literally named
+ * `values`, which on an ethers v6 `Result` shadows `Array.prototype.values` (a function) — so `args.values`
+ * returns that function and `args.values.map(...)` throws "values.map is not a function". Positional access
+ * sidesteps that (and any other reserved-name collision). Exported for unit testing. Throws if the log is not
+ * a parseable `ProposalCreated`.
+ */
+export function parseProposalLog(log) {
+  const parsed = PROPOSAL_IFACE.parseLog(log)
+  // order: proposalId, proposer, targets, values, signatures, calldatas, voteStart, voteEnd, description
+  const [id, proposer, targets, values, , calldatas, voteStart, voteEnd, description] = parsed.args
+  return {
+    id: id.toString(),
+    proposer,
+    description,
+    targets: Array.from(targets),
+    values: Array.from(values, (v) => v.toString()),
+    calldatas: Array.from(calldatas),
+    descriptionHash: ethers.id(description),
+    voteStart: voteStart.toString(),
+    voteEnd: voteEnd.toString(),
+  }
+}
+
+/**
  * `eth_getLogs` over [from, to] that is resilient to RPC block-range caps. Public ETC/Mordor nodes (and many
  * wallet RPC backends) reject a `getLogs` window wider than some provider-specific limit. On any failure we
  * bisect the range and retry each half, down to `minSpan` blocks — so a single oversized chunk degrades to a
@@ -201,30 +227,18 @@ export async function fetchGovernorProposals(reader, governor, { lookbackBlocks 
   raw.reverse()
   const proposals = []
   for (const log of raw.slice(0, max)) {
-    let parsed
-    try { parsed = PROPOSAL_IFACE.parseLog(log) } catch { continue }
-    const a = parsed.args
-    const id = a.proposalId
-    const state = await (async () => { try { return Number(await govRead.state(id)) } catch { return null } })()
+    // Decode is fault-isolated per proposal: a single un-parseable/odd log is skipped, never aborting the
+    // whole scan (which previously hid every proposal behind one decode error).
+    let base
+    try { base = parseProposalLog(log) } catch { continue }
+    const state = await (async () => { try { return Number(await govRead.state(base.id)) } catch { return null } })()
     const votes = await (async () => {
       try {
-        const [against, forV, abstain] = await govRead.proposalVotes(id)
+        const [against, forV, abstain] = await govRead.proposalVotes(base.id)
         return { against: against.toString(), for: forV.toString(), abstain: abstain.toString() }
       } catch { return null }
     })()
-    proposals.push({
-      id: id.toString(),
-      proposer: a.proposer,
-      description: a.description,
-      targets: a.targets,
-      values: a.values.map((v) => v.toString()),
-      calldatas: a.calldatas,
-      descriptionHash: ethers.id(a.description),
-      voteStart: a.voteStart.toString(),
-      voteEnd: a.voteEnd.toString(),
-      state,
-      votes,
-    })
+    proposals.push({ ...base, state, votes })
   }
   return { ok: true, proposals, scannedFrom, scannedTo: current, partial }
 }
