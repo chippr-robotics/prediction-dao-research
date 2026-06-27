@@ -91,7 +91,7 @@ attributable to a wallet (quickstart.md P1).
 - [X] T028 [P] [US1] Add `frontend/src/abis/ZKWagerPoolFactory.js` and `ZKWagerPool.js` ABI modules (sync emits `.json`)
 - [X] T029 [P] [US1] Implement BIP-39 gateway lib `frontend/src/lib/pools/gateway.js` (`phraseToIndices`, `indicesToPhrase`, `resolvePool` via `getContractAddressForChain('zkWagerPoolFactory', chainId)`)
 - [X] T030 [P] [US1] Implement nickname lib `frontend/src/lib/pools/nickname.js` (derive from the **public identity commitment** so any member can render it; versioned adjective/noun arrays; in-pool disambiguation; never written on-chain)
-- [ ] T031 [P] [US1] Implement in-browser proof lib `frontend/src/lib/pools/semaphoreProof.js` (lazy-load artifacts, `generateApprovalProof`)
+- [X] T031 [P] [US1] Implement in-browser proof lib `frontend/src/lib/pools/semaphoreProof.js` (lazy-load artifacts, `generateApprovalProof`)
 - [X] T032 [US1] Add `create-pool`/`join-pool` quick action tiles + dispatch in `frontend/src/components/fairwins/Dashboard.jsx` and routes `/pools/create|join|:poolId` in `frontend/src/App.jsx`
 - [X] T033 [US1] Implement `CreatePoolPage`, `JoinPoolPage`, `PoolPage` in `frontend/src/components/pools/` (create form, four-word join, pool summary, approve/claim/refund actions, honest state surfacing)
 - [ ] T034 [US1] Add subgraph factory data source + `ZKWagerPool` template to `subgraph/subgraph.yaml`, entities to `subgraph/schema.graphql`, placeholders to `subgraph/networks.json`
@@ -114,14 +114,14 @@ under another (quickstart.md P1 frontend / SC-008).
 
 ### Tests for User Story 2 (write first, must FAIL) ⚠️
 
-- [ ] T038 [P] [US2] Tests: language preference persistence + default English, and cross-language pool resolution in `frontend/src/test/wordListLanguage.test.js`
+- [X] T038 [P] [US2] Tests: language preference persistence + default English, and cross-language pool resolution in `frontend/src/test/wordListLanguage.test.js`
 
 ### Implementation for User Story 2
 
 - [X] T039 [P] [US2] Implement `frontend/src/utils/wordListLanguage.js` (device pref, curated enum ≥4 langs, validated, default `en`) following the `qrColorPreference.js` precedent
-- [ ] T040 [P] [US2] Bundle the supported BIP-39 wordlists and a per-language lookup in `frontend/src/lib/pools/bip39Lists.js`
-- [ ] T041 [US2] Wire the language into `gateway.js` rendering/parsing (use selected language list)
-- [ ] T042 [US2] Add the word-list language selector control to `frontend/src/components/account/WalletUtilitiesPanel.jsx` (WCAG 2.1 AA, accessible label)
+- [X] T040 [P] [US2] Bundle the supported BIP-39 wordlists and a per-language lookup in `frontend/src/lib/pools/bip39Lists.js`
+- [X] T041 [US2] Wire the language into `gateway.js` rendering/parsing (use selected language list)
+- [X] T042 [US2] Add the word-list language selector control to `frontend/src/components/account/WalletUtilitiesPanel.jsx` (WCAG 2.1 AA, accessible label)
 
 **Checkpoint**: US1 + US2 both work independently
 

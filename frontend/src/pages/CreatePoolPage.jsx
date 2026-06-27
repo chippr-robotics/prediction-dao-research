@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../hooks/useWalletManagement'
 import { usePools } from '../hooks/usePools'
 import Button from '../components/ui/Button'
+import './pools.css'
 
 /**
  * CreatePoolPage (spec 034) — open a group wager pool and get a shareable four-word phrase. The phrase

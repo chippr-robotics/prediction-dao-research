@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 // T021 [US1] — Create/Join/Pool pages: quick-action-driven flows render, the four-word gateway shows a
@@ -35,8 +35,25 @@ function base(overrides = {}) {
     resolvePhrase: vi.fn(),
     getPoolSummary: vi.fn(),
     joinPool: vi.fn(),
+    getMyNickname: vi.fn(),
+    closeJoining: vi.fn().mockResolvedValue('0xtx'),
+    cancelPool: vi.fn().mockResolvedValue('0xtx'),
+    proposeOutcome: vi.fn(),
+    vote: vi.fn().mockResolvedValue('0xtx'),
+    claimWinnings: vi.fn(),
+    refund: vi.fn().mockResolvedValue('0xtx'),
     ...overrides,
   }
+}
+
+function renderPoolAt(summary) {
+  return render(
+    <MemoryRouter initialEntries={[`/pools/${summary.address}`]}>
+      <Routes>
+        <Route path="/pools/:address" element={<PoolPage />} />
+      </Routes>
+    </MemoryRouter>
+  )
 }
 
 describe('ZK-Wager Pool pages', () => {
@@ -102,13 +119,52 @@ describe('ZK-Wager Pool pages', () => {
 
   it('PoolPage: renders live on-chain state for a pool address', async () => {
     usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(openSummary) }))
-    render(
-      <MemoryRouter initialEntries={[`/pools/${openSummary.address}`]}>
-        <Routes>
-          <Route path="/pools/:address" element={<PoolPage />} />
-        </Routes>
-      </MemoryRouter>
-    )
+    renderPoolAt(openSummary)
     expect(await screen.findByTestId('pool-state')).toHaveTextContent('JoiningOpen')
+  })
+
+  it('PoolPage: the creator sees close/cancel while joining is open', async () => {
+    const closeJoining = vi.fn().mockResolvedValue('0xtx')
+    const sum = { ...openSummary, isCreator: true }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), closeJoining }))
+    renderPoolAt(sum)
+    fireEvent.click(await screen.findByTestId('close-joining'))
+    await waitFor(() => expect(closeJoining).toHaveBeenCalledWith(sum.address))
+    expect(screen.getByTestId('cancel-pool')).toBeInTheDocument()
+  })
+
+  it('PoolPage: a joined member can approve the proposed outcome (with progress)', async () => {
+    const vote = vi.fn().mockResolvedValue('0xtx')
+    const sum = {
+      ...openSummary,
+      state: 1,
+      stateLabel: 'JoiningClosed',
+      withinResolutionWindow: true,
+      currentProposalId: '0xabc',
+      hasJoined: true,
+      approvalCount: 1,
+      requiredApprovals: 2,
+    }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), vote }))
+    renderPoolAt(sum)
+    expect(await screen.findByTestId('approval-progress')).toHaveTextContent('1 / 2')
+    fireEvent.click(screen.getByTestId('approve-outcome'))
+    await waitFor(() => expect(vote).toHaveBeenCalled())
+  })
+
+  it('PoolPage: a refund-eligible member can recover the buy-in', async () => {
+    const refund = vi.fn().mockResolvedValue('0xtx')
+    const sum = { ...openSummary, state: 1, stateLabel: 'JoiningClosed', refundEligible: true }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), refund }))
+    renderPoolAt(sum)
+    fireEvent.click(await screen.findByTestId('refund'))
+    await waitFor(() => expect(refund).toHaveBeenCalledWith(sum.address))
+  })
+
+  it('PoolPage: a resolved pool surfaces the resolved state', async () => {
+    const sum = { ...openSummary, state: 2, stateLabel: 'Resolved' }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum) }))
+    renderPoolAt(sum)
+    expect(await screen.findByTestId('pool-resolved')).toBeInTheDocument()
   })
 })
