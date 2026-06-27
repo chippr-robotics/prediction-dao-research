@@ -188,6 +188,37 @@ export async function getLogsRange(reader, governor, from, to, minSpan = 2000, t
   }
 }
 
+const TREASURY_VAULT_ABI = ['function executor() view returns (address)']
+const TREASURY_EXECUTOR_ABI = [
+  'function treasury() view returns (address)',
+  'function timelock() view returns (address)',
+]
+
+/**
+ * Detect whether a treasury vault is governable through an on-chain executor — the ECIP-1112/1113 pattern used
+ * by Olympia and the network treasuries, where funds live in an immutable vault spent via
+ * `Governor → Timelock → Executor → Treasury.withdraw`, NOT held by the timelock directly.
+ *
+ * Verified on-chain, never guessed: the vault must expose `executor()`, and that executor's `treasury()` /
+ * `timelock()` must round-trip back to THIS vault and the Governor's own timelock. Returns `{ executor }` for the
+ * executor-gated pattern, or null for the plain "timelock holds the funds" pattern (a generic OZ Governor).
+ */
+export async function detectTreasuryFunding(reader, vault, governorTimelock) {
+  try {
+    if (!reader || !ethers.isAddress(vault || '') || !ethers.isAddress(governorTimelock || '')) return null
+    const executor = await new ethers.Contract(vault, TREASURY_VAULT_ABI, reader).executor()
+    if (!ethers.isAddress(executor) || executor === ethers.ZeroAddress) return null
+    const ex = new ethers.Contract(executor, TREASURY_EXECUTOR_ABI, reader)
+    const [exTreasury, exTimelock] = await Promise.all([ex.treasury(), ex.timelock()])
+    const wired =
+      exTreasury.toLowerCase() === vault.toLowerCase() &&
+      exTimelock.toLowerCase() === governorTimelock.toLowerCase()
+    return wired ? { executor } : null
+  } catch {
+    return null
+  }
+}
+
 const VOTE_CAST_TOPIC = ethers.id('VoteCast(address,uint256,uint8,uint256,string)')
 const VOTE_CAST_IFACE = new ethers.Interface([
   'event VoteCast(address indexed voter, uint256 proposalId, uint8 support, uint256 weight, string reason)',

@@ -176,4 +176,28 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     await user.click(trigger)
     expect(screen.getByRole('dialog', { name: /new proposal/i })).toBeInTheDocument()
   })
+
+  it('builds an executeTreasury proposal via the "Fund from treasury" action (executor-gated DAO)', async () => {
+    const EXECUTOR = '0x00000000000000000000000000000000000000e1'
+    const EXEC_IFACE = new ethers.Interface(['function executeTreasury(address recipient, uint256 amount)'])
+    proposeAction.mockResolvedValue({})
+    const user = userEvent.setup()
+    // a governable funding source → opening pre-selects "Fund from treasury" (the correct path for this DAO)
+    renderBuilder({ fundingSources: [{ executor: EXECUTOR, label: 'Olympia Treasury', address: '0x0000000000000000000000000000000000000333', native: ethers.parseEther('2') }] })
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    expect(screen.getByText(/spends from its treasury via an on-chain executor/i)).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/^title$/i), 'Dev grant')
+    await user.type(screen.getByLabelText(/recipient/i), TO)
+    await user.type(screen.getByLabelText(/amount/i), '1')
+    const submit = screen.getByRole('button', { name: /submit proposal/i })
+    await waitFor(() => expect(submit).toBeEnabled())
+    await user.click(submit)
+    await waitFor(() => expect(proposeAction).toHaveBeenCalled())
+    const [, , payload] = proposeAction.mock.calls[0]
+    expect(payload.targets).toEqual([EXECUTOR]) // targets the executor, not the recipient
+    expect(payload.values).toEqual([0n])
+    const [to, amount] = EXEC_IFACE.decodeFunctionData('executeTreasury', payload.calldatas[0])
+    expect(to.toLowerCase()).toBe(TO)
+    expect(amount).toBe(ethers.parseEther('1'))
+  })
 })

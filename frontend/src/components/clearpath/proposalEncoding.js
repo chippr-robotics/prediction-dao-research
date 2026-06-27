@@ -6,9 +6,11 @@ import { ethers } from 'ethers'
 // testable. Governor correctness invariants live here: value=0 for ERC-20, description reused byte-for-byte,
 // description hash = keccak256(utf8), arrays equal length.
 
-export const ACTION_TYPE = { NATIVE: 'native', TOKEN: 'token', CUSTOM: 'custom' }
+export const ACTION_TYPE = { TREASURY: 'treasury', NATIVE: 'native', TOKEN: 'token', CUSTOM: 'custom' }
 
 const ERC20_TRANSFER_IFACE = new ethers.Interface(['function transfer(address to, uint256 amount)'])
+// The executor-gated treasury withdrawal (ECIP-1112/1113 pattern: Governor → Timelock → Executor → Treasury).
+const EXECUTE_TREASURY_IFACE = new ethers.Interface(['function executeTreasury(address recipient, uint256 amount)'])
 
 let _seq = 0
 /** A fresh blank action. `id` is a React key only — never submitted. */
@@ -17,6 +19,9 @@ export function newAction(type = ACTION_TYPE.TOKEN) {
   return {
     id: `a${_seq}`,
     type,
+    treasuryExecutor: '', // the on-chain executor for the "Fund from treasury" action (set from the detected source)
+    treasuryTo: '',
+    treasuryAmount: '',
     nativeTo: '',
     nativeAmount: '',
     tokenMode: 'usdc', // 'usdc' (treasury default) | 'other' (arbitrary ERC-20 at tokenAddress)
@@ -64,6 +69,17 @@ function requireAddress(v, label) {
  * @param meta (tokenAddr) => { decimals, symbol } | null
  */
 export function encodeAction(a, { usdcAddress, meta }) {
+  if (a.type === ACTION_TYPE.TREASURY) {
+    // Fund a recipient from the DAO's treasury via its executor (native only). The call carries NO value — the
+    // executor pulls from the vault — so target = executor, value = 0, calldata = executeTreasury(to, amount).
+    requireAddress(a.treasuryExecutor, 'Treasury executor')
+    requireAddress(a.treasuryTo, 'Recipient')
+    return {
+      target: a.treasuryExecutor.trim(),
+      value: 0n,
+      calldata: EXECUTE_TREASURY_IFACE.encodeFunctionData('executeTreasury', [a.treasuryTo.trim(), parseHuman(a.treasuryAmount, 18, 'Amount')]),
+    }
+  }
   if (a.type === ACTION_TYPE.NATIVE) {
     requireAddress(a.nativeTo, 'Recipient')
     return { target: a.nativeTo.trim(), value: parseHuman(a.nativeAmount, 18, 'Amount'), calldata: '0x' }

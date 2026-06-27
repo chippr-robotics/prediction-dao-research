@@ -12,9 +12,11 @@ import CpBottomSheet from './CpBottomSheet'
 // guards: non-blocking over-treasury warning; duplicate-proposal detection; the DAO's own revert surfaced.
 
 const ERC20_TRANSFER_IFACE = new ethers.Interface(['function transfer(address to, uint256 amount)'])
+const EXECUTE_TREASURY_IFACE = new ethers.Interface(['function executeTreasury(address recipient, uint256 amount)'])
+const EXECUTE_TREASURY_SELECTOR = EXECUTE_TREASURY_IFACE.getFunction('executeTreasury').selector
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—')
 
-export default function ProposalBuilder({ record, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], proposals = [], run, busy, onSubmitted }) {
+export default function ProposalBuilder({ record, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], fundingSources = [], proposals = [], run, busy, onSubmitted }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -86,10 +88,18 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
   const anyNativeKnown = treasuries.some((t) => t.native != null)
   const anyUsdcKnown = treasuries.some((t) => t.usdc != null)
   const usdcSymbol = treasuries.find((t) => t.usdcSymbol)?.usdcSymbol || 'USDC'
+  // "Fund from treasury" actions draw native from the governable vault(s), not the timelock — checked against
+  // the funding sources' own balance.
+  const treasuryHeld = fundingSources.reduce((sum, f) => sum + (f.native ?? 0n), 0n)
   let nativeTotal = 0n
   let usdcTotal = 0n
+  let treasuryTotal = 0n
   for (const p of A.perAction) {
     if (!p.encoded) continue
+    if (p.encoded.calldata.startsWith(EXECUTE_TREASURY_SELECTOR)) {
+      try { const [, amt] = EXECUTE_TREASURY_IFACE.decodeFunctionData('executeTreasury', p.encoded.calldata); treasuryTotal += amt } catch { /* not a treasury fund */ }
+      continue
+    }
     nativeTotal += p.encoded.value
     if (usdcAddress && p.encoded.target.toLowerCase() === usdcAddress.toLowerCase()) {
       try { const [, amt] = ERC20_TRANSFER_IFACE.decodeFunctionData('transfer', p.encoded.calldata); usdcTotal += amt } catch { /* not a transfer */ }
@@ -98,6 +108,7 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
   // Only warn once balances are known, and only when the spend truly exceeds total DAO holdings.
   const overNative = valid && anyNativeKnown && nativeTotal > nativeHeld
   const overUsdc = valid && anyUsdcKnown && usdcTotal > usdcHeld
+  const overTreasury = valid && fundingSources.length > 0 && treasuryTotal > treasuryHeld
   const dupId = valid ? predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash) : null
   // FR-025 duplicate pre-check: an identical action set + description hashes to the same id as a live proposal.
   const isDuplicate = !!dupId && proposals.some((p) => p.id === dupId)
@@ -121,10 +132,28 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
     ).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
   }
 
+  // "Fund from treasury" is offered FIRST when the DAO has a governable (executor-gated) vault; the generic
+  // actions stay available for the common pattern.
+  const typeOptions = fundingSources.length
+    ? [{ v: ACTION_TYPE.TREASURY, label: 'Fund from treasury' }, ...TYPE_OPTIONS]
+    : TYPE_OPTIONS
+
+  // On open, for a DAO with a governable treasury, pre-select "Fund from treasury" if the single action is still
+  // the pristine default — non-destructive, and steers the member to the workflow that actually funds.
+  function openBuilder() {
+    if (fundingSources.length && actions.length === 1) {
+      const a0 = actions[0]
+      if (a0.type === ACTION_TYPE.TOKEN && !a0.tokenTo && !a0.tokenAmount && !a0.treasuryTo && !a0.treasuryAmount) {
+        setActions([{ ...a0, type: ACTION_TYPE.TREASURY, treasuryExecutor: fundingSources[0].executor }])
+      }
+    }
+    setOpen(true)
+  }
+
   return (
     <>
       <div style={{ marginBottom: '0.8rem' }}>
-        <button type="button" className="cp-btn cp-btn-primary" onClick={() => setOpen(true)}>+ New proposal</button>
+        <button type="button" className="cp-btn cp-btn-primary" onClick={openBuilder}>+ New proposal</button>
       </div>
 
       <CpBottomSheet open={open} onClose={() => { reset(); setOpen(false) }} title="New proposal">
@@ -136,6 +165,13 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
         <label className="cp-label" htmlFor="cp-prop-body">Description (Markdown)</label>
         <textarea id="cp-prop-body" className="cp-input cp-textarea" rows={4} value={body} onChange={(e) => setBody(e.target.value)} placeholder="What this proposal does and why." />
       </div>
+
+      {fundingSources.length > 0 && (
+        <p className="cp-row-sub" style={{ marginBottom: '0.6rem' }}>
+          This DAO spends from its treasury via an on-chain executor — use <strong>Fund from treasury</strong> to
+          disburse native {nativeSymbol}. Generic sends draw from the timelock.
+        </p>
+      )}
 
       <div className="cp-action-head">
         <h4 style={{ margin: 0 }}>Actions</h4>
@@ -154,6 +190,8 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
           nativeSymbol={nativeSymbol}
           canRemove={actions.length > 1}
           account={account}
+          typeOptions={typeOptions}
+          fundingSources={fundingSources}
           onChange={(patch) => setAction(a.id, patch)}
           onRemove={() => removeAction(a.id)}
         />
@@ -165,6 +203,7 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
         <div className="cp-kv"><span className="k">Total native value</span><span className="cp-mono">{ethers.formatEther(nativeTotal)} {nativeSymbol || ''}</span></div>
         {overNative && <div className="cp-warn" role="status">Sends more {nativeSymbol} than the treasury holds. The proposal can still be created; execution will revert if not funded by then.</div>}
         {overUsdc && <div className="cp-warn" role="status">Sends more {usdcSymbol} than the treasury holds. The proposal can still be created; execution will revert if not funded.</div>}
+        {overTreasury && <div className="cp-warn" role="status">Funds more {nativeSymbol} than the treasury vault holds. The proposal can still be created; execution will revert if not funded.</div>}
         {isDuplicate && <div className="cp-error" role="alert">This exact proposal already exists (id {dupId.length > 14 ? `${dupId.slice(0, 8)}…${dupId.slice(-4)}` : dupId}). Submitting it would revert — change an action or the description.</div>}
         {!valid && <p className="cp-row-sub">{anyPending ? 'Reading token details…' : 'Add a title/description and at least one valid action to submit.'}</p>}
 
@@ -199,23 +238,43 @@ const TYPE_OPTIONS = [
   { v: ACTION_TYPE.CUSTOM, label: 'Custom call (advanced)' },
 ]
 
-function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canRemove, account, onChange, onRemove }) {
+function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canRemove, account, typeOptions = TYPE_OPTIONS, fundingSources = [], onChange, onRemove }) {
   const a = action
   const useDefaultUsdc = a.tokenMode !== 'other'
   const tokenAddr = useDefaultUsdc ? (usdcAddress || '') : a.tokenAddress.trim()
   const tokenMeta = a.type === ACTION_TYPE.TOKEN && tokenAddr ? meta(tokenAddr) : null
   const tokenSym = tokenMeta?.symbol || (useDefaultUsdc ? 'USDC' : 'token')
+  // Switching to "Fund from treasury" auto-selects the (only / first) governable source's executor.
+  const onType = (v) =>
+    onChange(v === ACTION_TYPE.TREASURY ? { type: ACTION_TYPE.TREASURY, treasuryExecutor: a.treasuryExecutor || fundingSources[0]?.executor || '' } : { type: v })
 
   return (
     <div className="cp-card" style={{ background: 'var(--cp-surface)' }}>
       <div className="cp-action-head">
         <span className="cp-badge">#{index + 1}</span>
         <label className="sr-only" htmlFor={`cp-act-type-${a.id}`}>Action {index + 1} type</label>
-        <select id={`cp-act-type-${a.id}`} className="cp-input cp-select" value={a.type} onChange={(e) => onChange({ type: e.target.value })} style={{ maxWidth: '14rem' }}>
-          {TYPE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+        <select id={`cp-act-type-${a.id}`} className="cp-input cp-select" value={a.type} onChange={(e) => onType(e.target.value)} style={{ maxWidth: '14rem' }}>
+          {typeOptions.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
         </select>
         {canRemove && <button type="button" className="cp-btn" aria-label={`Remove action ${index + 1}`} onClick={onRemove}>✕</button>}
       </div>
+
+      {a.type === ACTION_TYPE.TREASURY && (
+        <>
+          {fundingSources.length > 1 ? (
+            <div className="cp-field">
+              <label className="cp-label" htmlFor={`f-${a.id}-tsrc`}>Treasury</label>
+              <select id={`f-${a.id}-tsrc`} className="cp-input cp-select" value={a.treasuryExecutor} onChange={(e) => onChange({ treasuryExecutor: e.target.value })}>
+                {fundingSources.map((f) => <option key={f.executor} value={f.executor}>{f.label}</option>)}
+              </select>
+            </div>
+          ) : (
+            <p className="cp-row-sub">From {fundingSources[0]?.label || 'the treasury'} · native {nativeSymbol} via its on-chain executor.</p>
+          )}
+          <CpAddressField id={`f-${a.id}-trto`} label="Recipient" value={a.treasuryTo} onChange={(v) => onChange({ treasuryTo: v })} selfAddress={account} />
+          <div className="cp-field"><label className="cp-label" htmlFor={`f-${a.id}-tramt`}>Amount<span className="cp-suffix">{nativeSymbol}</span></label><input id={`f-${a.id}-tramt`} className="cp-input cp-mono" value={a.treasuryAmount} onChange={(e) => onChange({ treasuryAmount: e.target.value })} placeholder="0.0" /></div>
+        </>
+      )}
 
       {a.type === ACTION_TYPE.NATIVE && (
         <>
@@ -258,6 +317,16 @@ function ActionCard({ index, action, diag, meta, usdcAddress, nativeSymbol, canR
 }
 
 function ActionPreview({ type, enc, nativeSymbol, tokenSym }) {
+  if (type === ACTION_TYPE.TREASURY) {
+    let to = '—'
+    let amt = '0'
+    try {
+      const [t, a] = EXECUTE_TREASURY_IFACE.decodeFunctionData('executeTreasury', enc.calldata)
+      to = short(t)
+      amt = ethers.formatEther(a)
+    } catch { /* */ }
+    return <span>Fund {amt} {nativeSymbol} → {to} · from treasury via {short(enc.target)}</span>
+  }
   if (type === ACTION_TYPE.NATIVE) {
     return <span>Send {ethers.formatEther(enc.value)} {nativeSymbol} → {short(enc.target)}</span>
   }

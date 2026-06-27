@@ -21,6 +21,7 @@ vi.mock('../governorConnector', () => ({
   readGovernorSummary: (...a) => h.readGovernorSummary(...a),
   readTreasuries: (...a) => h.readTreasuries(...a),
   extraTreasuries: () => [],
+  detectTreasuryFunding: () => Promise.resolve(null),
   fetchGovernorProposals: (...a) => h.fetchGovernorProposals(...a),
   readVoterState: () => Promise.resolve({ hasVoted: null, votingPower: null, support: null }),
   readProposalEta: () => Promise.resolve(null),
