@@ -3,11 +3,27 @@ import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getContractAddressForChain } from '../../config/contracts'
+import { getNetwork } from '../../config/networks'
+import { makeReadProvider } from '../../utils/rpcProvider'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../abis/externalDAORegistry'
 
 // Upper bound on awaiting a confirmation — a broadcast-but-dropped tx must not hang wait() forever (it would
 // orphan the persistent in-flight toast). 120s is well beyond a normal confirmation on the live networks.
 const CONFIRM_TIMEOUT_MS = 120000
+
+// Cache read providers by (chainId → rpcUrl) so the same network always yields the SAME provider instance
+// across renders — dependent effects (ExternalDaoView keys reads on `reader`) must not see a fresh provider
+// every render. A plain memoized factory keeps referential stability without a hook (React-Compiler friendly).
+const READ_PROVIDERS = new Map()
+function cachedReadProvider(rpcUrl, chainId) {
+  const key = `${chainId}:${rpcUrl}`
+  let p = READ_PROVIDERS.get(key)
+  if (!p) {
+    p = makeReadProvider(rpcUrl, chainId)
+    READ_PROVIDERS.set(key, p)
+  }
+  return p
+}
 
 /**
  * Spec 030 — ClearPath hook (external-DAO pillar). Resolves the per-chain ExternalDAORegistry, exposes whether
@@ -22,7 +38,13 @@ export function useClearPath() {
   const registryAddress = getContractAddressForChain('externalDAORegistry', chainId)
   const usdcAddress = getContractAddressForChain('paymentToken', chainId) // per-network USDC for treasury balances
   const isSupported = ethers.isAddress(registryAddress || '')
-  const reader = provider || signer?.provider || null
+
+  // Read over the active network's OWN RPC, not the wallet provider. ClearPath's proposal indexer runs wide
+  // `eth_getLogs` scans, which injected/mobile wallet RPC backends routinely reject or choke on (the public
+  // node handles them reliably); `makeReadProvider` also disables JSON-RPC batching on ETC/Mordor. The wallet
+  // (`signer`) is still used for every write. Falls back to the wallet provider only if no RPC is configured.
+  const net = getNetwork(chainId)
+  const reader = net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : (provider || signer?.provider || null)
 
   const registryReader = useCallback(() => {
     if (!isSupported || !reader) return null
