@@ -9,6 +9,8 @@ import {
   extraTreasuries,
   fetchGovernorProposals,
   readVoterState,
+  readProposalEta,
+  explainTxError,
   castVote,
   queueProposal,
   executeProposal,
@@ -80,6 +82,32 @@ function describeProposalTiming(p, currentBlock, clockMode) {
   return { label: 'Voting closed', phase: 'closed' }
 }
 
+// The proposal id, click-to-copy (the full id) so a member can look it up on the explorer. Shows a brief
+// "Copied" confirmation; degrades quietly where the clipboard API is unavailable.
+function CopyableId({ id }) {
+  const [copied, setCopied] = useState(false)
+  const shortId = id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(id)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* clipboard unavailable / denied */ }
+  }
+  return (
+    <button type="button" className="cp-copy-id" onClick={copy} title="Copy full proposal ID" aria-label={`Copy proposal ID ${id}`}>
+      <span className="cp-mono">#{shortId}</span>
+      {copied ? (
+        <span className="cp-copied">Copied ✓</span>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
   const { showNotification } = useNotification()
   const net = getNetwork(chainId)
@@ -92,6 +120,8 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   const propsLoading = props.key !== record.dao
   const [busy, setBusy] = useState(false)
   const [voterStates, setVoterStates] = useState({}) // proposalId → { hasVoted, votingPower, support }
+  const [etas, setEtas] = useState({}) // proposalId → timelock execution ETA (unix seconds) for queued proposals
+  const [nowMs, setNowMs] = useState(() => Date.now()) // drives the "executable in …" countdown + auto-enable
   const s = sum.summary
 
   // Summary + treasuries (timelock + known extra vaults), native + USDC.
@@ -142,6 +172,29 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     return () => { cancelled = true }
   }, [reader, account, record.dao, props.key, props.ok, props.proposals])
 
+  // Execution ETA for queued proposals (no wallet needed). A queued proposal can only execute once the
+  // timelock delay elapses; without this the Execute button reverts early with the timelock's custom error.
+  useEffect(() => {
+    if (!reader || !props.ok || props.key !== record.dao) { setEtas({}); return undefined }
+    const queued = props.proposals.filter((p) => p.state === 5)
+    if (!queued.length) { setEtas({}); return undefined }
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(queued.map(async (p) => [p.id, await readProposalEta(reader, record.dao, p.id)]))
+      if (!cancelled) setEtas(Object.fromEntries(entries))
+    })()
+    return () => { cancelled = true }
+  }, [reader, record.dao, props.key, props.ok, props.proposals])
+
+  // Tick once a second only while some queued proposal is still waiting on its ETA, so the countdown stays live
+  // and the Execute button auto-enables the moment the delay passes. No timer otherwise.
+  useEffect(() => {
+    const pending = props.proposals.some((p) => p.state === 5 && etas[p.id] != null && etas[p.id] * 1000 > Date.now())
+    if (!pending) return undefined
+    const t = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [props.proposals, etas])
+
   // Surfaces the whole on-chain activity to the app notification system so the user stays aware end-to-end:
   // a persistent "confirm in your wallet" prompt during signing, a persistent "awaiting confirmation" toast
   // while the tx mines (block times on subgraph-less chains like Mordor exceed the 5s default auto-dismiss, so
@@ -169,7 +222,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       if (e?.code === 'TIMEOUT') {
         showNotification(`${label} is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.`, 'warning', 0)
       } else {
-        showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
+        showNotification(explainTxError(e), 'error')
       }
       return false
     } finally {
@@ -264,13 +317,19 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
           const timing = describeProposalTiming(p, props.scannedTo, s?.clockMode)
           const noPower = vs?.votingPower === '0'
           const canVote = p.state === 1 && !vs?.hasVoted && !noPower
+          const eta = etas[p.id]
+          const nowSec = Math.floor(nowMs / 1000)
+          const executeWaitSecs = p.state === 5 && eta != null && nowSec < eta ? eta - nowSec : 0
+          const executeReady = p.state === 5 && executeWaitSecs === 0
           return (
             <div key={p.id} className="cp-card" style={{ background: 'var(--cp-canvas)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="cp-row-name">{p.description ? p.description.slice(0, 80) : `Proposal ${short(p.id)}`}</span>
                 <span className="cp-badge">{PROPOSAL_STATE_LABEL[p.state] ?? 'Unknown'}</span>
               </div>
-              <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>#{p.id.length > 12 ? short(p.id) : p.id} · by {short(p.proposer)}</div>
+              <div className="cp-row-sub" style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <CopyableId id={p.id} /> <span>· by {short(p.proposer)}</span>
+              </div>
 
               {/* Timeline: proposed → voting window → outcome, with the live relative position. */}
               <div className="cp-timeline" aria-label="Proposal timeline">
@@ -299,6 +358,11 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
               {canVote && vs?.votingPower != null && vs.votingPower !== '0' && (
                 <p className="cp-vote-note" style={{ marginTop: '0.5rem' }}>Your voting power: {vs.votingPower}</p>
               )}
+              {executeWaitSecs > 0 && (
+                <p className="cp-vote-note" style={{ marginTop: '0.5rem' }}>
+                  Executable in {humanizeDelta(executeWaitSecs, true)} — the timelock delay must elapse before this proposal can run.
+                </p>
+              )}
 
               <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
                 {canVote && (
@@ -309,7 +373,18 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
                   </>
                 )}
                 {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => queueProposal(signer, record.dao, p))}>Queue</button>}
-                {p.state === 5 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Execute', () => executeProposal(signer, record.dao, p))}>Execute</button>}
+                {p.state === 5 && (
+                  <button
+                    type="button"
+                    className="cp-btn cp-btn-primary"
+                    disabled={busy || !executeReady}
+                    aria-disabled={busy || !executeReady}
+                    title={executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
+                    onClick={() => run('Execute', () => executeProposal(signer, record.dao, p))}
+                  >
+                    Execute
+                  </button>
+                )}
                 {explorerBase && <a className="cp-btn-link" href={`${explorerBase}/address/${record.dao}`} target="_blank" rel="noreferrer">Details ↗</a>}
               </div>
             </div>

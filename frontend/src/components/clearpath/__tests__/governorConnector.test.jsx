@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ethers } from 'ethers'
-import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport } from '../governorConnector'
+import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport, explainTxError } from '../governorConnector'
 
 // Spec 030 (US5) — the subgraph-less proposal indexer must survive RPC block-range caps. ETC/Mordor public
 // nodes (and many wallet RPC backends) reject an `eth_getLogs` window wider than a provider-specific limit;
@@ -109,5 +109,23 @@ describe('readVoterState / readVoteSupport (spec 030 — per-user voting state)'
     const reader = { getLogs: vi.fn(async () => [{ data, topics }]) }
     const support = await readVoteSupport(reader, GOV, { id: '42', voteStart: '1', voteEnd: '100' }, VOTER)
     expect(support).toBeNull()
+  })
+})
+
+describe('explainTxError (spec 030 — decode opaque custom-error reverts)', () => {
+  it('maps the timelock "not ready" selector to a plain explanation', () => {
+    // 0x5ead8eb5 = TimelockUnexpectedOperationState(bytes32,bytes32) — what an early execute reverts with
+    const msg = explainTxError({ data: '0x5ead8eb5' + '00'.repeat(64) })
+    expect(msg).toMatch(/timelock delay/i)
+  })
+
+  it('maps an insufficient-balance selector to a funding explanation', () => {
+    const msg = explainTxError({ info: { error: { data: '0xe450d38c00' } } }) // ERC20InsufficientBalance
+    expect(msg).toMatch(/enough token balance/i)
+  })
+
+  it('falls back to the ethers message for unknown selectors', () => {
+    expect(explainTxError({ shortMessage: 'user rejected' })).toBe('user rejected')
+    expect(explainTxError({ data: '0xdeadbeef', message: 'boom' })).toBe('boom')
   })
 })
