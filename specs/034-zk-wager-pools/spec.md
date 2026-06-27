@@ -35,6 +35,15 @@ for existing one-to-one wagers in a future feature (out of scope here).
 - Q: What is the maximum group size per pool? → A: A protocol cap of **~1,000 members per pool** (fixed anonymity-set capacity); the creator's chosen max members must not exceed it.
 - Q: How are payout recipients designated, and how do winners claim while staying anonymous? → A: The payout outcome assigns shares to **anonymous in-pool identities/nicknames**; a winner proves ownership of a winning identity and is paid to **any address they choose**, so payout never links back to their join wallet.
 
+### Session 2026-06-27 (analyze remediation)
+
+- Q: Are nicknames computed from the member's secret or from public data, and are they written on-chain? → A: Nicknames are derived from the member's **public identity commitment** (so any member can render them for leaderboards) and are **client-side display only — never emitted or stored on-chain**.
+- Q: What exactly is decoupled from the wallet on-chain, given the direct (non-relayed) join is a wallet transaction? → A: **Votes** are unlinkable to the wallet on-chain (Semaphore). On the **direct join path**, an observer can associate the joining wallet with its commitment/nickname (this is the already-disclosed "pool membership is visible" boundary). The **relayed/gasless path (P2)** additionally breaks the wallet↔commitment link. Full nickname/payout unlinkability is therefore a **relayed-path property**.
+- Q: May a pool run with sanctions screening disabled? → A: No on any value-bearing network. A pool MUST be deployed with a configured sanctions guard and MUST reject create/join if screening cannot be performed (no silent bypass). Disabling is permitted **only on local/dev/test networks**.
+- Q: Which membership budget do pools consume? → A: A **dedicated `POOL_PARTICIPANT_ROLE`** with its own tier limits, separate from `WAGER_PARTICIPANT_ROLE`, so pool activity is gated and tuned independently.
+- Q: Are vote choices private? → A: No — the **approved outcome (vote choice) is public** on-chain; only the **voter's identity** is anonymous.
+- Q: Does launch target Ethereum Classic? → A: Launch targets **Polygon/Amoy**; ETC/Mordor (technically feasible) is a **later increment**.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create and join a group pool with four words (Priority: P1)
@@ -245,33 +254,50 @@ standings by nickname in near real time with no member transaction required.
 #### Anonymous identity & nicknames
 
 - **FR-009**: When a member joins, the system MUST assign them a **stable two-word
-  nickname** that is consistent for the duration of that pool.
-- **FR-010**: A member's nickname and their votes MUST NOT be linkable to their
-  wallet address by other members or observers of on-chain data.
-- **FR-011**: The nickname MUST be derived deterministically from the member's own
-  local identity material so it is reproducible for that member in that pool.
+  nickname** that is consistent for the duration of that pool. The nickname is a
+  **client-side display label only — it MUST NOT be emitted to, or stored on, the
+  chain**.
+- **FR-010**: A member's **votes** MUST NOT be linkable to their wallet address by
+  other members or observers of on-chain data (enforced by the anonymous-proof
+  mechanism). For the nickname/in-pool identity, the unlinkability boundary is the
+  join path: on the **direct (member-paid) join** an observer may associate the
+  joining wallet with its in-pool identity (the same "pool membership is visible"
+  boundary stated in Assumptions); the **relayed/gasless path (P2)** additionally
+  breaks the wallet↔in-pool-identity link. No nickname is ever derived from, or
+  stored alongside, a wallet address.
+- **FR-011**: The nickname MUST be derived deterministically from the member's
+  **public identity commitment** so that **any** member can reproduce it (e.g. to
+  render a leaderboard), and it is stable for that member in that pool.
 - **FR-012**: Nicknames MUST be unique-enough within a pool that standings and
-  leaderboards are unambiguous; collisions within a pool MUST be disambiguated.
+  leaderboards are unambiguous; collisions within a pool MUST be disambiguated
+  (e.g. a short commitment-derived suffix).
 
 #### Resolution by anonymous consensus
 
-- **FR-013**: Each pool MUST support resolution by **m-of-n anonymous consensus**,
-  where the threshold is a configured **fraction of the members who have joined**:
-  the denominator is the joined-participant count captured when resolution opens,
-  and at least that fraction of members must independently approve the same payout
-  outcome for it to take effect. (E.g. a 60% threshold in a pool with 10 joined
-  members requires 6 approvals.)
+- **FR-013**: Each pool MUST support resolution by an **anonymous fraction-of-joined
+  approval threshold** (colloquially "m-of-n"): the threshold is a configured
+  **fraction of the members who have joined** — the denominator is the
+  joined-participant count captured when resolution opens — and at least that
+  fraction of members must independently approve the same payout outcome for it to
+  take effect. (E.g. a 60% threshold in a pool with 10 joined members requires 6
+  approvals.)
 - **FR-014**: Each member MUST be able to vote on a payout outcome **exactly once**
   per outcome; repeat votes MUST be rejected (no double-voting).
 - **FR-015**: A member's vote MUST be verifiable as coming from a legitimate pool
-  member without revealing which member or which wallet cast it.
+  member without revealing which member or which wallet cast it. The **vote choice
+  (the approved outcome) is public** on-chain; only the **voter's identity** is
+  anonymous.
 - **FR-016**: When the consensus threshold is reached for an outcome, the pool
   MUST lock that outcome as final and prevent further changes to the result.
 - **FR-017**: After resolution, a member entitled to a payout MUST be able to
   claim their share by **proving ownership of a winning in-pool identity**, and be
-  paid to **any address they choose** (which need not be their join wallet), so the
-  payout does not link to their wallet. Each winning share MUST be claimable at
-  most once.
+  paid to **any address they choose** (which need not be their join wallet). Each
+  winning share MUST be claimable at most once. The payout MUST NOT link to the
+  member's **join wallet** (the recipient is freely chosen and, on the relayed
+  path, the wallet↔identity link is broken). Note: v1 MAY reveal **which in-pool
+  identity** won (not which wallet); fully hiding the winning identity at claim time
+  is a possible future enhancement requiring a custom proof circuit — the exact
+  claim construction is finalized in the plan (design spike).
 - **FR-018**: The payout outcome MUST encode how the escrowed pot is divided among
   recipients **identified by their anonymous in-pool identity/nickname** (not by
   wallet address), and claims MUST be validated against the locked outcome.
@@ -296,9 +322,16 @@ standings by nickname in near real time with no member transaction required.
   **at full parity with one-to-one wagers**: both sanctions screening and
   membership gating are paramount and MUST apply. Specifically:
   - **FR-021a**: Every joining wallet MUST pass sanctions screening before its
-    buy-in is accepted; a screened-out wallet cannot join and no funds move.
+    buy-in is accepted; a screened-out wallet cannot join and no funds move. A pool
+    MUST be deployed with a **configured sanctions guard** and MUST **reject
+    create/join if screening cannot be performed** (no silent bypass). Disabling
+    screening is permitted **only on local/dev/test networks**, never on a network
+    holding real value.
   - **FR-021b**: Pool participation MUST be gated by the member's membership
-    tier/limits exactly as `WagerRegistry` gates wager participation.
+    tier/limits using the same `MembershipManager` mechanism as `WagerRegistry`,
+    via a **dedicated `POOL_PARTICIPANT_ROLE`** with its own tier limits (separate
+    from `WAGER_PARTICIPANT_ROLE`) so pool activity is gated and tuned
+    independently of one-to-one wagers.
   - **FR-021c**: The creator MUST pass the same sanctions and membership checks at
     pool creation.
   - **FR-021d**: These checks are performed against the **real wallet at
@@ -365,7 +398,9 @@ standings by nickname in near real time with no member transaction required.
   prove pool membership and cast an unlinkable vote, and from which their nickname
   is deterministically derived.
 - **Two-Word Nickname**: A stable, friendly label representing a member within one
-  pool, decoupled from their wallet address.
+  pool, derived deterministically from the member's **public identity commitment**
+  (reproducible by any member for leaderboards). **Client-side display only — never
+  emitted to or stored on-chain**; not derived from or stored with a wallet address.
 - **Payout Outcome (Proposal)**: A proposed division of the escrowed pot among
   recipients **identified by anonymous in-pool identity/nickname** (not wallet
   address), identified by a fixed reference that members approve; becomes the
@@ -389,8 +424,11 @@ standings by nickname in near real time with no member transaction required.
   address.
 - **SC-003**: 100% of generated four-word phrases are unique among concurrently
   active pools (zero collisions).
-- **SC-004**: No member's vote or nickname can be linked to their wallet address
-  using on-chain data alone (verified by review/audit of what is observable).
+- **SC-004**: No member's **vote** can be linked to their wallet address using
+  on-chain data alone (verified by review/audit). The nickname/in-pool identity is
+  likewise unlinkable to the wallet **on the relayed/gasless path**; on the direct
+  join path, only pool membership is observable (per the privacy boundary), never
+  the vote.
 - **SC-005**: Each member can vote at most once per payout outcome; 0% of pools
   resolve on duplicated or double-counted votes.
 - **SC-006**: A pool with a quorum of agreeing members resolves and locks its
@@ -409,8 +447,10 @@ standings by nickname in near real time with no member transaction required.
 - **SC-012**: A single pool supports up to ~1,000 members, and the cost to verify
   a member's vote does not increase as more members join (constant per-proof cost).
 - **SC-013**: A winner can receive their payout at an address unlinked to their
-  join wallet; on-chain data alone does not reveal which join wallet a payout
-  belongs to.
+  join wallet; on-chain data alone does not reveal which **join wallet** a payout
+  belongs to (the recipient is freely chosen; on the relayed path the
+  wallet↔identity link is also broken). v1 may reveal which in-pool identity won,
+  but never the wallet behind it.
 
 ## Assumptions
 
@@ -435,7 +475,10 @@ standings by nickname in near real time with no member transaction required.
 - **Quorum/timeout configured at creation**: The consensus threshold and the
   resolution timeout window are set when the pool is created.
 - **Network**: Pools target the platform's standard L2 deployment networks, with
-  data strictly scoped per active network.
+  data strictly scoped per active network. **Launch targets Polygon and Amoy**
+  (canonical Semaphore deployments); Ethereum Classic / Mordor support is
+  technically feasible but ships as a **later increment** (it requires
+  self-deploying the anonymity primitive).
 - **Compliance is paramount and enforced on the wallet**: Sanctions screening and
   membership gating apply to every joining wallet (and the creator) at full parity
   with one-to-one wagers, checked against the real wallet at join/creation time.

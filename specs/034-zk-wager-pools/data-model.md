@@ -124,8 +124,10 @@ Indexed via factory data source + dynamic `Pool` template.
 - **Pool**: `id` (address), `poolId`, `creator`, `token`, `buyIn`, `maxMembers`,
   `thresholdBips`, `joinDeadline`, `wordIndices` ([Int!]!), `state`, `memberCount`,
   `frozenDenominator`, `createdAtBlock/Timestamp`, `lockedOutcome`, `escrowBalance`.
-- **Join**: `id`, `pool`, `memberCommitment` (or index), `nicknameHash`, `blockTimestamp`.
-  (No wallet address indexed for the in-pool footprint — see privacy boundary.)
+- **Join**: `id`, `pool`, `memberCommitment` (or index), `blockTimestamp`. The
+  nickname is **not** indexed/stored — it is derived client-side from
+  `memberCommitment` for display (FR-009/FR-011). (No wallet address indexed for the
+  in-pool footprint — see privacy boundary.)
 - **Proposal**: `id` (poolId-proposalId), `pool`, `proposalId`, `approvalCount`,
   `lockedAt` (nullable).
 - **VoteEvent**: `id`, `pool`, `proposalId`, `nullifier`, `message` (choice), `blockTimestamp`.
@@ -142,10 +144,10 @@ Indexed via factory data source + dynamic `Pool` template.
 | Entity | Storage | Notes |
 |--------|---------|-------|
 | **Semaphore Identity** | client-held secret (local) | Source of commitment, nullifiers, and nickname. Member-custodied (FR / Assumptions: lost secret is out of scope). |
-| **Two-Word Nickname** | derived, not stored | `hash(identitySecret) → (adjective, noun)` indices; versioned word arrays; in-pool disambiguation suffix (FR-009/FR-011/FR-012). |
+| **Two-Word Nickname** | derived, not stored, **never on-chain** | `hash(publicIdentityCommitment) → (adjective, noun)` indices so any member can render it; versioned word arrays; in-pool disambiguation suffix (FR-009/FR-011/FR-012). |
 | **Word-List Language Preference** | localStorage (device) or per-wallet pref | Selected BIP-39 language; precedent = `utils/qrColorPreference.js` (curated enum, graceful fallback) or `UserPreferencesContext`. Default English (FR Assumptions). |
 | **Leaderboard State (P3)** | off-chain, creator-maintained | Interim standings by nickname; explicitly non-final (FR-029/FR-031). Not on-chain. |
-| **Gasless Join Request (P2)** | transient, Payload Packer | `{wallet, identityCommitment, nicknameHash, EIP-3009 authorization}`; validated + re-screened, never persisted with secrets. |
+| **Gasless Join Request (P2)** | transient, Payload Packer | `{wallet, identityCommitment, EIP-3009 authorization}`; validated + re-screened (sanctions + membership), never persisted with secrets. |
 | **Payout Matrix (proposal preimage)** | shared off-chain, hashed on-chain | Maps anonymous in-pool identities → shares; `proposalId = hash(matrix)`. Winners claim by proving ownership of a winning identity (FR-018/FR-020). |
 
 ---
@@ -155,7 +157,9 @@ Indexed via factory data source + dynamic `Pool` template.
 - `thresholdBips ∈ (0, 10000]`; `maxMembers ∈ [2, ~1000]` (FR-002a); `buyIn > 0`;
   `joinDeadline > now`.
 - Join allowed only while `state == JoiningOpen` and `memberCount < maxMembers` and wallet
-  passes sanctions + membership (FR-006/FR-007/FR-021).
+  passes sanctions + membership (FR-006/FR-007/FR-021). The **sanctions guard MUST be
+  configured** on value-bearing networks (reject if unset; FR-021a); membership is gated via a
+  dedicated **`POOL_PARTICIPANT_ROLE`** (FR-021b).
 - Approve allowed only while `state == JoiningClosed`, proof valid, nullifier unused
   (FR-014/FR-015).
 - Lock when `proposalApprovals[id] >= ceil(frozenDenominator * thresholdBips / 10000)`

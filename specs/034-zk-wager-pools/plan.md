@@ -19,9 +19,12 @@ commitment; resolution counts anonymous `validateProof` approvals (`scope = prop
 a **fraction of the joined members** approve, locking the creator's proposed payout outcome;
 winners then claim — proving ownership of a winning **in-pool identity** — to **any address**,
 keeping anonymity through payout. Joins screen the **real wallet** via the shared
-`ISanctionsGuard` + `IMembershipManager` (full parity with wagers, FR-021). Each pool gets a
+`ISanctionsGuard` (guard **required** on value-bearing networks — revert if unset) +
+`IMembershipManager` under a dedicated **`POOL_PARTICIPANT_ROLE`** (full parity with wagers,
+FR-021). Each pool gets a
 unique **4 BIP-39 word-index** identity (language-independent; rendered via a My Account
-word-list language selector) and members get client-derived **two-word nicknames**. The
+word-list language selector) and members get client-derived **two-word nicknames** (computed
+from the public identity commitment, never written on-chain). The
 subgraph indexes pools dynamically via a **factory data source + `Pool` template** (spec 028
 precedent). Gasless joins (P2) use **EIP-3009 `receiveWithAuthorization`** + a Payload Packer
 that re-screens the wallet, plus a managed relayer (OZ/Defender). Live unresolved leaderboards

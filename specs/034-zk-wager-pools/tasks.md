@@ -69,7 +69,7 @@ attributable to a wallet (quickstart.md P1).
 
 ### Tests for User Story 1 (write first, must FAIL) ⚠️
 
-- [ ] T012 [P] [US1] Factory tests (create, creator sanctions+membership screening, phrase uniqueness/collision, clone+registry, `PoolCreated`) in `test/pools/ZKWagerPoolFactory.test.js`
+- [ ] T012 [P] [US1] Factory tests (create, creator sanctions+`POOL_PARTICIPANT_ROLE` screening, **revert when sanctions guard unset on a value-bearing network**, phrase uniqueness/collision, clone+registry, `PoolCreated`) in `test/pools/ZKWagerPoolFactory.test.js`
 - [ ] T013 [P] [US1] Pool join/close tests (escrow, `addMember`, full/deadline close, frozen denominator, sanctioned/over-limit rejection, late-join rejection) in `test/pools/ZKWagerPool.test.js`
 - [ ] T014 [P] [US1] Resolution tests (creator proposes, approve once per nullifier, revise resets tally, threshold = ceil(frozenDenominator*bips/1e4) locks, double-vote reverts) in `test/pools/ZKWagerPool.resolution.test.js`
 - [ ] T015 [P] [US1] Payout/refund tests (claim to fresh address, no double-claim, under-quorum timeout refund, cancel-before-fill refund, no escrow path outside claim/refund) in `test/pools/ZKWagerPool.payout.test.js`
@@ -77,25 +77,25 @@ attributable to a wallet (quickstart.md P1).
 - [ ] T017 [P] [US1] Integration lifecycle test with real MembershipManager + SanctionsGuard gating in `test/pools/integration/pool-lifecycle.test.js`
 - [ ] T018 [P] [US1] Fork test against the Amoy Semaphore singleton in `test/fork/Semaphore.fork.test.js`
 - [ ] T019 [P] [US1] Frontend gateway tests (phrase↔indices parse/render, resolvePool, invalid/stale handling) in `frontend/src/test/poolGateway.test.js`
-- [ ] T020 [P] [US1] Frontend nickname determinism test in `frontend/src/test/poolNickname.test.js`
+- [ ] T020 [P] [US1] Frontend nickname determinism test (derived from public commitment, reproducible by any member, never on-chain) in `frontend/src/test/poolNickname.test.js`
 - [ ] T021 [P] [US1] Frontend create/join UI tests (quick action dispatch, pool summary before funds) in `frontend/src/test/PoolPages.test.jsx`
-- [ ] T022 [P] [US1] Subgraph matchstick test: `handlePoolCreated` instantiates the `ZKWagerPool` template in `subgraph/tests/zkWagerPool.test.ts`
+- [ ] T022 [P] [US1] Subgraph matchstick test: `handlePoolCreated` instantiates the `ZKWagerPool` template; assert entities are network-scoped and no nickname/wallet→vote data is indexed (FR-032/FR-033/FR-010) in `subgraph/tests/zkWagerPool.test.ts`
 
 ### Implementation for User Story 1
 
 - [ ] T023 [US1] Implement `ZKWagerPool.sol` (immutable clone: `initialize`, `join`, `closeJoining`/`pokeDeadline`, `proposeOutcome`, `approve` via Semaphore, `claim`, `refund`, `cancel`; CEI + reentrancy guards; bounded state) in `contracts/pools/ZKWagerPool.sol`
 - [ ] T024 [US1] Resolve the `claim` winning-share proof design spike (second Semaphore proof vs Merkle proof against `lockedOutcome`) and finalize in `ZKWagerPool.sol` + note in research.md
-- [ ] T025 [US1] Implement `ZKWagerPoolFactory.sol` (UUPSManaged proxy: `createPool` with screening, 4-word index assignment+collision check, Semaphore `createGroup` as admin, `cloneDeterministicWithImmutableArgs`, phrase↔pool registry, `PoolCreated`; append-only storage + `__gap`) in `contracts/pools/ZKWagerPoolFactory.sol`
+- [ ] T025 [US1] Implement `ZKWagerPoolFactory.sol` (UUPSManaged proxy: `createPool` with sanctions screening — **guard required on value-bearing networks, revert if unset (FR-021a)** — + `POOL_PARTICIPANT_ROLE` membership gating (FR-021b), 4-word index assignment+collision check, Semaphore `createGroup` as admin, `cloneDeterministicWithImmutableArgs`, phrase↔pool registry, `PoolCreated`; append-only storage + `__gap`) in `contracts/pools/ZKWagerPoolFactory.sol`
 - [ ] T026 [US1] Register the factory in `scripts/deploy/check-storage-layout.js` (CI gate)
 - [ ] T027 [US1] Write deploy script `scripts/deploy/deploy-zk-wager-pool-factory.js` (deterministic `poolImpl`, `deployProxy` factory, reuse sanctionsGuard/membershipManager, append to `deployments/*-v2.json`) mirroring `deploy-token-factory.js`
 - [ ] T028 [P] [US1] Add `frontend/src/abis/ZKWagerPoolFactory.js` and `ZKWagerPool.js` ABI modules (sync emits `.json`)
 - [ ] T029 [P] [US1] Implement BIP-39 gateway lib `frontend/src/lib/pools/gateway.js` (`phraseToIndices`, `indicesToPhrase`, `resolvePool` via `getContractAddressForChain('zkWagerPoolFactory', chainId)`)
-- [ ] T030 [P] [US1] Implement nickname lib `frontend/src/lib/pools/nickname.js` (versioned adjective/noun arrays, deterministic derivation, in-pool disambiguation)
+- [ ] T030 [P] [US1] Implement nickname lib `frontend/src/lib/pools/nickname.js` (derive from the **public identity commitment** so any member can render it; versioned adjective/noun arrays; in-pool disambiguation; never written on-chain)
 - [ ] T031 [P] [US1] Implement in-browser proof lib `frontend/src/lib/pools/semaphoreProof.js` (lazy-load artifacts, `generateApprovalProof`)
 - [ ] T032 [US1] Add `create-pool`/`join-pool` quick action tiles + dispatch in `frontend/src/components/fairwins/Dashboard.jsx` and routes `/pools/create|join|:poolId` in `frontend/src/App.jsx`
 - [ ] T033 [US1] Implement `CreatePoolPage`, `JoinPoolPage`, `PoolPage` in `frontend/src/components/pools/` (create form, four-word join, pool summary, approve/claim/refund actions, honest state surfacing)
 - [ ] T034 [US1] Add subgraph factory data source + `ZKWagerPool` template to `subgraph/subgraph.yaml`, entities to `subgraph/schema.graphql`, placeholders to `subgraph/networks.json`
-- [ ] T035 [US1] Implement subgraph mappings `subgraph/src/mappings/zkWagerPoolFactory.ts` (`handlePoolCreated` → `Pool.create`) and `zkWagerPool.ts` (join/propose/approve/lock/claim handlers)
+- [ ] T035 [US1] Implement subgraph mappings `subgraph/src/mappings/zkWagerPoolFactory.ts` (`handlePoolCreated` → `Pool.create`) and `zkWagerPool.ts` (join/propose/approve/lock/claim handlers); index commitments/nullifiers/shares only — **no nickname, no wallet→vote link** (FR-010)
 - [ ] T036 [US1] Update `CLAUDE.md` Guardrails with the parallel-system carve-out + new deployment keys (`zkWagerPoolFactory`, `zkWagerPoolFactoryImpl`, `poolImpl`)
 - [ ] T037 [US1] Add the `MembershipManager.setAuthorizedCaller` step for the factory/pool to the deploy runbook in `docs/runbooks/`
 

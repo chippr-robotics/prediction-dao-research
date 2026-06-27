@@ -53,12 +53,13 @@ resolvePool(idx: WordIndices): Promise<PoolSummary | null>            // factory
 ## 3. Two-word nickname (client-side, deterministic)
 
 ```ts
-// derived from the member's local Semaphore identity secret; no on-chain storage
-deriveNickname(identitySecret: bigint, poolId: string): { adjective: string; noun: string; hash: string }
+// derived from the member's PUBLIC identity commitment so any member can render it; never on-chain
+deriveNickname(identityCommitment: bigint, poolId: string): { adjective: string; noun: string }
 ```
 
-- Deterministic + stable per member per pool (FR-009/FR-011); `hash` is the on-chain/subgraph
-  reference (never the wallet).
+- Deterministic + stable per member per pool (FR-009/FR-011); computed from the public
+  commitment (which the subgraph already exposes), so **no separate nickname value is emitted
+  or stored on-chain** (FR-009/FR-010).
 - Adjective/noun arrays are **versioned** constants; large enough to make in-pool collisions
   rare; collisions disambiguated by a short commitment-derived suffix (FR-012).
 

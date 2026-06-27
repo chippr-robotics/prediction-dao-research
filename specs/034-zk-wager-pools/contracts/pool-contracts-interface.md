@@ -24,7 +24,10 @@ interface IMembershipManager {
 ```
 
 Pool create + join screen the **real wallet** via `checkBlocked` and gate via
-`checkCanCreate`/`recordCreate`; every terminal path calls `recordClose` (FR-021, FR-010 note).
+`checkCanCreate`/`recordCreate` under a dedicated **`POOL_PARTICIPANT_ROLE`** (FR-021b); every
+terminal path calls `recordClose` (FR-021). The **sanctions guard MUST be configured** on
+value-bearing networks — create/join revert if screening cannot be performed; disabling is
+allowed only on local/dev/test (FR-021a).
 
 ---
 
@@ -73,7 +76,9 @@ interface IZKWagerPoolFactory {
 **Invariants**
 - A `wordIndices` tuple maps to at most one **active** pool; collision-checked on assign
   (FR-003, SC-003).
-- `createPool` screens + records membership **before** cloning; reverts roll back the id.
+- `createPool` screens + records membership (`POOL_PARTICIPANT_ROLE`) **before** cloning;
+  reverts roll back the id. On value-bearing networks a sanctions guard MUST be configured;
+  `createPool` reverts if screening cannot be performed (FR-021a).
 - Factory (or the pool it creates) is the **Semaphore group admin** — joins are only ever
   added through the pool's `join` (research §1 invariant).
 - Storage append-only + `__gap`; registered in `check:storage-layout`.
@@ -142,7 +147,7 @@ interface IZKWagerPool {
     /// Creator cancels before fill → all members refundable (FR-023).
     function cancel() external;                 // onlyCreator, while JoiningOpen
 
-    event Joined(uint256 indexed identityCommitment, bytes32 nicknameHash);
+    event Joined(uint256 indexed identityCommitment);  // nickname is client-side only, never on-chain (FR-009)
     event JoiningClosed_(uint32 frozenDenominator);
     event OutcomeProposed(bytes32 indexed proposalId);
     event Approved(bytes32 indexed proposalId, uint256 nullifier, uint256 message);

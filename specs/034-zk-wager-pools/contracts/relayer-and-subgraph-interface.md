@@ -12,8 +12,7 @@ managed relayer (OpenZeppelin Relayer / Defender Relayer) that pays gas. No secr
 POST /api/pools/{poolId}/join-gasless
 Request:
 {
-  "identityCommitment": "0x…",     // Semaphore commitment to insert
-  "nicknameHash": "0x…",           // deterministic, client-derived
+  "identityCommitment": "0x…",     // Semaphore commitment to insert (nickname derives from this, client-side)
   "authorization": {               // EIP-3009 receiveWithAuthorization over native USDC
     "from": "0x…",                 // real wallet (screened)
     "to":   "0x{poolAddress}",
@@ -109,9 +108,11 @@ export function handlePoolCreated(event: PoolCreated): void {
 }
 ```
 
-**Privacy note**: the subgraph indexes in-pool identity references (commitment/nullifier/
-nickname hash) and payout shares — **not** the wallet→vote link (FR-010, SC-004). Payout
-`recipient` is the claim target only (FR-017/SC-013).
+**Privacy note**: the subgraph indexes in-pool identity references
+(commitment/nullifier) and payout shares — **not** nicknames (client-side only) and **not**
+the wallet→vote link (FR-010, SC-004). On the **direct join** path the join tx sender (wallet)
+is observable on-chain (pool membership is visible per the privacy boundary); the **relayed
+path** breaks that link. Payout `recipient` is the claim target only (FR-017/SC-013).
 
 **Risks**: template re-deploys force a re-sync unless **grafted** (`features:[grafting]`); use
 `indexerHints.prune` to cap store growth (research §8).

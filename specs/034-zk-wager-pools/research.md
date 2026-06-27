@@ -262,17 +262,21 @@ placeholder address + non-genesis startBlock to keep `graph build` green pre-dep
   language's BIP-39 wordlist, so the same pool resolves regardless of a member's chosen
   language (User Story 2, FR-003/FR-004). BIP-39 ships official wordlists for en, es, ja, fr,
   it, ko, zh-Hans, zh-Hant, cs, pt — satisfies "≥4 languages" (SC-008).
-- **Nicknames**: derived **client-side** by hashing the member's Semaphore identity secret and
-  taking deterministic modulo indices into a hardcoded adjective array and noun array
-  (e.g. "Prismatic Fox"). Stable per member per pool (FR-009/FR-011). Disambiguate in-pool
-  collisions by appending a short discriminator derived from the commitment (FR-012).
+- **Nicknames**: derived **client-side** by hashing the member's **public identity
+  commitment** (NOT the secret — so any member can render every member's nickname for
+  leaderboards) and taking deterministic modulo indices into a hardcoded adjective array and
+  noun array (e.g. "Prismatic Fox"). Stable per member per pool (FR-009/FR-011). **Never
+  emitted or stored on-chain** — derived on demand from the commitment the subgraph already
+  exposes. Disambiguate in-pool collisions with a short commitment-derived suffix (FR-012).
 
 **Rationale**: An index tuple makes the phrase a pure rendering of a language-independent
 identity (no re-translation problem), keeps uniqueness a simple on-chain set membership, and
 reuses the BIP-39 lists the project already depends on conceptually (the four-word "Open
 Challenge" code, spec 024, is the nearest UX precedent). Nicknames are a pure deterministic
-function of local secret material, so they need no on-chain storage and never touch the wallet
-address.
+function of the **public commitment**, so they need no on-chain storage, are reproducible by
+any member for leaderboards, and never touch the wallet address. **Important**: deriving from
+the secret (the original sketch) would let only the owner compute their own nickname, breaking
+shared leaderboards (US4) — hence the commitment.
 
 **Alternatives**: random phrase + opaque registry mapping with no index semantics (works but
 complicates multi-language rendering); deterministic encoding of a sequential pool id (leaks
@@ -289,12 +293,14 @@ collisions rare and MUST be versioned (changing them changes everyone's nickname
 **Decision**: Reuse the existing shared singletons against the **real wallet** at
 pool-create and join:
 - **Sanctions**: `ISanctionsGuard.checkBlocked(account)` (reverts `SanctionedAddress`), the
-  same call `WagerRegistry._screen` makes; configurable/optional via `setSanctionsGuard`
-  (`address(0)` disables per network).
+  same call `WagerRegistry._screen` makes. **The guard MUST be configured on value-bearing
+  networks** — create/join revert if screening cannot be performed (FR-021a). `address(0)`
+  (disable) is permitted **only on local/dev/test** networks, never where real value is held.
 - **Membership**: `IMembershipManager.checkCanCreate` → revert on deny, `recordCreate` after
   effects, `recordClose` on every terminal path. The pool/factory must be authorized via
-  `setAuthorizedCaller`. Decide whether pools share `WAGER_PARTICIPANT_ROLE`'s monthly/
-  concurrent budget or use a new role.
+  `setAuthorizedCaller`. **Decision: a dedicated `POOL_PARTICIPANT_ROLE`** with its own tier
+  limits (separate from `WAGER_PARTICIPANT_ROLE`) so pool activity is gated/tuned independently
+  of one-to-one wagers (FR-021b).
 
 **Rationale**: FR-021 mandates full parity with one-to-one wagers; reusing the exact call
 sites guarantees identical compliance behavior and keeps the checks on the wallet before any
@@ -322,8 +328,8 @@ admin op to capture in the deploy runbook.
 | Pool contracts | UUPSManaged factory + immutable `cloneDeterministicWithImmutableArgs` clones |
 | Indexing | factory data source + `Pool` template (TokenFactory/TokenInstance precedent) |
 | Gateway | 4 BIP-39 index tuple, language-independent identity, registry collision-checked |
-| Nicknames | client-side deterministic from identity secret; versioned word arrays |
-| Compliance | reuse `ISanctionsGuard.checkBlocked` + `IMembershipManager` on real wallet |
+| Nicknames | client-side deterministic from the **public commitment** (not secret); never on-chain; versioned word arrays |
+| Compliance | reuse `ISanctionsGuard.checkBlocked` (guard **required** on value-bearing nets) + `IMembershipManager` via dedicated `POOL_PARTICIPANT_ROLE`, on real wallet |
 | New deps | `@semaphore-protocol/contracts` (Solidity); `@semaphore-protocol/{identity,group,proof}` (frontend) — justified in plan.md Complexity Tracking |
 
 **Recommended phasing of risk**: P1 on **Polygon/Amoy first** (canonical Semaphore, no

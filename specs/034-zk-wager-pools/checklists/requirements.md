@@ -48,3 +48,17 @@
   - Payout matrix assigns shares to **anonymous in-pool identities**; winners claim
     to **any address**, preserving anonymity through payout.
 - All quality items pass (16/16). Spec is ready for `/speckit-plan`.
+- `/speckit-analyze` remediation session (2026-06-27) resolved the findings it surfaced,
+  recorded in `## Clarifications`:
+  - **Nickname privacy (I1)**: nicknames derive from the **public commitment**, are
+    **client-side display only / never on-chain**; FR-010 now scopes on-chain unlinkability to
+    **votes**, with full nickname/payout unlinkability a **relayed-path** property.
+  - **Sanctions (I2)**: guard **required** on value-bearing networks (no silent bypass);
+    disable only on local/dev/test.
+  - **Membership (U2)**: dedicated **`POOL_PARTICIPANT_ROLE`**.
+  - **Terminology (A1)**: canonical "fraction-of-joined approval threshold" ("m-of-n" colloquial).
+  - **Vote choice (V1)**: choices are public; only the voter is anonymous.
+  - **Claim anonymity (U1)**: v1 may reveal the winning in-pool identity (never the wallet);
+    exact proof construction is a planned spike (T024).
+  - ETC sequencing (S1) and FR-033 scoping test (C1) addressed; apiVersion (T1) already
+    consistent at 0.0.7.
