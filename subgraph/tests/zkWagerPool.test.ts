@@ -5,7 +5,6 @@ import {
   clearStore,
   afterEach,
   newMockEvent,
-  dataSourceMock,
 } from 'matchstick-as/assembly/index'
 import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts'
 import { PoolCreated } from '../generated/ZKWagerPoolFactory/ZKWagerPoolFactory'
@@ -66,8 +65,18 @@ function poolCreated(poolId: i32): PoolCreated {
 describe('ZKWagerPoolFactory.PoolCreated (spec 034 / T022)', () => {
   afterEach(() => {
     clearStore()
-    // Reset the data-source template-create counter so each test starts from 0 (it is cumulative).
-    dataSourceMock.resetValues()
+  })
+
+  // NOTE: matchstick (0.6.0) tracks the data-source template-create count cumulatively for the whole
+  // test file and exposes no reset for it (dataSourceMock.resetValues() only resets the mocked
+  // return address/network/context, not the create counter). Tests run in source order, so the
+  // dataSourceCount assertion MUST be the FIRST test — it is the only point where the count is a
+  // known 0 before the first handlePoolCreated call. Do not reorder it below the other tests.
+  test('instantiates the per-pool ZKWagerPool data-source template for the clone', () => {
+    assert.dataSourceCount('ZKWagerPool', 0)
+    handlePoolCreated(poolCreated(2))
+    // the factory handler spawns exactly one ZKWagerPool template for the new clone
+    assert.dataSourceCount('ZKWagerPool', 1)
   })
 
   test('handlePoolCreated indexes a Pool with its public fields and JoiningOpen state', () => {
@@ -88,13 +97,6 @@ describe('ZKWagerPoolFactory.PoolCreated (spec 034 / T022)', () => {
     assert.fieldEquals('Pool', POOL, 'state', '0')
     assert.fieldEquals('Pool', POOL, 'memberCount', '0')
     assert.fieldEquals('Pool', POOL, 'lockedOutcome', 'null')
-  })
-
-  test('instantiates the per-pool ZKWagerPool data-source template for the clone', () => {
-    assert.dataSourceCount('ZKWagerPool', 0)
-    handlePoolCreated(poolCreated(2))
-    // the factory handler spawns exactly one ZKWagerPool template for the new clone
-    assert.dataSourceCount('ZKWagerPool', 1)
   })
 
   test('PRIVACY (FR-009/FR-010): stores no nickname text and no wallet->vote linkage', () => {
