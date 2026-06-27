@@ -68,6 +68,19 @@ artifacts live under `specs/<feature>/`.
   `getContractAddressForChain('wagerRegistry', chainId)` and read `WagerRegistry`
   events; do not depend on `friendGroupMarketFactory` except as an explicit
   legacy fallback.
+- **ZK-Wager Pools (spec 034) are a documented exception to the "route escrow
+  through `wagerRegistry`" rule.** Group wager pools are a **parallel system**: the
+  `ZKWagerPoolFactory` (UUPS proxy, deployment keys `zkWagerPoolFactory` /
+  `zkWagerPoolFactoryImpl` / `poolImpl`) clones **immutable** `ZKWagerPool`
+  instances (ERC-1167), each with its own Semaphore group for anonymous
+  membership/voting. Pools escrow USDC and resolve by a creator-proposed payout
+  outcome that members anonymously approve to a fraction-of-joined threshold —
+  **not** via `wagerRegistry` or oracle adapters. They reuse the shared
+  `ISanctionsGuard` + `IMembershipManager` (role `POOL_PARTICIPANT_ROLE`) on the
+  real wallet (FR-021). Resolve the factory via
+  `getContractAddressForChain('zkWagerPoolFactory', chainId)`. Two-word nicknames
+  are **client-side only, never on-chain**. Launch targets Polygon/Amoy; ETC/Mordor
+  is a later increment (self-deploy Semaphore). See `specs/034-zk-wager-pools/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
