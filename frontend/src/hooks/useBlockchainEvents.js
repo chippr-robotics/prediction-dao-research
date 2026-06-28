@@ -148,8 +148,8 @@ export function useAccountChange(onAccountChange) {
 
     const handleAccountsChanged = (accounts) => {
       if (accounts.length === 0) {
-        announce('Please connect to MetaMask')
-        showNotification('Please connect to MetaMask', 'warning')
+        announce('Please connect your browser wallet')
+        showNotification('Please connect your browser wallet', 'warning')
       } else {
         announce('Account changed')
         showNotification('Account changed', 'info')

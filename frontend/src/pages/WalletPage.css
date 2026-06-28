@@ -194,7 +194,7 @@
   color: var(--text-secondary, #5A6772);
 }
 
-.install-metamask-link {
+.install-wallet-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -205,7 +205,7 @@
   transition: all 0.2s ease;
 }
 
-.install-metamask-link:hover {
+.install-wallet-link:hover {
   color: var(--primary-button-hover, #2F9E6E);
   text-decoration: underline;
 }
