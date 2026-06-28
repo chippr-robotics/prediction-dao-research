@@ -789,7 +789,7 @@ function FriendMarketsModal({
     } else if (endDate < minDate) {
       newErrors.endDateTime = 'End date must be at least 1 hour from now'
     } else if (endDate > maxDate) {
-      newErrors.endDateTime = 'End date must be within 21 days'
+      newErrors.endDateTime = 'End date must be within 72 months'
     }
 
     // Acceptance deadline is deterministic (midpoint of now → end), so
@@ -830,7 +830,7 @@ function FriendMarketsModal({
             if (linkedEnd.getTime() <= Date.now()) {
               newErrors.oracleConditionId = 'This Polymarket has already ended. Pick an active market.'
             } else if (linkedEnd.getTime() > maxLinkedEnd) {
-              newErrors.oracleConditionId = 'This market ends too far in the future to wager on (it must resolve within ~180 days). Pick a sooner-resolving market.'
+              newErrors.oracleConditionId = 'This market ends too far in the future to wager on (it must resolve within ~72 months). Pick a sooner-resolving market.'
             } else if (freshDeadline) {
               const acceptEnd = new Date(freshDeadline)
               if (!Number.isNaN(acceptEnd.getTime()) && acceptEnd.getTime() >= linkedEnd.getTime()) {

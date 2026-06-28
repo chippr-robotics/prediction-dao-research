@@ -38,7 +38,7 @@ contract WagerRegistry is IWagerRegistry, UUPSManaged, ReentrancyGuardUpgradeabl
     bytes32 public constant ACCOUNT_MODERATOR_ROLE = keccak256("ACCOUNT_MODERATOR_ROLE");
 
     uint64 public constant MAX_ACCEPT_WINDOW = 30 days;
-    uint64 public constant MAX_RESOLVE_WINDOW = 180 days;
+    uint64 public constant MAX_RESOLVE_WINDOW = 2160 days; // 72 months — supports elections and long-term contracts
 
     /// @notice EIP-712 typehash for an open-challenge acceptance. Binding `taker` (= msg.sender) to the
     ///         signature is the front-running defense (FR-011): a copied signature is useless to anyone else.
