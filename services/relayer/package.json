@@ -1,0 +1,22 @@
+{
+  "name": "fairwins-pool-relayer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gas-only relayer for ZK-Wager Pool gasless joins (spec 034). GAS INFRASTRUCTURE, not an app backend.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "lint": "echo 'no linter wired; relies on repo-level review' && exit 0"
+  },
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0"
+  }
+}
