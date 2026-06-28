@@ -5,6 +5,7 @@
  * at the contact level (FR-012).
  */
 
+import { useState } from 'react'
 import { addressKey } from '../../lib/addressBook/addressBookStore'
 import RestrictionTag from './RestrictionTag'
 
@@ -23,7 +24,15 @@ export default function ContactCard({
   onDeleteContact,
   onDeleteAddress,
 }) {
+  const [copiedKey, setCopiedKey] = useState(null)
   const statuses = contact.addresses.map((a) => getStatus(a.address, a.chainId))
+
+  function handleCopy(addr, key) {
+    navigator.clipboard.writeText(addr).then(() => {
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey(null), 1500)
+    })
+  }
   const containsRestricted = statuses.includes('restricted')
 
   return (
@@ -55,12 +64,21 @@ export default function ContactCard({
       <ul className="ab-address-list">
         {contact.addresses.map((a, i) => {
           const key = addressKey(a.address, a.chainId)
+          const copied = copiedKey === key
           return (
             <li key={key} className="ab-address-row">
               <div className="ab-address-main">
                 <code className="ab-address-value" title={a.address}>
                   {shorten(a.address)}
                 </code>
+                <button
+                  type="button"
+                  className={`ab-btn ab-btn-xs ab-copy-btn${copied ? ' ab-copy-btn--copied' : ''}`}
+                  onClick={() => handleCopy(a.address, key)}
+                  aria-label={`Copy address ${a.address}`}
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
                 <span className="ab-address-network">{networkName(a.chainId)}</span>
                 <RestrictionTag status={statuses[i]} />
               </div>
