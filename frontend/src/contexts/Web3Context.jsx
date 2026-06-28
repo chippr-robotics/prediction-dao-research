@@ -76,7 +76,7 @@ export function Web3Provider({ children }) {
   const connectWallet = useCallback(async () => {
     try {
       if (!window.ethereum) {
-        alert('Please install MetaMask to use this application')
+        alert('Please install a Web3 browser wallet to use this application')
         return false
       }
 

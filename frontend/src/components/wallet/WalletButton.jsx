@@ -12,6 +12,7 @@ import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
+import { getWalletLabel } from '../../utils/walletLabel'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
@@ -227,27 +228,9 @@ function WalletButton({ className = '' }) {
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`
   }
 
-  const getConnectorName = (connector) => {
-    // Format connector names nicely
-    // Check connector name or type for better display
-    const name = connector.name?.toLowerCase() || ''
-    const type = connector.type?.toLowerCase() || ''
-    
-    if (name.includes('metamask') || type === 'metamask') return 'MetaMask'
-    if (name.includes('walletconnect') || type === 'walletconnect') return 'WalletConnect'
-    if (name.includes('coinbase')) return 'Coinbase Wallet'
-    if (name === 'injected' || type === 'injected') {
-      // Try to detect the actual wallet from window.ethereum
-      if (typeof window !== 'undefined' && window.ethereum) {
-        if (window.ethereum.isMetaMask) return 'MetaMask'
-        if (window.ethereum.isCoinbaseWallet) return 'Coinbase Wallet'
-        if (window.ethereum.isBraveWallet) return 'Brave Wallet'
-        if (window.ethereum.isRabby) return 'Rabby'
-      }
-      return 'Browser Wallet'
-    }
-    return connector.name || 'Wallet'
-  }
+  // Vendor-neutral connector label — the generic injected connector resolves to
+  // "Browser Wallet" unless a specific provider can be positively detected.
+  const getConnectorName = (connector) => getWalletLabel(connector)
 
   return (
     <div className={`wallet-button-container ${className}`}>
