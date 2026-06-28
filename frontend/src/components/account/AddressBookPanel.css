@@ -218,6 +218,16 @@
   color: #b91c1c;
 }
 
+.ab-copy-btn {
+  color: var(--text-muted, #64748b);
+  min-width: 3.2rem;
+}
+
+.ab-copy-btn--copied {
+  color: #15803d;
+  border-color: #15803d;
+}
+
 .ab-modal-backdrop {
   position: fixed;
   inset: 0;
