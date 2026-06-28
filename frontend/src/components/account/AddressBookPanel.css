@@ -188,29 +188,70 @@
 
 .ab-btn {
   cursor: pointer;
-  border: 1px solid var(--border-color, #cbd5e1);
-  background: var(--btn-bg, #f8fafc);
-  color: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #64748b);
   border-radius: 0.375rem;
-  padding: 0.45rem 0.7rem;
+  padding: 0.3rem;
   font: inherit;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  line-height: 1;
+  transition: color 0.1s, background 0.1s;
+}
+
+.ab-btn:hover,
+.ab-btn:focus-visible {
+  color: var(--text, #0f172a);
+  background: var(--btn-hover-bg, rgba(0, 0, 0, 0.06));
+  outline: none;
+}
+
+.ab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+/* Labels hidden on small screens; shown alongside icon on larger screens */
+.ab-btn-label {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .ab-btn-label {
+    display: inline;
+  }
+
+  .ab-btn-sm {
+    padding: 0.3rem 0.55rem;
+  }
+
+  .ab-btn-xs {
+    padding: 0.2rem 0.45rem;
+  }
 }
 
 .ab-btn-sm {
-  padding: 0.3rem 0.55rem;
   font-size: 0.8rem;
 }
 
 .ab-btn-xs {
-  padding: 0.2rem 0.45rem;
   font-size: 0.72rem;
   align-self: flex-start;
 }
 
 .ab-btn-primary {
   background: var(--accent, #2563eb);
-  border-color: var(--accent, #2563eb);
+  color: #fff;
+  padding: 0.4rem 0.75rem;
+}
+
+.ab-btn-primary:hover,
+.ab-btn-primary:focus-visible {
+  background: var(--accent-hover, #1d4ed8);
   color: #fff;
 }
 
@@ -218,14 +259,24 @@
   color: #b91c1c;
 }
 
+.ab-btn-danger:hover,
+.ab-btn-danger:focus-visible {
+  background: rgba(185, 28, 28, 0.07);
+  color: #b91c1c;
+}
+
 .ab-copy-btn {
   color: var(--text-muted, #64748b);
-  min-width: 3.2rem;
 }
 
 .ab-copy-btn--copied {
   color: #15803d;
-  border-color: #15803d;
+}
+
+.ab-copy-btn--copied:hover,
+.ab-copy-btn--copied:focus-visible {
+  background: rgba(21, 128, 61, 0.07);
+  color: #15803d;
 }
 
 .ab-modal-backdrop {
