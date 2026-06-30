@@ -252,6 +252,24 @@ module.exports = {
       },
       viaIR: true,
     },
+    // Compile the vendored Semaphore V4 self-deploy closure (spec 034, ETC/Mordor) WITHOUT viaIR.
+    // PoseidonT3 (auto-generated assembly) and SemaphoreVerifier (bn128 pairing assembly) are
+    // hand-optimized for legacy codegen; the Yul IR pipeline balloons their compile to ~13 GB RSS
+    // and OOM-thrashes a 16 GB box (and would do the same to CI). These are deployed standalone and
+    // linked/held by address, so different codegen here cannot affect the viaIR app contracts.
+    // Nothing in contracts/ imports this closure except SemaphoreDeploy.sol.
+    overrides: Object.fromEntries(
+      [
+        "contracts/pools/SemaphoreDeploy.sol",
+        "@semaphore-protocol/contracts/Semaphore.sol",
+        "@semaphore-protocol/contracts/base/SemaphoreGroups.sol",
+        "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol",
+        "@semaphore-protocol/contracts/base/SemaphoreVerifierKeyPts.sol",
+        "@zk-kit/lean-imt.sol/InternalLeanIMT.sol",
+        "@zk-kit/lean-imt.sol/LeanIMT.sol",
+        "poseidon-solidity/PoseidonT3.sol",
+      ].map((f) => [f, { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 1 }, viaIR: false } }])
+    ),
   },
   networks: {
     hardhat: {

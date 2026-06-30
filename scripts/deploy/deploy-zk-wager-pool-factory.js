@@ -54,17 +54,6 @@ async function main() {
 
   const cfg = getZkPoolConfig(chainId);
 
-  // --- Resolve the Semaphore singleton (canonical on Amoy/Polygon; self-deploy on ETC/Mordor) ---
-  const semaphore = process.env[`ZKPOOL_SEMAPHORE_${chainId}`] || cfg.semaphore;
-  if (!semaphore || !ethers.isAddress(semaphore)) {
-    throw new Error(
-      cfg.selfDeploySemaphore
-        ? `No Semaphore on chain ${chainId}. Self-deploy Semaphore V4 + verifier first, then set ZKPOOL_SEMAPHORE_${chainId}.`
-        : `No Semaphore address configured for chain ${chainId} in zkPoolConfig.js.`
-    );
-  }
-  console.log(`Semaphore: ${semaphore}${cfg.selfDeploySemaphore ? " (self-deployed)" : " (canonical)"}`);
-
   // --- Load the existing deployment record; we APPEND to it ---
   const filename = getDeploymentFilename(network, "v2");
   const filepath = path.join(process.cwd(), "deployments", filename);
@@ -73,6 +62,20 @@ async function main() {
   }
   const record = JSON.parse(fs.readFileSync(filepath, "utf8"));
   const contracts = record.contracts || (record.contracts = {});
+
+  // --- Resolve the Semaphore singleton (canonical on Amoy/Polygon; self-deploy on ETC/Mordor) ---
+  // Precedence: explicit env override > the address self-deploy recorded > zkPoolConfig canonical.
+  const semaphore =
+    process.env[`ZKPOOL_SEMAPHORE_${chainId}`] || contracts.zkWagerPoolSemaphore || cfg.semaphore;
+  if (!semaphore || !ethers.isAddress(semaphore)) {
+    throw new Error(
+      cfg.selfDeploySemaphore
+        ? `No Semaphore on chain ${chainId}. Run scripts/deploy/deploy-semaphore.js first ` +
+          `(records zkWagerPoolSemaphore), or set ZKPOOL_SEMAPHORE_${chainId}.`
+        : `No Semaphore address configured for chain ${chainId} in zkPoolConfig.js.`
+    );
+  }
+  console.log(`Semaphore: ${semaphore}${cfg.selfDeploySemaphore ? " (self-deployed)" : " (canonical)"}`);
 
   const sanctionsGuard = contracts.sanctionsGuard;
   if (!sanctionsGuard || !ethers.isAddress(sanctionsGuard)) {
