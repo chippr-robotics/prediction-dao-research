@@ -236,10 +236,10 @@ describe('useBlockchainEvents hooks', () => {
 
       await waitFor(() => {
         expect(mockShowNotification).toHaveBeenCalledWith(
-          'Please connect to MetaMask',
+          'Please connect your browser wallet',
           'warning'
         )
-        expect(mockAnnounce).toHaveBeenCalledWith('Please connect to MetaMask')
+        expect(mockAnnounce).toHaveBeenCalledWith('Please connect your browser wallet')
       })
     })
 

@@ -19,6 +19,7 @@ import PortalNav from '../components/ui/PortalNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
+import { getWalletLabel, getWalletIcon } from '../utils/walletLabel'
 import './WalletPage.css'
 
 // My Account sections, shown via the WalletTabMenu kebab menu.
@@ -36,23 +37,11 @@ const WALLET_TABS = [
   { id: 'swap', label: 'Swap' },
 ]
 
-const CONNECTOR_CONFIG = {
-  walletConnect: {
-    icon: '\uD83D\uDD17',
-    label: 'WalletConnect'
-  },
-  injected: {
-    icon: '\uD83E\uDD8A',
-    label: 'MetaMask'
-  }
-}
-
+// Connector labels are resolved through the shared, vendor-neutral helper so
+// the generic injected option reads "Browser Wallet" rather than assuming a
+// specific vendor like MetaMask.
 const getConnectorInfo = (connector) => {
-  const config = CONNECTOR_CONFIG[connector.id]
-  if (config) {
-    return `${config.icon} ${config.label}`
-  }
-  return connector.name || connector.id
+  return `${getWalletIcon(connector)} ${getWalletLabel(connector)}`
 }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
@@ -279,7 +268,7 @@ function WalletPage() {
                     href="https://ethereum.org/en/wallets/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="install-metamask-link"
+                    className="install-wallet-link"
                   >
                     Learn about Web3 wallets
                   </a>

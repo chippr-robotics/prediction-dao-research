@@ -31,11 +31,11 @@
     "@semaphore-protocol/group": "^4.14.2",
     "@semaphore-protocol/identity": "^4.14.2",
     "@semaphore-protocol/proof": "^4.14.2",
-    "@tanstack/react-query": "^5.90.12",
-    "@walletconnect/ethereum-provider": "^2.23.1",
+    "@tanstack/react-query": "^5.101.2",
+    "@walletconnect/ethereum-provider": "^2.23.10",
     "@walletconnect/modal": "^2.7.0",
     "ethereum-blockies-base64": "^1.0.2",
-    "ethers": "^6.16.0",
+    "ethers": "^6.17.0",
     "file-saver": "^2.0.5",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
@@ -49,8 +49,8 @@
     "recharts": "^3.8.1",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
-    "viem": "^2.43.2",
-    "wagmi": "^3.1.0"
+    "viem": "^2.53.1",
+    "wagmi": "^3.6.21"
   },
   "devDependencies": {
     "@cypress/webpack-preprocessor": "^7.0.2",
