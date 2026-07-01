@@ -51,8 +51,8 @@ export const WAGER_DEFAULTS = {
    */
   MIN_TRADING_PERIOD_SECONDS: 60 * 60,
 
-  /** Maximum trading period in seconds (mirrors contract MAX_TRADING_PERIOD). */
-  MAX_TRADING_PERIOD_SECONDS: 21 * 24 * 60 * 60,
+  /** Maximum trading period in seconds (mirrors contract MAX_RESOLVE_WINDOW minus resolution buffer). */
+  MAX_TRADING_PERIOD_SECONDS: 72 * 30 * 24 * 60 * 60,
 
   /** Extra window (seconds) added to resolveDeadline beyond the trading end
    *  so that participants have time to declare a winner after the event ends.
@@ -64,7 +64,7 @@ export const WAGER_DEFAULTS = {
    *  MAX_RESOLVE_WINDOW; exceeding either reverts with BadDeadlines. Mirrored
    *  here so the client can clamp/validate before submitting. */
   MAX_ACCEPT_WINDOW_SECONDS: 30 * 24 * 60 * 60,
-  MAX_RESOLVE_WINDOW_SECONDS: 180 * 24 * 60 * 60,
+  MAX_RESOLVE_WINDOW_SECONDS: 72 * 30 * 24 * 60 * 60, // 72 months — supports elections and long-term contracts
 }
 
 /**

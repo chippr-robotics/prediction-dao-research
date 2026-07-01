@@ -501,7 +501,7 @@ export function translateRevert(reason) {
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'
-  if (reason.includes('BadDeadlines')) return 'Invalid deadlines. Accept window must be within 30 days; resolve window within 180 days.'
+  if (reason.includes('BadDeadlines')) return 'Invalid deadlines. Accept window must be within 30 days; resolve window within 72 months.'
   if (reason.includes('ZeroStake')) return 'Stakes must be greater than zero.'
   if (reason.includes('ConditionAlreadyResolved')) return 'That Polymarket condition is already resolved. Pick an unresolved one.'
   if (reason.includes('PolymarketRequired')) return 'Polymarket resolution requires a non-zero conditionId.'
