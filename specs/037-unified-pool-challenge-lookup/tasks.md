@@ -122,15 +122,15 @@ copy) with all previously saved codes; the Open Challenge surface no longer has 
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T024 [P] [US3] Component test for `RecoveryCodesPanel` — not-connected, no-backup, unlock → list → copy, and the unlock step preserved — in `frontend/src/components/account/__tests__/RecoveryCodesPanel.test.jsx` (FR-020/022/023)
-- [ ] T025 [P] [US3] Test that `OpenChallengeModal` no longer renders a "Recover codes" tab in `frontend/src/components/fairwins/__tests__/OpenChallengeModal.norecover.test.jsx` (FR-021)
+- [x] T024 [P] [US3] Component test for `RecoveryCodesPanel` — not-connected, no-backup, unlock → list → copy, and the unlock step preserved — in `frontend/src/components/account/__tests__/RecoveryCodesPanel.test.jsx` (FR-020/022/023)
+- [x] T025 [P] [US3] Test that `OpenChallengeModal` no longer renders a "Recover codes" tab in `frontend/src/components/fairwins/__tests__/OpenChallengeModal.norecover.test.jsx` (FR-021)
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Create `RecoveryCodesPanel.jsx` by extracting the RecoverPanel body from OpenChallengeModal, backed by the unchanged `useOpenChallengeCodeVault`, in `frontend/src/components/account/RecoveryCodesPanel.jsx` (contracts/recovery-codes-security.md)
-- [ ] T027 [US3] Mount `RecoveryCodesPanel` as a subsection under the Security tab in `frontend/src/pages/WalletPage.jsx` (depends on T026; FR-020)
-- [ ] T028 [US3] Remove the "Recover codes" (recover) tab entirely from `frontend/src/components/fairwins/OpenChallengeModal.jsx` (depends on T026; coordinate with T015 — same file)
-- [ ] T029 [US3] Accessibility pass on `RecoveryCodesPanel` + the Security subsection — button labels, list semantics, copy feedback in a live region (WCAG 2.1 AA) — in `frontend/src/components/account/RecoveryCodesPanel.jsx`
+- [x] T026 [US3] Create `RecoveryCodesPanel.jsx` by extracting the RecoverPanel body from OpenChallengeModal, backed by the unchanged `useOpenChallengeCodeVault`, in `frontend/src/components/account/RecoveryCodesPanel.jsx` (contracts/recovery-codes-security.md)
+- [x] T027 [US3] Mount `RecoveryCodesPanel` as a subsection under the Security tab in `frontend/src/pages/WalletPage.jsx` (depends on T026; FR-020)
+- [x] T028 [US3] Remove the "Recover codes" (recover) tab entirely from `frontend/src/components/fairwins/OpenChallengeModal.jsx` (depends on T026; coordinate with T015 — same file)
+- [x] T029 [US3] Accessibility pass on `RecoveryCodesPanel` + the Security subsection — button labels, list semantics, copy feedback in a live region (WCAG 2.1 AA) — in `frontend/src/components/account/RecoveryCodesPanel.jsx`
 
 **Checkpoint**: All three user stories independently functional.
 

@@ -13,6 +13,7 @@ import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import BackupPanel from '../components/account/BackupPanel'
+import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import PortalNav from '../components/ui/PortalNav'
@@ -445,6 +446,8 @@ function WalletPage() {
                         )}
                       </div>
                     </div>
+
+                    <RecoveryCodesPanel />
                   </div>
                 )}
 

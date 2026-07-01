@@ -78,18 +78,10 @@ function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'ma
               >
                 <span className="fm-resolution-tab-label">Take a challenge</span>
               </button>
-              <button
-                type="button" role="tab" aria-selected={tab === 'recover'}
-                className={`fm-resolution-tab ${tab === 'recover' ? 'active' : ''}`}
-                onClick={() => setTab('recover')}
-              >
-                <span className="fm-resolution-tab-label">Recover codes</span>
-              </button>
             </div>
 
             {tab === 'maker' && <MakerPanel onClose={onClose} />}
             {tab === 'taker' && <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} initialCode={initialCode} />}
-            {tab === 'recover' && <RecoverPanel />}
           </div>
         </div>
       </div>
@@ -503,95 +495,8 @@ function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Recover codes — unlock the device-local encrypted backup of created codes
-// (feature 024 follow-up). Lets a creator recover a forgotten four-word code.
-// ---------------------------------------------------------------------------
-function RecoverPanel() {
-  const { canUse, recoverCodes, busy } = useOpenChallengeCodeVault()
-  const [entries, setEntries] = useState(null) // null = not unlocked yet
-  const [error, setError] = useState(null)
-  const [copiedCode, setCopiedCode] = useState(null)
-
-  const handleUnlock = useCallback(async () => {
-    setError(null)
-    try {
-      const list = await recoverCodes()
-      setEntries(list)
-    } catch (err) {
-      setError(err?.message || 'Could not unlock your saved codes.')
-    }
-  }, [recoverCodes])
-
-  const handleCopy = useCallback(async (code) => {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopiedCode(code)
-      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000)
-    } catch { /* clipboard unavailable */ }
-  }, [])
-
-  if (!canUse) {
-    return (
-      <div className="fm-form">
-        <p className="fm-hint">Connect your wallet to recover the codes you saved on this device.</p>
-      </div>
-    )
-  }
-
-  if (entries == null) {
-    return (
-      <div className="fm-form">
-        <p className="fm-hint">
-          Codes you chose to back up are stored encrypted on this device, readable only with this wallet.
-          Unlock to recover a forgotten code. (Codes saved on other devices won&apos;t appear here.)
-        </p>
-        {error && <div className="fm-error-banner" role="alert">{error}</div>}
-        <div className="fm-success-actions">
-          <button type="button" className="fm-btn-primary" onClick={handleUnlock} disabled={busy}>
-            {busy ? 'Unlocking…' : 'Unlock my saved codes'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (entries.length === 0) {
-    return (
-      <div className="fm-form">
-        <p className="fm-hint">
-          No saved codes on this device yet. When you create an open challenge, choose
-          <strong> Save encrypted backup</strong> to make it recoverable here.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="fm-form">
-      <p className="fm-hint">Your saved codes — keep them private; anyone with a code can take that challenge.</p>
-      <ul className="oc-recover-list">
-        {entries.map((e) => (
-          <li key={e.code} className="oc-recover-item">
-            <div className="oc-recover-meta">
-              <span className="oc-recover-title">{e.description || 'Open challenge'}</span>
-              <span className="oc-recover-sub">
-                {e.wagerId != null ? `#${e.wagerId}` : 'Unsubmitted'}
-                {e.savedAt ? ` · saved ${new Date(e.savedAt).toLocaleDateString()}` : ''}
-              </span>
-            </div>
-            <div className="oc-code-display oc-recover-code">
-              <code className="oc-code">{e.code}</code>
-              <button type="button" className="fm-btn-secondary" onClick={() => handleCopy(e.code)}>
-                {copiedCode === e.code ? 'Copied ✓' : 'Copy'}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+// Recover codes moved to My Account → Security (spec 037, US3):
+// see components/account/RecoveryCodesPanel.jsx.
 
 // Full step order the accept flow walks through (the visible list omits the quick "check" read).
 const ACCEPT_STEP_ORDER = ['check', 'approve', 'sign', 'accept']
