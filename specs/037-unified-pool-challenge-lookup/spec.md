@@ -49,6 +49,7 @@ surfaces are unified.
 
 - Q: How does My Wagers enumerate the user's pools and challenges? → A: Hybrid — on-chain/subgraph indexing for participating/accepted/resolved items, plus device-local records (e.g., the open-challenge code vault) for items only known locally (created-but-unaccepted challenges); some items are therefore device-scoped.
 - Q: When one of the two lookups fails (network/chain error) rather than returning "no match", what does the unified lookup show? → A: Distinguish failure from empty — any lookup error with no positive match shows a retryable "couldn't check right now" state; "no match found" is shown only when both the challenge and pool lookups completed successfully and neither matched.
+- Q: Where does the unified "enter a phrase" lookup live, and what happens to the existing Take/Join tabs? → A: A dedicated, standalone "Enter a phrase" entry point (its own quick action/surface) handles both take and join; the Open Challenge and Group Pool surfaces drop their Take-a-challenge / Join-a-pool tabs and become create-only.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -194,9 +195,14 @@ open the challenge-creation surface to reach it.
 
 **Unified phrase lookup**
 
-- **FR-001**: The system MUST provide a single entry point where a user enters a
-  four-word phrase to be taken to the matching pool or open challenge, replacing the
-  separate "Take a challenge" and "Join a pool" entry points.
+- **FR-001**: The system MUST provide a single, standalone entry point (its own
+  quick action / surface) where a user enters a four-word phrase to be taken to the
+  matching pool or open challenge, replacing the separate "Take a challenge" and "Join a
+  pool" entry points.
+- **FR-001a**: The Open Challenge and Group Pool surfaces MUST drop their
+  "Take a challenge" and "Join a pool" tabs respectively and become create-only; the
+  take/join function is reached exclusively through the unified "enter a phrase" entry
+  point.
 - **FR-002**: The system MUST accept the phrase without requiring the user to declare
   in advance whether it belongs to a pool or a challenge.
 - **FR-003**: On submission, the system MUST attempt to resolve the phrase against both
