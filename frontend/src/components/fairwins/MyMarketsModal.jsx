@@ -15,6 +15,7 @@ import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import OpenChallengeDecryptModal from './OpenChallengeDecryptModal'
 import WagerList from './WagerList'
+import MyPoolsSection from './MyPoolsSection'
 import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
@@ -946,6 +947,8 @@ function MyMarketsModal({
 
         {/* Content Area */}
         <div className="mm-content">
+          {/* Group pools (spec 037) — self-hides when the user has none, so the wager view is unchanged. */}
+          <MyPoolsSection />
           {!isConnected ? (
             <div className="mm-empty-state">
               <div className="mm-empty-icon">&#128274;</div>

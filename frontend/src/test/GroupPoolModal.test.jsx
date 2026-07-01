@@ -31,12 +31,12 @@ describe('GroupPoolModal', () => {
     useWallet.mockReturnValue({ account: '0x1111111111111111111111111111111111111111', isConnected: true })
   })
 
-  it('renders as a wager-style bottom sheet with Create/Join tabs', () => {
+  it('renders as a wager-style bottom sheet, create-only (joining moved to the unified lookup, spec 037)', () => {
     usePools.mockReturnValue(pools())
     renderModal({ initialTab: 'create' })
     expect(screen.getByRole('dialog')).toHaveClass('friend-markets-modal-backdrop')
     expect(screen.getByRole('tab', { name: /create a pool/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /join a pool/i })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /join a pool/i })).toBeNull()
   })
 
   it('Create tab: submitting yields a shareable four-word phrase', async () => {
@@ -46,34 +46,5 @@ describe('GroupPoolModal', () => {
     renderModal({ initialTab: 'create' })
     fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
     expect(await screen.findByTestId('pool-phrase')).toHaveTextContent('crystal orbit harbor violet')
-  })
-
-  it('Join tab: a valid phrase shows the pool summary before funds, with a Join action', async () => {
-    usePools.mockReturnValue(pools({ resolvePhrase: vi.fn().mockResolvedValue({ summary: openSummary }) }))
-    renderModal({ initialTab: 'join' })
-    fireEvent.change(screen.getByLabelText(/four-word phrase/i), { target: { value: 'crystal orbit harbor violet' } })
-    fireEvent.click(screen.getByRole('button', { name: /find pool/i }))
-    expect(await screen.findByTestId('pool-summary')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /join for 10\.0 USDC/i })).toBeInTheDocument()
-  })
-
-  it('Join tab: an unknown phrase surfaces a clear not-found message', async () => {
-    usePools.mockReturnValue(pools({ resolvePhrase: vi.fn().mockResolvedValue({ notFound: true, reason: 'unknown' }) }))
-    renderModal({ initialTab: 'join' })
-    fireEvent.change(screen.getByLabelText(/four-word phrase/i), { target: { value: 'a b c d' } })
-    fireEvent.click(screen.getByRole('button', { name: /find pool/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no active pool matches/i)
-  })
-
-  it('Join tab: a full/closed pool is not joinable', async () => {
-    usePools.mockReturnValue(pools({
-      resolvePhrase: vi.fn().mockResolvedValue({ summary: { ...openSummary, state: 1, stateLabel: 'JoiningClosed', slotsRemaining: 0 } }),
-    }))
-    renderModal({ initialTab: 'join' })
-    fireEvent.change(screen.getByLabelText(/four-word phrase/i), { target: { value: 'a b c d' } })
-    fireEvent.click(screen.getByRole('button', { name: /find pool/i }))
-    await screen.findByTestId('pool-summary')
-    expect(screen.queryByRole('button', { name: /join for/i })).toBeNull()
-    expect(screen.getByText(/isn’t accepting new members/i)).toBeInTheDocument()
   })
 })

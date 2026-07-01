@@ -11,7 +11,7 @@ const ACCOUNT = '0x3333333333333333333333333333333333333333'
 const STAKE = 10_000_000n // 10 USDC (6 decimals)
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { allowance: 0n, balance: 100_000_000n },
+  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false },
   calls: [],
 }))
 
@@ -51,7 +51,10 @@ vi.mock('ethers', async () => {
       }
       acceptOpenWager.staticCall = () => Promise.resolve()
       return {
-        getWager: () => Promise.resolve({ token: TOKEN, opponentStake: STAKE }),
+        openWagerIdForClaim: () => state.throwLookup
+          ? Promise.reject(new Error('rpc down'))
+          : Promise.resolve(state.wagerId),
+        getWager: () => Promise.resolve({ token: TOKEN, opponentStake: STAKE, creator: '0xCreator', metadataUri: '' }),
         acceptOpenWager,
       }
     }
@@ -117,5 +120,41 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
       })
     ).rejects.toThrow(/Insufficient USDC balance/i)
     expect(calls).toEqual([])
+  })
+})
+
+// Spec 037, T004: structured, non-throwing lookup(code) used by the unified phrase lookup.
+describe('useOpenChallengeAccept.lookup (structured outcome)', () => {
+  beforeEach(() => { calls.length = 0; state.wagerId = 0n; state.throwLookup = false })
+
+  it('returns not-found when the code maps to no open challenge (wagerId 0)', async () => {
+    state.wagerId = 0n
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let res
+    await act(async () => { res = await result.current.lookup('river tiger kite zoo') })
+    expect(res.status).toBe('not-found')
+    expect(res.reason).toBe('no-match')
+    // A read-only lookup never signs or sends.
+    expect(calls).toEqual([])
+  })
+
+  it('returns matched with the wager payload when the code resolves', async () => {
+    state.wagerId = 4n
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let res
+    await act(async () => { res = await result.current.lookup('river tiger kite zoo') })
+    expect(res.status).toBe('matched')
+    expect(res.payload.wagerId).toBe(4n)
+    expect(res.payload.wager.creator).toBe('0xCreator')
+    expect(calls).toEqual([])
+  })
+
+  it('returns errored (not not-found) when the on-chain read fails — so the UI can say "couldn\'t check"', async () => {
+    state.throwLookup = true
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let res
+    await act(async () => { res = await result.current.lookup('river tiger kite zoo') })
+    expect(res.status).toBe('errored')
+    expect(res.error).toBeInstanceOf(Error)
   })
 })

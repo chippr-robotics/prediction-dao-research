@@ -135,7 +135,7 @@ sequenceDiagram
     App->>Chain: approve USDC + createOpenWager
     App-->>A: four-word code + QR  (save it!)
     A-->>B: shares the code
-    B->>App: "Take a challenge" → enters code
+    B->>App: "Enter a phrase" → enters code
     App-->>B: shows decrypted terms
     B->>App: Accept → approve + sign + confirm
     App->>Chain: acceptOpenWager (matching stake escrowed)

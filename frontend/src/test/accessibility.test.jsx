@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import Button from '../components/ui/Button'
 import StatusIndicator from '../components/ui/StatusIndicator'
@@ -244,42 +244,22 @@ describe('Accessibility Compliance Tests', () => {
 describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
   beforeEach(() => { createOpenChallenge.mockReset(); discover.mockReset(); accept.mockReset() })
 
-  it('has no axe violations on the Taker tab', async () => {
-    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
-    const results = await axe(container)
-    expect(results).toHaveNoViolations()
-  })
-
-  it('has no axe violations on the Maker tab', async () => {
+  it('has no axe violations on the create modal', async () => {
     const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
-  it('the four-word code input has an accessible label', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
-    // getByLabelText resolves the <label htmlFor> association — fails if the input is unlabeled.
-    const input = screen.getByLabelText(/word code/i)
-    expect(input).toBeInTheDocument()
-    expect(input.tagName).toBe('INPUT')
-  })
-
   it('the residual-risk / save-your-code notice is conveyed as TEXT, not color alone', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
-    // Maker form residual-risk disclosure: text is present (not color-only signaling).
+    // Create form residual-risk disclosure: text is present (not color-only signaling).
     expect(
       screen.getByText(/anyone you share the code with can take the other side/i)
-    ).toBeInTheDocument()
-
-    // Taker flow: the "save your code" guidance is rendered as readable text.
-    fireEvent.click(screen.getByRole('tab', { name: /take a challenge/i }))
-    expect(
-      screen.getByText(/Without it, an open challenge can.t be found or read/i)
     ).toBeInTheDocument()
   })
 
   it('the modal exposes a dialog role and an accessible name', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     // aria-labelledby points at the visible title, giving the dialog an accessible name.

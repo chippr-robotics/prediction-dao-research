@@ -12,6 +12,7 @@ vi.mock('../../hooks/useOpenChallengeAccept', () => ({
 }))
 
 import OpenChallengeModal from '../../components/fairwins/OpenChallengeModal'
+import RecoveryCodesPanel from '../../components/account/RecoveryCodesPanel'
 import { WalletContext } from '../../contexts/WalletContext'
 
 const ACCOUNT = '0x9999999999999999999999999999999999999999'
@@ -31,16 +32,16 @@ function withWallet(ui) {
 describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)', () => {
   beforeEach(() => { createOpenChallenge.mockReset(); localStorage.clear() })
 
-  it('saves an encrypted backup after creating, then recovers it on the Recover tab', async () => {
+  it('saves an encrypted backup after creating, then recovers it from the Security panel (spec 037, FR-022)', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 12n, txHash: '0xabc' })
-    withWallet(<OpenChallengeModal isOpen onClose={() => {}} />)
+    const { unmount } = withWallet(<OpenChallengeModal isOpen onClose={() => {}} />)
 
     // Create the challenge.
     fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await screen.findByText('river tiger kite zoo')
 
-    // Save the encrypted backup.
+    // Save the encrypted backup (MakerPanel — unchanged by the relocation).
     fireEvent.click(screen.getByRole('button', { name: /save encrypted backup/i }))
     expect(await screen.findByText(/encrypted backup saved/i)).toBeInTheDocument()
 
@@ -50,17 +51,17 @@ describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)'
     expect(raw).toBeTruthy()
     expect(raw).not.toContain('river tiger kite zoo')
 
-    // Recover it from the Recover codes tab.
-    fireEvent.click(screen.getByRole('tab', { name: /recover codes/i }))
+    // Recovery codes now live in My Account → Security. The same device vault round-trips there.
+    unmount()
+    withWallet(<RecoveryCodesPanel />)
     fireEvent.click(screen.getByRole('button', { name: /unlock my saved codes/i }))
     await waitFor(() => expect(screen.getByText('river tiger kite zoo')).toBeInTheDocument())
     expect(screen.getByText(/Will it rain\?/)).toBeInTheDocument()
     expect(screen.getByText(/#12/)).toBeInTheDocument()
   })
 
-  it('Recover tab shows an empty state when nothing is backed up', async () => {
-    withWallet(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('tab', { name: /recover codes/i }))
+  it('Security recovery panel shows an empty state when nothing is backed up', async () => {
+    withWallet(<RecoveryCodesPanel />)
     fireEvent.click(screen.getByRole('button', { name: /unlock my saved codes/i }))
     expect(await screen.findByText(/no saved codes on this device/i)).toBeInTheDocument()
   })

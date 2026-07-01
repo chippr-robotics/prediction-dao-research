@@ -9,6 +9,7 @@ import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
 import GroupPoolModal from './GroupPoolModal'
+import UnifiedLookupModal from './UnifiedLookupModal'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -164,18 +165,17 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
 
   const utilityActions = [
     {
-      id: 'join-pool',
+      id: 'enter-phrase',
       category: 'track',
-      tag: 'Join',
+      tag: 'Enter',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-          <polyline points="10 17 15 12 10 7" />
-          <line x1="15" y1="12" x2="3" y2="12" />
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.5" y2="16.5" />
         </svg>
       ),
-      title: 'Join a Pool',
-      description: 'Enter four words to find and join a group pool'
+      title: 'Enter a Phrase',
+      description: 'Enter four words to join a pool or take a challenge'
     },
     {
       id: 'my-wagers',
@@ -499,7 +499,10 @@ function Dashboard() {
   const [showGroupPool, setShowGroupPool] = useState(false)
   const [groupPoolTab, setGroupPoolTab] = useState('create')
   const [openChallengeTab, setOpenChallengeTab] = useState('maker')
-  const [openChallengeInitialCode, setOpenChallengeInitialCode] = useState('')
+  // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
+  const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
+  const [unifiedInitialPhrase, setUnifiedInitialPhrase] = useState('')
+  const [unifiedAutoResolve, setUnifiedAutoResolve] = useState(false)
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
   // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
@@ -535,15 +538,16 @@ function Dashboard() {
     navigate(location.pathname, { replace: true, state: {} })
   }, [routeWagerId, location.pathname, navigate])
 
-  // Open-challenge deep link (feature 024): a shared QR / link of the form
-  // /app?oc=take&code=<four words> opens the Open Challenge modal on the Taker tab with the code pre-filled.
-  // After consuming it we strip the query so it doesn't re-trigger on re-render or get bookmarked with the code.
+  // Shared-phrase deep link (feature 024 / spec 037): a shared QR / link of the form
+  // /app?oc=take&code=<four words> now opens the unified phrase lookup, pre-filled and auto-resolved,
+  // which finds whichever thing the words point to (challenge or pool). After consuming it we strip the
+  // query so it doesn't re-trigger on re-render or get bookmarked with the code.
   useEffect(() => {
     const code = parseTakeChallengeParams(location.search)
     if (code) {
-      setOpenChallengeInitialCode(code)
-      setOpenChallengeTab('taker')
-      setShowOpenChallenge(true)
+      setUnifiedInitialPhrase(code)
+      setUnifiedAutoResolve(true)
+      setShowUnifiedLookup(true)
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.search, location.pathname, navigate])
@@ -573,9 +577,10 @@ function Dashboard() {
         setGroupPoolTab('create')
         setShowGroupPool(true)
         break
-      case 'join-pool':
-        setGroupPoolTab('join')
-        setShowGroupPool(true)
+      case 'enter-phrase':
+        setUnifiedInitialPhrase('')
+        setUnifiedAutoResolve(false)
+        setShowUnifiedLookup(true)
         break
       case 'my-wagers':
         setShowMyWagers(true)
@@ -720,15 +725,27 @@ function Dashboard() {
         initialPolymarketMarket={initialPolymarketMarket}
       />
 
-      {/* Open Challenge (feature 024) — one modal, Maker/Taker tabs. key remounts for fresh state per open. */}
+      {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037). */}
       <OpenChallengeModal
         key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
         isOpen={showOpenChallenge}
         initialTab={openChallengeTab}
-        initialCode={openChallengeInitialCode}
         onClose={() => setShowOpenChallenge(false)}
         onBuyMembership={() => {
           setShowOpenChallenge(false)
+          showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
+        }}
+      />
+
+      {/* Unified phrase lookup (spec 037) — one entry point: enter four words to take a challenge or join a pool. */}
+      <UnifiedLookupModal
+        key={showUnifiedLookup ? 'ul-open' : 'ul-closed'}
+        isOpen={showUnifiedLookup}
+        initialPhrase={unifiedInitialPhrase}
+        autoResolve={unifiedAutoResolve}
+        onClose={() => setShowUnifiedLookup(false)}
+        onBuyMembership={() => {
+          setShowUnifiedLookup(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
         }}
       />

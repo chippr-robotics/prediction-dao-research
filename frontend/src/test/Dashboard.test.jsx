@@ -17,6 +17,14 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
   ) : null,
 }))
 
+// Stub the unified phrase lookup (spec 037) so we assert the Dashboard wiring — the "Enter a Phrase"
+// quick action and the ?oc=take&code= deep-link reroute — without its resolver/hook internals.
+vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
+  default: ({ isOpen, initialPhrase, autoResolve }) => isOpen ? (
+    <div data-testid="unified-modal" data-phrase={initialPhrase} data-auto={String(autoResolve)} />
+  ) : null,
+}))
+
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
     account: '0x1234567890abcdef1234567890abcdef12345678',
@@ -281,6 +289,40 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Create a wagerwith a friend')).toBeInTheDocument()
       expect(screen.getByText('How it works')).toBeInTheDocument()
       expect(screen.getByText('Resolution methods')).toBeInTheDocument()
+    })
+  })
+
+  describe('Unified phrase lookup entry (spec 037)', () => {
+    const providers = (children, initialEntries) => (
+      <MemoryRouter initialEntries={initialEntries}>
+        <UIContext.Provider value={defaultUIContext}>
+          <WalletContext.Provider value={defaultWalletContext}>
+            <UserPreferencesContext.Provider value={defaultPreferencesContext}>
+              <FriendMarketsContext.Provider value={defaultFriendMarketsContext}>
+                <DexContext.Provider value={defaultDexContext}>
+                  {children}
+                </DexContext.Provider>
+              </FriendMarketsContext.Provider>
+            </UserPreferencesContext.Provider>
+          </WalletContext.Provider>
+        </UIContext.Provider>
+      </MemoryRouter>
+    )
+
+    it('the "Enter a Phrase" quick action opens the unified lookup (no auto-resolve)', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByTestId('unified-modal')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText('Enter a Phrase'))
+      const modal = screen.getByTestId('unified-modal')
+      expect(modal).toHaveAttribute('data-auto', 'false')
+      expect(modal).toHaveAttribute('data-phrase', '')
+    })
+
+    it('a ?oc=take&code= deep link opens the unified lookup prefilled and auto-resolving (FR-013)', () => {
+      render(providers(<Dashboard />, ['/app?oc=take&code=river%20tiger%20kite%20zoo']))
+      const modal = screen.getByTestId('unified-modal')
+      expect(modal).toHaveAttribute('data-phrase', 'river tiger kite zoo')
+      expect(modal).toHaveAttribute('data-auto', 'true')
     })
   })
 
