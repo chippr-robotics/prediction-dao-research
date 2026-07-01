@@ -4,24 +4,24 @@
  * A member proves group membership anonymously: the proof reveals only a nullifier (one per scope) and
  * the message, never which member. For an approval the scope is the proposalId; for a claim it is the
  * pool's fixed claim scope and the message binds the payout recipient. The Semaphore packages and their
- * wasm/zkey artifacts are heavy, so they load lazily; specifiers are held in variables so the bundler
- * defers resolution until pool voting ships (kept out of the build until then).
+ * wasm/zkey artifacts are heavy, so they are code-split into a lazy chunk (static-specifier dynamic
+ * imports) that only loads when a member actually votes/claims.
  *
  * NOTE: building the prover's group requires the full list of member identity commitments, which the
- * app reads from the subgraph. Until that lands, callers pass `memberCommitments` explicitly.
+ * app reads on-chain from the pool's `Joined` events; callers pass `memberCommitments` explicitly.
  */
 
 async function loadSemaphore() {
-  const groupPkg = '@semaphore-protocol/group'
-  const proofPkg = '@semaphore-protocol/proof'
+  // Static specifiers → Vite/Rollup code-split these into a lazy chunk (both are real dependencies;
+  // see frontend/package.json). They only load on first vote/claim.
   try {
     const [groupMod, proofMod] = await Promise.all([
-      import(/* @vite-ignore */ groupPkg),
-      import(/* @vite-ignore */ proofPkg),
+      import('@semaphore-protocol/group'),
+      import('@semaphore-protocol/proof'),
     ])
     return { Group: groupMod.Group, generateProof: proofMod.generateProof }
-  } catch {
-    throw new Error('Anonymous voting support is not installed yet (@semaphore-protocol/group,/proof).')
+  } catch (e) {
+    throw new Error(`Could not load anonymous voting support (@semaphore-protocol/group,/proof): ${e?.message || e}`)
   }
 }
 
