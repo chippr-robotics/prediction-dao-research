@@ -43,6 +43,12 @@ Creating a challenge and creating a pool remain distinct actions (they ask for
 different things); only the **join/take** side and the **management/recovery**
 surfaces are unified.
 
+## Clarifications
+
+### Session 2026-07-01
+
+- Q: How does My Wagers enumerate the user's pools and challenges? → A: Hybrid — on-chain/subgraph indexing for participating/accepted/resolved items, plus device-local records (e.g., the open-challenge code vault) for items only known locally (created-but-unaccepted challenges); some items are therefore device-scoped.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - One phrase finds the right thing (Priority: P1)
@@ -238,6 +244,12 @@ open the challenge-creation surface to reach it.
 - **FR-019**: My Wagers MUST continue to behave correctly for users who have no
   challenges or pools (no errors, graceful empty states), preserving today's wager-only
   experience.
+- **FR-024**: My Wagers MUST source items from a hybrid of on-chain/subgraph indexing
+  (for participating, accepted, and resolved wagers, challenges, and pools) and
+  device-local records (e.g., the open-challenge code vault for created-but-unaccepted
+  challenges). Items that exist only in device-local records are device-scoped and MAY
+  not appear on another device; the view MUST NOT error or misreport when a type has no
+  indexed or local records.
 
 **Recovery codes in Security**
 
@@ -264,7 +276,8 @@ open the challenge-creation surface to reach it.
   single pool match, both (collision), none, or matched-but-not-actionable — that drives
   which interface is shown.
 - **My Wagers item**: A unified list entry representing a wager, open challenge, or pool,
-  carrying a type indicator, status, and the route to its management interface.
+  carrying a type indicator, status, and the route to its management interface. Sourced
+  from on-chain/subgraph indexing and/or device-local records (see FR-024).
 - **Recovery codes vault**: The user's device-local backup of open-challenge codes,
   gated by an unlock step, relocated to the Security tab.
 
