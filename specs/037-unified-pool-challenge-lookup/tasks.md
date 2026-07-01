@@ -98,13 +98,13 @@ sees the unchanged wager-only view.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T018 [P] [US2] Unit tests for `aggregateMyItems` — union + de-dup by (type,id), active/history bucketing, source precedence (context/subgraph over device), and empty-type safety — in `frontend/src/lib/lookup/__tests__/myWagersAggregation.test.js` (contracts/my-wagers-aggregation.md; FR-016/017/019/024)
+- [x] T018 [P] [US2] Unit tests for `aggregateMyItems` — union + de-dup by (type,id), active/history bucketing, source precedence (context/subgraph over device), and empty-type safety — in `frontend/src/lib/lookup/__tests__/myWagersAggregation.test.js` (contracts/my-wagers-aggregation.md; FR-016/017/019/024)
 - [ ] T019 [P] [US2] Component test: `MyMarketsModal` shows wager + challenge + pool items with type/status and routes correctly, and is unchanged when no challenges/pools exist, in `frontend/src/components/fairwins/__tests__/MyMarketsModal.consolidated.test.jsx`
 
 ### Implementation for User Story 2
 
 - [ ] T020 [US2] Implement `myWagersSources.js` — subgraph queries for created open challenges (`Wager(creator, status=open)`) and created/joined pools (`Pool(creator)`, `Pool`+`PoolJoin` reconciled to the user's identity commitment via `usePools.getMemberCommitments`), plus device-vault entries via `useOpenChallengeCodeVault.recoverCodes()` — in `frontend/src/lib/lookup/myWagersSources.js` (research.md D6; reuse the existing graph client)
-- [ ] T021 [US2] Implement `aggregateMyItems(sources, account)` — union, de-dup, active/history bucketing, provenance flags — in `frontend/src/lib/lookup/myWagersAggregation.js` (depends on T020)
+- [x] T021 [US2] Implement `aggregateMyItems(sources, account)` — union, de-dup, active/history bucketing, provenance flags — in `frontend/src/lib/lookup/myWagersAggregation.js` (depends on T020)
 - [ ] T022 [US2] Integrate aggregation into `frontend/src/components/fairwins/MyMarketsModal.jsx` — render challenge + pool items alongside wagers with type indicator/status across the existing sort/filter and active/history grouping, route per type, and preserve wager-only behavior when empty (depends on T021; FR-015/016/017/018/019)
 - [ ] T023 [US2] Ensure active-network scoping and honest status labels for challenge/pool items (no implied finality) in `frontend/src/components/fairwins/MyMarketsModal.jsx` and `frontend/src/lib/lookup/myWagersSources.js` (Constitution III; FR-024 device-scoped note)
 
