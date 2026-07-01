@@ -28,8 +28,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
+
       - name: Compile contracts
-        run: npm run compile
+        run: npm run compile:ci
 
       - name: Run tests with gas reporting
         env:
@@ -75,6 +83,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
 
       - name: Generate coverage report
         run: npm run test:coverage
@@ -125,6 +141,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -178,8 +202,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
+
       - name: Compile contracts
-        run: npm run compile
+        run: npm run compile:ci
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -284,6 +316,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -299,7 +339,7 @@ jobs:
           pip install crytic-compile
 
       - name: Compile contracts
-        run: npm run compile
+        run: npm run compile:ci
 
       - name: Run Medusa fuzzing (extended)
         run: |
