@@ -49,7 +49,7 @@ that existing code imports, so it must land (and stay backward-compatible) befor
 **⚠️ CRITICAL**: Complete before starting User Story 1.
 
 - [x] T003 Refactor `useOpenChallengeAccept` to expose a structured challenge lookup outcome `{ status: 'matched' | 'not-found' | 'errored', payload?, error? }` (e.g. a `lookup(code)` path) instead of signaling not-found by throwing a specific string; keep `discover`/`accept` behavior intact for existing callers, in `frontend/src/hooks/useOpenChallengeAccept.js` (research.md D3)
-- [ ] T004 [P] Unit tests for the structured challenge lookup outcome (matched / not-found / errored; no signature on lookup) in `frontend/src/hooks/__tests__/useOpenChallengeAccept.lookup.test.js`
+- [x] T004 [P] Unit tests for the structured challenge lookup outcome (matched / not-found / errored; no signature on lookup) in `frontend/src/hooks/__tests__/useOpenChallengeAccept.lookup.test.js`
 
 **Checkpoint**: Structured challenge lookup available — US1 resolver can be built.
 
@@ -68,7 +68,7 @@ malformed entry shows a format hint before any lookup — all without a wallet s
 
 - [x] T005 [P] [US1] Unit tests for `resolvePhraseLookup` covering every `LookupResult` branch — format-error, challenge, pool, collision, not-actionable, self, none, lookup-failed, and language-mismatch (English-only challenge gating) — in `frontend/src/lib/lookup/__tests__/resolvePhraseLookup.test.js` (contracts/unified-lookup.md; FR-006/007/009/011/012/025)
 - [x] T006 [P] [US1] Component test for `UnifiedLookupModal` — renders take/join panels, collision chooser, distinguishes "no match" vs "couldn't check", and performs no signature on preview — in `frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx` (FR-010)
-- [ ] T007 [P] [US1] Test the deep-link redirect: `?oc=take&code=<words>` opens the unified modal prefilled and auto-resolves, in `frontend/src/components/fairwins/__tests__/Dashboard.deeplink.test.jsx` (FR-013)
+- [x] T007 [P] [US1] Test the deep-link redirect: `?oc=take&code=<words>` opens the unified modal prefilled and auto-resolves, in `frontend/src/components/fairwins/__tests__/Dashboard.deeplink.test.jsx` (FR-013)
 
 ### Implementation for User Story 1
 
