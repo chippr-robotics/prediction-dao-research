@@ -1,64 +1,99 @@
 name: Setup Hardhat solc compiler
 description: >
-  Cache and resiliently pre-fetch the pinned solc compiler so a stalled
-  binaries.soliditylang.org download cannot hang CI. Warms Hardhat's compiler
-  cache, which is also reused by `hardhat coverage` and by
-  Slither/crytic-compile (which shells out to `hardhat compile`).
+  Pre-seed and cache the pinned solc compiler so Hardhat never has to reach
+  binaries.soliditylang.org (which stalls/outages and hangs CI for ~17 min on
+  "Downloading compiler"). The binary is fetched from the ethereum/solc-bin
+  GitHub mirror and dropped into Hardhat's compiler cache with a verified
+  checksum, so `hardhat compile` (and `hardhat coverage` / Slither's
+  crytic-compile, which reuse the same cache) find it locally and skip the
+  network fetch entirely.
 
 inputs:
   solc-version:
-    description: Solidity compiler version to warm (must match hardhat.config.js).
+    description: Solidity compiler version to provision (must match hardhat.config.js).
     required: false
     default: '0.8.24'
-  attempts:
-    description: Max compile attempts before failing loudly.
-    required: false
-    default: '5'
-  timeout-seconds:
-    description: Per-attempt timeout; a stalled download is killed and retried.
-    required: false
-    default: '240'
 
 runs:
   using: composite
   steps:
-    # Persist the downloaded solc binary across runs and across jobs. Once any
-    # run fetches solc successfully, later runs restore it and skip the network
-    # fetch entirely. Keyed on the pinned version so a version bump re-fetches.
+    # Persist the seeded compiler across runs and jobs. On a cache hit the seed
+    # step below is fully offline (no network at all).
     - name: Restore Hardhat solc compiler cache
       uses: actions/cache@v4
       with:
-        path: ~/.cache/hardhat-nodejs
+        path: ~/.cache/hardhat-nodejs/compilers-v2
         key: hardhat-solc-${{ runner.os }}-${{ inputs.solc-version }}
         restore-keys: |
           hardhat-solc-${{ runner.os }}-
 
-    # Warm the compiler with bounded retries. `timeout` converts Hardhat's
-    # occasional hung solc download (stalls with no error until the runner is
-    # reclaimed ~17 min later) into a killed attempt that we retry with backoff.
-    # Hardhat re-validates the compiler checksum, so a truncated partial download
-    # from a killed attempt is re-fetched rather than reused.
-    - name: Compile contracts (cached solc, retry + timeout)
+    # Root cause: Hardhat downloads solc from binaries.soliditylang.org, which
+    # has been stalling. Hardhat's downloader (getCompilersDir()/<platform>) skips
+    # the download when a listed build's binary already exists on disk, so we
+    # place list.json + the verified binary there from the GitHub mirror.
+    - name: Pre-seed solc from the ethereum/solc-bin mirror
+      shell: bash
+      run: |
+        set -euo pipefail
+        ver='${{ inputs.solc-version }}'
+        platform='linux-amd64'   # GitHub-hosted runners are ubuntu-latest
+        dir="$HOME/.cache/hardhat-nodejs/compilers-v2/${platform}"
+        mirror="https://raw.githubusercontent.com/ethereum/solc-bin/gh-pages/${platform}"
+        mkdir -p "$dir"
+
+        # Cache hit: a solc binary for this version is already present. Skip all
+        # network access so a mirror outage can't fail an otherwise-warm run.
+        existing="$(ls "$dir"/solc-${platform}-v${ver}+* 2>/dev/null | head -1 || true)"
+        if [ -f "$dir/list.json" ] && [ -n "$existing" ]; then
+          chmod +x "$existing"
+          echo "solc ${ver} already cached (${existing}); skipping mirror fetch."
+          exit 0
+        fi
+
+        # Cold cache: fetch the build index, resolve the exact filename + expected
+        # checksum for the pinned version, download the binary, and verify it.
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 \
+          --connect-timeout 15 --max-time 120 "${mirror}/list.json" -o "${dir}/list.json"
+
+        fname="$(node -e "process.stdout.write(require('${dir}/list.json').releases['${ver}'] || '')")"
+        want="$(node -e "const b=require('${dir}/list.json').builds.find(x=>x.version==='${ver}'&&x.prerelease===undefined); process.stdout.write(((b&&b.sha256)||'').replace(/^0x/,''))")"
+        if [ -z "$fname" ] || [ -z "$want" ]; then
+          echo "::error::solc ${ver} not found in mirror list.json"; exit 1
+        fi
+
+        curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 \
+          --connect-timeout 15 --max-time 300 "${mirror}/${fname}" -o "${dir}/${fname}.tmp"
+        got="$(sha256sum "${dir}/${fname}.tmp" | cut -d' ' -f1)"
+        if [ "$got" != "$want" ]; then
+          echo "::error::solc ${ver} checksum mismatch (got ${got}, want ${want})"; exit 1
+        fi
+        mv "${dir}/${fname}.tmp" "${dir}/${fname}"
+        chmod +x "${dir}/${fname}"
+        echo "Pre-seeded solc ${ver} (${fname}) from mirror; checksum verified."
+
+    # With the compiler pre-seeded, this should not touch the network. Keep a
+    # bounded retry + generous timeout purely as a safety net; a genuine long
+    # viaIR compile stays well under the ceiling, while a pathological hang still
+    # fails loudly instead of running to the job's max wall-clock.
+    - name: Compile contracts
       shell: bash
       run: |
         set -uo pipefail
-        attempts='${{ inputs.attempts }}'
-        per_timeout='${{ inputs.timeout-seconds }}'
-        for attempt in $(seq 1 "$attempts"); do
-          echo "::group::Compile attempt ${attempt}/${attempts} (timeout ${per_timeout}s)"
-          if timeout "${per_timeout}" npm run compile; then
-            echo "::endgroup::"
-            echo "Contracts compiled; solc ${{ inputs.solc-version }} cache is warm (attempt ${attempt})."
-            exit 0
-          fi
+        for attempt in 1 2; do
+          echo "::group::Compile attempt ${attempt}/2"
+          timeout 1200 npm run compile
           code=$?
           echo "::endgroup::"
+          if [ "$code" -eq 0 ]; then
+            echo "Contracts compiled on attempt ${attempt}."
+            exit 0
+          fi
           if [ "$code" -eq 124 ]; then
-            echo "::warning::compile attempt ${attempt} timed out after ${per_timeout}s (likely a stalled solc download); retrying" >&2
+            echo "::warning::compile attempt ${attempt} timed out after 1200s; retrying" >&2
           else
             echo "::warning::compile attempt ${attempt} failed (exit ${code}); retrying" >&2
           fi
-          sleep $((attempt * 15))
+          sleep 15
         done
-        echo "::error::npm run compile did not succeed after ${attempts} attempts (solc download or compilation failure)" >&2
+        echo "::error::npm run compile did not succeed after 2 attempts" >&2
         exit 1
