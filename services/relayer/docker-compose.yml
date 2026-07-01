@@ -1,0 +1,27 @@
+# FairWins ZK-Wager Pool gas relayer.
+#
+# Stands up the relayer locally or on a single VM/host. Secrets come from a local `.env` (copy
+# .env.example -> .env and fill in) — never commit `.env`. The container is non-root, stateless, and
+# exposes only the relay + health endpoints. Put a TLS-terminating reverse proxy (Caddy/nginx/Cloud
+# Run) in front for production.
+services:
+  relayer:
+    build: .
+    image: fairwins-pool-relayer:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8787}:${PORT:-8787}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    # Defense-in-depth: read-only root fs (the service writes nothing), no new privileges.
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp

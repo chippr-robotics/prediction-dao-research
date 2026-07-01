@@ -245,6 +245,36 @@ dataSources:
           handler: handleTokenCreated
       file: ./src/mappings/tokenFactory.ts
 
+  # ---------------------------------------------------------------------------
+  # ZKWagerPoolFactory — spec 034 ZK-Wager Pools. Indexes PoolCreated for pool
+  # discovery and spins up a dynamic ZKWagerPool data source per clone. Real
+  # address + deploy block live in networks.json per network (added post-deploy).
+  # PLACEHOLDER inline address (sentinel 0x..0029) + non-genesis startBlock keep a
+  # default `graph build` green and index nothing if accidentally deployed.
+  # NEVER set startBlock 0 / address 0x0 (genesis-flood). On subgraph-less networks
+  # (Mordor/ETC) the frontend reads pools over RPC instead.
+  # ---------------------------------------------------------------------------
+  - kind: ethereum
+    name: ZKWagerPoolFactory
+    network: polygon-amoy
+    source:
+      address: "0x0000000000000000000000000000000000000029"
+      abi: ZKWagerPoolFactory
+      startBlock: 40521027
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+      abis:
+        - name: ZKWagerPoolFactory
+          file: ../frontend/src/abis/ZKWagerPoolFactory.json
+      eventHandlers:
+        - event: PoolCreated(indexed uint256,indexed address,indexed address,uint32[4],address,uint256,uint32,uint16,uint64)
+          handler: handlePoolCreated
+      file: ./src/mappings/zkWagerPoolFactory.ts
+
 # ---------------------------------------------------------------------------
 # Per-token indexing template (spec 028 expansion, US10/US12). Instantiated from
 # the TokenFactory.handleTokenCreated handler for each FUNGIBLE issued token
@@ -282,3 +312,45 @@ templates:
         - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
           handler: handleRoleRevoked
       file: ./src/mappings/token.ts
+
+  # ---------------------------------------------------------------------------
+  # Per-pool indexing template (spec 034). Instantiated from
+  # ZKWagerPoolFactory.handlePoolCreated for each pool clone. Indexes joins
+  # (commitments), proposals, anonymous approvals (nullifiers), payouts, and
+  # lifecycle. Dynamic data source: no address here (supplied at create()).
+  # Privacy: no nickname, no wallet->vote link is stored (FR-010).
+  # ---------------------------------------------------------------------------
+  - kind: ethereum/contract
+    name: ZKWagerPool
+    network: polygon-amoy
+    source:
+      abi: ZKWagerPool
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - PoolJoin
+        - PoolProposal
+        - PoolVote
+        - PoolPayout
+      abis:
+        - name: ZKWagerPool
+          file: ../frontend/src/abis/ZKWagerPool.json
+      eventHandlers:
+        - event: Joined(indexed uint256)
+          handler: handleJoined
+        - event: JoiningClosedEvent(uint32)
+          handler: handleJoiningClosed
+        - event: OutcomeProposed(indexed bytes32)
+          handler: handleOutcomeProposed
+        - event: Approved(indexed bytes32,uint256,uint256)
+          handler: handleApproved
+        - event: OutcomeLocked(indexed bytes32)
+          handler: handleOutcomeLocked
+        - event: Claimed(indexed bytes32,address,uint256)
+          handler: handleClaimed
+        - event: PoolCancelled()
+          handler: handlePoolCancelled
+      file: ./src/mappings/zkWagerPool.ts
