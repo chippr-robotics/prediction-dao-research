@@ -51,8 +51,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: ${{ runner.os }}-hardhat-solc-0.8.24
+          restore-keys: |
+            ${{ runner.os }}-hardhat-solc-
+
       - name: Compile contracts
-        run: npm run compile
+        run: npm run compile:ci
 
       # Soft check: fork tests rely on an archive-mode Amoy RPC. Without the
       # AMOY_RPC_URL secret the test file enters describe.skip and the job
