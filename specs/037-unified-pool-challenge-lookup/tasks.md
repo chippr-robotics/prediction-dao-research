@@ -36,8 +36,8 @@ subgraph schema, or backend changes (spec FR-014).
 
 **Purpose**: Create the shared module location and test scaffolding for the new logic.
 
-- [ ] T001 Create the lookup module directory `frontend/src/lib/lookup/` with an `index.js` barrel exporting the resolver + aggregation modules
-- [ ] T002 [P] Add shared Vitest test helpers (fake `discoverChallenge` / `resolvePool` deps, sample challenge/pool/wager fixtures) in `frontend/src/lib/lookup/__tests__/_helpers.js`
+- [x] T001 Create the lookup module directory `frontend/src/lib/lookup/` with an `index.js` barrel exporting the resolver + aggregation modules
+- [x] T002 [P] Add shared Vitest test helpers (fake `discoverChallenge` / `resolvePool` deps, sample challenge/pool/wager fixtures) in `frontend/src/lib/lookup/__tests__/_helpers.js`
 
 ---
 
@@ -48,7 +48,7 @@ that existing code imports, so it must land (and stay backward-compatible) befor
 
 **⚠️ CRITICAL**: Complete before starting User Story 1.
 
-- [ ] T003 Refactor `useOpenChallengeAccept` to expose a structured challenge lookup outcome `{ status: 'matched' | 'not-found' | 'errored', payload?, error? }` (e.g. a `lookup(code)` path) instead of signaling not-found by throwing a specific string; keep `discover`/`accept` behavior intact for existing callers, in `frontend/src/hooks/useOpenChallengeAccept.js` (research.md D3)
+- [x] T003 Refactor `useOpenChallengeAccept` to expose a structured challenge lookup outcome `{ status: 'matched' | 'not-found' | 'errored', payload?, error? }` (e.g. a `lookup(code)` path) instead of signaling not-found by throwing a specific string; keep `discover`/`accept` behavior intact for existing callers, in `frontend/src/hooks/useOpenChallengeAccept.js` (research.md D3)
 - [ ] T004 [P] Unit tests for the structured challenge lookup outcome (matched / not-found / errored; no signature on lookup) in `frontend/src/hooks/__tests__/useOpenChallengeAccept.lookup.test.js`
 
 **Checkpoint**: Structured challenge lookup available — US1 resolver can be built.
@@ -66,14 +66,14 @@ malformed entry shows a format hint before any lookup — all without a wallet s
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T005 [P] [US1] Unit tests for `resolvePhraseLookup` covering every `LookupResult` branch — format-error, challenge, pool, collision, not-actionable, self, none, lookup-failed, and language-mismatch (English-only challenge gating) — in `frontend/src/lib/lookup/__tests__/resolvePhraseLookup.test.js` (contracts/unified-lookup.md; FR-006/007/009/011/012/025)
+- [x] T005 [P] [US1] Unit tests for `resolvePhraseLookup` covering every `LookupResult` branch — format-error, challenge, pool, collision, not-actionable, self, none, lookup-failed, and language-mismatch (English-only challenge gating) — in `frontend/src/lib/lookup/__tests__/resolvePhraseLookup.test.js` (contracts/unified-lookup.md; FR-006/007/009/011/012/025)
 - [ ] T006 [P] [US1] Component test for `UnifiedLookupModal` — renders take/join panels, collision chooser, distinguishes "no match" vs "couldn't check", and performs no signature on preview — in `frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx` (FR-010)
 - [ ] T007 [P] [US1] Test the deep-link redirect: `?oc=take&code=<words>` opens the unified modal prefilled and auto-resolves, in `frontend/src/components/fairwins/__tests__/Dashboard.deeplink.test.jsx` (FR-013)
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Implement `resolvePhraseLookup(input)` — normalize/validate to 4 words, run challenge + pool lookups concurrently via `Promise.allSettled`, gate the challenge lookup to valid English codes, and reduce source outcomes to a `LookupResult` — in `frontend/src/lib/lookup/resolvePhraseLookup.js` (depends on T003; data-model.md, contracts/unified-lookup.md)
-- [ ] T009 [US1] Implement `useUnifiedLookup()` wrapping the resolver + state and reading `getWordListLang()` and account, in `frontend/src/hooks/useUnifiedLookup.js` (depends on T008)
+- [x] T008 [US1] Implement `resolvePhraseLookup(input)` — normalize/validate to 4 words, run challenge + pool lookups concurrently via `Promise.allSettled`, gate the challenge lookup to valid English codes, and reduce source outcomes to a `LookupResult` — in `frontend/src/lib/lookup/resolvePhraseLookup.js` (depends on T003; data-model.md, contracts/unified-lookup.md)
+- [x] T009 [US1] Implement `useUnifiedLookup()` wrapping the resolver + state and reading `getWordListLang()` and account, in `frontend/src/hooks/useUnifiedLookup.js` (depends on T008)
 - [ ] T010 [P] [US1] Extract a behavior-preserving `TakeChallengePanel` from the OpenChallengeModal TakerPanel into `frontend/src/components/fairwins/TakeChallengePanel.jsx`
 - [ ] T011 [P] [US1] Extract a behavior-preserving `JoinPoolPanel` from the GroupPoolModal JoinPanel into `frontend/src/components/fairwins/JoinPoolPanel.jsx`
 - [ ] T012 [US1] Implement `UnifiedLookupModal.jsx` — phrase input → results routed to take/join panels, collision chooser, not-actionable/self states, and separate "no match found" vs "couldn't check right now — retry" outcomes — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx` (depends on T009, T010, T011)

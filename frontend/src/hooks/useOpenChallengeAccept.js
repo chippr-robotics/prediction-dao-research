@@ -39,56 +39,80 @@ export function useOpenChallengeAccept() {
   }, [chainId])
 
   /**
+   * Structured, non-throwing lookup used by the unified phrase lookup (spec 037, FR-003/025).
+   * Returns exactly one of:
+   *   { status: 'matched',   payload: { wagerId, wager, terms, termsUnavailable, needsMembership } }
+   *   { status: 'not-found', reason: 'invalid-code' | 'no-match' }
+   *   { status: 'errored',   error }
+   * Read-only — no wallet signature. Distinguishing 'not-found' from 'errored' lets the unified
+   * resolver show "couldn't check right now" instead of a false "no match" (spec 037, FR-025).
+   */
+  const lookup = useCallback(async (code) => {
+    // A non-English or non-four-word phrase is not a challenge code (challenges are English-only).
+    if (!isValidCode(code)) return { status: 'not-found', reason: 'invalid-code' }
+    const readProvider = provider || signer?.provider
+    if (!readProvider) {
+      return { status: 'errored', error: new Error('Connect your wallet to look up a challenge.') }
+    }
+    try {
+      const registryAddr = resolveRegistry()
+      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, readProvider)
+      const { claimAddress, symKey } = deriveFromCode(code)
+
+      const wagerId = await registry.openWagerIdForClaim(claimAddress)
+      if (wagerId === 0n) return { status: 'not-found', reason: 'no-match' }
+
+      const wager = await registry.getWager(wagerId)
+
+      // Decrypt the terms (code-keyed envelope on IPFS). A retrieval/tamper failure is surfaced as
+      // "terms unavailable" — on-chain accept does not need the plaintext (FR-020).
+      let terms = null
+      let termsUnavailable = false
+      try {
+        const { isIpfs, cid } = parseEncryptedIpfsReference(wager.metadataUri)
+        if (!isIpfs || !cid) throw new Error('no encrypted reference')
+        const envelope = await fetchEncryptedEnvelope(cid)
+        if (!isCodeEnvelope(envelope)) throw new Error('not a code-keyed envelope')
+        terms = decryptEnvelopeCode(envelope, symKey)
+      } catch {
+        termsUnavailable = true
+      }
+
+      // Membership check for the buy-membership prompt (any active tier may take — no tier floor).
+      let needsMembership = false
+      try {
+        const mAddr = chainId != null ? getContractAddressForChain('membershipManager', chainId) : getContractAddress('membershipManager')
+        if (mAddr && account) {
+          const mm = new ethers.Contract(mAddr, MEMBERSHIP_ABI, readProvider)
+          needsMembership = !(await mm.hasActiveRole(account, WAGER_PARTICIPANT_ROLE))
+        }
+      } catch {
+        needsMembership = false // non-fatal; the contract is the source of truth at accept
+      }
+
+      return { status: 'matched', payload: { wagerId, wager, terms, termsUnavailable, needsMembership } }
+    } catch (error) {
+      // Provider/RPC/contract failure — the caller MUST treat this as "couldn't check", not "no match".
+      return { status: 'errored', error }
+    }
+  }, [provider, signer, account, chainId, resolveRegistry])
+
+  /**
    * Look up an open challenge by its code, read it, and decrypt its terms. Read-only — no wallet signature.
    * Throws a clear error if the code is malformed or routes to no live challenge (never reveals a wager).
+   * Thin wrapper over lookup() that preserves the original throwing contract for existing callers.
    */
   const discover = useCallback(async (code) => {
     setError(null)
-    if (!isValidCode(code)) {
-      throw new Error('Enter the four words exactly as they were shared with you.')
+    const res = await lookup(code)
+    if (res.status === 'matched') return res.payload
+    if (res.status === 'not-found') {
+      throw new Error(res.reason === 'invalid-code'
+        ? 'Enter the four words exactly as they were shared with you.'
+        : 'No open challenge matches that code. Check the four words and try again.')
     }
-    const readProvider = provider || signer?.provider
-    if (!readProvider) throw new Error('Connect your wallet to look up a challenge.')
-
-    const registryAddr = resolveRegistry()
-    const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, readProvider)
-    const { claimAddress, symKey } = deriveFromCode(code)
-
-    const wagerId = await registry.openWagerIdForClaim(claimAddress)
-    if (wagerId === 0n) {
-      throw new Error('No open challenge matches that code. Check the four words and try again.')
-    }
-
-    const wager = await registry.getWager(wagerId)
-
-    // Decrypt the terms (code-keyed envelope on IPFS). A retrieval/tamper failure is surfaced as
-    // "terms unavailable" — on-chain accept does not need the plaintext (FR-020).
-    let terms = null
-    let termsUnavailable = false
-    try {
-      const { isIpfs, cid } = parseEncryptedIpfsReference(wager.metadataUri)
-      if (!isIpfs || !cid) throw new Error('no encrypted reference')
-      const envelope = await fetchEncryptedEnvelope(cid)
-      if (!isCodeEnvelope(envelope)) throw new Error('not a code-keyed envelope')
-      terms = decryptEnvelopeCode(envelope, symKey)
-    } catch {
-      termsUnavailable = true
-    }
-
-    // Membership check for the buy-membership prompt (any active tier may take — no tier floor).
-    let needsMembership = false
-    try {
-      const mAddr = chainId != null ? getContractAddressForChain('membershipManager', chainId) : getContractAddress('membershipManager')
-      if (mAddr && account) {
-        const mm = new ethers.Contract(mAddr, MEMBERSHIP_ABI, readProvider)
-        needsMembership = !(await mm.hasActiveRole(account, WAGER_PARTICIPANT_ROLE))
-      }
-    } catch {
-      needsMembership = false // non-fatal; the contract is the source of truth at accept
-    }
-
-    return { wagerId, wager, terms, termsUnavailable, needsMembership }
-  }, [provider, signer, account, chainId, resolveRegistry])
+    throw res.error
+  }, [lookup])
 
   /**
    * Accept the open challenge. Taking the other side escrows your matching stake, so this runs the full
@@ -171,7 +195,7 @@ export function useOpenChallengeAccept() {
     }
   }, [signer, account, resolveRegistry])
 
-  return { discover, accept, busy, error }
+  return { lookup, discover, accept, busy, error }
 }
 
 /** Map known contract reverts to friendly messages for the take flow. */
