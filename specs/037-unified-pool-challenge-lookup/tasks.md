@@ -67,21 +67,21 @@ malformed entry shows a format hint before any lookup — all without a wallet s
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
 - [x] T005 [P] [US1] Unit tests for `resolvePhraseLookup` covering every `LookupResult` branch — format-error, challenge, pool, collision, not-actionable, self, none, lookup-failed, and language-mismatch (English-only challenge gating) — in `frontend/src/lib/lookup/__tests__/resolvePhraseLookup.test.js` (contracts/unified-lookup.md; FR-006/007/009/011/012/025)
-- [ ] T006 [P] [US1] Component test for `UnifiedLookupModal` — renders take/join panels, collision chooser, distinguishes "no match" vs "couldn't check", and performs no signature on preview — in `frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx` (FR-010)
+- [x] T006 [P] [US1] Component test for `UnifiedLookupModal` — renders take/join panels, collision chooser, distinguishes "no match" vs "couldn't check", and performs no signature on preview — in `frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx` (FR-010)
 - [ ] T007 [P] [US1] Test the deep-link redirect: `?oc=take&code=<words>` opens the unified modal prefilled and auto-resolves, in `frontend/src/components/fairwins/__tests__/Dashboard.deeplink.test.jsx` (FR-013)
 
 ### Implementation for User Story 1
 
 - [x] T008 [US1] Implement `resolvePhraseLookup(input)` — normalize/validate to 4 words, run challenge + pool lookups concurrently via `Promise.allSettled`, gate the challenge lookup to valid English codes, and reduce source outcomes to a `LookupResult` — in `frontend/src/lib/lookup/resolvePhraseLookup.js` (depends on T003; data-model.md, contracts/unified-lookup.md)
 - [x] T009 [US1] Implement `useUnifiedLookup()` wrapping the resolver + state and reading `getWordListLang()` and account, in `frontend/src/hooks/useUnifiedLookup.js` (depends on T008)
-- [ ] T010 [P] [US1] Extract a behavior-preserving `TakeChallengePanel` from the OpenChallengeModal TakerPanel into `frontend/src/components/fairwins/TakeChallengePanel.jsx`
-- [ ] T011 [P] [US1] Extract a behavior-preserving `JoinPoolPanel` from the GroupPoolModal JoinPanel into `frontend/src/components/fairwins/JoinPoolPanel.jsx`
-- [ ] T012 [US1] Implement `UnifiedLookupModal.jsx` — phrase input → results routed to take/join panels, collision chooser, not-actionable/self states, and separate "no match found" vs "couldn't check right now — retry" outcomes — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx` (depends on T009, T010, T011)
+- [x] T010 [P] [US1] Extract a behavior-preserving `TakeChallengePanel` from the OpenChallengeModal TakerPanel into `frontend/src/components/fairwins/TakeChallengePanel.jsx`
+- [x] T011 [P] [US1] Extract a behavior-preserving `JoinPoolPanel` from the GroupPoolModal JoinPanel into `frontend/src/components/fairwins/JoinPoolPanel.jsx`
+- [x] T012 [US1] Implement `UnifiedLookupModal.jsx` — phrase input → results routed to take/join panels, collision chooser, not-actionable/self states, and separate "no match found" vs "couldn't check right now — retry" outcomes — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx` (depends on T009, T010, T011)
 - [ ] T013 [US1] Add the `enter-phrase` quick action + `UnifiedLookupModal` mount and remove the `join-pool` quick action in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012)
 - [ ] T014 [US1] Reroute the `parseTakeChallengeParams` deep-link effect to open `UnifiedLookupModal` prefilled/auto-resolve in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012; same file as T013 — run after it)
 - [ ] T015 [US1] Remove the "Take a challenge" (taker) tab, making the modal create-only, in `frontend/src/components/fairwins/OpenChallengeModal.jsx` (depends on T010; coordinate with T028)
 - [ ] T016 [US1] Remove the "Join a pool" (join) tab, making the modal create-only, in `frontend/src/components/fairwins/GroupPoolModal.jsx` (depends on T011)
-- [ ] T017 [US1] Accessibility pass on `UnifiedLookupModal` — labeled input, results in a live region, error `role="alert"`, focus moved to result/error (WCAG 2.1 AA) — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx`
+- [x] T017 [US1] Accessibility pass on `UnifiedLookupModal` — labeled input, results in a live region, error `role="alert"`, focus moved to result/error (WCAG 2.1 AA) — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx`
 
 **Checkpoint**: US1 fully functional and independently testable (MVP).
 
