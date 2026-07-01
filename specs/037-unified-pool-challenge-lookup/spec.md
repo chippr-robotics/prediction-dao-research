@@ -50,6 +50,7 @@ surfaces are unified.
 - Q: How does My Wagers enumerate the user's pools and challenges? → A: Hybrid — on-chain/subgraph indexing for participating/accepted/resolved items, plus device-local records (e.g., the open-challenge code vault) for items only known locally (created-but-unaccepted challenges); some items are therefore device-scoped.
 - Q: When one of the two lookups fails (network/chain error) rather than returning "no match", what does the unified lookup show? → A: Distinguish failure from empty — any lookup error with no positive match shows a retryable "couldn't check right now" state; "no match found" is shown only when both the challenge and pool lookups completed successfully and neither matched.
 - Q: Where does the unified "enter a phrase" lookup live, and what happens to the existing Take/Join tabs? → A: A dedicated, standalone "Enter a phrase" entry point (its own quick action/surface) handles both take and join; the Open Challenge and Group Pool surfaces drop their Take-a-challenge / Join-a-pool tabs and become create-only.
+- Q: When recovery codes move to Security, what happens to the old "Recover codes" tab in the Open Challenge surface? → A: Remove it entirely; recovery codes live only under My Account → Security (no redirect tab left behind).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -273,9 +274,9 @@ open the challenge-creation surface to reach it.
 
 - **FR-020**: The open-challenge recovery-codes feature (unlock, list saved codes, copy a
   code) MUST be available from the Security tab of the My Account page.
-- **FR-021**: After the move, the Open Challenge surface MUST NOT require a separate
-  recovery-codes tab to reach that function; any remaining reference MUST direct the user
-  to Security.
+- **FR-021**: After the move, the "Recover codes" tab MUST be removed entirely from the
+  Open Challenge surface; recovery codes are reachable only from My Account → Security
+  (no redirect tab or pointer left behind).
 - **FR-022**: Codes a user saved before the move MUST remain accessible from the new
   Security location with no data loss.
 - **FR-023**: Access to recovery codes from Security MUST preserve the current
