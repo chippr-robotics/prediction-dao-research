@@ -103,7 +103,7 @@ sees the unchanged wager-only view.
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Implement `myWagersSources.js` — subgraph queries for created open challenges (`Wager(creator, status=open)`) and created/joined pools (`Pool(creator)`, `Pool`+`PoolJoin` reconciled to the user's identity commitment via `usePools.getMemberCommitments`), plus device-vault entries via `useOpenChallengeCodeVault.recoverCodes()` — in `frontend/src/lib/lookup/myWagersSources.js` (research.md D6; reuse the existing graph client)
+- [x] T020 [US2] Implement `myWagersSources.js` — subgraph queries for created open challenges (`Wager(creator, status=open)`) and created/joined pools (`Pool(creator)`, `Pool`+`PoolJoin` reconciled to the user's identity commitment via `usePools.getMemberCommitments`), plus device-vault entries via `useOpenChallengeCodeVault.recoverCodes()` — in `frontend/src/lib/lookup/myWagersSources.js` (research.md D6; reuse the existing graph client)
 - [x] T021 [US2] Implement `aggregateMyItems(sources, account)` — union, de-dup, active/history bucketing, provenance flags — in `frontend/src/lib/lookup/myWagersAggregation.js` (depends on T020)
 - [ ] T022 [US2] Integrate aggregation into `frontend/src/components/fairwins/MyMarketsModal.jsx` — render challenge + pool items alongside wagers with type indicator/status across the existing sort/filter and active/history grouping, route per type, and preserve wager-only behavior when empty (depends on T021; FR-015/016/017/018/019)
 - [ ] T023 [US2] Ensure active-network scoping and honest status labels for challenge/pool items (no implied finality) in `frontend/src/components/fairwins/MyMarketsModal.jsx` and `frontend/src/lib/lookup/myWagersSources.js` (Constitution III; FR-024 device-scoped note)
