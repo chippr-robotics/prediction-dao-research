@@ -48,6 +48,7 @@ surfaces are unified.
 ### Session 2026-07-01
 
 - Q: How does My Wagers enumerate the user's pools and challenges? → A: Hybrid — on-chain/subgraph indexing for participating/accepted/resolved items, plus device-local records (e.g., the open-challenge code vault) for items only known locally (created-but-unaccepted challenges); some items are therefore device-scoped.
+- Q: When one of the two lookups fails (network/chain error) rather than returning "no match", what does the unified lookup show? → A: Distinguish failure from empty — any lookup error with no positive match shows a retryable "couldn't check right now" state; "no match found" is shown only when both the challenge and pool lookups completed successfully and neither matched.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -182,6 +183,10 @@ open the challenge-creation surface to reach it.
 - **No key / not connected.** Read-only lookup and preview MUST NOT require a wallet
   signature; only the terminal join/take action may require one, matching today's
   behavior.
+- **One lookup source unavailable.** If the challenge or pool lookup errors (network/RPC/
+  indexer failure) and nothing positive was found, the system MUST surface a retryable
+  "couldn't check right now" state rather than "no match found," so an existing item is
+  not wrongly reported as nonexistent (see FR-025).
 
 ## Requirements *(mandatory)*
 
@@ -206,9 +211,16 @@ open the challenge-creation surface to reach it.
 - **FR-006**: When the phrase resolves to both an open challenge and a pool, the system
   MUST present both matches and let the user choose which to open; it MUST NOT silently
   select one.
-- **FR-007**: When the phrase matches neither an active challenge nor an open pool, the
-  system MUST show a single, clear "no match found" outcome and allow correction and
-  retry.
+- **FR-007**: When **both** the challenge and pool lookups complete successfully and
+  neither matches, the system MUST show a single, clear "no match found" outcome and
+  allow correction and retry. It MUST NOT show "no match found" when either lookup failed
+  to complete (see FR-025).
+- **FR-025**: When either the challenge lookup or the pool lookup fails to complete
+  (e.g., network/RPC/indexer error) and no positive match was found, the system MUST show
+  a distinct, retryable "couldn't check right now" state — never "no match found" — so a
+  genuinely existing challenge or pool is not hidden behind a false negative. If one
+  lookup errors but the other returns a match, the system MAY proceed with the match while
+  indicating the other source could not be checked.
 - **FR-008**: The system MUST validate and normalize phrase input (word count, valid
   words, case, whitespace, hyphen/separator, Unicode) before performing a lookup, and
   explain the expected format when input is malformed.
@@ -273,8 +285,9 @@ open the challenge-creation surface to reach it.
 - **Group pool**: A multi-member buy-in discovered and joined via a phrase; has a buy-in,
   member/slot counts, approval threshold, and join/resolution windows.
 - **Lookup result**: The outcome of resolving a phrase — one of: single challenge match,
-  single pool match, both (collision), none, or matched-but-not-actionable — that drives
-  which interface is shown.
+  single pool match, both (collision), none (both sources checked, no match),
+  matched-but-not-actionable, or lookup-failed (a source could not be checked) — that
+  drives which interface or message is shown.
 - **My Wagers item**: A unified list entry representing a wager, open challenge, or pool,
   carrying a type indicator, status, and the route to its management interface. Sourced
   from on-chain/subgraph indexing and/or device-local records (see FR-024).
