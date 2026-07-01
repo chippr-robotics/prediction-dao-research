@@ -138,11 +138,11 @@ copy) with all previously saved codes; the Open Challenge surface no longer has 
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T030 [P] Run `npm run test:frontend` and confirm all new/updated Vitest suites pass
-- [ ] T031 [P] ESLint clean (zero errors) and accessibility audit (axe/Lighthouse) for the new surfaces (Constitution IV/V)
-- [ ] T032 Update user-facing copy/help that references "Take a challenge", "Join a pool", or "Recover codes" to the unified "Enter a phrase" flow and the Security location (in-app strings and `docs/`)
+- [x] T030 [P] Run `npm run test:frontend` and confirm all new/updated Vitest suites pass
+- [x] T031 [P] ESLint clean (zero errors) and accessibility audit (axe/Lighthouse) for the new surfaces (Constitution IV/V)
+- [x] T032 Update user-facing copy/help that references "Take a challenge", "Join a pool", or "Recover codes" to the unified "Enter a phrase" flow and the Security location (in-app strings and `docs/`)
 - [ ] T033 Execute `specs/037-unified-pool-challenge-lookup/quickstart.md` manual validation across US1/US2/US3
-- [ ] T034 [P] Grep `frontend/src/` for dead references to removed entry points (the `join-pool` action, the `taker`/`recover` tabs) and remove any leftovers
+- [x] T034 [P] Grep `frontend/src/` for dead references to removed entry points (the `join-pool` action, the `taker`/`recover` tabs) and remove any leftovers
 
 ---
 

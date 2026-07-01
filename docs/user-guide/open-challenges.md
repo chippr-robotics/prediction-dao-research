@@ -52,10 +52,11 @@ sent to any server.
 
 ## Taking an open challenge
 
-1. Open the app and choose **Take a challenge** (or open the link / scan the QR
-   someone sent you — the code is filled in for you).
-2. Enter the **four words** and select **Find challenge**. The app looks it up
-   and shows the (decrypted) terms.
+1. Open the app and choose **Enter a phrase** (or open the link / scan the QR
+   someone sent you — the code is filled in for you). This single entry point
+   works whether the four words point to an open challenge or a group pool.
+2. Enter the **four words** and select **Find**. The app looks it up and shows
+   the (decrypted) challenge terms.
 3. Select **Accept challenge**. Taking the other side escrows your matching
    stake, so acceptance is a short, guided sequence:
     1. **Approve** the stake token — lets the wager contract escrow your stake.
