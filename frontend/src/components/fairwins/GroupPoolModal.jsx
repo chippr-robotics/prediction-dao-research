@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { usePools } from '../../hooks/usePools'
-import { getWordListLang } from '../../utils/wordListLanguage'
 import './FriendMarketsModal.css'
 import '../../pages/pools.css'
 
@@ -65,16 +64,10 @@ export default function GroupPoolModal({ isOpen, onClose, initialTab = 'create' 
               >
                 <span className="fm-resolution-tab-label">Create a pool</span>
               </button>
-              <button
-                type="button" role="tab" aria-selected={tab === 'join'}
-                className={`fm-resolution-tab ${tab === 'join' ? 'active' : ''}`}
-                onClick={() => setTab('join')}
-              >
-                <span className="fm-resolution-tab-label">Join a pool</span>
-              </button>
             </div>
 
-            {tab === 'create' ? <CreatePanel onClose={onClose} /> : <JoinPanel onClose={onClose} />}
+            {/* Joining a pool moved to the unified phrase lookup (spec 037): enter four words there. */}
+            <CreatePanel onClose={onClose} />
           </div>
         </div>
       </div>
@@ -158,77 +151,5 @@ function CreatePanel({ onClose }) {
   )
 }
 
-function JoinPanel({ onClose }) {
-  const { isConnected } = useWallet()
-  const { resolvePhrase, joinPool, status, error } = usePools()
-  const navigate = useNavigate()
-  const [phrase, setPhrase] = useState('')
-  const [lookup, setLookup] = useState('idle')
-  const [summary, setSummary] = useState(null)
-  const [reason, setReason] = useState(null)
-
-  const onFind = async (e) => {
-    e.preventDefault()
-    setLookup('searching'); setSummary(null); setReason(null)
-    try {
-      const res = await resolvePhrase(phrase, getWordListLang())
-      if (res.notFound) { setLookup('notfound'); setReason(res.reason) } else { setSummary(res.summary); setLookup('found') }
-    } catch {
-      setLookup('notfound'); setReason('error')
-    }
-  }
-  const onJoin = async () => {
-    try {
-      await joinPool(summary.address)
-      onClose()
-      navigate(`/pools/${summary.address}`)
-    } catch {
-      /* surfaced via hook error */
-    }
-  }
-  const joinable = summary && summary.state === 0 && summary.slotsRemaining > 0
-
-  return (
-    <div className="fm-form">
-      <form onSubmit={onFind} className="fm-form-group fm-form-full">
-        <label htmlFor="gp-phrase">Four-word phrase <span className="fm-required">*</span></label>
-        <input
-          id="gp-phrase" type="text" value={phrase} onChange={(e) => setPhrase(e.target.value)}
-          placeholder="e.g. crystal orbit harbor violet" autoComplete="off" required
-        />
-        <button type="submit" className="fm-submit-btn" disabled={status === 'searching'}>Find pool</button>
-      </form>
-
-      {lookup === 'notfound' && (
-        <p className="fm-error" role="alert">
-          {reason === 'invalid'
-            ? 'Those four words aren’t a valid phrase. Check the spelling and word count.'
-            : 'No active pool matches that phrase. It may be full, resolved, or mistyped.'}
-        </p>
-      )}
-
-      {summary && (
-        <div className="pool-summary" data-testid="pool-summary">
-          <dl>
-            <dt>Buy-in</dt><dd>{summary.buyInFormatted} {summary.tokenSymbol}</dd>
-            <dt>Members</dt><dd>{summary.memberCount} / {summary.maxMembers} ({summary.slotsRemaining} left)</dd>
-            <dt>Status</dt><dd>{summary.stateLabel}</dd>
-            <dt>Approval threshold</dt><dd>{summary.thresholdPct}% of members</dd>
-          </dl>
-          {joinable ? (
-            <>
-              {error && <p className="fm-error" role="alert">{error}</p>}
-              <button type="button" className="fm-submit-btn" onClick={onJoin} disabled={!isConnected || status === 'joining'}>
-                {!isConnected ? 'Connect wallet to join' : status === 'joining' ? 'Joining…' : `Join for ${summary.buyInFormatted} ${summary.tokenSymbol}`}
-              </button>
-            </>
-          ) : (
-            <p className="pool-closed-note">
-              This pool isn’t accepting new members ({summary.stateLabel === 'JoiningOpen' ? 'full' : summary.stateLabel}).
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+// Joining a pool moved to the unified phrase lookup (spec 037, US1):
+// see components/fairwins/JoinPoolPanel.jsx and UnifiedLookupModal.jsx.

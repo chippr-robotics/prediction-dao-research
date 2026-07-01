@@ -77,10 +77,10 @@ malformed entry shows a format hint before any lookup — all without a wallet s
 - [x] T010 [P] [US1] Extract a behavior-preserving `TakeChallengePanel` from the OpenChallengeModal TakerPanel into `frontend/src/components/fairwins/TakeChallengePanel.jsx`
 - [x] T011 [P] [US1] Extract a behavior-preserving `JoinPoolPanel` from the GroupPoolModal JoinPanel into `frontend/src/components/fairwins/JoinPoolPanel.jsx`
 - [x] T012 [US1] Implement `UnifiedLookupModal.jsx` — phrase input → results routed to take/join panels, collision chooser, not-actionable/self states, and separate "no match found" vs "couldn't check right now — retry" outcomes — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx` (depends on T009, T010, T011)
-- [ ] T013 [US1] Add the `enter-phrase` quick action + `UnifiedLookupModal` mount and remove the `join-pool` quick action in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012)
-- [ ] T014 [US1] Reroute the `parseTakeChallengeParams` deep-link effect to open `UnifiedLookupModal` prefilled/auto-resolve in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012; same file as T013 — run after it)
-- [ ] T015 [US1] Remove the "Take a challenge" (taker) tab, making the modal create-only, in `frontend/src/components/fairwins/OpenChallengeModal.jsx` (depends on T010; coordinate with T028)
-- [ ] T016 [US1] Remove the "Join a pool" (join) tab, making the modal create-only, in `frontend/src/components/fairwins/GroupPoolModal.jsx` (depends on T011)
+- [x] T013 [US1] Add the `enter-phrase` quick action + `UnifiedLookupModal` mount and remove the `join-pool` quick action in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012)
+- [x] T014 [US1] Reroute the `parseTakeChallengeParams` deep-link effect to open `UnifiedLookupModal` prefilled/auto-resolve in `frontend/src/components/fairwins/Dashboard.jsx` (depends on T012; same file as T013 — run after it)
+- [x] T015 [US1] Remove the "Take a challenge" (taker) tab, making the modal create-only, in `frontend/src/components/fairwins/OpenChallengeModal.jsx` (depends on T010; coordinate with T028)
+- [x] T016 [US1] Remove the "Join a pool" (join) tab, making the modal create-only, in `frontend/src/components/fairwins/GroupPoolModal.jsx` (depends on T011)
 - [x] T017 [US1] Accessibility pass on `UnifiedLookupModal` — labeled input, results in a live region, error `role="alert"`, focus moved to result/error (WCAG 2.1 AA) — in `frontend/src/components/fairwins/UnifiedLookupModal.jsx`
 
 **Checkpoint**: US1 fully functional and independently testable (MVP).

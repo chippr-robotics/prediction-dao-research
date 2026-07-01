@@ -1,34 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-// Mock both flow hooks so the tabbed modal is tested deterministically (no chain/IPFS).
+// Mock the create flow so the modal renders deterministically (no chain/IPFS).
 const createOpenChallenge = vi.fn()
-const discover = vi.fn()
-const accept = vi.fn()
 vi.mock('../../hooks/useOpenChallengeCreate', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, useOpenChallengeCreate: () => ({ createOpenChallenge, busy: false, error: null }) }
 })
-vi.mock('../../hooks/useOpenChallengeAccept', () => ({
-  useOpenChallengeAccept: () => ({ discover, accept, busy: false, error: null }),
-}))
 
 import OpenChallengeModal from '../../components/fairwins/OpenChallengeModal'
 import { buildTakeChallengeUrl, parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 
-describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
-  beforeEach(() => { createOpenChallenge.mockReset(); discover.mockReset(); accept.mockReset() })
+describe('OpenChallengeModal (create-only; taking moved to the unified lookup, spec 037)', () => {
+  beforeEach(() => { createOpenChallenge.mockReset() })
 
   it('renders nothing when closed', () => {
     const { container } = render(<OpenChallengeModal isOpen={false} onClose={() => {}} />)
     expect(container.firstChild).toBeNull()
   })
 
-  it('shows both Maker and Taker tabs and defaults to Maker', () => {
+  it('is create-only — the Create tab is shown and there are no Take/Recover tabs', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     expect(screen.getByRole('tab', { name: /create a challenge/i })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: /take a challenge/i })).toHaveAttribute('aria-selected', 'false')
-    // Maker form is shown
+    expect(screen.queryByRole('tab', { name: /take a challenge/i })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /recover codes/i })).toBeNull()
     expect(screen.getByLabelText(/what's the wager/i)).toBeInTheDocument()
   })
 
@@ -43,7 +38,7 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     expect(await screen.findByText('river tiger kite zoo')).toBeInTheDocument()
     expect(screen.getByText(/Save this code now/i)).toBeInTheDocument()
-    // A scannable QR (deep link into the Taker flow) is shown alongside the code.
+    // A scannable QR (deep link into the unified take flow) is shown alongside the code.
     expect(screen.getByText(/scan to take/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/QR code to take this challenge/i)).toBeInTheDocument()
   })
@@ -57,7 +52,6 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     const form = createOpenChallenge.mock.calls[0][0]
     expect(typeof form.acceptDeadline).toBe('number')
     expect(typeof form.resolveDeadline).toBe('number')
-    // Resolve must be after accept, and accept must be in the future.
     expect(form.resolveDeadline).toBeGreaterThan(form.acceptDeadline)
     expect(form.acceptDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
   })
@@ -67,51 +61,9 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeEnabled()
-    // Set resolve-by into the past relative to accept-by → invalid window.
     fireEvent.change(screen.getByLabelText(/must be resolved by/i), { target: { value: '2000-01-01T00:00' } })
     expect(createBtn).toBeDisabled()
     expect(screen.getByRole('alert')).toHaveTextContent(/future/i)
-  })
-
-  it('Taker: pre-fills the code from a deep link (initialCode) and enables lookup', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" initialCode="river tiger kite zoo" />)
-    expect(screen.getByLabelText(/word code/i)).toHaveValue('river tiger kite zoo')
-    expect(screen.getByRole('button', { name: /find challenge/i })).toBeEnabled()
-  })
-
-  it('Taker: switching tabs, looking up by code, and accepting', async () => {
-    discover.mockResolvedValue({ wagerId: 4n, wager: {}, terms: { description: 'Will it snow?' }, termsUnavailable: false, needsMembership: false })
-    accept.mockResolvedValue({ txHash: '0xdef' })
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
-
-    const codeInput = screen.getByLabelText(/word code/i)
-    const findBtn = screen.getByRole('button', { name: /find challenge/i })
-    expect(findBtn).toBeDisabled()
-    fireEvent.change(codeInput, { target: { value: 'river tiger kite zoo' } })
-    expect(findBtn).toBeEnabled()
-    fireEvent.click(findBtn)
-
-    await waitFor(() => expect(discover).toHaveBeenCalledWith('river tiger kite zoo'))
-    expect(await screen.findByText(/Will it snow/)).toBeInTheDocument()
-    // The funding steps are shown up front so the taker knows acceptance is multi-step.
-    expect(screen.getByText(/Approve the stake token/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sign to authorize acceptance/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /accept challenge/i }))
-    // accept now receives an onProgress callback (step reporting) as its 3rd arg.
-    await waitFor(() => expect(accept).toHaveBeenCalledWith('river tiger kite zoo', 4n, expect.any(Function)))
-    expect(await screen.findByText(/taken the challenge/i)).toBeInTheDocument()
-  })
-
-  it('Taker: prompts for membership when the taker is not a member', async () => {
-    discover.mockResolvedValue({ wagerId: 1n, wager: {}, terms: { description: 'x' }, termsUnavailable: false, needsMembership: true })
-    const onBuyMembership = vi.fn()
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" onBuyMembership={onBuyMembership} />)
-    fireEvent.change(screen.getByLabelText(/word code/i), { target: { value: 'river tiger kite zoo' } })
-    fireEvent.click(screen.getByRole('button', { name: /find challenge/i }))
-    const buyBtn = await screen.findByRole('button', { name: /membership/i })
-    expect(screen.queryByRole('button', { name: /accept challenge/i })).not.toBeInTheDocument()
-    fireEvent.click(buyBtn)
-    expect(onBuyMembership).toHaveBeenCalled()
   })
 
   it('deep-link helpers round-trip the code through a take URL', () => {
@@ -120,14 +72,5 @@ describe('OpenChallengeModal (tabbed Maker/Taker)', () => {
     const { search } = new URL(url)
     expect(parseTakeChallengeParams(search)).toBe('river tiger kite zoo')
     expect(parseTakeChallengeParams('?foo=bar')).toBeNull()
-  })
-
-  it('Taker: shows terms-unavailable but still allows accept', async () => {
-    discover.mockResolvedValue({ wagerId: 2n, wager: {}, terms: null, termsUnavailable: true, needsMembership: false })
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="taker" />)
-    fireEvent.change(screen.getByLabelText(/word code/i), { target: { value: 'river tiger kite zoo' } })
-    fireEvent.click(screen.getByRole('button', { name: /find challenge/i }))
-    expect(await screen.findByText(/terms unavailable/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /accept challenge/i })).toBeInTheDocument()
   })
 })

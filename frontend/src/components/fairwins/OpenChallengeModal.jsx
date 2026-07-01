@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
-import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
 import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
 import { useWeb3 } from '../../hooks/useWeb3'
-import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordlist.js'
 import WagerQRCode from '../ui/WagerQRCode'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
@@ -20,12 +18,11 @@ const CloseIcon = () => (
 )
 
 /**
- * Open-challenge modal (feature 024) — one modal, two tabs:
- *   • Maker  — create a code-gated wager with no named opponent (Silver+).
- *   • Taker  — enter a four-word code to discover, read, and accept one.
- * Styled to match the create-a-wager modal (shared `fm-*` classes).
+ * Open-challenge modal (feature 024) — create a code-gated wager with no named opponent (Silver+).
+ * Taking a challenge moved to the unified phrase lookup (spec 037, UnifiedLookupModal). Styled to match
+ * the create-a-wager modal (shared `fm-*` classes).
  */
-function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'maker', initialCode = '' }) {
+function OpenChallengeModal({ isOpen, onClose, initialTab = 'maker' }) {
   const [tab, setTab] = useState(initialTab)
 
   useEffect(() => {
@@ -71,17 +68,10 @@ function OpenChallengeModal({ isOpen, onClose, onBuyMembership, initialTab = 'ma
               >
                 <span className="fm-resolution-tab-label">Create a challenge</span>
               </button>
-              <button
-                type="button" role="tab" aria-selected={tab === 'taker'}
-                className={`fm-resolution-tab ${tab === 'taker' ? 'active' : ''}`}
-                onClick={() => setTab('taker')}
-              >
-                <span className="fm-resolution-tab-label">Take a challenge</span>
-              </button>
             </div>
 
-            {tab === 'maker' && <MakerPanel onClose={onClose} />}
-            {tab === 'taker' && <TakerPanel onClose={onClose} onBuyMembership={onBuyMembership} initialCode={initialCode} />}
+            {/* Taking a challenge moved to the unified phrase lookup (spec 037). */}
+            <MakerPanel onClose={onClose} />
           </div>
         </div>
       </div>
@@ -369,187 +359,8 @@ function ArbitratorField({ value, onChange, onResolvedChange, disabled }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Taker — accept an open challenge by code
-// ---------------------------------------------------------------------------
-function TakerPanel({ onClose, onBuyMembership, initialCode = '' }) {
-  const { discover, accept, busy } = useOpenChallengeAccept()
-  const [code, setCode] = useState(initialCode)
-  const [phase, setPhase] = useState('enter') // enter | found | accepted
-  const [found, setFound] = useState(null)
-  const [error, setError] = useState(null)
-  const [progress, setProgress] = useState(null)
-  const [txHash, setTxHash] = useState(null)
-
-  const codeValid = isValidCode(code)
-
-  const handleLookup = useCallback(async (e) => {
-    e?.preventDefault?.()
-    setError(null)
-    try {
-      const result = await discover(code)
-      setFound(result)
-      setPhase('found')
-    } catch (err) {
-      setError(err.message)
-    }
-  }, [discover, code])
-
-  const handleAccept = useCallback(async () => {
-    setError(null)
-    try {
-      const { txHash: hash } = await accept(code, found.wagerId, (p) => setProgress(p))
-      setTxHash(hash)
-      setPhase('accepted')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setProgress(null)
-    }
-  }, [accept, code, found])
-
-  if (phase === 'accepted') {
-    return (
-      <div className="fm-success">
-        <div className="fm-success-icon" aria-hidden="true">&#10003;</div>
-        <h3>You&apos;ve taken the challenge</h3>
-        <p className="fm-success-desc">You&apos;re now the bound opponent. Keep your code to re-read the private terms in future.</p>
-        <div className="fm-success-actions">
-          <button type="button" className="fm-btn-primary fm-success-done" onClick={onClose}>Done</button>
-        </div>
-        {txHash && (
-          <p className="oc-tx-note">
-            Confirmed on-chain · <code className="oc-tx-hash">{shorten(txHash)}</code>
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  if (phase === 'found' && found) {
-    return (
-      <div className="fm-form">
-        <div className="fm-form-group fm-form-full">
-          <label>Challenge terms</label>
-          {found.termsUnavailable ? (
-            <div className="oc-notice oc-notice--warn" role="alert">
-              Terms unavailable — the encrypted details couldn&apos;t be retrieved. You can still accept; the
-              on-chain wager is unaffected. Keep your code to read the terms later.
-            </div>
-          ) : (
-            <pre className="oc-terms-body">{formatTerms(found.terms)}</pre>
-          )}
-        </div>
-
-        {/* Time constraints (feature 024 feedback): state the deadlines so the taker knows the window. */}
-        <ChallengeDeadlines wager={found.wager} />
-
-        {found.needsMembership ? (
-          <>
-            <div className="oc-notice oc-notice--warn">
-              An active membership is required to take a challenge. Any tier works — creating open challenges
-              needs Silver, but taking one does not.
-            </div>
-            <div className="fm-success-actions">
-              <button type="button" className="fm-btn-primary" onClick={() => onBuyMembership?.()}>Get a membership to take this</button>
-              <button type="button" className="fm-btn-secondary" onClick={() => { setPhase('enter'); setFound(null) }}>Back</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="fm-hint">Accepting binds you as the opponent and escrows your equal stake. This takes a few steps:</p>
-            <ol className="oc-steps">
-              <li className={stepClass(progress?.step, 'approve')}>Approve the stake token (lets the wager contract escrow your stake)</li>
-              <li className={stepClass(progress?.step, 'sign')}>Sign to authorize acceptance with your code</li>
-              <li className={stepClass(progress?.step, 'accept')}>Confirm acceptance — your stake is escrowed</li>
-            </ol>
-            {progress && <p className="fm-hint" role="status">{progress.message}</p>}
-            {error && <div className="fm-error-banner" role="alert">{error}</div>}
-            <p className="fm-hint">Save your code to re-read the terms later.</p>
-            <div className="fm-success-actions">
-              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
-              <button type="button" className="fm-btn-secondary" onClick={() => { setPhase('enter'); setFound(null); setProgress(null) }} disabled={busy}>Back</button>
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <form className="fm-form" onSubmit={handleLookup}>
-      <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-code-input">Enter the {CLAIM_CODE_WORD_COUNT}-word code you were given <span className="fm-required">*</span></label>
-        <input
-          id="oc-code-input" type="text" autoComplete="off" spellCheck="false"
-          placeholder="e.g. river tiger kite zoo"
-          value={code} onChange={(e) => setCode(e.target.value)} disabled={busy}
-        />
-        <span className="fm-hint">The code is shared by the creator. Without it, an open challenge can&apos;t be found or read.</span>
-      </div>
-      {error && <div className="fm-error-banner" role="alert">{error}</div>}
-      <div className="fm-success-actions">
-        <button type="submit" className="fm-btn-primary" disabled={!codeValid || busy}>{busy ? 'Looking up…' : 'Find challenge'}</button>
-      </div>
-    </form>
-  )
-}
-
 // Recover codes moved to My Account → Security (spec 037, US3):
 // see components/account/RecoveryCodesPanel.jsx.
-
-// Full step order the accept flow walks through (the visible list omits the quick "check" read).
-const ACCEPT_STEP_ORDER = ['check', 'approve', 'sign', 'accept']
-const STEP_LABELS = { check: 'Checking', approve: 'Approving', sign: 'Signing', accept: 'Confirming' }
-
-/** Mark a list step done (a later step is active), active (current), or pending — for the take-flow checklist. */
-function stepClass(current, step) {
-  if (!current) return 'oc-step'
-  const ci = ACCEPT_STEP_ORDER.indexOf(current)
-  const si = ACCEPT_STEP_ORDER.indexOf(step)
-  if (ci > si) return 'oc-step oc-step--done'
-  if (ci === si) return 'oc-step oc-step--active'
-  return 'oc-step'
-}
-
-function stepLabel(step) {
-  return STEP_LABELS[step] || 'Accepting'
-}
-
-/** Show an open challenge's accept/resolve deadlines (feature 024). Reads the on-chain wager struct. */
-function ChallengeDeadlines({ wager }) {
-  const accept = formatDeadline(wager?.acceptDeadline)
-  const resolve = formatDeadline(wager?.resolveDeadline)
-  if (!accept && !resolve) return null
-  return (
-    <div className="oc-deadlines" aria-label="Challenge time constraints">
-      {accept && (
-        <div className="oc-deadline">
-          <span className="oc-deadline-label">Take by</span>
-          <span className="oc-deadline-value">{accept}</span>
-        </div>
-      )}
-      {resolve && (
-        <div className="oc-deadline">
-          <span className="oc-deadline-label">Resolve by</span>
-          <span className="oc-deadline-value">{resolve}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** Format an on-chain unix-seconds deadline (bigint/number) as a local date-time, or '' if unset. */
-function formatDeadline(value) {
-  if (value == null) return ''
-  const secs = typeof value === 'bigint' ? Number(value) : Number(value)
-  if (!Number.isFinite(secs) || secs <= 0) return ''
-  try {
-    return new Date(secs * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-  } catch {
-    return ''
-  }
-}
 
 /** Format a unix-ms instant as a value for <input type="datetime-local"> (local time, minute precision). */
 function toDatetimeLocal(ms) {
@@ -562,16 +373,6 @@ function extractAddress(decodedText) {
   if (!decodedText) return null
   const match = String(decodedText).match(/0x[a-fA-F0-9]{40}/)
   return match ? match[0] : null
-}
-
-function formatTerms(terms) {
-  if (terms == null) return ''
-  if (typeof terms === 'string') return terms
-  try { return JSON.stringify(terms, null, 2) } catch { return String(terms) }
-}
-
-function shorten(hash) {
-  return hash && hash.length > 12 ? `${hash.slice(0, 8)}…${hash.slice(-6)}` : hash
 }
 
 export default OpenChallengeModal
