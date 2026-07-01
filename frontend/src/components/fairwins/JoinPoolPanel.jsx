@@ -1,6 +1,8 @@
+import { useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { usePools } from '../../hooks/usePools'
+import { UIContext } from '../../contexts/UIContext'
 import './FriendMarketsModal.css'
 import '../../pages/pools.css'
 
@@ -14,6 +16,9 @@ export default function JoinPoolPanel({ summary, onClose }) {
   const { isConnected } = useWallet()
   const { joinPool, status, error } = usePools()
   const navigate = useNavigate()
+  // Optional notification access — routes the join-success event into the app's toasts without
+  // requiring a UIProvider in tests (spec 037).
+  const ui = useContext(UIContext)
 
   if (!summary) return null
   const joinable = summary.state === 0 && summary.slotsRemaining > 0
@@ -21,6 +26,7 @@ export default function JoinPoolPanel({ summary, onClose }) {
   const onJoin = async () => {
     try {
       await joinPool(summary.address)
+      ui?.showNotification?.('You’ve joined the pool.', 'success', 6000)
       onClose?.()
       navigate(`/pools/${summary.address}`)
     } catch {

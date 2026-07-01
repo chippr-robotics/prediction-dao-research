@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useContext } from 'react'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
+import { UIContext } from '../../contexts/UIContext'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -12,6 +13,9 @@ import './OpenChallengeModal.css'
  */
 export default function TakeChallengePanel({ code, match, onClose, onBuyMembership, onBack }) {
   const { accept, busy } = useOpenChallengeAccept()
+  // Access the notification system directly (optional) so this panel still renders in tests without a
+  // UIProvider, while routing the take-success event into the app's notification toasts (spec 037).
+  const ui = useContext(UIContext)
   const [phase, setPhase] = useState('found')
   const [progress, setProgress] = useState(null)
   const [txHash, setTxHash] = useState(null)
@@ -24,12 +28,13 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
       const { txHash: hash } = await accept(code, found.wagerId, (p) => setProgress(p))
       setTxHash(hash)
       setPhase('accepted')
+      ui?.showNotification?.('You’ve taken the challenge — your stake is escrowed.', 'success', 6000)
     } catch (err) {
       setError(err.message)
     } finally {
       setProgress(null)
     }
-  }, [accept, code, found])
+  }, [accept, code, found, ui])
 
   if (!found) return null
 

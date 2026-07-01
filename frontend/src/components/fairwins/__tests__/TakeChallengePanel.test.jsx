@@ -7,6 +7,7 @@ vi.mock('../../../hooks/useOpenChallengeAccept', () => ({
 }))
 
 import TakeChallengePanel from '../TakeChallengePanel'
+import { UIContext } from '../../../contexts/UIContext'
 
 const matchOpen = { wagerId: 4n, wager: {}, terms: { description: 'Will it snow?' }, termsUnavailable: false, needsMembership: false }
 
@@ -43,5 +44,17 @@ describe('TakeChallengePanel (spec 037, US1)', () => {
     render(<TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: /accept challenge/i }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no longer open/i))
+  })
+
+  it('routes a success toast into the notification system (spec 037)', async () => {
+    accept.mockResolvedValue({ txHash: '0xdef' })
+    const showNotification = vi.fn()
+    render(
+      <UIContext.Provider value={{ showNotification }}>
+        <TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />
+      </UIContext.Provider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: /accept challenge/i }))
+    await waitFor(() => expect(showNotification).toHaveBeenCalledWith(expect.stringMatching(/taken the challenge/i), 'success', expect.any(Number)))
   })
 })
