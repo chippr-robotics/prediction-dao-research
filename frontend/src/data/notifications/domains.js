@@ -8,6 +8,7 @@ export const DOMAIN_META = {
   dao: { label: 'DAO' },
   token: { label: 'Token' },
   membership: { label: 'Membership' },
+  pools: { label: 'Pool' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */
