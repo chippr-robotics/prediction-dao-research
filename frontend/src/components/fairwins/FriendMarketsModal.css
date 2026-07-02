@@ -167,7 +167,8 @@
   gap: 0.375rem;
 }
 
-.fm-form-group label {
+.fm-form-group label,
+.fm-form-group .fm-label {
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-primary, #E6EDF3);

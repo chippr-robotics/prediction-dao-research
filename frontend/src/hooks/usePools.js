@@ -109,7 +109,12 @@ export function usePools() {
     return { signer, chainId: Number(net.chainId), account }
   }, [signer])
 
-  /** Create a pool. `form`: { buyIn, maxMembers, thresholdPct, joinDays, resolutionDays, token? } */
+  /**
+   * Create a pool. `form`: { buyIn, maxMembers, thresholdPct, token?, joinDeadline?, resolutionWindow?,
+   * joinDays?, resolutionDays? }. The create UI passes exact instants from its timeline element —
+   * `joinDeadline` (unix seconds) and `resolutionWindow` (seconds after joining closes); the older
+   * day-count fields remain as a fallback.
+   */
   const createPool = useCallback(async (form) => {
     setStatus('creating')
     setError(null)
@@ -131,8 +136,9 @@ export function usePools() {
         buyIn: ethers.parseUnits(String(form.buyIn), decimals),
         maxMembers: Number(form.maxMembers),
         thresholdBips: Math.round(Number(form.thresholdPct) * 100),
-        joinDeadline: now + Number(form.joinDays) * 86400,
-        resolutionWindow: Number(form.resolutionDays) * 86400,
+        joinDeadline: form.joinDeadline != null ? Number(form.joinDeadline) : now + Number(form.joinDays) * 86400,
+        resolutionWindow:
+          form.resolutionWindow != null ? Number(form.resolutionWindow) : Number(form.resolutionDays) * 86400,
       }
       const tx = await factory.createPool(params)
       const receipt = await tx.wait()
