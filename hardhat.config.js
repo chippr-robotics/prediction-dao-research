@@ -244,14 +244,23 @@ const etherscanConfig = BLOCKSCOUT_VERIFY_NETWORKS.has(verifyTargetNetwork())
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1,  // Optimize for deployment size over runtime gas
+    // NOTE: use the multi-compiler shape (`compilers: [...]` + `overrides`), NOT the
+    // shorthand `{ version, settings, overrides }`. Hardhat treats any solidity config
+    // object that has a top-level `version` key as a single SolcUserConfig and SILENTLY
+    // DROPS a sibling `overrides` field — so the shorthand form compiles the Semaphore
+    // closure below under viaIR:true, which OOM-thrashes the compiler past CI's timeout.
+    compilers: [
+      {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,  // Optimize for deployment size over runtime gas
+          },
+          viaIR: true,
+        },
       },
-      viaIR: true,
-    },
+    ],
     // Compile the vendored Semaphore V4 self-deploy closure (spec 034, ETC/Mordor) WITHOUT viaIR.
     // PoseidonT3 (auto-generated assembly) and SemaphoreVerifier (bn128 pairing assembly) are
     // hand-optimized for legacy codegen; the Yul IR pipeline balloons their compile to ~13 GB RSS
