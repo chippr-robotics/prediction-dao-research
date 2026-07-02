@@ -5,51 +5,67 @@
 Each decision below resolves a Technical Context unknown or a spec constraint.
 Format: Decision / Rationale / Alternatives considered.
 
+> **Revision 2026-07-02**: after the [alternatives.md](./alternatives.md)
+> deep-dive, the user superseded the strictly-serverless clarification and
+> chose the Trystero model (signaling-only rendezvous over public networks
+> and/or a FairWins Cloud Run ws-relay). R1, R3, R5, R6, and R12 were revised
+> in place; the manual copy/QR handshake design they replaced is preserved in
+> git history (commit `fc7967e`).
+
 ---
 
-## R1. Transport: browser-native WebRTC data channels, no wrapper library
+## R1. Transport: WebRTC data channels via Trystero (revised)
 
-**Decision**: Use the platform `RTCPeerConnection` + `RTCDataChannel` APIs
-directly, behind a thin injectable adapter (`webrtc.js`). Data channels only —
-no audio/video, no media stack.
+**Decision**: WebRTC data channels remain the transport; **Trystero**
+(`trystero`, one new dependency, ~58 KB min / ~22 KB gz measured) manages
+signaling and peer connection lifecycle, isolated behind `rendezvous.js` (the
+injectable seam for tests). Data channels only — no audio/video, no media
+stack.
 
-**Rationale**: WebRTC is the only browser-native transport that allows two
-browsers to exchange data directly without any server carrying the traffic —
-which the strictly-serverless clarification demands. Data channels give
-ordered/reliable delivery (SCTP over DTLS) with built-in transport encryption.
-Using the raw API adds **zero runtime dependencies** (constitution: new core
-tech must be justified; a platform API with no package is the minimal
-footprint). Our needs (star topology, one data channel per pair, manual
-signaling) don't benefit from a wrapper.
+**Rationale**: WebRTC is the only browser primitive for browser↔browser data
+(re-verified in alternatives.md — WebTransport is client-server only, P2P
+WebTransport dormant). With the posture change admitting signaling-only
+infrastructure, Trystero replaces the manual copy/QR handshake with automatic
+rendezvous while keeping all message content strictly peer-to-peer: nothing
+is persisted on, or readable by, signaling infrastructure (its payloads are
+encrypted with the room secret). It is actively maintained (v0.25.2, June
+2026), tiny relative to full p2p stacks (13× smaller than js-libp2p's browser
+bundle), and supports multiple interchangeable signaling strategies — which
+directly satisfies the no-single-provider requirement (FR-020b).
 
-**Alternatives considered**:
-- `simple-peer` / `peerjs`: convenience wrappers; peerjs requires its cloud
-  broker (excluded — serverless), simple-peer is effectively unmaintained and
-  adds a dependency for what is ~200 lines of adapter code here.
-- `libp2p` (js), **OrbitDB**, **Gun**, **Trystero**, **Waku**: evaluated in
-  depth (web-verified, with measured bundle sizes) in
-  [alternatives.md](./alternatives.md) — all fail the strictly-serverless
-  clarification (each needs relay/rendezvous infrastructure for
-  browser↔browser signaling), OrbitDB additionally makes data permanent and
-  Gun persists data on relays with unaudited crypto. Trystero (public-infra
-  signaling, ~22 KB gz) is recorded there as the ranked escape hatch if the
-  R12 spike shows manual-handshake friction is unacceptable.
+**Alternatives considered** (full evaluation in
+[alternatives.md](./alternatives.md), web-verified with measured bundle
+sizes):
+- Raw `RTCPeerConnection` + manual copy/QR signaling: the original decision
+  under the strictly-serverless posture; superseded by the user's 2026-07-02
+  choice — the per-member out-of-band handshake was the feature's biggest
+  friction and Trystero removes it at ~22 KB.
+- `js-libp2p`: needs a circuit relay v2 anyway, ~287 KB gz measured, solves
+  mesh/gossip problems a ≤50-peer star doesn't have.
+- **OrbitDB**: permanent content-addressed replication — incompatible with
+  FR-014 (claim codes must be deletable/never stored) by design.
+- **Gun**: relay peers persist all data; unaudited crypto (SEA) with known
+  serious flaws; near-dormant maintenance.
+- **Waku/Logos**: requires fleet nodes; packaging in flux mid-rebrand.
+- `simple-peer` / `peerjs`: peerjs requires its cloud broker; simple-peer is
+  effectively unmaintained and adds a dependency without solving signaling.
 - WebSocket/SSE: require a server — excluded by clarification.
 - On-chain messaging (events as transport): costs gas per message, seconds-to-
   minutes latency, permanently public — fails FR-011 and SC-001 and contradicts
   spec 034's "nicknames never on-chain".
 - WebTransport: server-client only (needs an HTTP/3 server) — not p2p.
 
-## R2. ICE servers: no TURN ever; STUN optional, disclosed, default-on — FLAGGED for user confirmation
+## R2. ICE servers: no TURN; STUN default-on, disclosed, toggleable (flag resolved by posture change)
 
-**Decision**: Configure **no TURN servers** (a TURN relay carries traffic — a
-"relay service" the clarification excludes). For STUN: ship with a small set of
-well-known public STUN servers **enabled by default but user-toggleable**, and
-disclose STUN in the same pre-connection consent as IP exposure (FR-021).
-Disabling STUN leaves host/mDNS/IPv6 candidates only. The Phase-1 feasibility
-spike (R12) measures both modes; this decision is **flagged** as an
-interpretation of "strictly serverless" for the user to confirm or veto at
-`/speckit-tasks` or in PR review.
+**Decision**: Configure **no TURN servers** — TURN carries the actual traffic
+(a content relay, still excluded), and the platform's GCP Cloud Run cannot
+host TURN's UDP allocation model anyway; symmetric-NAT↔symmetric-NAT pairs
+therefore still fail, degrade to manual flows (FR-022/FR-023). Public STUN
+servers ship **enabled by default and user-toggleable**, disclosed in the
+pre-connection consent alongside IP/rendezvous-metadata exposure (FR-021).
+The earlier "is STUN compatible with strictly serverless?" flag is **moot**
+under the revised posture (signaling infrastructure is now explicitly
+admitted; STUN is strictly less privileged than the admitted rendezvous).
 
 **Rationale**: The clarification excludes rendezvous, signaling, and relay
 services. STUN is none of these *functionally*: it is a stateless mirror that
@@ -74,31 +90,36 @@ flows (FR-022/FR-023).
 - Self-hosted STUN/TURN: FairWins-operated infra — excluded by clarification.
 - ICE-TCP / port-forwarding instructions: unrealistic UX for this audience.
 
-## R3. Serverless signaling: non-trickle offer/answer, compacted, copy/QR carried
+## R3. Rendezvous: pool-scoped Trystero room, member-derived secret, strategy fallback (revised)
 
-**Decision**: Manual signaling with **complete (non-trickle) ICE gathering**:
-the app waits for `icegatheringstatechange → complete` (with a 5 s cap) before
-emitting the payload, so one payload carries everything. The SDP is **compacted
-to a minimal field set** — ICE ufrag/pwd, DTLS fingerprint, and candidate list
-(with mDNS hostnames preserved) — then the full SDP is deterministically
-reconstructed on the receiving side (`sdpCompact.js`). Payload is wrapped per
-`contracts/handshake-payload.md` (versioned, checksummed, base64url) and
-carried by copy-paste or QR. Target ≤ ~1.8 KB so `qrcode.react` renders a
-scannable code; `html5-qrcode` (already used for wallet-address QR, spec 011)
-scans it back.
+**Decision**: Each pool channel is a Trystero room. `roomSecret.js` derives
+`{appId, roomId, password}` from **pool-member knowledge**: the pool's
+four-word phrase entropy + pool address + chainId, via `@noble/hashes` HKDF
+with domain separation. The room password engages Trystero's built-in
+encryption of signaling payloads, so rendezvous infrastructure sees only
+opaque blobs and cannot enumerate pool rooms (FR-020a). Signaling strategy is
+configured, in order: **Nostr (default, public relays)** → **FairWins
+ws-relay on GCP Cloud Run** (Trystero's `ws-relay` strategy, self-hosted,
+content-blind, non-persisting) — automatic failover between them satisfies
+FR-020b. Trickle ICE now works normally (live signaling path exists), so
+connection setup is seconds, not copy-paste minutes.
 
-**Rationale**: Trickle ICE requires a live signaling path — we don't have one;
-non-trickle is the standard "manual signaling" pattern. Raw browser SDP runs
-1–3 KB of mostly-constant lines; compaction keeps QR codes at a scannable
-density and copy-paste blobs short. Deterministic reconstruction (not SDP
-munging on live objects) keeps the module pure and unit-testable.
+**Rationale**: Removes the feature's largest UX cost (per-member manual
+handshake) per the user's decision, while message content remains strictly
+p2p. Deriving room identity from the phrase keeps the "four words are the
+key" product story coherent: the same secret that finds the pool finds its
+channel — and the phrase already lives only with members. The Cloud Run
+relay gives FairWins an availability lever (public Nostr relays come with no
+SLA) without becoming a content backend.
 
 **Alternatives considered**:
-- Shipping raw SDP: works but QR density becomes marginal on low-end cameras;
-  compact form is strictly better and testable.
-- Trickle with progressive QR frames: complexity without benefit at our scale.
-- Encoding into a BIP-39 word phrase (brand-consistent): ~1.5 KB → hundreds of
-  words; unusable.
+- Manual non-trickle copy/QR signaling (the superseded design — preserved in
+  git history at `fc7967e`): zero infrastructure but per-member handshake
+  friction; rejected by user decision after alternatives review.
+- Room id from pool address alone (no phrase entropy): outsiders could derive
+  it from public on-chain data and camp/DoS the room — fails FR-020a.
+- FairWins relay as the *only* strategy: single-provider dependency, fails
+  FR-020b and re-centralizes what can stay decentralized by default.
 
 ## R4. Topology: star with the creator as hub
 
@@ -109,45 +130,48 @@ with a clear message.
 
 **Rationale**: Every required flow is creator-centric (US1–US4): creator is the
 single writer for standings/announcements, sole recipient of claim codes, and
-natural presence authority. A star needs exactly one manual pairing per member
-(the minimum possible under serverless signaling), whereas a mesh needs
-O(n²) pairings — absurd with manual handshakes. Claim-code confidentiality
-(FR-011) becomes topological: the message only ever exists on the member↔
-creator link. 50 `RTCPeerConnection`s with idle data channels is well inside
-browser per-tab limits (hundreds) and trivial bandwidth (KB-scale messages).
+natural presence authority. A star needs n connections and one auth
+verification path, whereas a mesh needs O(n²) links, buys nothing the
+requirements ask for, and multiplies the IP-exposure surface (each member's
+address visible to every member instead of only the creator). Claim-code
+confidentiality (FR-011) becomes topological: the message only ever exists on
+the member↔creator link. 50 `RTCPeerConnection`s with idle data channels is
+well inside browser per-tab limits (hundreds) and trivial bandwidth (KB-scale
+messages).
 
 **Alternatives considered**:
-- Full mesh: O(n²) manual handshakes; nothing requires member↔member links
-  (member chat is out of scope).
+- Full mesh: O(n²) links and full-pool IP exposure; nothing requires
+  member↔member links (member chat is out of scope).
 - Supernode relay (members relay to members): adds forwarding logic and trust
   analysis for zero required functionality; violates YAGNI. Revisit only if a
   future feature needs creator-offline broadcast.
 
-## R5. Reconnection under serverless signaling
+## R5. Reconnection: automatic re-rendezvous (revised)
 
-**Decision**: A dropped session requires a fresh pairing (new offer/answer).
-Mitigations: (a) heartbeat ping/pong every 15 s keeps NAT bindings and detects
-death fast; (b) sessions survive transient stalls via SCTP retransmission —
-only ICE failure/close tears down; (c) the UI keeps "re-pair with creator" one
-tap away and pre-fills everything except the out-of-band exchange; (d) the
-creator's hub keeps the member's row (nickname, last claim-code state) so a
-re-pair restores context instantly via snapshot (FR-008).
+**Decision**: A dropped session reconnects **automatically**: the client stays
+joined to (or rejoins) the Trystero room and re-runs the in-band auth
+handshake when the peer reappears; heartbeat ping/pong every 15 s detects
+death fast, and the creator hub's per-commitment state (nickname row, last
+claim-code state) means a reconnecting member converges instantly via
+snapshot (FR-008). The UI shows truthful intermediate states ("reconnecting…",
+"creator unreachable") — automatic retry with honest status, never a fake
+connected state (constitution III).
 
-**Rationale**: ICE restart needs a signaling path — by construction we have
-none once the link is dead. Honest-state principle (constitution III) means we
-show a truthful "disconnected — re-pair to reconnect" rather than pretending.
-While a channel is still open, in-band renegotiation over the data channel is
-possible (perfect-negotiation pattern) and is noted as a future enhancement for
-network-change survival, not required for v1.
+**Rationale**: The live signaling path is exactly what the posture change
+buys; the superseded manual re-pairing flow was this design's biggest
+operational weakness.
 
-**Alternatives considered**: Persisting ICE credentials for silent reconnect
-(doesn't survive NAT rebinding; false hope), background retry loops (spinner
-theater against constitution III).
+**Alternatives considered**: manual re-pairing (superseded design); unbounded
+silent retry without status (spinner theater, against constitution III —
+retry backs off and surfaces state transitions).
 
 ## R6. Peer authentication: Semaphore identity (members), on-chain creator address (creator)
 
-**Decision**: The handshake payload binds, under a signature, the tuple
-`(chainId, poolAddress, role, sessionNonce, dtlsFingerprint, sessionPubKey)`:
+**Decision**: Auth is an **in-band handshake** — the first and only messages
+accepted on a freshly connected data channel (`sessionAuth.js`); the room
+secret grants rendezvous only, never channel access. The handshake binds,
+under a signature, the tuple
+`(chainId, poolAddress, role, sessionNonce, sessionPubKey[, boxPubKey])`:
 - **Member → creator**: signed with the member's Semaphore identity secret
   (`Identity.signMessage`, EdDSA); payload carries the public commitment. The
   creator verifies the signature against the commitment
@@ -159,11 +183,17 @@ theater against constitution III).
   members verify the recovered address equals the pool's on-chain `creator()`.
   The creator's address is already public pool metadata, and spec attribution
   is "by role", so this discloses nothing new.
-- Both handshakes certify an **ephemeral tweetnacl keypair** (`sessionPubKey`);
-  all subsequent envelopes are signed with session keys (R7), so neither side
-  is prompted per message. DTLS fingerprint binding defeats
-  man-in-the-middle-at-pairing: a tampered payload fails signature; a swapped
-  fingerprint fails DTLS.
+- Both handshakes certify an **ephemeral tweetnacl keypair** (`sessionPubKey`,
+  plus the creator's `boxPubKey` for claim-code encryption); all subsequent
+  envelopes are signed with session keys (R7), so neither side is prompted per
+  message. Peers that fail (or never complete) the handshake within a short
+  timeout are dropped. **MITM analysis**: a hostile peer holding the room
+  secret cannot forge either signature, so it can never impersonate the
+  creator or a member; at worst it passively relays already-signed envelopes,
+  which exposes only data every pool member receives anyway
+  (standings/announcements/presence) and never claim codes (boxed to the
+  wallet-certified creator key). Injecting or tampering fails signature
+  verification (FR-005).
 
 **Rationale**: Reuses exactly the identity material members already hold
 (spec assumption "Identity reuse"); no registration step, no new trust roots.
@@ -270,19 +300,24 @@ new one") and avoids ghost sessions inflating presence.
 ## R12. Feasibility spike (first implementation task) + test strategy
 
 **Decision**: Before UI work, a spike validates on real devices/networks:
-(1) manual copy/QR offer-answer connects two browsers on different home
-networks with STUN on; (2) the same with STUN off (expect LAN/IPv6-only);
-(3) payload size after compaction fits QR; (4) 50 loopback sessions on one tab
-stay responsive. Results are recorded in `research.md` as an addendum; if (1)
-fails materially, the R2 STUN default and the spec's serverless trade-offs go
-back to the user before further work. Automated testing: protocol modules are
+(1) Trystero **Nostr strategy** connects two browsers on different home
+networks and measures time-to-data-channel; (2) **failover** to a locally run
+`ws-relay` instance when Nostr relays are blocked/unreachable (FR-020b), and
+the same relay containerized for Cloud Run; (3) **room-secret gating** — a
+client with the wrong secret never rendezvouses with the pool room; (4) STUN
+off mode (expect LAN/IPv6-only); (5) 50 sessions against one hub tab stay
+responsive. Results are recorded in `research.md` as an addendum; if (1)
+fails materially, the default-strategy ordering (Nostr vs FairWins relay)
+flips with measured justification. Automated testing: protocol modules are
 pure (no `Date.now` in logic paths — versions and nonces injected) with Vitest
-unit tests; an in-memory `RTCPeerConnection` fake (pair of linked adapters)
-drives hub+client integration tests; axe tests cover the new UI.
+unit tests; a fake rendezvous (in-memory linked pair behind the
+`rendezvous.js` seam) drives hub+client integration tests without touching
+the network; axe tests cover the new UI.
 
-**Rationale**: The spec names this the riskiest assumption; constitution II
-demands tests alongside behavior — pure-core design makes the protocol
-testable without a browser, and the injectable `webrtc.js` adapter is the seam.
+**Rationale**: The spec names connectivity the riskiest assumption;
+constitution II demands tests alongside behavior — pure-core design makes the
+protocol testable without a browser, and the injectable `rendezvous.js`
+adapter is the seam.
 
 ---
 
@@ -290,16 +325,16 @@ testable without a browser, and the injectable `webrtc.js` adapter is the seam.
 
 | Unknown | Resolution |
 |---|---|
-| Transport & library | R1: native WebRTC data channels, zero new deps |
-| NAT traversal under serverless posture | R2: no TURN; STUN default-on, toggleable, disclosed (**flagged**) |
-| Handshake mechanics & payload size | R3: non-trickle, compacted SDP, copy/QR ≤ ~1.8 KB |
+| Transport & library | R1 (revised): WebRTC data channels via Trystero (one new dep, ~22 KB gz) |
+| NAT traversal | R2: no TURN (Cloud Run can't host it; accepted gap); STUN default-on, toggleable, disclosed |
+| Rendezvous/signaling | R3 (revised): pool-scoped Trystero room, phrase-derived secret, Nostr default → FairWins Cloud Run ws-relay fallback |
 | Topology & scale (FR-027) | R4: creator-hub star, hard cap 50 |
-| Reconnection | R5: re-pair; heartbeats; honest disconnect UX |
-| Peer auth (FR-002/003/004) | R6: Semaphore identity / on-chain creator address + session keys |
+| Reconnection | R5 (revised): automatic re-rendezvous + honest status UX |
+| Peer auth (FR-002/003/004) | R6 (revised): in-band handshake — Semaphore identity / on-chain creator address + session keys |
 | Replay/tamper (FR-005) | R7: signed envelopes, monotonic seq, session binding |
 | Claim-code confidentiality (FR-011/013) | R8: nacl.box to creator + signed ack |
 | Flooding (FR-024) | R9: token bucket + size caps + drop |
 | Late-join catch-up (FR-008) | R10: snapshot + latest-wins versioned docs |
 | Multi-tab (FR-026) | R11: per-commitment newest-wins |
-| Riskiest-assumption validation | R12: device spike before UI; pure-core Vitest strategy |
-| Alternative stacks (libp2p/OrbitDB/Gun/Trystero/Waku) | [alternatives.md](./alternatives.md): all rejected under serverless posture; Trystero = ranked escape hatch |
+| Riskiest-assumption validation | R12 (revised): strategy/connectivity spike before UI; fake-rendezvous Vitest strategy |
+| Alternative stacks (libp2p/OrbitDB/Gun/Trystero/Waku) | [alternatives.md](./alternatives.md): evaluated; **Trystero adopted** after posture change (2026-07-02); others rejected |

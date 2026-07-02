@@ -37,21 +37,33 @@ and four words" property. Participants appear on the channel only as their
 anonymous in-pool identity (two-word nickname) — never as a wallet address —
 consistent with the pool privacy model. The user has asked us to investigate
 browser-native peer-to-peer transport (WebRTC) as the vehicle; the transport
-choice is finalized in the plan. Connection establishment is **strictly
-serverless** (see Clarifications): members exchange connection-establishment
-material directly (e.g. copy-paste or QR, like existing share flows) — no
-FairWins or third-party rendezvous/relay service is involved.
+choice is finalized in the plan. Connection establishment is **automatic over
+signaling-only rendezvous infrastructure** (see Clarifications): peers find
+each other through ephemeral, content-blind signaling — public decentralized
+networks by default, optionally a lightweight FairWins-operated signaling
+relay — and message content still flows only between member devices.
 
 ## Clarifications
 
 ### Session 2026-07-02
 
 - Q: How should pool peers find each other (rendezvous/signaling) and relay
-  when direct connection fails? → A: **Strictly serverless** — members exchange
-  connection offers manually (copy-paste / QR handshake); no FairWins-operated
-  or third-party rendezvous, signaling, or relay service of any kind. If a
-  direct connection cannot be established, the channel is simply unavailable
-  for that pair and the manual flows apply.
+  when direct connection fails? → A: *(superseded below)* Strictly serverless —
+  members exchange connection offers manually (copy-paste / QR handshake); no
+  FairWins-operated or third-party rendezvous, signaling, or relay service of
+  any kind.
+- Q *(revisited after alternatives research — see alternatives.md)*: The
+  manual-handshake friction of the strictly serverless posture vs.
+  signaling-assisted connection? → A: **Supersedes the answer above.**
+  Adopt **automatic signaling over ephemeral, content-blind rendezvous
+  infrastructure** (the Trystero model): the SDP handshake rides public
+  decentralized networks (default) and/or a lightweight FairWins-operated
+  signaling relay (the platform runs GCP Cloud Run and is considering a relay
+  service). Signaling infrastructure MUST never see message content and MUST
+  NOT persist anything; all channel content still flows peer-to-peer between
+  member devices. Manual pairing is no longer a requirement. If signaling is
+  unavailable, the channel degrades gracefully and the manual flows
+  (copy-paste claim codes, creator-local standings) still apply.
 - Q: How many concurrently connected members must a pool's live channel
   support? → A: **Friend-group scale: ~25–50 concurrently connected members**
   per pool (the ~1,000-member pool cap is anonymity capacity, not expected live
@@ -210,13 +222,13 @@ with no wallet address shown.
   the creator's current state (standings, announcements) rather than replaying
   every missed intermediate update.
 - **Direct connection impossible** (restrictive network/NAT/firewall): With no
-  relay service available (strictly serverless posture), the channel must fail
-  gracefully to the manual flows with a clear "could not connect" outcome —
-  never a hung or half-working pool view.
-- **Handshake friction**: Establishing a session requires members to exchange
-  connection material out-of-band (copy-paste/QR); a botched, stale, or
-  partially completed handshake must produce a clear retry path, not a limbo
-  state.
+  media relay available, some peer pairs cannot form a direct connection; the
+  channel must fail gracefully to the manual flows with a clear "could not
+  connect" outcome — never a hung or half-working pool view.
+- **Signaling unavailable**: If the rendezvous path (public network or the
+  FairWins signaling relay) is down or unreachable, connection attempts must
+  fail visibly and quickly, the pool view must remain fully usable, and the
+  manual flows apply; recovery is automatic when signaling returns.
 - **Impersonation**: A device that is not a verified member of the pool must not
   be able to join the pool's channel, read its traffic, or post to it. A member
   must not be able to pass off messages as the creator's.
@@ -318,19 +330,26 @@ with no wallet address shown.
 
 #### Privacy, safety & platform posture
 
-- **FR-020**: Connection establishment MUST be strictly serverless: no
-  FairWins-operated or third-party rendezvous, signaling, or relay service is
-  used. Peer sessions are established solely from connection-establishment
-  material that members exchange directly (e.g. copy-paste or QR, consistent
-  with existing share flows), and message content flows only between member
-  devices — no server ever stores, reads, or relays it.
-- **FR-020a**: The connection-establishment material members exchange MUST NOT
-  contain wallet addresses or claim codes, and material for one pool/session
-  MUST NOT grant access to another pool's channel or a later session.
-- **FR-021**: Before a member's device exposes its network address to other pool
-  members via a direct connection, the member MUST be informed of that exposure
-  and be free to decline the channel (there is no relay to hide behind under the
-  serverless posture), since network-address linkage could otherwise erode the
+- **FR-020**: Connection establishment MUST use only **signaling-only,
+  content-blind rendezvous infrastructure**: public decentralized signaling
+  networks and/or a lightweight FairWins-operated signaling relay. Signaling
+  infrastructure carries only encrypted connection-establishment metadata, MUST
+  NOT be able to read channel message content, and MUST NOT persist anything.
+  Once connected, all message content flows only between member devices — no
+  server ever stores, reads, or relays channel messages.
+- **FR-020a**: Signaling/connection-establishment material MUST NOT contain
+  wallet addresses or claim codes; discovery of a pool's rendezvous MUST
+  require knowledge the pool's members share (so outsiders cannot enumerate or
+  camp pool channels); and material for one pool/session MUST NOT grant access
+  to another pool's channel or a later session.
+- **FR-020b**: The channel MUST NOT hard-depend on any single signaling
+  provider: if the configured rendezvous (public network or FairWins relay) is
+  unavailable, connection attempts fail visibly, the pool remains fully usable
+  (FR-022), and connectivity resumes automatically when signaling returns.
+- **FR-021**: Before a member's device exposes its network address to other
+  pool members via a direct connection — and to signaling infrastructure during
+  rendezvous — the member MUST be informed of that exposure and be free to
+  decline the channel, since network-address linkage could otherwise erode the
   pool's anonymity boundary out-of-band.
 - **FR-022**: The channel MUST be strictly additive: every pool capability
   (join, vote, propose, resolve, claim, refund, manual claim-code hand-off,
@@ -387,10 +406,10 @@ with no wallet address shown.
 - **SC-003**: 100% of channel participants are verified pool members; a
   non-member device can neither read nor post to a pool channel (verified by
   test/review).
-- **SC-004**: 0 servers of any kind (FairWins-operated or third-party) are
-  involved in establishing channel sessions or carrying channel messages;
-  message content exists only on member devices and in transit between them
-  (verified by review/audit).
+- **SC-004**: 0 channel messages are stored on, or readable in the clear by,
+  any server — signaling infrastructure sees only encrypted connection
+  metadata; message content exists only on member devices and in transit
+  between them (verified by review/audit).
 - **SC-005**: A claim code sent over the channel is readable by the creator
   only: 0% of hand-offs expose the code to other members or intermediaries
   (verified by test/review).
@@ -418,15 +437,18 @@ with no wallet address shown.
   written to be satisfiable by such a transport; the final transport selection,
   and the design of connection establishment, are plan-phase decisions
   validated by a feasibility spike.
-- **Strictly serverless connection establishment (clarified 2026-07-02)**:
-  There is no rendezvous, signaling, or relay service — FairWins-operated or
-  third-party. Members bootstrap sessions by exchanging connection material
-  directly (copy-paste/QR), the same way they already share four-word phrases
-  and claim codes today. The accepted trade-offs: per-session handshake
-  friction, no connection possible across networks that block direct
-  peer-to-peer traffic, and both parties must be online to establish a session.
-  The plan-phase spike validates that the chosen transport works within these
-  constraints and designs the handshake UX to minimize the friction.
+- **Signaling-assisted connection establishment (clarified 2026-07-02,
+  supersedes the strictly-serverless assumption)**: Peers rendezvous
+  automatically over content-blind signaling — public decentralized networks
+  by default, with an optional lightweight FairWins-operated signaling relay
+  (the platform already operates GCP Cloud Run) as a configured alternative or
+  fallback. No manual handshake is required. The accepted trade-offs:
+  connection metadata (encrypted rendezvous presence, IP visibility) is
+  exposed to signaling infrastructure and disclosed to members (FR-021); some
+  peer pairs behind restrictive NATs still cannot connect directly (no media
+  relay); and both parties must be online to establish a session. The
+  plan-phase spike validates connectivity rates and signaling-provider
+  behavior.
 - **Structured messages only**: The channel carries defined message types
   (standings, announcements, claim-code hand-offs, presence). Free-form
   member-to-member chat is out of scope — it would import moderation and abuse
@@ -458,9 +480,9 @@ with no wallet address shown.
 
 ## Out of Scope
 
-- Operating or depending on any rendezvous, signaling, or relay service —
-  FairWins-operated or third-party (strictly serverless posture, per
-  Clarifications).
+- Any server that stores, reads, or relays channel **message content**
+  (signaling-only infrastructure is in scope per Clarifications; a media/TURN
+  relay and server-side message history are not).
 - Free-form member-to-member chat or direct messages between non-creator
   members.
 - Server-side message history, store-and-forward delivery, or offline inboxes.
@@ -485,7 +507,9 @@ with no wallet address shown.
 - Existing client-side identity and cryptography building blocks
   (wallet-signature-derived keys, per-pool identity cache) for authenticating
   and encrypting channel participation.
-- The platform's no-backend posture (spec 007 lineage), here taken to its
-  strictest form: no rendezvous, signaling, or relay infrastructure at all
-  (FR-020); the existing out-of-band share flows (copy/QR) double as the
-  connection-handshake carrier.
+- Signaling-only rendezvous infrastructure (FR-020): public decentralized
+  signaling networks and, optionally, a lightweight FairWins-operated signaling
+  relay deployed on the platform's existing GCP Cloud Run footprint. Content
+  blindness and non-persistence are hard requirements on whichever path is
+  configured; the platform's no-backend-for-content posture (spec 007 lineage)
+  is preserved.

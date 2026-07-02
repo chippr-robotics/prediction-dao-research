@@ -158,18 +158,29 @@ inherent to browser networking, not to our design.
 
 ## Decision
 
-**Keep the plan's choice: raw browser WebRTC with manual (copy/QR) signaling**
-(research R1–R3), unchanged. It is the only option that satisfies the
-strictly-serverless clarification and the content-confinement requirements,
-and it carries zero new dependencies.
+> **Outcome (2026-07-02, user decision)**: after reviewing this analysis, the
+> user chose **Trystero** — escape hatch 1 below — and relaxed the
+> strictly-serverless clarification: the platform runs GCP Cloud Run and is
+> open to operating a lightweight signaling relay. The spec's Clarifications
+> section records the superseding answer; plan.md and research.md (R1/R3/R5/
+> R6/R12) were revised accordingly. Signaling is Nostr-by-default with the
+> FairWins Cloud Run `ws-relay` strategy as configured fallback; message
+> content remains strictly peer-to-peer, and C2's content-confinement
+> requirements are unchanged. The analysis below is preserved as written
+> (pre-decision) for the record.
 
-**Recorded escape hatch (in priority order), should the R12 spike or real
-usage show the manual handshake kills adoption:**
+The original recommendation under the strictly-serverless posture was to keep
+raw browser WebRTC with manual (copy/QR) signaling — the only option that
+satisfied that clarification — with the following escape hatches recorded:
+
 1. **Trystero-style public-infra signaling** (Nostr default) — requires
    revising the 2026-07-02 serverless clarification to re-admit third-party
    *signaling-only* infrastructure; everything else in the plan survives.
+   **← adopted.**
 2. Self-hosted or third-party dedicated signaling service — the original
-   clarification Options A/B, a bigger posture change.
+   clarification Options A/B, a bigger posture change. **← partially adopted:
+   the FairWins Cloud Run ws-relay is the configured fallback strategy, not
+   the default.**
 3. libp2p — only if a future feature genuinely needs mesh/gossip scale
    (e.g. creator-offline broadcast to hundreds); accept relay operation then.
 
@@ -177,12 +188,13 @@ usage show the manual handshake kills adoption:**
 contradicts FR-014 by design) and Gun (unaudited crypto, relay persistence,
 dormant maintenance) for this feature's traffic.
 
-## Revisit triggers
+## Revisit triggers (updated post-decision)
 
-- R12 spike: median pairing time per member > ~60 s or > ~20% abandonment in
-  hallway testing → escalate escape hatch 1 to the user.
-- STUN toggle data (R2) shows cross-network connect rates too low even with
-  STUN → the serverless posture itself, not the library, is the binding
-  constraint; same escalation.
+- R12 spike or production telemetry shows public Nostr rendezvous too
+  unreliable → flip the default strategy order to FairWins ws-relay first
+  (config change, FR-020b already requires both paths).
+- Cross-network connect rates too low without TURN (symmetric-NAT pairs) →
+  revisit the no-media-relay stance; note TURN cannot run on Cloud Run (UDP),
+  so that would mean a dedicated TURN host — a real posture discussion.
 - A future feature needs creator-offline fan-out or >50 live peers →
   re-evaluate libp2p at that feature's spec stage, not this one.

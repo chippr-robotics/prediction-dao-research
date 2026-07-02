@@ -18,31 +18,39 @@ How to prove the feature works end-to-end. References:
 
 ## 0. Feasibility spike (research R12 — run before implementation tasks)
 
-1. Serve the spike harness (a bare page using `sdpCompact.js` + `webrtc.js`
-   once they exist; before then, the R12 spike task builds a scratch page).
-2. Device A (offer) → copy compact payload → paste on Device B → copy answer →
-   paste on A.
-3. **Expected**: with STUN on, data channel opens across different home
-   networks; `ping`/`pong` round-trips < 500 ms. With STUN off, expect
-   connection only on same LAN or end-to-end IPv6 — record both results as an
-   addendum in research.md.
-4. Confirm payload ≤ ~1.8 KB and the QR renders/scans with the existing
-   `qrcode.react` / `html5-qrcode` components.
-5. If cross-network fails with STUN on, STOP: revisit research R2 with the
-   user before proceeding.
+1. Serve the spike harness (a bare page using `roomSecret.js` +
+   `rendezvous.js` once they exist; before then, the R12 spike task builds a
+   scratch page with Trystero directly).
+2. Devices A and B on **different home networks** join the same derived room
+   (Nostr strategy). **Expected**: data channel opens with no manual step;
+   measure time-to-channel (target: seconds) and `ping`/`pong` round-trips
+   < 500 ms.
+3. Block/unconfigure Nostr; run a local Trystero `ws-relay` and confirm
+   **automatic failover** connects A↔B through it (FR-020b). Containerize the
+   relay and confirm it runs on Cloud Run (WebSocket support, scale-to-zero
+   behavior noted).
+4. Wrong-secret check: a third client with an incorrect room secret never
+   rendezvouses with A/B (FR-020a).
+5. STUN off: expect connection only on same LAN or end-to-end IPv6 — record
+   results as an addendum in research.md.
+6. If (2) fails materially on public Nostr relays, flip the default strategy
+   order (FairWins relay first) with measured justification — record in
+   research.md.
 
 ## 1. Automated validation
 
 ```bash
-npm run test:frontend            # all Vitest suites, including:
-# poolChannelSdpCompact.test.js  – SDP ⇄ compact round-trip determinism
-# poolChannelHandshake.test.js   – payload build/parse/verify + all failure rows
-#                                  in contracts/handshake-payload.md
-# poolChannelEnvelope.test.js    – sign/verify, replay (seq), size cap, role matrix
-# poolChannelState.test.js       – snapshot, latest-wins versions, stale cache labeling
-# poolChannelHub.test.js         – loopback pair: capacity 50→51 decline,
-#                                  commitment dedupe, claim-code box/ack, rate limit
-# poolChannel.axe.test.jsx       – pairing panel, consent dialog, live panels
+npm run test:frontend             # all Vitest suites, including:
+# poolChannelRoomSecret.test.js   – room derivation determinism, domain separation,
+#                                   phrase-entropy (not rendered-words) input
+# poolChannelSessionAuth.test.js  – in-band auth build/parse/verify + all failure
+#                                   rows in contracts/handshake-payload.md
+# poolChannelEnvelope.test.js     – sign/verify, replay (seq), size cap, role matrix
+# poolChannelState.test.js        – snapshot, latest-wins versions, stale cache labeling
+# poolChannelHub.test.js          – fake-rendezvous loopback pair: capacity 50→51
+#                                   decline, commitment dedupe, claim-code box/ack,
+#                                   rate limit, auth-timeout drop
+# poolChannel.axe.test.jsx        – connect panel, consent dialog, live panels
 ```
 
 All suites MUST pass; new modules ship with their tests in the same PR
@@ -53,15 +61,17 @@ All suites MUST pass; new modules ship with their tests in the same PR
 ### US1 — live standings (P1)
 
 1. Browser A = pool creator; open the pool → "Live channel" → review consent
-   (IP exposure + STUN note) → generate pairing view.
-2. Browser B = member; open pool → "Connect to creator" → consent → copy/scan
-   the offer to A; return the answer to B.
+   (IP/rendezvous-metadata exposure + STUN note) → connect.
+2. Browser B = member; open pool → "Connect" → consent. **Expected**: A and B
+   show each other connected within seconds, no manual step (rendezvous is
+   automatic; status shows the active signaling strategy).
 3. On A, reorder standings / mark a member eliminated.
 4. **Expected on B (≤ 5 s)**: standings update by nickname, interim/off-chain
    badge visible, no transaction prompted (SC-001).
-5. Kill B's tab, change standings on A, reopen + re-pair B.
-6. **Expected**: B shows cached state labeled stale, then converges to current
-   snapshot ≤ 10 s after session up (SC-007, FR-008).
+5. Kill B's tab, change standings on A, reopen B.
+6. **Expected**: B shows cached state labeled stale, reconnects automatically,
+   and converges to the current snapshot ≤ 10 s after session up (SC-007,
+   FR-008).
 
 ### US2 — claim-code hand-off (P1)
 
@@ -89,11 +99,17 @@ All suites MUST pass; new modules ship with their tests in the same PR
 
 ### Negative / posture checks
 
-- Paste a truncated pairing code → checksum retry message (not a crash).
-- Paste a pairing code from a different pool → named scope mismatch.
-- Non-member wallet attempts pairing → "not a verified member" (SC-003).
-- DevTools network tab during a full session: **zero requests** to any
-  signaling/relay host (STUN binding checks only if STUN enabled) — SC-004.
+- Non-member wallet attempts to connect (valid room secret, no valid identity
+  signature) → dropped at auth; creator UI never lists it (SC-003, FR-002).
+- Wrong room secret (harness) → never rendezvouses with the pool room
+  (FR-020a).
+- Block the active signaling strategy mid-use → status shows failover to the
+  other strategy (FR-020b); block both → fast, visible "signaling
+  unreachable" + manual flows still work (FR-023).
+- Signaling-blindness check: capture ws-relay/Nostr traffic during a session →
+  only encrypted rendezvous blobs; no standings, announcements, claim codes,
+  commitments, or wallet addresses in the clear; nothing persisted by the
+  FairWins relay (SC-004, FR-020).
 - Flood from a member session (test harness) → member link dropped, A and
   other members unaffected (FR-024).
 - With the channel never connected, run a full pool lifecycle → everything

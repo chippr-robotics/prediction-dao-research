@@ -17,8 +17,9 @@ The per-pool channel as seen by one device.
 | poolAddress | address | the ZKWagerPool clone |
 | role | `creator` \| `member` | derived: wallet == on-chain `creator()` → creator |
 | lifecycle | enum | see state machine below |
-| consent | boolean | member acknowledged IP-exposure disclosure (FR-021); persisted per (account, pool) |
+| consent | boolean | member acknowledged IP/rendezvous-metadata exposure disclosure (FR-021); persisted per (account, pool) |
 | stunEnabled | boolean | R2 toggle; persisted per account; disclosed in consent |
+| signalingStrategy | enum | active rendezvous path: `nostr` (default) \| `wsRelay` (FairWins Cloud Run); auto-failover per FR-020b; surfaced in status UI |
 
 **Validation**: channel may only be offered for pools in an active lifecycle
 (joining-open / resolving / claiming); never for resolved-and-claimed or
@@ -27,9 +28,10 @@ cancelled pools (FR-025).
 **State machine (channel lifecycle)**:
 
 ```
-idle → consented → pairing → connected → degraded (creator unreachable)
-                     ↑            |            |
-                     └── re-pair ─┴────────────┘
+idle → consented → rendezvous (room join + in-band auth) → connected
+                        ↑              |                       |
+                        └── auto-reconnect (backoff, honest status) ┘
+connected → degraded (creator unreachable / signaling lost) → rendezvous
 any state → closed (pool concluded | user declined | network switched)
 ```
 
@@ -40,15 +42,15 @@ One authenticated WebRTC link. Creator holds ≤ 50 (FR-027); member holds ≤ 1
 
 | Field | Type | Notes |
 |---|---|---|
-| sessionId | string | `hash(memberNonce ‖ creatorNonce)` from handshake; binds envelopes (FR-020a) |
+| sessionId | string | `hash(memberNonce ‖ creatorNonce)` from in-band auth; binds envelopes (FR-020a) |
 | peerRole | `creator` \| `member` | |
 | commitment | bigint \| null | member peers only; must be ∈ on-chain member set (FR-002) |
 | nickname | string | derived via existing `nickname.js` from commitment (FR-003) |
-| peerSessionPubKey | bytes32 | certified in handshake; verifies envelope sigs (R6/R7) |
-| dtlsFingerprint | string | bound under handshake signature (R6) |
+| peerSessionPubKey | bytes32 | certified in in-band auth; verifies envelope sigs (R6/R7) |
+| peerBoxPubKey | bytes32 \| null | creator peers only; claim-code encryption target (R8) |
 | lastSeq | number | highest accepted `seq` from this peer (replay guard, FR-005) |
 | sendSeq | number | next outbound `seq` |
-| connState | enum | `connecting → open → closed/failed`; heartbeat-driven (R5) |
+| connState | enum | `awaiting-auth → open → closed/failed`; 10 s auth timeout; heartbeat-driven (R5) |
 
 **Validation rules**:
 - Handshake signature MUST verify against commitment (member) or on-chain
@@ -58,11 +60,15 @@ One authenticated WebRTC link. Creator holds ≤ 50 (FR-027); member holds ≤ 1
   (newest-wins, R11/FR-026).
 - Session 51+ on the hub → declined with reason (FR-027).
 
-## Entity: HandshakePayload (out-of-band, transient)
+## Entity: RoomDescriptor + AuthMessage (transient)
 
-See `contracts/handshake-payload.md` for the wire contract. Never persisted;
-single-use (nonce), pool- and session-scoped (FR-020a). MUST NOT contain
-wallet addresses (member payloads) or claim codes.
+See `contracts/handshake-payload.md`. **RoomDescriptor** `{appId, roomId,
+password}` is derived on demand from phrase entropy + pool + chain (never
+persisted, never displayed); the password keeps signaling content-blind
+(FR-020). **AuthMessage** is the in-band `fwpc-hs/1` first message on a fresh
+data channel: single-use nonce, pool- and session-scoped (FR-020a); member
+auth MUST NOT contain wallet addresses; nothing in either ever contains claim
+codes.
 
 ## Entity: Envelope (every channel message)
 
@@ -141,6 +147,6 @@ PeerSession.commitment ─→ on-chain Joined events (membership check, FR-002)
 | `fairwins_pool_channel_consent_v1_<account>_<pool>` | `{consented, stunEnabled}` |
 | `fairwins_pool_channel_docs_v1_<account>_<pool>` | last received `{standings, announcements, receivedAt}` (marked stale on load) |
 
-Never stored: identity secrets, session private keys, handshake payloads,
-claim codes (beyond the pre-existing `identityCache` entry), wallet addresses
-of peers.
+Never stored: identity secrets, session private keys, room descriptors
+(re-derived on demand), auth messages, claim codes (beyond the pre-existing
+`identityCache` entry), wallet addresses of peers.

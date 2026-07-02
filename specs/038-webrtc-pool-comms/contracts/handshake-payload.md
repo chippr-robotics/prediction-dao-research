@@ -1,81 +1,98 @@
-# Contract: Out-of-Band Handshake Payload (`fwpc-hs/1`)
+# Contract: Rendezvous & In-Band Session Auth (`fwpc-hs/1`)
 
-The pairing payload members and the creator exchange by copy-paste or QR to
-establish a channel session. Two payload kinds: `offer` (member → creator) and
-`answer` (creator → member). Implemented by `frontend/src/lib/pools/channel/
-handshake.js` + `sdpCompact.js`.
+> Revised 2026-07-02 for the Trystero posture change (see spec Clarifications
+> and research R3/R6). The previous version of this contract — an out-of-band
+> copy/QR SDP payload — is preserved in git history (commit `fc7967e`).
 
-## Wire format
+How a device goes from "pool member with the app open" to "authenticated peer
+session". Two layers, implemented by `frontend/src/lib/pools/channel/
+roomSecret.js`, `rendezvous.js`, and `sessionAuth.js`.
+
+## Layer 1 — Rendezvous (room derivation + join)
+
+Room identity is derived from **pool-member knowledge only** (FR-020a):
 
 ```
-FWPC1-<kind>-<base64url(deflate(json))>-<crc8hex>
+seed     = HKDF-SHA256(ikm = phraseEntropy ‖ poolAddress ‖ chainId,
+                       info = "fairwins/pool-channel/v1")
+appId    = "fairwins-pool-channel"
+roomId   = hex(seed[0..16])
+password = base64(seed[16..48])     // engages Trystero signaling encryption
 ```
 
-- `FWPC1` — version tag; parsers MUST reject other versions with a clear
-  "incompatible version" message.
-- `kind` — `O` (offer) or `A` (answer).
-- Payload is deflate-compressed JSON, base64url (no padding).
-- `crc8hex` — 2-hex-char checksum of the base64url body; catches truncated
-  copy-paste before JSON parsing.
-- Size budget: ≤ ~1.8 KB total (QR-scannable with `qrcode.react` defaults;
-  validated by spike R12). The UI always offers copyable text alongside QR.
+- `phraseEntropy` is the pool's four-word-phrase entropy (language-independent
+  form, same value all members already hold via the gateway) — NOT the
+  rendered words of any one language.
+- The `password` means signaling infrastructure (Nostr relays or the FairWins
+  ws-relay) carries only opaque encrypted blobs: content-blind by
+  construction (FR-020).
+- Signaling strategy order (FR-020b): `nostr` (public relays, default) →
+  `wsRelay` (FairWins signaling relay on GCP Cloud Run). Failover is
+  automatic and surfaced in the connection status UI. Strategy endpoints come
+  from frontend config/sync artifacts — never hardcoded (constitution V).
+- Rooms are joined only while the pool is in an active lifecycle (FR-025) and
+  after the member's consent to IP/metadata exposure (FR-021).
 
-## JSON fields (both kinds)
+**Security property**: holding the room secret grants *rendezvous only* —
+peers discover each other and open data channels, but nothing is trusted or
+readable at the channel level until Layer 2 completes.
+
+## Layer 2 — In-band session auth (first messages on a new data channel)
+
+Until auth completes, a session accepts exactly one message kind: `auth`.
+Anything else → immediate drop. Auth not completed within 10 s → drop.
+
+### `auth` message fields
 
 | Field | Type | Purpose |
 |---|---|---|
-| `chainId` | number | scope; receiver MUST match active network |
-| `pool` | address | scope; receiver MUST match open pool |
+| `v` | `"fwpc-hs/1"` | version; mismatch → drop with clear reason |
+| `chainId` | number | scope; MUST match active network |
+| `pool` | address | scope; MUST match the room's pool |
 | `role` | `"member"` \| `"creator"` | asserted role; drives verification path |
-| `nonce` | hex(16B) | single-use; `sessionId = keccak(offerNonce ‖ answerNonce)` |
+| `nonce` | hex(16B) | fresh per session attempt; `sessionId = keccak(memberNonce ‖ creatorNonce)` |
 | `sessionPubKey` | base64(32B) | ephemeral tweetnacl signing pub key (envelope auth) |
-| `boxPubKey` | base64(32B) | ephemeral tweetnacl box pub key (claim-code encryption; creator answer only, optional in offer) |
-| `dtls` | string | DTLS certificate fingerprint (`a=fingerprint`) |
-| `ice` | object | `{ufrag, pwd, candidates[]}` — compact ICE parameters (see sdpCompact) |
+| `boxPubKey` | base64(32B) | ephemeral tweetnacl box pub key (creator only; claim-code encryption) |
 | `auth` | object | signature block, per role (below) |
 
-`sdpCompact` candidate entries keep only: foundation, component, protocol,
-priority, address (incl. mDNS hostnames), port, type, and relatedAddress/port
-where present. Receiver reconstructs a canonical SDP; reconstruction MUST be
-deterministic and covered by round-trip unit tests.
-
-## Authentication block
-
-Signed message (both roles), exact byte layout defined in `handshake.js` and
-kept stable:
+### Signed tuple (byte layout fixed in `sessionAuth.js`)
 
 ```
-"FairWins Pool Channel v1" ‖ chainId ‖ pool ‖ role ‖ nonce ‖ dtls ‖ sessionPubKey [‖ boxPubKey]
+"FairWins Pool Channel v1" ‖ chainId ‖ pool ‖ role ‖ nonce ‖ sessionPubKey [‖ boxPubKey]
 ```
 
-- **Member offer**: `auth = {commitment, sig}` where `sig` is a Semaphore
-  identity signature (`Identity.signMessage`). Verifier (creator) MUST:
+- **Member**: `auth = {commitment, sig}` — a Semaphore identity signature
+  (`Identity.signMessage`). Verifier (creator) MUST:
   1. verify `sig` against `commitment` (`Identity.verifySignature`);
-  2. check `commitment` ∈ pool's on-chain member set;
-  3. reject reused `nonce` (session table).
-  The offer MUST NOT contain any wallet address (FR-020a).
-- **Creator answer**: `auth = {sig}`, an EIP-191 wallet signature. Verifier
+  2. require `commitment` ∈ the pool's on-chain member set (Joined events);
+  3. reject a `nonce` already seen this app session.
+  Member auth MUST NOT contain any wallet address (FR-020a/FR-003).
+- **Creator**: `auth = {sig}` — an EIP-191 wallet signature. Verifier
   (member) MUST recover the address and require it equals the pool's on-chain
   `creator()`.
 
-A session opens only when: both signatures verified, scopes matched, DTLS
-fingerprint of the actual connection equals the signed `dtls`, and the data
-channel's first message (`hello` envelope) verifies under `sessionPubKey`.
-Any mismatch → session torn down with a truthful error (no silent retry loop).
+A session opens only when both directions verified. After that, only
+`fwpc/1` envelopes signed by the certified `sessionPubKey`s are accepted
+(see [channel-protocol.md](./channel-protocol.md)).
 
-## Prohibited content
+### Why this is sufficient without transport-fingerprint binding
 
-Payloads MUST NEVER contain: claim codes, identity secrets, wallet addresses
-(member payloads), or material valid for another pool/session (single-use
-nonces enforce this) — FR-020a, FR-014.
+A hostile room peer (someone who obtained the room secret) cannot forge
+either signature, so it can never impersonate the creator or a member, inject
+messages, or read claim codes (boxed to the wallet-certified creator
+`boxPubKey`). Its worst case is passively relaying already-signed envelopes —
+exposing only data every authenticated pool member receives anyway. Room
+secrets derive from the phrase members already guard; leaking it leaks
+rendezvous presence, not channel authority (analysis in research R6).
 
 ## Failure handling (edge cases from spec)
 
 | Condition | Required behavior |
 |---|---|
-| Checksum/parse failure | "code looks incomplete — re-copy/rescan" retry prompt |
+| Signaling unreachable (all strategies) | fast, visible "can't reach signaling" + manual-flow fallback; auto-retry with backoff and honest status (FR-020b/FR-023) |
 | Version mismatch | explicit incompatible-version message |
-| Wrong pool/network scope | named mismatch (which pool/network it was for) |
-| Signature invalid / non-member | "not a verified member of this pool" (FR-002) |
-| Stale (nonce already used) | "this pairing code was already used — generate a new one" |
-| ICE never connects | truthful "could not connect" + manual-flow fallback (FR-023) |
+| Wrong pool/network scope | named mismatch (which pool/network the peer was on) |
+| Signature invalid / non-member commitment | drop; creator UI never lists the peer (FR-002) |
+| Auth timeout (10 s) | drop silently; peer may retry via re-rendezvous |
+| Nonce replayed | drop session attempt |
+| Hub at capacity (50) | `bye{reason:"capacity"}` after auth, clear member-side message (FR-027) |

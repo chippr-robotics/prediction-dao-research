@@ -1,6 +1,8 @@
 # Contract: Pool Channel Message Protocol (`fwpc/1`)
 
-All traffic on an established data channel. Implemented by
+All traffic on an established data channel **after** the in-band `fwpc-hs/1`
+auth exchange completes (see [handshake-payload.md](./handshake-payload.md);
+pre-auth, only `auth` messages are accepted). Implemented by
 `frontend/src/lib/pools/channel/envelope.js`, `channelState.js`,
 `creatorHub.js`, `memberClient.js`.
 
