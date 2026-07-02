@@ -81,8 +81,25 @@ describe('PoolPage', () => {
     expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Gentle Fox')
     expect(restorePoolIdentity).toHaveBeenCalledWith(sum.address)
     expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
-    // The restored claim code flows into the resolution actions — also no click.
-    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('987654321')
+    // The raw claim code is never rendered — it's system-managed now (no scary integer on screen).
+    expect(screen.queryByText('987654321')).toBeNull()
+  })
+
+  it('lets a not-yet-joined viewer (including the creator) join while joining is open', async () => {
+    const joinPool = vi.fn().mockResolvedValue({ txHash: '0xtx' })
+    const sum = { ...openSummary, isCreator: true, hasJoined: false, state: 0, slotsRemaining: 3 }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), joinPool }))
+    renderPoolAt(sum)
+    fireEvent.click(await screen.findByTestId('join-pool'))
+    await waitFor(() => expect(joinPool).toHaveBeenCalledWith(sum.address))
+  })
+
+  it('collapses the pool details into an expandable summary (default collapsed)', async () => {
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(openSummary) }))
+    renderPoolAt(openSummary)
+    const details = await screen.findByTestId('pool-summary')
+    expect(details.tagName).toBe('DETAILS')
+    expect(details.open).toBe(false)
   })
 
   it('falls back to the Reveal button only when the automatic restore fails (declined signature)', async () => {

@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
 import { poolStateDisplay } from '../lib/pools/poolContracts'
 import { deriveNickname } from '../lib/pools/nickname'
+import { payoutDisplayMap } from '../lib/pools/payout'
+import { readProposedMatrix, readStoredMatrix } from '../lib/pools/proposalStore'
 import Button from '../components/ui/Button'
-import PoolLeaderboard from '../components/pools/PoolLeaderboard'
 import PoolParticipants from '../components/pools/PoolParticipants'
 import PoolResolutionActions from '../components/pools/PoolResolutionActions'
 import './pools.css'
 
-// Creator's device-local rank arrangement (until a sync channel ships — same honest limitation as the
-// interim leaderboard, so other members keep the alphabetical view).
+// Creator's device-local rank arrangement (until a cross-member sync channel ships, so other members
+// keep the alphabetical view).
 const rankKey = (pool) => `fairwins_pool_rank_v1_${String(pool || '').toLowerCase()}`
 function readRankOrder(pool) {
   try {
@@ -30,23 +31,25 @@ function writeRankOrder(pool, order) {
 }
 
 /**
- * PoolPage (spec 034) — view a pool's live, on-chain state and take the state-appropriate action
- * (creator: close/cancel; member: approve the outcome or refund). Honest finality (Principle III):
- * pending, closed, resolved, and refund-eligible states are surfaced truthfully.
+ * PoolPage (spec 034) — view a pool's live, on-chain state and take the state-appropriate action. The
+ * roster, standings, and proposed payout are unified into one display (UX round 3): once a payout is
+ * proposed, the members' cards show medals + amounts. Honest finality (Principle III): pending, closed,
+ * resolved, and refund-eligible states are surfaced truthfully.
  */
 export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
   const {
     getPoolSummary, peekPoolIdentity, restorePoolIdentity, getMemberCommitments,
-    closeJoining, cancelPool, vote, refund, status,
+    joinPool, closeJoining, cancelPool, vote, refund, status,
   } = pools
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
-  // The member's display identity ({ nickname, claimCode }) — auto-restored, never click-gated.
+  // The member's display identity ({ nickname, claimCode, commitment }) — auto-restored, never click-gated.
   const [identity, setIdentity] = useState(null)
   const [identityStatus, setIdentityStatus] = useState('idle') // idle | restoring | failed
   const [notice, setNotice] = useState(null)
+  const [voteProgress, setVoteProgress] = useState(null)
 
   // The anonymous participant roster (alias cards) + the creator's device-local rank arrangement.
   const [participants, setParticipants] = useState(null)
@@ -56,17 +59,10 @@ export default function PoolPage() {
     writeRankOrder(address, order)
   }
 
-  // Off-chain interim leaderboard (US4). Local to this session until the sync channel ships (T050);
-  // PoolLeaderboard marks it non-final/off-chain so this is honest.
-  const [standings, setStandings] = useState([])
-  const lbId = useRef(0)
-  const addPlayer = (nick) =>
-    setStandings((s) => [...s, { id: `p${lbId.current++}`, nickname: nick, score: 0, eliminated: false }])
-  const scoreChange = (id, score) =>
-    setStandings((s) => s.map((e) => (e.id === id ? { ...e, score } : e)))
-  const toggleEliminate = (id) =>
-    setStandings((s) => s.map((e) => (e.id === id ? { ...e, eliminated: !e.eliminated } : e)))
-  const removePlayer = (id) => setStandings((s) => s.filter((e) => e.id !== id))
+  // The verified proposed/locked payout (from the device-local store, keyed to the on-chain proposalId).
+  // Bumped by `proposalNonce` when a member pastes a freshly-received payout so this re-reads.
+  const [proposalNonce, setProposalNonce] = useState(0)
+  const [verifiedProposal, setVerifiedProposal] = useState(null)
 
   const reload = useCallback(async () => {
     try {
@@ -91,8 +87,7 @@ export default function PoolPage() {
 
   const loaded = summary && summary.address === address
 
-  // Load the anonymous roster from PUBLIC Joined-event commitments (no signature) and derive each
-  // member's alias — so everyone sees who's in, and the creator can rank (tester feedback, items 3–4).
+  // Load the anonymous roster from PUBLIC Joined-event commitments (no signature) and derive each alias.
   useEffect(() => {
     if (!loaded) return undefined
     let active = true
@@ -113,19 +108,9 @@ export default function PoolPage() {
     }
   }, [loaded, address, getMemberCommitments])
 
-  // Auto-populate the interim leaderboard from the roster so the creator never types names in by hand
-  // (tester feedback, item 5). Manual additions stay possible for guests/edge cases.
-  useEffect(() => {
-    if (!participants || participants.length === 0) return
-    setStandings((s) =>
-      s.length ? s : participants.map((p) => ({ id: p.commitment, nickname: p.label, score: 0, eliminated: false }))
-    )
-  }, [participants])
-
-  // ALWAYS auto-show a joined member's identity (live-app tester feedback): cache-first (no prompt at
-  // all on the device they joined from); when the cache is missing (new device, cleared storage,
-  // pre-cache join) restore it automatically with one wallet signature. Declining the signature falls
-  // back to the manual Reveal button.
+  // ALWAYS auto-show a joined member's identity: cache-first (no prompt on the device they joined from);
+  // when the cache is missing, restore it automatically with one wallet signature. Declining falls back
+  // to the manual Reveal button.
   useEffect(() => {
     if (!loaded || !summary.hasJoined || identity) return undefined
     let active = true
@@ -134,13 +119,13 @@ export default function PoolPage() {
         const peeked = await peekPoolIdentity?.(address)
         if (!active) return
         if (peeked?.nickname) {
-          setIdentity({ nickname: peeked.nickname, claimCode: peeked.claimCode || null })
+          setIdentity({ nickname: peeked.nickname, claimCode: peeked.claimCode || null, commitment: peeked.commitment || null })
           return
         }
         setIdentityStatus('restoring')
         const restored = await restorePoolIdentity(address)
         if (!active) return
-        setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode })
+        setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode, commitment: restored.commitment })
         setIdentityStatus('idle')
       } catch {
         if (active) setIdentityStatus('failed')
@@ -150,6 +135,34 @@ export default function PoolPage() {
       active = false
     }
   }, [loaded, summary, identity, address, peekPoolIdentity, restorePoolIdentity])
+
+  // Read the device-local proposal that matches the current on-chain proposalId (or the locked outcome
+  // once resolved), so the roster can render medals/amounts and the claim can auto-fill.
+  useEffect(() => {
+    if (!loaded) return
+    if (summary.state === 1 && summary.currentProposalId) {
+      const stored = readProposedMatrix(address, summary.currentProposalId)
+      setVerifiedProposal(stored ? { entries: stored.entries, display: stored.display } : null)
+    } else if (summary.state === 2) {
+      const stored = readStoredMatrix(address)
+      setVerifiedProposal(stored ? { entries: stored.entries, display: stored.display } : null)
+    } else {
+      setVerifiedProposal(null)
+    }
+  }, [loaded, summary?.state, summary?.currentProposalId, address, proposalNonce])
+
+  // { commitment → amount } for the roster. Prefer the creator's shared display map; else fall back to
+  // just the member's own row (so they at least see their own payout highlighted).
+  const payoutByCommitment = useMemo(() => {
+    if (!verifiedProposal) return null
+    const map = payoutDisplayMap(verifiedProposal.entries, verifiedProposal.display)
+    if (map) return map
+    if (identity?.claimCode && identity?.commitment) {
+      const mine = verifiedProposal.entries.find((e) => String(e.claimNullifier) === String(identity.claimCode))
+      if (mine) return new Map([[String(identity.commitment), BigInt(mine.amount)]])
+    }
+    return null
+  }, [verifiedProposal, identity])
 
   const run = async (fn) => {
     setNotice(null)
@@ -161,11 +174,27 @@ export default function PoolPage() {
     }
   }
 
-  // Manual fallback, only reached when the automatic restore failed (e.g. the signature was declined).
+  const joinThisPool = () =>
+    run(async () => {
+      await joinPool(address)
+      setIdentity(null) // force a fresh identity restore now that we're a member
+    })
+
+  const approve = () =>
+    run(async () => {
+      setVoteProgress('Preparing your anonymous approval…')
+      try {
+        await vote(address, (msg) => setVoteProgress(msg))
+      } finally {
+        setVoteProgress(null)
+      }
+    })
+
+  // Manual fallback, only reached when the automatic identity restore failed (declined signature).
   const revealNickname = () =>
     run(async () => {
       const restored = await restorePoolIdentity(address)
-      setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode })
+      setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode, commitment: restored.commitment })
       setIdentityStatus('idle')
     })
 
@@ -187,14 +216,25 @@ export default function PoolPage() {
     )
   }
 
+  const canJoin = !summary.hasJoined && summary.state === 0 && summary.slotsRemaining > 0
+
   return (
     <main className="page pool-page" aria-labelledby="pool-h">
       <h1 id="pool-h">Group pool</h1>
 
-      <section className="pool-summary" aria-label="Pool details" data-testid="pool-summary">
+      {/* Pool details are collapsed by default (tester feedback: they took up too much space). The
+          one-line summary keeps the essentials visible; expand for the full breakdown. */}
+      <details className="pool-summary" aria-label="Pool details" data-testid="pool-summary">
+        <summary className="pool-summary-line">
+          <span className="pool-summary-status" data-testid="pool-state">{poolStateDisplay(summary.state)}</span>
+          <span className="pool-summary-sep" aria-hidden="true">·</span>
+          <span>{summary.buyInFormatted} {summary.tokenSymbol} buy-in</span>
+          <span className="pool-summary-sep" aria-hidden="true">·</span>
+          <span>{summary.memberCount}/{summary.maxMembers} members</span>
+        </summary>
         <dl>
           <dt>Status</dt>
-          <dd data-testid="pool-state">{poolStateDisplay(summary.state)}</dd>
+          <dd>{poolStateDisplay(summary.state)}</dd>
           <dt>Buy-in</dt>
           <dd>{summary.buyInFormatted} {summary.tokenSymbol}</dd>
           <dt>Members</dt>
@@ -202,10 +242,9 @@ export default function PoolPage() {
           <dt>Approval threshold</dt>
           <dd>{summary.thresholdPct}% of members who join</dd>
         </dl>
-      </section>
+      </details>
 
-      {/* Identity is only meaningful for joined members — a viewer (or a creator who hasn't joined
-          their own pool) has no alias here, so no Reveal button is dangled at them. */}
+      {/* Identity is only meaningful for joined members. */}
       {summary.hasJoined && (
         <section className="pool-identity" aria-label="Your identity">
           {identity?.nickname ? (
@@ -220,13 +259,27 @@ export default function PoolPage() {
         </section>
       )}
 
-      {/* Anonymous roster: alias cards for everyone; the creator can drag/arrange the rank order */}
+      {/* Join — the creator (or any viewer) can take part in the pool while joining is open. */}
+      {canJoin && (
+        <section className="pool-actions" aria-label="Join">
+          <Button data-testid="join-pool" onClick={joinThisPool} disabled={status === 'joining'}>
+            {status === 'joining' ? 'Joining…' : `Join this pool — ${summary.buyInFormatted} ${summary.tokenSymbol}`}
+          </Button>
+          {summary.isCreator && <p className="pool-hint">You created this pool; join it to take part yourself.</p>}
+        </section>
+      )}
+
+      {/* Unified roster + standings: alias cards for everyone; medals/amounts once a payout is proposed */}
       {summary.state !== 3 && (
         <PoolParticipants
           participants={participants}
           isCreator={summary.isCreator}
           order={rankOrder}
           onReorder={handleReorder}
+          payoutByCommitment={payoutByCommitment}
+          tokenSymbol={summary.tokenSymbol}
+          tokenDecimals={summary.tokenDecimals}
+          resolved={summary.state === 2}
         />
       )}
 
@@ -251,13 +304,16 @@ export default function PoolPage() {
                 Approvals: {summary.approvalCount} / {summary.requiredApprovals} needed
               </p>
               {summary.hasJoined && (
-                <Button
-                  data-testid="approve-outcome"
-                  onClick={() => run(() => vote(address))}
-                  disabled={status === 'voting'}
-                >
-                  {status === 'voting' ? 'Approving…' : 'Approve the proposed outcome'}
-                </Button>
+                <>
+                  <Button
+                    data-testid="approve-outcome"
+                    onClick={approve}
+                    disabled={status === 'voting'}
+                  >
+                    {status === 'voting' ? 'Approving…' : 'Approve the proposed payout'}
+                  </Button>
+                  {voteProgress && <p className="pool-hint" role="status" data-testid="vote-progress">{voteProgress}</p>}
+                </>
               )}
             </>
           ) : (
@@ -270,18 +326,21 @@ export default function PoolPage() {
 
       {summary.state === 2 && (
         <section className="pool-resolved" aria-label="Resolved">
-          <p data-testid="pool-resolved">This pool is resolved. Winners can claim their share to any address.</p>
+          <p data-testid="pool-resolved">This pool is resolved. Winners can claim their share below.</p>
         </section>
       )}
 
-      {/* Reveal-claim-code, creator propose-builder, and winner claim (US1 resolution loop) */}
+      {/* Resolution loop: creator propose/revise, member receive+dispute, winner claim */}
       {(summary.hasJoined || summary.isCreator || summary.state === 2) && summary.state !== 3 && (
         <PoolResolutionActions
-          summary={summary}
+          summary={{ ...summary, myCommitment: identity?.commitment || null }}
           pools={pools}
           participants={participants}
           rankOrder={rankOrder}
           claimCode={identity?.claimCode || null}
+          verifiedProposal={verifiedProposal}
+          payoutByCommitment={payoutByCommitment}
+          onProposalReceived={() => setProposalNonce((n) => n + 1)}
           onChanged={reload}
         />
       )}
@@ -292,19 +351,6 @@ export default function PoolPage() {
             {status === 'refunding' ? 'Refunding…' : `Refund my ${summary.buyInFormatted} ${summary.tokenSymbol}`}
           </Button>
         </section>
-      )}
-
-      {/* Live unresolved leaderboard for multi-round formats (US4); hidden once cancelled */}
-      {summary.state !== 3 && (
-        <PoolLeaderboard
-          entries={standings}
-          isCreator={summary.isCreator}
-          isFinal={summary.state === 2}
-          onScoreChange={scoreChange}
-          onToggleEliminate={toggleEliminate}
-          onAddPlayer={addPlayer}
-          onRemovePlayer={removePlayer}
-        />
       )}
 
       {notice && <p role="alert" className="form-error" data-testid="pool-notice">{notice}</p>}

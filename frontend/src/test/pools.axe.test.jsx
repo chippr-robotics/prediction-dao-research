@@ -12,7 +12,7 @@ import { useWallet } from '../hooks/useWalletManagement'
 import { usePools } from '../hooks/usePools'
 import GroupPoolModal from '../components/fairwins/GroupPoolModal'
 import PoolPage from '../pages/PoolPage'
-import PoolLeaderboard from '../components/pools/PoolLeaderboard'
+import PoolParticipants from '../components/pools/PoolParticipants'
 import WordListLanguageSelector from '../components/pools/WordListLanguageSelector'
 
 const summary = {
@@ -39,6 +39,9 @@ function poolsMock(overrides = {}) {
     createPool: vi.fn(), resolvePhrase: vi.fn(),
     getPoolSummary: vi.fn().mockResolvedValue(summary),
     joinPool: vi.fn(), getMyNickname: vi.fn(),
+    peekPoolIdentity: vi.fn().mockResolvedValue(null),
+    restorePoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: null, nickname: { label: 'Prismatic Fox', suffix: '7b' } }),
+    getMemberCommitments: vi.fn().mockResolvedValue([]),
     closeJoining: vi.fn(), cancelPool: vi.fn(), proposeOutcome: vi.fn(),
     vote: vi.fn(), claimWinnings: vi.fn(), refund: vi.fn(),
     ...overrides,
@@ -69,12 +72,15 @@ describe('ZK-Wager Pool UI accessibility', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('PoolLeaderboard (creator view) has no a11y violations', async () => {
-    const entries = [
-      { id: 'a', nickname: 'Prismatic Fox', score: 3, eliminated: false },
-      { id: 'b', nickname: 'Thunder Eagle', score: 7, eliminated: true },
+  it('PoolParticipants roster with a proposed payout has no a11y violations', async () => {
+    const participants = [
+      { commitment: '1', label: 'Prismatic Fox', suffix: '7b' },
+      { commitment: '2', label: 'Thunder Eagle', suffix: '0c' },
     ]
-    const { container } = render(<PoolLeaderboard entries={entries} isCreator onScoreChange={() => {}} />)
+    const payout = new Map([['1', 10000000n], ['2', 0n]])
+    const { container } = render(
+      <PoolParticipants participants={participants} isCreator payoutByCommitment={payout} tokenSymbol="USDC" tokenDecimals={6} />
+    )
     expect(await axe(container)).toHaveNoViolations()
   })
 

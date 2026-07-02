@@ -373,23 +373,33 @@ export function usePools() {
 
   /**
    * Member: anonymously approve the current proposal. Needs the full member-commitment set to build the
-   * prover's group (read from the subgraph once available).
+   * prover's group. `onProgress(message)` reports each phase so the UI never looks like it "did nothing"
+   * during the (heavy, in-browser) ZK proof — the top user complaint was a silent wallet-signature prompt
+   * followed by no visible submission.
    */
-  const vote = useCallback(async (poolAddress) => {
+  const vote = useCallback(async (poolAddress, onProgress) => {
+    const step = (m) => { try { onProgress?.(m) } catch { /* ignore */ } }
     setStatus('voting')
     setError(null)
     try {
       const { signer: s } = await requireSigner()
       const pool = getPool(poolAddress, s)
       const proposalId = await pool.currentProposalId()
+      if (!proposalId || proposalId === ethers.ZeroHash) {
+        throw new Error('There is no proposed payout to approve yet.')
+      }
+      step('Reading the group…')
       const memberCommitments = await getMemberCommitments(poolAddress)
+      step('Confirm the signature in your wallet to unlock your anonymous identity…')
       const { identity } = await createPoolIdentity(s, poolAddress)
+      step('Generating your anonymous approval proof (this can take a moment)…')
       const proof = await generatePoolProof({
         identity,
         memberCommitments,
         message: 1n, // approve
         scope: BigInt(proposalId),
       })
+      step('Submitting your approval on-chain…')
       const tx = await pool.approve(proof)
       const hash = (await tx.wait()).hash
       setStatus('idle')

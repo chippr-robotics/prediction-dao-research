@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ethers } from 'ethers'
 import PoolResolutionActions from '../components/pools/PoolResolutionActions'
-import { payoutMatrixHash, serializeMatrix } from '../lib/pools/payout'
+import { payoutMatrixHash } from '../lib/pools/payout'
 
-// US1 resolution UI (spec 034): reveal claim code, creator propose-builder (sum must equal escrow),
-// winner claim. Wired through a mocked usePools.
+// Resolution UI (spec 034, UX round 3): no manual "add winner" row, no raw claim code on screen,
+// creator can propose AND revise, members receive/verify + can suggest an alternative split, and
+// claiming is one tap. Wired through a mocked usePools + wallet.
+
+vi.mock('../hooks/useWalletManagement', () => ({ useWallet: vi.fn() }))
+import { useWallet } from '../hooks/useWalletManagement'
+
+const ACCOUNT = '0x1111111111111111111111111111111111111111'
 
 const baseSummary = {
   address: '0x00000000000000000000000000000000000000aa',
@@ -16,89 +22,45 @@ const baseSummary = {
   memberCount: 2,
 }
 
+const participants = [
+  { commitment: '10', label: 'Silent Owl', suffix: '0a' },
+  { commitment: '11', label: 'Amber Fox', suffix: '0b' },
+]
+
 function mockPools(over = {}) {
   return {
     status: 'idle',
     proposeOutcome: vi.fn().mockResolvedValue('0xtx'),
     claimWinnings: vi.fn().mockResolvedValue('0xtx'),
     getMyClaimCode: vi.fn().mockResolvedValue('123456789'),
-    getPoolSummary: vi.fn(),
     ...over,
   }
 }
 
-describe('PoolResolutionActions (US1)', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('a joined member can reveal their claim code', async () => {
-    const pools = mockPools()
-    render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }} pools={pools} />)
-    fireEvent.click(screen.getByRole('button', { name: /reveal my claim code/i }))
-    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('123456789')
+describe('PoolResolutionActions (UX round 3)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+    useWallet.mockReturnValue({ account: ACCOUNT, isConnected: true })
   })
 
-  it('shows the claim code handed down from the page-level identity restore (no click)', async () => {
+  it('a member copies their payout code for the creator — the raw code is never shown', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.assign(navigator, { clipboard: { writeText } })
     render(
       <PoolResolutionActions
         summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }}
         pools={mockPools()}
-        claimCode="555666777"
+        claimCode="424242"
       />
     )
-    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('555666777')
-    expect(screen.queryByRole('button', { name: /reveal my claim code/i })).toBeNull()
+    // No scary integer on screen.
+    expect(screen.queryByText('424242')).toBeNull()
+    fireEvent.click(screen.getByTestId('copy-my-code'))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('424242'))
   })
 
-  it('auto-shows the claim code from the device cache without a click (tester feedback)', async () => {
-    const pools = mockPools({
-      peekPoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: '424242', nickname: null }),
-    })
-    render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }} pools={pools} />)
-    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('424242')
-    expect(screen.queryByRole('button', { name: /reveal my claim code/i })).toBeNull()
-  })
-
-  it('creator propose is gated until the matrix sums to the escrow', async () => {
-    const pools = mockPools()
-    render(
-      <PoolResolutionActions
-        summary={{ ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true }}
-        pools={pools}
-      />
-    )
-    // escrow = 2 * 10 = 20 USDC. One row of 10 -> incomplete sum -> propose disabled.
-    fireEvent.change(screen.getByLabelText('Claim code 1'), { target: { value: '111' } })
-    fireEvent.change(screen.getByLabelText('Amount 1'), { target: { value: '10' } })
-    expect(screen.getByTestId('propose-outcome')).toBeDisabled()
-
-    // add a second winner for the remaining 10 -> sum matches -> enabled + proposes
-    fireEvent.click(screen.getByRole('button', { name: /add winner/i }))
-    fireEvent.change(screen.getByLabelText('Claim code 2'), { target: { value: '222' } })
-    fireEvent.change(screen.getByLabelText('Amount 2'), { target: { value: '10' } })
-    await waitFor(() => expect(screen.getByTestId('propose-outcome')).not.toBeDisabled())
-    fireEvent.click(screen.getByTestId('propose-outcome'))
-    await waitFor(() => expect(pools.proposeOutcome).toHaveBeenCalledWith(baseSummary.address, expect.stringMatching(/^0x[0-9a-f]{64}$/)))
-  })
-
-  it('a winner claims by pasting the matrix + recipient', async () => {
-    const pools = mockPools()
-    render(<PoolResolutionActions summary={{ ...baseSummary, state: 2 }} pools={pools} />)
-    fireEvent.change(screen.getByLabelText(/payout matrix/i), {
-      target: { value: '[{"claimNullifier":"111","amount":"20000000"}]' },
-    })
-    fireEvent.change(screen.getByLabelText(/pay to address/i), {
-      target: { value: '0x1111111111111111111111111111111111111111' },
-    })
-    fireEvent.click(screen.getByTestId('claim'))
-    await waitFor(() => expect(pools.claimWinnings).toHaveBeenCalled())
-    expect(pools.claimWinnings.mock.calls[0][1].recipient).toBe('0x1111111111111111111111111111111111111111')
-  })
-
-  it('seeds the propose builder with one alias row per participant, in rank order (item 5)', async () => {
-    const participants = [
-      { commitment: '10', label: 'Silent Owl', suffix: '0a' },
-      { commitment: '11', label: 'Amber Fox', suffix: '0b' },
-    ]
+  it('the creator builder has one row per participant and NO "add winner" control', () => {
     render(
       <PoolResolutionActions
         summary={{ ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true }}
@@ -107,68 +69,124 @@ describe('PoolResolutionActions (US1)', () => {
         rankOrder={['10', '11']}
       />
     )
-    expect(await screen.findByTestId('propose-nick-0')).toHaveTextContent('Silent Owl')
+    expect(screen.getByTestId('propose-nick-0')).toHaveTextContent('Silent Owl')
     expect(screen.getByTestId('propose-nick-1')).toHaveTextContent('Amber Fox')
-    expect(screen.getByPlaceholderText('claim code from Silent Owl')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add winner/i })).toBeNull()
   })
 
-  it('BUG item 7: a member sees + verifies the proposed split by pasting the shared matrix', async () => {
+  it('creator propose is gated until the amounts sum to the escrow, then proposes', async () => {
+    const pools = mockPools()
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true }}
+        pools={pools}
+        participants={participants}
+        rankOrder={['10', '11']}
+      />
+    )
+    fireEvent.change(screen.getByLabelText('Payout code from Silent Owl'), { target: { value: '111' } })
+    fireEvent.change(screen.getByLabelText('Amount for Silent Owl'), { target: { value: '10' } })
+    // Only 10 of 20 allocated → still disabled.
+    expect(screen.getByTestId('propose-outcome')).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Payout code from Amber Fox'), { target: { value: '222' } })
+    fireEvent.change(screen.getByLabelText('Amount for Amber Fox'), { target: { value: '10' } })
+    await waitFor(() => expect(screen.getByTestId('propose-outcome')).not.toBeDisabled())
+    fireEvent.click(screen.getByTestId('propose-outcome'))
+    await waitFor(() =>
+      expect(pools.proposeOutcome).toHaveBeenCalledWith(baseSummary.address, expect.stringMatching(/^0x[0-9a-f]{64}$/))
+    )
+  })
+
+  it('the builder says "Update the proposed payout" and prefills amounts when revising', () => {
+    const entries = [
+      { claimNullifier: '111', amount: '12000000' },
+      { claimNullifier: '222', amount: '8000000' },
+    ]
+    const display = [
+      { commitment: '10', amount: '12000000' },
+      { commitment: '11', amount: '8000000' },
+    ]
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true, currentProposalId: payoutMatrixHash(entries) }}
+        pools={mockPools()}
+        participants={participants}
+        rankOrder={['10', '11']}
+        verifiedProposal={{ entries, display }}
+      />
+    )
+    expect(screen.getByRole('heading', { name: /update the proposed payout/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Amount for Silent Owl')).toHaveValue(12)
+    expect(screen.getByLabelText('Amount for Amber Fox')).toHaveValue(8)
+  })
+
+  it('a member receives + verifies the shared payout; onProposalReceived fires only when it matches', () => {
     const entries = [
       { claimNullifier: '111', amount: '10000000' },
       { claimNullifier: '222', amount: '10000000' },
     ]
     const proposalId = payoutMatrixHash(entries)
-    const summary = {
-      ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true, currentProposalId: proposalId,
-    }
-    render(<PoolResolutionActions summary={summary} pools={mockPools()} />)
-
-    const details = await screen.findByTestId('proposal-details')
-    expect(details).toBeInTheDocument()
-
-    // A tampered matrix is called out, never rendered as the proposal.
-    fireEvent.change(screen.getByLabelText(/payout matrix \(shared by the creator\)/i), {
-      target: { value: '[{"claimNullifier":"111","amount":"20000000"}]' },
-    })
-    expect(await screen.findByTestId('proposal-mismatch')).toHaveTextContent(/does not match/i)
-
-    // The genuine matrix verifies and renders the breakdown.
-    fireEvent.change(screen.getByLabelText(/payout matrix \(shared by the creator\)/i), {
-      target: { value: serializeMatrix(entries) },
-    })
-    expect(await screen.findByTestId('proposal-verified')).toHaveTextContent(/verified/i)
-    expect(screen.getAllByRole('row')).toHaveLength(3) // header + 2 entries
-    expect(screen.getAllByText('10.0 USDC')).toHaveLength(2)
-  })
-
-  it('the creator sees the proposal breakdown automatically after proposing (stored preimage)', async () => {
-    const entries = [{ claimNullifier: '333', amount: '20000000' }]
-    const proposalId = payoutMatrixHash(entries)
-    localStorage.setItem(
-      `fairwins_pool_matrix_v1_${baseSummary.address.toLowerCase()}`,
-      JSON.stringify({ proposalId, matrix: serializeMatrix(entries) })
+    const onProposalReceived = vi.fn()
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true, currentProposalId: proposalId }}
+        pools={mockPools()}
+        participants={participants}
+        onProposalReceived={onProposalReceived}
+      />
     )
-    const summary = {
-      ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true, currentProposalId: proposalId,
-    }
-    render(<PoolResolutionActions summary={summary} pools={mockPools()} />)
-    expect(await screen.findByTestId('proposal-verified')).toBeInTheDocument()
+    const box = screen.getByLabelText(/payout the creator shared/i)
+    // Tampered payload → rejected, no callback.
+    fireEvent.change(box, { target: { value: '[{"claimNullifier":"111","amount":"20000000"}]' } })
+    fireEvent.click(screen.getByRole('button', { name: /review payout/i }))
+    expect(screen.getByTestId('pool-resolution-notice')).toHaveTextContent(/does not match/i)
+    expect(onProposalReceived).not.toHaveBeenCalled()
+    // Genuine matrix → accepted.
+    fireEvent.change(box, { target: { value: JSON.stringify(entries) } })
+    fireEvent.click(screen.getByRole('button', { name: /review payout/i }))
+    expect(onProposalReceived).toHaveBeenCalled()
   })
 
-  it('auto-fills the claim matrix from the stored preimage and detects the claimant’s row', async () => {
+  it('a member can open a dispute builder and copy an alternative split for the creator', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.assign(navigator, { clipboard: { writeText } })
+    const entries = [{ claimNullifier: '111', amount: '20000000' }]
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true, currentProposalId: payoutMatrixHash(entries) }}
+        pools={mockPools()}
+        participants={participants}
+        verifiedProposal={{ entries, display: null }}
+      />
+    )
+    fireEvent.click(screen.getByTestId('dispute-toggle'))
+    expect(screen.getByTestId('dispute-builder')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Suggested amount for Silent Owl'), { target: { value: '20' } })
+    fireEvent.click(screen.getByRole('button', { name: /copy my suggestion/i }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Silent Owl: 20 USDC')))
+  })
+
+  it('claiming is one tap: auto-detects the row and pays the connected wallet', async () => {
     const entries = [
-      { claimNullifier: '999', amount: '10000000' },
+      { claimNullifier: '111', amount: '10000000' },
       { claimNullifier: '424242', amount: '10000000' },
     ]
-    localStorage.setItem(
-      `fairwins_pool_matrix_v1_${baseSummary.address.toLowerCase()}`,
-      JSON.stringify({ proposalId: payoutMatrixHash(entries), matrix: serializeMatrix(entries) })
+    const pools = mockPools()
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, hasJoined: true, state: 2, myCommitment: '11' }}
+        pools={pools}
+        participants={participants}
+        claimCode="424242"
+        verifiedProposal={{ entries, display: [{ commitment: '11', amount: '10000000' }] }}
+        payoutByCommitment={new Map([['11', 10000000n]])}
+      />
     )
-    const pools = mockPools({
-      peekPoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: '424242', nickname: null }),
-    })
-    render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 2 }} pools={pools} />)
-    await waitFor(() => expect(screen.getByLabelText(/payout matrix/i)).toHaveValue(serializeMatrix(entries)))
-    await waitFor(() => expect(screen.getByLabelText(/your row index/i)).toHaveValue(1))
+    expect(screen.getByTestId('claim-amount')).toHaveTextContent('10.0 USDC')
+    fireEvent.click(screen.getByTestId('claim'))
+    await waitFor(() => expect(pools.claimWinnings).toHaveBeenCalled())
+    const arg = pools.claimWinnings.mock.calls[0][1]
+    expect(arg.index).toBe(1) // 424242 is row 1
+    expect(arg.recipient).toBe(ACCOUNT)
   })
 })

@@ -117,6 +117,86 @@ standings" was a manual add-player form. Fixes:
   roster, and the manual add-player form is collapsed behind an "Add a player manually" disclosure
   (edge-case tool, not the primary flow).
 
+### Manager redesign + resolution fixes (round 4)
+
+Post-deploy tester punchlist. Delivered frontend-only against the **immutable** deployed pool contract:
+
+- **Removed non-functional entry**: the propose-builder's "Add winner" row and the leaderboard's "Add
+  player manually" form are gone. The `PoolLeaderboard` component (off-chain multi-round scores) was
+  deleted — it duplicated the participant roster.
+- **One unified roster** (`PoolParticipants`): the old "Participants" and "Live standings" sections were
+  merged. Once a payout is proposed, in-the-money cards grow, sort to the top, carry a 🥇/🥈/🥉 medal,
+  and show their amount; out-of-the-money cards are de-emphasised. The amounts come from a
+  `{ commitment → amount }` display map the creator shares alongside the on-chain matrix (commitments
+  are public, so this leaks nothing); it's trusted only after (a) the code-matrix hash matches the
+  on-chain proposalId and (b) the display amount multiset matches the matrix (`payoutDisplayMap`).
+- **Claim codes are system-managed**: no raw nullifier integer is shown anywhere. Members hand their
+  code to the creator with one tap ("Copy my payout code"); the creator's own row auto-fills from the
+  cached identity; at claim time the app matches the member's cached code to their row automatically and
+  pays the connected wallet in one tap.
+- **Creator can take part**: a "Join this pool" action on the manager page lets the creator (or any
+  not-yet-joined viewer) join while joining is open — the contract's `join` already permits it.
+- **Creator can revise a mis-keyed payout**: `proposeOutcome` accepts a new id (approvals are keyed per
+  id, so a revision restarts the count), surfaced as "Update the proposed payout" with amounts prefilled.
+- **Collapsible details**: pool details are a `<details>` collapsed by default with a one-line digest.
+
+**Constraint-driven / honest limitations (need product decision before further work):**
+
+- **Member "dispute" is off-chain by necessity.** The deployed `ZKWagerPool` only lets the *creator*
+  call `proposeOutcome`; members can approve or, by withholding approval until `resolutionWindow`
+  elapses, force refunds for everyone. There is **no on-chain path for a member-submitted counter
+  proposal**. Round 4 ships the feasible version: a member can build a suggested split and copy it to
+  the creator (who revises), and the UI surfaces the withhold→refund outcome. True on-chain member
+  proposals would require a **new pool implementation + factory template swap + security review +
+  redeploy** — deferred, needs explicit go.
+- **Approve-does-nothing (vote) — CONFIRMED root cause, no contract fix needed.** Round 4 shipped a
+  partial fix (staged progress + surfaced errors) and flagged two candidate root causes: proof-artifact
+  loading failures, or a scope-vs-BN254-field mismatch that would need a contract change. Both are now
+  resolved with certainty, using this environment's deploy/browser access:
+  - **Scope/field mismatch: REFUTED by reading the real package.** `Semaphore.sol::verifyProof` never
+    passes `proof.scope` to the Groth16 verifier raw — it computes
+    `_hash(scope) = uint256(keccak256(abi.encodePacked(scope))) >> 8` (248 bits, safely inside the
+    BN254 scalar field) as the actual public signal, and the installed
+    `@semaphore-protocol/proof` (`dist/index.node.js`) computes the **identical** `hash()` for the
+    circuit witness while returning the **raw, unhashed** `scope` in the proof object for the on-chain
+    struct — byte-for-byte symmetric with the contract. A full `keccak256` proposalId is valid input;
+    no field-reduction is missing on either side. **Empirically confirmed**: the new
+    `test/pools/integration/pool-real-semaphore-resolution.test.js` self-deploys the REAL
+    `Semaphore`/`SemaphoreVerifier`/`PoseidonT3` (the same trio `deploy-semaphore.js` uses for
+    ETC/Mordor) against a plain hardhat node, generates genuine Groth16 proofs via
+    `@semaphore-protocol/proof`, and drives a full `proposeOutcome → approve ×2 → OutcomeLocked →
+    claim` cycle — including a member who is also the pool's creator (round-4's join-your-own-pool
+    path) — against the real verifier, with a real ERC20 payout asserted. This closes the exact gap
+    `test/fork/Semaphore.fork.test.js` documents as "impractical to run inside this on-chain fork
+    harness... intentionally NOT exercised" — approve/claim are now verified against real crypto, not
+    just `MockSemaphore`. No contract-level change is warranted for this concern.
+  - **CSP blocks WebAssembly compilation: CONFIRMED, this is the actual bug.** `frontend/nginx.conf`'s
+    CSP `script-src` has no `'unsafe-eval'` or `'wasm-unsafe-eval'` (the comment even claimed "the
+    app/bundle uses no eval()/Function()/WASM" — stale as of spec 034, which added the first WASM
+    consumer). `@semaphore-protocol/proof`'s Groth16 prover compiles/instantiates a `.wasm` circuit
+    witness calculator for every proof — join-time claim-code precache, `vote`/`approve`, and `claim`
+    (`frontend/src/lib/pools/semaphoreProof.js`). **Reproduced empirically**: a page served under the
+    exact production CSP string, fetching the real `semaphore-16.wasm`, throws
+    `CompileError: WebAssembly.instantiate(): Compiling or instantiating WebAssembly module violates
+    the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of
+    script...` — this fires strictly after `createPoolIdentity`'s wallet signature (the one signature
+    users report seeing), so from the user's side it looks exactly like "signs once, then nothing
+    happens." Adding **only** `'wasm-unsafe-eval'` (the narrow WASM-compile grant — NOT the broader
+    `'unsafe-eval'`, which would also permit `eval()`/`new Function()`) to `script-src` was verified to
+    clear the CSP block (the failure mode changes from a `CompileError`/CSP violation to ordinary
+    WASM-instantiation semantics). **Fix applied** to `frontend/nginx.conf`'s `script-src` (explicit
+    user authorization obtained — the harness's auto-mode classifier gates loosening a production CSP
+    even with strong supporting evidence).
+  - **Secondary hardening: applied.** Proof generation previously fetched the ~5.2 MB circuit
+    artifacts (`semaphore-16.wasm` + `.zkey`) fresh from a third-party CDN (`snark-artifacts.pse.dev`)
+    on **every** proof — no caching, and three separate flows (join precache, vote, claim) each
+    re-fetched it. On a slow/mobile connection this was a second, independent way the flow could stall
+    even after the CSP fix. Now self-hosted (user-authorized) under `frontend/public/semaphore/`
+    (`semaphore-16.<contenthash>.wasm`/`.zkey`, checksummed against the PSE-published bytes at vendor
+    time) and passed explicitly via `generateProof`'s `snarkArtifacts` parameter
+    (`frontend/src/lib/pools/semaphoreProof.js`) — the runtime dependency on that CDN is gone. nginx
+    long-caches `.wasm`/`.zkey` immutably like other content-hashed static assets.
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)

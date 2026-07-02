@@ -9,7 +9,23 @@
  *
  * NOTE: building the prover's group requires the full list of member identity commitments, which the
  * app reads on-chain from the pool's `Joined` events; callers pass `memberCommitments` explicitly.
+ *
+ * Circuit artifacts are SELF-HOSTED (public/semaphore/), not fetched from the default
+ * `@semaphore-protocol/proof` CDN (snark-artifacts.pse.dev) at proof time. That default path was a
+ * confirmed reliability risk beyond the CSP fix for the "approve does nothing" bug: every proof (join
+ * precache, approve/vote, claim) re-fetched ~5.2MB with no caching, from a live third-party host, for a
+ * money-moving flow. Self-hosting removes the runtime dependency; the filename carries a content hash
+ * of the vendored bytes so a future artifact update naturally cache-busts (nginx long-caches these like
+ * other hashed static assets). See specs/034-zk-wager-pools/implementation-notes.md.
  */
+
+// Depth-16 circuit artifacts, vendored from the canonical PSE snark-artifacts release that
+// @semaphore-protocol/proof's own default resolution would otherwise fetch at proof time. Frozen at
+// the content hash in the filename — verify the new hash before ever replacing these files.
+const SEMAPHORE_ARTIFACTS = {
+  wasm: '/semaphore/semaphore-16.06df3146.wasm',
+  zkey: '/semaphore/semaphore-16.948763c7.zkey',
+}
 
 async function loadSemaphore() {
   // Static specifiers → Vite/Rollup code-split these into a lazy chunk (both are real dependencies;
@@ -50,6 +66,9 @@ function toSolidityProof(p) {
 export async function generatePoolProof({ identity, memberCommitments, message, scope, depth = 16 }) {
   const { Group, generateProof } = await loadSemaphore()
   const group = new Group(memberCommitments)
-  const full = await generateProof(identity, group, message, scope, depth)
+  // depth=16 is the only tree depth vendored (SEMAPHORE_ARTIFACTS); a different depth would need its
+  // own artifacts and is not something the pool contracts currently configure.
+  const artifacts = depth === 16 ? SEMAPHORE_ARTIFACTS : undefined
+  const full = await generateProof(identity, group, message, scope, depth, artifacts)
   return toSolidityProof(full)
 }
