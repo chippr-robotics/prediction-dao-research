@@ -1,10 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
+import { poolStateDisplay } from '../lib/pools/poolContracts'
+import { deriveNickname } from '../lib/pools/nickname'
 import Button from '../components/ui/Button'
 import PoolLeaderboard from '../components/pools/PoolLeaderboard'
+import PoolParticipants from '../components/pools/PoolParticipants'
 import PoolResolutionActions from '../components/pools/PoolResolutionActions'
 import './pools.css'
+
+// Creator's device-local rank arrangement (until a sync channel ships — same honest limitation as the
+// interim leaderboard, so other members keep the alphabetical view).
+const rankKey = (pool) => `fairwins_pool_rank_v1_${String(pool || '').toLowerCase()}`
+function readRankOrder(pool) {
+  try {
+    const raw = localStorage.getItem(rankKey(pool))
+    const arr = raw ? JSON.parse(raw) : null
+    return Array.isArray(arr) ? arr : null
+  } catch {
+    return null
+  }
+}
+function writeRankOrder(pool, order) {
+  try {
+    localStorage.setItem(rankKey(pool), JSON.stringify(order))
+  } catch {
+    /* private browsing / quota — degrade to session-only */
+  }
+}
 
 /**
  * PoolPage (spec 034) — view a pool's live, on-chain state and take the state-appropriate action
@@ -14,11 +37,22 @@ import './pools.css'
 export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
-  const { getPoolSummary, getMyNickname, closeJoining, cancelPool, vote, refund, status } = pools
+  const {
+    getPoolSummary, getMyNickname, peekPoolIdentity, getMemberCommitments,
+    closeJoining, cancelPool, vote, refund, status,
+  } = pools
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
   const [nickname, setNickname] = useState(null)
   const [notice, setNotice] = useState(null)
+
+  // The anonymous participant roster (alias cards) + the creator's device-local rank arrangement.
+  const [participants, setParticipants] = useState(null)
+  const [rankOrder, setRankOrder] = useState(() => readRankOrder(address))
+  const handleReorder = (order) => {
+    setRankOrder(order)
+    writeRankOrder(address, order)
+  }
 
   // Off-chain interim leaderboard (US4). Local to this session until the sync channel ships (T050);
   // PoolLeaderboard marks it non-final/off-chain so this is honest.
@@ -54,6 +88,50 @@ export default function PoolPage() {
   }, [address, getPoolSummary])
 
   const loaded = summary && summary.address === address
+
+  // Load the anonymous roster from PUBLIC Joined-event commitments (no signature) and derive each
+  // member's alias — so everyone sees who's in, and the creator can rank (tester feedback, items 3–4).
+  useEffect(() => {
+    if (!loaded) return undefined
+    let active = true
+    Promise.resolve()
+      .then(() => getMemberCommitments(address))
+      .then((commitments) => {
+        if (!active || !Array.isArray(commitments)) return
+        setParticipants(
+          commitments.map((c) => {
+            const n = deriveNickname(c, address)
+            return { commitment: c.toString(), label: n.label, suffix: n.suffix }
+          })
+        )
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [loaded, address, getMemberCommitments])
+
+  // Auto-populate the interim leaderboard from the roster so the creator never types names in by hand
+  // (tester feedback, item 5). Manual additions stay possible for guests/edge cases.
+  useEffect(() => {
+    if (!participants || participants.length === 0) return
+    setStandings((s) =>
+      s.length ? s : participants.map((p) => ({ id: p.commitment, nickname: p.label, score: 0, eliminated: false }))
+    )
+  }, [participants])
+
+  // Auto-show the member's nickname (tester feedback) — from the device cache only, so nothing here can
+  // pop an unrequested wallet signature. The Reveal button remains as the fallback for uncached devices.
+  useEffect(() => {
+    if (!loaded || !summary.hasJoined || nickname) return
+    let active = true
+    peekPoolIdentity?.(address)
+      .then((id) => active && id?.nickname && setNickname(id.nickname))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [loaded, summary, nickname, address, peekPoolIdentity])
 
   const run = async (fn) => {
     setNotice(null)
@@ -92,7 +170,7 @@ export default function PoolPage() {
       <section className="pool-summary" aria-label="Pool details" data-testid="pool-summary">
         <dl>
           <dt>Status</dt>
-          <dd data-testid="pool-state">{summary.stateLabel}</dd>
+          <dd data-testid="pool-state">{poolStateDisplay(summary.state)}</dd>
           <dt>Buy-in</dt>
           <dd>{summary.buyInFormatted} {summary.tokenSymbol}</dd>
           <dt>Members</dt>
@@ -109,6 +187,16 @@ export default function PoolPage() {
           <Button variant="secondary" onClick={revealNickname}>Reveal my nickname</Button>
         )}
       </section>
+
+      {/* Anonymous roster: alias cards for everyone; the creator can drag/arrange the rank order */}
+      {summary.state !== 3 && (
+        <PoolParticipants
+          participants={participants}
+          isCreator={summary.isCreator}
+          order={rankOrder}
+          onReorder={handleReorder}
+        />
+      )}
 
       {/* Creator controls while joining is open */}
       {summary.isCreator && summary.state === 0 && (
@@ -156,7 +244,13 @@ export default function PoolPage() {
 
       {/* Reveal-claim-code, creator propose-builder, and winner claim (US1 resolution loop) */}
       {(summary.hasJoined || summary.isCreator || summary.state === 2) && summary.state !== 3 && (
-        <PoolResolutionActions summary={summary} pools={pools} onChanged={reload} />
+        <PoolResolutionActions
+          summary={summary}
+          pools={pools}
+          participants={participants}
+          rankOrder={rankOrder}
+          onChanged={reload}
+        />
       )}
 
       {summary.refundEligible && (
