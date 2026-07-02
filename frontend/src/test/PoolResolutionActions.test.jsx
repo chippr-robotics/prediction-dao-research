@@ -34,6 +34,15 @@ describe('PoolResolutionActions (US1)', () => {
     expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('123456789')
   })
 
+  it('auto-shows the claim code from the device cache without a click (tester feedback)', async () => {
+    const pools = mockPools({
+      peekPoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: '424242', nickname: null }),
+    })
+    render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }} pools={pools} />)
+    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('424242')
+    expect(screen.queryByRole('button', { name: /reveal my claim code/i })).toBeNull()
+  })
+
   it('creator propose is gated until the matrix sums to the escrow', async () => {
     const pools = mockPools()
     render(

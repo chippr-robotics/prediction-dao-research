@@ -11,6 +11,7 @@ import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolStateDisplay, poolClaim
 import { phraseToIndices, resolvePool, indicesToPhrase } from '../lib/pools/gateway'
 import { createPoolIdentity } from '../lib/pools/identity'
 import { deriveNickname } from '../lib/pools/nickname'
+import { readPoolIdentity, cachePoolIdentity } from '../lib/pools/identityCache'
 import { generatePoolProof } from '../lib/pools/semaphoreProof'
 
 function requiredApprovals(frozenDenominator, thresholdBips) {
@@ -193,9 +194,28 @@ export function usePools() {
         const approveTx = await token.approve(poolAddress, summary.buyIn)
         await approveTx.wait()
       }
-      const { commitment } = await createPoolIdentity(s, poolAddress)
+      const { identity, commitment } = await createPoolIdentity(s, poolAddress)
       const tx = await pool.join(commitment)
       const receipt = await tx.wait()
+
+      // Best-effort (tester feedback): derive + cache the display values NOW, while the identity is in
+      // memory from the join signature, so nickname and claim code auto-show later with no re-prompt.
+      // The identity secret itself is never persisted.
+      try {
+        cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
+        const joined = await pool.queryFilter(pool.filters.Joined())
+        const memberCommitments = joined.map((e) => BigInt(e.args.identityCommitment))
+        const proof = await generatePoolProof({
+          identity,
+          memberCommitments,
+          message: 0n,
+          scope: poolClaimScope(poolAddress),
+        })
+        cachePoolIdentity(account, poolAddress, { claimCode: proof.nullifier.toString() })
+      } catch {
+        /* non-fatal — the reveal paths below still work and will backfill the cache */
+      }
+
       setStatus('idle')
       return { txHash: receipt.hash }
     } catch (e) {
@@ -217,11 +237,38 @@ export function usePools() {
     return events.map((e) => BigInt(e.args.identityCommitment))
   }, [requireSigner])
 
-  /** Derive the connected member's anonymous nickname for a pool (signs to seed the local identity). */
+  /**
+   * The connected member's anonymous nickname for a pool. Cache-first: after joining on this device the
+   * public commitment is cached, so this resolves with NO signature; otherwise it signs once to re-derive
+   * the identity and backfills the cache.
+   */
   const getMyNickname = useCallback(async (poolAddress) => {
-    const { signer: s } = await requireSigner()
+    const { signer: s, account } = await requireSigner()
+    const cached = readPoolIdentity(account, poolAddress)
+    if (cached?.commitment) return deriveNickname(cached.commitment, poolAddress)
     const { commitment } = await createPoolIdentity(s, poolAddress)
+    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
     return deriveNickname(commitment, poolAddress)
+  }, [requireSigner])
+
+  /**
+   * Non-prompting read of the member's cached display identity for a pool: { commitment, claimCode,
+   * nickname } or null when nothing is cached / no wallet. Lets pages auto-show the nickname and claim
+   * code (tester feedback) without ever popping an unrequested signature.
+   */
+  const peekPoolIdentity = useCallback(async (poolAddress) => {
+    try {
+      const { account } = await requireSigner()
+      const cached = readPoolIdentity(account, poolAddress)
+      if (!cached?.commitment && !cached?.claimCode) return null
+      return {
+        commitment: cached.commitment || null,
+        claimCode: cached.claimCode || null,
+        nickname: cached.commitment ? deriveNickname(cached.commitment, poolAddress) : null,
+      }
+    } catch {
+      return null
+    }
   }, [requireSigner])
 
   /**
@@ -230,9 +277,13 @@ export function usePools() {
    * to the wallet, and is the value the contract matches at claim time. Returns a decimal string.
    */
   const getMyClaimCode = useCallback(async (poolAddress) => {
-    const { signer: s } = await requireSigner()
+    const { signer: s, account } = await requireSigner()
+    // Cache-first (tester feedback): the code is derived at join (or first reveal) and cached, so
+    // subsequent views auto-show it without a signature or a fresh proof.
+    const cached = readPoolIdentity(account, poolAddress)
+    if (cached?.claimCode) return cached.claimCode
     const memberCommitments = await getMemberCommitments(poolAddress)
-    const { identity } = await createPoolIdentity(s, poolAddress)
+    const { identity, commitment } = await createPoolIdentity(s, poolAddress)
     // The nullifier is a deterministic function of (claimScope, identity); message/group-validity don't
     // affect it, so this matches the nullifier the real claim proof will produce.
     const proof = await generatePoolProof({
@@ -241,7 +292,9 @@ export function usePools() {
       message: 0n,
       scope: poolClaimScope(poolAddress),
     })
-    return proof.nullifier.toString()
+    const code = proof.nullifier.toString()
+    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString(), claimCode: code })
+    return code
   }, [requireSigner, getMemberCommitments])
 
   /** Creator: close joining early (freezes the denominator). */
@@ -348,6 +401,7 @@ export function usePools() {
     getMemberCommitments,
     getMyNickname,
     getMyClaimCode,
+    peekPoolIdentity,
     closeJoining,
     cancelPool,
     proposeOutcome,

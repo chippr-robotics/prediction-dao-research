@@ -15,7 +15,7 @@ import './pools.css'
 export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
-  const { getPoolSummary, getMyNickname, closeJoining, cancelPool, vote, refund, status } = pools
+  const { getPoolSummary, getMyNickname, peekPoolIdentity, closeJoining, cancelPool, vote, refund, status } = pools
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
   const [nickname, setNickname] = useState(null)
@@ -55,6 +55,19 @@ export default function PoolPage() {
   }, [address, getPoolSummary])
 
   const loaded = summary && summary.address === address
+
+  // Auto-show the member's nickname (tester feedback) — from the device cache only, so nothing here can
+  // pop an unrequested wallet signature. The Reveal button remains as the fallback for uncached devices.
+  useEffect(() => {
+    if (!loaded || !summary.hasJoined || nickname) return
+    let active = true
+    peekPoolIdentity?.(address)
+      .then((id) => active && id?.nickname && setNickname(id.nickname))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [loaded, summary, nickname, address, peekPoolIdentity])
 
   const run = async (fn) => {
     setNotice(null)

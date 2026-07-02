@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import Button from '../ui/Button'
 import { payoutMatrixHash, payoutMatrixSum, serializeMatrix, parseMatrix } from '../../lib/pools/payout'
@@ -14,13 +14,26 @@ import { payoutMatrixHash, payoutMatrixSum, serializeMatrix, parseMatrix } from 
  * Controlled by the parent (PoolPage), which supplies the connected `pools` hook + the pool `summary`.
  */
 export default function PoolResolutionActions({ summary, pools, onChanged }) {
-  const { proposeOutcome, claimWinnings, getMyClaimCode, status } = pools
+  const { proposeOutcome, claimWinnings, getMyClaimCode, peekPoolIdentity, status } = pools
   const decimals = summary.tokenDecimals || 6
   const escrow = BigInt(summary.frozenDenominator || summary.memberCount || 0) * BigInt(summary.buyIn || 0)
 
   const [claimCode, setClaimCode] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
+
+  // Auto-show the member's claim code (tester feedback) — cache-only read, derived at join time; the
+  // Reveal button stays as the fallback for members who joined before caching existed.
+  useEffect(() => {
+    if (!summary.hasJoined || claimCode) return
+    let active = true
+    peekPoolIdentity?.(summary.address)
+      .then((id) => active && id?.claimCode && setClaimCode(id.claimCode))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [summary.hasJoined, summary.address, claimCode, peekPoolIdentity])
 
   // Creator propose-builder rows: { claimCode, amount (human USDC) }
   const [rows, setRows] = useState([{ claimCode: '', amount: '' }])

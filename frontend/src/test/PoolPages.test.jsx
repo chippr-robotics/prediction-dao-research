@@ -24,6 +24,7 @@ function base(overrides = {}) {
     status: 'idle', error: null,
     createPool: vi.fn(), resolvePhrase: vi.fn(), getPoolSummary: vi.fn(), joinPool: vi.fn(),
     getMyNickname: vi.fn(), getMyClaimCode: vi.fn(), getMemberCommitments: vi.fn(),
+    peekPoolIdentity: vi.fn().mockResolvedValue(null),
     closeJoining: vi.fn().mockResolvedValue('0xtx'), cancelPool: vi.fn().mockResolvedValue('0xtx'),
     proposeOutcome: vi.fn(), vote: vi.fn().mockResolvedValue('0xtx'), claimWinnings: vi.fn(),
     refund: vi.fn().mockResolvedValue('0xtx'),
@@ -52,6 +53,17 @@ describe('PoolPage', () => {
     const state = await screen.findByTestId('pool-state')
     expect(state).toHaveTextContent('Open')
     expect(state).not.toHaveTextContent('JoiningOpen')
+  })
+
+  it('auto-shows a joined member’s nickname from the device cache (no click, no signature)', async () => {
+    const sum = { ...openSummary, hasJoined: true }
+    const peekPoolIdentity = vi.fn().mockResolvedValue({
+      commitment: '123', claimCode: null, nickname: { label: 'Prismatic Fox', suffix: '7b' },
+    })
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), peekPoolIdentity }))
+    renderPoolAt(sum)
+    expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Prismatic Fox')
+    expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
   })
 
   it('the creator sees close/cancel while joining is open', async () => {
