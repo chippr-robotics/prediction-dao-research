@@ -197,6 +197,24 @@ Post-deploy tester punchlist. Delivered frontend-only against the **immutable** 
     (`frontend/src/lib/pools/semaphoreProof.js`) — the runtime dependency on that CDN is gone. nginx
     long-caches `.wasm`/`.zkey` immutably like other content-hashed static assets.
 
+### CSP fix landed in the wrong file — production was still broken (round 5)
+
+The round-4-followup CSP fix above added `'wasm-unsafe-eval'` to **`frontend/nginx.conf`** only. But
+production (fairwins.app) is built from the **root `Dockerfile`**, which deploys
+**`frontend/nginx.conf.template`** (envsubst'd at container start) — `frontend/nginx.conf` is used by
+`frontend/Dockerfile`, a different image. So the deployed CSP never gained the token, and a tester on
+fairwins.app still hit the exact `WebAssembly.compile() … 'unsafe-eval' is not an allowed source`
+CompileError when approving a payout. (Round-4's error surfacing did its job — the failure is now
+visible in red instead of silent.)
+
+Fix: applied the identical `'wasm-unsafe-eval'` token + rationale comment to
+`frontend/nginx.conf.template`, and added `frontend/src/test/nginxCspScriptSrc.test.js` — a regression
+guard asserting **both** configs carry the narrow WASM grant (and never the broad `'unsafe-eval'`),
+mirroring `nginxCspConnectSrc.test.js`. That connect-src guard already existed *because these two files
+diverged once before*, but it only checked `connect-src`; the new test closes the `script-src` gap so a
+one-file fix can't silently leave production broken again. The self-hosted artifacts are served from
+`'self'`, so no `connect-src`/CDN change is needed alongside this.
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)
