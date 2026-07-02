@@ -160,6 +160,10 @@
   margin-top: 0.75rem;
 }
 
+/* Manual player entry is an edge-case tool — collapsed by default behind a small disclosure. */
+.leaderboard-add-details { margin-top: 0.75rem; }
+.leaderboard-add-details > summary { font-size: 0.85rem; opacity: 0.75; cursor: pointer; }
+
 /* Participant roster (pool-manager tester feedback): anonymous alias cards + creator rank arrangement */
 .pool-participants { margin: 1rem 0; }
 .pool-participants h2 { font-size: 1rem; margin: 0 0 0.25rem; }

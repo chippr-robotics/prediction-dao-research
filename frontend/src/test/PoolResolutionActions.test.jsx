@@ -37,6 +37,18 @@ describe('PoolResolutionActions (US1)', () => {
     expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('123456789')
   })
 
+  it('shows the claim code handed down from the page-level identity restore (no click)', async () => {
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }}
+        pools={mockPools()}
+        claimCode="555666777"
+      />
+    )
+    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('555666777')
+    expect(screen.queryByRole('button', { name: /reveal my claim code/i })).toBeNull()
+  })
+
   it('auto-shows the claim code from the device cache without a click (tester feedback)', async () => {
     const pools = mockPools({
       peekPoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: '424242', nickname: null }),

@@ -23,7 +23,20 @@ import { sortParticipants } from '../../lib/pools/participantOrder'
 export default function PoolParticipants({ participants, isCreator = false, order = null, onReorder }) {
   const [dragIndex, setDragIndex] = useState(null)
 
-  if (!participants || participants.length === 0) return null
+  if (!participants) return null // still loading — render nothing rather than a false "empty"
+
+  // Loaded but empty (live-app tester feedback): tell the creator what fills this in instead of
+  // silently omitting the section.
+  if (participants.length === 0) {
+    return (
+      <section className="pool-participants" aria-label="Participants" data-testid="pool-participants">
+        <h2>Participants (0)</h2>
+        <p className="pool-participants-hint" data-testid="participants-empty">
+          No one has joined yet — share the pool&apos;s four words so friends can find and join it.
+        </p>
+      </section>
+    )
+  }
 
   const sorted = sortParticipants(participants, order)
   const arranged = Boolean(order && order.length)

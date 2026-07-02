@@ -94,6 +94,29 @@ and feel of the other wager create surfaces:
   icon copy button and a QR that deep-links into the unified phrase lookup (`?oc=take&code=<words>`
   resolves pools as well as challenges), plus "Open my pool" / "Done" actions.
 
+### Live-app verification follow-up (round 3)
+
+Screenshots from fairwins.app showed the round-1 manager fixes only partially landing in practice:
+the nickname/claim-code auto-show was **cache-only**, so any member whose device lacked the join-time
+cache (joined pre-cache, another device, cleared storage) still saw click-to-reveal buttons; the
+identity section rendered even for viewers who never joined; and the creator's first sight of "Live
+standings" was a manual add-player form. Fixes:
+
+- **`usePools.restorePoolIdentity`**: one-signature full restore — cache-first (no prompt on the
+  join device), otherwise re-derive the identity, derive + cache the claim code, return
+  `{ commitment, claimCode, nickname }`. `PoolPage` now auto-runs it whenever a joined member has no
+  cached identity, so the nickname AND claim code always auto-show; declining the signature falls
+  back to the manual Reveal button. The restored claim code is passed down to
+  `PoolResolutionActions`.
+- **Identity section only for joined members** — a viewer (including a creator who hasn't joined
+  their own pool, the 0/N case in the screenshots) no longer sees a meaningless "Reveal my
+  nickname" button.
+- **Roster empty state**: once loaded with zero members, `PoolParticipants` says "share the pool's
+  four words" instead of omitting the section.
+- **Leaderboard**: the creator's empty state now says standings fill in automatically from the
+  roster, and the manual add-player form is collapsed behind an "Add a player manually" disclosure
+  (edge-case tool, not the primary flow).
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)

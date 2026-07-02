@@ -25,6 +25,9 @@ function base(overrides = {}) {
     createPool: vi.fn(), resolvePhrase: vi.fn(), getPoolSummary: vi.fn(), joinPool: vi.fn(),
     getMyNickname: vi.fn(), getMyClaimCode: vi.fn(), getMemberCommitments: vi.fn(),
     peekPoolIdentity: vi.fn().mockResolvedValue(null),
+    restorePoolIdentity: vi.fn().mockResolvedValue({
+      commitment: '123', claimCode: '987654321', nickname: { label: 'Prismatic Fox', suffix: '7b' },
+    }),
     closeJoining: vi.fn().mockResolvedValue('0xtx'), cancelPool: vi.fn().mockResolvedValue('0xtx'),
     proposeOutcome: vi.fn(), vote: vi.fn().mockResolvedValue('0xtx'), claimWinnings: vi.fn(),
     refund: vi.fn().mockResolvedValue('0xtx'),
@@ -60,10 +63,43 @@ describe('PoolPage', () => {
     const peekPoolIdentity = vi.fn().mockResolvedValue({
       commitment: '123', claimCode: null, nickname: { label: 'Prismatic Fox', suffix: '7b' },
     })
-    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), peekPoolIdentity }))
+    const restorePoolIdentity = vi.fn()
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), peekPoolIdentity, restorePoolIdentity }))
     renderPoolAt(sum)
     expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Prismatic Fox')
     expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
+    expect(restorePoolIdentity).not.toHaveBeenCalled() // cache hit — no signature path
+  })
+
+  it('auto-RESTORES the identity when nothing is cached — still no click (live-app tester feedback)', async () => {
+    const sum = { ...openSummary, hasJoined: true }
+    const restorePoolIdentity = vi.fn().mockResolvedValue({
+      commitment: '123', claimCode: '987654321', nickname: { label: 'Gentle Fox', suffix: '14' },
+    })
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), restorePoolIdentity }))
+    renderPoolAt(sum)
+    expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Gentle Fox')
+    expect(restorePoolIdentity).toHaveBeenCalledWith(sum.address)
+    expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
+    // The restored claim code flows into the resolution actions — also no click.
+    expect(await screen.findByTestId('my-claim-code')).toHaveTextContent('987654321')
+  })
+
+  it('falls back to the Reveal button only when the automatic restore fails (declined signature)', async () => {
+    const sum = { ...openSummary, hasJoined: true }
+    const restorePoolIdentity = vi.fn().mockRejectedValue(new Error('user rejected signature'))
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), restorePoolIdentity }))
+    renderPoolAt(sum)
+    expect(await screen.findByRole('button', { name: /reveal my nickname/i })).toBeInTheDocument()
+  })
+
+  it('shows no identity section to a viewer who has not joined (e.g. a creator outside the pool)', async () => {
+    const sum = { ...openSummary, isCreator: true, hasJoined: false }
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum) }))
+    renderPoolAt(sum)
+    await screen.findByTestId('pool-state')
+    expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
+    expect(screen.queryByTestId('my-nickname')).toBeNull()
   })
 
   it('the creator sees close/cancel while joining is open', async () => {

@@ -18,14 +18,22 @@ import { sortParticipants } from '../../lib/pools/participantOrder'
  * Controlled by the parent (PoolPage), which supplies the connected `pools` hook, the pool `summary`,
  * the anonymous `participants` roster, and the creator's `rankOrder`.
  */
-export default function PoolResolutionActions({ summary, pools, participants = null, rankOrder = null, onChanged }) {
+export default function PoolResolutionActions({
+  summary, pools, participants = null, rankOrder = null, claimCode: restoredClaimCode = null, onChanged,
+}) {
   const { proposeOutcome, claimWinnings, getMyClaimCode, peekPoolIdentity, status } = pools
   const decimals = summary.tokenDecimals || 6
   const escrow = BigInt(summary.frozenDenominator || summary.memberCount || 0) * BigInt(summary.buyIn || 0)
 
-  const [claimCode, setClaimCode] = useState(null)
+  const [claimCode, setClaimCode] = useState(restoredClaimCode)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
+
+  // The page-level identity restore (PoolPage) supplies the code with at most one signature; adopt it
+  // whenever it lands after mount.
+  useEffect(() => {
+    if (restoredClaimCode && !claimCode) setClaimCode(restoredClaimCode)
+  }, [restoredClaimCode, claimCode])
 
   // Auto-show the member's claim code (tester feedback) — cache-only read, derived at join time; the
   // Reveal button stays as the fallback for members who joined before caching existed.
