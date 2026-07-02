@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ethers } from 'ethers'
 import PoolResolutionActions from '../components/pools/PoolResolutionActions'
+import { payoutMatrixHash, serializeMatrix } from '../lib/pools/payout'
 
 // US1 resolution UI (spec 034): reveal claim code, creator propose-builder (sum must equal escrow),
 // winner claim. Wired through a mocked usePools.
@@ -27,6 +28,8 @@ function mockPools(over = {}) {
 }
 
 describe('PoolResolutionActions (US1)', () => {
+  beforeEach(() => localStorage.clear())
+
   it('a joined member can reveal their claim code', async () => {
     const pools = mockPools()
     render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true }} pools={pools} />)
@@ -77,5 +80,83 @@ describe('PoolResolutionActions (US1)', () => {
     fireEvent.click(screen.getByTestId('claim'))
     await waitFor(() => expect(pools.claimWinnings).toHaveBeenCalled())
     expect(pools.claimWinnings.mock.calls[0][1].recipient).toBe('0x1111111111111111111111111111111111111111')
+  })
+
+  it('seeds the propose builder with one alias row per participant, in rank order (item 5)', async () => {
+    const participants = [
+      { commitment: '10', label: 'Silent Owl', suffix: '0a' },
+      { commitment: '11', label: 'Amber Fox', suffix: '0b' },
+    ]
+    render(
+      <PoolResolutionActions
+        summary={{ ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true }}
+        pools={mockPools()}
+        participants={participants}
+        rankOrder={['10', '11']}
+      />
+    )
+    expect(await screen.findByTestId('propose-nick-0')).toHaveTextContent('Silent Owl')
+    expect(screen.getByTestId('propose-nick-1')).toHaveTextContent('Amber Fox')
+    expect(screen.getByPlaceholderText('claim code from Silent Owl')).toBeInTheDocument()
+  })
+
+  it('BUG item 7: a member sees + verifies the proposed split by pasting the shared matrix', async () => {
+    const entries = [
+      { claimNullifier: '111', amount: '10000000' },
+      { claimNullifier: '222', amount: '10000000' },
+    ]
+    const proposalId = payoutMatrixHash(entries)
+    const summary = {
+      ...baseSummary, hasJoined: true, state: 1, withinResolutionWindow: true, currentProposalId: proposalId,
+    }
+    render(<PoolResolutionActions summary={summary} pools={mockPools()} />)
+
+    const details = await screen.findByTestId('proposal-details')
+    expect(details).toBeInTheDocument()
+
+    // A tampered matrix is called out, never rendered as the proposal.
+    fireEvent.change(screen.getByLabelText(/payout matrix \(shared by the creator\)/i), {
+      target: { value: '[{"claimNullifier":"111","amount":"20000000"}]' },
+    })
+    expect(await screen.findByTestId('proposal-mismatch')).toHaveTextContent(/does not match/i)
+
+    // The genuine matrix verifies and renders the breakdown.
+    fireEvent.change(screen.getByLabelText(/payout matrix \(shared by the creator\)/i), {
+      target: { value: serializeMatrix(entries) },
+    })
+    expect(await screen.findByTestId('proposal-verified')).toHaveTextContent(/verified/i)
+    expect(screen.getAllByRole('row')).toHaveLength(3) // header + 2 entries
+    expect(screen.getAllByText('10.0 USDC')).toHaveLength(2)
+  })
+
+  it('the creator sees the proposal breakdown automatically after proposing (stored preimage)', async () => {
+    const entries = [{ claimNullifier: '333', amount: '20000000' }]
+    const proposalId = payoutMatrixHash(entries)
+    localStorage.setItem(
+      `fairwins_pool_matrix_v1_${baseSummary.address.toLowerCase()}`,
+      JSON.stringify({ proposalId, matrix: serializeMatrix(entries) })
+    )
+    const summary = {
+      ...baseSummary, isCreator: true, state: 1, withinResolutionWindow: true, currentProposalId: proposalId,
+    }
+    render(<PoolResolutionActions summary={summary} pools={mockPools()} />)
+    expect(await screen.findByTestId('proposal-verified')).toBeInTheDocument()
+  })
+
+  it('auto-fills the claim matrix from the stored preimage and detects the claimant’s row', async () => {
+    const entries = [
+      { claimNullifier: '999', amount: '10000000' },
+      { claimNullifier: '424242', amount: '10000000' },
+    ]
+    localStorage.setItem(
+      `fairwins_pool_matrix_v1_${baseSummary.address.toLowerCase()}`,
+      JSON.stringify({ proposalId: payoutMatrixHash(entries), matrix: serializeMatrix(entries) })
+    )
+    const pools = mockPools({
+      peekPoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: '424242', nickname: null }),
+    })
+    render(<PoolResolutionActions summary={{ ...baseSummary, hasJoined: true, state: 2 }} pools={pools} />)
+    await waitFor(() => expect(screen.getByLabelText(/payout matrix/i)).toHaveValue(serializeMatrix(entries)))
+    await waitFor(() => expect(screen.getByLabelText(/your row index/i)).toHaveValue(1))
   })
 })

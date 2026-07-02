@@ -185,3 +185,16 @@
   border-radius: 6px; padding: 0.1rem 0.5rem; cursor: pointer; font: inherit;
 }
 .pool-participant-controls button:disabled { opacity: 0.35; cursor: default; }
+
+/* Proposed-payout visibility (tester bug item 7) + builder alias chips (item 5) */
+.pool-proposal-details { margin: 1rem 0; }
+.pool-proposal-table { border-collapse: collapse; width: 100%; max-width: 32rem; }
+.pool-proposal-table th, .pool-proposal-table td {
+  text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+}
+.pool-proposal-table tr.is-you td { background: var(--accent-soft, rgba(59, 156, 120, 0.12)); font-weight: 600; }
+.pool-propose-nick {
+  display: inline-flex; align-items: center; min-width: 9rem;
+  font-size: 0.85rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 8px;
+  background: var(--accent-soft, rgba(59, 156, 120, 0.12));
+}
