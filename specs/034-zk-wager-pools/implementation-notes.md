@@ -184,19 +184,18 @@ Post-deploy tester punchlist. Delivered frontend-only against the **immutable** 
     happens." Adding **only** `'wasm-unsafe-eval'` (the narrow WASM-compile grant — NOT the broader
     `'unsafe-eval'`, which would also permit `eval()`/`new Function()`) to `script-src` was verified to
     clear the CSP block (the failure mode changes from a `CompileError`/CSP violation to ordinary
-    WASM-instantiation semantics). **This fix has NOT been applied to `frontend/nginx.conf`** — the
-    harness's auto-mode classifier requires explicit user authorization to loosen a production CSP, so
-    it is pending a human go-ahead rather than shipped unilaterally. See the PR/conversation for the
-    exact one-line diff.
-  - **Secondary hardening (recommended, also pending authorization):** proof generation currently
-    fetches the ~5.2 MB circuit artifacts (`semaphore-16.wasm` + `.zkey`) fresh from a third-party CDN
-    (`snark-artifacts.pse.dev`) on **every** proof — no caching, and three separate flows (join
-    precache, vote, claim) each re-fetch it. On a slow/mobile connection this is a second, independent
-    way the flow can stall even after the CSP fix. Self-hosting those two static files under
-    `frontend/public/` and passing them explicitly via `generateProof`'s `snarkArtifacts` parameter
-    would remove the runtime dependency on that CDN entirely (compatible with the no-backend footprint
-    — static files served by the existing SPA/nginx). Not applied here for the same reason: vendoring
-    externally-sourced binary artifacts into the shipped bundle also requires explicit authorization.
+    WASM-instantiation semantics). **Fix applied** to `frontend/nginx.conf`'s `script-src` (explicit
+    user authorization obtained — the harness's auto-mode classifier gates loosening a production CSP
+    even with strong supporting evidence).
+  - **Secondary hardening: applied.** Proof generation previously fetched the ~5.2 MB circuit
+    artifacts (`semaphore-16.wasm` + `.zkey`) fresh from a third-party CDN (`snark-artifacts.pse.dev`)
+    on **every** proof — no caching, and three separate flows (join precache, vote, claim) each
+    re-fetched it. On a slow/mobile connection this was a second, independent way the flow could stall
+    even after the CSP fix. Now self-hosted (user-authorized) under `frontend/public/semaphore/`
+    (`semaphore-16.<contenthash>.wasm`/`.zkey`, checksummed against the PSE-published bytes at vendor
+    time) and passed explicitly via `generateProof`'s `snarkArtifacts` parameter
+    (`frontend/src/lib/pools/semaphoreProof.js`) — the runtime dependency on that CDN is gone. nginx
+    long-caches `.wasm`/`.zkey` immutably like other content-hashed static assets.
 
 ## Actual on-chain deployment (ops, post-merge)
 
