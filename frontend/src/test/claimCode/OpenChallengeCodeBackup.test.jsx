@@ -32,7 +32,7 @@ function withWallet(ui) {
 describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)', () => {
   beforeEach(() => { createOpenChallenge.mockReset(); localStorage.clear() })
 
-  it('saves an encrypted backup after creating, then recovers it from the Security panel (spec 037, FR-022)', async () => {
+  it('auto-saves an encrypted backup after creating (no interaction), then recovers it from the Security panel (spec 037, FR-022)', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 12n, txHash: '0xabc' })
     const { unmount } = withWallet(<OpenChallengeModal isOpen onClose={() => {}} />)
 
@@ -41,8 +41,7 @@ describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)'
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await screen.findByText('river tiger kite zoo')
 
-    // Save the encrypted backup (MakerPanel — unchanged by the relocation).
-    fireEvent.click(screen.getByRole('button', { name: /save encrypted backup/i }))
+    // The encrypted backup saves automatically — no button press (testing feedback).
     expect(await screen.findByText(/encrypted backup saved/i)).toBeInTheDocument()
 
     // Nothing recoverable is stored in cleartext.

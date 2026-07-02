@@ -1,9 +1,5 @@
 /* Open-challenge modal — small additions on top of the shared fm-* (FriendMarketsModal) styles. */
 
-.oc-mode-tabs {
-  margin-bottom: 1.25rem;
-}
-
 .oc-code-display {
   display: flex;
   align-items: center;
@@ -22,6 +18,28 @@
   word-spacing: 0.18em;
   color: var(--fm-accent, #2fbf71);
   user-select: all;
+}
+
+/* Icon-only copy button beside the four-word code (testing feedback). */
+.oc-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--fm-border, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  color: var(--fm-accent, #2fbf71);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.oc-copy-btn:hover {
+  background: rgba(47, 191, 113, 0.12);
+  border-color: var(--fm-accent, #2fbf71);
 }
 
 .oc-terms-body {
@@ -133,6 +151,61 @@
 
 .oc-deadline-warn {
   color: #d99b00;
+}
+
+/* ── Deadline timeline (testing feedback) ────────────────────────────
+   Reuses the 1v1 create-wager timeline element (fm-endtime track + stat
+   tiles) with a slider per deadline; tapping a tile opens exact entry. */
+.oc-timeline {
+  gap: 0.5rem;
+}
+
+.oc-deadline-slider .fm-odds-slider {
+  margin: 0.4rem 0 0.25rem;
+}
+
+/* Two deadlines → two tiles (the 1v1 grid is three-up). */
+.oc-stat-tiles {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Stat tiles double as buttons that open manual date entry. */
+.oc-stat-tile-btn {
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.oc-stat-tile-btn:hover:not(:disabled) {
+  border-color: var(--tile-accent);
+  box-shadow: 0 0 0 2px var(--tile-border);
+}
+
+.oc-stat-tile-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.oc-tile-edit {
+  margin-top: 0.125rem;
+  font-size: 0.62rem;
+  color: var(--text-muted, #7A8590);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.oc-manual-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+/* Purple resolve-by node on the shared timeline track. */
+.fm-timeline-node.is-resolve {
+  background: var(--fm-resolve);
 }
 
 /* Read-only deadline summary on the taker's "challenge found" view. */

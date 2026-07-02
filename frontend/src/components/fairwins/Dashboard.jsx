@@ -498,7 +498,6 @@ function Dashboard() {
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
   const [showGroupPool, setShowGroupPool] = useState(false)
   const [groupPoolTab, setGroupPoolTab] = useState('create')
-  const [openChallengeTab, setOpenChallengeTab] = useState('maker')
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
   const [unifiedInitialPhrase, setUnifiedInitialPhrase] = useState('')
@@ -570,7 +569,6 @@ function Dashboard() {
         setShowCreateWager(true)
         break
       case 'open-challenge':
-        setOpenChallengeTab('maker')
         setShowOpenChallenge(true)
         break
       case 'create-pool':
@@ -729,7 +727,6 @@ function Dashboard() {
       <OpenChallengeModal
         key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
         isOpen={showOpenChallenge}
-        initialTab={openChallengeTab}
         onClose={() => setShowOpenChallenge(false)}
         onBuyMembership={() => {
           setShowOpenChallenge(false)

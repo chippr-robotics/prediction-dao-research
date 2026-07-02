@@ -245,13 +245,13 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
   beforeEach(() => { createOpenChallenge.mockReset(); discover.mockReset(); accept.mockReset() })
 
   it('has no axe violations on the create modal', async () => {
-    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
+    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
   it('the residual-risk / save-your-code notice is conveyed as TEXT, not color alone', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} initialTab="maker" />)
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
     // Create form residual-risk disclosure: text is present (not color-only signaling).
     expect(
       screen.getByText(/anyone you share the code with can take the other side/i)
