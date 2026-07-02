@@ -35,6 +35,17 @@ export function getPool(address, runner) {
 
 export const POOL_STATE = ['JoiningOpen', 'JoiningClosed', 'Resolved', 'Cancelled']
 
+/**
+ * Human display labels for POOL_STATE (tester feedback: the raw enum name "JoiningOpen" leaked into
+ * the UI). Keep POOL_STATE as the stable enum-name mapping; render THIS in user-facing surfaces.
+ */
+export const POOL_STATE_DISPLAY = ['Open', 'Closed — resolving', 'Resolved', 'Cancelled']
+
+/** User-facing label for a pool state (falls back to 'Unknown' for an unrecognized value). */
+export function poolStateDisplay(state) {
+  return POOL_STATE_DISPLAY[Number(state)] ?? 'Unknown'
+}
+
 /** The pool's fixed claim scope: keccak256(abi.encodePacked(pool, "ZKPOOL_CLAIM")) — matches the contract. */
 export function poolClaimScope(poolAddress) {
   return BigInt(ethers.keccak256(ethers.solidityPacked(['address', 'string'], [poolAddress, 'ZKPOOL_CLAIM'])))

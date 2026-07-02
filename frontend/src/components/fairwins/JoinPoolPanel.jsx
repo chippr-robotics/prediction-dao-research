@@ -4,6 +4,7 @@ import { useWallet } from '../../hooks/useWalletManagement'
 import { usePools } from '../../hooks/usePools'
 import { UIContext } from '../../contexts/UIContext'
 import { recordJoinedPool } from '../../lib/lookup/myWagersSources'
+import { poolStateDisplay } from '../../lib/pools/poolContracts'
 import './FriendMarketsModal.css'
 import '../../pages/pools.css'
 
@@ -43,7 +44,7 @@ export default function JoinPoolPanel({ summary, onClose }) {
       <dl>
         <dt>Buy-in</dt><dd>{summary.buyInFormatted} {summary.tokenSymbol}</dd>
         <dt>Members</dt><dd>{summary.memberCount} / {summary.maxMembers} ({summary.slotsRemaining} left)</dd>
-        <dt>Status</dt><dd>{summary.stateLabel}</dd>
+        <dt>Status</dt><dd>{poolStateDisplay(summary.state)}</dd>
         <dt>Approval threshold</dt><dd>{summary.thresholdPct}% of members</dd>
       </dl>
       {joinable ? (
@@ -60,7 +61,7 @@ export default function JoinPoolPanel({ summary, onClose }) {
         </>
       ) : (
         <p className="pool-closed-note">
-          This pool isn’t accepting new members ({summary.stateLabel === 'JoiningOpen' ? 'full' : summary.stateLabel}).
+          This pool isn’t accepting new members ({summary.state === 0 ? 'full' : poolStateDisplay(summary.state).toLowerCase()}).
         </p>
       )}
     </div>

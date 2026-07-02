@@ -46,10 +46,12 @@ describe('PoolPage', () => {
     useWallet.mockReturnValue({ account: '0x1111111111111111111111111111111111111111', isConnected: true })
   })
 
-  it('renders live on-chain state for a pool address', async () => {
+  it('renders live on-chain state with a human status label (not the raw enum name)', async () => {
     usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(openSummary) }))
     renderPoolAt(openSummary)
-    expect(await screen.findByTestId('pool-state')).toHaveTextContent('JoiningOpen')
+    const state = await screen.findByTestId('pool-state')
+    expect(state).toHaveTextContent('Open')
+    expect(state).not.toHaveTextContent('JoiningOpen')
   })
 
   it('the creator sees close/cancel while joining is open', async () => {

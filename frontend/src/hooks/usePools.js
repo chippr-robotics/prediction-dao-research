@@ -7,7 +7,7 @@ import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { getContractAddressForChain } from '../config/contracts'
-import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolClaimScope } from '../lib/pools/poolContracts'
+import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolStateDisplay, poolClaimScope } from '../lib/pools/poolContracts'
 import { phraseToIndices, resolvePool, indicesToPhrase } from '../lib/pools/gateway'
 import { createPoolIdentity } from '../lib/pools/identity'
 import { deriveNickname } from '../lib/pools/nickname'
@@ -71,6 +71,7 @@ async function summarizePool(poolContract, account) {
     address: await poolContract.getAddress(),
     state,
     stateLabel: POOL_STATE[state] ?? 'Unknown',
+    stateDisplay: poolStateDisplay(state),
     buyIn,
     buyInFormatted: ethers.formatUnits(buyIn, decimals),
     tokenAddress: tokenAddr,

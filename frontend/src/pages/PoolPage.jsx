@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
+import { poolStateDisplay } from '../lib/pools/poolContracts'
 import Button from '../components/ui/Button'
 import PoolLeaderboard from '../components/pools/PoolLeaderboard'
 import PoolResolutionActions from '../components/pools/PoolResolutionActions'
@@ -92,7 +93,7 @@ export default function PoolPage() {
       <section className="pool-summary" aria-label="Pool details" data-testid="pool-summary">
         <dl>
           <dt>Status</dt>
-          <dd data-testid="pool-state">{summary.stateLabel}</dd>
+          <dd data-testid="pool-state">{poolStateDisplay(summary.state)}</dd>
           <dt>Buy-in</dt>
           <dd>{summary.buyInFormatted} {summary.tokenSymbol}</dd>
           <dt>Members</dt>
