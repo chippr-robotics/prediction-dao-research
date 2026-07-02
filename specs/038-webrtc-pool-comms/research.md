@@ -26,8 +26,14 @@ signaling) don't benefit from a wrapper.
 - `simple-peer` / `peerjs`: convenience wrappers; peerjs requires its cloud
   broker (excluded — serverless), simple-peer is effectively unmaintained and
   adds a dependency for what is ~200 lines of adapter code here.
-- `libp2p` (js): full p2p stack; heavy bundle, and its useful transports
-  (circuit relay, rendezvous) all require infrastructure we're barred from.
+- `libp2p` (js), **OrbitDB**, **Gun**, **Trystero**, **Waku**: evaluated in
+  depth (web-verified, with measured bundle sizes) in
+  [alternatives.md](./alternatives.md) — all fail the strictly-serverless
+  clarification (each needs relay/rendezvous infrastructure for
+  browser↔browser signaling), OrbitDB additionally makes data permanent and
+  Gun persists data on relays with unaudited crypto. Trystero (public-infra
+  signaling, ~22 KB gz) is recorded there as the ranked escape hatch if the
+  R12 spike shows manual-handshake friction is unacceptable.
 - WebSocket/SSE: require a server — excluded by clarification.
 - On-chain messaging (events as transport): costs gas per message, seconds-to-
   minutes latency, permanently public — fails FR-011 and SC-001 and contradicts
@@ -296,3 +302,4 @@ testable without a browser, and the injectable `webrtc.js` adapter is the seam.
 | Late-join catch-up (FR-008) | R10: snapshot + latest-wins versioned docs |
 | Multi-tab (FR-026) | R11: per-commitment newest-wins |
 | Riskiest-assumption validation | R12: device spike before UI; pure-core Vitest strategy |
+| Alternative stacks (libp2p/OrbitDB/Gun/Trystero/Waku) | [alternatives.md](./alternatives.md): all rejected under serverless posture; Trystero = ranked escape hatch |
