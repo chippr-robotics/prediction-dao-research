@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { usePools } from '../../hooks/usePools'
 import { UIContext } from '../../contexts/UIContext'
-import { recordJoinedPool } from '../../lib/lookup/myWagersSources'
 import { poolStateDisplay } from '../../lib/pools/poolContracts'
 import './FriendMarketsModal.css'
 import '../../pages/pools.css'
@@ -15,7 +14,7 @@ import '../../pages/pools.css'
  * resolved summary and performs the join.
  */
 export default function JoinPoolPanel({ summary, onClose }) {
-  const { isConnected, account } = useWallet()
+  const { isConnected } = useWallet()
   const { joinPool, status, error } = usePools()
   const navigate = useNavigate()
   // Optional notification access — routes the join-success event into the app's toasts without
@@ -27,10 +26,8 @@ export default function JoinPoolPanel({ summary, onClose }) {
 
   const onJoin = async () => {
     try {
+      // joinPool records the membership device-locally (usePools) so the pool surfaces in My Wagers.
       await joinPool(summary.address)
-      // Record the join device-locally so this pool can surface in My Wagers (FR-024): on-chain
-      // membership is anonymous, so the joining wallet is only known on this device.
-      recordJoinedPool(account, summary.address)
       ui?.showNotification?.('You’ve joined the pool.', 'success', 6000)
       onClose?.()
       navigate(`/pools/${summary.address}`)

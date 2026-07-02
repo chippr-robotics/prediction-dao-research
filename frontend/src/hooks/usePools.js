@@ -12,6 +12,7 @@ import { phraseToIndices, resolvePool, indicesToPhrase } from '../lib/pools/gate
 import { createPoolIdentity } from '../lib/pools/identity'
 import { deriveNickname } from '../lib/pools/nickname'
 import { readPoolIdentity, cachePoolIdentity } from '../lib/pools/identityCache'
+import { recordJoinedPool } from '../lib/lookup/myWagersSources'
 import { generatePoolProof } from '../lib/pools/semaphoreProof'
 
 function requiredApprovals(frozenDenominator, thresholdBips) {
@@ -113,7 +114,7 @@ export function usePools() {
     setStatus('creating')
     setError(null)
     try {
-      const { signer: s, chainId } = await requireSigner()
+      const { signer: s, chainId, account } = await requireSigner()
       const factory = getFactory(s, chainId)
       const tokenAddr = form.token || getContractAddressForChain('paymentToken', chainId)
       if (!tokenAddr) throw new Error('No buy-in token configured for this network.')
@@ -145,6 +146,9 @@ export function usePools() {
         })
         .find((e) => e && e.name === 'PoolCreated')
       const wordIndices = ev ? ev.args.wordIndices.map((x) => Number(x)) : null
+      // Record the pool device-locally so My Wagers can always list it, even when the subgraph for this
+      // chain is lagging or absent (tester feedback: pools must be easy to locate again).
+      if (ev) recordJoinedPool(account, ev.args.pool)
       setStatus('idle')
       return {
         poolId: ev ? ev.args.poolId : null,
@@ -197,6 +201,10 @@ export function usePools() {
       const { identity, commitment } = await createPoolIdentity(s, poolAddress)
       const tx = await pool.join(commitment)
       const receipt = await tx.wait()
+
+      // Record the join device-locally at the hook level so EVERY join path (unified lookup, pool page,
+      // future surfaces) makes the pool findable in My Wagers (tester feedback).
+      recordJoinedPool(account, poolAddress)
 
       // Best-effort (tester feedback): derive + cache the display values NOW, while the identity is in
       // memory from the join signature, so nickname and claim code auto-show later with no re-prompt.
