@@ -117,6 +117,53 @@ standings" was a manual add-player form. Fixes:
   roster, and the manual add-player form is collapsed behind an "Add a player manually" disclosure
   (edge-case tool, not the primary flow).
 
+### Manager redesign + resolution fixes (round 4)
+
+Post-deploy tester punchlist. Delivered frontend-only against the **immutable** deployed pool contract:
+
+- **Removed non-functional entry**: the propose-builder's "Add winner" row and the leaderboard's "Add
+  player manually" form are gone. The `PoolLeaderboard` component (off-chain multi-round scores) was
+  deleted — it duplicated the participant roster.
+- **One unified roster** (`PoolParticipants`): the old "Participants" and "Live standings" sections were
+  merged. Once a payout is proposed, in-the-money cards grow, sort to the top, carry a 🥇/🥈/🥉 medal,
+  and show their amount; out-of-the-money cards are de-emphasised. The amounts come from a
+  `{ commitment → amount }` display map the creator shares alongside the on-chain matrix (commitments
+  are public, so this leaks nothing); it's trusted only after (a) the code-matrix hash matches the
+  on-chain proposalId and (b) the display amount multiset matches the matrix (`payoutDisplayMap`).
+- **Claim codes are system-managed**: no raw nullifier integer is shown anywhere. Members hand their
+  code to the creator with one tap ("Copy my payout code"); the creator's own row auto-fills from the
+  cached identity; at claim time the app matches the member's cached code to their row automatically and
+  pays the connected wallet in one tap.
+- **Creator can take part**: a "Join this pool" action on the manager page lets the creator (or any
+  not-yet-joined viewer) join while joining is open — the contract's `join` already permits it.
+- **Creator can revise a mis-keyed payout**: `proposeOutcome` accepts a new id (approvals are keyed per
+  id, so a revision restarts the count), surfaced as "Update the proposed payout" with amounts prefilled.
+- **Collapsible details**: pool details are a `<details>` collapsed by default with a one-line digest.
+
+**Constraint-driven / honest limitations (need product decision before further work):**
+
+- **Member "dispute" is off-chain by necessity.** The deployed `ZKWagerPool` only lets the *creator*
+  call `proposeOutcome`; members can approve or, by withholding approval until `resolutionWindow`
+  elapses, force refunds for everyone. There is **no on-chain path for a member-submitted counter
+  proposal**. Round 4 ships the feasible version: a member can build a suggested split and copy it to
+  the creator (who revises), and the UI surfaces the withhold→refund outcome. True on-chain member
+  proposals would require a **new pool implementation + factory template swap + security review +
+  redeploy** — deferred, needs explicit go.
+- **Approve-does-nothing (vote) — root-cause analysis, partial fix.** The single wallet prompt users
+  saw was the identity-derivation signature (`createPoolIdentity`); the on-chain `approve` then needs a
+  browser-generated Groth16 proof (`generatePoolProof`) whose `scope` is the proposalId. Round 4 makes
+  the flow honest — staged progress messages ("Generating your anonymous approval proof…", "Submitting
+  on-chain…") and a surfaced error so it can never silently "do nothing." Two candidate root causes
+  remain to confirm on the live network (not reproducible in-sandbox; tests use a mock verifier):
+  1. **Proof artifacts** (`.wasm`/`.zkey`) failing/hanging to load in a mobile webview → now surfaced,
+     but hosting/bundling of the artifacts should be verified in the deployed build.
+  2. **Scope vs. field mismatch**: the proposalId is a full `keccak256` (up to 2²⁵⁶−1) used directly as
+     the Semaphore `scope`; the real verifier requires a value in the BN254 field (~2²⁵⁴). If the
+     library reduces it mod field, the returned `proof.scope` no longer equals the contract's
+     `uint256(pid)` and `approve` reverts on estimate → no wallet prompt for the tx. **This would be a
+     contract-level fix** (reduce/rehash the proposal scope into the field on both sides) — flagged for
+     review, not changed here, because it touches the audited immutable pool.
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)

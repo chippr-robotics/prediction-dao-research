@@ -57,4 +57,28 @@ describe('PoolParticipants', () => {
     expect(aliases()[0]).toContain('Prismatic Newt')
     expect(screen.queryByText(/0x/)).toBeNull()
   })
+
+  it('incorporates a proposed payout: winners sort to the top, get medals + amounts, in-the-money cards grow', () => {
+    // Amber Fox (commitment 1) wins 15, Silent Owl (3) wins 5, Prismatic Newt (2) gets nothing.
+    const payout = new Map([['1', 15000000n], ['3', 5000000n], ['2', 0n]])
+    render(<PoolParticipants participants={P} payoutByCommitment={payout} tokenSymbol="USDC" tokenDecimals={6} />)
+    const cards = screen.getAllByTestId('participant-card')
+    expect(cards[0]).toHaveTextContent('Amber Fox')       // highest payout first
+    expect(cards[0].textContent).toContain('🥇')
+    expect(cards[0]).toHaveClass('in-money')
+    expect(cards[1]).toHaveTextContent('Silent Owl')
+    expect(cards[1].textContent).toContain('🥈')
+    // Out-of-the-money card is de-emphasised and shows no payout.
+    expect(cards[2]).toHaveTextContent('Prismatic Newt')
+    expect(cards[2]).toHaveClass('no-payout')
+    expect(screen.getByText('15.0 USDC')).toBeInTheDocument()
+    // Reordering is disabled once a payout is proposed (standings are payout-ranked).
+    expect(screen.queryByRole('button', { name: /move/i })).toBeNull()
+  })
+
+  it('labels the section "Final standings" once resolved', () => {
+    const payout = new Map([['1', 20000000n]])
+    render(<PoolParticipants participants={P} payoutByCommitment={payout} resolved tokenDecimals={6} />)
+    expect(screen.getByRole('heading', { name: /final standings/i })).toBeInTheDocument()
+  })
 })

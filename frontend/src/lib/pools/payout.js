@@ -45,3 +45,62 @@ export function parseMatrix(text) {
     return null
   }
 }
+
+/**
+ * Shared-proposal envelope (spec 034 UX round 3). The creator shares TWO things bundled together:
+ *   - `matrix`: the { claimNullifier, amount } rows the contract hashes/claims against (the secret-ish
+ *     part — claim codes stay out of sight, but are needed to claim).
+ *   - `display`: a { commitment, amount } map so EVERY member's roster card can show a medal + amount
+ *     for who's in the money. Identity commitments are public (from Joined events), so sharing them
+ *     with amounts reveals nothing the roster doesn't already show.
+ * The display map is a convenience annotation: it is validated only by checking its amount multiset
+ * matches the on-chain-verified matrix, never trusted for the actual payout (that stays code-gated).
+ */
+export function serializeSharedProposal({ entries, display }) {
+  return JSON.stringify({
+    v: 1,
+    matrix: entries.map((e) => ({ claimNullifier: String(e.claimNullifier), amount: String(e.amount) })),
+    display: (display || []).map((d) => ({ commitment: String(d.commitment), amount: String(d.amount) })),
+  })
+}
+
+/**
+ * Parse a shared proposal. Accepts the envelope above OR a legacy bare `PayoutEntry[]` array (older
+ * shares / the on-chain-only path). Returns { entries, display } — `display` is null when absent.
+ */
+export function parseSharedProposal(text) {
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed)) {
+      const entries = parseMatrix(text)
+      return entries ? { entries, display: null } : null
+    }
+    if (parsed && Array.isArray(parsed.matrix)) {
+      const entries = parseMatrix(JSON.stringify(parsed.matrix))
+      if (!entries) return null
+      const display = Array.isArray(parsed.display)
+        ? parsed.display.map((d) => ({ commitment: String(BigInt(d.commitment)), amount: String(BigInt(d.amount)) }))
+        : null
+      return { entries, display }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build a { commitment → amount } lookup for the roster from a verified matrix + its display map.
+ * Only used once the matrix hash has been verified against the on-chain proposalId, and only when the
+ * display amounts (multiset) match the matrix amounts — so a tampered display can't inflate a card.
+ */
+export function payoutDisplayMap(entries, display) {
+  if (!display || !display.length) return null
+  const matrixAmounts = [...entries.map((e) => String(e.amount))].sort()
+  const displayAmounts = [...display.map((d) => String(d.amount))].sort()
+  if (matrixAmounts.length !== displayAmounts.length) return null
+  for (let i = 0; i < matrixAmounts.length; i++) if (matrixAmounts[i] !== displayAmounts[i]) return null
+  const map = new Map()
+  for (const d of display) map.set(String(d.commitment), BigInt(d.amount))
+  return map
+}

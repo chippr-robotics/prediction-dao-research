@@ -50,12 +50,34 @@
   word-spacing: 0.25rem;
 }
 
+/* Pool details: collapsed by default (tester feedback) — a one-line digest, expandable for the rest. */
 .pool-summary {
   background: var(--surface-2, #f6f8fa);
   border-radius: 10px;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   margin: 1rem 0;
 }
+
+.pool-summary-line {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.pool-summary-status {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: var(--accent-soft, rgba(59, 156, 120, 0.15));
+  color: var(--accent, #3b9c78);
+}
+
+.pool-summary-sep { opacity: 0.4; }
+
+.pool-summary[open] dl { margin-top: 0.85rem; }
 
 .pool-summary dl {
   display: grid;
@@ -93,78 +115,15 @@
   color: var(--text-muted, #5a6472);
 }
 
-/* Live leaderboard (US4) */
-.pool-leaderboard {
-  margin: 1.5rem 0;
+/* Small inline hints + text-link buttons used across the resolution flow. */
+.pool-hint { font-size: 0.8rem; opacity: 0.72; margin: 0.35rem 0 0; }
+.pool-link-btn {
+  background: none; border: none; padding: 0; margin: 0.5rem 0 0;
+  color: var(--accent, #3b9c78); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline;
 }
 
-.leaderboard-interim {
-  font-size: 0.9rem;
-  color: var(--text-muted, #5a6472);
-  background: var(--surface-2, #fff8e6);
-  border-left: 3px solid var(--warning, #d9a400);
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-}
-
-.leaderboard-list {
-  list-style: none;
-  padding: 0;
-  margin: 0.75rem 0 0;
-}
-
-.leaderboard-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.25rem;
-  border-bottom: 1px solid var(--border-color, #e6e9ee);
-}
-
-.leaderboard-row.eliminated {
-  opacity: 0.55;
-  text-decoration: line-through;
-}
-
-.lb-rank {
-  width: 1.5rem;
-  text-align: right;
-  color: var(--text-muted, #5a6472);
-  font-variant-numeric: tabular-nums;
-}
-
-.lb-nick {
-  flex: 1;
-  font-weight: 600;
-}
-
-.lb-score,
-.lb-score-input {
-  font-variant-numeric: tabular-nums;
-}
-
-.lb-score-input {
-  width: 4.5rem;
-}
-
-.lb-actions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.leaderboard-add {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: end;
-  margin-top: 0.75rem;
-}
-
-/* Manual player entry is an edge-case tool — collapsed by default behind a small disclosure. */
-.leaderboard-add-details { margin-top: 0.75rem; }
-.leaderboard-add-details > summary { font-size: 0.85rem; opacity: 0.75; cursor: pointer; }
-
-/* Participant roster (pool-manager tester feedback): anonymous alias cards + creator rank arrangement */
+/* Unified roster + standings (UX round 3): anonymous alias cards, creator rank arrangement, and
+   medals/amounts once a payout is proposed. */
 .pool-participants { margin: 1rem 0; }
 .pool-participants h2 { font-size: 1rem; margin: 0 0 0.25rem; }
 .pool-participants-hint { font-size: 0.8rem; opacity: 0.7; margin: 0 0 0.5rem; }
@@ -183,6 +142,24 @@
 }
 .pool-participant-alias { flex: 1; font-weight: 600; }
 .pool-participant-suffix { margin-left: 0.35rem; font-size: 0.7rem; font-weight: 400; opacity: 0.55; }
+
+/* In-the-money cards grow and gain an accent border once a payout is proposed; the rank chip carries
+   the medal emoji for the top three. */
+.pool-participant-card.in-money {
+  padding: 0.75rem 1rem;
+  border-color: var(--accent, #3b9c78);
+  background: var(--accent-soft, rgba(59, 156, 120, 0.12));
+  box-shadow: 0 1px 6px rgba(59, 156, 120, 0.15);
+}
+.pool-participant-card.in-money .pool-participant-alias { font-size: 1.05rem; }
+.pool-participant-card.no-payout { opacity: 0.62; }
+.pool-participant-card.in-money .pool-participant-rank {
+  background: transparent; font-size: 1.15rem;
+}
+.pool-participant-payout {
+  font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent, #3b9c78);
+}
+.pool-participant-card.no-payout .pool-participant-payout { color: var(--text-muted, #5a6472); font-weight: 500; }
 .pool-participant-controls { display: inline-flex; gap: 0.25rem; }
 .pool-participant-controls button {
   border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15)); background: none;
@@ -202,3 +179,17 @@
   font-size: 0.85rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 8px;
   background: var(--accent-soft, rgba(59, 156, 120, 0.12));
 }
+.pool-propose-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
+.pool-propose-row input { flex: 1; min-width: 7rem; }
+.pool-propose-controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 0.6rem; }
+
+/* Member receive / dispute / claim panels */
+.pool-receive, .pool-dispute, .pool-claim, .pool-claim-advanced { margin: 1rem 0; }
+.pool-receive textarea, .pool-claim textarea, .pool-claim-advanced textarea,
+.pool-claim-advanced input {
+  width: 100%; box-sizing: border-box; padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-color, #ccd2da); border-radius: 8px; font: inherit;
+}
+.pool-claim-advanced { padding-top: 0.5rem; border-top: 1px dashed var(--border-color, rgba(0, 0, 0, 0.12)); }
+.pool-claim-code { margin: 1rem 0; }
+.pool-resolution-notice { margin-top: 0.75rem; }
