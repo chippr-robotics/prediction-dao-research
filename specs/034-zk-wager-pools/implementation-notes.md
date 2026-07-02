@@ -215,6 +215,44 @@ diverged once before*, but it only checked `connect-src`; the new test closes th
 one-file fix can't silently leave production broken again. The self-hosted artifacts are served from
 `'self'`, so no `connect-src`/CDN change is needed alongside this.
 
+### Resolution redesign — address-based pools, no claim code (round 6)
+
+Testers rejected the per-member "claim code" (a private Semaphore nullifier the winner had to hand the
+creator to be included in the payout). Requirement: the claim code must be **derivable from public
+knowledge by both parties, or not exist**. That is impossible while claims stay anonymous — the
+nullifier is `Poseidon(identity secret, claimScope)`, private by construction, and *not* derivable from
+the public identity commitment (that unlinkability is the whole anonymity guarantee). Product decision
+(confirmed with the user, twice, after surfacing the true cost): **drop pool anonymity** and make the
+winner's **wallet address** the public claim code.
+
+- **`contracts/pools/PublicWagerPool.sol`** — a new, non-anonymous, **address-based** pool. It is a
+  **drop-in template** for the existing `ZKWagerPoolFactory`: identical `initialize(...)` selector, so
+  `factory.setTemplate(newImpl)` adopts it for **new pools** with **no factory upgrade**. The
+  `semaphore_`/`groupId_` init args are accepted but unused (call-selector compat); the factory still
+  creates a per-pool Semaphore group that this template never touches — trimming that is a safe factory
+  follow-up (the group is inert). Members `join()` / `approve()` / `claim()` with their wallet; the
+  payout matrix keys on `PayoutEntry{ address winner, uint256 amount }`. Same lifecycle/states, same
+  creator-proposes-members-approve-to-threshold resolution, same CEI + reentrancy-guard + escrow-only-
+  exits (claim on Resolved; refund/cancel) invariants as `ZKWagerPool`. No Semaphore, no Groth16, no
+  WASM — which also removes the CSP/proof-generation failure surface entirely for these pools.
+- **Tests**: `test/pools/PublicWagerPool.test.js` (9 cases) drives the full lifecycle against the REAL
+  factory with `PublicWagerPool` as the template — proving the drop-in, plus join/auto-close, threshold
+  approval + lock, address-keyed claim (winner-only, double-claim guard, matrix-hash + sum checks),
+  creator revise, non-member/non-creator guards, timeout refund, and cancel.
+
+**GATES before this is live (not done here):**
+1. **Formal smart-contract security review** (`.github/agents/smart-contract-security`) of
+   `PublicWagerPool` — it handles escrowed funds. MUST pass before any value-bearing deploy.
+2. **Deploy + `factory.setTemplate(publicWagerPoolImpl)`** on Amoy → validate end-to-end → Polygon
+   (explicit go). Existing `ZKWagerPool` pools are immutable and unaffected; only pools created *after*
+   the template swap are address-based.
+3. **Frontend rewire (follow-up PR)**: rip out the Semaphore identity/proof/claim-code machinery for
+   new pools — `join()` with no identity, roster from `Joined(address)` events (nickname still derived
+   deterministically from the public address for a friendly label), `approve()` as a plain tx (no
+   proof/progress/WASM), creator builds the payout by address straight from the roster, one-tap
+   `claim(entries, index, recipient)` where the app picks the row whose `winner == connected account`.
+   Deferred until the contract direction passes review, to avoid rework against a changing interface.
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)
