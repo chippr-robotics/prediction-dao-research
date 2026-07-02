@@ -497,7 +497,6 @@ function Dashboard() {
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
   const [showGroupPool, setShowGroupPool] = useState(false)
-  const [groupPoolTab, setGroupPoolTab] = useState('create')
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
   const [unifiedInitialPhrase, setUnifiedInitialPhrase] = useState('')
@@ -572,7 +571,6 @@ function Dashboard() {
         setShowOpenChallenge(true)
         break
       case 'create-pool':
-        setGroupPoolTab('create')
         setShowGroupPool(true)
         break
       case 'enter-phrase':
@@ -747,11 +745,11 @@ function Dashboard() {
         }}
       />
 
-      {/* Group Pool (spec 034) — one modal, Create/Join tabs, matching the wager bottom-sheet UX. */}
+      {/* Group Pool (spec 034) — create-only modal matching the wager bottom-sheet UX;
+          joining lives in the unified phrase lookup (spec 037). */}
       <GroupPoolModal
         key={showGroupPool ? 'gp-open' : 'gp-closed'}
         isOpen={showGroupPool}
-        initialTab={groupPoolTab}
         onClose={() => setShowGroupPool(false)}
       />
 

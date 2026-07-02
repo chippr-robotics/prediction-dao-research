@@ -8,7 +8,8 @@ import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
-import { formatTileClock, formatTileDay, formatTimelineSpan } from './wagerTimeline'
+import DeadlineTimeline from './DeadlineTimeline'
+import { toDatetimeLocal } from './wagerTimeline'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -332,158 +333,9 @@ function MakerPanel({ onClose }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Deadline timeline — reuses the 1v1 create-wager timeline element (track +
-// stat tiles, shared fm-* styles) for the open challenge's two deadlines.
-// Each deadline has a slider for coarse picking; tapping its stat tile opens
-// a datetime-local input for exact manual entry (testing feedback).
-// ---------------------------------------------------------------------------
-const HOUR_MS = 3600 * 1000
-const ACCEPT_MAX_HOURS = 30 * 24    // contract MAX_ACCEPT_WINDOW (30 days)
-const RESOLVE_MAX_HOURS = 90 * 24   // slider cap — comfortably under the contract's 180-day resolve window
-const DEFAULT_RESOLVE_GAP_MS = 7 * 24 * HOUR_MS
-
-function DeadlineTimeline({ acceptBy, resolveBy, onAcceptChange, onResolveChange, disabled }) {
-  const [manualFor, setManualFor] = useState(null) // null | 'accept' | 'resolve'
-  // Mount-time "now" anchors the slider scale so positions don't drift while the form is open.
-  const [nowMs] = useState(() => Date.now())
-  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
-  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
-  const acceptValid = Number.isFinite(acceptMs)
-  const resolveValid = Number.isFinite(resolveMs)
-
-  const clampHours = (h, max) => Math.min(max, Math.max(1, h))
-  const acceptHours = acceptValid ? clampHours(Math.round((acceptMs - nowMs) / HOUR_MS), ACCEPT_MAX_HOURS) : 48
-  const resolveHours = acceptValid && resolveValid
-    ? clampHours(Math.round((resolveMs - acceptMs) / HOUR_MS), RESOLVE_MAX_HOURS)
-    : 7 * 24
-
-  const handleAcceptSlide = (e) => {
-    const nextAccept = nowMs + Number(e.target.value) * HOUR_MS
-    // Sliding the acceptance point drags the resolve point with it (constant gap) so the
-    // timeline can never be slid into an accept-after-resolve state.
-    const gap = acceptValid && resolveValid && resolveMs > acceptMs ? resolveMs - acceptMs : DEFAULT_RESOLVE_GAP_MS
-    onAcceptChange(toDatetimeLocal(nextAccept))
-    onResolveChange(toDatetimeLocal(nextAccept + gap))
-  }
-
-  const handleResolveSlide = (e) => {
-    const base = acceptValid ? acceptMs : nowMs + 48 * HOUR_MS
-    onResolveChange(toDatetimeLocal(base + Number(e.target.value) * HOUR_MS))
-  }
-
-  const describe = (ms) => Number.isFinite(ms)
-    ? `${formatTileClock(new Date(ms))} · ${formatTileDay(new Date(ms))}`
-    : '—'
-
-  // Track percentages over the full now → resolve span (amber = open for acceptance,
-  // green = active wager window) — same visual grammar as the 1v1 timeline.
-  const span = Math.max(1, (resolveValid ? resolveMs : nowMs + 1) - nowMs)
-  const acceptPct = acceptValid ? Math.max(0, Math.min(100, ((acceptMs - nowMs) / span) * 100)) : 0
-  const trackStyle = {
-    background: `linear-gradient(to right,` +
-      ` var(--fm-accept) 0%, var(--fm-accept) ${acceptPct}%,` +
-      ` var(--fm-active) ${acceptPct}%, var(--fm-active) 100%)`
-  }
-
-  const toggleManual = (which) => setManualFor((cur) => (cur === which ? null : which))
-
-  return (
-    <div className="fm-form-group fm-form-full fm-endtime oc-timeline">
-      <div className="oc-deadline-slider">
-        <div className="fm-input-header">
-          <label htmlFor="oc-accept-slider">Open for acceptance until <span className="fm-required">*</span></label>
-          <span className="fm-odds-value">{describe(acceptMs)}</span>
-        </div>
-        <input
-          id="oc-accept-slider" type="range" className="fm-odds-slider"
-          min={1} max={ACCEPT_MAX_HOURS} step={1}
-          value={acceptHours} onChange={handleAcceptSlide} disabled={disabled}
-          aria-valuetext={describe(acceptMs)}
-        />
-        <span className="fm-hint">After this, the challenge can no longer be taken and your stake is refundable.</span>
-      </div>
-
-      <div className="oc-deadline-slider">
-        <div className="fm-input-header">
-          <label htmlFor="oc-resolve-slider">Must be resolved by <span className="fm-required">*</span></label>
-          <span className="fm-odds-value">{describe(resolveMs)}</span>
-        </div>
-        <input
-          id="oc-resolve-slider" type="range" className="fm-odds-slider"
-          min={1} max={RESOLVE_MAX_HOURS} step={1}
-          value={resolveHours} onChange={handleResolveSlide} disabled={disabled}
-          aria-valuetext={describe(resolveMs)}
-        />
-        <span className="fm-hint">The outcome must be submitted before this time.</span>
-      </div>
-
-      {acceptValid && resolveValid && (
-        <>
-          <span className="fm-endtime-summary">
-            Open {formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · then up
-            to {formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle
-          </span>
-
-          <div className="fm-timeline-track" style={trackStyle} aria-hidden="true">
-            <span className="fm-timeline-node is-accept" style={{ left: `${acceptPct}%` }} />
-            <span className="fm-timeline-node is-resolve" style={{ left: '100%' }} />
-          </div>
-        </>
-      )}
-
-      <div className="fm-stat-tiles oc-stat-tiles">
-        <button
-          type="button"
-          className="fm-stat-tile is-accept oc-stat-tile-btn"
-          onClick={() => toggleManual('accept')}
-          disabled={disabled}
-          aria-expanded={manualFor === 'accept'}
-          aria-controls={manualFor === 'accept' ? 'oc-accept-by' : undefined}
-        >
-          <span className="fm-stat-head"><span className="fm-stat-dot" aria-hidden="true" />Open until</span>
-          <span className="fm-stat-time">{acceptValid ? formatTileClock(new Date(acceptMs)) : '—'}</span>
-          <span className="fm-stat-day">{acceptValid ? formatTileDay(new Date(acceptMs)) : ''}</span>
-          <span className="oc-tile-edit">Tap to type a date</span>
-        </button>
-        <button
-          type="button"
-          className="fm-stat-tile is-resolve oc-stat-tile-btn"
-          onClick={() => toggleManual('resolve')}
-          disabled={disabled}
-          aria-expanded={manualFor === 'resolve'}
-          aria-controls={manualFor === 'resolve' ? 'oc-resolve-by' : undefined}
-        >
-          <span className="fm-stat-head"><span className="fm-stat-dot" aria-hidden="true" />Resolve by</span>
-          <span className="fm-stat-time">{resolveValid ? formatTileClock(new Date(resolveMs)) : '—'}</span>
-          <span className="fm-stat-day">{resolveValid ? formatTileDay(new Date(resolveMs)) : ''}</span>
-          <span className="oc-tile-edit">Tap to type a date</span>
-        </button>
-      </div>
-
-      {manualFor === 'accept' && (
-        <div className="oc-manual-entry">
-          <label htmlFor="oc-accept-by">Exact date &amp; time — open for acceptance until</label>
-          <input
-            id="oc-accept-by" type="datetime-local" className="oc-datetime fm-datetime-input"
-            value={acceptBy} min={toDatetimeLocal(nowMs)}
-            onChange={(e) => onAcceptChange(e.target.value)} disabled={disabled}
-          />
-        </div>
-      )}
-      {manualFor === 'resolve' && (
-        <div className="oc-manual-entry">
-          <label htmlFor="oc-resolve-by">Exact date &amp; time — must be resolved by</label>
-          <input
-            id="oc-resolve-by" type="datetime-local" className="oc-datetime fm-datetime-input"
-            value={resolveBy} min={acceptBy || toDatetimeLocal(nowMs)}
-            onChange={(e) => onResolveChange(e.target.value)} disabled={disabled}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
+// Deadline timeline moved to the shared DeadlineTimeline component (./DeadlineTimeline.jsx) so the
+// group-pool create flow presents its windows the same way (pool-manager tester feedback). This
+// modal renders it with its default open-challenge labels.
 
 // ---------------------------------------------------------------------------
 // Arbitrator entry — ENS-aware address input with address-book + QR-scan helpers
@@ -543,12 +395,6 @@ function ArbitratorField({ value, onChange, onResolvedChange, disabled }) {
 
 // Recover codes moved to My Account → Security (spec 037, US3):
 // see components/account/RecoveryCodesPanel.jsx.
-
-/** Format a unix-ms instant as a value for <input type="datetime-local"> (local time, minute precision). */
-function toDatetimeLocal(ms) {
-  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000)
-  return d.toISOString().slice(0, 16)
-}
 
 /** Pull a 0x-address out of scanned QR text — a bare address or one embedded in a URL path/query. */
 function extractAddress(decodedText) {

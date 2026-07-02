@@ -52,13 +52,8 @@ describe('ZK-Wager Pool UI accessibility', () => {
     usePools.mockReturnValue(poolsMock())
   })
 
-  it('GroupPoolModal (create tab) has no a11y violations', async () => {
-    const { container } = render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} initialTab="create" /></MemoryRouter>)
-    expect(await axe(container)).toHaveNoViolations()
-  })
-
-  it('GroupPoolModal (join tab) has no a11y violations', async () => {
-    const { container } = render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} initialTab="join" /></MemoryRouter>)
+  it('GroupPoolModal (create-only) has no a11y violations', async () => {
+    const { container } = render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} /></MemoryRouter>)
     expect(await axe(container)).toHaveNoViolations()
   })
 

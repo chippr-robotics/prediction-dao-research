@@ -25,9 +25,14 @@ describe('sortParticipants', () => {
 })
 
 describe('PoolParticipants', () => {
-  it('renders nothing with no participants', () => {
-    const { container } = render(<PoolParticipants participants={[]} />)
+  it('renders nothing while the roster is still loading (null)', () => {
+    const { container } = render(<PoolParticipants participants={null} />)
     expect(container.firstChild).toBeNull()
+  })
+
+  it('shows a share-the-words empty state once loaded with no members (live-app tester feedback)', () => {
+    render(<PoolParticipants participants={[]} />)
+    expect(screen.getByTestId('participants-empty')).toHaveTextContent(/share the pool.s four words/i)
   })
 
   it('members see a read-only alphabetical roster (no reorder controls)', () => {

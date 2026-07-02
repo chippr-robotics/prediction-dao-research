@@ -24,3 +24,9 @@ export const formatTimelineSpan = (from, to) => {
   if (days > 0) return `${days} day${days > 1 ? 's' : ''} ${hours}h`
   return `${hours}h`
 }
+
+/** Format a unix-ms instant as a value for <input type="datetime-local"> (local time, minute precision). */
+export const toDatetimeLocal = (ms) => {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000)
+  return d.toISOString().slice(0, 16)
+}

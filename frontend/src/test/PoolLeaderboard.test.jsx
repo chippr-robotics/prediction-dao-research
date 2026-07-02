@@ -53,6 +53,15 @@ describe('PoolLeaderboard (US4)', () => {
     expect(onAddPlayer).toHaveBeenCalledWith('Cobalt Lynx')
   })
 
+  it('tells the creator standings auto-fill and tucks manual entry behind a disclosure', () => {
+    render(<PoolLeaderboard entries={[]} isCreator />)
+    expect(screen.getByText(/fill in automatically as members join/i)).toBeInTheDocument()
+    // Manual add still exists as an edge-case tool, but collapsed behind a <details> disclosure.
+    const details = screen.getByText(/add a player manually/i).closest('details')
+    expect(details).not.toBeNull()
+    expect(details.open).toBe(false)
+  })
+
   it('hides the interim marker and editing when final', () => {
     render(<PoolLeaderboard entries={entries} isCreator isFinal />)
     expect(screen.queryByRole('note')).toBeNull()

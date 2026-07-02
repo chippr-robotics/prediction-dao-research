@@ -67,6 +67,56 @@ integration + gasless; fork skips without RPC), `graph codegen` + `graph build` 
 tests pass, `vite build` green (with the local `.env` `VITE_PINATA_JWT` unset — a known local-only
 guard; CI is clean). Matchstick (T022) is Docker-gated on this host and runs in CI.
 
+## Create-flow UX punchlist (tester feedback, round 2)
+
+Testers reviewed the group-pool UX end to end. The **pool-manager** items (auto-shown nickname,
+human-readable status, participant roster with creator drag-ranking, alphabetical member view,
+auto-populated leaderboard/propose-builder, cached claim code, member-visible verified proposals)
+shipped in the prior round (PR #786). This round refines the **create** flow so it matches the look
+and feel of the other wager create surfaces:
+
+- **No mode pill**: the lone "Create a pool" tab is gone — the modal is create-only (joining lives in
+  the unified phrase lookup, spec 037) and the header alone says what it does, same as the open
+  challenge.
+- **Money-formatted buy-in**: `$`-prefixed, `USDC`-suffixed, 2-decimal-on-blur — identical chrome to
+  the open-challenge stake entry.
+- **Windows as the shared deadline timeline**: join and resolution windows are no longer bare
+  day-count inputs. The open-challenge timeline element (sliders + track + stat tiles +
+  tap-to-type `datetime-local`) was extracted into the shared
+  `frontend/src/components/fairwins/DeadlineTimeline.jsx` and both surfaces render it (pools with
+  "Joining open until" / "Must be resolved by" wording). The create form now passes an exact
+  `joinDeadline` (unix seconds) and `resolutionWindow` (seconds after joining closes) to
+  `usePools.createPool`, which still accepts the older day-count fields as a fallback.
+- **Approval threshold as a named selector**: the raw percent field read as jargon — replaced with a
+  Majority (51%) / Two-thirds (67%) / Everyone (100%) radio-pill selector with a plain-language hint,
+  still stored as bips on-chain.
+- **Share view matches the open challenge**: the four words render in the shared code display with an
+  icon copy button and a QR that deep-links into the unified phrase lookup (`?oc=take&code=<words>`
+  resolves pools as well as challenges), plus "Open my pool" / "Done" actions.
+
+### Live-app verification follow-up (round 3)
+
+Screenshots from fairwins.app showed the round-1 manager fixes only partially landing in practice:
+the nickname/claim-code auto-show was **cache-only**, so any member whose device lacked the join-time
+cache (joined pre-cache, another device, cleared storage) still saw click-to-reveal buttons; the
+identity section rendered even for viewers who never joined; and the creator's first sight of "Live
+standings" was a manual add-player form. Fixes:
+
+- **`usePools.restorePoolIdentity`**: one-signature full restore — cache-first (no prompt on the
+  join device), otherwise re-derive the identity, derive + cache the claim code, return
+  `{ commitment, claimCode, nickname }`. `PoolPage` now auto-runs it whenever a joined member has no
+  cached identity, so the nickname AND claim code always auto-show; declining the signature falls
+  back to the manual Reveal button. The restored claim code is passed down to
+  `PoolResolutionActions`.
+- **Identity section only for joined members** — a viewer (including a creator who hasn't joined
+  their own pool, the 0/N case in the screenshots) no longer sees a meaningless "Reveal my
+  nickname" button.
+- **Roster empty state**: once loaded with zero members, `PoolParticipants` says "share the pool's
+  four words" instead of omitting the section.
+- **Leaderboard**: the creator's empty state now says standings fill in automatically from the
+  roster, and the manual add-player form is collapsed behind an "Add a player manually" disclosure
+  (edge-case tool, not the primary flow).
+
 ## Actual on-chain deployment (ops, post-merge)
 
 Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)

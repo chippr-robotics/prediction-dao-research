@@ -109,7 +109,12 @@ export function usePools() {
     return { signer, chainId: Number(net.chainId), account }
   }, [signer])
 
-  /** Create a pool. `form`: { buyIn, maxMembers, thresholdPct, joinDays, resolutionDays, token? } */
+  /**
+   * Create a pool. `form`: { buyIn, maxMembers, thresholdPct, token?, joinDeadline?, resolutionWindow?,
+   * joinDays?, resolutionDays? }. The create UI passes exact instants from its timeline element —
+   * `joinDeadline` (unix seconds) and `resolutionWindow` (seconds after joining closes); the older
+   * day-count fields remain as a fallback.
+   */
   const createPool = useCallback(async (form) => {
     setStatus('creating')
     setError(null)
@@ -131,8 +136,9 @@ export function usePools() {
         buyIn: ethers.parseUnits(String(form.buyIn), decimals),
         maxMembers: Number(form.maxMembers),
         thresholdBips: Math.round(Number(form.thresholdPct) * 100),
-        joinDeadline: now + Number(form.joinDays) * 86400,
-        resolutionWindow: Number(form.resolutionDays) * 86400,
+        joinDeadline: form.joinDeadline != null ? Number(form.joinDeadline) : now + Number(form.joinDays) * 86400,
+        resolutionWindow:
+          form.resolutionWindow != null ? Number(form.resolutionWindow) : Number(form.resolutionDays) * 86400,
       }
       const tx = await factory.createPool(params)
       const receipt = await tx.wait()
@@ -280,6 +286,45 @@ export function usePools() {
   }, [requireSigner])
 
   /**
+   * Restore the connected member's full display identity for a pool with at most ONE wallet signature.
+   * Cache-first (no signature at all when the join-time cache is present); otherwise re-derives the
+   * identity, derives the claim-scope nullifier ("claim code"), caches both, and returns
+   * { commitment, claimCode, nickname }. Lets the pool page auto-show a joined member's nickname and
+   * claim code even on devices where the join-time cache is missing (live-app tester feedback: a
+   * joined member should never have to click to reveal who they are).
+   */
+  const restorePoolIdentity = useCallback(async (poolAddress) => {
+    const { signer: s, account } = await requireSigner()
+    const cached = readPoolIdentity(account, poolAddress)
+    if (cached?.commitment && cached?.claimCode) {
+      return {
+        commitment: cached.commitment,
+        claimCode: cached.claimCode,
+        nickname: deriveNickname(cached.commitment, poolAddress),
+      }
+    }
+    const { identity, commitment } = await createPoolIdentity(s, poolAddress)
+    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
+    let claimCode = cached?.claimCode || null
+    if (!claimCode) {
+      try {
+        const memberCommitments = await getMemberCommitments(poolAddress)
+        const proof = await generatePoolProof({
+          identity,
+          memberCommitments,
+          message: 0n,
+          scope: poolClaimScope(poolAddress),
+        })
+        claimCode = proof.nullifier.toString()
+        cachePoolIdentity(account, poolAddress, { claimCode })
+      } catch {
+        /* non-fatal — the nickname still shows; the claim-code reveal path can backfill later */
+      }
+    }
+    return { commitment: commitment.toString(), claimCode, nickname: deriveNickname(commitment, poolAddress) }
+  }, [requireSigner, getMemberCommitments])
+
+  /**
    * Reveal the connected member's "claim code" — their claim-scope Semaphore nullifier. The member shares
    * this off-chain with the creator, who places it (with an amount) in the payout matrix. It is unlinkable
    * to the wallet, and is the value the contract matches at claim time. Returns a decimal string.
@@ -410,6 +455,7 @@ export function usePools() {
     getMyNickname,
     getMyClaimCode,
     peekPoolIdentity,
+    restorePoolIdentity,
     closeJoining,
     cancelPool,
     proposeOutcome,

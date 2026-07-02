@@ -42,7 +42,11 @@ export default function PoolLeaderboard({
       )}
 
       {sorted.length === 0 ? (
-        <p className="leaderboard-empty">No standings yet.</p>
+        <p className="leaderboard-empty">
+          {editable
+            ? 'Standings fill in automatically as members join — no need to enter anyone by hand.'
+            : 'No standings yet.'}
+        </p>
       ) : (
         <ol className="leaderboard-list">
           {sorted.map((e, i) => (
@@ -82,18 +86,23 @@ export default function PoolLeaderboard({
         </ol>
       )}
 
+      {/* Manual entry is an edge-case tool (guests, corrections) — the roster auto-populates the
+          standings, so keep this tucked away instead of front-and-center (live-app tester feedback). */}
       {editable && (
-        <form className="leaderboard-add" onSubmit={submitAdd}>
-          <label htmlFor="lb-add-player">Add player (nickname)</label>
-          <input
-            id="lb-add-player"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="e.g. Prismatic Fox"
-            autoComplete="off"
-          />
-          <button type="submit">Add</button>
-        </form>
+        <details className="leaderboard-add-details">
+          <summary>Add a player manually</summary>
+          <form className="leaderboard-add" onSubmit={submitAdd}>
+            <label htmlFor="lb-add-player">Add player (nickname)</label>
+            <input
+              id="lb-add-player"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Prismatic Fox"
+              autoComplete="off"
+            />
+            <button type="submit">Add</button>
+          </form>
+        </details>
       )}
     </section>
   )

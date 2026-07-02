@@ -38,12 +38,14 @@ export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
   const {
-    getPoolSummary, getMyNickname, peekPoolIdentity, getMemberCommitments,
+    getPoolSummary, peekPoolIdentity, restorePoolIdentity, getMemberCommitments,
     closeJoining, cancelPool, vote, refund, status,
   } = pools
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
-  const [nickname, setNickname] = useState(null)
+  // The member's display identity ({ nickname, claimCode }) — auto-restored, never click-gated.
+  const [identity, setIdentity] = useState(null)
+  const [identityStatus, setIdentityStatus] = useState('idle') // idle | restoring | failed
   const [notice, setNotice] = useState(null)
 
   // The anonymous participant roster (alias cards) + the creator's device-local rank arrangement.
@@ -120,18 +122,34 @@ export default function PoolPage() {
     )
   }, [participants])
 
-  // Auto-show the member's nickname (tester feedback) — from the device cache only, so nothing here can
-  // pop an unrequested wallet signature. The Reveal button remains as the fallback for uncached devices.
+  // ALWAYS auto-show a joined member's identity (live-app tester feedback): cache-first (no prompt at
+  // all on the device they joined from); when the cache is missing (new device, cleared storage,
+  // pre-cache join) restore it automatically with one wallet signature. Declining the signature falls
+  // back to the manual Reveal button.
   useEffect(() => {
-    if (!loaded || !summary.hasJoined || nickname) return
+    if (!loaded || !summary.hasJoined || identity) return undefined
     let active = true
-    peekPoolIdentity?.(address)
-      .then((id) => active && id?.nickname && setNickname(id.nickname))
-      .catch(() => {})
+    ;(async () => {
+      try {
+        const peeked = await peekPoolIdentity?.(address)
+        if (!active) return
+        if (peeked?.nickname) {
+          setIdentity({ nickname: peeked.nickname, claimCode: peeked.claimCode || null })
+          return
+        }
+        setIdentityStatus('restoring')
+        const restored = await restorePoolIdentity(address)
+        if (!active) return
+        setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode })
+        setIdentityStatus('idle')
+      } catch {
+        if (active) setIdentityStatus('failed')
+      }
+    })()
     return () => {
       active = false
     }
-  }, [loaded, summary, nickname, address, peekPoolIdentity])
+  }, [loaded, summary, identity, address, peekPoolIdentity, restorePoolIdentity])
 
   const run = async (fn) => {
     setNotice(null)
@@ -143,7 +161,13 @@ export default function PoolPage() {
     }
   }
 
-  const revealNickname = () => run(async () => setNickname(await getMyNickname(address)))
+  // Manual fallback, only reached when the automatic restore failed (e.g. the signature was declined).
+  const revealNickname = () =>
+    run(async () => {
+      const restored = await restorePoolIdentity(address)
+      setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode })
+      setIdentityStatus('idle')
+    })
 
   if (error) {
     return (
@@ -180,13 +204,21 @@ export default function PoolPage() {
         </dl>
       </section>
 
-      <section className="pool-identity" aria-label="Your identity">
-        {nickname ? (
-          <p>You are <strong data-testid="my-nickname">{nickname.label}</strong> in this pool.</p>
-        ) : (
-          <Button variant="secondary" onClick={revealNickname}>Reveal my nickname</Button>
-        )}
-      </section>
+      {/* Identity is only meaningful for joined members — a viewer (or a creator who hasn't joined
+          their own pool) has no alias here, so no Reveal button is dangled at them. */}
+      {summary.hasJoined && (
+        <section className="pool-identity" aria-label="Your identity">
+          {identity?.nickname ? (
+            <p>You are <strong data-testid="my-nickname">{identity.nickname.label}</strong> in this pool.</p>
+          ) : identityStatus === 'restoring' ? (
+            <p data-testid="identity-restoring">
+              Restoring your pool identity… confirm the signature in your wallet if prompted.
+            </p>
+          ) : (
+            <Button variant="secondary" onClick={revealNickname}>Reveal my nickname</Button>
+          )}
+        </section>
+      )}
 
       {/* Anonymous roster: alias cards for everyone; the creator can drag/arrange the rank order */}
       {summary.state !== 3 && (
@@ -249,6 +281,7 @@ export default function PoolPage() {
           pools={pools}
           participants={participants}
           rankOrder={rankOrder}
+          claimCode={identity?.claimCode || null}
           onChanged={reload}
         />
       )}
