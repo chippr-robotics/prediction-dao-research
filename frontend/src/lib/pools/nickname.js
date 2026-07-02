@@ -18,8 +18,16 @@ const DOMAIN = `FAIRWINS_POOL_NICK_v${NICKNAME_VERSION}`
  */
 export function deriveNickname(identityCommitment, poolId = '') {
   const commitment = getBigInt(identityCommitment)
+  // Normalise the pool scope so the SAME member renders the SAME two words for EVERYONE, regardless of
+  // how the pool address was cased in the URL / navigation that produced it. A checksummed `0xAbC…` and
+  // a lowercase `0xabc…` are the same pool, but `solidityPacked(['string'], …)` packs their raw bytes,
+  // so an un-normalised scope hashed to different words per viewer — while the commitment-only `suffix`
+  // stayed identical (exactly the "#12 / #ba match but the names differ across users" bug). Lowercasing
+  // is address-safe and can't throw. NB: this changes the words for any in-flight pool once, after which
+  // every viewer agrees.
+  const scope = String(poolId).toLowerCase()
   const h = getBigInt(
-    keccak256(solidityPacked(['uint256', 'string', 'string'], [commitment, String(poolId), DOMAIN]))
+    keccak256(solidityPacked(['uint256', 'string', 'string'], [commitment, scope, DOMAIN]))
   )
 
   const adjCount = BigInt(ADJECTIVES.length)

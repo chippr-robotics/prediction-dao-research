@@ -23,6 +23,21 @@ describe('pool nickname', () => {
     expect(fromStr).toEqual(fromBig)
   })
 
+  it('is INVARIANT to pool-address casing so every viewer sees the same words (cross-user determinism)', () => {
+    // Different users reach a pool via differently-cased addresses (creator: the contract's checksummed
+    // address; a shared link: lowercase). The words must not depend on that casing — only the
+    // commitment-only suffix was casing-invariant before, which is why suffixes matched but names didn't.
+    const checksummed = '0x5aA0Ea1a5Cd4C1b0f0B8a3B2C1D0e9F8a7B6C5d4'
+    const lower = checksummed.toLowerCase()
+    const upper = checksummed.toUpperCase().replace('0X', '0x')
+    const a = deriveNickname(commitment, checksummed)
+    const b = deriveNickname(commitment, lower)
+    const c = deriveNickname(commitment, upper)
+    expect(a.label).toEqual(b.label)
+    expect(a.label).toEqual(c.label)
+    expect(a).toEqual(b)
+  })
+
   it('varies across commitments and scopes', () => {
     const a = deriveNickname(commitment, 'pool-1')
     const b = deriveNickname(commitment + 1n, 'pool-1')
