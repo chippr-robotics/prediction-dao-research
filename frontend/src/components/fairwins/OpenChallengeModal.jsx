@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
@@ -8,6 +8,7 @@ import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
+import { formatTileClock, formatTileDay, formatTimelineSpan } from './wagerTimeline'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -17,14 +18,26 @@ const CloseIcon = () => (
   </svg>
 )
 
+const CopyIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
 /**
  * Open-challenge modal (feature 024) — create a code-gated wager with no named opponent (Silver+).
  * Taking a challenge moved to the unified phrase lookup (spec 037, UnifiedLookupModal). Styled to match
- * the create-a-wager modal (shared `fm-*` classes).
+ * the create-a-wager modal (shared `fm-*` classes). Create-only, so no mode tabs — the header alone
+ * says what this modal does (testing feedback).
  */
-function OpenChallengeModal({ isOpen, onClose, initialTab = 'maker' }) {
-  const [tab, setTab] = useState(initialTab)
-
+function OpenChallengeModal({ isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -59,17 +72,6 @@ function OpenChallengeModal({ isOpen, onClose, initialTab = 'maker' }) {
 
         <div className="fm-content">
           <div className="fm-panel">
-            {/* Maker / Taker tabs (same tab styling as the create-wager resolution tabs) */}
-            <div className="fm-resolution-tabs oc-mode-tabs" role="tablist" aria-label="Open challenge mode">
-              <button
-                type="button" role="tab" aria-selected={tab === 'maker'}
-                className={`fm-resolution-tab ${tab === 'maker' ? 'active' : ''}`}
-                onClick={() => setTab('maker')}
-              >
-                <span className="fm-resolution-tab-label">Create a challenge</span>
-              </button>
-            </div>
-
             {/* Taking a challenge moved to the unified phrase lookup (spec 037). */}
             <MakerPanel onClose={onClose} />
           </div>
@@ -85,7 +87,7 @@ function OpenChallengeModal({ isOpen, onClose, initialTab = 'maker' }) {
 function MakerPanel({ onClose }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const [description, setDescription] = useState('')
-  const [stake, setStake] = useState('10')
+  const [stake, setStake] = useState('10.00')
   const [resolutionType, setResolutionType] = useState(String(OPEN_RESOLUTION_TYPES.Either))
   const [arbitrator, setArbitrator] = useState('')
   const [arbitratorResolved, setArbitratorResolved] = useState('')
@@ -102,6 +104,7 @@ function MakerPanel({ onClose }) {
   const { saveCode, canUse: canBackup } = useOpenChallengeCodeVault()
   const [backupState, setBackupState] = useState('idle') // idle | saving | saved | error
   const [backupError, setBackupError] = useState(null)
+  const autoBackupStarted = useRef(false)
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const arbitratorAddr = arbitratorResolved || arbitrator
@@ -162,16 +165,33 @@ function MakerPanel({ onClose }) {
     }
   }, [result, saveCode, description, stake])
 
+  // Save the share words locally without the user having to do anything (testing feedback):
+  // as soon as the challenge exists, write the encrypted device backup automatically. If it
+  // can't complete (no wallet, signature declined), the manual save button below is the fallback.
+  useEffect(() => {
+    if (!result || !canBackup || autoBackupStarted.current) return
+    autoBackupStarted.current = true
+    handleSaveBackup()
+  }, [result, canBackup, handleSaveBackup])
+
   if (result) {
     return (
       <div className="fm-success">
         <div className="fm-success-icon" aria-hidden="true">&#127881;</div>
-        <h3>Open challenge created{result.wagerId != null ? ` (#${result.wagerId})` : ''}</h3>
+        <h3>Open challenge created</h3>
         <p className="fm-success-desc">Share this four-word code with whoever you want to take the other side.</p>
 
         <div className="oc-code-display">
           <code className="oc-code">{result.code}</code>
-          <button type="button" className="fm-btn-secondary" onClick={handleCopy}>{copied ? 'Copied ✓' : 'Copy'}</button>
+          <button
+            type="button"
+            className="oc-copy-btn"
+            onClick={handleCopy}
+            title={copied ? 'Copied' : 'Copy code'}
+            aria-label={copied ? 'Copied' : 'Copy code'}
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
         </div>
 
         <div className="oc-qr">
@@ -184,12 +204,16 @@ function MakerPanel({ onClose }) {
           don't store it server-side. Anyone with the code can take the other side.
         </div>
 
-        {/* Encrypted backup (recovery) — stored only on this device, readable only with this wallet. */}
+        {/* Encrypted backup (recovery) — saved automatically, stored only on this device, readable only with this wallet. */}
         <div className="oc-backup">
           {backupState === 'saved' ? (
             <p className="oc-backup-ok" role="status">
               <span aria-hidden="true">&#128274;</span> Encrypted backup saved to this device. Recover it
               anytime from the <strong>Recover codes</strong> tab with this wallet.
+            </p>
+          ) : backupState === 'saving' ? (
+            <p className="oc-backup-ok" role="status">
+              <span aria-hidden="true">&#128274;</span> Saving an encrypted backup to this device…
             </p>
           ) : (
             <>
@@ -197,9 +221,9 @@ function MakerPanel({ onClose }) {
                 type="button"
                 className="fm-btn-secondary"
                 onClick={handleSaveBackup}
-                disabled={!canBackup || backupState === 'saving'}
+                disabled={!canBackup}
               >
-                {backupState === 'saving' ? 'Saving…' : 'Save encrypted backup to this device'}
+                Save encrypted backup to this device
               </button>
               <span className="fm-hint">
                 {canBackup
@@ -242,8 +266,23 @@ function MakerPanel({ onClose }) {
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-stake">Stake — each side (USDC) <span className="fm-required">*</span></label>
-        <input id="oc-stake" type="number" min="0" step="0.01" value={stake} onChange={(e) => setStake(e.target.value)} disabled={busy} />
+        <label htmlFor="oc-stake">Stake — each side <span className="fm-required">*</span></label>
+        <div className="fm-stake-input-wrapper">
+          <span className="fm-stake-prefix">$</span>
+          <input
+            id="oc-stake" type="number" inputMode="decimal" min="0" step="0.01"
+            placeholder="10.00" className="fm-stake-usd"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
+            onBlur={() => {
+              const n = Number(stake)
+              if (stake !== '' && Number.isFinite(n) && n > 0) setStake(n.toFixed(2))
+            }}
+            disabled={busy}
+          />
+          <span className="fm-stake-suffix">USDC</span>
+        </div>
+        <span className="fm-hint">Enter the amount in USD — both sides stake this much in USDC.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
@@ -266,25 +305,15 @@ function MakerPanel({ onClose }) {
         />
       )}
 
-      {/* Time constraints (feature 024 feedback): make the deadlines explicit and editable. */}
-      <div className="fm-form-group">
-        <label htmlFor="oc-accept-by">Open for acceptance until <span className="fm-required">*</span></label>
-        <input
-          id="oc-accept-by" type="datetime-local" className="oc-datetime"
-          value={acceptBy} min={toDatetimeLocal(Date.now())}
-          onChange={(e) => setAcceptBy(e.target.value)} disabled={busy}
-        />
-        <span className="fm-hint">After this, the challenge can no longer be taken and your stake is refundable.</span>
-      </div>
-      <div className="fm-form-group">
-        <label htmlFor="oc-resolve-by">Must be resolved by <span className="fm-required">*</span></label>
-        <input
-          id="oc-resolve-by" type="datetime-local" className="oc-datetime"
-          value={resolveBy} min={acceptBy || toDatetimeLocal(Date.now())}
-          onChange={(e) => setResolveBy(e.target.value)} disabled={busy}
-        />
-        <span className="fm-hint">The outcome must be submitted before this time.</span>
-      </div>
+      {/* Time constraints (testing feedback): the 1v1-wager timeline element — slide to pick each
+          time, or tap a tile to type the exact date & time. */}
+      <DeadlineTimeline
+        acceptBy={acceptBy}
+        resolveBy={resolveBy}
+        onAcceptChange={setAcceptBy}
+        onResolveChange={setResolveBy}
+        disabled={busy}
+      />
       {!deadlinesValid && (acceptBy || resolveBy) && (
         <p className="fm-hint oc-deadline-warn" role="alert">
           Pick an acceptance time in the future and a resolve time after it.
@@ -300,6 +329,159 @@ function MakerPanel({ onClose }) {
         </button>
       </div>
     </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Deadline timeline — reuses the 1v1 create-wager timeline element (track +
+// stat tiles, shared fm-* styles) for the open challenge's two deadlines.
+// Each deadline has a slider for coarse picking; tapping its stat tile opens
+// a datetime-local input for exact manual entry (testing feedback).
+// ---------------------------------------------------------------------------
+const HOUR_MS = 3600 * 1000
+const ACCEPT_MAX_HOURS = 30 * 24    // contract MAX_ACCEPT_WINDOW (30 days)
+const RESOLVE_MAX_HOURS = 90 * 24   // slider cap — comfortably under the contract's 180-day resolve window
+const DEFAULT_RESOLVE_GAP_MS = 7 * 24 * HOUR_MS
+
+function DeadlineTimeline({ acceptBy, resolveBy, onAcceptChange, onResolveChange, disabled }) {
+  const [manualFor, setManualFor] = useState(null) // null | 'accept' | 'resolve'
+  // Mount-time "now" anchors the slider scale so positions don't drift while the form is open.
+  const [nowMs] = useState(() => Date.now())
+  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
+  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
+  const acceptValid = Number.isFinite(acceptMs)
+  const resolveValid = Number.isFinite(resolveMs)
+
+  const clampHours = (h, max) => Math.min(max, Math.max(1, h))
+  const acceptHours = acceptValid ? clampHours(Math.round((acceptMs - nowMs) / HOUR_MS), ACCEPT_MAX_HOURS) : 48
+  const resolveHours = acceptValid && resolveValid
+    ? clampHours(Math.round((resolveMs - acceptMs) / HOUR_MS), RESOLVE_MAX_HOURS)
+    : 7 * 24
+
+  const handleAcceptSlide = (e) => {
+    const nextAccept = nowMs + Number(e.target.value) * HOUR_MS
+    // Sliding the acceptance point drags the resolve point with it (constant gap) so the
+    // timeline can never be slid into an accept-after-resolve state.
+    const gap = acceptValid && resolveValid && resolveMs > acceptMs ? resolveMs - acceptMs : DEFAULT_RESOLVE_GAP_MS
+    onAcceptChange(toDatetimeLocal(nextAccept))
+    onResolveChange(toDatetimeLocal(nextAccept + gap))
+  }
+
+  const handleResolveSlide = (e) => {
+    const base = acceptValid ? acceptMs : nowMs + 48 * HOUR_MS
+    onResolveChange(toDatetimeLocal(base + Number(e.target.value) * HOUR_MS))
+  }
+
+  const describe = (ms) => Number.isFinite(ms)
+    ? `${formatTileClock(new Date(ms))} · ${formatTileDay(new Date(ms))}`
+    : '—'
+
+  // Track percentages over the full now → resolve span (amber = open for acceptance,
+  // green = active wager window) — same visual grammar as the 1v1 timeline.
+  const span = Math.max(1, (resolveValid ? resolveMs : nowMs + 1) - nowMs)
+  const acceptPct = acceptValid ? Math.max(0, Math.min(100, ((acceptMs - nowMs) / span) * 100)) : 0
+  const trackStyle = {
+    background: `linear-gradient(to right,` +
+      ` var(--fm-accept) 0%, var(--fm-accept) ${acceptPct}%,` +
+      ` var(--fm-active) ${acceptPct}%, var(--fm-active) 100%)`
+  }
+
+  const toggleManual = (which) => setManualFor((cur) => (cur === which ? null : which))
+
+  return (
+    <div className="fm-form-group fm-form-full fm-endtime oc-timeline">
+      <div className="oc-deadline-slider">
+        <div className="fm-input-header">
+          <label htmlFor="oc-accept-slider">Open for acceptance until <span className="fm-required">*</span></label>
+          <span className="fm-odds-value">{describe(acceptMs)}</span>
+        </div>
+        <input
+          id="oc-accept-slider" type="range" className="fm-odds-slider"
+          min={1} max={ACCEPT_MAX_HOURS} step={1}
+          value={acceptHours} onChange={handleAcceptSlide} disabled={disabled}
+          aria-valuetext={describe(acceptMs)}
+        />
+        <span className="fm-hint">After this, the challenge can no longer be taken and your stake is refundable.</span>
+      </div>
+
+      <div className="oc-deadline-slider">
+        <div className="fm-input-header">
+          <label htmlFor="oc-resolve-slider">Must be resolved by <span className="fm-required">*</span></label>
+          <span className="fm-odds-value">{describe(resolveMs)}</span>
+        </div>
+        <input
+          id="oc-resolve-slider" type="range" className="fm-odds-slider"
+          min={1} max={RESOLVE_MAX_HOURS} step={1}
+          value={resolveHours} onChange={handleResolveSlide} disabled={disabled}
+          aria-valuetext={describe(resolveMs)}
+        />
+        <span className="fm-hint">The outcome must be submitted before this time.</span>
+      </div>
+
+      {acceptValid && resolveValid && (
+        <>
+          <span className="fm-endtime-summary">
+            Open {formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · then up
+            to {formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle
+          </span>
+
+          <div className="fm-timeline-track" style={trackStyle} aria-hidden="true">
+            <span className="fm-timeline-node is-accept" style={{ left: `${acceptPct}%` }} />
+            <span className="fm-timeline-node is-resolve" style={{ left: '100%' }} />
+          </div>
+        </>
+      )}
+
+      <div className="fm-stat-tiles oc-stat-tiles">
+        <button
+          type="button"
+          className="fm-stat-tile is-accept oc-stat-tile-btn"
+          onClick={() => toggleManual('accept')}
+          disabled={disabled}
+          aria-expanded={manualFor === 'accept'}
+          aria-controls={manualFor === 'accept' ? 'oc-accept-by' : undefined}
+        >
+          <span className="fm-stat-head"><span className="fm-stat-dot" aria-hidden="true" />Open until</span>
+          <span className="fm-stat-time">{acceptValid ? formatTileClock(new Date(acceptMs)) : '—'}</span>
+          <span className="fm-stat-day">{acceptValid ? formatTileDay(new Date(acceptMs)) : ''}</span>
+          <span className="oc-tile-edit">Tap to type a date</span>
+        </button>
+        <button
+          type="button"
+          className="fm-stat-tile is-resolve oc-stat-tile-btn"
+          onClick={() => toggleManual('resolve')}
+          disabled={disabled}
+          aria-expanded={manualFor === 'resolve'}
+          aria-controls={manualFor === 'resolve' ? 'oc-resolve-by' : undefined}
+        >
+          <span className="fm-stat-head"><span className="fm-stat-dot" aria-hidden="true" />Resolve by</span>
+          <span className="fm-stat-time">{resolveValid ? formatTileClock(new Date(resolveMs)) : '—'}</span>
+          <span className="fm-stat-day">{resolveValid ? formatTileDay(new Date(resolveMs)) : ''}</span>
+          <span className="oc-tile-edit">Tap to type a date</span>
+        </button>
+      </div>
+
+      {manualFor === 'accept' && (
+        <div className="oc-manual-entry">
+          <label htmlFor="oc-accept-by">Exact date &amp; time — open for acceptance until</label>
+          <input
+            id="oc-accept-by" type="datetime-local" className="oc-datetime fm-datetime-input"
+            value={acceptBy} min={toDatetimeLocal(nowMs)}
+            onChange={(e) => onAcceptChange(e.target.value)} disabled={disabled}
+          />
+        </div>
+      )}
+      {manualFor === 'resolve' && (
+        <div className="oc-manual-entry">
+          <label htmlFor="oc-resolve-by">Exact date &amp; time — must be resolved by</label>
+          <input
+            id="oc-resolve-by" type="datetime-local" className="oc-datetime fm-datetime-input"
+            value={resolveBy} min={acceptBy || toDatetimeLocal(nowMs)}
+            onChange={(e) => onResolveChange(e.target.value)} disabled={disabled}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 

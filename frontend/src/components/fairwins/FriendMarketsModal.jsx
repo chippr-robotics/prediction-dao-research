@@ -34,6 +34,7 @@ import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
 import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
+import { formatTileClock, formatTileDay, formatTimelineSpan } from './wagerTimeline'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -132,31 +133,8 @@ const RESOLUTION_TAB_ICONS = {
   [ResolutionType.UMA]: '🔮',
 }
 
-// ── End-date timeline formatters (compact-chips redesign) ───────────
-// The end-date region renders three glanceable stat tiles (Accept by /
-// Ends / Resolve by). Each shows a short clock + day, so the timeline reads
-// at a glance without the tall stack of labelled read-only rows it replaces.
-
-/** "2:05 PM" — short local clock for a stat tile. */
-const formatTileClock = (date) =>
-  date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-
-/** "Jun 17" — short local month + day for a stat tile. */
-const formatTileDay = (date) =>
-  date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-
-/**
- * Human duration between two dates as "1 day 0h" / "3h" — used for the
- * "lasts …" summary so the wager length is legible before committing.
- */
-const formatTimelineSpan = (from, to) => {
-  let minutes = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000))
-  const days = Math.floor(minutes / 1440)
-  minutes -= days * 1440
-  const hours = Math.floor(minutes / 60)
-  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ${hours}h`
-  return `${hours}h`
-}
+// End-date timeline formatters (compact-chips redesign) live in
+// wagerTimeline.js so the open-challenge deadline timeline reuses them.
 
 /**
  * FriendMarketsModal
