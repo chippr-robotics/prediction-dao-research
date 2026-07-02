@@ -37,7 +37,26 @@ and four words" property. Participants appear on the channel only as their
 anonymous in-pool identity (two-word nickname) — never as a wallet address —
 consistent with the pool privacy model. The user has asked us to investigate
 browser-native peer-to-peer transport (WebRTC) as the vehicle; the transport
-choice and its connection-establishment approach are finalized in the plan.
+choice is finalized in the plan. Connection establishment is **strictly
+serverless** (see Clarifications): members exchange connection-establishment
+material directly (e.g. copy-paste or QR, like existing share flows) — no
+FairWins or third-party rendezvous/relay service is involved.
+
+## Clarifications
+
+### Session 2026-07-02
+
+- Q: How should pool peers find each other (rendezvous/signaling) and relay
+  when direct connection fails? → A: **Strictly serverless** — members exchange
+  connection offers manually (copy-paste / QR handshake); no FairWins-operated
+  or third-party rendezvous, signaling, or relay service of any kind. If a
+  direct connection cannot be established, the channel is simply unavailable
+  for that pair and the manual flows apply.
+- Q: How many concurrently connected members must a pool's live channel
+  support? → A: **Friend-group scale: ~25–50 concurrently connected members**
+  per pool (the ~1,000-member pool cap is anonymity capacity, not expected live
+  concurrency). Beyond the target the channel degrades gracefully; on-chain
+  flows are never affected.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -190,9 +209,14 @@ with no wallet address shown.
   guarantee; a member who reconnects while the pool is active must converge to
   the creator's current state (standings, announcements) rather than replaying
   every missed intermediate update.
-- **Direct connection impossible** (restrictive network/NAT/firewall): The
-  channel must either fall back to an acceptable relayed connection or fail
-  gracefully to manual flows — never a hung or half-working pool view.
+- **Direct connection impossible** (restrictive network/NAT/firewall): With no
+  relay service available (strictly serverless posture), the channel must fail
+  gracefully to the manual flows with a clear "could not connect" outcome —
+  never a hung or half-working pool view.
+- **Handshake friction**: Establishing a session requires members to exchange
+  connection material out-of-band (copy-paste/QR); a botched, stale, or
+  partially completed handshake must produce a clear retry path, not a limbo
+  state.
 - **Impersonation**: A device that is not a verified member of the pool must not
   be able to join the pool's channel, read its traffic, or post to it. A member
   must not be able to pass off messages as the creator's.
@@ -294,15 +318,20 @@ with no wallet address shown.
 
 #### Privacy, safety & platform posture
 
-- **FR-020**: No FairWins-operated server may store, read, or relay the content
-  of channel messages. Any infrastructure used to establish connections between
-  peers (or to relay them when direct connection is impossible) MUST see only
-  connection metadata, never message content in the clear.
+- **FR-020**: Connection establishment MUST be strictly serverless: no
+  FairWins-operated or third-party rendezvous, signaling, or relay service is
+  used. Peer sessions are established solely from connection-establishment
+  material that members exchange directly (e.g. copy-paste or QR, consistent
+  with existing share flows), and message content flows only between member
+  devices — no server ever stores, reads, or relays it.
+- **FR-020a**: The connection-establishment material members exchange MUST NOT
+  contain wallet addresses or claim codes, and material for one pool/session
+  MUST NOT grant access to another pool's channel or a later session.
 - **FR-021**: Before a member's device exposes its network address to other pool
   members via a direct connection, the member MUST be informed of that exposure
-  and offered a more private option (a relayed connection mode and/or declining
-  the channel), since network-address linkage could otherwise erode the pool's
-  anonymity boundary out-of-band.
+  and be free to decline the channel (there is no relay to hide behind under the
+  serverless posture), since network-address linkage could otherwise erode the
+  pool's anonymity boundary out-of-band.
 - **FR-022**: The channel MUST be strictly additive: every pool capability
   (join, vote, propose, resolve, claim, refund, manual claim-code hand-off,
   creator-local standings) MUST remain fully functional when the channel is
@@ -320,6 +349,11 @@ with no wallet address shown.
   channel state: presence counts each member once, and duplicate claim-code
   deliveries from the same member MUST collapse to a single entry for the
   creator.
+- **FR-027**: A pool channel MUST support at least 25 — with a design target of
+  50 — concurrently connected members while meeting the near-real-time delivery
+  expectation (FR-007). Beyond the design target, additional connection
+  attempts MUST fail gracefully with a clear message, without degrading
+  already-connected members and without affecting any on-chain capability.
 
 ### Key Entities
 
@@ -353,8 +387,9 @@ with no wallet address shown.
 - **SC-003**: 100% of channel participants are verified pool members; a
   non-member device can neither read nor post to a pool channel (verified by
   test/review).
-- **SC-004**: 0 channel messages are stored on, or readable in the clear by, any
-  FairWins-operated server or any connection-establishment infrastructure
+- **SC-004**: 0 servers of any kind (FairWins-operated or third-party) are
+  involved in establishing channel sessions or carrying channel messages;
+  message content exists only on member devices and in transit between them
   (verified by review/audit).
 - **SC-005**: A claim code sent over the channel is readable by the creator
   only: 0% of hand-offs expose the code to other members or intermediaries
@@ -371,6 +406,10 @@ with no wallet address shown.
 - **SC-009**: Pools that use announcements for resolution nudges reach their
   approval threshold before timeout at least as often as pools that don't (the
   channel never makes coordination worse).
+- **SC-010**: A pool channel sustains 25 concurrently connected members within
+  the SC-001 latency and remains functional at 50; connection attempts beyond
+  the design target are declined with a clear message and 0 impact on
+  already-connected members or on-chain flows.
 
 ## Assumptions
 
@@ -379,13 +418,15 @@ with no wallet address shown.
   written to be satisfiable by such a transport; the final transport selection,
   and the design of connection establishment, are plan-phase decisions
   validated by a feasibility spike.
-- **Connection establishment within the no-backend posture**: Peer-to-peer
-  transports still require a way for peers to find each other. Consistent with
-  the precedent set in spec 034's implementation ("rides an optional
-  third-party realtime service — no FairWins backend"), a lightweight
-  third-party or existing-infrastructure rendezvous is acceptable **provided**
-  it never sees message content in the clear (FR-020) and its unavailability
-  only degrades the channel, never the pool (FR-022).
+- **Strictly serverless connection establishment (clarified 2026-07-02)**:
+  There is no rendezvous, signaling, or relay service — FairWins-operated or
+  third-party. Members bootstrap sessions by exchanging connection material
+  directly (copy-paste/QR), the same way they already share four-word phrases
+  and claim codes today. The accepted trade-offs: per-session handshake
+  friction, no connection possible across networks that block direct
+  peer-to-peer traffic, and both parties must be online to establish a session.
+  The plan-phase spike validates that the chosen transport works within these
+  constraints and designs the handshake UX to minimize the friction.
 - **Structured messages only**: The channel carries defined message types
   (standings, announcements, claim-code hand-offs, presence). Free-form
   member-to-member chat is out of scope — it would import moderation and abuse
@@ -405,6 +446,11 @@ with no wallet address shown.
   nullifier) is deliberately revealed to the creator and does not let anyone
   else claim. The channel treats it as confidential to the member→creator pair
   anyway (defense in depth), but its exposure is not fund-loss-critical.
+- **Friend-group concurrency (clarified 2026-07-02)**: The live channel is
+  sized for the pools people actually run — roughly 25–50 concurrently
+  connected members — not the ~1,000-member anonymity cap. Larger pools remain
+  fully functional on-chain; their members simply may not all be live-connected
+  at once.
 - **Same-network scope**: The channel inherits the pool's network scoping; no
   cross-network or cross-pool traffic.
 - **Active-tab availability**: Members receive channel traffic while the app is
@@ -412,6 +458,9 @@ with no wallet address shown.
 
 ## Out of Scope
 
+- Operating or depending on any rendezvous, signaling, or relay service —
+  FairWins-operated or third-party (strictly serverless posture, per
+  Clarifications).
 - Free-form member-to-member chat or direct messages between non-creator
   members.
 - Server-side message history, store-and-forward delivery, or offline inboxes.
@@ -436,6 +485,7 @@ with no wallet address shown.
 - Existing client-side identity and cryptography building blocks
   (wallet-signature-derived keys, per-pool identity cache) for authenticating
   and encrypting channel participation.
-- The platform's no-backend posture (spec 007 lineage): any rendezvous or relay
-  infrastructure must satisfy FR-020/FR-022 rather than becoming a FairWins
-  content server.
+- The platform's no-backend posture (spec 007 lineage), here taken to its
+  strictest form: no rendezvous, signaling, or relay infrastructure at all
+  (FR-020); the existing out-of-band share flows (copy/QR) double as the
+  connection-handshake carrier.
