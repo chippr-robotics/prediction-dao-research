@@ -159,3 +159,29 @@
   align-items: end;
   margin-top: 0.75rem;
 }
+
+/* Participant roster (pool-manager tester feedback): anonymous alias cards + creator rank arrangement */
+.pool-participants { margin: 1rem 0; }
+.pool-participants h2 { font-size: 1rem; margin: 0 0 0.25rem; }
+.pool-participants-hint { font-size: 0.8rem; opacity: 0.7; margin: 0 0 0.5rem; }
+.pool-participants-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.pool-participant-card {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem; border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 10px; background: var(--surface-2, rgba(0, 0, 0, 0.02));
+}
+.pool-participant-card.dragging { opacity: 0.5; border-style: dashed; }
+.pool-participant-card[draggable='true'] { cursor: grab; }
+.pool-participant-rank {
+  min-width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 0.75rem; font-weight: 700;
+  background: var(--accent-soft, rgba(59, 156, 120, 0.15)); color: var(--accent, #3b9c78);
+}
+.pool-participant-alias { flex: 1; font-weight: 600; }
+.pool-participant-suffix { margin-left: 0.35rem; font-size: 0.7rem; font-weight: 400; opacity: 0.55; }
+.pool-participant-controls { display: inline-flex; gap: 0.25rem; }
+.pool-participant-controls button {
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15)); background: none;
+  border-radius: 6px; padding: 0.1rem 0.5rem; cursor: pointer; font: inherit;
+}
+.pool-participant-controls button:disabled { opacity: 0.35; cursor: default; }
