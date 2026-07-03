@@ -8,8 +8,10 @@ import './PillSelect.css'
  * the disabled/locked-option treatment the original oracle tab strip used.
  *
  * options: [{ value, label, icon?, disabled?, disabledReason? }]
+ * `info` (spec 039): an optional InfoTip rendered beside the label but outside
+ * the labelId span, so the radiogroup's accessible name stays clean.
  */
-function PillSelect({ label, options, value, onChange, disabled = false, multiline = false }) {
+function PillSelect({ label, options, value, onChange, disabled = false, multiline = false, info = null }) {
   const labelId = useId()
   const enabledValues = options.filter((o) => !o.disabled).map((o) => o.value)
   // Roving tabindex: the selected pill is the tab stop when it's enabled;
@@ -45,7 +47,11 @@ function PillSelect({ label, options, value, onChange, disabled = false, multili
 
   return (
     <div className="pill-select-wrap">
-      {label && <span id={labelId} className="fm-label">{label}</span>}
+      {label && (
+        info
+          ? <span className="fm-label-row"><span id={labelId} className="fm-label">{label}</span>{info}</span>
+          : <span id={labelId} className="fm-label">{label}</span>
+      )}
       <div
         className={`pill-select${multiline ? ' pill-select-multiline' : ''}`}
         role="radiogroup"

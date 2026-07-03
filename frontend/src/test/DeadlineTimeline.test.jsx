@@ -144,13 +144,13 @@ describe('DeadlineTimeline (spec 038 US1)', () => {
     render(<DeadlineTimeline milestones={twoMilestones()} onChange={() => {}} disabled idPrefix="oc" />)
     const dot = document.getElementById('oc-accept-slider')
     expect(dot).not.toHaveAttribute('tabindex')
-    fireEvent.click(screen.getByRole('button', { name: /open until/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open until:/i }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('tapping an editable tile opens the SetTimeModal for that milestone', () => {
     render(<DeadlineTimeline milestones={twoMilestones()} onChange={() => {}} idPrefix="oc" />)
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
     const dialog = screen.getByRole('dialog', { name: /set date and time/i })
     expect(dialog).toBeInTheDocument()
     expect(screen.getByText('Must be resolved by')).toBeInTheDocument()
@@ -159,12 +159,51 @@ describe('DeadlineTimeline (spec 038 US1)', () => {
   it('confirming the modal commits the value through onChange and closes it', () => {
     const onChange = vi.fn()
     render(<DeadlineTimeline milestones={twoMilestones()} onChange={onChange} idPrefix="oc" />)
-    fireEvent.click(screen.getByRole('button', { name: /open until/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open until:/i }))
     const dialog = screen.getByRole('dialog', { name: /set date and time/i })
     const input = within(dialog).getByLabelText(/open for acceptance until/i)
     fireEvent.change(input, { target: { value: '2026-06-10T12:00' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Set' }))
     expect(onChange).toHaveBeenCalledWith('accept', expect.any(Number))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('DeadlineTimeline milestone hints behind info icons (spec 039 US1)', () => {
+  it('does not render milestone hint text inline', () => {
+    render(<DeadlineTimeline milestones={twoMilestones()} onChange={() => {}} idPrefix="oc" />)
+    expect(screen.queryByText('accept hint')).not.toBeInTheDocument()
+    expect(screen.queryByText('resolve hint')).not.toBeInTheDocument()
+    expect(document.querySelector('.dt-hint')).toBeNull()
+  })
+
+  it('reveals each hint from its tile info icon, one bubble at a time', () => {
+    render(<DeadlineTimeline milestones={twoMilestones()} onChange={() => {}} idPrefix="oc" />)
+    fireEvent.click(screen.getByRole('button', { name: 'About: Open until' }))
+    expect(screen.getByRole('note')).toHaveTextContent('accept hint')
+
+    fireEvent.click(screen.getByRole('button', { name: 'About: Resolve by' }))
+    const notes = screen.getAllByRole('note')
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toHaveTextContent('resolve hint')
+  })
+
+  it('opening a hint does not open the set-time modal', () => {
+    render(<DeadlineTimeline milestones={twoMilestones()} onChange={() => {}} idPrefix="oc" />)
+    fireEvent.click(screen.getByRole('button', { name: 'About: Open until' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the computed summary line inline and renders no icon for hintless milestones', () => {
+    render(
+      <DeadlineTimeline
+        milestones={threeMilestones()}
+        onChange={() => {}}
+        idPrefix="fm"
+        summary="Open 2 days for a taker"
+      />
+    )
+    expect(screen.getByText('Open 2 days for a taker')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^About:/ })).not.toBeInTheDocument()
   })
 })

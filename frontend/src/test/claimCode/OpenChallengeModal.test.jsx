@@ -23,7 +23,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
     expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.getByLabelText(/what's the wager/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/what's the wager/i, { selector: 'input' })).toBeInTheDocument()
   })
 
   it('Maker: gates create until description + stake, then shows the generated code + a scannable QR', async () => {
@@ -31,7 +31,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeDisabled()
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     expect(createBtn).toBeEnabled()
     fireEvent.click(createBtn)
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
@@ -50,7 +50,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
   it('Maker: passes the chosen accept/resolve deadlines (seconds) to createOpenChallenge', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     const form = createOpenChallenge.mock.calls[0][0]
@@ -77,18 +77,18 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(Number(resolveDot.getAttribute('aria-valuenow'))).toBe(Number(before) + 60 * 60 * 1000)
 
     // Tapping a tile opens the shared set-time modal, not an inline input.
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
     expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
   })
 
   it('Maker: the set-time modal rejects a resolve time outside the allowed range', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeEnabled()
 
     // Tap the Resolve-by tile and try to type a time before the allowed window.
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
     const dialog = screen.getByRole('dialog', { name: /set date and time/i })
     const input = within(dialog).getByLabelText(/must be resolved by/i)
     fireEvent.change(input, { target: { value: '2000-01-01T00:00' } })
@@ -100,7 +100,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
 
   it('Maker: the USDC stake entry is formatted as money ($ prefix, interactive token control, 2-decimal blur)', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const stake = screen.getByLabelText(/stake — each side/i)
+    const stake = screen.getByLabelText(/stake — each side/i, { selector: 'input' })
     expect(stake).toHaveValue(10) // default 10.00
     fireEvent.change(stake, { target: { value: '12.5' } })
     fireEvent.blur(stake)
@@ -121,5 +121,44 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     const { search } = new URL(url)
     expect(parseTakeChallengeParams(search)).toBe('river tiger kite zoo')
     expect(parseTakeChallengeParams('?foo=bar')).toBeNull()
+  })
+})
+
+describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () => {
+  beforeEach(() => { createOpenChallenge.mockReset() })
+
+  it('hides the static field explainers by default and reveals each from its icon, one at a time', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    expect(screen.queryByText(/the taker takes the opposite/i)).toBeNull()
+    expect(screen.queryByText(/only USDC is supported/i)).toBeNull()
+    expect(screen.queryByText(/single-party self-resolution/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
+    expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
+
+    fireEvent.click(screen.getByRole('button', { name: 'About: Stake — each side' }))
+    expect(screen.getAllByRole('note')).toHaveLength(1)
+    expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
+
+    fireEvent.click(screen.getByRole('button', { name: 'About: How is it resolved?' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/single-party self-resolution/i)
+  })
+
+  it('keeps dynamic text inline on the success screen: security warning visible, backup explainer behind its icon', async () => {
+    createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
+    await screen.findByText('river tiger kite zoo')
+
+    // The four-word-code risk warning is a security disclosure — always inline (FR-005).
+    expect(screen.getByText(/brute-force/i)).toBeInTheDocument()
+    expect(screen.getByText(/Save this code now/i)).toBeInTheDocument()
+
+    // The backup explainer sits behind an icon and shows the current-state variant (FR-009).
+    expect(screen.queryByText(/encrypted copy of this code/i)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'About: Encrypted backup' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/encrypted copy/i)
   })
 })

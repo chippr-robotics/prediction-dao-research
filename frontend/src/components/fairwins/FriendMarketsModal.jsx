@@ -37,6 +37,7 @@ import { formatUSD, getMarketUrl } from './marketHelpers'
 import { formatTimelineSpan, fromDatetimeLocal } from './wagerTimeline'
 import DeadlineTimeline from './DeadlineTimeline'
 import PillSelect from '../ui/PillSelect'
+import InfoTip from '../ui/InfoTip'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -1167,11 +1168,16 @@ function FriendMarketsModal({
                             value={formData.resolutionType}
                             onChange={(t) => handleFormChange('resolutionType', t)}
                             disabled={submitting}
+                            info={(
+                              <InfoTip label={`About: ${resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who settles this offer?'}`}>
+                                {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                              </InfoTip>
+                            )}
                           />
                           <span className="fm-hint">
                             {isTabLocked(formData.resolutionType)
                               ? oracleAvailability[formData.resolutionType]?.lockedReason
-                              : RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                              : null}
                             {resolutionCategory === 'oracle' && !anyOracleEnabled && (
                               <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
                                 {isOracleModelExposed(ResolutionType.ChainlinkDataFeed)
@@ -1187,9 +1193,16 @@ function FriendMarketsModal({
                         {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          formData.resolutionType === ResolutionType.Polymarket && (
                           <div className="fm-form-group fm-form-full">
-                            <label htmlFor="fm-polymarket-search">
-                              Linked Polymarket Event <span className="fm-required">*</span>
-                            </label>
+                            <span className="fm-label-row">
+                              <label htmlFor="fm-polymarket-search">
+                                Linked Polymarket Event <span className="fm-required">*</span>
+                              </label>
+                              <InfoTip label="About: Linked Polymarket Event">
+                                {selectedPolymarketMarket
+                                  ? 'Browse top markets by category, or search for a specific event. Picking a different one will replace your current selection.'
+                                  : 'Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.'}
+                              </InfoTip>
+                            </span>
 
                             {selectedPolymarketMarket && (
                               <div className="fm-polymarket-selected">
@@ -1248,9 +1261,6 @@ function FriendMarketsModal({
                                 </button>
                                 {polymarketBrowserOpen && (
                                   <div id="fm-polymarket-browse-panel" className="fm-polymarket-browse-panel">
-                                    <span className="fm-hint">
-                                      Browse top markets by category, or search for a specific event. Picking a different one will replace your current selection.
-                                    </span>
                                     <PolymarketBrowser
                                       variant="inline"
                                       showFilters
@@ -1263,10 +1273,6 @@ function FriendMarketsModal({
                               </div>
                             ) : (
                               <>
-                                <span className="fm-hint">
-                                  Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
-                                </span>
-
                                 <PolymarketBrowser
                                   variant="inline"
                                   showFilters
@@ -1316,11 +1322,13 @@ function FriendMarketsModal({
                         {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          isExtensibleOracleType(formData.resolutionType) && (
                           <div className="fm-form-group fm-form-full">
-                            <label>
-                              Your side of the bet <span className="fm-required">*</span>
-                            </label>
-                            <span className="fm-hint">
-                              The oracle will return a YES or NO outcome. Pick which side you&apos;re taking — your opponent gets the other.
+                            <span className="fm-label-row">
+                              <label>
+                                Your side of the bet <span className="fm-required">*</span>
+                              </label>
+                              <InfoTip label="About: Your side of the bet">
+                                The oracle will return a YES or NO outcome. Pick which side you&apos;re taking — your opponent gets the other.
+                              </InfoTip>
                             </span>
                             <div className="fm-side-picker">
                               {[
@@ -1353,11 +1361,13 @@ function FriendMarketsModal({
                          formData.resolutionType === ResolutionType.Polymarket &&
                          selectedPolymarketMarket && (
                           <div className="fm-form-group fm-form-full">
-                            <label>
-                              Your side of the bet <span className="fm-required">*</span>
-                            </label>
-                            <span className="fm-hint">
-                              Pick which outcome you&apos;re taking. Your opponent will be on the other side, and the bet description will say so explicitly.
+                            <span className="fm-label-row">
+                              <label>
+                                Your side of the bet <span className="fm-required">*</span>
+                              </label>
+                              <InfoTip label="About: Your side of the bet">
+                                Pick which outcome you&apos;re taking. Your opponent will be on the other side, and the bet description will say so explicitly.
+                              </InfoTip>
                             </span>
                             <div className="fm-side-picker">
                               {['0', '1'].map((idx) => {
@@ -1397,9 +1407,14 @@ function FriendMarketsModal({
                     )}
 
                     <div className="fm-form-group fm-form-full">
-                      <label htmlFor="fm-description">
-                        What&apos;s the bet? <span className="fm-required">*</span>
-                      </label>
+                      <span className="fm-label-row">
+                        <label htmlFor="fm-description">
+                          What&apos;s the bet? <span className="fm-required">*</span>
+                        </label>
+                        <InfoTip label="About: What's the bet?">
+                          Phrase this so it&apos;s clear which side you&apos;re on (e.g., &ldquo;I&apos;m betting YES that...&rdquo;). Your opponent takes the opposite side.
+                        </InfoTip>
+                      </span>
                       <input
                         id="fm-description"
                         type="text"
@@ -1410,9 +1425,6 @@ function FriendMarketsModal({
                         className={errors.description ? 'error' : ''}
                         maxLength={200}
                       />
-                      <span className="fm-hint">
-                        Phrase this so it&apos;s clear which side you&apos;re on (e.g., &ldquo;I&apos;m betting YES that...&rdquo;). Your opponent takes the opposite side.
-                      </span>
                       {errors.description && <span className="fm-error">{errors.description}</span>}
                     </div>
 
@@ -1467,9 +1479,22 @@ function FriendMarketsModal({
                         control is always interactive, even though most flows only
                         offer one meaningful default. */}
                     <div className="fm-form-group fm-form-full">
-                      <label htmlFor="fm-stake">
-                        Stake Amount <span className="fm-required">*</span>
-                      </label>
+                      <span className="fm-label-row">
+                        <label htmlFor="fm-stake">
+                          Stake Amount <span className="fm-required">*</span>
+                        </label>
+                        <InfoTip label="About: Stake Amount">
+                          {formData.stakeTokenId === 'STABLE'
+                            ? 'Enter amount in USD (e.g., 10.00 for $10)'
+                            : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
+                          {' · '}
+                          {formData.stakeTokenId === 'NATIVE'
+                            ? 'the chain native token'
+                            : formData.stakeTokenId === 'CUSTOM'
+                            ? 'enter the custom token address below'
+                            : `${selectedStakeToken?.name} from the active chain`}
+                        </InfoTip>
+                      </span>
                       <div className="fm-stake-input-wrapper fm-stake-row">
                         {(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') && (
                           <span className="fm-stake-prefix">$</span>
@@ -1501,26 +1526,20 @@ function FriendMarketsModal({
                           ))}
                         </select>
                       </div>
-                      <span className="fm-hint">
-                        {formData.stakeTokenId === 'STABLE'
-                          ? 'Enter amount in USD (e.g., 10.00 for $10)'
-                          : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
-                        {' · '}
-                        {formData.stakeTokenId === 'NATIVE'
-                          ? 'the chain native token'
-                          : formData.stakeTokenId === 'CUSTOM'
-                          ? 'enter the custom token address below'
-                          : `${selectedStakeToken?.name} from the active chain`}
-                      </span>
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 
                     {/* Custom token address input - only shown when CUSTOM is selected */}
                     {formData.stakeTokenId === 'CUSTOM' && (
                       <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-custom-token">
-                          Custom Token Address <span className="fm-required">*</span>
-                        </label>
+                        <span className="fm-label-row">
+                          <label htmlFor="fm-custom-token">
+                            Custom Token Address <span className="fm-required">*</span>
+                          </label>
+                          <InfoTip label="About: Custom Token Address">
+                            Enter a valid ERC-20 token address
+                          </InfoTip>
+                        </span>
                         <input
                           id="fm-custom-token"
                           type="text"
@@ -1530,7 +1549,6 @@ function FriendMarketsModal({
                           disabled={submitting}
                           className={errors.customStakeTokenAddress ? 'error' : ''}
                         />
-                        <span className="fm-hint">Enter a valid ERC-20 token address</span>
                         {errors.customStakeTokenAddress && <span className="fm-error">{errors.customStakeTokenAddress}</span>}
                       </div>
                     )}
@@ -1546,10 +1564,12 @@ function FriendMarketsModal({
                           value={formData.resolutionType}
                           onChange={(t) => handleFormChange('resolutionType', t)}
                           disabled={submitting}
+                          info={(
+                            <InfoTip label="About: Who Can Resolve?">
+                              {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                            </InfoTip>
+                          )}
                         />
-                        <span className="fm-hint">
-                          {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
-                        </span>
                       </div>
                     )}
 
@@ -1557,9 +1577,16 @@ function FriendMarketsModal({
                     {formData.resolutionType === ResolutionType.ThirdParty &&
                      (friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
                       <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-arbitrator">
-                          Arbitrator Address <span className="fm-required">*</span>
-                        </label>
+                        <span className="fm-label-row">
+                          <label htmlFor="fm-arbitrator">
+                            Arbitrator Address <span className="fm-required">*</span>
+                          </label>
+                          <InfoTip label="About: Arbitrator Address">
+                            A neutral third party who decides the outcome and can read the private
+                            wager terms to resolve it — they cannot take a side.
+                            They must have registered an encryption key.
+                          </InfoTip>
+                        </span>
                         <div className="fm-input-with-action">
                           <div className="fm-address-input-wrap">
                             <AddressInput
@@ -1586,11 +1613,6 @@ function FriendMarketsModal({
                           address={formData.arbitratorResolved || formData.arbitrator}
                           chainId={chainId}
                         />
-                        <span className="fm-hint">
-                          A neutral third party who decides the outcome and can read the private
-                          wager terms to resolve it — they cannot take a side.
-                          They must have registered an encryption key.
-                        </span>
                       </div>
                     )}
 
