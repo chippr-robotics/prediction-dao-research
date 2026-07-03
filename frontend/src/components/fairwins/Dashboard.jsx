@@ -6,6 +6,7 @@ import { useModal } from '../../hooks/useUI'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
+import { isCardVisible, subscribe as subscribeQuickAccess } from '../../utils/quickAccessPreference'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
 import GroupPoolModal from './GroupPoolModal'
@@ -75,6 +76,12 @@ function QuickActionCard({ action, onAction }) {
 }
 
 function QuickActions({ onAction, actionNeededCount = 0 }) {
+  const navigate = useNavigate()
+  // Quick access card visibility (spec 038 US5) — re-render when the
+  // Preferences panel changes it, even from a different mounted instance.
+  const [, forceRender] = useState(0)
+  useEffect(() => subscribeQuickAccess(() => forceRender((n) => n + 1)), [])
+
   // Spec 012 FR-007: the My Wagers entry point surfaces the watcher's
   // action-needed count. The full sentence goes into the button's aria-label
   // (an aria-label suppresses descendant text for the accessible name) and is
@@ -237,34 +244,61 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     }
   ]
 
+  // Filter by the user's quick access card preference (spec 038 US5); a
+  // group header only renders when it still has a visible card under it.
+  const visibleCreateActions = createActions.filter((a) => isCardVisible(a.id))
+  const visibleUtilityActions = utilityActions.filter((a) => isCardVisible(a.id))
+
+  if (visibleCreateActions.length === 0 && visibleUtilityActions.length === 0) {
+    return (
+      <div className="quick-actions-grid quick-actions-empty" role="note">
+        <p className="qa-empty-title">All quick access cards are hidden</p>
+        <p className="qa-empty-message">
+          Turn cards back on from Preferences in My Account to see them here again.
+        </p>
+        <button type="button" className="qa-empty-cta" onClick={() => navigate('/wallet')}>
+          Open Preferences
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="quick-actions-grid">
-      <div className="qa-group-header" role="presentation">
-        <span className="qa-group-eyebrow">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Start a wager
-        </span>
-        <span className="qa-group-sub">Pick who settles the outcome</span>
-      </div>
-      {createActions.map(action => (
-        <QuickActionCard key={action.id} action={action} onAction={onAction} />
-      ))}
+      {visibleCreateActions.length > 0 && (
+        <>
+          <div className="qa-group-header" role="presentation">
+            <span className="qa-group-eyebrow">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Start a wager
+            </span>
+            <span className="qa-group-sub">Pick who settles the outcome</span>
+          </div>
+          {visibleCreateActions.map(action => (
+            <QuickActionCard key={action.id} action={action} onAction={onAction} />
+          ))}
+        </>
+      )}
 
-      <div className="qa-group-header qa-group-header--track" role="presentation">
-        <span className="qa-group-eyebrow">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Track &amp; share
-        </span>
-        <span className="qa-group-sub">Your wagers and in-person handoffs</span>
-      </div>
-      {utilityActions.map(action => (
-        <QuickActionCard key={action.id} action={action} onAction={onAction} />
-      ))}
+      {visibleUtilityActions.length > 0 && (
+        <>
+          <div className="qa-group-header qa-group-header--track" role="presentation">
+            <span className="qa-group-eyebrow">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Track &amp; share
+            </span>
+            <span className="qa-group-sub">Your wagers and in-person handoffs</span>
+          </div>
+          {visibleUtilityActions.map(action => (
+            <QuickActionCard key={action.id} action={action} onAction={onAction} />
+          ))}
+        </>
+      )}
     </div>
   )
 }

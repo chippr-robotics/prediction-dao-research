@@ -7,13 +7,16 @@ import ActivityBreakdowns from './ActivityBreakdowns'
 import RecentActivityFeed from './RecentActivityFeed'
 import FreshnessIndicator from './FreshnessIndicator'
 import WalletUtilitiesPanel from './WalletUtilitiesPanel'
+import PreferencesPanel from './PreferencesPanel'
 import EmptyState from './EmptyState'
 import './AccountDashboard.css'
 
 /**
  * AccountDashboard — the Account tab body (spec 020). Real-time personal stats:
  * identity strip, summary tiles, hero P&L chart, breakdowns, recent activity,
- * and a de-emphasised wallet-utilities panel. Honest empty states throughout.
+ * a de-emphasised wallet-utilities panel, and a Preferences section (spec 038
+ * US5 — no tab navigation exists in My Account, so Preferences lives here as
+ * a section rather than a separate tab). Honest empty states throughout.
  */
 function AccountDashboard({ address }) {
   const navigate = useNavigate()
@@ -61,6 +64,7 @@ function AccountDashboard({ address }) {
       )}
 
       <WalletUtilitiesPanel address={address} onDisconnect={handleDisconnect} />
+      <PreferencesPanel />
     </div>
   )
 }
