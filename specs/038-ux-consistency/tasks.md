@@ -113,7 +113,7 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 ### Implementation for User Story 3
 
 - [ ] T028 [US3] Switch `.fm-endtime` in `frontend/src/components/fairwins/FriendMarketsModal.css` to consume the global `--timeline-*` tokens (T003): delete the scoped `--fm-accept/#E8910C`, `--fm-active`, `--fm-resolve` definitions and repoint `fm-timeline-node`, `fm-stat-tile` tints, `fm-stat-dot`, and any inline gradients to the tokens (research R3)
-- [ ] T029 [US3] Update inline gradient references that hardcode `var(--fm-accept)`/`var(--fm-active)` in `frontend/src/components/fairwins/DeadlineTimeline.jsx` and `frontend/src/components/fairwins/FriendMarketsModal.jsx` to the `--timeline-*` tokens; verify no amber remains in any timeline surface
+- [ ] T029 [US3] Update any remaining inline gradient references that hardcode `var(--fm-accept)`/`var(--fm-active)` (primarily in `frontend/src/components/fairwins/FriendMarketsModal.jsx`; `DeadlineTimeline.jsx` is already tokenized by T010) to the `--timeline-*` tokens; update UI copy that names the timeline color (e.g. the "Opponent accepts before the amber mark…" helper text) to match the new palette; verify no amber remains in any timeline surface
 
 **Checkpoint**: US1–US3 complete; timelines are on-brand everywhere.
 
@@ -127,7 +127,7 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T030 [P] [US4] Extend `frontend/src/test/NotificationBell.test.jsx`: assert the rendered `.notification-bell` has `padding: 0` (no inherited global button padding), the 18px icon and unread badge render, and a large unread count caps at "99+"
+- [ ] T030 [P] [US4] Extend `frontend/src/test/NotificationBell.test.jsx`: assert the rendered `.notification-bell` has `padding: 0` (no inherited global button padding), the 18px icon and unread badge render, and a large unread count caps at "99+"; add an axe check and assert the bell is keyboard-focusable with an accessible name (FR-016, Constitution V)
 
 ### Implementation for User Story 4
 
@@ -147,7 +147,7 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 ### Tests for User Story 5 ⚠️ (write first, ensure they FAIL)
 
 - [ ] T033 [P] [US5] Unit tests for `quickAccessPreference.js` (empty/corrupt storage → all visible; unknown ids ignored; unset id defaults visible; `setCardVisible` persists full hidden set; `subscribe` notifies) in `frontend/src/test/quickAccessPreference.test.js`
-- [ ] T034 [P] [US5] Component tests for `PreferencesPanel` (lists all 9 cards with current state, toggling writes preference) in `frontend/src/test/PreferencesPanel.test.jsx`
+- [ ] T034 [P] [US5] Component tests for `PreferencesPanel` (lists all 9 cards with current state, toggling writes preference) in `frontend/src/test/PreferencesPanel.test.jsx`; add an axe accessibility test and assert the visibility toggles are keyboard-operable with accessible labels (FR-016, Constitution V)
 - [ ] T035 [P] [US5] Extend `frontend/src/test/Dashboard.test.jsx`: hidden cards are not rendered, remaining cards reflow, all-hidden shows the empty state linking to Preferences
 
 ### Implementation for User Story 5
@@ -165,7 +165,7 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 **Purpose**: Consistency verification and validation across the whole feature
 
-- [ ] T040 [P] Sweep for leftover divergence: confirm zero remaining `<select>` for who-settles, zero `datetime-local` form fields / "tap to type a date" links, zero encryption toggles, zero amber timeline literals across `frontend/src` (grep for `E8910C`, `fm-end-date`, `enableEncryption`, `Tap to type`)
+- [ ] T040 [P] Sweep for leftover divergence: confirm zero remaining `<select>` for who-settles, zero `datetime-local` form fields / "tap to type a date" links, zero encryption toggles, zero amber timeline literals or color-naming copy across `frontend/src` (grep for `E8910C`, `fm-end-date`, `enableEncryption`, `Tap to type`, `amber`)
 - [ ] T041 [P] Update `frontend/src/components/ui/index.js` and any component README/exports so `PillSelect` and `SetTimeModal` are discoverable; remove dead CSS/props left by removed controls
 - [ ] T042 Run `cd frontend && npm run lint` and `npm run test:frontend`; resolve any ESLint errors and failing/updated tests (Constitution IV — no `continue-on-error`)
 - [ ] T043 Run `npm run test:e2e:fast` (Cypress smoke) to confirm the three creation flows still submit unchanged resolution/stake/deadline values

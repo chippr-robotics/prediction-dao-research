@@ -131,7 +131,7 @@ each, including when an unread-count badge is shown.
 
 ### User Story 5 - Choose which cards appear on quick access (Priority: P3)
 
-A user opens the Preferences tab in My Account and sees a list of the cards
+A user opens the Preferences section in My Account and sees a list of the cards
 available on the quick access view, each with a visibility control. Cards they
 turn off no longer appear on the quick access view; cards they turn back on
 reappear. The choice persists for that user across sessions on the same device.
@@ -145,7 +145,7 @@ page reload.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Preferences tab in My Account, **When** the user views it, **Then** it lists every card available on the quick access view with its current visibility state.
+1. **Given** the Preferences section in My Account, **When** the user views it, **Then** it lists every card available on the quick access view with its current visibility state.
 2. **Given** a card is toggled off in Preferences, **When** the user returns to the quick access view, **Then** that card is not shown and the remaining cards fill the space cleanly.
 3. **Given** the user has customized card visibility, **When** they reload the app on the same device, **Then** their card visibility choices are preserved.
 4. **Given** the user has hidden all cards, **When** they open the quick access view, **Then** a friendly empty state explains that cards are hidden and points to Preferences to restore them.
@@ -179,7 +179,7 @@ page reload.
 - **FR-010**: Pill rows MUST present unavailable options as visibly disabled with an accessible explanation of why they are unavailable, and MUST preserve the exact option set and downstream behavior of the controls they replace.
 - **FR-011**: In every creation flow, the stake amount input and stake token selector MUST appear on a single line, with the token control always interactive — including when only one token is available.
 - **FR-012**: The notification bell MUST be fully visible, unclipped, and meet minimum touch-target sizing at all supported screen sizes, with its styling isolated from generic button and responsive rules that previously obscured it.
-- **FR-013**: The Preferences tab in My Account MUST list all quick access cards with individual visibility controls.
+- **FR-013**: The Preferences section in My Account MUST list all quick access cards with individual visibility controls.
 - **FR-014**: The quick access view MUST show only the cards the user has left visible, MUST reflow cleanly, and MUST show a recoverable empty state when all cards are hidden.
 - **FR-015**: Quick access card visibility choices MUST persist for the user across sessions on the same device, and all cards MUST default to visible for users who have never customized them.
 - **FR-016**: All harmonized controls (timeline, set-time modal, pill rows, stake line, bell, preference toggles) MUST be operable by keyboard and assistive technology, consistent with the project's accessibility standard.
@@ -214,3 +214,6 @@ page reload.
 - The set of quick access cards is the set of cards currently shown on the quick access/dashboard view; adding new cards is out of scope.
 - Mobile-first: the screenshots are mobile, and mobile is the primary target, but the harmonized controls must also work at tablet/desktop sizes.
 - No smart-contract or on-chain changes are required; this is a frontend-only feature.
+- The My Account view has no tab navigation today, so "Preferences" is delivered
+  as a section/panel within the account area (not a new tab); adding tabbed
+  navigation is out of scope.
