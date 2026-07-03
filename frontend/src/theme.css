@@ -118,6 +118,7 @@
   --timeline-accept: var(--brand-secondary, #4C9AFF);   /* accept/join window */
   --timeline-active: var(--brand-primary, #36B37E);      /* active wager window */
   --timeline-resolve: #8C7CF0;                            /* resolve window */
+  --timeline-resolve-rgb: 140, 124, 240;                  /* for rgba() tile tints */
 }
 
 .theme-dark {
@@ -125,6 +126,7 @@
   --timeline-accept: var(--brand-secondary, #4C9AFF);
   --timeline-active: var(--brand-primary, #36B37E);
   --timeline-resolve: #9D8FF5;
+  --timeline-resolve-rgb: 157, 143, 245;
 }
 
 /* ===================================

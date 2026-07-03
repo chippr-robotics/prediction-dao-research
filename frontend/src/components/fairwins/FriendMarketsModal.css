@@ -260,12 +260,9 @@
 
 /* ── End date + glanceable timeline (compact-chips redesign) ─────────
    Replaces the tall stack of End Date / Acceptance Deadline / Resolution
-   Window read-only rows with a slim accent track + three stat tiles. */
-.fm-endtime {
-  --fm-accept: #E8910C;   /* amber  — accept-by */
-  --fm-active: #36B37E;   /* green  — ends (matches app accent) */
-  --fm-resolve: #8C7CF0;  /* purple — resolve-by */
-}
+   Window read-only rows with a slim accent track + three stat tiles.
+   Colors come from the global --timeline-* brand-palette tokens
+   (theme.css, spec 038) — no local amber override here anymore. */
 
 .fm-endtime-summary {
   font-size: 0.75rem;
@@ -291,13 +288,13 @@
 }
 
 .fm-timeline-node.is-accept {
-  background: var(--fm-accept);
+  background: var(--timeline-accept);
 }
 
 .fm-timeline-node.is-end {
   width: 18px;
   height: 18px;
-  background: var(--fm-active);
+  background: var(--timeline-active);
 }
 
 .fm-stat-tiles {
@@ -318,21 +315,21 @@
 }
 
 .fm-stat-tile.is-accept {
-  --tile-accent: var(--fm-accept);
-  --tile-bg: rgba(232, 145, 12, 0.08);
-  --tile-border: rgba(232, 145, 12, 0.28);
+  --tile-accent: var(--timeline-accept);
+  --tile-bg: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.08);
+  --tile-border: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.28);
 }
 
 .fm-stat-tile.is-ends {
-  --tile-accent: var(--fm-active);
-  --tile-bg: rgba(54, 179, 126, 0.08);
-  --tile-border: rgba(54, 179, 126, 0.28);
+  --tile-accent: var(--timeline-active);
+  --tile-bg: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+  --tile-border: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.28);
 }
 
 .fm-stat-tile.is-resolve {
-  --tile-accent: var(--fm-resolve);
-  --tile-bg: rgba(140, 124, 240, 0.08);
-  --tile-border: rgba(140, 124, 240, 0.28);
+  --tile-accent: var(--timeline-resolve);
+  --tile-bg: rgba(var(--timeline-resolve-rgb, 140, 124, 240), 0.08);
+  --tile-border: rgba(var(--timeline-resolve-rgb, 140, 124, 240), 0.28);
 }
 
 .fm-stat-head {

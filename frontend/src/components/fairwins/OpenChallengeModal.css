@@ -203,9 +203,9 @@
   margin-top: 0.25rem;
 }
 
-/* Purple resolve-by node on the shared timeline track. */
+/* Resolve-by node on the shared timeline track (spec 038 --timeline-resolve). */
 .fm-timeline-node.is-resolve {
-  background: var(--fm-resolve);
+  background: var(--timeline-resolve);
 }
 
 /* Read-only deadline summary on the taker's "challenge found" view. */
