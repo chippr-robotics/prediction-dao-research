@@ -34,7 +34,9 @@ import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
 import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
-import { formatTileClock, formatTileDay, formatTimelineSpan } from './wagerTimeline'
+import { formatTimelineSpan, fromDatetimeLocal } from './wagerTimeline'
+import DeadlineTimeline from './DeadlineTimeline'
+import PillSelect from '../ui/PillSelect'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -355,10 +357,8 @@ function FriendMarketsModal({
   // when those inputs change; once they edit, we leave their text alone.
   const lastAutoDescriptionRef = useRef('')
 
-  // Encryption state
-  const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
-  // The "What gets encrypted?" field breakdown is collapsed by default to save
-  // space; the user expands it only if they want the detail.
+  // Encryption is always on (spec 038 — no selector); only the "What gets
+  // encrypted?" disclosure is collapsed by default to save space.
   const [showEncryptionDetails, setShowEncryptionDetails] = useState(false)
 
   // Reset form function - memoized to prevent stale closures
@@ -384,7 +384,6 @@ function FriendMarketsModal({
     setPolymarketBrowserOpen(false)
     clearPolymarket()
     lastAutoDescriptionRef.current = ''
-    setEnableEncryption(true)
   }, [clearPolymarket, defaultResolutionType])
 
   // Reset modal state when opened. Always lands on the form for the
@@ -900,55 +899,52 @@ function FriendMarketsModal({
         ]
       }
 
-      // Handle encryption if enabled
+      // Encryption is always applied (spec 038 — no off switch; presentation-
+      // only change, behavior unchanged from the prior default-on state).
       let finalMetadata = marketMetadata
 
-      if (enableEncryption) {
-        // Every wager type (1v1 + Offer) is head-to-head, so we always
-        // encrypt to the single opponent. Use the ENS-resolved address (falls
-        // back to raw input when the user typed a hex address, since
-        // onResolvedChange mirrors that value).
-        const opponentAddress = formData.opponentResolved
+      // Every wager type (1v1 + Offer) is head-to-head, so we always
+      // encrypt to the single opponent. Use the ENS-resolved address (falls
+      // back to raw input when the user typed a hex address, since
+      // onResolvedChange mirrors that value).
+      const opponentAddress = formData.opponentResolved
 
-        if (opponentAddress) {
-          const opponentKey = await lookupOpponentKey(opponentAddress)
-          if (!opponentKey) {
+      if (opponentAddress) {
+        const opponentKey = await lookupOpponentKey(opponentAddress)
+        if (!opponentKey) {
+          throw new Error(
+            'Your opponent has not registered their encryption key yet. ' +
+            'They must visit the app and register their key before you can create this wager.'
+          )
+        }
+
+        // 1v1 encrypted: force X25519 so we can add the opponent using the
+        // X25519 public key returned by the on-chain KeyRegistry. The X-Wing
+        // (v2.0) path can't be used here because the registry only stores
+        // 32-byte X25519 keys; addRecipientByPublicKey would then read an
+        // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
+        const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519', termsVersion: currentTermsVersion() })
+        finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
+
+        // ThirdParty (Spec Kit 005): the arbitrator must also read the private
+        // terms to resolve the wager, so encrypt for them as a third recipient.
+        // Key-gate: they must have a registered encryption key (mirrors the
+        // opponent gate above) — otherwise block, don't create an unreadable wager.
+        if (formData.resolutionType === ResolutionType.ThirdParty && formData.arbitratorResolved) {
+          const arbitratorKey = await lookupOpponentKey(formData.arbitratorResolved)
+          if (!arbitratorKey) {
             throw new Error(
-              'Your opponent has not registered their encryption key yet. ' +
-              'They must visit the app and register their key before you can create an encrypted wager. ' +
-              'You can still create an unencrypted wager.'
+              'The arbitrator has not registered their encryption key yet. ' +
+              'They must register their key before you can create this wager.'
             )
           }
-
-          // 1v1 encrypted: force X25519 so we can add the opponent using the
-          // X25519 public key returned by the on-chain KeyRegistry. The X-Wing
-          // (v2.0) path can't be used here because the registry only stores
-          // 32-byte X25519 keys; addRecipientByPublicKey would then read an
-          // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
-          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519', termsVersion: currentTermsVersion() })
-          finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
-
-          // ThirdParty (Spec Kit 005): the arbitrator must also read the private
-          // terms to resolve the wager, so encrypt for them as a third recipient.
-          // Key-gate: they must have a registered encryption key (mirrors the
-          // opponent gate above) — otherwise block, don't create an unreadable wager.
-          if (formData.resolutionType === ResolutionType.ThirdParty && formData.arbitratorResolved) {
-            const arbitratorKey = await lookupOpponentKey(formData.arbitratorResolved)
-            if (!arbitratorKey) {
-              throw new Error(
-                'The arbitrator has not registered their encryption key yet. ' +
-                'They must register their key before you can create an encrypted third-party wager, ' +
-                'or you can create an unencrypted wager instead.'
-              )
-            }
-            finalMetadata = addRecipientByPublicKey(finalMetadata, formData.arbitratorResolved, arbitratorKey)
-          }
-        } else {
-          // Defensive fallback: validation guarantees an opponent, but if one
-          // is somehow missing, encrypt to the creator only rather than crash.
-          const { envelope } = await createEncrypted(marketMetadata, { termsVersion: currentTermsVersion() })
-          finalMetadata = envelope
+          finalMetadata = addRecipientByPublicKey(finalMetadata, formData.arbitratorResolved, arbitratorKey)
         }
+      } else {
+        // Defensive fallback: validation guarantees an opponent, but if one
+        // is somehow missing, encrypt to the creator only rather than crash.
+        const { envelope } = await createEncrypted(marketMetadata, { termsVersion: currentTermsVersion() })
+        finalMetadata = envelope
       }
 
       // Calculate trading period BEFORE building submit data
@@ -1003,8 +999,8 @@ function FriendMarketsModal({
           // 'native' means the chain's native token (no ERC20 address), pass null for this case
           collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
           // Include encrypted metadata (opponent's key wrapped via on-chain registry)
-          encryptedMetadata: enableEncryption ? finalMetadata : null,
-          isEncrypted: enableEncryption,
+          encryptedMetadata: finalMetadata,
+          isEncrypted: true,
           // Progress callback for transaction status updates
           onProgress: handleProgress
         }
@@ -1048,7 +1044,7 @@ function FriendMarketsModal({
           }
         },
         // Encryption fields
-        isEncrypted: enableEncryption,
+        isEncrypted: true,
         ipfsCid: result?.ipfsCid || null,
         metadataHash: result?.metadataHash || null,
       }
@@ -1159,43 +1155,19 @@ function FriendMarketsModal({
                             always visible in the oracle flow. */}
                         {!(resolutionCategory === 'oracle' && resolutionTabTypes.length <= 1) && (
                         <div className="fm-form-group fm-form-full">
-                          <label id="fm-resolution-tabs-label">
-                            {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who settles this offer?'}
-                          </label>
-                          <div
-                            className="fm-resolution-tabs"
-                            role="tablist"
-                            aria-labelledby="fm-resolution-tabs-label"
-                          >
-                            {resolutionTabTypes.map((t) => {
-                              const locked = isTabLocked(t)
-                              const active = formData.resolutionType === t
-                              return (
-                                <button
-                                  key={t}
-                                  type="button"
-                                  role="tab"
-                                  aria-selected={active}
-                                  aria-disabled={locked}
-                                  disabled={submitting || locked}
-                                  title={locked ? oracleAvailability[t]?.lockedReason : undefined}
-                                  className={`fm-resolution-tab ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
-                                  onClick={() => { if (!locked) handleFormChange('resolutionType', t) }}
-                                >
-                                  {RESOLUTION_TAB_ICONS[t] && (
-                                    <span className="fm-resolution-tab-icon" aria-hidden="true">{RESOLUTION_TAB_ICONS[t]}</span>
-                                  )}
-                                  <span className="fm-resolution-tab-label">{RESOLUTION_TAB_LABELS[t]}</span>
-                                  {locked && (
-                                    <svg className="fm-resolution-tab-lock" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                    </svg>
-                                  )}
-                                </button>
-                              )
-                            })}
-                          </div>
+                          <PillSelect
+                            label={resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who settles this offer?'}
+                            options={resolutionTabTypes.map((t) => ({
+                              value: t,
+                              label: RESOLUTION_TAB_LABELS[t],
+                              icon: RESOLUTION_TAB_ICONS[t],
+                              disabled: isTabLocked(t),
+                              disabledReason: isTabLocked(t) ? oracleAvailability[t]?.lockedReason : undefined,
+                            }))}
+                            value={formData.resolutionType}
+                            onChange={(t) => handleFormChange('resolutionType', t)}
+                            disabled={submitting}
+                          />
                           <span className="fm-hint">
                             {isTabLocked(formData.resolutionType)
                               ? oracleAvailability[formData.resolutionType]?.lockedReason
@@ -1491,11 +1463,14 @@ function FriendMarketsModal({
                     )}
 
 
-                    <div className="fm-form-group">
+                    {/* Stake amount + token on one line (spec 038 FR-011): the token
+                        control is always interactive, even though most flows only
+                        offer one meaningful default. */}
+                    <div className="fm-form-group fm-form-full">
                       <label htmlFor="fm-stake">
                         Stake Amount <span className="fm-required">*</span>
                       </label>
-                      <div className="fm-stake-input-wrapper">
+                      <div className="fm-stake-input-wrapper fm-stake-row">
                         {(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') && (
                           <span className="fm-stake-prefix">$</span>
                         )}
@@ -1511,42 +1486,33 @@ function FriendMarketsModal({
                           disabled={submitting}
                           className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'STABLE' ? 'fm-stake-usd' : ''}`}
                         />
-                        {formData.stakeTokenId !== 'STABLE' && formData.stakeTokenId !== 'CUSTOM' && (
-                          <span className="fm-stake-suffix">{selectedStakeToken?.symbol || 'MATIC'}</span>
-                        )}
+                        <select
+                          id="fm-stake-token"
+                          aria-label="Stake Token"
+                          value={formData.stakeTokenId}
+                          onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
+                          disabled={submitting}
+                          className="fm-token-select fm-stake-token-inline"
+                        >
+                          {STAKE_TOKEN_OPTIONS.map(token => (
+                            <option key={token.id} value={token.id}>
+                              {token.icon} {token.symbol}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <span className="fm-hint">
                         {formData.stakeTokenId === 'STABLE'
                           ? 'Enter amount in USD (e.g., 10.00 for $10)'
                           : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
-                      </span>
-                      {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
-                    </div>
-
-                    <div className="fm-form-group">
-                      <label htmlFor="fm-stake-token">
-                        Stake Token
-                      </label>
-                      <select
-                        id="fm-stake-token"
-                        value={formData.stakeTokenId}
-                        onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
-                        disabled={submitting}
-                        className="fm-token-select"
-                      >
-                        {STAKE_TOKEN_OPTIONS.map(token => (
-                          <option key={token.id} value={token.id}>
-                            {token.icon} {token.symbol} - {token.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="fm-hint">
+                        {' · '}
                         {formData.stakeTokenId === 'NATIVE'
-                          ? 'The chain native token will be used for stakes'
+                          ? 'the chain native token'
                           : formData.stakeTokenId === 'CUSTOM'
-                          ? 'Enter custom token address below'
+                          ? 'enter the custom token address below'
                           : `${selectedStakeToken?.name} from the active chain`}
                       </span>
+                      {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 
                     {/* Custom token address input - only shown when CUSTOM is selected */}
@@ -1570,22 +1536,17 @@ function FriendMarketsModal({
                     )}
 
                     {/* Resolution Type selector (participant flow only). The
-                        oracle / Offer flows render a tab strip at the top of
+                        oracle / Offer flows render a pill row at the top of
                         the form instead — see the settlement section above. */}
                     {!useResolutionTabs && resolutionOptionTypes.length > 0 && (
                       <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-resolution-type">Who Can Resolve?</label>
-                        <select
-                          id="fm-resolution-type"
+                        <PillSelect
+                          label="Who Can Resolve?"
+                          options={resolutionOptionTypes.map((t) => ({ value: t, label: RESOLUTION_TYPE_LABELS[t] }))}
                           value={formData.resolutionType}
-                          onChange={(e) => handleFormChange('resolutionType', parseInt(e.target.value, 10))}
+                          onChange={(t) => handleFormChange('resolutionType', t)}
                           disabled={submitting}
-                          className="fm-select"
-                        >
-                          {resolutionOptionTypes.map((t) => (
-                            <option key={t} value={t}>{RESOLUTION_TYPE_LABELS[t]}</option>
-                          ))}
-                        </select>
+                        />
                         <span className="fm-hint">
                           {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
                         </span>
@@ -1626,8 +1587,8 @@ function FriendMarketsModal({
                           chainId={chainId}
                         />
                         <span className="fm-hint">
-                          A neutral third party who decides the outcome and can read the
-                          {enableEncryption ? ' private ' : ' '}wager terms to resolve it — they cannot take a side.
+                          A neutral third party who decides the outcome and can read the private
+                          wager terms to resolve it — they cannot take a side.
                           They must have registered an encryption key.
                         </span>
                       </div>
@@ -1706,201 +1667,134 @@ function FriendMarketsModal({
                     })()}
 
                     {/*
-                      End date + glanceable timeline (compact-chips redesign).
-                      The datetime input keeps #fm-end-date with min/max; the
-                      acceptance deadline and resolution window that used to be
-                      separate read-only rows are now a slim accent track plus
-                      three stat tiles (Accept by / Ends / Resolve by) for the
-                      lowest vertical footprint.
+                      End date + glanceable timeline (spec 038 US1): the same
+                      shared DeadlineTimeline control every create flow uses.
+                      "Ends" is directly editable (drag its dot or tap its tile
+                      to open the set-time modal); "Accept by" and "Resolve by"
+                      are derived from it and render as read-only milestones.
 
-                      The editable input is hidden when a Polymarket is linked —
-                      the wager's end time is locked to that market's own end time
-                      so the side bet can't settle before (or long after) the
-                      linked event — but the derived timeline still renders.
+                      "Ends" becomes non-editable when a Polymarket is linked —
+                      the wager's end time is locked to that market's own end
+                      time so the side bet can't settle before (or long after)
+                      the linked event — but the derived timeline still renders.
                     */}
-                    <div className="fm-form-group fm-form-full fm-endtime">
-                      {!(formData.resolutionType === ResolutionType.Polymarket && selectedPolymarketMarket) && (
-                        <>
-                          <label htmlFor="fm-end-date">
-                            End Date &amp; Time <span className="fm-required">*</span>
-                          </label>
-                          <input
-                            id="fm-end-date"
-                            type="datetime-local"
-                            value={formData.endDateTime}
-                            onChange={(e) => handleFormChange('endDateTime', e.target.value)}
-                            min={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000))}
-                            max={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000))}
+                    {formData.endDateTime && !Number.isNaN(new Date(formData.endDateTime).getTime()) && (() => {
+                      const endMs = fromDatetimeLocal(formData.endDateTime)
+                      const acceptMs = formData.acceptanceDeadline ? fromDatetimeLocal(formData.acceptanceDeadline) : NaN
+                      const windowMs = (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
+                      const resolveMs = endMs + windowMs
+                      const endMin = Date.now() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000
+                      const endMax = Date.now() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000
+                      const endLocked = formData.resolutionType === ResolutionType.Polymarket && !!selectedPolymarketMarket
+
+                      const milestones = [
+                        {
+                          key: 'accept', label: 'Accept by', tileHead: 'Accept by',
+                          value: acceptMs, min: endMin, max: endMax, editable: false,
+                          segmentColor: 'var(--timeline-accept)', dotClass: 'is-accept', tileClass: 'is-accept',
+                        },
+                        {
+                          key: 'end', label: 'End Date & Time', tileHead: 'Ends',
+                          value: endMs, min: endMin, max: endMax, editable: !endLocked,
+                          segmentColor: 'var(--timeline-active)', dotClass: 'is-end', tileClass: 'is-ends',
+                        },
+                        {
+                          key: 'resolve', label: 'Resolve by', tileHead: 'Resolve by',
+                          value: resolveMs, min: endMin, max: endMax + windowMs, editable: false,
+                          segmentColor: 'var(--timeline-resolve)', dotClass: 'is-resolve', tileClass: 'is-resolve',
+                        },
+                      ]
+                      const handleEndChange = (key, ms) => {
+                        if (key !== 'end') return
+                        handleFormChange('endDateTime', toDateTimeLocal(new Date(ms)))
+                      }
+
+                      return (
+                        <div className="fm-form-group fm-form-full">
+                          <DeadlineTimeline
+                            milestones={milestones}
+                            onChange={handleEndChange}
                             disabled={submitting}
-                            className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
+                            idPrefix="fm"
+                            summary={`Resolves once this passes · lasts ${formatTimelineSpan(new Date(), new Date(endMs))} · min 1h, max 21d`}
                           />
                           {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
-                        </>
-                      )}
+                          <p className="fm-timeline-note">
+                            <span className="fm-timeline-note-icon" aria-hidden="true">&#9432;</span>
+                            Opponent accepts before the blue mark; you settle in the 48h after it ends or stakes refund.
+                          </p>
+                        </div>
+                      )
+                    })()}
 
-                      {formData.endDateTime && !Number.isNaN(new Date(formData.endDateTime).getTime()) && (() => {
-                        const now = new Date()
-                        const end = new Date(formData.endDateTime)
-                        const accept = formData.acceptanceDeadline && !Number.isNaN(new Date(formData.acceptanceDeadline).getTime())
-                          ? new Date(formData.acceptanceDeadline)
-                          : null
-                        const windowMs = (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
-                        const resolveClose = new Date(end.getTime() + windowMs)
-
-                        // Position the accent track / markers proportionally along
-                        // now → resolveClose so the amber (accept) and green (end)
-                        // marks land where they actually fall in the timeline.
-                        const span = Math.max(1, resolveClose.getTime() - now.getTime())
-                        const clamp = (n) => Math.max(0, Math.min(100, n))
-                        const acceptPct = accept ? clamp(((accept.getTime() - now.getTime()) / span) * 100) : 0
-                        const endPct = clamp(((end.getTime() - now.getTime()) / span) * 100)
-                        const trackStyle = {
-                          background: `linear-gradient(to right,` +
-                            ` var(--fm-accept) 0%, var(--fm-accept) ${acceptPct}%,` +
-                            ` var(--fm-active) ${acceptPct}%, var(--fm-active) ${endPct}%,` +
-                            ` var(--fm-resolve) ${endPct}%, var(--fm-resolve) 100%)`
-                        }
-
-                        return (
-                          <>
-                            <span className="fm-endtime-summary">
-                              Resolves once this passes · lasts {formatTimelineSpan(now, end)} · min 1h, max 21d
-                            </span>
-
-                            <div className="fm-timeline-track" style={trackStyle} aria-hidden="true">
-                              {accept && (
-                                <span className="fm-timeline-node is-accept" style={{ left: `${acceptPct}%` }} />
-                              )}
-                              <span className="fm-timeline-node is-end" style={{ left: `${endPct}%` }} />
-                            </div>
-
-                            <div className="fm-stat-tiles">
-                              <div className="fm-stat-tile is-accept">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Accept by
-                                </span>
-                                <span className="fm-stat-time">{accept ? formatTileClock(accept) : '—'}</span>
-                                <span className="fm-stat-day">{accept ? formatTileDay(accept) : ''}</span>
-                              </div>
-                              <div className="fm-stat-tile is-ends">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Ends
-                                </span>
-                                <span className="fm-stat-time">{formatTileClock(end)}</span>
-                                <span className="fm-stat-day">{formatTileDay(end)}</span>
-                              </div>
-                              <div className="fm-stat-tile is-resolve">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Resolve by
-                                </span>
-                                <span className="fm-stat-time">{formatTileClock(resolveClose)}</span>
-                                <span className="fm-stat-day">{formatTileDay(resolveClose)}</span>
-                              </div>
-                            </div>
-
-                            <p className="fm-timeline-note">
-                              <span className="fm-timeline-note-icon" aria-hidden="true">&#9432;</span>
-                              Opponent accepts before the amber mark; you settle in the 48h after it ends or stakes refund.
-                            </p>
-                          </>
-                        )
-                      })()}
-                    </div>
-
-                    {/* Privacy / Encryption Toggle */}
+                    {/* Encryption indicator (spec 038 FR-001/FR-002): private wagers are
+                        always encrypted — there is no on/off selector. This compact,
+                        non-interactive row replaces the old toggle block; "How encryption
+                        works" stays a one-click disclosure for anyone who wants detail. */}
                     <div className="fm-form-group fm-form-full">
-                      <div className={`fm-encryption-toggle ${enableEncryption ? 'fm-encryption-enabled' : ''}`}>
-                        <label className="fm-toggle-label">
-                          <input
-                            type="checkbox"
-                            checked={enableEncryption}
-                            onChange={(e) => setEnableEncryption(e.target.checked)}
-                            disabled={submitting}
-                          />
-                          <span className="fm-toggle-switch"></span>
-                          <span className="fm-toggle-text">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                              <path d="M7 11V7a5 5 0 0110 0v4"/>
+                      <div className="fm-encryption-indicator">
+                        <span className="fm-pq-badge">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                          </svg>
+                          <span>End-to-End Encrypted</span>
+                        </span>
+
+                        <div className="fm-encryption-info">
+                          <button
+                            type="button"
+                            className="fm-encryption-info-header fm-encryption-info-toggle"
+                            onClick={() => setShowEncryptionDetails(v => !v)}
+                            aria-expanded={showEncryptionDetails}
+                            aria-controls="fm-encryption-details"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M12 16v-4M12 8h.01"/>
                             </svg>
-                            Private Wager
-                          </span>
-                        </label>
-
-                        {enableEncryption && (
-                          <div className="fm-pq-badge">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
-                            <span>End-to-End Encrypted</span>
-                          </div>
-                        )}
-
-                        {!enableEncryption && (
-                          <span className="fm-hint">
-                            Wager details will be publicly visible on the blockchain.
-                          </span>
-                        )}
-
-                        {/* Encryption explainer is collapsed by default to save space;
-                            the toggle + badge convey the state, details are one click away. */}
-                        {enableEncryption && (
-                          <div className="fm-encryption-info">
-                            <button
-                              type="button"
-                              className="fm-encryption-info-header fm-encryption-info-toggle"
-                              onClick={() => setShowEncryptionDetails(v => !v)}
-                              aria-expanded={showEncryptionDetails}
-                              aria-controls="fm-encryption-details"
+                            <span>How encryption works</span>
+                            <svg
+                              className={`fm-encryption-chevron ${showEncryptionDetails ? 'open' : ''}`}
+                              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                              aria-hidden="true"
                             >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 16v-4M12 8h.01"/>
-                              </svg>
-                              <span>How encryption works</span>
-                              <svg
-                                className={`fm-encryption-chevron ${showEncryptionDetails ? 'open' : ''}`}
-                                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                aria-hidden="true"
-                              >
-                                <polyline points="6 9 12 15 18 9"/>
-                              </svg>
-                            </button>
+                              <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                          </button>
 
-                            {showEncryptionDetails && (
-                              <div id="fm-encryption-details" className="fm-encryption-details">
-                                <p className="fm-hint">
-                                  End-to-end encrypted. Only participants can decrypt wager details.
-                                </p>
+                          {showEncryptionDetails && (
+                            <div id="fm-encryption-details" className="fm-encryption-details">
+                              <p className="fm-hint">
+                                End-to-end encrypted. Only participants can decrypt wager details.
+                              </p>
 
-                                <div className="fm-encryption-subhead">What gets encrypted?</div>
-                                <div className="fm-encryption-fields">
-                                  <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Bet description &amp; terms</span></div>
-                                  <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Wager metadata</span></div>
-                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Participant addresses</span></div>
-                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Stake amount &amp; token</span></div>
-                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Wager timing</span></div>
-                                </div>
-
-                                {!encryptionInitialized && !encryptionInitializing && (
-                                  <div className="fm-encryption-warning">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <circle cx="12" cy="12" r="10"/>
-                                      <path d="M12 16v-4M12 8h.01"/>
-                                    </svg>
-                                    <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
-                                  </div>
-                                )}
-
-                                {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
-                                  <p className="fm-encryption-note">
-                                    Your opponent must have registered their encryption key to create an encrypted wager.
-                                  </p>
-                                )}
+                              <div className="fm-encryption-subhead">What gets encrypted?</div>
+                              <div className="fm-encryption-fields">
+                                <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Bet description &amp; terms</span></div>
+                                <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Wager metadata</span></div>
+                                <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Participant addresses</span></div>
+                                <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Stake amount &amp; token</span></div>
+                                <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Wager timing</span></div>
                               </div>
-                            )}
-                          </div>
-                        )}
+
+                              {!encryptionInitialized && !encryptionInitializing && (
+                                <div className="fm-encryption-warning">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 16v-4M12 8h.01"/>
+                                  </svg>
+                                  <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
+                                </div>
+                              )}
+
+                              {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
+                                <p className="fm-encryption-note">
+                                  Your opponent must have registered their encryption key to create this wager.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {encryptionInitializing && (
                           <div className="fm-encryption-status">
                             <span className="fm-spinner-small"></span>

@@ -29,6 +29,27 @@ class MockIntersectionObserver {
 }
 global.IntersectionObserver = MockIntersectionObserver
 
+// Polyfill the Pointer Events API — jsdom does not implement PointerEvent or
+// element pointer-capture, which drag-based components (e.g. the deadline
+// timeline, spec 038) rely on for dot-dragging.
+if (typeof global.PointerEvent === 'undefined') {
+  class MockPointerEvent extends MouseEvent {
+    constructor(type, params = {}) {
+      super(type, params)
+      this.pointerId = params.pointerId ?? 0
+      this.pointerType = params.pointerType ?? 'mouse'
+    }
+  }
+  global.PointerEvent = MockPointerEvent
+  window.PointerEvent = MockPointerEvent
+}
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = () => {}
+}
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = () => {}
+}
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()

@@ -260,12 +260,9 @@
 
 /* ── End date + glanceable timeline (compact-chips redesign) ─────────
    Replaces the tall stack of End Date / Acceptance Deadline / Resolution
-   Window read-only rows with a slim accent track + three stat tiles. */
-.fm-endtime {
-  --fm-accept: #E8910C;   /* amber  — accept-by */
-  --fm-active: #36B37E;   /* green  — ends (matches app accent) */
-  --fm-resolve: #8C7CF0;  /* purple — resolve-by */
-}
+   Window read-only rows with a slim accent track + three stat tiles.
+   Colors come from the global --timeline-* brand-palette tokens
+   (theme.css, spec 038) — no local amber override here anymore. */
 
 .fm-endtime-summary {
   font-size: 0.75rem;
@@ -291,13 +288,13 @@
 }
 
 .fm-timeline-node.is-accept {
-  background: var(--fm-accept);
+  background: var(--timeline-accept);
 }
 
 .fm-timeline-node.is-end {
   width: 18px;
   height: 18px;
-  background: var(--fm-active);
+  background: var(--timeline-active);
 }
 
 .fm-stat-tiles {
@@ -318,21 +315,21 @@
 }
 
 .fm-stat-tile.is-accept {
-  --tile-accent: var(--fm-accept);
-  --tile-bg: rgba(232, 145, 12, 0.08);
-  --tile-border: rgba(232, 145, 12, 0.28);
+  --tile-accent: var(--timeline-accept);
+  --tile-bg: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.08);
+  --tile-border: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.28);
 }
 
 .fm-stat-tile.is-ends {
-  --tile-accent: var(--fm-active);
-  --tile-bg: rgba(54, 179, 126, 0.08);
-  --tile-border: rgba(54, 179, 126, 0.28);
+  --tile-accent: var(--timeline-active);
+  --tile-bg: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+  --tile-border: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.28);
 }
 
 .fm-stat-tile.is-resolve {
-  --tile-accent: var(--fm-resolve);
-  --tile-bg: rgba(140, 124, 240, 0.08);
-  --tile-border: rgba(140, 124, 240, 0.28);
+  --tile-accent: var(--timeline-resolve);
+  --tile-bg: rgba(var(--timeline-resolve-rgb, 140, 124, 240), 0.08);
+  --tile-border: rgba(var(--timeline-resolve-rgb, 140, 124, 240), 0.28);
 }
 
 .fm-stat-head {
@@ -447,6 +444,32 @@
 /* Number input spinner buttons - uses color-scheme for automatic theming */
 .fm-stake-input-wrapper input[type="number"] {
   color-scheme: var(--color-scheme, dark);
+}
+
+/* Stake amount + token on one line (spec 038 FR-011) — the token select sits
+   as the trailing segment of the same input group, styled like the stake
+   suffix it replaces, but always interactive (never a plain label). */
+.fm-stake-row .fm-stake-token-inline {
+  flex: 0 0 auto;
+  max-width: 40%;
+  border: none;
+  border-left: 1px solid var(--border-color, #23303D);
+  border-radius: 0;
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.02));
+  color: var(--text-primary, #E6EDF3);
+  font-size: 0.85rem;
+  padding: 0.75rem 1.75rem 0.75rem 0.75rem;
+  cursor: pointer;
+}
+
+.fm-stake-row .fm-stake-token-inline:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(54, 179, 126, 0.35);
+}
+
+.fm-stake-row .fm-stake-token-inline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Input with Action Button (QR Scan, Lookup) */
@@ -1031,85 +1054,13 @@
 
 /* ==================== Encryption / Privacy Styles ==================== */
 
-/* Encryption Toggle */
-.fm-encryption-toggle {
-  padding: 1rem;
-  background: var(--bg-primary, #0E141B);
-  border: 1px solid var(--border-color, #23303D);
-  border-radius: 10px;
-}
-
-.fm-toggle-label {
+/* Always-on encryption indicator (spec 038 FR-001/FR-002) — a compact,
+   non-interactive row (badge + one disclosure control), replacing the old
+   toggle block. No card chrome: it's informational, not a decision point. */
+.fm-encryption-indicator {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.fm-toggle-label input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.fm-toggle-switch {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  background: var(--bg-tertiary, #1A242D);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.fm-toggle-switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: var(--text-muted, #7A8590);
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.fm-toggle-label input:checked + .fm-toggle-switch {
-  background: linear-gradient(135deg, #36B37E 0%, #2ECC71 100%);
-}
-
-.fm-toggle-label input:checked + .fm-toggle-switch::after {
-  transform: translateX(20px);
-  background: white;
-}
-
-.fm-toggle-label input:disabled + .fm-toggle-switch {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.fm-toggle-text {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary, #E6EDF3);
-}
-
-.fm-toggle-text svg {
-  color: var(--text-muted, #7A8590);
-}
-
-.fm-toggle-label input:checked ~ .fm-toggle-text svg {
-  color: #36B37E;
-}
-
-.fm-encryption-toggle .fm-hint {
-  margin-top: 0.5rem;
-  display: block;
 }
 
 .fm-encryption-warning {
@@ -1129,7 +1080,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.75rem;
   padding: 0.625rem 0.875rem;
   background: rgba(54, 179, 126, 0.1);
   border: 1px solid rgba(54, 179, 126, 0.25);
@@ -1231,8 +1181,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+  width: fit-content;
   padding: 0.375rem 0.625rem;
-  margin-top: 0.75rem;
   background: linear-gradient(135deg, rgba(138, 43, 226, 0.35) 0%, rgba(75, 0, 130, 0.4) 100%);
   border: 1px solid rgba(183, 148, 246, 0.5);
   border-radius: 6px;
@@ -1268,16 +1218,8 @@
   color: #E9DFFF;
 }
 
-/* Encryption Toggle Enhanced */
-.fm-encryption-enabled {
-  border-color: rgba(54, 179, 126, 0.4);
-  background: var(--bg-primary, #0E141B);
-  box-shadow: inset 0 0 0 1px rgba(54, 179, 126, 0.15);
-}
-
 /* Encryption Info Panel */
 .fm-encryption-info {
-  margin-top: 0.75rem;
   padding: 0.75rem;
   background: rgba(54, 179, 126, 0.05);
   border: 1px solid rgba(54, 179, 126, 0.15);
@@ -1730,58 +1672,8 @@
   font-size: 0.9rem;
 }
 
-/* ── Resolution-type tabs (oracle / Make an Offer flows) ─────────────── */
-.fm-resolution-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.fm-resolution-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.5rem 0.85rem;
-  background: var(--bg-primary, #0E141B);
-  border: 1px solid var(--border-color, #23303D);
-  border-radius: 999px;
-  color: var(--text-primary, #1F2933);
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.fm-resolution-tab:hover:not(:disabled) {
-  border-color: var(--brand-primary, #36B37E);
-}
-
-.fm-resolution-tab.active {
-  border-color: var(--brand-primary, #36B37E);
-  background: rgba(54, 179, 126, 0.12);
-  color: var(--brand-primary, #36B37E);
-}
-
-.fm-resolution-tab.locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.fm-resolution-tab:disabled:not(.locked) {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.fm-resolution-tab-lock {
-  flex-shrink: 0;
-  opacity: 0.8;
-}
-
-.fm-resolution-tab-icon {
-  flex-shrink: 0;
-  font-size: 0.95rem;
-  line-height: 1;
-}
+/* Resolution-type / who-settles selection now uses the shared PillSelect
+   component (components/ui/PillSelect.jsx + PillSelect.css, spec 038). */
 
 /* ── Oracle condition picker ─────────────────────────────────────────── */
 .fm-oracle-picker {

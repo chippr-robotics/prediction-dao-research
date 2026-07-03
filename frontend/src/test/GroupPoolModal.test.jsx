@@ -38,7 +38,7 @@ describe('GroupPoolModal', () => {
     expect(screen.getByLabelText(/buy-in — each member/i)).toBeInTheDocument()
   })
 
-  it('the buy-in entry is formatted as money ($ prefix, USDC suffix, 2-decimal blur)', () => {
+  it('the buy-in entry is formatted as money ($ prefix, interactive USDC token control, 2-decimal blur)', () => {
     usePools.mockReturnValue(pools())
     renderModal()
     const buyIn = screen.getByLabelText(/buy-in — each member/i)
@@ -47,21 +47,29 @@ describe('GroupPoolModal', () => {
     fireEvent.blur(buyIn)
     expect(buyIn.value).toBe('12.50')
     expect(screen.getByText('$')).toBeInTheDocument()
-    expect(screen.getByText('USDC')).toBeInTheDocument()
+    // Stake token control is always interactive (spec 038 FR-011), even
+    // though group pools only support USDC on this network today.
+    const tokenControl = screen.getByLabelText(/^stake token$/i)
+    expect(tokenControl.tagName).toBe('SELECT')
+    expect(tokenControl).not.toBeDisabled()
+    expect(tokenControl.value).toBe('USDC')
   })
 
-  it('join/resolve windows use the timeline element — sliders plus tap-to-type manual entry', () => {
+  it('join/resolve windows use the shared timeline element — draggable dots plus tap-to-set modal', () => {
     usePools.mockReturnValue(pools())
     renderModal()
-    const joinSlider = screen.getByLabelText(/joining open until/i)
-    const resolveSlider = screen.getByLabelText(/must be resolved by/i)
-    expect(joinSlider).toHaveAttribute('type', 'range')
-    expect(resolveSlider).toHaveAttribute('type', 'range')
+    const joinDot = screen.getByRole('slider', { name: /joining open until/i })
+    const resolveDot = screen.getByRole('slider', { name: /must be resolved by/i })
+    expect(joinDot).toBeInTheDocument()
+    expect(resolveDot).toBeInTheDocument()
+    // No native picker field or "type a date" link anywhere in the form (FR-005).
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(screen.queryByText(/tap to type a date/i)).toBeNull()
 
-    // No manual input until a tile is tapped.
-    expect(screen.queryByLabelText(/exact date & time/i)).toBeNull()
+    // Tapping a tile opens the shared set-time modal, not an inline input.
     fireEvent.click(screen.getByRole('button', { name: /join by/i }))
-    expect(screen.getByLabelText(/exact date & time — joining open until/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
+    expect(screen.getByText(/joining open until/i)).toBeInTheDocument()
   })
 
   it('the approval threshold is a named selector, not a raw percent field', async () => {
