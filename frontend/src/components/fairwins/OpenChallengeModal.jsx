@@ -10,6 +10,7 @@ import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
 import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
+import PillSelect from '../ui/PillSelect'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -313,7 +314,7 @@ function MakerPanel({ onClose }) {
 
       <div className="fm-form-group fm-form-full">
         <label htmlFor="oc-stake">Stake — each side <span className="fm-required">*</span></label>
-        <div className="fm-stake-input-wrapper">
+        <div className="fm-stake-input-wrapper fm-stake-row">
           <span className="fm-stake-prefix">$</span>
           <input
             id="oc-stake" type="number" inputMode="decimal" min="0" step="0.01"
@@ -326,17 +327,26 @@ function MakerPanel({ onClose }) {
             }}
             disabled={busy}
           />
-          <span className="fm-stake-suffix">USDC</span>
+          {/* Stake token control is always interactive (spec 038 FR-011), even
+              though open challenges only support the chain stablecoin today. */}
+          <select id="oc-stake-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" disabled={busy} value="USDC" onChange={() => {}}>
+            <option value="USDC">💵 USDC</option>
+          </select>
         </div>
-        <span className="fm-hint">Enter the amount in USD — both sides stake this much in USDC.</span>
+        <span className="fm-hint">Enter the amount in USD. Only USDC is supported for open challenges on this network.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-resolution">How is it resolved? <span className="fm-required">*</span></label>
-        <select id="oc-resolution" className="fm-select" value={resolutionType} onChange={(e) => setResolutionType(e.target.value)} disabled={busy}>
-          <option value={OPEN_RESOLUTION_TYPES.Either}>Either side submits the outcome</option>
-          <option value={OPEN_RESOLUTION_TYPES.ThirdParty}>A named third-party arbitrator decides</option>
-        </select>
+        <PillSelect
+          label={<>How is it resolved? <span className="fm-required">*</span></>}
+          options={[
+            { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side submits the outcome' },
+            { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'A named third-party arbitrator decides' },
+          ]}
+          value={resolutionType}
+          onChange={setResolutionType}
+          disabled={busy}
+        />
         <span className="fm-hint">
           Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
         </span>

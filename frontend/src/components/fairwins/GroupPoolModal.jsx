@@ -6,6 +6,7 @@ import WagerQRCode from '../ui/WagerQRCode'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
 import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
+import PillSelect from '../ui/PillSelect'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 import '../../pages/pools.css'
@@ -238,7 +239,7 @@ function CreatePanel({ onClose }) {
 
       <div className="fm-form-group fm-form-full">
         <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
-        <div className="fm-stake-input-wrapper">
+        <div className="fm-stake-input-wrapper fm-stake-row">
           <span className="fm-stake-prefix">$</span>
           <input
             id="gp-buyin" type="number" inputMode="decimal" min="0" step="0.01"
@@ -251,9 +252,13 @@ function CreatePanel({ onClose }) {
             }}
             required
           />
-          <span className="fm-stake-suffix">USDC</span>
+          {/* Stake token control is always interactive (spec 038 FR-011), even
+              though group pools only support the chain stablecoin today. */}
+          <select id="gp-buyin-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" value="USDC" onChange={() => {}}>
+            <option value="USDC">💵 USDC</option>
+          </select>
         </div>
-        <span className="fm-hint">Enter the amount in USD — every member pays this much in USDC to join.</span>
+        <span className="fm-hint">Enter the amount in USD. Only USDC is supported for group pools on this network.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
@@ -266,21 +271,12 @@ function CreatePanel({ onClose }) {
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <span className="fm-label" id="gp-threshold-label">Who must approve the payout? <span className="fm-required">*</span></span>
-        <div className="fm-resolution-tabs" role="radiogroup" aria-labelledby="gp-threshold-label">
-          {THRESHOLD_CHOICES.map((c) => (
-            <button
-              key={c.pct}
-              type="button"
-              role="radio"
-              aria-checked={thresholdPct === c.pct}
-              className={`fm-resolution-tab ${thresholdPct === c.pct ? 'active' : ''}`}
-              onClick={() => setThresholdPct(c.pct)}
-            >
-              <span className="fm-resolution-tab-label">{c.label}</span>
-            </button>
-          ))}
-        </div>
+        <PillSelect
+          label={<>Who must approve the payout? <span className="fm-required">*</span></>}
+          options={THRESHOLD_CHOICES.map((c) => ({ value: c.pct, label: c.label }))}
+          value={thresholdPct}
+          onChange={setThresholdPct}
+        />
         <span className="fm-hint">
           {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
         </span>

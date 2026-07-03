@@ -98,7 +98,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(createBtn).toBeEnabled()
   })
 
-  it('Maker: the USDC stake entry is formatted as money ($ prefix, 2-decimal blur)', () => {
+  it('Maker: the USDC stake entry is formatted as money ($ prefix, interactive token control, 2-decimal blur)', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const stake = screen.getByLabelText(/stake — each side/i)
     expect(stake).toHaveValue(10) // default 10.00
@@ -107,7 +107,12 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(stake.value).toBe('12.50')
     // Money chrome around the input.
     expect(screen.getByText('$')).toBeInTheDocument()
-    expect(screen.getByText('USDC')).toBeInTheDocument()
+    // Stake token control is always interactive (spec 038 FR-011), even
+    // though open challenges only support USDC on this network today.
+    const tokenControl = screen.getByLabelText(/^stake token$/i)
+    expect(tokenControl.tagName).toBe('SELECT')
+    expect(tokenControl).not.toBeDisabled()
+    expect(tokenControl.value).toBe('USDC')
   })
 
   it('deep-link helpers round-trip the code through a take URL', () => {

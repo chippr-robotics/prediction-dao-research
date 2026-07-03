@@ -38,7 +38,7 @@ describe('GroupPoolModal', () => {
     expect(screen.getByLabelText(/buy-in — each member/i)).toBeInTheDocument()
   })
 
-  it('the buy-in entry is formatted as money ($ prefix, USDC suffix, 2-decimal blur)', () => {
+  it('the buy-in entry is formatted as money ($ prefix, interactive USDC token control, 2-decimal blur)', () => {
     usePools.mockReturnValue(pools())
     renderModal()
     const buyIn = screen.getByLabelText(/buy-in — each member/i)
@@ -47,7 +47,12 @@ describe('GroupPoolModal', () => {
     fireEvent.blur(buyIn)
     expect(buyIn.value).toBe('12.50')
     expect(screen.getByText('$')).toBeInTheDocument()
-    expect(screen.getByText('USDC')).toBeInTheDocument()
+    // Stake token control is always interactive (spec 038 FR-011), even
+    // though group pools only support USDC on this network today.
+    const tokenControl = screen.getByLabelText(/^stake token$/i)
+    expect(tokenControl.tagName).toBe('SELECT')
+    expect(tokenControl).not.toBeDisabled()
+    expect(tokenControl.value).toBe('USDC')
   })
 
   it('join/resolve windows use the shared timeline element — draggable dots plus tap-to-set modal', () => {
