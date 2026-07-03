@@ -22,6 +22,10 @@ modals, `DeadlineTimeline`, panels) depend on this contract; tests enforce it.
 | `children` | ReactNode | yes | Bubble content. Re-evaluated on every render → the bubble shows current-state text when opened (FR-009). Plain text or simple inline markup; no interactive content other than links. |
 | `className` | string | no | Appended to the wrapper `<span>`; hosts use it for spacing only, never to restyle the bubble. |
 
+One internal exception: `bubbleRole` (default `'note'`) exists solely so the
+`ScreeningInfoButton` wrapper can keep its spec-021 dialog semantics for rich
+content; wager views MUST NOT pass it.
+
 No other props. Hosts MUST NOT control open state, placement, or styling of
 the bubble (single shared design, FR-006).
 

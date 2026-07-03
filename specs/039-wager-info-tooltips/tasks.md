@@ -23,7 +23,7 @@ Web app frontend workspace: components in `frontend/src/components/`, tests in `
 
 **Purpose**: Confirm a green baseline so sweep regressions are attributable.
 
-- [ ] T001 Install workspaces (`npm install`) and record a green baseline: `npm run test:frontend` and `npm --workspace frontend run lint` pass on the branch before any change
+- [X] T001 Install workspaces (`npm install`) and record a green baseline: `npm run test:frontend` and `npm --workspace frontend run lint` pass on the branch before any change
 
 ---
 
@@ -33,11 +33,11 @@ Web app frontend workspace: components in `frontend/src/components/`, tests in `
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Write behavior tests for the InfoTip contract (B1–B8: open on click/Enter/Space, re-click close, outside-mousedown close without focus steal, Escape close with focus return, single-open via `fairwins:infotip-open` CustomEvent, unmount cleanup, viewport clamp effect, tab-order/icon-only rendering; children re-evaluated per render for FR-009) in frontend/src/test/InfoTip.test.jsx — tests must fail before T004
-- [ ] T003 [P] Write axe tests (trigger name/role/value closed and open, `aria-expanded`/`aria-controls` wiring, live-region announcement container) in frontend/src/test/InfoTip.axe.test.jsx — must fail before T004
-- [ ] T004 Implement the InfoTip component (props `label`/`children`/`className` only; button trigger with ⓘ SVG; always-mounted `aria-live="polite"` bubble region; document listeners while open; CustomEvent coordination; `useLayoutEffect` viewport clamp per research R5) in frontend/src/components/ui/InfoTip.jsx
-- [ ] T005 Create bubble/icon styles (≥24×24 px hit area, speech-bubble arrow, `max-width: min(20rem, calc(100vw - 2rem))`, light + dark theme tokens with AA contrast, focus-visible ring) in frontend/src/components/ui/InfoTip.css
-- [ ] T006 Refactor ScreeningInfoButton to a thin wrapper over InfoTip keeping its public API, `ab-info-*` class hooks, and rich (heading/list/link) content; existing suite frontend/src/test/addressBook/AddressBookButton.test.jsx must stay green unmodified, in frontend/src/components/ui/ScreeningInfoButton.jsx
+- [X] T002 [P] Write behavior tests for the InfoTip contract (B1–B8: open on click/Enter/Space, re-click close, outside-mousedown close without focus steal, Escape close with focus return, single-open via `fairwins:infotip-open` CustomEvent, unmount cleanup, viewport clamp effect, tab-order/icon-only rendering; children re-evaluated per render for FR-009) in frontend/src/test/InfoTip.test.jsx — tests must fail before T004
+- [X] T003 [P] Write axe tests (trigger name/role/value closed and open, `aria-expanded`/`aria-controls` wiring, live-region announcement container) in frontend/src/test/InfoTip.axe.test.jsx — must fail before T004
+- [X] T004 Implement the InfoTip component (props `label`/`children`/`className` only; button trigger with ⓘ SVG; always-mounted `aria-live="polite"` bubble region; document listeners while open; CustomEvent coordination; `useLayoutEffect` viewport clamp per research R5) in frontend/src/components/ui/InfoTip.jsx
+- [X] T005 Create bubble/icon styles (≥24×24 px hit area, speech-bubble arrow, `max-width: min(20rem, calc(100vw - 2rem))`, light + dark theme tokens with AA contrast, focus-visible ring) in frontend/src/components/ui/InfoTip.css
+- [X] T006 Refactor ScreeningInfoButton to a thin wrapper over InfoTip keeping its public API, `ab-info-*` class hooks, and rich (heading/list/link) content; existing suite frontend/src/test/addressBook/AddressBookButton.test.jsx must stay green unmodified, in frontend/src/components/ui/ScreeningInfoButton.jsx
 
 **Checkpoint**: `InfoTip` passes its own tests and axe suite; `ScreeningInfoButton` call sites unchanged — story sweeps can begin (in parallel if staffed).
 

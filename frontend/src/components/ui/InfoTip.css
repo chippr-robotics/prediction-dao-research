@@ -1,0 +1,93 @@
+.infotip-wrap {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+
+.infotip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+}
+
+.infotip-btn:hover,
+.infotip-btn:focus-visible {
+  color: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+}
+
+.infotip-btn:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Zero-size anchor point centered under the icon; the bubble and its arrow
+   hang off it so a horizontal clamp shift never detaches the arrow. */
+.infotip-region {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.infotip-region:has(.infotip-bubble:not(.infotip-bubble-above))::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: -6px;
+  border: 6px solid transparent;
+  border-top-width: 0;
+  border-bottom-color: var(--card-bg, #fff);
+  filter: drop-shadow(0 -1px 0 var(--border-color, #cbd5e1));
+}
+
+.infotip-region:has(.infotip-bubble-above)::before {
+  content: '';
+  position: absolute;
+  bottom: 28px;
+  left: -6px;
+  border: 6px solid transparent;
+  border-bottom-width: 0;
+  border-top-color: var(--card-bg, #fff);
+  filter: drop-shadow(0 1px 0 var(--border-color, #cbd5e1));
+}
+
+.infotip-bubble {
+  pointer-events: auto;
+  position: absolute;
+  top: 10px;
+  left: 0;
+  transform: translateX(calc(-50% + var(--infotip-shift, 0px)));
+  display: block;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2rem));
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 0.5rem;
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #1e293b);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+}
+
+.infotip-bubble-above {
+  top: auto;
+  bottom: 34px;
+}
