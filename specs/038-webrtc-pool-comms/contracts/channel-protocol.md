@@ -36,7 +36,7 @@ violations → drop session per rate rules):
 
 | Type | Direction | Body | Notes |
 |---|---|---|---|
-| `hello` | both, once | `{}` | first message post-connect; proves session key liveness |
+| `hello` | both, once | `{}` | first **envelope** after the `fwpc-hs/1` auth exchange completes; confirms the certified-session-key signing path end-to-end before any state flows |
 | `ping` / `pong` | both | `{}` | heartbeat every 15 s; 2 missed → connState degraded, 4 → closed (R5) |
 | `snapshot` | creator → member | `{standings, announcements, presence}` | sent on session open (FR-008); full docs with versions |
 | `standings-update` | creator → member | full `StandingsDoc` | latest-wins by `version` (R10); recipients render interim badge (FR-009) |
@@ -44,7 +44,7 @@ violations → drop session per rate rules):
 | `presence` | creator → member | `{connected: [commitment…], version}` | deduped by commitment (FR-026); display-only (FR-019) |
 | `claim-code` | member → creator | `{boxed}` = nacl.box(`{commitment, claimCode}`, creator boxPubKey) | never forwarded/broadcast (FR-011); collapses per commitment |
 | `claim-code-ack` | creator → member | `{commitment}` | delivery confirmation (FR-013); member UI flips to "delivered" |
-| `bye` | both | `{reason}` | clean teardown: pool concluded (FR-025), replaced session (R11), declined capacity (FR-027) |
+| `bye` | both | `{reason}` | clean teardown: pool concluded (FR-025), replaced session (`superseded`, R11), superseded hub tab (`superseded-hub`, R11), declined capacity (FR-027) |
 
 **Authority matrix** (FR-004/FR-017): `snapshot`, `standings-update`,
 `announcement`, `presence`, `claim-code-ack` are valid **only from the
@@ -58,13 +58,22 @@ messages are dropped and count against the rate limit.
   safe, no history replay).
 - Snapshot-on-connect + full-doc updates = a reconnecting member converges in
   one message (SC-007).
+- The creator **persists authored docs and version counters** device-locally
+  and resumes the monotonic sequence after a reload — versions never restart
+  at 0 for a pool (analyze C4).
 - Received docs are cached device-locally for honest "last known (possibly
   stale)" rendering when disconnected; staleness is always labeled.
 
 ## Hub behavior (creator side)
 
-- ≤ 50 concurrent sessions (FR-027); session 51 receives `bye{reason:
-  "capacity"}` before close and the member UI explains it.
+- ≤ 50 concurrent **authenticated** sessions (FR-027); session 51 receives
+  `bye{reason:"capacity"}` before close and the member UI explains it.
+- ≤ 10 concurrent **pending-auth** connections (camper containment, FR-020a);
+  excess attempts are refused at the rendezvous layer; pending peers get
+  nothing but the auth exchange and are dropped at the 10 s timeout.
+- At most one active hub per (account, pool) per device: hub tabs coordinate
+  leadership via `BroadcastChannel`; a superseded hub tab closes its sessions
+  with `bye{reason:"superseded-hub"}` (analyze C3/R11).
 - Sessions keyed by commitment; a newer authenticated session for the same
   commitment replaces the older (`bye{reason:"superseded"}`) — FR-026/R11.
 - Fan-out: doc changes broadcast to all open sessions; per-session send queues

@@ -29,8 +29,11 @@ How to prove the feature works end-to-end. References:
    **automatic failover** connects A↔B through it (FR-020b). Containerize the
    relay and confirm it runs on Cloud Run (WebSocket support, scale-to-zero
    behavior noted).
-4. Wrong-secret check: a third client with an incorrect room secret never
-   rendezvouses with A/B (FR-020a).
+4. Room isolation + camper check: a third client with a *different* room
+   descriptor never rendezvouses with A/B; a third client with the *correct*
+   descriptor (it is publicly derivable — FR-020a honest scope) reaches the
+   room but, lacking a valid identity, never receives channel data and is
+   dropped at the auth timeout.
 5. STUN off: expect connection only on same LAN or end-to-end IPv6 — record
    results as an addendum in research.md.
 6. If (2) fails materially on public Nostr relays, flip the default strategy
@@ -99,10 +102,13 @@ All suites MUST pass; new modules ship with their tests in the same PR
 
 ### Negative / posture checks
 
-- Non-member wallet attempts to connect (valid room secret, no valid identity
-  signature) → dropped at auth; creator UI never lists it (SC-003, FR-002).
-- Wrong room secret (harness) → never rendezvouses with the pool room
-  (FR-020a).
+- Non-member wallet attempts to connect (room descriptor derived from public
+  chain data, no valid identity signature) → dropped at the auth timeout,
+  never receives channel data, creator UI never lists it, and ≥11 concurrent
+  camper connections cannot exhaust the hub (pending-auth cap) — SC-003,
+  FR-002, FR-020a.
+- Different room descriptor (harness) → never rendezvouses with the pool
+  room (cross-pool isolation).
 - Block the active signaling strategy mid-use → status shows failover to the
   other strategy (FR-020b); block both → fast, visible "signaling
   unreachable" + manual flows still work (FR-023).

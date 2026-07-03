@@ -232,6 +232,12 @@ with no wallet address shown.
 - **Impersonation**: A device that is not a verified member of the pool must not
   be able to join the pool's channel, read its traffic, or post to it. A member
   must not be able to pass off messages as the creator's.
+- **Room camping**: Because a pool's rendezvous is derivable from public
+  on-chain data, a non-member may discover it and attempt connections. They
+  must never pass authentication, must be dropped promptly, must not learn
+  channel content, and must not be able to exhaust the creator's capacity or
+  otherwise degrade the channel for members. Members are told (consent) that
+  such a party could observe their network address during the attempt.
 - **Claim code sent to the wrong party**: The hand-off must be addressed to the
   creator specifically; there must be no way to accidentally broadcast a claim
   code to the whole pool.
@@ -338,17 +344,24 @@ with no wallet address shown.
   Once connected, all message content flows only between member devices — no
   server ever stores, reads, or relays channel messages.
 - **FR-020a**: Signaling/connection-establishment material MUST NOT contain
-  wallet addresses or claim codes; discovery of a pool's rendezvous MUST
-  require knowledge the pool's members share (so outsiders cannot enumerate or
-  camp pool channels); and material for one pool/session MUST NOT grant access
-  to another pool's channel or a later session.
+  wallet addresses or claim codes, and material for one pool/session MUST NOT
+  grant access to another pool's channel or a later session. Because pool
+  identifiers (including the four-word phrase's word indices) are publicly
+  readable on-chain, a pool's rendezvous MUST be treated as **discoverable by
+  non-members**: all trust MUST therefore be enforced by member
+  authentication — a non-member who discovers the rendezvous MUST never be
+  able to read or post channel content, MUST be disconnected promptly on
+  failed/absent authentication, and MUST NOT be able to degrade the channel
+  for members (bounded pending connections, rate caps).
 - **FR-020b**: The channel MUST NOT hard-depend on any single signaling
   provider: if the configured rendezvous (public network or FairWins relay) is
   unavailable, connection attempts fail visibly, the pool remains fully usable
   (FR-022), and connectivity resumes automatically when signaling returns.
-- **FR-021**: Before a member's device exposes its network address to other
-  pool members via a direct connection — and to signaling infrastructure during
-  rendezvous — the member MUST be informed of that exposure and be free to
+- **FR-021**: Before a member's device exposes its network address — to other
+  pool members via a direct connection, to signaling infrastructure during
+  rendezvous, and potentially to **non-members who discover the publicly
+  derivable rendezvous** (until they fail authentication and are dropped,
+  FR-020a) — the member MUST be informed of that exposure and be free to
   decline the channel, since network-address linkage could otherwise erode the
   pool's anonymity boundary out-of-band.
 - **FR-022**: The channel MUST be strictly additive: every pool capability

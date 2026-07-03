@@ -58,17 +58,25 @@ One authenticated WebRTC link. Creator holds ≤ 50 (FR-027); member holds ≤ 1
   `contracts/handshake-payload.md`; otherwise the session never opens (FR-002).
 - A new authenticated session for an existing commitment replaces the old one
   (newest-wins, R11/FR-026).
-- Session 51+ on the hub → declined with reason (FR-027).
+- Session 51+ on the hub → declined with reason (FR-027); pending-auth
+  connections capped at 10 (camper containment, FR-020a).
+- At most one active hub per (account, pool) per device — `BroadcastChannel`
+  tab leadership; superseded hub tabs close sessions with
+  `bye{superseded-hub}` (analyze C3).
 
 ## Entity: RoomDescriptor + AuthMessage (transient)
 
 See `contracts/handshake-payload.md`. **RoomDescriptor** `{appId, roomId,
-password}` is derived on demand from phrase entropy + pool + chain (never
-persisted, never displayed); the password keeps signaling content-blind
-(FR-020). **AuthMessage** is the in-band `fwpc-hs/1` first message on a fresh
-data channel: single-use nonce, pool- and session-scoped (FR-020a); member
-auth MUST NOT contain wallet addresses; nothing in either ever contains claim
-codes.
+password}` is derived on demand from phrase entropy (recoverable from the
+pool summary's on-chain `wordIndices`) + pool + chain — never persisted,
+never displayed. Because all inputs are public on-chain, the descriptor is
+derivable by non-members: it scopes rooms and keeps signaling blobs opaque to
+operators (FR-020) but is **not an access control** — auth is (FR-020a).
+**AuthMessage** is the in-band `fwpc-hs/1` first message on a fresh data
+channel: single-use nonce per attempt, pool- and session-scoped (FR-020a);
+the certified session keypair is app-session-lived and reused across
+reconnects (one wallet prompt, analyze C2); member auth MUST NOT contain
+wallet addresses; nothing in either ever contains claim codes.
 
 ## Entity: Envelope (every channel message)
 
@@ -86,7 +94,10 @@ type, body, sig}`; ≤ 8 KB serialized; unknown `type` ignored (FR-024).
 **Validation**: rows keyed by commitment (nicknames derived locally, never
 transmitted as authority); rendered with the interim/off-chain badge
 (FR-009); persisted to `localStorage` display cache with `staleness = version
-+ receivedAt(injected clock)` for honest "possibly stale" rendering.
++ receivedAt(injected clock)` for honest "possibly stale" rendering. The
+**creator additionally persists authored docs + version counters** and
+resumes the monotonic sequence on reload (analyze C4) — versions never
+restart for a pool.
 
 ## Entity: Announcement (single-writer: creator)
 
@@ -146,6 +157,7 @@ PeerSession.commitment ─→ on-chain Joined events (membership check, FR-002)
 |---|---|
 | `fairwins_pool_channel_consent_v1_<account>_<pool>` | `{consented, stunEnabled}` |
 | `fairwins_pool_channel_docs_v1_<account>_<pool>` | last received `{standings, announcements, receivedAt}` (marked stale on load) |
+| `fairwins_pool_channel_authored_v1_<account>_<pool>` | creator only: authored `{standings, announcements}` incl. version counters, resumed on reload (analyze C4) |
 
 Never stored: identity secrets, session private keys, room descriptors
 (re-derived on demand), auth messages, claim codes (beyond the pre-existing

@@ -10,7 +10,7 @@ roomSecret.js`, `rendezvous.js`, and `sessionAuth.js`.
 
 ## Layer 1 — Rendezvous (room derivation + join)
 
-Room identity is derived from **pool-member knowledge only** (FR-020a):
+Room identity is derived deterministically from pool identifiers:
 
 ```
 seed     = HKDF-SHA256(ikm = phraseEntropy ‖ poolAddress ‖ chainId,
@@ -21,11 +21,13 @@ password = base64(seed[16..48])     // engages Trystero signaling encryption
 ```
 
 - `phraseEntropy` is the pool's four-word-phrase entropy (language-independent
-  form, same value all members already hold via the gateway) — NOT the
-  rendered words of any one language.
-- The `password` means signaling infrastructure (Nostr relays or the FairWins
-  ws-relay) carries only opaque encrypted blobs: content-blind by
-  construction (FR-020).
+  form; available to members locally and recoverable from the pool summary's
+  on-chain `wordIndices`) — NOT the rendered words of any one language.
+- **Honest scope (FR-020a)**: the phrase's word indices are emitted on-chain
+  by the pool factory, so all derivation inputs are public and the room
+  descriptor is derivable by non-members. The `password` keeps signaling
+  blobs opaque to signaling operators (FR-020) and scopes rooms — it is
+  **not an access control**. Access control is Layer 2 exclusively.
 - Signaling strategy order (FR-020b): `nostr` (public relays, default) →
   `wsRelay` (FairWins signaling relay on GCP Cloud Run). Failover is
   automatic and surfaced in the connection status UI. Strategy endpoints come
@@ -33,9 +35,14 @@ password = base64(seed[16..48])     // engages Trystero signaling encryption
 - Rooms are joined only while the pool is in an active lifecycle (FR-025) and
   after the member's consent to IP/metadata exposure (FR-021).
 
-**Security property**: holding the room secret grants *rendezvous only* —
-peers discover each other and open data channels, but nothing is trusted or
-readable at the channel level until Layer 2 completes.
+**Security property**: reaching the room grants *rendezvous only* — peers
+discover each other and open data channels, but nothing is trusted or
+readable at the channel level until Layer 2 completes. **Camper containment**
+(spec edge case "Room camping"): the hub caps concurrent pending-auth
+sessions (≤10) separately from the 50 authenticated-session cap, drops peers
+at the 10 s auth timeout, and never fans out any channel data pre-auth; the
+residual exposure — a non-member observing rendezvous presence and member
+network addresses during attempts — is disclosed in the FR-021 consent.
 
 ## Layer 2 — In-band session auth (first messages on a new data channel)
 
@@ -51,8 +58,8 @@ Anything else → immediate drop. Auth not completed within 10 s → drop.
 | `pool` | address | scope; MUST match the room's pool |
 | `role` | `"member"` \| `"creator"` | asserted role; drives verification path |
 | `nonce` | hex(16B) | fresh per session attempt; `sessionId = keccak(memberNonce ‖ creatorNonce)` |
-| `sessionPubKey` | base64(32B) | ephemeral tweetnacl signing pub key (envelope auth) |
-| `boxPubKey` | base64(32B) | ephemeral tweetnacl box pub key (creator only; claim-code encryption) |
+| `sessionPubKey` | base64(32B) | tweetnacl signing pub key (envelope auth) — generated once per app session per (account, pool), memory-only, **reused across automatic reconnects with fresh nonces**, so the wallet/identity prompt happens once per app session, never per reconnect (analyze C2) |
+| `boxPubKey` | base64(32B) | tweetnacl box pub key (creator only; claim-code encryption); same lifetime as `sessionPubKey` |
 | `auth` | object | signature block, per role (below) |
 
 ### Signed tuple (byte layout fixed in `sessionAuth.js`)

@@ -93,31 +93,49 @@ flows (FR-022/FR-023).
 ## R3. Rendezvous: pool-scoped Trystero room, member-derived secret, strategy fallback (revised)
 
 **Decision**: Each pool channel is a Trystero room. `roomSecret.js` derives
-`{appId, roomId, password}` from **pool-member knowledge**: the pool's
-four-word phrase entropy + pool address + chainId, via `@noble/hashes` HKDF
-with domain separation. The room password engages Trystero's built-in
-encryption of signaling payloads, so rendezvous infrastructure sees only
-opaque blobs and cannot enumerate pool rooms (FR-020a). Signaling strategy is
-configured, in order: **Nostr (default, public relays)** → **FairWins
-ws-relay on GCP Cloud Run** (Trystero's `ws-relay` strategy, self-hosted,
-content-blind, non-persisting) — automatic failover between them satisfies
-FR-020b. Trickle ICE now works normally (live signaling path exists), so
-connection setup is seconds, not copy-paste minutes.
+`{appId, roomId, password}` from the pool's four-word phrase entropy + pool
+address + chainId, via `@noble/hashes` HKDF with domain separation. The room
+password engages Trystero's built-in encryption of signaling payloads.
+Signaling strategy is configured, in order: **Nostr (default, public
+relays)** → **FairWins ws-relay on GCP Cloud Run** (Trystero's `ws-relay`
+strategy, self-hosted, content-blind, non-persisting) — automatic failover
+between them satisfies FR-020b. Trickle ICE now works normally (live
+signaling path exists), so connection setup is seconds, not copy-paste
+minutes.
+
+**Honest scope of the room secret (speckit-analyze finding C1)**: the
+phrase's word indices are **emitted on-chain** by the pool factory (they are
+how phrase→pool discovery works; see `usePools.js` reading
+`ev.args.wordIndices`), so every derivation input is public and the room
+descriptor is **derivable by non-members**. The room secret therefore
+provides *scoping and uniqueness*, and opacity toward signaling operators who
+don't correlate with chain data — it is **not an access control**. Access
+control is exclusively the in-band auth handshake (R6): a camper who derives
+the room can attempt connections but never passes auth, is dropped on the
+auth timeout, is bounded by pending-connection caps (R9), and never reads
+channel content. The residual exposure — a camper can observe rendezvous
+presence and member network addresses during attempts — is disclosed in the
+FR-021 consent (spec edge case "Room camping").
 
 **Rationale**: Removes the feature's largest UX cost (per-member manual
 handshake) per the user's decision, while message content remains strictly
-p2p. Deriving room identity from the phrase keeps the "four words are the
-key" product story coherent: the same secret that finds the pool finds its
-channel — and the phrase already lives only with members. The Cloud Run
-relay gives FairWins an availability lever (public Nostr relays come with no
-SLA) without becoming a content backend.
+p2p. Deriving room identity from the phrase keeps derivation local and
+deterministic for members in any UI language (the entropy, not rendered
+words, is the input) with no extra secret to distribute. The Cloud Run relay
+gives FairWins an availability lever (public Nostr relays come with no SLA)
+without becoming a content backend.
 
 **Alternatives considered**:
 - Manual non-trickle copy/QR signaling (the superseded design — preserved in
   git history at `fc7967e`): zero infrastructure but per-member handshake
   friction; rejected by user decision after alternatives review.
-- Room id from pool address alone (no phrase entropy): outsiders could derive
-  it from public on-chain data and camp/DoS the room — fails FR-020a.
+- A creator-generated random channel secret distributed out-of-band alongside
+  the phrase: would make rooms truly non-derivable, but reintroduces a second
+  shared secret and breaks the "share only four words" product story;
+  recorded as optional future hardening, not v1.
+- Stopping the on-chain emission of word indices (spec 034 factory change):
+  removes the public derivability at the root, but requires a contract
+  upgrade and breaks phrase→pool discovery as built — out of scope here.
 - FairWins relay as the *only* strategy: single-provider dependency, fails
   FR-020b and re-centralizes what can stay decentralized by default.
 
@@ -186,8 +204,12 @@ under a signature, the tuple
 - Both handshakes certify an **ephemeral tweetnacl keypair** (`sessionPubKey`,
   plus the creator's `boxPubKey` for claim-code encryption); all subsequent
   envelopes are signed with session keys (R7), so neither side is prompted per
-  message. Peers that fail (or never complete) the handshake within a short
-  timeout are dropped. **MITM analysis**: a hostile peer holding the room
+  message. **Key-reuse policy (analyze finding C2)**: the certified keypair is
+  generated once per app session per (account, pool), held in memory only, and
+  **reused across automatic reconnects with fresh nonces** — the wallet/
+  identity prompt happens on first channel use in an app session (or on
+  account/network switch), never on every reconnect. Peers that fail (or never
+  complete) the handshake within a short timeout are dropped. **MITM analysis**: a hostile peer holding the room
   secret cannot forge either signature, so it can never impersonate the
   creator or a member; at worst it passively relays already-signed envelopes,
   which exposes only data every pool member receives anyway
@@ -283,6 +305,12 @@ problem exists; latest-wins versions are the simplest correct model
 (constitution: YAGNI). Full-document updates dodge diff/patch bugs at our
 sizes (≤50 rows).
 
+**Creator persistence (analyze finding C4)**: the creator persists their
+authored docs *and version counters* device-locally (same display-cache key
+family as the member cache) and resumes the monotonic sequence after a page
+reload — otherwise a reloaded creator restarts at version 0 and members
+holding higher versions would correctly reject every subsequent update.
+
 **Alternatives considered**: CRDTs (no concurrent writers exist), event-log
 replay (violates "converge, don't replay" edge case; unbounded growth).
 
@@ -294,8 +322,18 @@ closed with a reason). Presence counts commitments, not sockets. Claim-code
 state keys by commitment, so duplicates collapse regardless of which device
 sent them (FR-026).
 
+**Creator hub leadership (analyze finding C3)**: at most **one active hub**
+per (account, pool) per device: hub tabs coordinate via a `BroadcastChannel`
+leadership claim (newest claim wins; the superseded tab closes its sessions
+with `bye{reason:"superseded-hub"}` and downgrades to a passive view). A
+creator opening a second *device* is the same newest-wins rule from the
+members' perspective: they follow whichever hub authenticated most recently,
+and doc versions stay monotonic because the creator persists version counters
+(R10).
+
 **Rationale**: Newest-wins matches user intent ("my other tab died, I opened a
-new one") and avoids ghost sessions inflating presence.
+new one") and avoids ghost sessions inflating presence — and, for the hub
+role, prevents two live hubs forking standings state.
 
 ## R12. Feasibility spike (first implementation task) + test strategy
 
