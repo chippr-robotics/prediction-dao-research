@@ -97,9 +97,9 @@ Web app frontend workspace: components in `frontend/src/components/`, tests in `
 
 ### Implementation for User Story 3
 
-- [ ] T021 [P] [US3] Extend view-level axe coverage to swept views with a bubble open: add InfoTip open-state scans to frontend/src/test/timelineColors.axe.test.jsx or a new frontend/src/test/InfoTipViews.axe.test.jsx covering OpenChallengeModal and GroupPoolModal render trees (SC-004: zero new violations)
-- [ ] T022 [P] [US3] Add view-integration keyboard tests: within OpenChallengeModal, tab order reaches each icon in DOM order with accessible names, Enter/Space/Escape behave per contract B1/B4, and no focus trap, in frontend/src/test/claimCode/OpenChallengeModal.test.jsx
-- [ ] T023 [US3] Fix any contrast/focus/name findings the new axe scans surface (expected in bubble text tokens or focus ring against modal backgrounds) in frontend/src/components/ui/InfoTip.css
+- [X] T021 [P] [US3] Extend view-level axe coverage to swept views with a bubble open: add InfoTip open-state scans to frontend/src/test/timelineColors.axe.test.jsx or a new frontend/src/test/InfoTipViews.axe.test.jsx covering OpenChallengeModal and GroupPoolModal render trees (SC-004: zero new violations)
+- [X] T022 [P] [US3] Add view-integration keyboard tests: within OpenChallengeModal, tab order reaches each icon in DOM order with accessible names, Enter/Space/Escape behave per contract B1/B4, and no focus trap, in frontend/src/test/claimCode/OpenChallengeModal.test.jsx
+- [X] T023 [US3] Fix any contrast/focus/name findings the new axe scans surface (expected in bubble text tokens or focus ring against modal backgrounds) in frontend/src/components/ui/InfoTip.css
 
 **Checkpoint**: All three stories complete; FR-007/SC-004 enforced in CI.
 
@@ -107,10 +107,10 @@ Web app frontend workspace: components in `frontend/src/components/`, tests in `
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T024 [P] Sweep-completeness check: grep the seven swept components for remaining static-explainer `.fm-hint` usages and confirm every remaining occurrence is a documented STAY item (update the data-model.md inventory tables' dispositions to "done" as a review record)
-- [ ] T025 [P] Remove dead CSS left by the sweep (unused `.dt-hint` rules, orphaned hint margins) in frontend/src/components/fairwins/DeadlineTimeline.css and frontend/src/components/fairwins/FriendMarketsModal.css
-- [ ] T026 Run full gates locally: `npm run test:frontend` and `npm --workspace frontend run lint` green; fix any fallout
-- [ ] T027 Execute the quickstart.md manual validation (mobile viewport walkthrough incl. 320 px clamp check, SC-001 height/word-count comparison, theme toggle) and record results in specs/039-wager-info-tooltips/quickstart.md under a "Validation run" note
+- [X] T024 [P] Sweep-completeness check: grep the seven swept components for remaining static-explainer `.fm-hint` usages and confirm every remaining occurrence is a documented STAY item (update the data-model.md inventory tables' dispositions to "done" as a review record)
+- [X] T025 [P] Remove dead CSS left by the sweep (unused `.dt-hint` rules, orphaned hint margins) in frontend/src/components/fairwins/DeadlineTimeline.css and frontend/src/components/fairwins/FriendMarketsModal.css
+- [X] T026 Run full gates locally: `npm run test:frontend` and `npm --workspace frontend run lint` green; fix any fallout
+- [X] T027 Execute the quickstart.md manual validation (mobile viewport walkthrough incl. 320 px clamp check, SC-001 height/word-count comparison, theme toggle) and record results in specs/039-wager-info-tooltips/quickstart.md under a "Validation run" note
 
 ---
 

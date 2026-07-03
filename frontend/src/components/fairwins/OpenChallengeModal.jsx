@@ -271,7 +271,7 @@ function MakerPanel({ onClose }) {
             </p>
           ) : (
             <>
-              <span className="fm-label-row oc-backup-row">
+              <span className="fm-label-row">
                 <button
                   type="button"
                   className="fm-btn-secondary"

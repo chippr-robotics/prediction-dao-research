@@ -1700,6 +1700,13 @@
   margin-top: 0.25rem;
 }
 
+/* The kind-help InfoTip (spec 039) sits flush at the top-left of the picker,
+   under the field's "Oracle condition" label. */
+.fm-oracle-picker-help {
+  align-self: flex-start;
+  margin-left: 0;
+}
+
 .fm-oracle-picker--unavailable {
   background: var(--bg-tertiary, rgba(255, 255, 255, 0.04));
   padding: 0.75rem;

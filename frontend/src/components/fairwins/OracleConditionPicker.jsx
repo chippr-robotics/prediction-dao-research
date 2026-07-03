@@ -91,9 +91,7 @@ function OracleConditionPicker({ kind, adapterAddress, value, onChange, error, d
 
   return (
     <div className="fm-oracle-picker" data-kind={kind}>
-      <span className="fm-oracle-picker-help">
-        <InfoTip label="About this oracle condition">{KIND_HELP[kind]}</InfoTip>
-      </span>
+      <InfoTip label="About this oracle condition" className="fm-oracle-picker-help">{KIND_HELP[kind]}</InfoTip>
 
       {!manualMode && (
         <div className="fm-oracle-picker-list" role="listbox" aria-label="Registered conditions">
