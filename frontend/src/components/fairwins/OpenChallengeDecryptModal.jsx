@@ -4,6 +4,7 @@ import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordli
 import { decryptEnvelopeCode, isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+import InfoTip from '../ui/InfoTip'
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -80,14 +81,16 @@ export default function OpenChallengeDecryptModal({ isOpen, onClose, envelope, o
         <div className="fm-content">
           <div className="fm-panel">
             <form className="fm-form" onSubmit={handleSubmit}>
-              <p className="fm-hint">
-                This is an open challenge — its terms are locked to the four-word code, not your wallet.
-                Enter the code you saved when you created or took it to read the terms.
-              </p>
               <div className="fm-form-group fm-form-full">
-                <label htmlFor="oc-decrypt-code">
-                  Your {CLAIM_CODE_WORD_COUNT}-word code <span className="fm-required">*</span>
-                </label>
+                <span className="fm-label-row">
+                  <label htmlFor="oc-decrypt-code">
+                    Your {CLAIM_CODE_WORD_COUNT}-word code <span className="fm-required">*</span>
+                  </label>
+                  <InfoTip label="About reading this challenge">
+                    This is an open challenge — its terms are locked to the four-word code, not your wallet.
+                    Enter the code you saved when you created or took it to read the terms.
+                  </InfoTip>
+                </span>
                 <input
                   id="oc-decrypt-code" type="text" autoComplete="off" spellCheck="false"
                   placeholder="e.g. river tiger kite zoo"

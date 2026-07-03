@@ -4,6 +4,7 @@ import { useUnifiedLookup } from '../../hooks/useUnifiedLookup'
 import { normalizePhrase } from '../../lib/lookup/resolvePhraseLookup.js'
 import TakeChallengePanel from './TakeChallengePanel'
 import JoinPoolPanel from './JoinPoolPanel'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -151,14 +152,18 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
             {showForm && (
               <form className="fm-form" onSubmit={onSubmit}>
                 <div className="fm-form-group fm-form-full">
-                  <label htmlFor="unified-phrase-input">Four-word phrase <span className="fm-required">*</span></label>
+                  <span className="fm-label-row">
+                    <label htmlFor="unified-phrase-input">Four-word phrase <span className="fm-required">*</span></label>
+                    <InfoTip label="About: Four-word phrase">
+                      We’ll find whatever the words point to — a challenge or a pool.
+                    </InfoTip>
+                  </span>
                   <input
                     id="unified-phrase-input" type="text" autoComplete="off" spellCheck="false"
                     placeholder="e.g. crystal orbit harbor violet"
                     value={phrase} onChange={(e) => setPhrase(e.target.value)}
                     disabled={status === 'resolving'}
                   />
-                  <span className="fm-hint">We’ll find whatever the words point to — a challenge or a pool.</span>
                 </div>
 
                 {status === 'result' && result?.kind === 'format-error' && (

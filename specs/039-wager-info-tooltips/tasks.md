@@ -74,16 +74,16 @@ Web app frontend workspace: components in `frontend/src/components/`, tests in `
 
 ### Tests for User Story 2
 
-- [ ] T014 [P] [US2] Update group-pool suite: 5 MOVE items (intro, share-words, USDC, join-close, resolution-detail with FR-009 state variance) hidden by default and revealed via icons; join-deadline `role="alert"` stays inline, in frontend/src/test/GroupPoolModal.test.jsx
-- [ ] T015 [P] [US2] Update take/lookup/decrypt/picker suites for their MOVE items (accept-explainer + save-code; "We'll find whatever the words point to…"; decrypt intro; `KIND_HELP[kind]` with FR-009 state variance) and assert `role="status"` progress and flow prompts stay inline, in frontend/src/components/fairwins/__tests__/TakeChallengePanel.test.jsx, frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx, frontend/src/test/claimCode/OpenChallengeDecryptModal.test.jsx, and frontend/src/test/OracleConditionPicker.test.jsx
+- [X] T014 [P] [US2] Update group-pool suite: 5 MOVE items (intro, share-words, USDC, join-close, resolution-detail with FR-009 state variance) hidden by default and revealed via icons; join-deadline `role="alert"` stays inline, in frontend/src/test/GroupPoolModal.test.jsx
+- [X] T015 [P] [US2] Update take/lookup/decrypt/picker suites for their MOVE items (accept-explainer + save-code; "We'll find whatever the words point to…"; decrypt intro; `KIND_HELP[kind]` with FR-009 state variance) and assert `role="status"` progress and flow prompts stay inline, in frontend/src/components/fairwins/__tests__/TakeChallengePanel.test.jsx, frontend/src/components/fairwins/__tests__/UnifiedLookupModal.test.jsx, frontend/src/test/claimCode/OpenChallengeDecryptModal.test.jsx, and frontend/src/test/OracleConditionPicker.test.jsx
 
 ### Implementation for User Story 2
 
-- [ ] T016 [P] [US2] Sweep GroupPoolModal per its inventory rows (5 MOVE, 1 STAY), in frontend/src/components/fairwins/GroupPoolModal.jsx
-- [ ] T017 [P] [US2] Sweep TakeChallengePanel (move the accept-explainer `<p>` and "Save your code…" line behind icons; keep the `oc-steps` tracker and progress/error inline), in frontend/src/components/fairwins/TakeChallengePanel.jsx
-- [ ] T018 [P] [US2] Sweep UnifiedLookupModal (move the "We'll find whatever the words point to…" hint; keep disambiguation prompt and participant status inline), in frontend/src/components/fairwins/UnifiedLookupModal.jsx
-- [ ] T019 [P] [US2] Sweep OpenChallengeDecryptModal (move the code-locked intro behind an icon beside the code field label), in frontend/src/components/fairwins/OpenChallengeDecryptModal.jsx
-- [ ] T020 [P] [US2] Sweep OracleConditionPicker (`KIND_HELP[kind]` becomes an InfoTip beside the kind selector, current-kind text at open time), in frontend/src/components/fairwins/OracleConditionPicker.jsx
+- [X] T016 [P] [US2] Sweep GroupPoolModal per its inventory rows (5 MOVE, 1 STAY), in frontend/src/components/fairwins/GroupPoolModal.jsx
+- [X] T017 [P] [US2] Sweep TakeChallengePanel (move the accept-explainer `<p>` and "Save your code…" line behind icons; keep the `oc-steps` tracker and progress/error inline), in frontend/src/components/fairwins/TakeChallengePanel.jsx
+- [X] T018 [P] [US2] Sweep UnifiedLookupModal (move the "We'll find whatever the words point to…" hint; keep disambiguation prompt and participant status inline), in frontend/src/components/fairwins/UnifiedLookupModal.jsx
+- [X] T019 [P] [US2] Sweep OpenChallengeDecryptModal (move the code-locked intro behind an icon beside the code field label), in frontend/src/components/fairwins/OpenChallengeDecryptModal.jsx
+- [X] T020 [P] [US2] Sweep OracleConditionPicker (`KIND_HELP[kind]` becomes an InfoTip beside the kind selector, current-kind text at open time), in frontend/src/components/fairwins/OracleConditionPicker.jsx
 
 **Checkpoint**: All wager pop-up views share one pattern; SC-002's "100% behind icons, none lost" holds across the full inventory.
 

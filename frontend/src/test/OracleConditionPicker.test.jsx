@@ -24,6 +24,13 @@ describe('OracleConditionPicker', () => {
     expect(screen.getByText(/Chainlink Data Feed is not deployed/i)).toBeInTheDocument()
   })
 
+  it('moves the kind help text behind an info icon (spec 039 US2)', () => {
+    render(<OracleConditionPicker kind="datafeed" adapterAddress={ADAPTER} value="" onChange={vi.fn()} />)
+    expect(screen.queryByText(/price-feed predicates/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'About this oracle condition' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/price-feed predicates/i)
+  })
+
   it('shows a Loading row while the hook is loading', () => {
     hookReturn.current.loading = true
     render(<OracleConditionPicker kind="datafeed" adapterAddress={ADAPTER} value="" onChange={vi.fn()} />)

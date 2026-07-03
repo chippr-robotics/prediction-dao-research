@@ -25,6 +25,16 @@ describe('TakeChallengePanel (spec 037, US1)', () => {
     expect(await screen.findByText(/taken the challenge/i)).toBeInTheDocument()
   })
 
+  it('moves the accept explainer and save-code note behind an info icon (spec 039 US2)', () => {
+    render(<TakeChallengePanel code="river tiger kite zoo" match={matchOpen} onClose={() => {}} />)
+    expect(screen.queryByText(/binds you as the opponent/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/save your code to re-read/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'About accepting' }))
+    const note = screen.getByRole('note')
+    expect(note).toHaveTextContent(/binds you as the opponent/i)
+    expect(note).toHaveTextContent(/save your code to re-read/i)
+  })
+
   it('prompts for membership when the taker is not a member (no accept button)', () => {
     const onBuyMembership = vi.fn()
     render(<TakeChallengePanel code="river tiger kite zoo" match={{ ...matchOpen, needsMembership: true }} onClose={() => {}} onBuyMembership={onBuyMembership} />)
