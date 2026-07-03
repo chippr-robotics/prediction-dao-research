@@ -9,9 +9,16 @@ import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
-import { toDatetimeLocal } from './wagerTimeline'
+import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+
+// Deadline bounds (unchanged from the previous slider-based timeline):
+// acceptance window caps at the open-challenge contract's MAX_ACCEPT_WINDOW
+// (30 days); the resolve window caps comfortably under the 180-day contract
+// resolve window.
+const ACCEPT_MAX_MS = 30 * DAY_MS
+const RESOLVE_MAX_GAP_MS = 90 * DAY_MS
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -95,8 +102,10 @@ function MakerPanel({ onClose }) {
   // Deadlines (feature 024 feedback): the maker sets when the challenge can still be taken and when it must
   // be resolved by, so the time constraints aren't hidden defaults. Stored as <input type="datetime-local">
   // strings and converted to unix seconds on submit.
-  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * 3600 * 1000))
-  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * 3600 * 1000))
+  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * HOUR_MS))
+  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * HOUR_MS))
+  // Mount-time "now" anchors the timeline's track/bounds so positions don't drift while the form is open.
+  const [nowMs] = useState(() => Date.now())
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
@@ -110,12 +119,48 @@ function MakerPanel({ onClose }) {
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const arbitratorAddr = arbitratorResolved || arbitrator
   const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
-  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
-  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
+  const acceptMs = fromDatetimeLocal(acceptBy)
+  const resolveMs = fromDatetimeLocal(resolveBy)
   const deadlinesValid =
     Number.isFinite(acceptMs) && Number.isFinite(resolveMs) &&
     acceptMs > Date.now() && resolveMs > acceptMs
   const canCreate = description.trim().length > 0 && Number(stake) > 0 && arbitratorValid && deadlinesValid && !busy
+
+  // Milestones for the shared DeadlineTimeline control (spec 038 US1): both
+  // deadlines are directly editable via drag or the tap-to-set modal.
+  const timelineMilestones = [
+    {
+      key: 'accept',
+      label: 'Open for acceptance until',
+      tileHead: 'Open until',
+      value: Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS,
+      min: nowMs + HOUR_MS,
+      max: nowMs + ACCEPT_MAX_MS,
+      editable: true,
+      hint: 'After this, the challenge can no longer be taken and your stake is refundable.',
+      segmentColor: 'var(--timeline-accept)',
+      dotClass: 'is-accept',
+      tileClass: 'is-accept',
+    },
+    {
+      key: 'resolve',
+      label: 'Must be resolved by',
+      tileHead: 'Resolve by',
+      value: Number.isFinite(resolveMs) ? resolveMs : (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + 7 * DAY_MS,
+      min: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + HOUR_MS,
+      max: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + RESOLVE_MAX_GAP_MS,
+      editable: true,
+      hint: 'The outcome must be submitted before this time.',
+      segmentColor: 'var(--timeline-active)',
+      dotClass: 'is-resolve',
+      tileClass: 'is-resolve',
+    },
+  ]
+  const handleTimelineChange = (key, ms) => {
+    const str = toDatetimeLocal(ms)
+    if (key === 'accept') setAcceptBy(str)
+    else if (key === 'resolve') setResolveBy(str)
+  }
 
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()
@@ -306,14 +351,17 @@ function MakerPanel({ onClose }) {
         />
       )}
 
-      {/* Time constraints (testing feedback): the 1v1-wager timeline element — slide to pick each
-          time, or tap a tile to type the exact date & time. */}
+      {/* Time constraints (testing feedback): the shared deadline timeline — drag a dot to
+          pick each time, or tap a tile to open the exact date & time modal. */}
       <DeadlineTimeline
-        acceptBy={acceptBy}
-        resolveBy={resolveBy}
-        onAcceptChange={setAcceptBy}
-        onResolveChange={setResolveBy}
+        milestones={timelineMilestones}
+        onChange={handleTimelineChange}
         disabled={busy}
+        idPrefix="oc"
+        summary={deadlinesValid
+          ? `Open ${formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · ` +
+            `then up to ${formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle`
+          : null}
       />
       {!deadlinesValid && (acceptBy || resolveBy) && (
         <p className="fm-hint oc-deadline-warn" role="alert">

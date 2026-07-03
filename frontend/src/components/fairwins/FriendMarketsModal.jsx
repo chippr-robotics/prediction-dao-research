@@ -34,7 +34,8 @@ import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
 import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
-import { formatTileClock, formatTileDay, formatTimelineSpan } from './wagerTimeline'
+import { formatTimelineSpan, fromDatetimeLocal } from './wagerTimeline'
+import DeadlineTimeline from './DeadlineTimeline'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -1706,106 +1707,65 @@ function FriendMarketsModal({
                     })()}
 
                     {/*
-                      End date + glanceable timeline (compact-chips redesign).
-                      The datetime input keeps #fm-end-date with min/max; the
-                      acceptance deadline and resolution window that used to be
-                      separate read-only rows are now a slim accent track plus
-                      three stat tiles (Accept by / Ends / Resolve by) for the
-                      lowest vertical footprint.
+                      End date + glanceable timeline (spec 038 US1): the same
+                      shared DeadlineTimeline control every create flow uses.
+                      "Ends" is directly editable (drag its dot or tap its tile
+                      to open the set-time modal); "Accept by" and "Resolve by"
+                      are derived from it and render as read-only milestones.
 
-                      The editable input is hidden when a Polymarket is linked —
-                      the wager's end time is locked to that market's own end time
-                      so the side bet can't settle before (or long after) the
-                      linked event — but the derived timeline still renders.
+                      "Ends" becomes non-editable when a Polymarket is linked —
+                      the wager's end time is locked to that market's own end
+                      time so the side bet can't settle before (or long after)
+                      the linked event — but the derived timeline still renders.
                     */}
-                    <div className="fm-form-group fm-form-full fm-endtime">
-                      {!(formData.resolutionType === ResolutionType.Polymarket && selectedPolymarketMarket) && (
-                        <>
-                          <label htmlFor="fm-end-date">
-                            End Date &amp; Time <span className="fm-required">*</span>
-                          </label>
-                          <input
-                            id="fm-end-date"
-                            type="datetime-local"
-                            value={formData.endDateTime}
-                            onChange={(e) => handleFormChange('endDateTime', e.target.value)}
-                            min={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000))}
-                            max={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000))}
+                    {formData.endDateTime && !Number.isNaN(new Date(formData.endDateTime).getTime()) && (() => {
+                      const endMs = fromDatetimeLocal(formData.endDateTime)
+                      const acceptMs = formData.acceptanceDeadline ? fromDatetimeLocal(formData.acceptanceDeadline) : NaN
+                      const windowMs = (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
+                      const resolveMs = endMs + windowMs
+                      const endMin = Date.now() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000
+                      const endMax = Date.now() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000
+                      const endLocked = formData.resolutionType === ResolutionType.Polymarket && !!selectedPolymarketMarket
+
+                      const milestones = [
+                        {
+                          key: 'accept', label: 'Accept by', tileHead: 'Accept by',
+                          value: acceptMs, min: endMin, max: endMax, editable: false,
+                          segmentColor: 'var(--timeline-accept)', dotClass: 'is-accept', tileClass: 'is-accept',
+                        },
+                        {
+                          key: 'end', label: 'End Date & Time', tileHead: 'Ends',
+                          value: endMs, min: endMin, max: endMax, editable: !endLocked,
+                          segmentColor: 'var(--timeline-active)', dotClass: 'is-end', tileClass: 'is-ends',
+                        },
+                        {
+                          key: 'resolve', label: 'Resolve by', tileHead: 'Resolve by',
+                          value: resolveMs, min: endMin, max: endMax + windowMs, editable: false,
+                          segmentColor: 'var(--timeline-resolve)', dotClass: 'is-resolve', tileClass: 'is-resolve',
+                        },
+                      ]
+                      const handleEndChange = (key, ms) => {
+                        if (key !== 'end') return
+                        handleFormChange('endDateTime', toDateTimeLocal(new Date(ms)))
+                      }
+
+                      return (
+                        <div className="fm-form-group fm-form-full">
+                          <DeadlineTimeline
+                            milestones={milestones}
+                            onChange={handleEndChange}
                             disabled={submitting}
-                            className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
+                            idPrefix="fm"
+                            summary={`Resolves once this passes · lasts ${formatTimelineSpan(new Date(), new Date(endMs))} · min 1h, max 21d`}
                           />
                           {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
-                        </>
-                      )}
-
-                      {formData.endDateTime && !Number.isNaN(new Date(formData.endDateTime).getTime()) && (() => {
-                        const now = new Date()
-                        const end = new Date(formData.endDateTime)
-                        const accept = formData.acceptanceDeadline && !Number.isNaN(new Date(formData.acceptanceDeadline).getTime())
-                          ? new Date(formData.acceptanceDeadline)
-                          : null
-                        const windowMs = (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
-                        const resolveClose = new Date(end.getTime() + windowMs)
-
-                        // Position the accent track / markers proportionally along
-                        // now → resolveClose so the amber (accept) and green (end)
-                        // marks land where they actually fall in the timeline.
-                        const span = Math.max(1, resolveClose.getTime() - now.getTime())
-                        const clamp = (n) => Math.max(0, Math.min(100, n))
-                        const acceptPct = accept ? clamp(((accept.getTime() - now.getTime()) / span) * 100) : 0
-                        const endPct = clamp(((end.getTime() - now.getTime()) / span) * 100)
-                        const trackStyle = {
-                          background: `linear-gradient(to right,` +
-                            ` var(--fm-accept) 0%, var(--fm-accept) ${acceptPct}%,` +
-                            ` var(--fm-active) ${acceptPct}%, var(--fm-active) ${endPct}%,` +
-                            ` var(--fm-resolve) ${endPct}%, var(--fm-resolve) 100%)`
-                        }
-
-                        return (
-                          <>
-                            <span className="fm-endtime-summary">
-                              Resolves once this passes · lasts {formatTimelineSpan(now, end)} · min 1h, max 21d
-                            </span>
-
-                            <div className="fm-timeline-track" style={trackStyle} aria-hidden="true">
-                              {accept && (
-                                <span className="fm-timeline-node is-accept" style={{ left: `${acceptPct}%` }} />
-                              )}
-                              <span className="fm-timeline-node is-end" style={{ left: `${endPct}%` }} />
-                            </div>
-
-                            <div className="fm-stat-tiles">
-                              <div className="fm-stat-tile is-accept">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Accept by
-                                </span>
-                                <span className="fm-stat-time">{accept ? formatTileClock(accept) : '—'}</span>
-                                <span className="fm-stat-day">{accept ? formatTileDay(accept) : ''}</span>
-                              </div>
-                              <div className="fm-stat-tile is-ends">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Ends
-                                </span>
-                                <span className="fm-stat-time">{formatTileClock(end)}</span>
-                                <span className="fm-stat-day">{formatTileDay(end)}</span>
-                              </div>
-                              <div className="fm-stat-tile is-resolve">
-                                <span className="fm-stat-head">
-                                  <span className="fm-stat-dot" aria-hidden="true" />Resolve by
-                                </span>
-                                <span className="fm-stat-time">{formatTileClock(resolveClose)}</span>
-                                <span className="fm-stat-day">{formatTileDay(resolveClose)}</span>
-                              </div>
-                            </div>
-
-                            <p className="fm-timeline-note">
-                              <span className="fm-timeline-note-icon" aria-hidden="true">&#9432;</span>
-                              Opponent accepts before the amber mark; you settle in the 48h after it ends or stakes refund.
-                            </p>
-                          </>
-                        )
-                      })()}
-                    </div>
+                          <p className="fm-timeline-note">
+                            <span className="fm-timeline-note-icon" aria-hidden="true">&#9432;</span>
+                            Opponent accepts before the blue mark; you settle in the 48h after it ends or stakes refund.
+                          </p>
+                        </div>
+                      )
+                    })()}
 
                     {/* Privacy / Encryption Toggle */}
                     <div className="fm-form-group fm-form-full">

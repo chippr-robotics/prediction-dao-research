@@ -110,6 +110,24 @@
 }
 
 /* ===================================
+   TIMELINE PHASE TOKENS
+   (spec 038 — deadline timelines use brand colors, not the legacy orange)
+   =================================== */
+
+:root {
+  --timeline-accept: var(--brand-secondary, #4C9AFF);   /* accept/join window */
+  --timeline-active: var(--brand-primary, #36B37E);      /* active wager window */
+  --timeline-resolve: #8C7CF0;                            /* resolve window */
+}
+
+.theme-dark {
+  /* Same hues read fine on dark surfaces; kept explicit for future tuning. */
+  --timeline-accept: var(--brand-secondary, #4C9AFF);
+  --timeline-active: var(--brand-primary, #36B37E);
+  --timeline-resolve: #9D8FF5;
+}
+
+/* ===================================
    COMPONENT-SPECIFIC VARIABLES
    =================================== */
 

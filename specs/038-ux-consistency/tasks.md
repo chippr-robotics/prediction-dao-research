@@ -39,8 +39,8 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 **⚠️ CRITICAL**: Complete before the user-story phases that depend on them (US1 timeline math; US3 tokens). US2/US4/US5 do not depend on this phase.
 
-- [ ] T003 Add global timeline phase tokens to `frontend/src/theme.css` `:root` — `--timeline-accept: var(--brand-secondary)`, `--timeline-active: var(--brand-primary)`, `--timeline-resolve: #8C7CF0` — with light+dark values (per data-model.md TimelinePhaseToken). Do NOT yet remove the scoped `--fm-*` vars (US3 does that switch-over).
-- [ ] T004 [P] Add shared clamp/step/ordering helpers to `frontend/src/components/fairwins/wagerTimeline.js` (`clampToRange`, `stepValue`, `enforceOrdering`/min-separation, epoch↔`datetime-local` converters) so drag and modal share identical bounds logic (research R2, FR-004/FR-006)
+- [X] T003 Add global timeline phase tokens to `frontend/src/theme.css` `:root` — `--timeline-accept: var(--brand-secondary)`, `--timeline-active: var(--brand-primary)`, `--timeline-resolve: #8C7CF0` — with light+dark values (per data-model.md TimelinePhaseToken). Do NOT yet remove the scoped `--fm-*` vars (US3 does that switch-over).
+- [X] T004 [P] Add shared clamp/step/ordering helpers to `frontend/src/components/fairwins/wagerTimeline.js` (`clampToRange`, `stepValue`, `enforceOrdering`/min-separation, epoch↔`datetime-local` converters) so drag and modal share identical bounds logic (research R2, FR-004/FR-006)
 
 **Checkpoint**: Tokens available for consumption; timeline math centralized.
 
@@ -54,20 +54,20 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T005 [P] [US1] Unit tests for `wagerTimeline.js` helpers (clamp at min/max, step by 15m/1h, ordering/min-separation, epoch↔datetime-local round-trip) in `frontend/src/test/wagerTimeline.test.js`
-- [ ] T006 [P] [US1] Component tests for `SetTimeModal` (opens with value, rejects out-of-range with range message, Set fires only in-range, Escape/Cancel closes, focus trap + `role="dialog"`) in `frontend/src/test/SetTimeModal.test.jsx`
-- [ ] T007 [P] [US1] Component tests for reworked `DeadlineTimeline` (dot has `role="slider"` + aria values; Pointer-Events drag updates value and clamps; arrow keys step; tapping a tile opens the modal; no `datetime-local` field or "tap to type a date" link rendered) in `frontend/src/test/DeadlineTimeline.test.jsx`
-- [ ] T008 [P] [US1] Add axe accessibility test for `DeadlineTimeline` + `SetTimeModal` (keyboard operability, labelling) in `frontend/src/test/DeadlineTimeline.axe.test.jsx`
+- [X] T005 [P] [US1] Unit tests for `wagerTimeline.js` helpers (clamp at min/max, step by 15m/1h, ordering/min-separation, epoch↔datetime-local round-trip) in `frontend/src/test/wagerTimeline.test.js`
+- [X] T006 [P] [US1] Component tests for `SetTimeModal` (opens with value, rejects out-of-range with range message, Set fires only in-range, Escape/Cancel closes, focus trap + `role="dialog"`) in `frontend/src/test/SetTimeModal.test.jsx`
+- [X] T007 [P] [US1] Component tests for reworked `DeadlineTimeline` (dot has `role="slider"` + aria values; Pointer-Events drag updates value and clamps; arrow keys step; tapping a tile opens the modal; no `datetime-local` field or "tap to type a date" link rendered) in `frontend/src/test/DeadlineTimeline.test.jsx`
+- [X] T008 [P] [US1] Add axe accessibility test for `DeadlineTimeline` + `SetTimeModal` (keyboard operability, labelling) in `frontend/src/test/DeadlineTimeline.axe.test.jsx`
 
 ### Implementation for User Story 1
 
-- [ ] T009 [P] [US1] Create `frontend/src/components/fairwins/SetTimeModal.jsx` + `SetTimeModal.css` per contracts §2 (focus-trapped dialog wrapping a bounded `datetime-local`, Cancel/Set, range explanation on invalid)
-- [ ] T010 [US1] Rework `frontend/src/components/fairwins/DeadlineTimeline.jsx` per contracts §1: new `milestones[]` + `onChange(key, epochMs)` API; make editable dots draggable (Pointer Events, `setPointerCapture`, `touch-action:none`) with `role="slider"` + arrow-key stepping; tapping a tile/time opens `SetTimeModal`; remove the two `<input type="range">` sliders, the inline `oc-manual-entry` block, and "Tap to type a date" links; preserve accept-drags-resolve-at-constant-gap; consume `--timeline-*` tokens (depends on T004, T009)
-- [ ] T011 [US1] Update `frontend/src/components/fairwins/DeadlineTimeline.css` (dot hit-area sizing for touch, focus ring, drag cursor; remove slider styling) 
-- [ ] T012 [US1] Adopt reworked timeline in `frontend/src/components/fairwins/OpenChallengeModal.jsx` — migrate from `acceptBy/resolveBy/onAcceptChange/...` to the `milestones[]` API (labels "Open for acceptance until"/"Must be resolved by"), keep bounds from `acceptMaxHours`/`resolveMaxHours` (depends on T010)
-- [ ] T013 [US1] Adopt reworked timeline in `frontend/src/components/fairwins/GroupPoolModal.jsx` — `idPrefix="gp"`, labels "Joining open until"/"Must be resolved by", tile heads "Join by"/"Resolve by" (depends on T010)
-- [ ] T014 [US1] Convert FriendMarketsModal end-time to the shared control in `frontend/src/components/fairwins/FriendMarketsModal.jsx`: remove `#fm-end-date` (`datetime-local`); make the derived timeline's **Ends** dot draggable + tile tap-to-edit; keep "Accept by"/"Resolve by" derived/read-only; bounds from `WAGER_DEFAULTS.MIN/MAX_TRADING_PERIOD_SECONDS` (depends on T010)
-- [ ] T015 [US1] Update existing modal tests to the new interaction in `frontend/src/test/GroupPoolModal.test.jsx`, `frontend/src/test/FriendMarketsModal.test.jsx`, and the open-challenge tests (`frontend/src/components/fairwins/__tests__/OpenChallengeModal.norecover.test.jsx`, `frontend/src/test/claimCode/OpenChallengeModal.test.jsx`): assert no native picker/"tap to type" link, timeline present, submitted deadline values unchanged
+- [X] T009 [P] [US1] Create `frontend/src/components/fairwins/SetTimeModal.jsx` + `SetTimeModal.css` per contracts §2 (focus-trapped dialog wrapping a bounded `datetime-local`, Cancel/Set, range explanation on invalid)
+- [X] T010 [US1] Rework `frontend/src/components/fairwins/DeadlineTimeline.jsx` per contracts §1: new `milestones[]` + `onChange(key, epochMs)` API; make editable dots draggable (Pointer Events, `setPointerCapture`, `touch-action:none`) with `role="slider"` + arrow-key stepping; tapping a tile/time opens `SetTimeModal`; remove the two `<input type="range">` sliders, the inline `oc-manual-entry` block, and "Tap to type a date" links; preserve accept-drags-resolve-at-constant-gap; consume `--timeline-*` tokens (depends on T004, T009)
+- [X] T011 [US1] Update `frontend/src/components/fairwins/DeadlineTimeline.css` (dot hit-area sizing for touch, focus ring, drag cursor; remove slider styling) 
+- [X] T012 [US1] Adopt reworked timeline in `frontend/src/components/fairwins/OpenChallengeModal.jsx` — migrate from `acceptBy/resolveBy/onAcceptChange/...` to the `milestones[]` API (labels "Open for acceptance until"/"Must be resolved by"), keep bounds from `acceptMaxHours`/`resolveMaxHours` (depends on T010)
+- [X] T013 [US1] Adopt reworked timeline in `frontend/src/components/fairwins/GroupPoolModal.jsx` — `idPrefix="gp"`, labels "Joining open until"/"Must be resolved by", tile heads "Join by"/"Resolve by" (depends on T010)
+- [X] T014 [US1] Convert FriendMarketsModal end-time to the shared control in `frontend/src/components/fairwins/FriendMarketsModal.jsx`: remove `#fm-end-date` (`datetime-local`); make the derived timeline's **Ends** dot draggable + tile tap-to-edit; keep "Accept by"/"Resolve by" derived/read-only; bounds from `WAGER_DEFAULTS.MIN/MAX_TRADING_PERIOD_SECONDS` (depends on T010)
+- [X] T015 [US1] Update existing modal tests to the new interaction in `frontend/src/test/GroupPoolModal.test.jsx`, `frontend/src/test/FriendMarketsModal.test.jsx`, and the open-challenge tests (`frontend/src/components/fairwins/__tests__/OpenChallengeModal.norecover.test.jsx`, `frontend/src/test/claimCode/OpenChallengeModal.test.jsx`): assert no native picker/"tap to type" link, timeline present, submitted deadline values unchanged
 
 **Checkpoint**: US1 fully functional and independently testable — every flow sets time the same way.
 

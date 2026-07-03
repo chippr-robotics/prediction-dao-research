@@ -50,18 +50,21 @@ describe('GroupPoolModal', () => {
     expect(screen.getByText('USDC')).toBeInTheDocument()
   })
 
-  it('join/resolve windows use the timeline element — sliders plus tap-to-type manual entry', () => {
+  it('join/resolve windows use the shared timeline element — draggable dots plus tap-to-set modal', () => {
     usePools.mockReturnValue(pools())
     renderModal()
-    const joinSlider = screen.getByLabelText(/joining open until/i)
-    const resolveSlider = screen.getByLabelText(/must be resolved by/i)
-    expect(joinSlider).toHaveAttribute('type', 'range')
-    expect(resolveSlider).toHaveAttribute('type', 'range')
+    const joinDot = screen.getByRole('slider', { name: /joining open until/i })
+    const resolveDot = screen.getByRole('slider', { name: /must be resolved by/i })
+    expect(joinDot).toBeInTheDocument()
+    expect(resolveDot).toBeInTheDocument()
+    // No native picker field or "type a date" link anywhere in the form (FR-005).
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(screen.queryByText(/tap to type a date/i)).toBeNull()
 
-    // No manual input until a tile is tapped.
-    expect(screen.queryByLabelText(/exact date & time/i)).toBeNull()
+    // Tapping a tile opens the shared set-time modal, not an inline input.
     fireEvent.click(screen.getByRole('button', { name: /join by/i }))
-    expect(screen.getByLabelText(/exact date & time — joining open until/i)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
+    expect(screen.getByText(/joining open until/i)).toBeInTheDocument()
   })
 
   it('the approval threshold is a named selector, not a raw percent field', async () => {

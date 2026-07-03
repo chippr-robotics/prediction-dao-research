@@ -1,0 +1,57 @@
+/* SetTimeModal — the shared "type an exact date & time" dialog (spec 038). */
+
+.stm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 20, 27, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100; /* above the create-wager modal backdrop */
+  padding: 1rem;
+}
+
+.stm-dialog {
+  width: 100%;
+  max-width: 340px;
+  background: var(--bg-secondary, #141C24);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.stm-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #E6EDF3);
+}
+
+.stm-label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #AAB6C2);
+}
+
+.stm-input {
+  width: 100%;
+}
+
+.stm-error {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #E5533D;
+}
+
+.stm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  margin-top: 0.375rem;
+}
