@@ -54,4 +54,11 @@ describe('OpenChallengeDecryptModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/didn't unlock/i)
     expect(onDecrypted).not.toHaveBeenCalled()
   })
+
+  it('moves the code-locked intro behind an info icon (spec 039 US2)', () => {
+    render(<OpenChallengeDecryptModal isOpen onClose={() => {}} envelope={null} onDecrypted={() => {}} />)
+    expect(screen.queryByText(/locked to the four-word code/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'About reading this challenge' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/locked to the four-word code/i)
+  })
 })

@@ -253,6 +253,23 @@
   color: var(--text-muted, #7A8590);
 }
 
+/* Label + info icon on one line (spec 039) — the static field explainers
+   moved from .fm-hint paragraphs into InfoTip bubbles beside their labels. */
+.fm-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.fm-label-row > label,
+.fm-label-row > .fm-label {
+  margin: 0;
+}
+
+.fm-subtitle .infotip-wrap {
+  vertical-align: -0.35em;
+}
+
 .fm-error {
   font-size: 0.75rem;
   color: #E5533D;
@@ -1681,6 +1698,13 @@
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.25rem;
+}
+
+/* The kind-help InfoTip (spec 039) sits flush at the top-left of the picker,
+   under the field's "Oracle condition" label. */
+.fm-oracle-picker-help {
+  align-self: flex-start;
+  margin-left: 0;
 }
 
 .fm-oracle-picker--unavailable {

@@ -7,6 +7,7 @@ import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
 import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
 import PillSelect from '../ui/PillSelect'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 import '../../pages/pools.css'
@@ -65,7 +66,13 @@ export default function GroupPoolModal({ isOpen, onClose }) {
               <span className="fm-brand-icon" aria-hidden="true">&#128101;</span>
               <h2 id="group-pool-title">Group Pool</h2>
             </div>
-            <p className="fm-subtitle">A larger pool — share four words so friends can join</p>
+            <p className="fm-subtitle">
+              A larger pool — share four words so friends can join
+              <InfoTip label="About group pools">
+                Everyone pays the same buy-in into one pot. When it&apos;s decided, you propose the payout and the
+                group approves it anonymously.
+              </InfoTip>
+            </p>
           </div>
           <button className="fm-close-btn" onClick={onClose} aria-label="Close modal">
             <CloseIcon />
@@ -209,12 +216,13 @@ function CreatePanel({ onClose }) {
 
         <div className="oc-qr">
           <WagerQRCode value={buildTakeChallengeUrl(result.phrase)} size={180} ariaLabel="QR code to join this pool" />
-          <span className="oc-qr-caption">Scan to join — opens the app with the words filled in</span>
+          <span className="oc-qr-caption">
+            Scan to join — opens the app with the words filled in
+            <InfoTip label="About sharing the words">
+              Anyone you give the words to can join (after paying the buy-in), so share them with the group you mean.
+            </InfoTip>
+          </span>
         </div>
-
-        <p className="fm-hint">
-          Anyone you give the words to can join (after paying the buy-in), so share them with the group you mean.
-        </p>
 
         <div className="fm-success-actions">
           <button
@@ -232,13 +240,13 @@ function CreatePanel({ onClose }) {
 
   return (
     <form className="fm-form" onSubmit={onSubmit}>
-      <p className="fm-hint">
-        Everyone pays the same buy-in into one pot. When it&apos;s decided, you propose the payout and the
-        group approves it anonymously.
-      </p>
-
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
+        <span className="fm-label-row">
+          <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
+          <InfoTip label="About: Buy-in — each member">
+            Enter the amount in USD. Only USDC is supported for group pools on this network.
+          </InfoTip>
+        </span>
         <div className="fm-stake-input-wrapper fm-stake-row">
           <span className="fm-stake-prefix">$</span>
           <input
@@ -258,16 +266,19 @@ function CreatePanel({ onClose }) {
             <option value="USDC">💵 USDC</option>
           </select>
         </div>
-        <span className="fm-hint">Enter the amount in USD. Only USDC is supported for group pools on this network.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
+        <span className="fm-label-row">
+          <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
+          <InfoTip label="About: Maximum members">
+            Joining closes automatically once the pool fills.
+          </InfoTip>
+        </span>
         <input
           id="gp-max" type="number" min="2" max="1000"
           value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} required
         />
-        <span className="fm-hint">Joining closes automatically once the pool fills.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
@@ -276,10 +287,12 @@ function CreatePanel({ onClose }) {
           options={THRESHOLD_CHOICES.map((c) => ({ value: c.pct, label: c.label }))}
           value={thresholdPct}
           onChange={setThresholdPct}
+          info={(
+            <InfoTip label="About: Who must approve the payout?">
+              {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
+            </InfoTip>
+          )}
         />
-        <span className="fm-hint">
-          {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
-        </span>
       </div>
 
       {/* Windows (tester feedback): the shared deadline timeline — drag a dot to pick each

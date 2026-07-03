@@ -43,7 +43,17 @@ describe('DeadlineTimeline + SetTimeModal accessibility (spec 038 US1, FR-016)',
     const { container } = render(
       <DeadlineTimeline milestones={milestones()} onChange={() => {}} idPrefix="oc" summary="Open 2 days" />
     )
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('the timeline with a milestone hint bubble open has no accessibility violations (spec 039)', async () => {
+    const { container } = render(
+      <DeadlineTimeline milestones={milestones()} onChange={() => {}} idPrefix="oc" summary="Open 2 days" />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'About: Open until' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/no longer be taken/i)
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

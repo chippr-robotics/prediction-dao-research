@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { useOracleConditions } from '../../hooks/useOracleConditions'
+import InfoTip from '../ui/InfoTip'
 
 const KIND_LABELS = {
   datafeed:  'Chainlink Data Feed',
@@ -90,7 +91,7 @@ function OracleConditionPicker({ kind, adapterAddress, value, onChange, error, d
 
   return (
     <div className="fm-oracle-picker" data-kind={kind}>
-      <span className="fm-hint">{KIND_HELP[kind]}</span>
+      <InfoTip label="About this oracle condition" className="fm-oracle-picker-help">{KIND_HELP[kind]}</InfoTip>
 
       {!manualMode && (
         <div className="fm-oracle-picker-list" role="listbox" aria-label="Registered conditions">

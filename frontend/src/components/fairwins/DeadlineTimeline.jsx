@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { formatTileClock, formatTileDay, clampToRange, stepByMinutes } from './wagerTimeline'
 import SetTimeModal from './SetTimeModal'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 import './DeadlineTimeline.css'
@@ -152,12 +153,12 @@ export default function DeadlineTimeline({ milestones, onChange, disabled, idPre
               {m.editable && <span className="oc-tile-edit">Tap to set</span>}
             </>
           )
-          if (!m.editable) {
-            return <div key={m.key} id={tileId} className={tileClassName}>{content}</div>
-          }
-          return (
+          // The hint moved from an inline paragraph to a corner InfoTip
+          // (spec 039). It overlays the tile from a wrapper because the
+          // editable tile is itself a button — nesting the two would be
+          // invalid interactive content.
+          const tile = m.editable ? (
             <button
-              key={m.key}
               id={tileId}
               className={tileClassName}
               type="button"
@@ -168,13 +169,19 @@ export default function DeadlineTimeline({ milestones, onChange, disabled, idPre
             >
               {content}
             </button>
+          ) : (
+            <div id={tileId} className={tileClassName}>{content}</div>
+          )
+          return (
+            <div key={m.key} className="dt-tile-wrap">
+              {tile}
+              {m.hint && (
+                <InfoTip label={`About: ${m.tileHead}`} className="dt-tile-info">{m.hint}</InfoTip>
+              )}
+            </div>
           )
         })}
       </div>
-
-      {milestones.filter((m) => m.hint).map((m) => (
-        <span key={`hint-${m.key}`} className="fm-hint dt-hint">{m.hint}</span>
-      ))}
 
       {milestones.map((m) => m.editable && modalFor === m.key && (
         <SetTimeModal

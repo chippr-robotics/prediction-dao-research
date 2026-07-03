@@ -37,7 +37,7 @@ describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)'
     const { unmount } = withWallet(<OpenChallengeModal isOpen onClose={() => {}} />)
 
     // Create the challenge.
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await screen.findByText('river tiger kite zoo')
 

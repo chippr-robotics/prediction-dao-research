@@ -298,7 +298,7 @@ describe('FriendMarketsModal', () => {
       mockLookupOpponentKey.mockResolvedValueOnce(null)
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
@@ -360,7 +360,7 @@ describe('FriendMarketsModal', () => {
   describe('Direct-to-form behavior', () => {
     it('opens directly into the 1v1 form when no initialType is passed', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.getByLabelText(/what's the bet/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/what's the bet/i, { selector: 'input' })).toBeInTheDocument()
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
     })
 
@@ -447,10 +447,10 @@ describe('FriendMarketsModal', () => {
         <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />
       )
       // No arbitrator input until Third Party is chosen…
-      expect(screen.queryByLabelText(/arbitrator address/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/arbitrator address/i, { selector: 'input' })).not.toBeInTheDocument()
       await user.click(screen.getByRole('radio', { name: /a friend \(arbitrator\)/i })) // ResolutionType.ThirdParty
       // …then the arbitrator input appears.
-      expect(await screen.findByLabelText(/arbitrator address/i)).toBeInTheDocument()
+      expect(await screen.findByLabelText(/arbitrator address/i, { selector: 'input' })).toBeInTheDocument()
     })
 
     it('oracle category shows oracle resolution tabs (not a dropdown)', () => {
@@ -511,7 +511,7 @@ describe('FriendMarketsModal', () => {
   describe('Create Form', () => {
     it('puts stake amount and stake token on one line, with the token always interactive (spec 038 FR-011)', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      const amountInput = screen.getByLabelText(/stake amount/i)
+      const amountInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
       const tokenSelect = screen.getByLabelText(/^stake token$/i)
       // Same wrapper row, not two separate stacked groups.
       expect(amountInput.closest('.fm-stake-input-wrapper')).toBe(tokenSelect.closest('.fm-stake-input-wrapper'))
@@ -533,7 +533,7 @@ describe('FriendMarketsModal', () => {
     it('should validate description minimum length', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Short')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Short')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
@@ -544,7 +544,7 @@ describe('FriendMarketsModal', () => {
     it('should validate opponent address for 1v1', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(screen.getByLabelText(/opponent address/i), 'invalid-address')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
@@ -558,7 +558,7 @@ describe('FriendMarketsModal', () => {
     it('should not allow betting against yourself', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0x1234567890123456789012345678901234567890'
@@ -573,7 +573,7 @@ describe('FriendMarketsModal', () => {
     it('should have stake input with default value', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      const stakeInput = screen.getByLabelText(/stake amount/i)
+      const stakeInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
       expect(stakeInput).toHaveValue(10)
       expect(stakeInput).toHaveAttribute('min', '0.1')
     })
@@ -583,7 +583,7 @@ describe('FriendMarketsModal', () => {
         <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
       )
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
@@ -595,7 +595,7 @@ describe('FriendMarketsModal', () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
@@ -641,7 +641,7 @@ describe('FriendMarketsModal', () => {
 
   describe('Success State', () => {
     const fillAndSubmit = async () => {
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
@@ -707,7 +707,7 @@ describe('FriendMarketsModal', () => {
       // Back on a fresh 1v1 form, NOT a (removed) type selector.
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
       expect(screen.queryByText('Choose Wager Type')).not.toBeInTheDocument()
-      expect(screen.getByLabelText(/what's the bet/i)).toHaveValue('')
+      expect(screen.getByLabelText(/what's the bet/i, { selector: 'input' })).toHaveValue('')
     })
 
     it('should have Copy Link button in success state', async () => {
@@ -783,7 +783,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -816,7 +816,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -843,7 +843,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -871,7 +871,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -955,7 +955,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'ETH closes above 3000 by year end — Chainlink Data Feed test'
       )
       await userEvent.type(
@@ -979,7 +979,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'UMA assertion: Patriots win Super Bowl LX'
       )
       await userEvent.type(
@@ -1003,7 +1003,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Chainlink Functions: some custom request'
       )
       await userEvent.type(
@@ -1026,7 +1026,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Chainlink Data Feed test — no side picked'
       )
       await userEvent.type(
@@ -1101,6 +1101,40 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByText('Start Fresh'))
 
       expect(onClearPendingTransaction).toHaveBeenCalled()
+    })
+  })
+
+  describe('explainers behind info icons (spec 039 US1)', () => {
+    it('hides static field explainers by default and reveals each from its icon, one at a time', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      expect(screen.queryByText(/your opponent takes the opposite side/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/enter amount in usd/i)).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: "About: What's the bet?" }))
+      expect(screen.getByRole('note')).toHaveTextContent(/your opponent takes the opposite side/i)
+
+      fireEvent.click(screen.getByRole('button', { name: 'About: Stake Amount' }))
+      expect(screen.getAllByRole('note')).toHaveLength(1)
+      expect(screen.getByRole('note')).toHaveTextContent(/enter amount in usd/i)
+    })
+
+    it('the stake guidance bubble reflects the currently selected token (FR-009)', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      fireEvent.click(screen.getByRole('button', { name: 'About: Stake Amount' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/enter amount in usd/i)
+
+      fireEvent.change(screen.getByLabelText(/^stake token$/i), { target: { value: 'NATIVE' } })
+      expect(screen.getByRole('note')).toHaveTextContent(/the chain native token/i)
+    })
+
+    it('moves the arbitrator explainer behind an icon on the third-party path', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      await user.click(screen.getByRole('radio', { name: /a friend \(arbitrator\)/i }))
+      await screen.findByLabelText(/arbitrator address/i, { selector: 'input' })
+      expect(screen.queryByText(/they cannot take a side/i)).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'About: Arbitrator Address' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/they cannot take a side/i)
     })
   })
 })

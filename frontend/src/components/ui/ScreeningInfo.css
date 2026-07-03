@@ -1,49 +1,17 @@
-.ab-info-wrap {
-  position: relative;
-  display: inline-flex;
-}
+/* Screening-specific styling on top of the shared InfoTip bubble (spec 039). */
 
-.ab-info-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-secondary, #64748b);
-  cursor: pointer;
-}
-
-.ab-info-btn:hover,
-.ab-info-btn:focus-visible {
-  color: var(--accent, #2563eb);
-  border-color: var(--accent, #2563eb);
-}
-
-.ab-info-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 1100;
+.screening-info .infotip-bubble {
   width: min(320px, 80vw);
-  background: var(--card-bg, #fff);
-  color: inherit;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 0.5rem;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  max-width: min(320px, calc(100vw - 2rem));
   padding: 0.75rem 0.9rem;
-  text-align: left;
 }
 
-.ab-info-popover h4 {
+.screening-info .infotip-bubble h4 {
   margin: 0 0 0.5rem;
   font-size: 0.9rem;
 }
 
-.ab-info-popover ul {
+.screening-info .infotip-bubble ul {
   margin: 0;
   padding-left: 1.1rem;
   display: flex;
