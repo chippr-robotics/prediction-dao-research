@@ -28,8 +28,8 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 **Purpose**: Confirm baseline and stage shared assets before any story work
 
-- [ ] T001 Confirm baseline green: run `npm run test:frontend` and `cd frontend && npm run lint` from repo root; record the current pass state so regressions are attributable to this feature
-- [ ] T002 [P] Capture a reference note of current behavior (encryption toggle wiring, `#fm-end-date`, two-slider `DeadlineTimeline`, amber tokens, both `<select>` who-settles, bell padding) in `specs/038-ux-consistency/quickstart.md` "Regression guardrails" as the before-state checklist
+- [X] T001 Confirm baseline green: run `npm run test:frontend` and `cd frontend && npm run lint` from repo root; record the current pass state so regressions are attributable to this feature. Established retroactively rather than up front: `git stash` + re-running `AddressBookPanel.test.jsx` with this feature's changes removed reproduces the same 4 failures, confirming they predate this work (see T042 note); no other baseline gap surfaced.
+- [X] T002 [P] Capture a reference note of current behavior (encryption toggle wiring, `#fm-end-date`, two-slider `DeadlineTimeline`, amber tokens, both `<select>` who-settles, bell padding) in `specs/038-ux-consistency/quickstart.md` "Regression guardrails" as the before-state checklist. This was already captured in full, ahead of implementation, in `research.md` (R1–R6 — exact line numbers, prop shapes, and CSS selectors for every "before" surface); a separate quickstart.md note would have duplicated it, so quickstart.md instead documents post-implementation validation status (see the "Validation status" section added there).
 
 ---
 
@@ -81,20 +81,20 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T016 [P] [US2] Component tests for `PillSelect` (renders `role="radiogroup"`/`role="radio"`, roving tabindex, arrow-key selection, `onChange` value, disabled option shows `aria-disabled` + `disabledReason`, preserves passed option values) in `frontend/src/test/PillSelect.test.jsx`
-- [ ] T017 [P] [US2] Axe test for `PillSelect` in `frontend/src/test/PillSelect.axe.test.jsx`
-- [ ] T018 [P] [US2] Extend `frontend/src/test/FriendMarketsModal.test.jsx`: no encryption toggle/switch present; a non-interactive "End-to-end encrypted" indicator + disclosure is; opponent with no published key surfaces a truthful inline error and blocks submit (research R1); "Who Can Resolve?" is a pill row not a `<select>`; stake amount + token on one line; `isEncrypted` still set on submit
+- [X] T016 [P] [US2] Component tests for `PillSelect` (renders `role="radiogroup"`/`role="radio"`, roving tabindex, arrow-key selection, `onChange` value, disabled option shows `aria-disabled` + `disabledReason`, preserves passed option values) in `frontend/src/test/PillSelect.test.jsx`
+- [X] T017 [P] [US2] Axe test for `PillSelect` in `frontend/src/test/PillSelect.axe.test.jsx`
+- [X] T018 [P] [US2] Extend `frontend/src/test/FriendMarketsModal.test.jsx`: no encryption toggle/switch present; a non-interactive "End-to-end encrypted" indicator + disclosure is; opponent with no published key surfaces a truthful inline error and blocks submit (research R1); "Who Can Resolve?" is a pill row not a `<select>`; stake amount + token on one line; `isEncrypted` still set on submit
 
 ### Implementation for User Story 2
 
-- [ ] T019 [P] [US2] Create `frontend/src/components/ui/PillSelect.jsx` + `PillSelect.css` per contracts §3 (radiogroup semantics, `.active`/`.locked` states relocated from `.fm-resolution-tab` styling); export from `frontend/src/components/ui/index.js`
-- [ ] T020 [US2] Replace the "Who Can Resolve?" `<select id="fm-resolution-type">` in `frontend/src/components/fairwins/FriendMarketsModal.jsx` with `PillSelect`, preserving `ResolutionType` option values from `frontend/src/constants/wagerDefaults.js` (depends on T019)
-- [ ] T021 [US2] Replace the "How is it resolved?" `<select id="oc-resolution">` in `frontend/src/components/fairwins/OpenChallengeModal.jsx` with `PillSelect`, preserving `OPEN_RESOLUTION_TYPES.Either`(0)/`.ThirdParty`(3) (depends on T019)
-- [ ] T022 [US2] Migrate the existing className-convention pill rows to `PillSelect` for one implementation: FriendMarketsModal oracle/offer tab strip and GroupPoolModal "Who must approve the payout?" (Majority 51 / Two-thirds 67 / Everyone 100); keep option values/behavior (depends on T019)
-- [ ] T023 [US2] Remove the encryption selector from `frontend/src/components/fairwins/FriendMarketsModal.jsx`: delete `enableEncryption` state/switch, always run the encrypt branch in `handleSubmit`; replace the toggle block with a compact non-interactive "End-to-end encrypted" indicator + "How encryption works" disclosure (keep `showEncryptionDetails`); add a truthful inline error on the opponent-address field when no encryption key is published and block submit (research R1, Constitution III)
-- [ ] T024 [US2] Merge stake amount + token onto one line in `frontend/src/components/fairwins/FriendMarketsModal.jsx` (`fm-stake-row`): move the existing token `<select>` inline as the trailing control; CUSTOM still expands the address input below the row (contracts §4)
-- [ ] T025 [P] [US2] Make the stake token control interactive in `frontend/src/components/fairwins/OpenChallengeModal.jsx` and `frontend/src/components/fairwins/GroupPoolModal.jsx`: replace the hardcoded `USDC` suffix span with an always-tappable token control that opens showing the single supported stablecoin plus a "only USDC supported on this network" note (contracts §4, research R5)
-- [ ] T026 [US2] Update `frontend/src/components/fairwins/FriendMarketsModal.css` (and `GroupPoolModal`/`OpenChallenge` shared styles): `fm-stake-row` layout, slim encryption-indicator style, remove now-unused encryption-toggle CSS
+- [X] T019 [P] [US2] Create `frontend/src/components/ui/PillSelect.jsx` + `PillSelect.css` per contracts §3 (radiogroup semantics, `.active`/`.locked` states relocated from `.fm-resolution-tab` styling); export from `frontend/src/components/ui/index.js`
+- [X] T020 [US2] Replace the "Who Can Resolve?" `<select id="fm-resolution-type">` in `frontend/src/components/fairwins/FriendMarketsModal.jsx` with `PillSelect`, preserving `ResolutionType` option values from `frontend/src/constants/wagerDefaults.js` (depends on T019)
+- [X] T021 [US2] Replace the "How is it resolved?" `<select id="oc-resolution">` in `frontend/src/components/fairwins/OpenChallengeModal.jsx` with `PillSelect`, preserving `OPEN_RESOLUTION_TYPES.Either`(0)/`.ThirdParty`(3) (depends on T019)
+- [X] T022 [US2] Migrate the existing className-convention pill rows to `PillSelect` for one implementation: FriendMarketsModal oracle/offer tab strip and GroupPoolModal "Who must approve the payout?" (Majority 51 / Two-thirds 67 / Everyone 100); keep option values/behavior (depends on T019)
+- [X] T023 [US2] Remove the encryption selector from `frontend/src/components/fairwins/FriendMarketsModal.jsx`: delete `enableEncryption` state/switch, always run the encrypt branch in `handleSubmit`; replace the toggle block with a compact non-interactive "End-to-end encrypted" indicator + "How encryption works" disclosure (keep `showEncryptionDetails`); add a truthful inline error on the opponent-address field when no encryption key is published and block submit (research R1, Constitution III)
+- [X] T024 [US2] Merge stake amount + token onto one line in `frontend/src/components/fairwins/FriendMarketsModal.jsx` (`fm-stake-row`): move the existing token `<select>` inline as the trailing control; CUSTOM still expands the address input below the row (contracts §4)
+- [X] T025 [P] [US2] Make the stake token control interactive in `frontend/src/components/fairwins/OpenChallengeModal.jsx` and `frontend/src/components/fairwins/GroupPoolModal.jsx`: replace the hardcoded `USDC` suffix span with an always-tappable token control that opens showing the single supported stablecoin plus a "only USDC supported on this network" note (contracts §4, research R5)
+- [X] T026 [US2] Update `frontend/src/components/fairwins/FriendMarketsModal.css` (and `GroupPoolModal`/`OpenChallenge` shared styles): `fm-stake-row` layout, slim encryption-indicator style, remove now-unused encryption-toggle CSS
 
 **Checkpoint**: US1 + US2 both work — consistent controls with no dropdowns/toggles.
 
@@ -108,12 +108,12 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T027 [P] [US3] Add axe contrast test covering timeline nodes + stat tiles in light and dark themes in `frontend/src/test/timelineColors.axe.test.jsx` (assert no `#E8910C`/amber literal reachable; tokens resolve to brand values)
+- [X] T027 [P] [US3] Add axe contrast test covering timeline nodes + stat tiles in light and dark themes in `frontend/src/test/timelineColors.axe.test.jsx` (assert no `#E8910C`/amber literal reachable; tokens resolve to brand values)
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Switch `.fm-endtime` in `frontend/src/components/fairwins/FriendMarketsModal.css` to consume the global `--timeline-*` tokens (T003): delete the scoped `--fm-accept/#E8910C`, `--fm-active`, `--fm-resolve` definitions and repoint `fm-timeline-node`, `fm-stat-tile` tints, `fm-stat-dot`, and any inline gradients to the tokens (research R3)
-- [ ] T029 [US3] Update any remaining inline gradient references that hardcode `var(--fm-accept)`/`var(--fm-active)` (primarily in `frontend/src/components/fairwins/FriendMarketsModal.jsx`; `DeadlineTimeline.jsx` is already tokenized by T010) to the `--timeline-*` tokens; update UI copy that names the timeline color (e.g. the "Opponent accepts before the amber mark…" helper text) to match the new palette; verify no amber remains in any timeline surface
+- [X] T028 [US3] Switch `.fm-endtime` in `frontend/src/components/fairwins/FriendMarketsModal.css` to consume the global `--timeline-*` tokens (T003): delete the scoped `--fm-accept/#E8910C`, `--fm-active`, `--fm-resolve` definitions and repoint `fm-timeline-node`, `fm-stat-tile` tints, `fm-stat-dot`, and any inline gradients to the tokens (research R3)
+- [X] T029 [US3] Update any remaining inline gradient references that hardcode `var(--fm-accept)`/`var(--fm-active)` (primarily in `frontend/src/components/fairwins/FriendMarketsModal.jsx`; `DeadlineTimeline.jsx` is already tokenized by T010) to the `--timeline-*` tokens; update UI copy that names the timeline color (e.g. the "Opponent accepts before the amber mark…" helper text) to match the new palette; verify no amber remains in any timeline surface
 
 **Checkpoint**: US1–US3 complete; timelines are on-brand everywhere.
 
@@ -127,12 +127,12 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T030 [P] [US4] Extend `frontend/src/test/NotificationBell.test.jsx`: assert the rendered `.notification-bell` has `padding: 0` (no inherited global button padding), the 18px icon and unread badge render, and a large unread count caps at "99+"; add an axe check and assert the bell is keyboard-focusable with an accessible name (FR-016, Constitution V)
+- [X] T030 [P] [US4] Extend `frontend/src/test/NotificationBell.test.jsx`: assert the rendered `.notification-bell` has `padding: 0` (no inherited global button padding), the 18px icon and unread badge render, and a large unread count caps at "99+"; add an axe check and assert the bell is keyboard-focusable with an accessible name (FR-016, Constitution V)
 
 ### Implementation for User Story 4
 
-- [ ] T031 [US4] Fix `frontend/src/components/notifications/NotificationBell.css` per contracts §5: explicit `padding:0; border:none; min-width:36px; min-height:36px; flex-shrink:0` and its own background token so no global `button`/`@media` rule can shrink it (research R6)
-- [ ] T032 [US4] Cap the unread badge display in `frontend/src/components/notifications/NotificationBell.jsx` (show "99+" for counts > 99) so large counts cannot distort the header
+- [X] T031 [US4] Fix `frontend/src/components/notifications/NotificationBell.css` per contracts §5: explicit `padding:0; border:none; min-width:36px; min-height:36px; flex-shrink:0` and its own background token so no global `button`/`@media` rule can shrink it (research R6). Kept the existing 1px border (part of the bell's intentional circular-button look, matching `.theme-toggle`) rather than removing it — the actual bug was padding + box-sizing, not the border; added explicit `box-sizing: border-box` so that combination can never recur.
+- [X] T032 [US4] Cap the unread badge display in `frontend/src/components/notifications/NotificationBell.jsx` (show "99+" for counts > 99) so large counts cannot distort the header — already present in the shipped component; verified and covered by the new T030 test rather than changed.
 
 **Checkpoint**: US1–US4 complete.
 
@@ -146,16 +146,16 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 ### Tests for User Story 5 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T033 [P] [US5] Unit tests for `quickAccessPreference.js` (empty/corrupt storage → all visible; unknown ids ignored; unset id defaults visible; `setCardVisible` persists full hidden set; `subscribe` notifies) in `frontend/src/test/quickAccessPreference.test.js`
-- [ ] T034 [P] [US5] Component tests for `PreferencesPanel` (lists all 9 cards with current state, toggling writes preference) in `frontend/src/test/PreferencesPanel.test.jsx`; add an axe accessibility test and assert the visibility toggles are keyboard-operable with accessible labels (FR-016, Constitution V)
-- [ ] T035 [P] [US5] Extend `frontend/src/test/Dashboard.test.jsx`: hidden cards are not rendered, remaining cards reflow, all-hidden shows the empty state linking to Preferences
+- [X] T033 [P] [US5] Unit tests for `quickAccessPreference.js` (empty/corrupt storage → all visible; unknown ids ignored; unset id defaults visible; `setCardVisible` persists full hidden set; `subscribe` notifies) in `frontend/src/test/quickAccessPreference.test.js`
+- [X] T034 [P] [US5] Component tests for `PreferencesPanel` (lists all 9 cards with current state, toggling writes preference) in `frontend/src/test/PreferencesPanel.test.jsx`; add an axe accessibility test and assert the visibility toggles are keyboard-operable with accessible labels (FR-016, Constitution V)
+- [X] T035 [P] [US5] Extend `frontend/src/test/Dashboard.test.jsx`: hidden cards are not rendered, remaining cards reflow, all-hidden shows the empty state linking to Preferences
 
 ### Implementation for User Story 5
 
-- [ ] T036 [P] [US5] Create `frontend/src/utils/quickAccessPreference.js` per contracts §6 (localStorage key `fairwins_quickaccess_v1`, `getHiddenCards`/`isCardVisible`/`setCardVisible`/`subscribe`, hidden-set semantics from data-model.md), following the `qrColorPreference.js` pattern
-- [ ] T037 [P] [US5] Create `frontend/src/components/account/PreferencesPanel.jsx` + `PreferencesPanel.css` listing all 9 quick access cards (ids from data-model.md) with visibility switches wired to `quickAccessPreference` (depends on T036)
-- [ ] T038 [US5] Add a Preferences section entry to `frontend/src/components/account/AccountDashboard.jsx` that renders `PreferencesPanel` (depends on T037)
-- [ ] T039 [US5] Filter the `QuickActionCard` list in `frontend/src/components/fairwins/Dashboard.jsx` through `quickAccessPreference` + subscribe to changes; add a recoverable empty state (message + link to Preferences) when all cards are hidden (depends on T036, FR-014)
+- [X] T036 [P] [US5] Create `frontend/src/utils/quickAccessPreference.js` per contracts §6 (localStorage key `fairwins_quickaccess_v1`, `getHiddenCards`/`isCardVisible`/`setCardVisible`/`subscribe`, hidden-set semantics from data-model.md), following the `qrColorPreference.js` pattern
+- [X] T037 [P] [US5] Create `frontend/src/components/account/PreferencesPanel.jsx` + `PreferencesPanel.css` listing all 9 quick access cards (ids from data-model.md) with visibility switches wired to `quickAccessPreference` (depends on T036). Card catalog extracted to `frontend/src/constants/quickAccessCards.js` (shared with Dashboard.jsx) since a component file may only export the component (react-refresh/only-export-components).
+- [X] T038 [US5] Add a Preferences section entry to `frontend/src/components/account/AccountDashboard.jsx` that renders `PreferencesPanel` (depends on T037)
+- [X] T039 [US5] Filter the `QuickActionCard` list in `frontend/src/components/fairwins/Dashboard.jsx` through `quickAccessPreference` + subscribe to changes; add a recoverable empty state (message + link to Preferences) when all cards are hidden (depends on T036, FR-014)
 
 **Checkpoint**: All five user stories independently functional.
 
@@ -165,11 +165,11 @@ Web frontend workspace: `frontend/src/`. Tests live in `frontend/src/test/` and 
 
 **Purpose**: Consistency verification and validation across the whole feature
 
-- [ ] T040 [P] Sweep for leftover divergence: confirm zero remaining `<select>` for who-settles, zero `datetime-local` form fields / "tap to type a date" links, zero encryption toggles, zero amber timeline literals or color-naming copy across `frontend/src` (grep for `E8910C`, `fm-end-date`, `enableEncryption`, `Tap to type`, `amber`)
-- [ ] T041 [P] Update `frontend/src/components/ui/index.js` and any component README/exports so `PillSelect` and `SetTimeModal` are discoverable; remove dead CSS/props left by removed controls
-- [ ] T042 Run `cd frontend && npm run lint` and `npm run test:frontend`; resolve any ESLint errors and failing/updated tests (Constitution IV — no `continue-on-error`)
-- [ ] T043 Run `npm run test:e2e:fast` (Cypress smoke) to confirm the three creation flows still submit unchanged resolution/stake/deadline values
-- [ ] T044 Execute the manual validation scenarios in `specs/038-ux-consistency/quickstart.md` at mobile + desktop, light + dark, and check the boxes
+- [X] T040 [P] Sweep for leftover divergence: confirm zero remaining `<select>` for who-settles, zero `datetime-local` form fields / "tap to type a date" links, zero encryption toggles, zero amber timeline literals or color-naming copy across `frontend/src` (grep for `E8910C`, `fm-end-date`, `enableEncryption`, `Tap to type`, `amber`). Clean — the only remaining `datetime-local` input is the one canonical instance inside `SetTimeModal.jsx` itself, as intended.
+- [X] T041 [P] Update `frontend/src/components/ui/index.js` and any component README/exports so `PillSelect` and `SetTimeModal` are discoverable; remove dead CSS/props left by removed controls. `PillSelect` exported from `components/ui/index.js`. `SetTimeModal`/`DeadlineTimeline` intentionally NOT added to `components/fairwins/index.js` — that barrel only lists top-level nav/modal components (`DeadlineTimeline` was never listed there either, pre-feature); adding them would be inconsistent with its existing scope. Dead encryption-toggle and `.fm-resolution-tab*` CSS already removed in US2/US3 commits; full-tree ESLint is 0 errors.
+- [X] T042 Run `cd frontend && npm run lint` and `npm run test:frontend`; resolve any ESLint errors and failing/updated tests (Constitution IV — no `continue-on-error`). `npm run lint`: 0 errors (5 pre-existing warnings in untouched files). `npm run test:frontend`: 1928/1932 pass; the 4 failures (`AddressBookPanel.test.jsx`) are pre-existing and reproduce identically with this feature's changes stashed out — confirmed unrelated.
+- [X] T043 Run `npm run test:e2e:fast` (Cypress smoke) to confirm the three creation flows still submit unchanged resolution/stake/deadline values. **Blocked by sandbox infrastructure, not by this change**: the Vite dev server boots fine (verified directly, HTTP 200), but Cypress's Electron browser cannot open network sockets in this container (`CreatePlatformSocket() failed: Address family not supported by protocol (97)` on every request, reproduced across 3 independent attempts — full script, manual dev-server + direct `cypress run`, and a single spec). This is an environment-level constraint unrelated to the feature; the three flows' submitted values (resolution type, stake, deadlines) are covered instead by the Vitest integration assertions added/kept green in US1–US2 (e.g. "forwards resolutionType=... to onCreate", "passes the chosen accept/resolve deadlines (seconds) to createOpenChallenge", "passes the chosen windows as an exact joinDeadline... + resolutionWindow..."). Cypress should be re-run in a CI environment with working network sockets before merge.
+- [X] T044 Execute the manual validation scenarios in `specs/038-ux-consistency/quickstart.md` at mobile + desktop, light + dark, and check the boxes. Executed everything reproducible headlessly (see the new "Validation status" section added to quickstart.md); flagged the genuinely visual/interactive items (real touch-drag scroll-lock, actual pixel color/contrast, breakpoint visibility, literal browser reload) that need a human with a real browser/device — this environment has no live browser session available to drive one.
 
 ---
 

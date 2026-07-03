@@ -90,3 +90,46 @@ Expected: all pass; axe checks report no new violations.
   timeline with the new colorway.
 - `npm run test:frontend` and Cypress fast suite green in CI; no
   `continue-on-error` added anywhere.
+
+## Validation status (implementation pass, 2026-07-03)
+
+Ran everything executable headlessly; flagged what still needs a human with a
+real browser. Section numbers match "Manual validation scenarios" above.
+
+- **1 (timeline control)**: steps 2, 4, 5 fully covered by
+  `DeadlineTimeline.test.jsx`/`SetTimeModal.test.jsx` (no native picker,
+  modal range validation, keyboard stepping). Step 3's drag-updates-live and
+  clamp behavior is covered by simulated Pointer Events; "the page does not
+  scroll while dragging" (the `touch-action: none` CSS) can only be proven on
+  a real touchscreen — needs manual check.
+- **2 (control language)**: fully covered by `PillSelect.test.jsx` +
+  the three modals' test suites (pill rows, disabled-option explanations,
+  stake+token one line and always tappable, no encryption toggle, honest
+  no-key error). "The form is visibly shorter" is qualitative — SC-003's
+  measurable proxy (at least one full control block removed) holds by
+  inspection of the diff; a pixel/visual confirmation is not automated.
+- **3 (brand colors)**: `timelineColors.axe.test.jsx` proves no amber
+  literal reaches the DOM and the `--timeline-*` tokens are referenced.
+  Actual rendered pixel color and contrast in light/dark theme is out of
+  reach in jsdom (see T027) — needs a real-browser/visual check.
+- **4 (notification bell)**: `NotificationBell.test.jsx` proves the shipped
+  CSS resets padding/box-sizing/min-size (source-text check, since jsdom
+  doesn't apply real stylesheets) and the badge caps at "99+". Literal
+  pixel visibility across 320/390/768/1280px needs a real browser.
+- **5 (quick access preferences)**: fully covered by
+  `quickAccessPreference.test.js` + `PreferencesPanel.test.jsx` +
+  `Dashboard.test.jsx`, including the empty-state and cross-component sync.
+  "Reload the app" is exercised as localStorage round-tripping across
+  independent test renders, not a literal browser reload.
+- **Regression guardrails**: no other component renders the timeline CSS
+  classes outside the three creation flows (`grep` confirms
+  `DeadlineTimeline.jsx` is the sole producer) — no separate "wager detail"
+  timeline was missed. End-to-end testnet wager creation and the Cypress fast
+  suite were **not** completed — `npm run test:e2e:fast` is blocked in this
+  sandbox by an infrastructure limitation (Electron cannot open network
+  sockets here: `CreatePlatformSocket() failed: Address family not supported
+  by protocol`), reproduced across three independent attempts and unrelated
+  to this change. Re-run Cypress in a normal CI runner before merge.
+- `npm run test:frontend`: 1928/1932 pass; the 4 failures are pre-existing
+  and unrelated (`AddressBookPanel.test.jsx`, reproduces identically with
+  this feature's changes stashed out). `npm run lint`: 0 errors.
