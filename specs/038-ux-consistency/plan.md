@@ -1,113 +1,127 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: UX Consistency Harmonization
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Branch**: `claude/ux-consistency-harmonization-lfv7yr` | **Date**: 2026-07-03 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/speckit-plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Input**: Feature specification from `/specs/038-ux-consistency/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Harmonize the FairWins frontend so the three creation flows (private wager,
+open challenge, group pool), the header, and the dashboard share one control
+language: a single interactive deadline-timeline control (draggable milestone
+dots + tap-to-edit set-time modal) replaces native date pickers and range
+sliders; timeline colors move from the amber colorway to brand-palette tokens;
+"who settles" selections become pill rows everywhere via a shared `PillSelect`
+component extracted from the existing `.fm-resolution-tabs` CSS convention;
+stake amount + token merge onto one line with an always-interactive token
+control; the encryption toggle is removed (encryption always on, compact
+informational indicator retained); the notification bell CSS is isolated from
+the global `button` rule that currently crushes it; and a new Preferences
+section in My Account lets users toggle quick access card visibility, persisted
+per device in localStorage. Frontend-only — no contract, subgraph, or on-chain
+changes.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Language/Version**: JavaScript (ESM), React 19.2, Vite 7.2 (existing `frontend/` app)
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+**Primary Dependencies**: React 19, react-router-dom 7, wagmi/viem/ethers (untouched), plain CSS with design tokens in `frontend/src/theme.css`; no new runtime dependencies
 
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+**Storage**: Browser `localStorage` for quick access card preferences (device-scoped, following the existing `qrColorPreference.js` pattern); no server or on-chain storage
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Testing**: Vitest 4 + @testing-library/react + vitest-axe (unit/integration/a11y), Cypress (e2e); tests live in `frontend/src/test/` and colocated `__tests__/`
 
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
+**Target Platform**: Responsive web (mobile-first — feature is driven by mobile screenshots), evergreen browsers, light + dark theme
 
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: Web frontend (the `frontend/` workspace of the existing monorepo)
 
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+**Performance Goals**: Dot-drag interaction tracks the pointer at 60fps (pointer events + CSS transforms, no layout thrash); no bundle-size regression from new dependencies (none added)
 
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+**Constraints**: WCAG 2.1 AA (axe/Lighthouse gate in CI); encryption behavior must remain honest (badge only when actually encrypted); no changes to contract ABIs, deployment artifacts, or `wagerRegistry` interaction paths
 
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
-
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Scale/Scope**: 7 UI surfaces, ~10 components touched (3 creation modals, `DeadlineTimeline`, new `SetTimeModal` + `PillSelect` + preferences panel, `NotificationBell`, `Dashboard`, `AccountDashboard`), 9 quick access cards, 3 timeline color tokens
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Assessment | Status |
+|---|---|---|
+| I. Security-first smart contracts | No `contracts/` changes. Encryption flag (`isEncrypted`) continues to flow to the same creation paths; removing the off-switch narrows, not widens, the attack surface. No key handling changes. | PASS (N/A scope) |
+| II. Test-first, comprehensive coverage | Every behavior change lands with Vitest coverage: new dedicated tests for `DeadlineTimeline` (currently untested directly), `SetTimeModal`, `PillSelect`, quick access preference storage, Dashboard card filtering, bell visibility; existing modal tests updated in the same PR. | PASS |
+| III. Honest state, no mocks in shipped paths | Encryption indicator renders only when the wager will actually be encrypted; if the opponent's key cannot be found, the UI says so truthfully (see research R1). Timeline milestones keep reflecting real min/max bounds from `WAGER_DEFAULTS`. No mock data introduced. | PASS |
+| IV. Fail loudly in CI | No CI config changes; existing lint/test/axe gates cover the new code. | PASS |
+| V. Accessible, consistent frontend | Core purpose of the feature. Drag interaction gets a keyboard-equivalent path (dots focusable, arrow keys); pill rows keep `role=radiogroup` semantics; new colors validated for AA contrast; axe tests extended. | PASS |
+
+**Post-design re-check (after Phase 1)**: PASS — design introduces two small
+shared components (`PillSelect`, `SetTimeModal`) and one storage util, all
+replacing duplicated patterns rather than adding parallel ones. No violations;
+Complexity Tracking empty.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit-plan command output)
-├── research.md          # Phase 0 output (/speckit-plan command)
-├── data-model.md        # Phase 1 output (/speckit-plan command)
-├── quickstart.md        # Phase 1 output (/speckit-plan command)
-├── contracts/           # Phase 1 output (/speckit-plan command)
-└── tasks.md             # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
+specs/038-ux-consistency/
+├── spec.md              # Feature specification (/speckit-specify output)
+├── plan.md              # This file
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
+├── contracts/
+│   └── ui-contracts.md  # Phase 1 output — component & storage contracts
+├── checklists/
+│   └── requirements.md  # Spec quality checklist
+└── tasks.md             # Phase 2 output (/speckit-tasks — NOT created by /speckit-plan)
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+frontend/src/
+├── theme.css                          # + global timeline phase tokens (brand palette)
+├── index.css                          # (unchanged; bell opts out locally)
+├── components/
+│   ├── Header.jsx                     # renders NotificationBell (unchanged wiring)
+│   ├── ui/
+│   │   ├── PillSelect.jsx             # NEW — shared pill/segmented control
+│   │   ├── PillSelect.css             # NEW — promoted from .fm-resolution-tabs
+│   │   └── index.js                   # + export PillSelect
+│   ├── fairwins/
+│   │   ├── DeadlineTimeline.jsx       # REWORKED — draggable dots, modal entry, 2-or-3 milestones
+│   │   ├── SetTimeModal.jsx           # NEW — tap-to-edit exact date/time modal
+│   │   ├── wagerTimeline.js           # + shared clamp/format helpers
+│   │   ├── FriendMarketsModal.jsx     # remove enc toggle + #fm-end-date; adopt timeline; stake row; PillSelect
+│   │   ├── FriendMarketsModal.css     # remove amber tokens; stake-row layout; slim enc indicator
+│   │   ├── OpenChallengeModal.jsx     # PillSelect for "How is it resolved?"; token control on stake line
+│   │   ├── GroupPoolModal.jsx         # PillSelect adoption (already pill-style); token control
+│   │   └── Dashboard.jsx              # filter QuickActionCards by preference; empty state
+│   ├── notifications/
+│   │   └── NotificationBell.css       # isolate from global button rule (padding/border reset)
+│   └── account/
+│       ├── AccountDashboard.jsx       # + Preferences section entry
+│       ├── PreferencesPanel.jsx       # NEW — quick access card visibility toggles
+│       └── PreferencesPanel.css       # NEW
+├── utils/
+│   └── quickAccessPreference.js       # NEW — localStorage util (qrColorPreference pattern)
+└── test/
+    ├── DeadlineTimeline.test.jsx      # NEW (component currently has no direct tests)
+    ├── SetTimeModal.test.jsx          # NEW
+    ├── PillSelect.test.jsx            # NEW
+    ├── PreferencesPanel.test.jsx      # NEW
+    ├── quickAccessPreference.test.js  # NEW
+    ├── Dashboard.test.jsx             # UPDATED — card filtering + empty state
+    ├── NotificationBell.test.jsx      # UPDATED — visibility/size assertions
+    ├── FriendMarketsModal.test.jsx    # UPDATED — no toggle, timeline entry, stake row
+    └── GroupPoolModal.test.jsx        # UPDATED — PillSelect + timeline
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Single existing web frontend (`frontend/`); all changes
+land inside it. New shared primitives go in `components/ui/` (PillSelect) and
+`components/fairwins/` (SetTimeModal, next to the timeline it serves); the
+preference util follows the established `utils/*Preference.js` pattern.
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+No constitution violations — table intentionally empty.
