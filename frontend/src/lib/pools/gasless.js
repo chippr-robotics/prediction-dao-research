@@ -1,12 +1,14 @@
 /**
- * Client-side gasless join for ZK-Wager Pools (spec 034, US3) — WITHOUT an app backend.
+ * Client-side gasless join for Wager Pools (spec 034, US3, address-based) — WITHOUT an app backend.
  *
  * The "no-backend footprint" directive forbids a FairWins server, so there is no "Payload Packer"
  * service. Instead the client signs an EIP-3009 `ReceiveWithAuthorization` here; a THIRD-PARTY relayer
- * (e.g. Gelato/Biconomy/OZ Defender, or the user's own) submits `ZKWagerPool.joinWithAuthorization` and
- * pays gas. The signed authorization binds amount + recipient and is replay-protected by the token, so
- * the relayer is untrusted (it can censor, never steal). When no relayer is configured, the member joins
- * normally (paying gas) — gasless is purely additive.
+ * (e.g. Gelato/Biconomy/OZ Defender, or the user's own) submits `WagerPool.joinWithAuthorization` and
+ * pays gas. The join is identity-free: membership is keyed by the member's public wallet address, so the
+ * only thing signed is the EIP-3009 authorization that pulls USDC into the pool. The authorization binds
+ * amount + recipient and is replay-protected by the token, so the relayer is untrusted (it can censor,
+ * never steal). When no relayer is configured, the member joins normally (paying gas) — gasless is purely
+ * additive.
  */
 import { ethers } from 'ethers'
 
@@ -47,13 +49,13 @@ export async function signReceiveAuthorization({
 
 /**
  * Relay a gasless join via a pluggable third-party relayer. `relayer` is a function
- * (authorization, { pool, identityCommitment }) => Promise<{ txHash }>. No relayer ⇒ a clear error so
- * the UI falls back to a normal (gas-paying) join. This keeps gas abstraction entirely off the FairWins
- * footprint (no app backend).
+ * (authorization, { pool }) => Promise<{ txHash }>. No relayer ⇒ a clear error so the UI falls back to a
+ * normal (gas-paying) join. This keeps gas abstraction entirely off the FairWins footprint (no app
+ * backend). The join is identity-free — only the pool address is passed alongside the authorization.
  */
-export async function relayGaslessJoin(relayer, authorization, { pool, identityCommitment }) {
+export async function relayGaslessJoin(relayer, authorization, { pool }) {
   if (typeof relayer !== 'function') {
     throw new Error('No gasless relayer configured. Join normally (you pay gas), or configure a third-party relayer.')
   }
-  return relayer(authorization, { pool, identityCommitment })
+  return relayer(authorization, { pool })
 }

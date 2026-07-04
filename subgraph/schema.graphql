@@ -236,10 +236,17 @@ type TokenActivity @entity(immutable: true) {
 }
 
 # ---------------------------------------------------------------------------
-# ZK-Wager Pools (spec 034). Privacy: we index in-pool identity references
-# (commitments, nullifiers) and payout shares only — NEVER a nickname or a
-# wallet->vote link (FR-010). Nicknames are derived client-side from the public
-# commitment. Network-scoped per deployment.
+# Group Wager Pools (spec 034, address-based redesign). The ZK/Semaphore design
+# was removed: pools are now a PUBLIC parallel system. Membership, approvals and
+# claims are keyed by REAL WALLET ADDRESS — there is no anonymity primitive and
+# no nullifier/commitment. The winner's address IS the claim code. The creator
+# proposes a payout matrix keyed by winner address that members approve to a
+# fraction-of-joined threshold; the locked matrix preimage is fully indexed here
+# so the resolved split is queryable on-chain-sourced. Two-word/BIP-39 nicknames
+# are client-side only (FR-009) — the subgraph stores only the language-
+# independent integer word indices, never rendered text. Network-scoped per
+# deployment. WagerPoolFactory is a UUPS proxy at a stable address; each pool is
+# an immutable ERC-1167 clone (indexed via the WagerPool data-source template).
 # ---------------------------------------------------------------------------
 type Pool @entity(immutable: false) {
   "pool clone address (lowercased hex)"
@@ -248,71 +255,143 @@ type Pool @entity(immutable: false) {
   poolId: BigInt!
   "pool creator (sole payout proposer)"
   creator: Bytes!
-  "buy-in token (USDC)"
+  "buy-in token (USDC) allowlisted for the network"
   token: Bytes!
-  "per-member buy-in"
+  "per-member buy-in (token base units)"
   buyIn: BigInt!
   maxMembers: Int!
-  "approval threshold in basis points of joined members"
+  "approval threshold in basis points of joined members, (0, 10000]"
   thresholdBips: Int!
-  joinDeadline: BigInt!
-  "the four BIP-39 word indices identifying the pool (language-independent)"
+  "absolute unix time joining/acceptance closes (mirrors WagerRegistry acceptDeadline)"
+  acceptDeadline: BigInt!
+  "absolute unix time by which resolution must complete; after it the pool is refund-only"
+  resolveDeadline: BigInt!
+  "the four BIP-39 word indices identifying the pool (language-independent; the phrase is rendered client-side)"
   wordIndices: [Int!]!
-  "0=JoiningOpen 1=JoiningClosed 2=Resolved 3=Cancelled (mirrors on-chain reads; events advance it)"
+  "0=JoiningOpen 1=JoiningClosed 2=Resolved 3=Cancelled (mirrors on-chain PoolState; events advance it)"
   state: Int!
   memberCount: Int!
-  "locked payout-matrix hash once resolved (else null)"
+  "denominator frozen at close (member count snapshot used for the approval threshold); null while JoiningOpen"
+  frozenDenominator: Int
+  "gross buy-ins escrowed (buyIn * memberCount), accumulated as members join"
+  escrowTotal: BigInt!
+  "latest proposed payout-matrix hash (proposalId); null until the creator first proposes"
+  currentProposalId: Bytes
+  "locked payout-matrix hash (proposalId) once resolved; null otherwise"
   lockedOutcome: Bytes
   createdAt: BigInt!
   createdAtBlock: BigInt!
   createdTxHash: Bytes!
-  joins: [PoolJoin!]! @derivedFrom(field: "pool")
+  "block timestamp of the resolving OutcomeLocked, or null while unresolved"
+  resolvedAt: BigInt
+  members: [PoolMember!]! @derivedFrom(field: "pool")
   proposals: [PoolProposal!]! @derivedFrom(field: "pool")
-  payouts: [PoolPayout!]! @derivedFrom(field: "pool")
+  claims: [PoolClaim!]! @derivedFrom(field: "pool")
+  refunds: [PoolRefund!]! @derivedFrom(field: "pool")
 }
 
-type PoolJoin @entity(immutable: true) {
-  "pool-commitment"
+"A member who joined a pool by their public wallet address (one Joined event). Mutable so a later Refunded can flip `refunded`."
+type PoolMember @entity(immutable: false) {
+  "<pool>-<member address>"
   id: ID!
   pool: Pool!
-  "Semaphore identity commitment (the nickname is derived from this client-side)"
-  identityCommitment: BigInt!
-  timestamp: BigInt!
-  txHash: Bytes!
+  "the joining wallet (public; the address is the winner's future claim code)"
+  member: Bytes!
+  "buy-in escrowed at join (snapshot of the pool buyIn)"
+  buyIn: BigInt!
+  joinedAt: BigInt!
+  joinedAtBlock: BigInt!
+  joinTxHash: Bytes!
+  "true once this member has taken a Refunded payout (cancel/refund-only path)"
+  refunded: Boolean!
+  refundedAt: BigInt
 }
 
+"A creator-proposed payout matrix (one OutcomeProposed event). The matrix maps winner addresses to amounts; the full split is stored as parallel arrays AND as PoolPayoutEntry children so it is queryable per winner. `locked` flips true when the proposal reaches threshold (OutcomeLocked)."
 type PoolProposal @entity(immutable: false) {
-  "pool-proposalId"
+  "<pool>-<proposalId>"
   id: ID!
   pool: Pool!
   proposalId: Bytes!
+  "winner addresses, index-aligned with `amounts` (the payout matrix)"
+  winners: [Bytes!]!
+  "payout amounts (token base units), index-aligned with `winners`"
+  amounts: [BigInt!]!
+  "number of payout entries in the matrix"
+  entryCount: Int!
+  "sum of all entry amounts (should equal the pool escrow at lock)"
+  totalPayout: BigInt!
+  "count of member approvals seen for this proposal"
   approvalCount: Int!
+  "true once the proposal locked as the resolved outcome"
+  locked: Boolean!
+  proposedAt: BigInt!
+  proposedTxHash: Bytes!
   "block timestamp the outcome locked, or null while unresolved"
   lockedAt: BigInt
+  entries: [PoolPayoutEntry!]! @derivedFrom(field: "proposal")
+  approvals: [PoolApproval!]! @derivedFrom(field: "proposal")
 }
 
-type PoolVote @entity(immutable: true) {
-  "pool-nullifier"
+"One row of a proposal's payout matrix (winner + amount), for per-winner queryability. Immutable — the matrix is fixed at proposal time."
+type PoolPayoutEntry @entity(immutable: true) {
+  "<pool>-<proposalId>-<index>"
   id: ID!
   pool: Pool!
+  proposal: PoolProposal!
+  "position of this entry in the matrix (also the on-chain claim index)"
+  index: Int!
+  "winner wallet (their address is the claim code for this share)"
+  winner: Bytes!
+  "share amount (token base units)"
+  amount: BigInt!
+}
+
+"A member's approval of a proposed payout matrix (one Approved event). Public: the approving wallet is on-chain."
+type PoolApproval @entity(immutable: true) {
+  "<pool>-<proposalId>-<member address>"
+  id: ID!
+  pool: Pool!
+  proposal: PoolProposal!
   proposalId: Bytes!
-  "anonymous nullifier (unlinkable to wallet/commitment)"
-  nullifier: BigInt!
-  "vote choice carried in the Semaphore message"
-  message: BigInt!
+  "the approving member wallet (public)"
+  member: Bytes!
   timestamp: BigInt!
   txHash: Bytes!
 }
 
-type PoolPayout @entity(immutable: true) {
-  "pool-nullifier"
+"A settled winning share paid out of a resolved pool (one Claimed event)."
+type PoolClaim @entity(immutable: true) {
+  "<txHash>-<logIndex>"
   id: ID!
   pool: Pool!
-  "claim-scope nullifier of the winning share"
-  shareRef: Bytes!
-  "recipient address chosen at claim (unlinked to the join wallet)"
+  "the winner (their address was the claim code)"
+  winner: Bytes!
+  "recipient the winner chose to receive the funds (may differ from winner)"
   recipient: Bytes!
   amount: BigInt!
   timestamp: BigInt!
   txHash: Bytes!
+}
+
+"A buy-in returned to a member (one Refunded event) on the cancel / refund-only path."
+type PoolRefund @entity(immutable: true) {
+  "<txHash>-<logIndex>"
+  id: ID!
+  pool: Pool!
+  member: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+"An allowlist decision for a pool buy-in token (one TokenAllowed event from the factory). Lets the create-pool flow list allowed tokens without an eth_getLogs scan."
+type PoolAllowedToken @entity(immutable: false) {
+  "token address (lowercased hex)"
+  id: ID!
+  token: Bytes!
+  "current allowlist state (last TokenAllowed wins)"
+  allowed: Boolean!
+  updatedAt: BigInt!
+  updatedTxHash: Bytes!
 }

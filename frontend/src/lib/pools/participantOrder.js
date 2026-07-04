@@ -1,17 +1,20 @@
 /**
- * Participant ordering for the pool roster (pool-manager tester feedback, items 3–4).
- * Alphabetical by alias (then suffix) by default; the creator's arranged commitment order wins when
- * present, with unknown commitments appended alphabetically.
+ * Participant ordering for the pool roster (spec 034, address-based).
+ * Alphabetical by alias (then suffix) by default; the creator's arranged wallet-address order wins when
+ * present, with unknown addresses appended alphabetically. Roster items are { address, nickname:{label,
+ * suffix} } (nickname derived deterministically from the public wallet address).
  */
 export function sortParticipants(participants, order) {
   const alphabetical = [...participants].sort(
-    (a, b) => a.label.localeCompare(b.label) || a.suffix.localeCompare(b.suffix)
+    (a, b) =>
+      a.nickname.label.localeCompare(b.nickname.label) ||
+      a.nickname.suffix.localeCompare(b.nickname.suffix)
   )
   if (!order || !order.length) return alphabetical
-  const rank = new Map(order.map((c, i) => [String(c), i]))
-  return [...alphabetical].sort((a, b) => {
-    const ra = rank.has(a.commitment) ? rank.get(a.commitment) : Number.MAX_SAFE_INTEGER
-    const rb = rank.has(b.commitment) ? rank.get(b.commitment) : Number.MAX_SAFE_INTEGER
-    return ra - rb
-  })
+  const rank = new Map(order.map((addr, i) => [String(addr).toLowerCase(), i]))
+  const rankOf = (p) =>
+    rank.has(String(p.address).toLowerCase())
+      ? rank.get(String(p.address).toLowerCase())
+      : Number.MAX_SAFE_INTEGER
+  return [...alphabetical].sort((a, b) => rankOf(a) - rankOf(b))
 }

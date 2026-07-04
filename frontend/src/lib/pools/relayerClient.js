@@ -1,5 +1,5 @@
 /**
- * Frontend client for the FairWins ZK-Wager Pool gas relayer (spec 034, US3).
+ * Frontend client for the FairWins Wager Pool gas relayer (spec 034, US3, address-based).
  *
  * The relayer is GAS INFRASTRUCTURE, not an app backend (see services/relayer/README.md). It is
  * OPTIONAL: when `VITE_POOL_RELAYER_URL` is unset, `makePoolRelayer()` returns null so the gasless flow
@@ -7,8 +7,10 @@
  * explicitly operated.
  *
  * `makePoolRelayer(chainId)` returns a function shaped for `relayGaslessJoin`'s `relayer` arg:
- *   (authorization, { pool, identityCommitment }) => Promise<{ txHash }>
- * It POSTs { chainId, pool, identityCommitment, authorization } to `${VITE_POOL_RELAYER_URL}/relay/pool-join`.
+ *   (authorization, { pool }) => Promise<{ txHash }>
+ * It POSTs { chainId, pool, authorization } to `${VITE_POOL_RELAYER_URL}/relay/pool-join`. The join is
+ * identity-free — membership is keyed by the EIP-3009 authorization's `from` address, so no commitment is
+ * sent.
  */
 
 /** The configured relayer base URL, or '' when unset. Read at call time so tests can stub the env. */
@@ -42,24 +44,23 @@ function serializeAuthorization(auth) {
  * Build a relayer submit function bound to `chainId`, or null when no relayer URL is configured.
  *
  * The returned function is usable directly as the `relayer` argument to
- * `relayGaslessJoin(relayer, authorization, { pool, identityCommitment })`.
+ * `relayGaslessJoin(relayer, authorization, { pool })`.
  *
  * @param {number} chainId - The chain the pool lives on (sent in the payload so the relayer picks the
  *   right RPC/signer). Required when a relayer is configured.
- * @returns {null | ((authorization: object, ctx: { pool: string, identityCommitment: bigint|string }) => Promise<{ txHash: string }>)}
+ * @returns {null | ((authorization: object, ctx: { pool: string }) => Promise<{ txHash: string }>)}
  */
 export function makePoolRelayer(chainId) {
   const base = relayerBaseUrl()
   if (!base) return null // no relayer operated → caller falls back to a normal join
 
-  return async function relay(authorization, { pool, identityCommitment }) {
+  return async function relay(authorization, { pool }) {
     if (chainId == null) throw new Error('relayerClient: chainId is required to relay a pool join')
     if (!pool) throw new Error('relayerClient: pool address is required')
 
     const payload = {
       chainId: Number(chainId),
       pool,
-      identityCommitment: toUintString(identityCommitment),
       authorization: serializeAuthorization(authorization),
     }
 

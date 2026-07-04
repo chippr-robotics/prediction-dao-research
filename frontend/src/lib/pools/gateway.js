@@ -77,7 +77,7 @@ export function phraseToIndices(phrase, lang = DEFAULT_BIP39_LANG) {
 /**
  * Resolve an index tuple to a pool address via the factory contract. Returns null when no pool maps to
  * the phrase (unknown/stale phrase).
- * @param {import('ethers').Contract} factory a ZKWagerPoolFactory contract instance (read runner)
+ * @param {import('ethers').Contract} factory a WagerPoolFactory contract instance (read runner)
  * @param {number[]} indices
  * @returns {Promise<string|null>}
  */

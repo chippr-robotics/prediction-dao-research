@@ -103,9 +103,30 @@ Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
 - **OracleMarketLink** (immutable, issue #751) — one row per `MarketLinked`,
   associating a `marketId` with an `OracleCondition`. The three adapter handlers
   (`oracleAdapters.ts`) make no contract calls.
+- **Pool / PoolMember / PoolProposal / PoolPayoutEntry / PoolApproval / PoolClaim
+  / PoolRefund / PoolAllowedToken** (spec 034, Group Wager Pools — the
+  ZK/Semaphore design was removed) — a **public**, address-based parallel system.
+  The `WagerPoolFactory` UUPS proxy (`wagerPoolFactory.ts`) indexes `PoolCreated`
+  into a `Pool` (keyed by clone address) and spins up a **`WagerPool` template**
+  data source per immutable ERC-1167 clone; `TokenAllowed` → `PoolAllowedToken`.
+  The per-pool template (`wagerPool.ts`) indexes joins (`PoolMember`, by public
+  wallet), the creator's proposed payout matrix (`PoolProposal` with parallel
+  `winners`/`amounts` arrays **and** per-winner `PoolPayoutEntry` children so the
+  resolved split is fully queryable), member approvals (`PoolApproval`), `PoolClaim`,
+  `PoolRefund`, and the lifecycle state (`JoiningOpen→JoiningClosed→Resolved` /
+  `Cancelled`, mirroring the on-chain `PoolState` enum). No anonymity primitive,
+  nullifier or commitment; the winner's wallet address **is** the claim code.
+  Two-word/BIP-39 nicknames are **client-side only** — only the language-
+  independent integer `wordIndices` are stored (FR-009). ABIs are vendored in
+  [`abis/`](./abis/) (from the `WagerPoolFactory`/`WagerPool` artifacts). Handlers
+  make no contract calls. **Studio note:** Studio does **not** support Mordor/ETC,
+  so the Studio subgraph realistically targets `matic` (with `polygon-amoy` for
+  indexing validation); Mordor needs a self-hosted graph-node. Real factory
+  addresses + deploy blocks are **TODO-on-deploy** placeholders in
+  `networks.json` (sentinel `0x…0034`, non-genesis startBlock — never `0x0`/`0`).
 
-See `schema.graphql` and `specs/017-subgraph-v2-wager-transfers/` for the full
-contract.
+See `schema.graphql`, `specs/017-subgraph-v2-wager-transfers/` and
+`specs/034-zk-wager-pools/` for the full contract.
 
 ## Fallback
 

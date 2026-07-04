@@ -13,7 +13,7 @@ const ACCOUNT = '0xAbc0000000000000000000000000000000000001'
 const url = () => 'https://subgraph.example/graph'
 const rawPool = (over = {}) => ({
   id: '0xpool1', poolId: '3', creator: ACCOUNT.toLowerCase(), token: '0xusdc',
-  buyIn: '10', maxMembers: '10', thresholdBips: '6000', joinDeadline: '0',
+  buyIn: '10', maxMembers: '10', thresholdBips: '6000', acceptDeadline: '0', resolveDeadline: '0',
   state: '0', memberCount: '2', createdAt: '100', ...over,
 })
 

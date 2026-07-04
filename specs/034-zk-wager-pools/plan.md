@@ -104,6 +104,40 @@ relayer/packer service. P3: leaderboard UI + off-chain state channel.
 **Result**: PASS — no unjustified violations. New-technology justifications captured in
 Complexity Tracking.
 
+### Constitution addendum (round 7): Semaphore removed — security basis is now address-based custody
+
+The address-based redesign (see spec.md "Redesign addendum (round 7)" and
+implementation-notes round 7) **removes Semaphore V4 entirely** from both the pool and the
+factory. Principle I above rested the anonymity leg of the security argument on the **audited
+Semaphore V4 (PSE)** plus the invariant that **our contract is the group admin and the only
+path to `addMember`**. That leg no longer applies — there is no ZK primitive, no group admin,
+no proof verification. The security argument for `WagerPool`/`WagerPoolFactory` now rests
+**solely on address-based custody invariants**, which removing the ZK layer does not weaken:
+
+- **CEI + reentrancy guards on every value path** — `join`/`joinWithAuthorization`/`claim`/
+  `refund` are `nonReentrant`, effects (member/claim/refund flags) precede the SafeERC20
+  transfer.
+- **Escrow-only-exits** — the ONLY paths that move escrow out are `claim` (state `Resolved`)
+  and `refund`/`cancel`; the creator cannot force a payout (members approve to a
+  fraction-of-joined threshold), preserving FR-020b/FR-022.
+- **Per-INDEX single-claim** — claims are tracked by payout-matrix **row index**
+  (`claimedIndex[index]`), not by winner address. This closes a bug in the prior per-address
+  guard: a matrix that legitimately lists the same winner in two rows would have stranded the
+  second row's funds. A matrix whose amounts sum to escrow is now always fully claimable.
+- **`resolveDeadline` refund path** — after the absolute resolve deadline with no locked
+  outcome, the pool is refund-only, so funds are never stuck (FR-019, SC-007). Deadlines are
+  bounded/ordered by `_checkDeadlines`, mirroring `WagerRegistry`.
+- **EIP-712 replay-nonce for the `…WithSig` twins** — `SignerIntentBase._verifyIntent` binds
+  `signer`, a single-use nonce, and a validity window into the typed-data hash, scoped by
+  `chainId + verifyingContract`; the nonce burn is an effect before any external interaction.
+  A relayer cannot forge, retarget, or replay a member's authorized action.
+
+Slither + Medusa + the formal smart-contract security review (`.github/agents/
+smart-contract-security`) remain gating before any value-bearing deploy; the review scope is
+now the address-based custody surface above (not a Semaphore integration). Removing the ZK
+stack also removes the CSP/WASM proof-generation failure surface entirely and unblocks
+ETC/Mordor (no self-deployed anonymity primitive) — launch is now Mordor → Polygon (no Amoy).
+
 ## Project Structure
 
 ### Documentation (this feature)

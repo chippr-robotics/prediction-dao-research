@@ -87,17 +87,18 @@ describe('GroupPoolModal', () => {
     expect(createPool.mock.calls[0][0].thresholdPct).toBe(100)
   })
 
-  it('passes the chosen windows as an exact joinDeadline (unix s) + resolutionWindow (s)', async () => {
+  it('passes the chosen windows as two exact absolute deadlines (acceptDeadline + resolveDeadline, unix s)', async () => {
     const createPool = vi.fn().mockResolvedValue({ pool: POOL_ADDR, phrase: 'crystal orbit harbor violet' })
     usePools.mockReturnValue(pools({ createPool }))
     renderModal()
     fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
     await waitFor(() => expect(createPool).toHaveBeenCalled())
     const form = createPool.mock.calls[0][0]
-    expect(typeof form.joinDeadline).toBe('number')
-    expect(form.joinDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
-    expect(typeof form.resolutionWindow).toBe('number')
-    expect(form.resolutionWindow).toBeGreaterThan(0)
+    // Timing mirrors the 1v1/open-challenge flow: two absolute unix-second deadlines, not a relative window.
+    expect(typeof form.acceptDeadline).toBe('number')
+    expect(form.acceptDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
+    expect(typeof form.resolveDeadline).toBe('number')
+    expect(form.resolveDeadline).toBeGreaterThan(form.acceptDeadline)
   })
 
   it('share view matches the open-challenge share view: four words + copy icon + join QR', async () => {

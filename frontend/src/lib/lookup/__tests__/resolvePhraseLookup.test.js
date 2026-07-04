@@ -125,7 +125,7 @@ describe('resolvePhraseLookup — not-actionable & self (FR-011/012)', () => {
   })
 
   it('marks a pool past its join deadline as not-actionable', async () => {
-    const summary = makePoolSummary({ joinDeadline: 1000 })
+    const summary = makePoolSummary({ acceptDeadline: 1000 })
     const deps = makeDeps({ pool: { summary } })
     const res = await resolvePhraseLookup({ phrase: VALID_EN_CODE, now: 2000, deps })
     expect(res.kind).toBe('not-actionable')
