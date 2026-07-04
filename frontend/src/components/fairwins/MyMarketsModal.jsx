@@ -978,8 +978,9 @@ function MyMarketsModal({
 
         {/* Content Area */}
         <div className="mm-content">
-          {/* Group pools (spec 037) — self-hides when the user has none, so the wager view is unchanged. */}
-          <MyPoolsSection />
+          {/* Group pools (spec 037; spec 040 US5) — tab-aware: active pools show in the active
+              tabs, terminal pools move to History. Self-hides when the user has none for the tab. */}
+          <MyPoolsSection activeTab={activeTab} />
           {!isConnected ? (
             <div className="mm-empty-state">
               <div className="mm-empty-icon">&#128274;</div>

@@ -121,7 +121,7 @@ open a pool → no decrypt-words prompt at any point.
 ### Tests for User Story 3
 
 - [ ] T021 [P] [US3] Unit test the auto-unlock decision (saved code → auto-decrypt, no prompt; no saved code → prompt once then `addEntry`) in `frontend/src/test/decryptAutoUnlock.test.js`
-- [ ] T022 [P] [US3] Regression test that viewing a member's own pool triggers no decrypt-words prompt in `frontend/src/test/MyPoolsSection.test.jsx`
+- [X] T022 [P] [US3] Regression test that viewing a member's own pool triggers no decrypt-words prompt in `frontend/src/test/MyPoolsSection.test.jsx`
 
 ### Implementation for User Story 3
 
@@ -143,11 +143,11 @@ close the modal → interval is cleared.
 
 ### Tests for User Story 4
 
-- [ ] T026 [P] [US4] Test that `useMyPools` re-runs `load()` on its interval and clears the interval on unmount in `frontend/src/test/useMyPools.test.jsx`
+- [X] T026 [P] [US4] Test that `useMyPools` re-runs `load()` on its interval and clears the interval on unmount in `frontend/src/test/useMyPools.test.jsx`
 
 ### Implementation for User Story 4
 
-- [ ] T027 [US4] Add `refresh()` + a ~30s interval (matching the wager poll) with unmount cleanup to `frontend/src/hooks/useMyPools.js`
+- [X] T027 [US4] Add `refresh()` + a ~30s interval (matching the wager poll) with unmount cleanup to `frontend/src/hooks/useMyPools.js`
 
 **Checkpoint**: Pools refresh automatically while the modal is open; polling stops on close.
 
@@ -162,12 +162,12 @@ the History tab shows the terminal pool.
 
 ### Tests for User Story 5
 
-- [ ] T028 [P] [US5] Test that `MyPoolsSection` renders `bucket:'active'` pools on non-history tabs and `bucket:'history'` pools on the History tab (and nothing when the filtered list is empty) in `frontend/src/test/MyPoolsSection.test.jsx`
+- [X] T028 [P] [US5] Test that `MyPoolsSection` renders `bucket:'active'` pools on non-history tabs and `bucket:'history'` pools on the History tab (and nothing when the filtered list is empty) in `frontend/src/test/MyPoolsSection.test.jsx`
 
 ### Implementation for User Story 5
 
-- [ ] T029 [US5] Make `MyPoolsSection` tab-aware: accept an `activeTab` prop, filter `items` by `bucket` per tab, and remove the per-row Active/Past chip, in `frontend/src/components/fairwins/MyPoolsSection.jsx`
-- [ ] T030 [US5] Pass `activeTab` from `frontend/src/components/fairwins/MyMarketsModal.jsx` into `<MyPoolsSection>` (depends on T029)
+- [X] T029 [US5] Make `MyPoolsSection` tab-aware: accept an `activeTab` prop, filter `items` by `bucket` per tab, and remove the per-row Active/Past chip, in `frontend/src/components/fairwins/MyPoolsSection.jsx`
+- [X] T030 [US5] Pass `activeTab` from `frontend/src/components/fairwins/MyMarketsModal.jsx` into `<MyPoolsSection>` (depends on T029)
 
 **Checkpoint**: Terminal pools live under History; active pools stay in the active tabs.
 
