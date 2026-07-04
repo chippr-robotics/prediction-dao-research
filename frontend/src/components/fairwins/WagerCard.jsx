@@ -1,5 +1,6 @@
 import Badge from '../ui/Badge'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
+import OpponentName from './OpponentName'
 
 // spec 012 FR-007 action-needed labels, reused on the card's status row.
 const ACTION_NEEDED_LABELS = {
@@ -87,7 +88,11 @@ export default function WagerCard({
           {vm.showPreview && (
             <div className="wc-preview">
               <span className="wc-avatar" style={{ background: vm.avatarColor }} aria-hidden="true"></span>
-              <span className="wc-preview-text">{vm.opponent}</span>
+              <span className="wc-preview-text">
+                {vm.opponentAddress
+                  ? <OpponentName address={vm.opponentAddress} interactive={false} />
+                  : vm.opponent}
+              </span>
               <span className="wc-dot">·</span>
               <span className="wc-preview-text">{vm.timeLeft}</span>
             </div>
@@ -190,7 +195,11 @@ export default function WagerCard({
             {vm.meta.map((m, i) => (
               <div className="wc-meta-item" key={i}>
                 <div className="wc-meta-label">{m.label}</div>
-                <div className={`wc-meta-value${m.tone ? ` ${m.tone}` : ''}`}>{m.value}</div>
+                <div className={`wc-meta-value${m.tone ? ` ${m.tone}` : ''}`}>
+                  {m.kind === 'address'
+                    ? <OpponentName address={m.address} isSelf={m.isSelf} />
+                    : m.value}
+                </div>
               </div>
             ))}
           </div>

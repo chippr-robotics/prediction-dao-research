@@ -40,7 +40,7 @@ Sequence these by task ID. US1 and US2 share the card files, so prefer completin
 
 **Purpose**: Confirm the working baseline; no new dependencies are introduced by this feature.
 
-- [ ] T001 Confirm `npm run test:frontend` and `npm run lint --workspace frontend` pass on a clean tree before changes; verify no new npm dependencies are required (ENS via existing `wagmi`, hashing via existing `ethers`).
+- [X] T001 Confirm `npm run test:frontend` and `npm run lint --workspace frontend` pass on a clean tree before changes; verify no new npm dependencies are required (ENS via existing `wagmi`, hashing via existing `ethers`).
 
 ---
 
@@ -49,7 +49,7 @@ Sequence these by task ID. US1 and US2 share the card files, so prefer completin
 **Purpose**: Shared test scaffolding used by multiple story tests. These refinements are otherwise
 independent — there is no blocking production code shared across all stories.
 
-- [ ] T002 [P] Add/extend shared Vitest fixtures for wager states (pending, active, `draw_proposed` with a known `drawProposer`, terminal `draw`, resolved) and pool items (one `bucket:'active'`, one `bucket:'history'`) in `frontend/src/test/fixtures/myWagers.js` (create if absent), reused by US1–US7 tests.
+- [X] T002 [P] Add/extend shared Vitest fixtures for wager states (pending, active, `draw_proposed` with a known `drawProposer`, terminal `draw`, resolved) and pool items (one `bucket:'active'`, one `bucket:'history'`) in `frontend/src/test/fixtures/myWagers.js` (create if absent), reused by US1–US7 tests.
 
 **Checkpoint**: Fixtures ready — user stories can proceed (in priority order or in parallel where files don't collide).
 
@@ -65,19 +65,19 @@ the expected label; tap to reveal and copy the full address; own side still read
 
 ### Tests for User Story 1
 
-- [ ] T003 [P] [US1] Unit test `deriveAddressName` (deterministic, casing-invariant, always returns a two-word label) in `frontend/src/test/addressName.test.js`
-- [ ] T004 [P] [US1] Hook test `useOpponentName` resolution priority (address book > ENS > generated; never returns raw address; synchronous generated fallback) in `frontend/src/test/useOpponentName.test.jsx`
-- [ ] T005 [P] [US1] Component test `OpponentName` — renders "You" when self, toggles full-address reveal on click/Enter, exposes copy + accessible label — in `frontend/src/test/OpponentName.test.jsx`
+- [X] T003 [P] [US1] Unit test `deriveAddressName` (deterministic, casing-invariant, always returns a two-word label) in `frontend/src/test/addressName.test.js`
+- [X] T004 [P] [US1] Hook test `useOpponentName` resolution priority (address book > ENS > generated; never returns raw address; synchronous generated fallback) in `frontend/src/test/useOpponentName.test.jsx`
+- [X] T005 [P] [US1] Component test `OpponentName` — renders "You" when self, toggles full-address reveal on click/Enter, exposes copy + accessible label — in `frontend/src/test/OpponentName.test.jsx`
 
 ### Implementation for User Story 1
 
-- [ ] T006 [P] [US1] Implement `deriveAddressName(address)` reusing the `ADJECTIVES`/`NOUNS` vocab from `lib/pools/nicknameWords.js`, keyed by `keccak256` of the normalized address, in `frontend/src/lib/naming/addressName.js`
-- [ ] T007 [US1] Implement `useOpponentName(address, { chainId })` (address book via `useAddressBook().findByAddress` → `useEnsReverseLookup` → `deriveAddressName`) in `frontend/src/hooks/useOpponentName.js` (depends on T006)
-- [ ] T008 [US1] Implement `OpponentName.jsx` presentational component (button + reveal + copy, WCAG 2.1 AA) in `frontend/src/components/fairwins/OpponentName.jsx` (depends on T007)
-- [ ] T009 [US1] In `frontend/src/components/fairwins/wagerVm.js`, expose the raw `opponentAddress` and an `isSelf` flag on the view model (keep existing `opponent` for back-compat) so the card can render `<OpponentName>`
-- [ ] T010 [US1] Render `<OpponentName address={vm.opponentAddress} isSelf={…} />` in the opponent slot of `frontend/src/components/fairwins/WagerCard.jsx` (depends on T008, T009)
-- [ ] T011 [US1] Render `<OpponentName>` in the opponent column of `frontend/src/components/fairwins/WagerTable.jsx` (depends on T008, T009)
-- [ ] T012 [US1] Update opponent-name assertions in `frontend/src/test/MyMarketsModal.test.jsx` (name shown instead of raw address; reveal works)
+- [X] T006 [P] [US1] Implement `deriveAddressName(address)` reusing the `ADJECTIVES`/`NOUNS` vocab from `lib/pools/nicknameWords.js`, keyed by `keccak256` of the normalized address, in `frontend/src/lib/naming/addressName.js`
+- [X] T007 [US1] Implement `useOpponentName(address, { chainId })` (address book via `useAddressBook().findByAddress` → `useEnsReverseLookup` → `deriveAddressName`) in `frontend/src/hooks/useOpponentName.js` (depends on T006)
+- [X] T008 [US1] Implement `OpponentName.jsx` presentational component (button + reveal + copy, WCAG 2.1 AA) in `frontend/src/components/fairwins/OpponentName.jsx` (depends on T007)
+- [X] T009 [US1] In `frontend/src/components/fairwins/wagerVm.js`, expose the raw `opponentAddress` and an `isSelf` flag on the view model (keep existing `opponent` for back-compat) so the card can render `<OpponentName>`
+- [X] T010 [US1] Render `<OpponentName address={vm.opponentAddress} isSelf={…} />` in the opponent slot of `frontend/src/components/fairwins/WagerCard.jsx` (depends on T008, T009)
+- [X] T011 [US1] Render `<OpponentName>` in the opponent column of `frontend/src/components/fairwins/WagerTable.jsx` (depends on T008, T009)
+- [X] T012 [US1] Update opponent-name assertions in `frontend/src/test/MyMarketsModal.test.jsx` (name shown instead of raw address; reveal works)
 
 **Checkpoint**: Opponents render by name with click-to-reveal in both card and table views.
 

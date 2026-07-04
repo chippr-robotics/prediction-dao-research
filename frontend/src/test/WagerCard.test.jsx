@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WagerCardGrid from '../components/fairwins/WagerCardGrid'
+import { deriveAddressName } from '../lib/naming/addressName'
 
 // The activity watcher is optional; stub it so the grid renders without a
 // provider. Tests assign activityRef.current per scenario to drive the
@@ -163,10 +164,26 @@ describe('WagerCard (via WagerCardGrid)', () => {
   })
 
   it('renders the opponent preview line only in comfortable density', () => {
+    // The opponent now renders by friendly name (spec 040), not the raw address.
+    const oppName = deriveAddressName(OTHER).label
     const { rerender } = render(<WagerCardGrid {...baseProps} density="compact" markets={[activeWager()]} />)
-    // Compact: no preview line (the short opponent address is not shown collapsed).
-    expect(screen.queryByText(/0xABCD/i)).not.toBeInTheDocument()
+    // Compact: no preview line.
+    expect(screen.queryByText(oppName)).not.toBeInTheDocument()
     rerender(<WagerCardGrid {...baseProps} density="comfortable" markets={[activeWager()]} />)
-    expect(screen.getByText(/0xABCD/i)).toBeInTheDocument()
+    expect(screen.getByText(oppName)).toBeInTheDocument()
+  })
+
+  it('shows the opponent by generated name and reveals the address on click (spec 040 US1)', async () => {
+    const user = userEvent.setup()
+    render(<WagerCardGrid {...baseProps} markets={[activeWager()]} />)
+    await user.click(screen.getByText('Lakers ML vs Mike'))
+    const oppName = deriveAddressName(OTHER).label
+    const toggle = screen.getByRole('button', { name: new RegExp(`show full address for ${oppName}`, 'i') })
+    expect(toggle).toBeInTheDocument()
+    // Raw address hidden until revealed; creator side is "You".
+    expect(screen.queryByText('0xABCD…EF12')).not.toBeInTheDocument()
+    expect(screen.getByText('You')).toBeInTheDocument()
+    await user.click(toggle)
+    expect(screen.getByText('0xABCD…EF12')).toBeInTheDocument()
   })
 })

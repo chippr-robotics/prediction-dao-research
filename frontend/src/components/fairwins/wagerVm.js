@@ -94,17 +94,19 @@ export function buildWagerVm(market, ctx) {
   // Counterparty / creator labels (on-chain public; display only).
   const others = [market.creator, ...(market.participants || [])]
     .filter(a => a && a.toLowerCase?.() !== me)
-  const opponent = others.length ? formatShortAddress(others[0]) : '—'
-  const creatorLabel = market.creator?.toLowerCase?.() === me ? 'You' : formatShortAddress(market.creator)
+  const opponentAddress = others.length ? others[0] : null
+  const opponent = opponentAddress ? formatShortAddress(opponentAddress) : '—'
+  const creatorIsSelf = market.creator?.toLowerCase?.() === me
+  const creatorLabel = creatorIsSelf ? 'You' : formatShortAddress(market.creator)
   const endRaw = market.tradingEndTime || market.endDate
 
   const meta = [
     showOutcome && outcome
       ? { label: 'Outcome', value: outcome.label, tone: outcome.tone }
-      : { label: 'Opponent', value: opponent },
+      : { label: 'Opponent', value: opponent, kind: opponentAddress ? 'address' : undefined, address: opponentAddress },
     { label: showOutcome ? 'Settled' : 'Ends', value: showOutcome ? formatDate(endRaw) : timeLeft },
     { label: 'Wager ID', value: `#${market.id}` },
-    { label: 'Creator', value: creatorLabel },
+    { label: 'Creator', value: creatorLabel, kind: 'address', address: market.creator, isSelf: creatorIsSelf },
   ]
 
   // Action visibility — identical rules to the former MarketsTable.
@@ -182,6 +184,7 @@ export function buildWagerVm(market, ctx) {
     actionNeeded,
     actionBadgeRedundant,
     opponent,
+    opponentAddress,
     avatarColor: avatarColor(others[0] || idStr),
   }
 }

@@ -3,6 +3,7 @@ import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { buildWagerVm } from './wagerVm'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
+import OpponentName from './OpponentName'
 
 const VARIANT_CLASS = {
   primary: 'wc-action-primary',
@@ -104,6 +105,11 @@ export default function WagerTable({
                 <span className="mm-table-market-title">
                   <span>{vm.displayTitle}</span>
                 </span>
+                {vm.opponentAddress && (
+                  <span className="mm-table-market-opponent">
+                    <OpponentName address={vm.opponentAddress} interactive={false} />
+                  </span>
+                )}
               </td>
               <td className="wc-table-amount">
                 <strong>{vm.stake}</strong> {vm.tokenSymbol}

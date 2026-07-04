@@ -552,6 +552,14 @@
   white-space: nowrap;
 }
 
+/* Opponent name subtitle under the wager title (spec 040 US1). */
+.mm-table-market-opponent {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
 /* Unread row indicator (matches FriendMarketsModal pattern) */
 .mm-table-row.mm-unread {
   position: relative;
