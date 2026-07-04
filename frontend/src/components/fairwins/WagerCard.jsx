@@ -70,7 +70,11 @@ export default function WagerCard({
             <span className="wc-stake">{vm.stake}</span>
             <span className="wc-token">{vm.tokenSymbol}</span>
             {vm.outcome && (
-              <span className={`wc-outcome ${vm.outcome.tone}`}>{vm.outcome.label}</span>
+              <span className={`wc-outcome ${vm.outcome.tone}`}>
+                {vm.outcome.address
+                  ? <OpponentName address={vm.outcome.address} interactive={false} />
+                  : vm.outcome.label}
+              </span>
             )}
           </div>
           <div className="wc-title" id={headingId} title={vm.displayTitle}>
@@ -100,6 +104,9 @@ export default function WagerCard({
         </div>
         <div className="wc-header-side">
           <span className={`wc-status ${vm.statusClass}`}>{vm.statusText}</span>
+          {vm.draw?.phase === 'proposed' && (
+            <Badge variant="warning" className="wc-draw-badge">Draw pending</Badge>
+          )}
           {/* Action-needed tag. While the card is collapsed this tag is the only
               signal that the wager needs attention — its action buttons live in
               the expanded body, and on phones the grid never auto-expands, so a
@@ -126,6 +133,26 @@ export default function WagerCard({
       {isOpen && (
         <div className="wc-body" id={panelId}>
           <div className="wc-divider"></div>
+
+          {/* Draw submission state (spec 040 US2) — which party has submitted a draw. */}
+          {vm.draw && (
+            <div className={`wc-draw wc-draw--${vm.draw.phase}`} role="status">
+              <div className="wc-draw-head">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3v18M5 7h14M5 7l-3 6a4 4 0 008 0L5 7zM19 7l-3 6a4 4 0 008 0l-5-6z" />
+                </svg>
+                <span className="wc-draw-label">{vm.draw.label}</span>
+              </div>
+              <div className="wc-draw-chips">
+                <span className={`wc-draw-chip${vm.draw.mySubmitted ? ' wc-draw-chip--done' : ' wc-draw-chip--pending'}`}>
+                  You: {vm.draw.mySubmitted ? 'submitted' : 'not yet'}
+                </span>
+                <span className={`wc-draw-chip${vm.draw.opponentSubmitted ? ' wc-draw-chip--done' : ' wc-draw-chip--pending'}`}>
+                  Opponent: {vm.draw.opponentSubmitted ? 'submitted' : 'not yet'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Terms / decrypt affordance */}
           {vm.encState === 'locked' && (

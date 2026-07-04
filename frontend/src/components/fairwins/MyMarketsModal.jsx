@@ -17,8 +17,11 @@ import OpenChallengeDecryptModal from './OpenChallengeDecryptModal'
 import WagerList from './WagerList'
 import MyPoolsSection from './MyPoolsSection'
 import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
+import { fetchDrawProposals } from '../../data/notifications/drawProposalScan'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
+import OpponentName from './OpponentName'
+import { useOpponentName } from '../../hooks/useOpponentName'
 import './MyMarketsModal.css'
 import './WagerCard.css'
 
@@ -68,6 +71,11 @@ function MyMarketsModal({
   // Markets data state
   const [markets, setMarkets] = useState([])
   const [userPositions, setUserPositions] = useState([])
+
+  // Open draw proposals per wager (spec 040 US2). The proposer is not in the
+  // WagerRegistry struct, so it's read from the subgraph scan and mapped onto
+  // each wager so the card can show who has submitted a draw. { wagerId: proposer }.
+  const [drawProposerById, setDrawProposerById] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -126,6 +134,30 @@ function MyMarketsModal({
     const id = setInterval(() => { refreshFriendMarkets() }, 30000)
     return () => clearInterval(id)
   }, [isOpen, account, refreshFriendMarkets])
+
+  // Draw-proposal scan (spec 040 US2). Keeps the per-wager draw proposer current
+  // while the modal is open (same 30s cadence as the market refresh). A failed
+  // read retains prior state rather than fabricating revokes (honest state).
+  const drawScanKey = useMemo(
+    () => decryptableMarkets.map(m => String(m.id)).sort().join(','),
+    [decryptableMarkets]
+  )
+  useEffect(() => {
+    if (!isOpen || !account) return
+    const wagerIds = drawScanKey ? drawScanKey.split(',').filter(Boolean) : []
+    if (wagerIds.length === 0) { setDrawProposerById({}); return }
+    let alive = true
+    const run = async () => {
+      const { proposals, ok } = await fetchDrawProposals({ chainId, wagerIds })
+      if (!alive || !ok) return
+      const map = {}
+      for (const p of proposals) map[String(p.wagerId)] = p.proposer
+      setDrawProposerById(map)
+    }
+    run()
+    const id = setInterval(run, 30000)
+    return () => { alive = false; clearInterval(id) }
+  }, [isOpen, account, chainId, drawScanKey])
 
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
@@ -326,7 +358,11 @@ function MyMarketsModal({
       if (dismissedIds?.has(String(market.id))) return
 
       const status = getMarketStatus(market)
-      const marketWithStatus = { ...market, computedStatus: status }
+      const marketWithStatus = {
+        ...market,
+        computedStatus: status,
+        drawProposedBy: drawProposerById[String(market.id)] ?? null,
+      }
 
       // Apply status filter. The default ("all") view also hides expired
       // offers so they don't clutter the list — pick "Expired" explicitly
@@ -400,7 +436,7 @@ function MyMarketsModal({
     history.sort(comparator)
 
     return { participating, created, arbitrating, history }
-  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId])
+  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId, drawProposerById])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -1524,8 +1560,7 @@ function MarketDetailView({
         <div className="mm-detail-item">
           <span className="mm-detail-label">Creator</span>
           <span className="mm-detail-value">
-            {formatAddress(market.creator)}
-            {isCreator && <span className="mm-you-tag">You</span>}
+            <OpponentName address={market.creator} isSelf={isCreator} />
           </span>
         </div>
         <div className="mm-detail-item">
@@ -1788,15 +1823,23 @@ function ResolutionModal({
 
   // Participant-anchored display labels so the resolver clearly sees which party each
   // choice pays out, instead of an ambiguous "Pass/Fail" (Bug #2).
-  const fmtParty = (addr) => {
+  // Resolve both parties to friendly names (spec 040). Fixed two calls, so the
+  // hook order is stable across renders.
+  const creatorName = useOpponentName(market.creator)
+  const opponentName = useOpponentName(market.opponent)
+
+  // Friendly party names (spec 040) so the resolver sees who each choice pays,
+  // by name, alongside the short address for certainty.
+  const fmtParty = (addr, resolvedName) => {
     if (!addr) return 'Unknown'
     const short = `${addr.slice(0, 6)}…${addr.slice(-4)}`
     const isYou = account && addr.toLowerCase() === account.toLowerCase()
-    return isYou ? `${short} (You)` : short
+    const name = isYou ? 'You' : (resolvedName || short)
+    return name === short ? short : `${name} · ${short}`
   }
   const outcomeLabels = {
-    [outcomes[0]]: { title: 'Creator wins', who: fmtParty(market.creator) },
-    [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent) },
+    [outcomes[0]]: { title: 'Creator wins', who: fmtParty(market.creator, creatorName.displayName) },
+    [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent, opponentName.displayName) },
   }
   const labelFor = (outcome) => {
     if (outcome === DRAW) return 'Draw — both parties refunded'

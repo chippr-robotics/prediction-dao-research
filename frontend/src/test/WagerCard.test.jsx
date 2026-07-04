@@ -173,6 +173,18 @@ describe('WagerCard (via WagerCardGrid)', () => {
     expect(screen.getByText(oppName)).toBeInTheDocument()
   })
 
+  it('shows draw submission chips when a draw is proposed (spec 040 US2)', async () => {
+    const user = userEvent.setup()
+    const w = activeWager({ id: '99', description: 'Draw Pending', drawProposedBy: ME })
+    render(<WagerCardGrid {...baseProps} markets={[w]} />)
+    // Evident even collapsed via the header badge.
+    expect(screen.getByText('Draw pending')).toBeInTheDocument()
+    await user.click(screen.getByText('Draw Pending'))
+    expect(screen.getByText(/you proposed/i)).toBeInTheDocument()
+    expect(screen.getByText(/You: submitted/i)).toBeInTheDocument()
+    expect(screen.getByText(/Opponent: not yet/i)).toBeInTheDocument()
+  })
+
   it('shows the opponent by generated name and reveals the address on click (spec 040 US1)', async () => {
     const user = userEvent.setup()
     render(<WagerCardGrid {...baseProps} markets={[activeWager()]} />)

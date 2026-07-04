@@ -100,9 +100,35 @@ export function buildWagerVm(market, ctx) {
   const creatorLabel = creatorIsSelf ? 'You' : formatShortAddress(market.creator)
   const endRaw = market.tradingEndTime || market.endDate
 
+  // Draw state (spec 040 US2). A terminal DRAW means both parties agreed and
+  // stakes were returned. Otherwise, an open proposer (from the subgraph scan,
+  // attached as `drawProposedBy`) means a draw is proposed and awaiting the
+  // other party — surfaced regardless of who proposed, so the proposer also
+  // sees that their submission is recorded.
+  const drawProposer = market.drawProposedBy ? String(market.drawProposedBy).toLowerCase() : null
+  let draw = null
+  if (market.computedStatus === MarketStatus.DRAW) {
+    draw = {
+      phase: 'settled',
+      proposer: drawProposer,
+      mySubmitted: true,
+      opponentSubmitted: true,
+      label: 'Both agreed · stakes returned',
+    }
+  } else if (drawProposer) {
+    const mine = drawProposer === me
+    draw = {
+      phase: 'proposed',
+      proposer: drawProposer,
+      mySubmitted: mine,
+      opponentSubmitted: !mine,
+      label: mine ? 'You proposed · awaiting opponent' : 'Opponent proposed · your turn',
+    }
+  }
+
   const meta = [
     showOutcome && outcome
-      ? { label: 'Outcome', value: outcome.label, tone: outcome.tone }
+      ? { label: 'Outcome', value: outcome.label, tone: outcome.tone, kind: outcome.address ? 'address' : undefined, address: outcome.address }
       : { label: 'Opponent', value: opponent, kind: opponentAddress ? 'address' : undefined, address: opponentAddress },
     { label: showOutcome ? 'Settled' : 'Ends', value: showOutcome ? formatDate(endRaw) : timeLeft },
     { label: 'Wager ID', value: `#${market.id}` },
@@ -185,6 +211,7 @@ export function buildWagerVm(market, ctx) {
     actionBadgeRedundant,
     opponent,
     opponentAddress,
+    draw,
     avatarColor: avatarColor(others[0] || idStr),
   }
 }

@@ -94,17 +94,17 @@ counterparty's proposal, and a terminal "Draw — stakes returned" once both sub
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Unit test the draw descriptor derivation (phase/proposer/mySubmitted/opponentSubmitted/label from `computedStatus` + `drawProposedBy`) in `frontend/src/test/wagerVmDraw.test.js`
-- [ ] T014 [P] [US2] Regression test that a `null → proposer` draw transition emits a user-facing, clearly-labeled "Draw proposed — respond" notification in `frontend/src/test/diffEngine.test.js` (and/or `frontend/src/test/sources/wagerSource.test.js`)
+- [X] T013 [P] [US2] Unit test the draw descriptor derivation (phase/proposer/mySubmitted/opponentSubmitted/label from `computedStatus` + `drawProposedBy`) in `frontend/src/test/wagerVmDraw.test.js`
+- [X] T014 [P] [US2] Regression test that a `null → proposer` draw transition emits a user-facing, clearly-labeled "Draw proposed — respond" notification in `frontend/src/test/diffEngine.test.js` (and/or `frontend/src/test/sources/wagerSource.test.js`)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Enrich the modal's markets with `drawProposedBy` by calling `fetchDrawProposals({ chainId, wagerIds })` (retain prior state on `ok:false`) and mapping the proposer onto each market before building the view model, in `frontend/src/components/fairwins/MyMarketsModal.jsx`
-- [ ] T016 [US2] Add the `draw` descriptor (`phase`, `proposer`, `mySubmitted`, `opponentSubmitted`, `label`) to the view model in `frontend/src/components/fairwins/wagerVm.js` (depends on T015; sequence after T009)
-- [ ] T017 [US2] Render a distinct draw status treatment + per-party submission chip pair (text + icon, not color alone) in `frontend/src/components/fairwins/WagerCard.jsx` (depends on T016; sequence after T010)
-- [ ] T018 [US2] Render draw state in `frontend/src/components/fairwins/WagerTable.jsx` (depends on T016; sequence after T011)
-- [ ] T019 [US2] Verify the draw-proposal notification path (`data/notifications/derivedState.js` / `diffEngine.js` / `sources/wagerSource.js`); add/label the emission only if T014 shows it is not already produced
-- [ ] T020 [US2] Add draw-state / submission-chip styles in `frontend/src/components/fairwins/WagerCard.css` (and `MyMarketsModal.css` if needed)
+- [X] T015 [US2] Enrich the modal's markets with `drawProposedBy` by calling `fetchDrawProposals({ chainId, wagerIds })` (retain prior state on `ok:false`) and mapping the proposer onto each market before building the view model, in `frontend/src/components/fairwins/MyMarketsModal.jsx`
+- [X] T016 [US2] Add the `draw` descriptor (`phase`, `proposer`, `mySubmitted`, `opponentSubmitted`, `label`) to the view model in `frontend/src/components/fairwins/wagerVm.js` (depends on T015; sequence after T009)
+- [X] T017 [US2] Render a distinct draw status treatment + per-party submission chip pair (text + icon, not color alone) in `frontend/src/components/fairwins/WagerCard.jsx` (depends on T016; sequence after T010)
+- [X] T018 [US2] Render draw state in `frontend/src/components/fairwins/WagerTable.jsx` (depends on T016; sequence after T011)
+- [X] T019 [US2] Verify the draw-proposal notification path (`data/notifications/derivedState.js` / `diffEngine.js` / `sources/wagerSource.js`); add/label the emission only if T014 shows it is not already produced
+- [X] T020 [US2] Add draw-state / submission-chip styles in `frontend/src/components/fairwins/WagerCard.css` (and `MyMarketsModal.css` if needed)
 
 **Checkpoint**: Draw wagers show state + submission progress on the card, and proposals notify.
 

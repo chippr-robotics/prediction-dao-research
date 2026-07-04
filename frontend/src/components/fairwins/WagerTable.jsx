@@ -114,12 +114,19 @@ export default function WagerTable({
               <td className="wc-table-amount">
                 <strong>{vm.stake}</strong> {vm.tokenSymbol}
                 {vm.outcome && (
-                  <span className={`wc-outcome ${vm.outcome.tone}`} style={{ marginLeft: 6 }}>{vm.outcome.label}</span>
+                  <span className={`wc-outcome ${vm.outcome.tone}`} style={{ marginLeft: 6 }}>
+                    {vm.outcome.address
+                      ? <OpponentName address={vm.outcome.address} interactive={false} />
+                      : vm.outcome.label}
+                  </span>
                 )}
               </td>
               <td className="mm-table-time">{vm.meta[1]?.value}</td>
               <td>
                 <span className={`mm-status-badge ${vm.statusClass}`}>{vm.statusText}</span>
+                {vm.draw?.phase === 'proposed' && (
+                  <span className="mm-table-draw" title={vm.draw.label}>Draw pending</span>
+                )}
               </td>
               {hasActionsColumn && (
                 <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>
