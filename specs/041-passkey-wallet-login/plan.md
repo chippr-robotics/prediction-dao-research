@@ -42,15 +42,13 @@ UserOperation path is needed for (a) operations on the smart account itself
 intents, and (c) the self-sufficiency fallback when the relayer is down
 (FR-013/FR-014).
 
-> **Open point for the maintainer**: PR #793 moved the *pools* launch
-> sequence to **Mordor → Polygon (no Amoy)**. 041's clarified network scope
-> (Polygon 137 + Amoy 80002 first; ETC/Mordor later) is driven by a physical
-> constraint — Mordor has no RIP-7212 precompile, no canonical EntryPoint,
-> and no bundler infrastructure — so this plan keeps Amoy as the passkey
-> validation network. If the platform standardizes on Mordor-first testing,
-> the ETC/Mordor increment (self-deploy EntryPoint + FCL fallback verifier +
-> self-hosted-bundler-only) moves forward in priority and should be
-> re-scoped via `/speckit-clarify`.
+> **Resolved (maintainer decision, 2026-07-04)**: PR #793 moved the *pools*
+> launch sequence to Mordor → Polygon (no Amoy), but **041 keeps Amoy
+> (80002) as the passkey validation network** — Mordor has no RIP-7212
+> precompile, no canonical EntryPoint, and no bundler infrastructure, so it
+> cannot exercise the launch-path passkey stack. The ETC/Mordor increment
+> (self-deploy EntryPoint + FCL fallback verifier + self-hosted-bundler-only)
+> stays a deferred increment per spec FR-022.
 
 ## Summary
 
