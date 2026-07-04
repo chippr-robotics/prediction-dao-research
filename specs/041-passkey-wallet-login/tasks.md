@@ -17,9 +17,9 @@
 
 **Purpose**: Vendor the account stack and prepare configuration surfaces.
 
-- [ ] T001 Vendor the pinned Coinbase Smart Wallet release (account, factory, WebAuthnSol, FCL P-256 fallback verifier, ERC-1271 plumbing — research.md §1, **no source modifications**) into `contracts/account/`, with a provenance header (upstream repo, commit, license) in `contracts/account/README.md`
-- [ ] T002 Verify the locked `viem`/`wagmi` versions in `frontend/package.json` expose the account-abstraction APIs assumed in research.md §5 (`toWebAuthnAccount`, `toCoinbaseSmartAccount`, `createBundlerClient`) and pin the account-release ↔ EntryPoint version pairing (research.md §2); record corrections in `specs/041-passkey-wallet-login/research.md` §2/§5, bumping the minor version only if required
-- [ ] T003 [P] Add per-network config for `bundlerUrls[]`, `erc20PaymasterUrl?`, and passkey `capabilities` flags to `frontend/src/config/networks.js`, with matching `VITE_*` vars documented in `frontend/.env.example` (SubmissionRoute entity, data-model.md)
+- [x] T001 Vendor the pinned Coinbase Smart Wallet release (account, factory, WebAuthnSol, FCL P-256 fallback verifier, ERC-1271 plumbing — research.md §1, **no source modifications**) into `contracts/account/`, with a provenance header (upstream repo, commit, license) in `contracts/account/README.md`
+- [x] T002 Verify the locked `viem`/`wagmi` versions in `frontend/package.json` expose the account-abstraction APIs assumed in research.md §5 (`toWebAuthnAccount`, `toCoinbaseSmartAccount`, `createBundlerClient`) and pin the account-release ↔ EntryPoint version pairing (research.md §2); record corrections in `specs/041-passkey-wallet-login/research.md` §2/§5, bumping the minor version only if required
+- [x] T003 [P] Add per-network config for `bundlerUrls[]`, `erc20PaymasterUrl?`, and passkey `capabilities` flags to `frontend/src/config/networks.js`, with matching `VITE_*` vars documented in `frontend/.env.example` (SubmissionRoute entity, data-model.md)
 
 ---
 
@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: No user story work begins until this phase completes.
 
-- [ ] T004 Integrate `contracts/account/` into the Hardhat build (`hardhat.config.js` compiler settings/remappings as needed) so `npm run compile` passes with the vendored stack
+- [x] T004 Integrate `contracts/account/` into the Hardhat build (`hardhat.config.js` compiler settings/remappings as needed) so `npm run compile` passes with the vendored stack
 - [ ] T005 [P] Unit tests in `test/account/wallet.test.js`: owner add/remove via self-call, remove-last-owner reverts, `executeBatch` atomicity (contracts/onchain-deployments.md behavioral surface)
 - [ ] T006 [P] Unit tests in `test/account/webauthn.test.js`: WebAuthnSol verifies a P-256 WebAuthn assertion via the Solidity fallback path; `isValidSignature` (ERC-1271) accepts WebAuthn-owner signatures and rejects tampered digests
 - [ ] T007 [P] Unit tests in `test/account/factory.test.js`: CREATE2 determinism — `getAddress(owners, nonce)` equals deployed address, address invariant under later owner changes (FR-023)

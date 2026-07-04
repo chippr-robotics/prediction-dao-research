@@ -31,6 +31,22 @@ const PRIMARY_CHAIN_ID = 137
 const MAINNET_CHAIN_ID = 137
 const TESTNET_CHAIN_ID = 80002
 
+// Passkey smart-account submission config (spec 041, data-model
+// "SubmissionRoute"). Parses a comma-separated ERC-4337 bundler URL list
+// (ordered: self-hosted alto first, public fallbacks). Empty/unset → null so
+// the passkey capability flips off and the login surface hides the option
+// honestly (FR-004) instead of offering a dead path. erc20PaymasterUrl is the
+// optional fee-in-USDC path; null → UserOp fees fall back to the account's
+// native balance (spec 041 clarification Q3).
+const passkeyConfig = (urlsEnv, paymasterEnv) => {
+  const bundlerUrls = (urlsEnv || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (bundlerUrls.length === 0) return null
+  return { bundlerUrls, erc20PaymasterUrl: paymasterEnv || null }
+}
+
 const NETWORKS = {
   80002: {
     chainId: 80002,
@@ -92,11 +108,18 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap',
     },
+    // Passkey smart accounts (spec 041) — Amoy is the passkey validation
+    // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_AMOY,
+      import.meta.env?.VITE_ERC20_PAYMASTER_AMOY
+    ),
     get capabilities() {
       return {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         friendMarkets: true,
+        passkeyAccounts: Boolean(this.passkey),
       }
     },
   },
@@ -161,11 +184,16 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
     },
+    // Passkey smart accounts are a deferred increment on the ETC family
+    // (spec 041 FR-022): no RIP-7212 precompile, no canonical EntryPoint,
+    // no bundler infrastructure. null keeps the login option honestly hidden.
+    passkey: null,
     get capabilities() {
       return {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         friendMarkets: true,
+        passkeyAccounts: false,
       }
     },
   },
@@ -221,11 +249,15 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_ETC_ETCSWAP_URL || 'https://v3.etcswap.org',
     },
+    // Passkey smart accounts are a deferred increment on the ETC family
+    // (spec 041 FR-022) — see the Mordor entry for the constraint list.
+    passkey: null,
     get capabilities() {
       return {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         friendMarkets: true,
+        passkeyAccounts: false,
       }
     },
   },
@@ -274,11 +306,18 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap?chain=polygon',
     },
+    // Passkey smart accounts (spec 041) — production network: RIP-7212
+    // precompile live since the Napoli upgrade, canonical EntryPoint v0.6.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_POLYGON,
+      import.meta.env?.VITE_ERC20_PAYMASTER_POLYGON
+    ),
     get capabilities() {
       return {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         friendMarkets: true,
+        passkeyAccounts: Boolean(this.passkey),
       }
     },
   },
@@ -298,7 +337,17 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
-    capabilities: { polymarketSidebets: false, dex: false, friendMarkets: true },
+    // Local dev/e2e: point VITE_BUNDLER_URLS_LOCAL at a local bundler (alto
+    // against the hardhat node) to exercise passkey flows in Cypress.
+    passkey: passkeyConfig(import.meta.env?.VITE_BUNDLER_URLS_LOCAL, null),
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: false,
+        friendMarkets: true,
+        passkeyAccounts: Boolean(this.passkey),
+      }
+    },
   },
 }
 

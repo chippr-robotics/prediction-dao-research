@@ -139,8 +139,12 @@ utilities for ceremonies. The connector exposes the standard wagmi surface
 `getProvider`) so `WalletContext` treats it as just another connector;
 `WalletContext`'s signing abstraction becomes **viem-first for smart
 accounts** (the ethers `BrowserProvider` path remains for EOA connectors
-untouched). Pin exact viem API names at implementation start against the
-locked viem version.
+untouched). **Verified at implementation start (T002)**: viem `2.53.1`
+exports `toWebAuthnAccount`, `toCoinbaseSmartAccount`, `createBundlerClient`,
+`createWebAuthnCredential`, `entryPoint06Address`/`entryPoint06Abi` from
+`viem/account-abstraction`; wagmi `3.6.21` exports `createConnector`. The
+EntryPoint pairing for the vendored Coinbase Smart Wallet v1.1.0 is **v0.6**
+(`entryPoint06Address`), matching research §2.
 
 **Rationale**: Zero new vendor dependencies (viem already ships everything,
 including the WebAuthn helpers); matches the repo's existing custom-connector

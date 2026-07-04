@@ -260,6 +260,21 @@ module.exports = {
           viaIR: true,
         },
       },
+      {
+        // Vendored Coinbase Smart Wallet closure (contracts/account/, spec 041) pins
+        // `pragma solidity 0.8.23` exactly — nothing else in the repo uses this entry.
+        // evmVersion "paris" (no PUSH0) keeps the account bytecode deployable byte-identically
+        // on every platform network including the later ETC/Mordor increment (FR-022/FR-023).
+        version: "0.8.23",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+          viaIR: true,
+          evmVersion: "paris",
+        },
+      },
     ],
     // Compile the vendored Semaphore V4 self-deploy closure (spec 034, ETC/Mordor) WITHOUT viaIR.
     // PoseidonT3 (auto-generated assembly) and SemaphoreVerifier (bn128 pairing assembly) are
