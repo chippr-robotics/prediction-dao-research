@@ -401,3 +401,56 @@ describe('audit trail (FR-021): no key material or signatures in events', () => 
     }
   })
 })
+
+describe('ERC-1271 contract-account signers (spec 041 — passkey smart accounts)', () => {
+  // A contract actor cannot ECDSA-recover to its own address; the gateway must fall back to
+  // asking the actor contract via eth_call isValidSignature, mirroring SignerIntentBase.
+  const contractActor = '0x00000000000000000000000000000000000a11ce'
+
+  function buildWith1271(mode) {
+    const config = testConfig()
+    const providers = mockProviders(config, { erc1271: { [contractActor]: mode } })
+    return build({ config, providers })
+  }
+
+  it('accepts a signer-attributed intent from a contract actor whose isValidSignature returns the magic value', async () => {
+    const ctx = buildWith1271('magic')
+    const intent = await signedIntent(ctx.config, { actorAddress: ethers.getAddress(contractActor) })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    expect(ctx.engine.submissions).toHaveLength(1)
+    // Attribution binds to the CONTRACT actor, not any recovered EOA.
+    expect(ctx.engine.submissions[0].args.data.toLowerCase()).toContain(contractActor.slice(2).toLowerCase())
+  })
+
+  it('rejects when the contract actor returns a wrong magic value', async () => {
+    const ctx = buildWith1271('wrong')
+    const intent = await signedIntent(ctx.config, { actorAddress: ethers.getAddress(contractActor) })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('invalid_signature')
+  })
+
+  it('rejects when the contract actor reverts', async () => {
+    const ctx = buildWith1271('revert')
+    const intent = await signedIntent(ctx.config, { actorAddress: ethers.getAddress(contractActor) })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('invalid_signature')
+  })
+
+  it('rejects a codeless actor (eth_call returns 0x) — fail-closed', async () => {
+    const ctx = buildWith1271(undefined) // not in the map -> '0x'
+    const intent = await signedIntent(ctx.config, { actorAddress: ethers.getAddress(contractActor) })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('invalid_signature')
+  })
+
+  it('keeps plain EOA intents on the strict ECDSA path (no 1271 call needed)', async () => {
+    const ctx = buildWith1271(undefined)
+    const intent = await signedIntent(ctx.config) // actor == recovered EOA
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+  })
+})
