@@ -1,5 +1,6 @@
 import { http, createConfig } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
+import { passkeyConnector } from './connectors/passkey'
 
 // Define Ethereum Classic mainnet
 const ethereumClassic = {
@@ -164,6 +165,9 @@ export const config = createConfig({
       },
       showQrModal: true,
     }),
+    // Passkey smart accounts (spec 041) — first-class connector beside the
+    // classic wallets; capability-gated per network (FR-001/FR-004).
+    passkeyConnector(),
   ],
   transports: {
     [amoy.id]: http(networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology'),

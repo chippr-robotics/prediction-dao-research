@@ -12,7 +12,7 @@ import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
   // Wagmi hooks for wallet connection
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, connector: activeConnector } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
@@ -38,6 +38,80 @@ export function WalletProvider({ children }) {
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
+
+  // ---- Spec 041: unified login-method + capability surface (FR-002) ----
+  // `loginMethod` is INFORMATIONAL ONLY (signing ceremony differs); identity,
+  // gating, and screening always key off `address` — no feature may branch on
+  // it for authorization.
+  const loginMethod = useMemo(() => {
+    if (!isConnected || !activeConnector) return null
+    if (activeConnector.id === 'fairwinsPasskey' || activeConnector.type === 'passkey') return 'passkey'
+    if (activeConnector.id === 'walletConnect') return 'walletconnect'
+    return 'injected'
+  }, [isConnected, activeConnector])
+
+  // Encryption capability for the FR-012 degradation UI. Classic wallets keep
+  // the legacy signature-derived path (always available); passkey sessions
+  // resolve through the PRF pipeline lazily (state refined by usePasskeyAccount
+  // /account-management surfaces as ceremonies happen).
+  const [accountCapabilities, setAccountCapabilities] = useState({ encryption: 'available' })
+  useEffect(() => {
+    let cancelled = false
+    async function resolveCapabilities() {
+      if (!isConnected) return setAccountCapabilities({ encryption: 'available' })
+      if (loginMethod !== 'passkey') return setAccountCapabilities({ encryption: 'available' })
+      try {
+        const [{ capability }, { knownCredentials }] = await Promise.all([
+          import('../lib/passkey/prfKeys'),
+          import('../lib/passkey/credentials'),
+        ])
+        const cred = knownCredentials().find((c) => c.address?.toLowerCase() === address?.toLowerCase())
+        const out = capability({
+          account: address,
+          credentialId: cred?.credentialId,
+          prfCapable: cred?.prfCapable ?? false,
+        })
+        if (!cancelled) setAccountCapabilities({ encryption: out.state, encryptionReason: out.reason })
+      } catch {
+        if (!cancelled) {
+          setAccountCapabilities({
+            encryption: 'unavailable',
+            encryptionReason: 'Encrypted-feature capability could not be determined on this device.',
+          })
+        }
+      }
+    }
+    resolveCapabilities()
+    return () => {
+      cancelled = true
+    }
+  }, [isConnected, loginMethod, address])
+
+  /**
+   * Unified write abstraction (spec 041): batched calls in one confirmation.
+   * - Passkey sessions: fulfilled by the smart-account layer (viem-first) via
+   *   the submission router — ONE ceremony covers the whole batch (FR-016).
+   * - Classic wallets: sequential signer transactions (existing behavior,
+   *   unchanged for existing users — SC-004).
+   * Each call: { target, data, value? }.
+   */
+  const sendCalls = useCallback(
+    async (calls) => {
+      if (!calls?.length) throw new Error('sendCalls: empty batch')
+      if (loginMethod === 'passkey') {
+        const { sendPasskeyBatch } = await import('../lib/passkey/sendBatch')
+        return sendPasskeyBatch({ chainId, address, calls })
+      }
+      if (!signer) throw new Error('No signer available')
+      const receipts = []
+      for (const c of calls) {
+        const tx = await signer.sendTransaction({ to: c.target ?? c.to, data: c.data, value: c.value ?? 0n })
+        receipts.push(await tx.wait())
+      }
+      return { route: 'direct', receipts, txHash: receipts.at(-1)?.hash }
+    },
+    [loginMethod, chainId, address, signer]
+  )
 
   // Update provider and signer when connection changes
   // Use wagmi's walletClient for proper authorization
@@ -542,6 +616,11 @@ export function WalletProvider({ children }) {
     // Transaction methods
     sendTransaction,
     signMessage,
+    sendCalls,
+
+    // Spec 041: unified login surface (informational only — never authz)
+    loginMethod,
+    accountCapabilities,
     
     // Balance methods
     refreshBalances,

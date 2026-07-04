@@ -193,6 +193,9 @@ vi.mock('ethers', async () => {
 
 // Mock wagmi hooks for WalletProvider
 vi.mock('wagmi', () => ({
+  // Real-wagmi passthrough: createConnector is an identity wrapper (spec 041
+  // passkey connector unit tests instantiate the connector function directly).
+  createConnector: (createConnectorFn) => createConnectorFn,
   useAccount: vi.fn(() => ({
     address: '0x1234567890123456789012345678901234567890',
     isConnected: true
