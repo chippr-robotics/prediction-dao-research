@@ -36,7 +36,8 @@ describe('OpenChallengeDecryptModal', () => {
     expect(unlock).toBeEnabled()
     fireEvent.click(unlock)
 
-    await waitFor(() => expect(onDecrypted).toHaveBeenCalledWith(terms))
+    // Reports the terms plus the validated code so the caller can remember it (spec 040 US3).
+    await waitFor(() => expect(onDecrypted).toHaveBeenCalledWith(terms, code))
     expect(onClose).toHaveBeenCalled()
   })
 

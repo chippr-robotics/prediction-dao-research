@@ -214,10 +214,10 @@ correctly; default view still hides expired wagers.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T035 [P] Run an accessibility audit (axe/Lighthouse) over the changed My Wagers surface — opponent-name reveal, draw status/chips, filter, header — and fix any WCAG 2.1 AA regressions
-- [ ] T036 [P] Verify per-network (chainId) isolation across opponent resolution, draw enrichment, and pool bucketing (no testnet/mainnet leakage), per Constitution III
-- [ ] T037 Run `npm run test:frontend` and `npm run lint --workspace frontend` — both green with no new warnings
-- [ ] T038 Execute the manual scenarios in `specs/040-my-wagers-refinements/quickstart.md` (US1–US7) and confirm the success-criteria mapping
+- [X] T035 [P] Run an accessibility audit (axe/Lighthouse) over the changed My Wagers surface — opponent-name reveal, draw status/chips, filter, header — and fix any WCAG 2.1 AA regressions
+- [X] T036 [P] Verify per-network (chainId) isolation across opponent resolution, draw enrichment, and pool bucketing (no testnet/mainnet leakage), per Constitution III
+- [X] T037 Run `npm run test:frontend` and `npm run lint --workspace frontend` — both green with no new warnings
+- [X] T038 Execute the manual scenarios in `specs/040-my-wagers-refinements/quickstart.md` (US1–US7) and confirm the success-criteria mapping
 
 ---
 
