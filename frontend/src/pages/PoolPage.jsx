@@ -41,7 +41,7 @@ export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
   const {
-    getPoolSummary, getMembers, getMyNickname,
+    getPoolSummary, getMembers, getMyNickname, fetchProposedMatrix,
     joinPool, closeJoining, cancelPool, vote, refund, status,
   } = pools
   const [summary, setSummary] = useState(null)
@@ -59,8 +59,9 @@ export default function PoolPage() {
     writeRankOrder(address, order)
   }
 
-  // The verified proposed/locked payout (from the device-local store, keyed to the on-chain proposalId).
-  // Bumped by `proposalNonce` when a member pastes a freshly-received payout so this re-reads.
+  // The verified proposed/locked payout. PRIMARY source: the on-chain `OutcomeProposed` event (read via
+  // the hook); FALLBACK: the device-local store, keyed to the on-chain proposalId. Bumped by
+  // `proposalNonce` when a member pastes a freshly-received payout (fallback path) so this re-reads.
   const [proposalNonce, setProposalNonce] = useState(0)
   const [verifiedProposal, setVerifiedProposal] = useState(null)
 
@@ -113,20 +114,37 @@ export default function PoolPage() {
     }
   }, [loaded, summary?.hasJoined, address, getMyNickname])
 
-  // Read the device-local proposal that matches the current on-chain proposalId (or the locked outcome
-  // once resolved), so the roster can render medals/amounts and the claim can auto-fill.
+  // Obtain the proposed/locked payout so the roster can render medals/amounts and the claim can auto-fill.
+  // PRIMARY: read the full matrix straight from the on-chain `OutcomeProposed` event — a member no longer
+  // needs the creator's off-chain share to see/claim their payout. FALLBACK (RPC without log support):
+  // the device-local copy the creator shared / a member pasted, verified against the on-chain proposalId.
   useEffect(() => {
-    if (!loaded) return
-    if (summary.state === 1 && summary.currentProposalId) {
-      const stored = readProposedMatrix(address, summary.currentProposalId)
-      setVerifiedProposal(stored ? { entries: stored.entries } : null)
-    } else if (summary.state === 2) {
-      const stored = readStoredMatrix(address)
-      setVerifiedProposal(stored ? { entries: stored.entries } : null)
-    } else {
+    if (!loaded) return undefined
+    const wantsProposal = (summary.state === 1 && summary.currentProposalId) || summary.state === 2
+    if (!wantsProposal) {
       setVerifiedProposal(null)
+      return undefined
     }
-  }, [loaded, summary?.state, summary?.currentProposalId, address, proposalNonce])
+    let active = true
+    const fromStore = () => {
+      const stored =
+        summary.state === 1 && summary.currentProposalId
+          ? readProposedMatrix(address, summary.currentProposalId)
+          : readStoredMatrix(address)
+      return stored ? { entries: stored.entries } : null
+    }
+    fetchProposedMatrix(address)
+      .then((entries) => {
+        if (!active) return
+        setVerifiedProposal(entries && entries.length ? { entries } : fromStore())
+      })
+      .catch(() => {
+        if (active) setVerifiedProposal(fromStore())
+      })
+    return () => {
+      active = false
+    }
+  }, [loaded, summary?.state, summary?.currentProposalId, address, proposalNonce, fetchProposedMatrix])
 
   // { addressLower → amount } for the roster, built directly from the verified matrix (winner = address).
   const payoutByAddress = useMemo(() => {

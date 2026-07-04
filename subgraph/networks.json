@@ -3,6 +3,10 @@
     "WagerRegistry": {
       "address": "0x5023765809fDA93ab9F11B684fdb76521eD31774",
       "startBlock": 88118344
+    },
+    "WagerPoolFactory": {
+      "address": "0x0000000000000000000000000000000000000034",
+      "startBlock": 88118344
     }
   },
   "mordor": {
@@ -21,6 +25,10 @@
     "TokenFactory": {
       "address": "0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62",
       "startBlock": 16422550
+    },
+    "WagerPoolFactory": {
+      "address": "0x0000000000000000000000000000000000000034",
+      "startBlock": 16404317
     }
   },
   "polygon-amoy": {
@@ -47,6 +55,10 @@
     "UMAOptimisticOracleV3Adapter": {
       "address": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88",
       "startBlock": 38841817
+    },
+    "WagerPoolFactory": {
+      "address": "0x0000000000000000000000000000000000000034",
+      "startBlock": 40521027
     }
   }
 }

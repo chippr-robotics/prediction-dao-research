@@ -170,11 +170,16 @@ export default function PoolResolutionActions({
 
   return (
     <section className="pool-resolution-actions" aria-label="Resolution actions">
-      {/* Member: receive the shared payout so the roster can show it + you can approve/claim */}
+      {/* Member: FALLBACK only. The proposed payout is normally read straight from the chain
+          (OutcomeProposed) and shown on the roster automatically; this paste box appears just when a
+          member's RPC can't serve logs, so they can review + verify the creator's shared copy instead. */}
       {memberNeedsToReceive && (
         <div className="pool-receive" data-testid="receive-proposal">
           <h2>Review the proposed payout</h2>
-          <p>The creator proposed a split. Paste what they shared to see it and verify it matches the chain.</p>
+          <p>
+            The proposed split is normally read straight from the chain. If it didn&apos;t load here, paste
+            the payout the creator shared — we&apos;ll verify it matches the on-chain proposal before you approve.
+          </p>
           <label htmlFor="receive-shared">Payout the creator shared</label>
           <textarea id="receive-shared" rows={3} value={pasteText} onChange={(e) => setPasteText(e.target.value)} />
           <Button onClick={receiveShared} disabled={!pasteText.trim()}>Review payout</Button>

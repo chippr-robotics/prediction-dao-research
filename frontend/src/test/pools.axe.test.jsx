@@ -42,6 +42,7 @@ function poolsMock(overrides = {}) {
     joinPool: vi.fn(),
     getMembers: vi.fn().mockResolvedValue([]),
     getMyNickname: vi.fn().mockResolvedValue({ label: 'Prismatic Fox', suffix: '7b' }),
+    fetchProposedMatrix: vi.fn().mockResolvedValue(null),
     closeJoining: vi.fn(), cancelPool: vi.fn(), proposeOutcome: vi.fn(),
     vote: vi.fn(), claimWinnings: vi.fn(), refund: vi.fn(),
     ...overrides,

@@ -13,10 +13,11 @@
 import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
-import { getContractAddressForChain } from '../config/contracts'
+import { getContractAddressForChain, getDeploymentBlockForChain } from '../config/contracts'
 import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolStateDisplay } from '../lib/pools/poolContracts'
 import { phraseToIndices, resolvePool, indicesToPhrase } from '../lib/pools/gateway'
 import { deriveNickname } from '../lib/pools/nickname'
+import { payoutMatrixHash } from '../lib/pools/payout'
 import { recordJoinedPool } from '../lib/lookup/myWagersSources'
 
 function requiredApprovals(frozenDenominator, thresholdBips) {
@@ -252,6 +253,39 @@ export function usePools() {
     return deriveNickname(account, poolAddress)
   }, [requireSigner])
 
+  /**
+   * Read the creator's proposed payout matrix straight from the chain. `proposeOutcome` now commits AND
+   * EMITS the full `PayoutEntry[]` (event `OutcomeProposed`), so any member can read the split without the
+   * creator sharing it off-chain. Returns the CURRENT proposal's rows as `[{ winner, amount: bigint }]`,
+   * VERIFIED to hash back to the on-chain proposalId, or null when there is no proposal / the RPC can't
+   * serve logs (in which case the off-chain paste in proposalStore stays as the fallback).
+   */
+  const fetchProposedMatrix = useCallback(async (poolAddress) => {
+    try {
+      const { signer: s, chainId } = await requireSigner()
+      const pool = getPool(poolAddress, s)
+      const onChainId = await pool.currentProposalId()
+      const targetId = onChainId && onChainId !== ethers.ZeroHash ? onChainId : null
+      // Bound the scan to the factory's deploy block when known (never scan from genesis); a provider that
+      // still rejects the range throws below and we return null so the off-chain fallback takes over.
+      const fromBlock = getDeploymentBlockForChain('wagerPoolFactory', chainId) || 0
+      const events = await pool.queryFilter(pool.filters.OutcomeProposed(), fromBlock)
+      if (!events.length) return null
+      // Prefer the event matching the current on-chain proposalId (the latest one if the creator revised);
+      // fall back to the most recent event otherwise (e.g. a resolved pool whose id is no longer exposed).
+      const match =
+        (targetId && [...events].reverse().find((e) => e.args.proposalId === targetId)) ||
+        events[events.length - 1]
+      const entries = (match.args.entries || []).map((e) => ({ winner: e.winner, amount: BigInt(e.amount) }))
+      if (!entries.length) return null
+      // Trust the decoded matrix only if it hashes to the id it claims (guards against a bad decode).
+      if (payoutMatrixHash(entries) !== (targetId || match.args.proposalId)) return null
+      return entries
+    } catch {
+      return null
+    }
+  }, [requireSigner])
+
   /** Creator: close joining early (freezes the denominator). */
   const closeJoining = useCallback(async (poolAddress) => {
     const { signer: s } = await requireSigner()
@@ -360,6 +394,7 @@ export function usePools() {
     joinPool,
     getMembers,
     getMyNickname,
+    fetchProposedMatrix,
     closeJoining,
     pokeDeadline,
     cancelPool,

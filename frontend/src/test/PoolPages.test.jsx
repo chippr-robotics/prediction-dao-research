@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { ethers } from 'ethers'
+import { saveProposedMatrix } from '../lib/pools/proposalStore'
 
 // PoolPage (spec 034, address-based): the routed pool-management view — live state + the member's
 // address-derived alias (no signature, no reveal/restore) + the state-driven actions (creator
@@ -26,6 +28,8 @@ function base(overrides = {}) {
     createPool: vi.fn(), resolvePhrase: vi.fn(), getPoolSummary: vi.fn(), joinPool: vi.fn(),
     getMembers: vi.fn().mockResolvedValue([]),
     getMyNickname: vi.fn().mockResolvedValue({ label: 'Prismatic Fox', suffix: '7b' }),
+    // On-chain matrix reader (PRIMARY source). Default: no logs → PoolPage falls back to the paste/store.
+    fetchProposedMatrix: vi.fn().mockResolvedValue(null),
     closeJoining: vi.fn().mockResolvedValue('0xtx'), cancelPool: vi.fn().mockResolvedValue('0xtx'),
     proposeOutcome: vi.fn(), vote: vi.fn().mockResolvedValue('0xtx'), claimWinnings: vi.fn(),
     refund: vi.fn().mockResolvedValue('0xtx'),
@@ -45,6 +49,7 @@ function renderPoolAt(summary) {
 describe('PoolPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     useWallet.mockReturnValue({ account: '0x1111111111111111111111111111111111111111', isConnected: true })
   })
 
@@ -129,5 +134,53 @@ describe('PoolPage', () => {
     usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum) }))
     renderPoolAt(sum)
     expect(await screen.findByTestId('pool-resolved')).toBeInTheDocument()
+  })
+
+  // ── On-chain payout matrix (OutcomeProposed) is the PRIMARY source; the pasted/stored copy is fallback ──
+  const ACCOUNT = '0x1111111111111111111111111111111111111111'
+  const OTHER = '0x2222222222222222222222222222222222222222'
+  const resolvedSummary = {
+    ...openSummary, state: 2, stateLabel: 'Resolved', hasJoined: true,
+    tokenDecimals: 6, buyIn: ethers.parseUnits('10', 6), frozenDenominator: 2,
+  }
+
+  it('reads the proposed payout from the chain so a winner sees their share without a pasted code', async () => {
+    const fetchProposedMatrix = vi.fn().mockResolvedValue([
+      { winner: ACCOUNT, amount: 10000000n },
+      { winner: OTHER, amount: 10000000n },
+    ])
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(resolvedSummary), fetchProposedMatrix }))
+    renderPoolAt(resolvedSummary)
+    // The share is derived from the on-chain matrix alone — nothing was pasted/stored.
+    expect(await screen.findByTestId('claim-amount')).toHaveTextContent('10.0 USDC')
+    await waitFor(() => expect(fetchProposedMatrix).toHaveBeenCalledWith(resolvedSummary.address))
+  })
+
+  it('prefers the on-chain matrix over a stale pasted/stored copy', async () => {
+    // Stored copy would give the winner 5; the chain says 10 — the chain must win.
+    saveProposedMatrix(openSummary.address, '0xstored', [
+      { winner: ACCOUNT, amount: 5000000n },
+      { winner: OTHER, amount: 15000000n },
+    ])
+    const fetchProposedMatrix = vi.fn().mockResolvedValue([
+      { winner: ACCOUNT, amount: 10000000n },
+      { winner: OTHER, amount: 10000000n },
+    ])
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(resolvedSummary), fetchProposedMatrix }))
+    renderPoolAt(resolvedSummary)
+    expect(await screen.findByTestId('claim-amount')).toHaveTextContent('10.0 USDC')
+  })
+
+  it('falls back to the pasted/stored matrix when the on-chain log query yields nothing', async () => {
+    saveProposedMatrix(openSummary.address, '0xstored', [
+      { winner: ACCOUNT, amount: 7000000n },
+      { winner: OTHER, amount: 13000000n },
+    ])
+    // RPC without log support → null; PoolPage must still show the winner's share from the stored copy.
+    const fetchProposedMatrix = vi.fn().mockResolvedValue(null)
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(resolvedSummary), fetchProposedMatrix }))
+    renderPoolAt(resolvedSummary)
+    expect(await screen.findByTestId('claim-amount')).toHaveTextContent('7.0 USDC')
+    await waitFor(() => expect(fetchProposedMatrix).toHaveBeenCalledWith(resolvedSummary.address))
   })
 })

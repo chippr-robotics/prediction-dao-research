@@ -4,10 +4,12 @@
  * SanctionsGuard (and, when enabled, MembershipManager) and APPENDS the new addresses to its
  * `deployments/<net>-chain<id>-v2.json` record (never overwrites the live UUPS proxies).
  *
- *   GAS_PRICE_WEI=30000000000 npx hardhat run scripts/deploy/deploy-wager-pool-factory.js --network amoy
+ * Launch sequence is Mordor (ETC testnet) first, then Polygon mainnet — no Amoy. E.g.:
+ *   GAS_PRICE_WEI=100000000000 npx hardhat run scripts/deploy/deploy-wager-pool-factory.js --network mordor
+ *   GAS_PRICE_WEI=30000000000  npx hardhat run scripts/deploy/deploy-wager-pool-factory.js --network polygon
  *
  * Then: npm run sync:frontend-contracts -- --network <name> --chainId <id>  (frontend reads the address),
- * and publish the subgraph for the network.
+ * and publish the subgraph for the network where The Graph supports it (Polygon; not ETC/Mordor).
  *
  * WagerPools are address-based (spec 034 redesign) — there is NO Semaphore / anonymity primitive.
  * Membership and voting are by public wallet address, so every network (including ETC/Mordor) deploys

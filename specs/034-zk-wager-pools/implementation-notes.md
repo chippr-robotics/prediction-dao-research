@@ -312,8 +312,8 @@ Semaphore-ectomy + rename**, no dead ZK scaffolding left behind.
   created. Getting the twins in before the fresh deploy is the only window. Self-submit entrypoints
   remain the primary path; the twins are purely additive (nonce namespace is separate storage, no
   `__gap` cost).
-- **Deploy plan.** Fresh deploy of `WagerPoolFactory` + `WagerPool` — **Amoy (staging) → Polygon
-  mainnet → Mordor**. There are no existing address-based pools to migrate; round-6 `ZKWagerPool`
+- **Deploy plan.** Fresh deploy of `WagerPoolFactory` + `WagerPool` — **Mordor (ETC testnet) →
+  Polygon mainnet** (no Amoy). There are no existing address-based pools to migrate; round-6 `ZKWagerPool`
   pools (if any were ever created on a live net) are immutable and simply age out. Removing Semaphore
   **unblocks Mordor/ETC**: there is no longer an anonymity primitive to self-deploy, and the
   contracts compile paris/shanghai-safe, so ETC moves from "later increment" into the launch
@@ -364,8 +364,10 @@ single-member-can't-lock case, and factory `TokenNotAllowed` allowlist enforceme
 
 ## Actual on-chain deployment (ops, post-merge)
 
-Not a tasks.md code task. Sequence: formal security review → Amoy (`deploy-wager-pool-factory.js`,
-which allowlists `POOL_USDC_80002` on the way up) → validate end-to-end → `sync:frontend-contracts` +
-add the factory address/startBlock to `subgraph/networks.json` + publish the subgraph → Polygon
-mainnet (pause for explicit go; real POL; requires the formal security review) → Mordor/ETC (deploys
-directly now — no Semaphore to self-deploy).
+Not a tasks.md code task. Sequence: formal security review → **Mordor** (ETC testnet, chainId 63) via
+`deploy-wager-pool-factory.js`; screening is off there, so it accepts a test token — deploy/point
+`POOL_USDC_63` at a test USDC (mock or bridged) since ETC has no canonical Circle USDC → validate
+end-to-end → `sync:frontend-contracts` + publish the subgraph where supported (The Graph Studio does
+not host ETC/Mordor — Polygon only; Mordor needs a self-hosted graph-node or the UI reads chain
+directly) → **Polygon** mainnet (pause for explicit go; real POL; the deploy allowlists
+`POOL_USDC_137` on the way up) → sync frontend + publish the Polygon subgraph. No Amoy.

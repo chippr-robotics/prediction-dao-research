@@ -3,9 +3,9 @@
  *
  * Feeds aggregateMyItems() with the item types the existing wager path does NOT already cover:
  *  - Group pools the user CREATED — indexed by the subgraph (Pool.creator).
- *  - Group pools the user JOINED — pool membership is anonymous on-chain (only identity commitments are
- *    indexed, never wallets), and deriving a wallet's commitment requires a signature, so joins are
- *    recorded device-locally at join time and their summaries re-fetched from the subgraph by id.
+ *  - Group pools the user JOINED — membership is by public wallet address (Joined(address)), but the
+ *    subgraph has no wallet→pools reverse index, so joins are recorded device-locally at join time and
+ *    their summaries are re-fetched from the subgraph by id.
  *  - Device-vault open challenges — created-but-locally-known codes (via the code vault).
  *
  * 1v1 wagers and created open challenges (which are themselves Wager entities keyed by creator) already
@@ -18,7 +18,7 @@ import { getSubgraphUrl } from '../../config/networks'
 
 export const POOL_STATE_LABELS = { 0: 'Joining open', 1: 'Joining closed', 2: 'Resolved', 3: 'Cancelled' }
 
-const POOL_FIELDS = 'id poolId creator token buyIn maxMembers thresholdBips joinDeadline state memberCount createdAt'
+const POOL_FIELDS = 'id poolId creator token buyIn maxMembers thresholdBips acceptDeadline resolveDeadline state memberCount createdAt'
 
 const CREATED_POOLS_QUERY = `
   query MyCreatedPools($owner: Bytes!, $first: Int!) {

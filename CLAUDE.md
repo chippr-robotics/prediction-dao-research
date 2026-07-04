@@ -85,8 +85,8 @@ artifacts live under `specs/<feature>/`.
   relayable via `joinWithAuthorization` (EIP-3009), baked into the immutable clone
   template. Resolve the factory via
   `getContractAddressForChain('wagerPoolFactory', chainId)`. Two-word nicknames are
-  **client-side only, never on-chain**. Launch targets **Amoy → Polygon → Mordor**
-  (removing Semaphore unblocks ETC/Mordor). See `specs/034-zk-wager-pools/`.
+  **client-side only, never on-chain**. Launch targets **Mordor (ETC testnet) → Polygon**
+  (removing Semaphore unblocks ETC/Mordor; no Amoy in the sequence). See `specs/034-zk-wager-pools/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

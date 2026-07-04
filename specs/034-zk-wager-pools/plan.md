@@ -136,7 +136,7 @@ Slither + Medusa + the formal smart-contract security review (`.github/agents/
 smart-contract-security`) remain gating before any value-bearing deploy; the review scope is
 now the address-based custody surface above (not a Semaphore integration). Removing the ZK
 stack also removes the CSP/WASM proof-generation failure surface entirely and unblocks
-ETC/Mordor (no self-deployed anonymity primitive) — launch is now Amoy → Polygon → Mordor.
+ETC/Mordor (no self-deployed anonymity primitive) — launch is now Mordor → Polygon (no Amoy).
 
 ## Project Structure
 

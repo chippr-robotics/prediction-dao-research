@@ -208,7 +208,7 @@ The old ZK surface is deleted; new pools resolve by winner **address**.
 - [X] T069 [P] Frontend rewire (separate workstream this session): join/approve/claim as plain txs (no identity/proof/WASM), roster + payout-by-address from the public roster, nickname derived from the public address, `getContractAddressForChain('wagerPoolFactory', chainId)`
 - [X] T070 [P] Docs: rewrite CLAUDE.md carve-out, spec.md addendum, plan.md Constitution addendum, tasks Phase 8, implementation-notes round 7
 - [ ] T071 Formal smart-contract security review (`.github/agents/smart-contract-security`) of the address-based custody surface (CEI/reentrancy, escrow-only-exits, per-index single-claim, `resolveDeadline` refund path, EIP-712 replay-nonce) — MUST pass before any value-bearing deploy
-- [ ] T072 Deploy + validate `WagerPoolFactory` + `WagerPool` end-to-end on **Amoy** (staging), then **Polygon** mainnet, then **Mordor** (Semaphore removal unblocks ETC) — gated on T071 + floppy key + explicit go
+- [ ] T072 Deploy + validate `WagerPoolFactory` + `WagerPool` end-to-end on **Mordor** (ETC testnet — Semaphore removal unblocks ETC) first, then **Polygon** mainnet. No Amoy. Gated on T071 + floppy key + explicit go
 
 **Checkpoint**: Address-based pools implemented + tested; deploy/validate pending review
 

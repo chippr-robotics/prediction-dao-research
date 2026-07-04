@@ -98,8 +98,8 @@ addendum governs.
   with no locked outcome, the pool is refund-only (FR-019 stands).
 - **Mordor/ETC is now IN launch scope.** Removing Semaphore removes the only reason ETC
   was deferred (no more self-deploying the anonymity primitive); the contracts compile
-  paris/shanghai-safe. Launch sequence is **Amoy → Polygon → Mordor** (supersedes the
-  Polygon/Amoy-only launch in Assumptions "Network").
+  paris/shanghai-safe. Launch sequence is **Mordor (ETC testnet) → Polygon mainnet** — no Amoy
+  (supersedes the Polygon/Amoy-only launch in Assumptions "Network").
 - **Relayer-ready (spec 035/036 alignment).** A reusable base
   `contracts/upgradeable/SignerIntentBase.sol` (EIP-712 + ERC-7201-namespaced,
   single-use replay nonce, `_verifyIntent`) backs a `…WithSig` twin for every

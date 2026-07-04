@@ -34,7 +34,7 @@ export function makePoolSummary(overrides = {}) {
     slotsRemaining: 8,
     thresholdBips: 6000,
     thresholdPct: 60,
-    joinDeadline: 0,
+    acceptDeadline: 0,
     isCreator: false,
     hasJoined: false,
     refundEligible: false,
