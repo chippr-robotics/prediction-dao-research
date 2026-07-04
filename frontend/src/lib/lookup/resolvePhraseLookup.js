@@ -60,7 +60,7 @@ function classifyPool(summary, account, now) {
   const isSelf = !!summary.isCreator || !!summary.hasJoined
   const open = summary.state === 0 // 0 = JoiningOpen
   const hasSlots = (summary.slotsRemaining ?? 0) > 0
-  const beforeDeadline = !summary.joinDeadline || now < summary.joinDeadline
+  const beforeDeadline = !summary.acceptDeadline || now < summary.acceptDeadline
   const actionable = open && hasSlots && beforeDeadline && !summary.hasJoined
   if (isSelf) return { kind: 'self', type: 'pool', match: summary }
   if (!actionable) {

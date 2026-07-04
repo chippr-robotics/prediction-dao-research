@@ -1,19 +1,24 @@
 /**
- * usePools — data hook for ZK-Wager Pools (spec 034). Encapsulates all contract reads/writes so pages
- * stay presentational and testable (the pages mock this hook). Honest state: pool lifecycle is read from
- * chain and surfaced truthfully; addresses come from synced config.
+ * usePools — data hook for Wager Pools (spec 034, address-based — Semaphore removed). Encapsulates all
+ * contract reads/writes so pages stay presentational and testable (the pages mock this hook). Membership,
+ * voting, and claims are by PUBLIC WALLET ADDRESS: the roster comes from `Joined(address)` events, a
+ * member's nickname is derived deterministically from their address, and the winner's address is the
+ * "claim code". Timing mirrors WagerRegistry — two absolute deadlines, `acceptDeadline`/`resolveDeadline`.
+ *
+ * Relayer path (spec 035/036): every write below is a plain self-submitted EOA transaction today. The
+ * contracts additionally expose EIP-712 `…WithSig` twins (approveWithSig/claimWithSig/…) and an EIP-3009
+ * gasless join, so this layer can later route submissions through a relayer without changing the pages —
+ * the action set here maps 1:1 to those twins.
  */
 import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
-import { getContractAddressForChain } from '../config/contracts'
-import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolStateDisplay, poolClaimScope } from '../lib/pools/poolContracts'
+import { getContractAddressForChain, getDeploymentBlockForChain } from '../config/contracts'
+import { ERC20_ABI, getFactory, getPool, POOL_STATE, poolStateDisplay } from '../lib/pools/poolContracts'
 import { phraseToIndices, resolvePool, indicesToPhrase } from '../lib/pools/gateway'
-import { createPoolIdentity } from '../lib/pools/identity'
 import { deriveNickname } from '../lib/pools/nickname'
-import { readPoolIdentity, cachePoolIdentity } from '../lib/pools/identityCache'
+import { payoutMatrixHash } from '../lib/pools/payout'
 import { recordJoinedPool } from '../lib/lookup/myWagersSources'
-import { generatePoolProof } from '../lib/pools/semaphoreProof'
 
 function requiredApprovals(frozenDenominator, thresholdBips) {
   if (frozenDenominator <= 0) return 0
@@ -23,7 +28,7 @@ function requiredApprovals(frozenDenominator, thresholdBips) {
 async function summarizePool(poolContract, account) {
   const [
     stateNum, buyIn, tokenAddr, memberCount, maxMembers, thresholdBips,
-    joinDeadline, creator, frozenDenominator, closedAt, resolutionWindow, currentProposalId,
+    acceptDeadline, creator, frozenDenominator, closedAt, resolveDeadline, currentProposalId,
   ] = await Promise.all([
     poolContract.state(),
     poolContract.buyIn(),
@@ -31,11 +36,11 @@ async function summarizePool(poolContract, account) {
     poolContract.memberCount(),
     poolContract.maxMembers(),
     poolContract.thresholdBips(),
-    poolContract.joinDeadline(),
+    poolContract.acceptDeadline(),
     poolContract.creator(),
     poolContract.frozenDenominator(),
     poolContract.closedAt(),
-    poolContract.resolutionWindow(),
+    poolContract.resolveDeadline(),
     poolContract.currentProposalId(),
   ])
   const runner = poolContract.runner
@@ -53,15 +58,18 @@ async function summarizePool(poolContract, account) {
   const denom = Number(frozenDenominator)
   const bips = Number(thresholdBips)
   const now = Math.floor(Date.now() / 1000)
-  const windowEnd = Number(closedAt) + Number(resolutionWindow)
+  // Resolution is valid until the ABSOLUTE resolve deadline (no drift — matches WagerRegistry).
+  const windowEnd = Number(resolveDeadline)
   const hasProposal = currentProposalId && currentProposalId !== ethers.ZeroHash
 
   let hasJoined = false
   let alreadyRefunded = false
   let approvalCount = 0
+  let alreadyApproved = false
   if (account) {
     hasJoined = await poolContract.hasJoined(account)
     alreadyRefunded = await poolContract.refunded(account)
+    if (hasProposal) alreadyApproved = await poolContract.approvedBy(currentProposalId, account)
   }
   if (hasProposal) approvalCount = Number(await poolContract.proposalApprovals(currentProposalId))
 
@@ -84,10 +92,13 @@ async function summarizePool(poolContract, account) {
     slotsRemaining: Number(maxMembers) - Number(memberCount),
     thresholdBips: bips,
     thresholdPct: bips / 100,
-    joinDeadline: Number(joinDeadline),
+    acceptDeadline: Number(acceptDeadline),
+    resolveDeadline: Number(resolveDeadline),
+    closedAt: Number(closedAt),
     creator,
     isCreator: account ? creator.toLowerCase() === account.toLowerCase() : false,
     hasJoined,
+    alreadyApproved,
     frozenDenominator: denom,
     currentProposalId: hasProposal ? currentProposalId : null,
     approvalCount,
@@ -110,10 +121,10 @@ export function usePools() {
   }, [signer])
 
   /**
-   * Create a pool. `form`: { buyIn, maxMembers, thresholdPct, token?, joinDeadline?, resolutionWindow?,
-   * joinDays?, resolutionDays? }. The create UI passes exact instants from its timeline element —
-   * `joinDeadline` (unix seconds) and `resolutionWindow` (seconds after joining closes); the older
-   * day-count fields remain as a fallback.
+   * Create a pool. `form`: { buyIn, maxMembers, thresholdPct, token?, acceptDeadline, resolveDeadline,
+   * joinDays?, resolutionDays? }. The create UI passes exact instants from the shared DeadlineTimeline —
+   * `acceptDeadline` and `resolveDeadline` (unix seconds), identical to the 1v1/open-challenge flow; the
+   * older day-count fields remain as a fallback.
    */
   const createPool = useCallback(async (form) => {
     setStatus('creating')
@@ -131,14 +142,19 @@ export function usePools() {
         /* default USDC */
       }
       const now = Math.floor(Date.now() / 1000)
+      const acceptDeadline =
+        form.acceptDeadline != null ? Number(form.acceptDeadline) : now + Number(form.joinDays) * 86400
+      const resolveDeadline =
+        form.resolveDeadline != null
+          ? Number(form.resolveDeadline)
+          : acceptDeadline + Number(form.resolutionDays) * 86400
       const params = {
         token: tokenAddr,
         buyIn: ethers.parseUnits(String(form.buyIn), decimals),
         maxMembers: Number(form.maxMembers),
         thresholdBips: Math.round(Number(form.thresholdPct) * 100),
-        joinDeadline: form.joinDeadline != null ? Number(form.joinDeadline) : now + Number(form.joinDays) * 86400,
-        resolutionWindow:
-          form.resolutionWindow != null ? Number(form.resolutionWindow) : Number(form.resolutionDays) * 86400,
+        acceptDeadline,
+        resolveDeadline,
       }
       const tx = await factory.createPool(params)
       const receipt = await tx.wait()
@@ -189,7 +205,7 @@ export function usePools() {
     return summarizePool(getPool(address, s), account)
   }, [requireSigner])
 
-  /** Join a pool: derive identity, approve the buy-in, then join. */
+  /** Join a pool: approve the buy-in, then join with your wallet (no identity/proof). */
   const joinPool = useCallback(async (poolAddress) => {
     setStatus('joining')
     setError(null)
@@ -198,38 +214,15 @@ export function usePools() {
       const pool = getPool(poolAddress, s)
       const summary = await summarizePool(pool, account)
       const token = new ethers.Contract(summary.tokenAddress, ERC20_ABI, s)
-      const owner = await s.getAddress()
-      const allowance = await token.allowance(owner, poolAddress)
+      const allowance = await token.allowance(account, poolAddress)
       if (allowance < summary.buyIn) {
         const approveTx = await token.approve(poolAddress, summary.buyIn)
         await approveTx.wait()
       }
-      const { identity, commitment } = await createPoolIdentity(s, poolAddress)
-      const tx = await pool.join(commitment)
+      const tx = await pool.join()
       const receipt = await tx.wait()
-
-      // Record the join device-locally at the hook level so EVERY join path (unified lookup, pool page,
-      // future surfaces) makes the pool findable in My Wagers (tester feedback).
+      // Record the join device-locally so EVERY join path makes the pool findable in My Wagers.
       recordJoinedPool(account, poolAddress)
-
-      // Best-effort (tester feedback): derive + cache the display values NOW, while the identity is in
-      // memory from the join signature, so nickname and claim code auto-show later with no re-prompt.
-      // The identity secret itself is never persisted.
-      try {
-        cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
-        const joined = await pool.queryFilter(pool.filters.Joined())
-        const memberCommitments = joined.map((e) => BigInt(e.args.identityCommitment))
-        const proof = await generatePoolProof({
-          identity,
-          memberCommitments,
-          message: 0n,
-          scope: poolClaimScope(poolAddress),
-        })
-        cachePoolIdentity(account, poolAddress, { claimCode: proof.nullifier.toString() })
-      } catch {
-        /* non-fatal — the reveal paths below still work and will backfill the cache */
-      }
-
       setStatus('idle')
       return { txHash: receipt.hash }
     } catch (e) {
@@ -240,120 +233,70 @@ export function usePools() {
   }, [requireSigner])
 
   /**
-   * Read the full set of member identity commitments from the pool's Joined events over RPC. This is the
-   * group the prover reconstructs to generate an approval/claim proof — read directly from chain so the
-   * resolution loop does NOT depend on the subgraph (the subgraph is for discovery/listing only).
+   * The pool roster: member wallet addresses from `Joined(address)` events, each with a deterministic
+   * nickname derived from the public address. Read directly from chain so the roster does NOT depend on
+   * the subgraph (the subgraph is for discovery/listing only).
    */
-  const getMemberCommitments = useCallback(async (poolAddress) => {
+  const getMembers = useCallback(async (poolAddress) => {
     const { signer: s } = await requireSigner()
     const pool = getPool(poolAddress, s)
     const events = await pool.queryFilter(pool.filters.Joined())
-    return events.map((e) => BigInt(e.args.identityCommitment))
+    return events.map((e) => {
+      const address = e.args.member
+      return { address, nickname: deriveNickname(address, poolAddress) }
+    })
   }, [requireSigner])
 
-  /**
-   * The connected member's anonymous nickname for a pool. Cache-first: after joining on this device the
-   * public commitment is cached, so this resolves with NO signature; otherwise it signs once to re-derive
-   * the identity and backfills the cache.
-   */
+  /** The connected member's deterministic nickname for a pool (derived from their public address). */
   const getMyNickname = useCallback(async (poolAddress) => {
-    const { signer: s, account } = await requireSigner()
-    const cached = readPoolIdentity(account, poolAddress)
-    if (cached?.commitment) return deriveNickname(cached.commitment, poolAddress)
-    const { commitment } = await createPoolIdentity(s, poolAddress)
-    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
-    return deriveNickname(commitment, poolAddress)
+    const { account } = await requireSigner()
+    return deriveNickname(account, poolAddress)
   }, [requireSigner])
 
   /**
-   * Non-prompting read of the member's cached display identity for a pool: { commitment, claimCode,
-   * nickname } or null when nothing is cached / no wallet. Lets pages auto-show the nickname and claim
-   * code (tester feedback) without ever popping an unrequested signature.
+   * Read the creator's proposed payout matrix straight from the chain. `proposeOutcome` now commits AND
+   * EMITS the full `PayoutEntry[]` (event `OutcomeProposed`), so any member can read the split without the
+   * creator sharing it off-chain. Returns the CURRENT proposal's rows as `[{ winner, amount: bigint }]`,
+   * VERIFIED to hash back to the on-chain proposalId, or null when there is no proposal / the RPC can't
+   * serve logs (in which case the off-chain paste in proposalStore stays as the fallback).
    */
-  const peekPoolIdentity = useCallback(async (poolAddress) => {
+  const fetchProposedMatrix = useCallback(async (poolAddress) => {
     try {
-      const { account } = await requireSigner()
-      const cached = readPoolIdentity(account, poolAddress)
-      if (!cached?.commitment && !cached?.claimCode) return null
-      return {
-        commitment: cached.commitment || null,
-        claimCode: cached.claimCode || null,
-        nickname: cached.commitment ? deriveNickname(cached.commitment, poolAddress) : null,
-      }
+      const { signer: s, chainId } = await requireSigner()
+      const pool = getPool(poolAddress, s)
+      const onChainId = await pool.currentProposalId()
+      const targetId = onChainId && onChainId !== ethers.ZeroHash ? onChainId : null
+      // Bound the scan to the factory's deploy block when known (never scan from genesis); a provider that
+      // still rejects the range throws below and we return null so the off-chain fallback takes over.
+      const fromBlock = getDeploymentBlockForChain('wagerPoolFactory', chainId) || 0
+      const events = await pool.queryFilter(pool.filters.OutcomeProposed(), fromBlock)
+      if (!events.length) return null
+      // Prefer the event matching the current on-chain proposalId (the latest one if the creator revised);
+      // fall back to the most recent event otherwise (e.g. a resolved pool whose id is no longer exposed).
+      const match =
+        (targetId && [...events].reverse().find((e) => e.args.proposalId === targetId)) ||
+        events[events.length - 1]
+      const entries = (match.args.entries || []).map((e) => ({ winner: e.winner, amount: BigInt(e.amount) }))
+      if (!entries.length) return null
+      // Trust the decoded matrix only if it hashes to the id it claims (guards against a bad decode).
+      if (payoutMatrixHash(entries) !== (targetId || match.args.proposalId)) return null
+      return entries
     } catch {
       return null
     }
   }, [requireSigner])
 
-  /**
-   * Restore the connected member's full display identity for a pool with at most ONE wallet signature.
-   * Cache-first (no signature at all when the join-time cache is present); otherwise re-derives the
-   * identity, derives the claim-scope nullifier ("claim code"), caches both, and returns
-   * { commitment, claimCode, nickname }. Lets the pool page auto-show a joined member's nickname and
-   * claim code even on devices where the join-time cache is missing (live-app tester feedback: a
-   * joined member should never have to click to reveal who they are).
-   */
-  const restorePoolIdentity = useCallback(async (poolAddress) => {
-    const { signer: s, account } = await requireSigner()
-    const cached = readPoolIdentity(account, poolAddress)
-    if (cached?.commitment && cached?.claimCode) {
-      return {
-        commitment: cached.commitment,
-        claimCode: cached.claimCode,
-        nickname: deriveNickname(cached.commitment, poolAddress),
-      }
-    }
-    const { identity, commitment } = await createPoolIdentity(s, poolAddress)
-    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString() })
-    let claimCode = cached?.claimCode || null
-    if (!claimCode) {
-      try {
-        const memberCommitments = await getMemberCommitments(poolAddress)
-        const proof = await generatePoolProof({
-          identity,
-          memberCommitments,
-          message: 0n,
-          scope: poolClaimScope(poolAddress),
-        })
-        claimCode = proof.nullifier.toString()
-        cachePoolIdentity(account, poolAddress, { claimCode })
-      } catch {
-        /* non-fatal — the nickname still shows; the claim-code reveal path can backfill later */
-      }
-    }
-    return { commitment: commitment.toString(), claimCode, nickname: deriveNickname(commitment, poolAddress) }
-  }, [requireSigner, getMemberCommitments])
-
-  /**
-   * Reveal the connected member's "claim code" — their claim-scope Semaphore nullifier. The member shares
-   * this off-chain with the creator, who places it (with an amount) in the payout matrix. It is unlinkable
-   * to the wallet, and is the value the contract matches at claim time. Returns a decimal string.
-   */
-  const getMyClaimCode = useCallback(async (poolAddress) => {
-    const { signer: s, account } = await requireSigner()
-    // Cache-first (tester feedback): the code is derived at join (or first reveal) and cached, so
-    // subsequent views auto-show it without a signature or a fresh proof.
-    const cached = readPoolIdentity(account, poolAddress)
-    if (cached?.claimCode) return cached.claimCode
-    const memberCommitments = await getMemberCommitments(poolAddress)
-    const { identity, commitment } = await createPoolIdentity(s, poolAddress)
-    // The nullifier is a deterministic function of (claimScope, identity); message/group-validity don't
-    // affect it, so this matches the nullifier the real claim proof will produce.
-    const proof = await generatePoolProof({
-      identity,
-      memberCommitments,
-      message: 0n,
-      scope: poolClaimScope(poolAddress),
-    })
-    const code = proof.nullifier.toString()
-    cachePoolIdentity(account, poolAddress, { commitment: commitment.toString(), claimCode: code })
-    return code
-  }, [requireSigner, getMemberCommitments])
-
   /** Creator: close joining early (freezes the denominator). */
   const closeJoining = useCallback(async (poolAddress) => {
     const { signer: s } = await requireSigner()
     const tx = await getPool(poolAddress, s).closeJoining()
+    return (await tx.wait()).hash
+  }, [requireSigner])
+
+  /** Anyone: close joining once the accept deadline has passed. */
+  const pokeDeadline = useCallback(async (poolAddress) => {
+    const { signer: s } = await requireSigner()
+    const tx = await getPool(poolAddress, s).pokeDeadline()
     return (await tx.wait()).hash
   }, [requireSigner])
 
@@ -364,18 +307,21 @@ export function usePools() {
     return (await tx.wait()).hash
   }, [requireSigner])
 
-  /** Creator: propose (or revise) the payout outcome. `proposalId` = keccak of the payout matrix. */
-  const proposeOutcome = useCallback(async (poolAddress, proposalId) => {
+  /**
+   * Creator: propose (or revise) the payout outcome by committing the FULL payout matrix. The contract
+   * validates it on-chain (non-empty, non-zero winners, amounts sum to the exact escrow) and emits it, so
+   * every member can read the split from the chain before approving. `entries` is a `{winner, amount}[]`
+   * array; the on-chain `proposalId` = keccak256(abi.encode(entries)).
+   */
+  const proposeOutcome = useCallback(async (poolAddress, entries) => {
     const { signer: s } = await requireSigner()
-    const tx = await getPool(poolAddress, s).proposeOutcome(proposalId)
+    const tx = await getPool(poolAddress, s).proposeOutcome(entries)
     return (await tx.wait()).hash
   }, [requireSigner])
 
   /**
-   * Member: anonymously approve the current proposal. Needs the full member-commitment set to build the
-   * prover's group. `onProgress(message)` reports each phase so the UI never looks like it "did nothing"
-   * during the (heavy, in-browser) ZK proof — the top user complaint was a silent wallet-signature prompt
-   * followed by no visible submission.
+   * Member: approve the current proposal with your wallet (one approval per member per proposal). Plain
+   * transaction — no ZK proof, no WASM. `onProgress(message)` reports the submission phase.
    */
   const vote = useCallback(async (poolAddress, onProgress) => {
     const step = (m) => { try { onProgress?.(m) } catch { /* ignore */ } }
@@ -388,19 +334,9 @@ export function usePools() {
       if (!proposalId || proposalId === ethers.ZeroHash) {
         throw new Error('There is no proposed payout to approve yet.')
       }
-      step('Reading the group…')
-      const memberCommitments = await getMemberCommitments(poolAddress)
-      step('Confirm the signature in your wallet to unlock your anonymous identity…')
-      const { identity } = await createPoolIdentity(s, poolAddress)
-      step('Generating your anonymous approval proof (this can take a moment)…')
-      const proof = await generatePoolProof({
-        identity,
-        memberCommitments,
-        message: 1n, // approve
-        scope: BigInt(proposalId),
-      })
+      step('Confirm the approval in your wallet…')
+      const tx = await pool.approve()
       step('Submitting your approval on-chain…')
-      const tx = await pool.approve(proof)
       const hash = (await tx.wait()).hash
       setStatus('idle')
       return hash
@@ -409,24 +345,19 @@ export function usePools() {
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner, getMemberCommitments])
+  }, [requireSigner])
 
-  /** Winner: claim a share to `recipient`. `entries` is the payout matrix preimage (shared by the creator). */
+  /**
+   * Winner: claim a share to `recipient`. `entries` is the payout-matrix preimage (shared by the creator);
+   * the connected wallet must equal `entries[index].winner`.
+   */
   const claimWinnings = useCallback(async (poolAddress, { entries, index, recipient }) => {
     setStatus('claiming')
     setError(null)
     try {
       const { signer: s } = await requireSigner()
       const pool = getPool(poolAddress, s)
-      const memberCommitments = await getMemberCommitments(poolAddress)
-      const { identity } = await createPoolIdentity(s, poolAddress)
-      const proof = await generatePoolProof({
-        identity,
-        memberCommitments,
-        message: BigInt(recipient),
-        scope: poolClaimScope(poolAddress),
-      })
-      const tx = await pool.claim(entries, index, proof, recipient)
+      const tx = await pool.claim(entries, index, recipient)
       const hash = (await tx.wait()).hash
       setStatus('idle')
       return hash
@@ -435,7 +366,7 @@ export function usePools() {
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner, getMemberCommitments])
+  }, [requireSigner])
 
   /** Member: recover the buy-in after a timeout or cancellation. */
   const refund = useCallback(async (poolAddress) => {
@@ -461,12 +392,11 @@ export function usePools() {
     resolvePhrase,
     getPoolSummary,
     joinPool,
-    getMemberCommitments,
+    getMembers,
     getMyNickname,
-    getMyClaimCode,
-    peekPoolIdentity,
-    restorePoolIdentity,
+    fetchProposedMatrix,
     closeJoining,
+    pokeDeadline,
     cancelPool,
     proposeOutcome,
     vote,

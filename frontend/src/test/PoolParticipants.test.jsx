@@ -1,26 +1,31 @@
 /**
- * PoolParticipants tests (pool-manager tester feedback, items 3–4): anonymous alias cards for everyone,
- * alphabetical until the creator arranges an order, creator-only reordering.
+ * PoolParticipants tests (spec 034, address-based): alias cards for everyone (labels derived from the
+ * public wallet address), alphabetical until the creator arranges an order, creator-only reordering,
+ * and a proposed payout keyed by winner ADDRESS.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PoolParticipants from '../components/pools/PoolParticipants'
 import { sortParticipants } from '../lib/pools/participantOrder'
 
+const A1 = '0x1111111111111111111111111111111111111111'
+const A2 = '0x2222222222222222222222222222222222222222'
+const A3 = '0x3333333333333333333333333333333333333333'
+
 const P = [
-  { commitment: '3', label: 'Silent Owl', suffix: '03' },
-  { commitment: '1', label: 'Amber Fox', suffix: '01' },
-  { commitment: '2', label: 'Prismatic Newt', suffix: '02' },
+  { address: A3, nickname: { label: 'Silent Owl', suffix: '03' } },
+  { address: A1, nickname: { label: 'Amber Fox', suffix: '01' } },
+  { address: A2, nickname: { label: 'Prismatic Newt', suffix: '02' } },
 ]
 
 const aliases = () => screen.getAllByTestId('participant-card').map((el) => el.textContent)
 
 describe('sortParticipants', () => {
   it('is alphabetical by alias without a creator order', () => {
-    expect(sortParticipants(P, null).map((p) => p.label)).toEqual(['Amber Fox', 'Prismatic Newt', 'Silent Owl'])
+    expect(sortParticipants(P, null).map((p) => p.nickname.label)).toEqual(['Amber Fox', 'Prismatic Newt', 'Silent Owl'])
   })
-  it('follows the creator order, appending unknown commitments alphabetically', () => {
-    expect(sortParticipants(P, ['2', '3']).map((p) => p.label)).toEqual(['Prismatic Newt', 'Silent Owl', 'Amber Fox'])
+  it('follows the creator order, appending unknown addresses alphabetically', () => {
+    expect(sortParticipants(P, [A2, A3]).map((p) => p.nickname.label)).toEqual(['Prismatic Newt', 'Silent Owl', 'Amber Fox'])
   })
 })
 
@@ -48,20 +53,20 @@ describe('PoolParticipants', () => {
     render(<PoolParticipants participants={P} isCreator order={null} onReorder={onReorder} />)
     // Alphabetical start: Amber Fox, Prismatic Newt, Silent Owl. Move Silent Owl up one.
     fireEvent.click(screen.getByRole('button', { name: /move silent owl up/i }))
-    expect(onReorder).toHaveBeenCalledWith(['1', '3', '2'])
+    expect(onReorder).toHaveBeenCalledWith([A1, A3, A2])
   })
 
   it('shows rank numbers once an order exists and never shows wallets', () => {
-    render(<PoolParticipants participants={P} isCreator={false} order={['2', '1', '3']} />)
+    render(<PoolParticipants participants={P} isCreator={false} order={[A2, A1, A3]} />)
     expect(screen.getByLabelText('Rank 1')).toBeInTheDocument()
     expect(aliases()[0]).toContain('Prismatic Newt')
     expect(screen.queryByText(/0x/)).toBeNull()
   })
 
   it('incorporates a proposed payout: winners sort to the top, get medals + amounts, in-the-money cards grow', () => {
-    // Amber Fox (commitment 1) wins 15, Silent Owl (3) wins 5, Prismatic Newt (2) gets nothing.
-    const payout = new Map([['1', 15000000n], ['3', 5000000n], ['2', 0n]])
-    render(<PoolParticipants participants={P} payoutByCommitment={payout} tokenSymbol="USDC" tokenDecimals={6} />)
+    // Amber Fox (A1) wins 15, Silent Owl (A3) wins 5, Prismatic Newt (A2) gets nothing.
+    const payout = new Map([[A1, 15000000n], [A3, 5000000n], [A2, 0n]])
+    render(<PoolParticipants participants={P} payoutByAddress={payout} tokenSymbol="USDC" tokenDecimals={6} />)
     const cards = screen.getAllByTestId('participant-card')
     expect(cards[0]).toHaveTextContent('Amber Fox')       // highest payout first
     expect(cards[0].textContent).toContain('🥇')
@@ -77,8 +82,8 @@ describe('PoolParticipants', () => {
   })
 
   it('labels the section "Final standings" once resolved', () => {
-    const payout = new Map([['1', 20000000n]])
-    render(<PoolParticipants participants={P} payoutByCommitment={payout} resolved tokenDecimals={6} />)
+    const payout = new Map([[A1, 20000000n]])
+    render(<PoolParticipants participants={P} payoutByAddress={payout} resolved tokenDecimals={6} />)
     expect(screen.getByRole('heading', { name: /final standings/i })).toBeInTheDocument()
   })
 })

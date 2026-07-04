@@ -111,10 +111,12 @@ function CreatePanel({ onClose }) {
   const [buyIn, setBuyIn] = useState('10.00')
   const [maxMembers, setMaxMembers] = useState('10')
   const [thresholdPct, setThresholdPct] = useState(THRESHOLD_CHOICES[0].pct)
-  // Windows as concrete instants (tester feedback): the same slider + tap-to-type timeline as the
-  // open challenge, instead of bare day counts. joinBy → the on-chain joinDeadline; resolveBy − joinBy
-  // → the resolutionWindow that starts when joining actually closes. Mount-time "now" anchors the
-  // future check (same anchor the timeline's sliders use); the contract re-checks at create time.
+  // Windows as two ABSOLUTE instants (spec 034 address-based redesign): the same slider + tap-to-type
+  // timeline as the open challenge, instead of bare day counts. joinBy → the on-chain `acceptDeadline`
+  // (joining closes); resolveBy → the on-chain `resolveDeadline` (resolution must complete by). No
+  // relative resolution-window / drift math — both instants pass straight through to createPool, exactly
+  // like the 1v1/open-challenge flow. Mount-time "now" anchors the future check (same anchor the
+  // timeline's sliders use); the contract re-checks at create time.
   const [mountedAtMs] = useState(() => Date.now())
   const [joinBy, setJoinBy] = useState(() => toDatetimeLocal(mountedAtMs + 7 * DAY_MS))
   const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(mountedAtMs + 10 * DAY_MS))
@@ -172,8 +174,8 @@ function CreatePanel({ onClose }) {
         buyIn,
         maxMembers,
         thresholdPct,
-        joinDeadline: Math.floor(joinMs / 1000),
-        resolutionWindow: Math.max(1, Math.floor((resolveMs - joinMs) / 1000)),
+        acceptDeadline: Math.floor(joinMs / 1000),
+        resolveDeadline: Math.floor(resolveMs / 1000),
       }))
     } catch {
       /* surfaced via hook error */

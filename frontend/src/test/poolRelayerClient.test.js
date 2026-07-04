@@ -48,7 +48,7 @@ describe('pool relayer client (gas infra, optional)', () => {
     const relayer = makePoolRelayer(80002)
     expect(typeof relayer).toBe('function')
 
-    const res = await relayer(sampleAuthorization(), { pool: POOL, identityCommitment: 42n })
+    const res = await relayer(sampleAuthorization(), { pool: POOL })
     expect(res).toEqual({ txHash: '0xdeadbeef' })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -60,8 +60,8 @@ describe('pool relayer client (gas infra, optional)', () => {
     const sent = JSON.parse(opts.body)
     expect(sent.chainId).toBe(80002)
     expect(sent.pool).toBe(POOL)
-    // bigints are serialized as decimal strings (JSON-safe)
-    expect(sent.identityCommitment).toBe('42')
+    // The join is identity-free: no commitment is sent (membership is keyed by the authorization's `from`).
+    expect(sent).not.toHaveProperty('identityCommitment')
     expect(sent.authorization).toEqual({
       from: '0x00000000000000000000000000000000000000bb',
       to: POOL,
@@ -83,7 +83,7 @@ describe('pool relayer client (gas infra, optional)', () => {
       json: async () => ({ error: { code: 'screened', message: 'sender failed sanctions screening' } }),
     })
     const relayer = makePoolRelayer(80002)
-    await expect(relayer(sampleAuthorization(), { pool: POOL, identityCommitment: 42n })).rejects.toThrow(
+    await expect(relayer(sampleAuthorization(), { pool: POOL })).rejects.toThrow(
       /screened.*sanctions screening/i
     )
   })
@@ -92,6 +92,6 @@ describe('pool relayer client (gas infra, optional)', () => {
     vi.stubEnv('VITE_POOL_RELAYER_URL', RELAYER_URL)
     global.fetch = vi.fn()
     const relayer = makePoolRelayer(undefined)
-    await expect(relayer(sampleAuthorization(), { pool: POOL, identityCommitment: 42n })).rejects.toThrow(/chainId is required/i)
+    await expect(relayer(sampleAuthorization(), { pool: POOL })).rejects.toThrow(/chainId is required/i)
   })
 })

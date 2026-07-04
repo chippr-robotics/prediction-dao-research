@@ -1,27 +1,24 @@
 /**
- * Payout-matrix helpers for ZK-Wager Pool resolution (spec 034).
+ * Payout-matrix helpers for Wager Pool resolution (spec 034, address-based — Semaphore removed).
  *
- * The creator proposes an outcome by committing to a payout matrix: an array of
- * { claimNullifier, amount } rows (each winner identified by their claim-scope Semaphore nullifier — the
- * "claim code" they reveal off-chain). The on-chain proposalId / lockedOutcome is keccak256(abi.encode(
- * PayoutEntry[])), computed identically here so the UI can derive the id the creator proposes and that a
- * claimant must pass back. The matrix preimage is shared off-chain (copied/downloaded) — only its hash
- * lives on-chain.
+ * The creator proposes an outcome by committing to a payout matrix: an array of { winner, amount } rows,
+ * each winner identified by their PUBLIC wallet address (the address IS the "claim code"). The on-chain
+ * proposalId / lockedOutcome is keccak256(abi.encode(PayoutEntry[])), computed identically here so the UI
+ * can derive the id the creator proposes and that a claimant passes back. The matrix is fully public
+ * (winners come straight from the roster), so it can be shared off-chain verbatim — only its hash lives
+ * on-chain.
  */
-import { AbiCoder, keccak256 } from 'ethers'
+import { AbiCoder, keccak256, getAddress } from 'ethers'
 
-/** Normalise a row to bigint fields. */
+/** Normalise a row to { winner: checksummed address, amount: bigint }. */
 function normEntry(e) {
-  return { claimNullifier: BigInt(e.claimNullifier), amount: BigInt(e.amount) }
+  return { winner: getAddress(String(e.winner)), amount: BigInt(e.amount) }
 }
 
 /** keccak256(abi.encode(PayoutEntry[])) — equals the contract's lockedOutcome / proposalId. */
 export function payoutMatrixHash(entries) {
   const coder = AbiCoder.defaultAbiCoder()
-  const enc = coder.encode(
-    ['tuple(uint256 claimNullifier,uint256 amount)[]'],
-    [entries.map(normEntry)]
-  )
+  const enc = coder.encode(['tuple(address winner,uint256 amount)[]'], [entries.map(normEntry)])
   return keccak256(enc)
 }
 
@@ -32,7 +29,7 @@ export function payoutMatrixSum(entries) {
 
 /** Serialise the matrix for off-chain sharing (creator → winners). */
 export function serializeMatrix(entries) {
-  return JSON.stringify(entries.map((e) => ({ claimNullifier: String(e.claimNullifier), amount: String(e.amount) })))
+  return JSON.stringify(entries.map((e) => ({ winner: getAddress(String(e.winner)), amount: String(e.amount) })))
 }
 
 /** Parse a shared matrix string back to rows; returns null on malformed input. */
@@ -40,48 +37,38 @@ export function parseMatrix(text) {
   try {
     const arr = JSON.parse(text)
     if (!Array.isArray(arr)) return null
-    return arr.map((e) => ({ claimNullifier: String(BigInt(e.claimNullifier)), amount: String(BigInt(e.amount)) }))
+    return arr.map((e) => ({ winner: getAddress(String(e.winner)), amount: String(BigInt(e.amount)) }))
   } catch {
     return null
   }
 }
 
 /**
- * Shared-proposal envelope (spec 034 UX round 3). The creator shares TWO things bundled together:
- *   - `matrix`: the { claimNullifier, amount } rows the contract hashes/claims against (the secret-ish
- *     part — claim codes stay out of sight, but are needed to claim).
- *   - `display`: a { commitment, amount } map so EVERY member's roster card can show a medal + amount
- *     for who's in the money. Identity commitments are public (from Joined events), so sharing them
- *     with amounts reveals nothing the roster doesn't already show.
- * The display map is a convenience annotation: it is validated only by checking its amount multiset
- * matches the on-chain-verified matrix, never trusted for the actual payout (that stays code-gated).
+ * Shared-proposal envelope. Because winners are public addresses, the matrix is fully shareable and the
+ * old separate "display" annotation is no longer needed — the roster reads amounts straight from the
+ * matrix. Kept as a versioned envelope for forward compatibility.
  */
-export function serializeSharedProposal({ entries, display }) {
+export function serializeSharedProposal({ entries }) {
   return JSON.stringify({
-    v: 1,
-    matrix: entries.map((e) => ({ claimNullifier: String(e.claimNullifier), amount: String(e.amount) })),
-    display: (display || []).map((d) => ({ commitment: String(d.commitment), amount: String(d.amount) })),
+    v: 2,
+    matrix: entries.map((e) => ({ winner: getAddress(String(e.winner)), amount: String(e.amount) })),
   })
 }
 
 /**
- * Parse a shared proposal. Accepts the envelope above OR a legacy bare `PayoutEntry[]` array (older
- * shares / the on-chain-only path). Returns { entries, display } — `display` is null when absent.
+ * Parse a shared proposal. Accepts the v2 envelope above OR a bare `PayoutEntry[]` array. Returns
+ * { entries } or null on malformed input.
  */
 export function parseSharedProposal(text) {
   try {
     const parsed = JSON.parse(text)
     if (Array.isArray(parsed)) {
       const entries = parseMatrix(text)
-      return entries ? { entries, display: null } : null
+      return entries ? { entries } : null
     }
     if (parsed && Array.isArray(parsed.matrix)) {
       const entries = parseMatrix(JSON.stringify(parsed.matrix))
-      if (!entries) return null
-      const display = Array.isArray(parsed.display)
-        ? parsed.display.map((d) => ({ commitment: String(BigInt(d.commitment)), amount: String(BigInt(d.amount)) }))
-        : null
-      return { entries, display }
+      return entries ? { entries } : null
     }
     return null
   } catch {
@@ -90,17 +77,13 @@ export function parseSharedProposal(text) {
 }
 
 /**
- * Build a { commitment → amount } lookup for the roster from a verified matrix + its display map.
- * Only used once the matrix hash has been verified against the on-chain proposalId, and only when the
- * display amounts (multiset) match the matrix amounts — so a tampered display can't inflate a card.
+ * Build a { winnerAddress(lowercased) → amount } lookup for the roster from a verified matrix. Only used
+ * once the matrix hash has been verified against the on-chain proposalId. Winners are public, so no
+ * separate display map is needed.
  */
-export function payoutDisplayMap(entries, display) {
-  if (!display || !display.length) return null
-  const matrixAmounts = [...entries.map((e) => String(e.amount))].sort()
-  const displayAmounts = [...display.map((d) => String(d.amount))].sort()
-  if (matrixAmounts.length !== displayAmounts.length) return null
-  for (let i = 0; i < matrixAmounts.length; i++) if (matrixAmounts[i] !== displayAmounts[i]) return null
+export function payoutDisplayMap(entries) {
+  if (!entries || !entries.length) return null
   const map = new Map()
-  for (const d of display) map.set(String(d.commitment), BigInt(d.amount))
+  for (const e of entries) map.set(getAddress(String(e.winner)).toLowerCase(), BigInt(e.amount))
   return map
 }

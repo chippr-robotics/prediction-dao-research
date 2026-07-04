@@ -5,15 +5,13 @@ import { dirname, resolve } from 'node:path'
 
 // Regression guard for the CSP script-src WebAssembly grant.
 //
-// ZK-Wager Pools (spec 034) generate Semaphore Groth16 proofs in the browser, which compiles/
-// instantiates a `.wasm` circuit witness calculator (frontend/src/lib/pools/semaphoreProof.js —
-// join-time claim-code precache, approve/vote, and claim). A `script-src` WITHOUT a WASM grant makes
-// every CSP-enforcing browser throw `CompileError: ... 'unsafe-eval' is not an allowed source` the
-// moment a member tries to approve/claim — strictly after the identity-derivation wallet signature, so
-// it presents as the "approve does nothing" bug (signs once, then silence).
+// Spec 034's Group Pools redesign dropped Semaphore (and its in-browser Groth16 proof generation)
+// entirely, so the bundle no longer compiles or instantiates any `.wasm`. The narrow
+// `'wasm-unsafe-eval'` token was removed from script-src along with it, re-tightening the production
+// CSP. This guard asserts it stays gone: if a future change re-adds a WASM grant it must come with a
+// deliberate justification, not silently ride back in.
 //
-// `'wasm-unsafe-eval'` is the NARROW grant: it permits WebAssembly compilation only, NOT eval()/
-// new Function(). The broader `'unsafe-eval'` must never ship — the bundle uses no dynamic eval.
+// The broader `'unsafe-eval'` must never ship either — the bundle uses no dynamic eval()/new Function().
 //
 // Like nginxCspConnectSrc.test.js, this asserts BOTH nginx configs stay in sync: nginx.conf
 // (frontend/Dockerfile) and nginx.conf.template (root Dockerfile — the PRODUCTION deploy). They
@@ -27,7 +25,7 @@ const CONFIGS = [
 ]
 
 describe('nginx CSP script-src WebAssembly grant', () => {
-  it.each(CONFIGS)('%s allows WASM compilation via the narrow wasm-unsafe-eval token', (path) => {
+  it.each(CONFIGS)('%s no longer carries a WASM grant (Semaphore removed in spec 034)', (path) => {
     const conf = readFileSync(path, 'utf8')
     const cspLine = conf
       .split('\n')
@@ -37,15 +35,17 @@ describe('nginx CSP script-src WebAssembly grant', () => {
     const scriptSrc = cspLine.match(/script-src\s+([^;]*)/)?.[1]
     expect(scriptSrc, `${path} CSP has no script-src directive`).toBeTruthy()
 
+    // Spec 034 dropped Semaphore + its in-browser Groth16 proofs, so no .wasm is compiled anymore.
+    // The narrow 'wasm-unsafe-eval' token was removed with it — re-adding a WASM grant must be a
+    // deliberate, justified change, not a silent regression.
     expect(
       scriptSrc,
-      `${path} script-src is missing 'wasm-unsafe-eval' — Semaphore proof generation (pool ` +
-        `approve/claim) will throw a CSP CompileError and silently fail`,
-    ).toContain("'wasm-unsafe-eval'")
+      `${path} script-src should not carry 'wasm-unsafe-eval' — Semaphore/WASM was removed in spec 034`,
+    ).not.toContain("'wasm-unsafe-eval'")
 
     // The broad grant must never ship — it would also permit eval()/new Function().
     expect(
-      scriptSrc.replace("'wasm-unsafe-eval'", ''),
+      scriptSrc,
       `${path} script-src must not contain the broad 'unsafe-eval'`,
     ).not.toContain("'unsafe-eval'")
   })

@@ -246,20 +246,29 @@ dataSources:
       file: ./src/mappings/tokenFactory.ts
 
   # ---------------------------------------------------------------------------
-  # ZKWagerPoolFactory — spec 034 ZK-Wager Pools. Indexes PoolCreated for pool
-  # discovery and spins up a dynamic ZKWagerPool data source per clone. Real
-  # address + deploy block live in networks.json per network (added post-deploy).
-  # PLACEHOLDER inline address (sentinel 0x..0029) + non-genesis startBlock keep a
-  # default `graph build` green and index nothing if accidentally deployed.
-  # NEVER set startBlock 0 / address 0x0 (genesis-flood). On subgraph-less networks
-  # (Mordor/ETC) the frontend reads pools over RPC instead.
+  # WagerPoolFactory — spec 034 Group Wager Pools (address-based redesign; the
+  # ZK/Semaphore design was removed). A UUPS proxy at a stable address that
+  # clones immutable ERC-1167 WagerPool instances. Indexes PoolCreated for pool
+  # discovery (spinning up a dynamic WagerPool data source per clone) and
+  # TokenAllowed for the buy-in-token allowlist. Real address + deploy block live
+  # in networks.json per network (added post-deploy).
+  #
+  # PLACEHOLDER inline address (sentinel 0x..0034, mnemonic for spec 034) +
+  # non-genesis startBlock keep a default `graph build` green and index nothing
+  # if accidentally deployed. NEVER set startBlock 0 / address 0x0 (genesis-flood,
+  # issue #703/#704) — a TODO-on-deploy placeholder must still be a non-genesis
+  # sentinel. Launch sequence is Mordor (63) then Polygon mainnet (matic, 137);
+  # Studio does NOT support Mordor, so the Studio subgraph realistically targets
+  # matic (with polygon-amoy for indexing validation) while Mordor needs a
+  # self-hosted graph-node. On subgraph-less networks the frontend reads pools
+  # over RPC instead.
   # ---------------------------------------------------------------------------
   - kind: ethereum
-    name: ZKWagerPoolFactory
+    name: WagerPoolFactory
     network: polygon-amoy
     source:
-      address: "0x0000000000000000000000000000000000000029"
-      abi: ZKWagerPoolFactory
+      address: "0x0000000000000000000000000000000000000034"
+      abi: WagerPoolFactory
       startBlock: 40521027
     mapping:
       kind: ethereum/events
@@ -267,13 +276,16 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Pool
+        - PoolAllowedToken
       abis:
-        - name: ZKWagerPoolFactory
-          file: ../frontend/src/abis/ZKWagerPoolFactory.json
+        - name: WagerPoolFactory
+          file: ./abis/WagerPoolFactory.json
       eventHandlers:
-        - event: PoolCreated(indexed uint256,indexed address,indexed address,uint32[4],address,uint256,uint32,uint16,uint64)
+        - event: PoolCreated(indexed uint256,indexed address,indexed address,uint32[4],address,uint256,uint32,uint16,uint64,uint64)
           handler: handlePoolCreated
-      file: ./src/mappings/zkWagerPoolFactory.ts
+        - event: TokenAllowed(indexed address,bool)
+          handler: handleTokenAllowed
+      file: ./src/mappings/wagerPoolFactory.ts
 
 # ---------------------------------------------------------------------------
 # Per-token indexing template (spec 028 expansion, US10/US12). Instantiated from
@@ -314,43 +326,49 @@ templates:
       file: ./src/mappings/token.ts
 
   # ---------------------------------------------------------------------------
-  # Per-pool indexing template (spec 034). Instantiated from
-  # ZKWagerPoolFactory.handlePoolCreated for each pool clone. Indexes joins
-  # (commitments), proposals, anonymous approvals (nullifiers), payouts, and
-  # lifecycle. Dynamic data source: no address here (supplied at create()).
-  # Privacy: no nickname, no wallet->vote link is stored (FR-010).
+  # Per-pool indexing template (spec 034, address-based). Instantiated from
+  # WagerPoolFactory.handlePoolCreated for each immutable ERC-1167 clone. Indexes
+  # joins (public wallet), the creator's proposed payout matrix (winner->amount),
+  # member approvals (public wallet), claims, refunds and lifecycle transitions.
+  # Dynamic data source: no address here (supplied at WagerPool.create()). No
+  # anonymity primitive — everything here is public wallet-keyed; nicknames are
+  # client-side only (FR-009).
   # ---------------------------------------------------------------------------
   - kind: ethereum/contract
-    name: ZKWagerPool
+    name: WagerPool
     network: polygon-amoy
     source:
-      abi: ZKWagerPool
+      abi: WagerPool
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
         - Pool
-        - PoolJoin
+        - PoolMember
         - PoolProposal
-        - PoolVote
-        - PoolPayout
+        - PoolPayoutEntry
+        - PoolApproval
+        - PoolClaim
+        - PoolRefund
       abis:
-        - name: ZKWagerPool
-          file: ../frontend/src/abis/ZKWagerPool.json
+        - name: WagerPool
+          file: ./abis/WagerPool.json
       eventHandlers:
-        - event: Joined(indexed uint256)
+        - event: Joined(indexed address)
           handler: handleJoined
         - event: JoiningClosedEvent(uint32)
           handler: handleJoiningClosed
-        - event: OutcomeProposed(indexed bytes32)
+        - event: OutcomeProposed(indexed bytes32,(address,uint256)[])
           handler: handleOutcomeProposed
-        - event: Approved(indexed bytes32,uint256,uint256)
+        - event: Approved(indexed bytes32,indexed address)
           handler: handleApproved
         - event: OutcomeLocked(indexed bytes32)
           handler: handleOutcomeLocked
-        - event: Claimed(indexed bytes32,address,uint256)
+        - event: Claimed(indexed address,address,uint256)
           handler: handleClaimed
+        - event: Refunded(indexed address,uint256)
+          handler: handleRefunded
         - event: PoolCancelled()
           handler: handlePoolCancelled
-      file: ./src/mappings/zkWagerPool.ts
+      file: ./src/mappings/wagerPool.ts

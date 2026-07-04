@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /// @title MockPoolSanctions
 /// @notice TEST-ONLY minimal sanctions guard matching the `checkBlocked` selector the
-///         {ZKWagerPoolFactory} consults. NEVER deploy in a production path (constitution III).
+///         {WagerPoolFactory} consults. NEVER deploy in a production path (constitution III).
 contract MockPoolSanctions {
     mapping(address => bool) public denied;
 
@@ -24,7 +24,7 @@ contract MockPoolSanctions {
 
 /// @title MockPoolMembership
 /// @notice TEST-ONLY minimal membership gate matching the `checkCanCreate` selector the
-///         {ZKWagerPoolFactory} consults. NEVER deploy in a production path (constitution III).
+///         {WagerPoolFactory} consults. NEVER deploy in a production path (constitution III).
 contract MockPoolMembership {
     bool public allowed = true;
 

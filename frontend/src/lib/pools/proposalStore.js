@@ -13,10 +13,11 @@ import { serializeMatrix, parseMatrix, payoutMatrixHash } from './payout'
 const key = (pool) => `fairwins_pool_matrix_v1_${String(pool || '').toLowerCase()}`
 
 /**
- * Save the proposed matrix for a pool (overwrites any earlier proposal's copy). `display` is the
- * optional { commitment, amount }[] annotation that lets every roster card show a medal + amount.
+ * Save the proposed matrix for a pool (overwrites any earlier proposal's copy). The matrix rows are
+ * { winner: address, amount } — winners are public addresses, so the roster reads amounts straight from
+ * the matrix and no separate display annotation is needed.
  */
-export function saveProposedMatrix(pool, proposalId, entries, display = null) {
+export function saveProposedMatrix(pool, proposalId, entries) {
   if (!pool || !proposalId || !entries) return
   try {
     localStorage.setItem(
@@ -24,9 +25,6 @@ export function saveProposedMatrix(pool, proposalId, entries, display = null) {
       JSON.stringify({
         proposalId,
         matrix: serializeMatrix(entries),
-        display: display
-          ? display.map((d) => ({ commitment: String(d.commitment), amount: String(d.amount) }))
-          : null,
       })
     )
   } catch {
@@ -36,15 +34,15 @@ export function saveProposedMatrix(pool, proposalId, entries, display = null) {
 
 /** Read the stored matrix for a pool without an id check (used to prefill the claim form once the
  * pool is resolved and the on-chain currentProposalId may no longer be exposed). Parse-checked only —
- * the contract still verifies the hash against lockedOutcome at claim time. Returns { text, entries,
- * display } or null. */
+ * the contract still verifies the hash against lockedOutcome at claim time. Returns { text, entries } or
+ * null. */
 export function readStoredMatrix(pool) {
   if (!pool) return null
   try {
     const raw = localStorage.getItem(key(pool))
     const stored = raw ? JSON.parse(raw) : null
     const entries = stored ? parseMatrix(stored.matrix) : null
-    return entries ? { text: stored.matrix, entries, display: stored.display || null } : null
+    return entries ? { text: stored.matrix, entries } : null
   } catch {
     return null
   }
@@ -52,7 +50,7 @@ export function readStoredMatrix(pool) {
 
 /**
  * Read the stored matrix for a pool IF it matches `proposalId` (a stale copy of an older proposal is
- * ignored). Returns { text, entries, display } or null.
+ * ignored). Returns { text, entries } or null.
  */
 export function readProposedMatrix(pool, proposalId) {
   if (!pool || !proposalId) return null
@@ -62,7 +60,7 @@ export function readProposedMatrix(pool, proposalId) {
     if (!stored || stored.proposalId !== proposalId) return null
     const entries = parseMatrix(stored.matrix)
     if (!entries || payoutMatrixHash(entries) !== proposalId) return null
-    return { text: stored.matrix, entries, display: stored.display || null }
+    return { text: stored.matrix, entries }
   } catch {
     return null
   }

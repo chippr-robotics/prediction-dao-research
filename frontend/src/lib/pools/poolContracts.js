@@ -1,11 +1,11 @@
 /**
- * Contract wiring for ZK-Wager Pools (spec 034). Addresses come from the synced config
- * (`getContractAddressForChain`), never hardcoded (Principle V); ABIs are mirrored from the compiled
- * artifacts.
+ * Contract wiring for Wager Pools (spec 034, address-based — Semaphore removed). Addresses come from the
+ * synced config (`getContractAddressForChain`), never hardcoded (Principle V); ABIs are mirrored from the
+ * compiled artifacts.
  */
 import { ethers } from 'ethers'
-import { ZK_WAGER_POOL_FACTORY_ABI } from '../../abis/ZKWagerPoolFactory'
-import { ZK_WAGER_POOL_ABI } from '../../abis/ZKWagerPool'
+import { WAGER_POOL_FACTORY_ABI } from '../../abis/WagerPoolFactory'
+import { WAGER_POOL_ABI } from '../../abis/WagerPool'
 import { getContractAddressForChain } from '../../config/contracts'
 
 export const ERC20_ABI = [
@@ -16,21 +16,21 @@ export const ERC20_ABI = [
   'function symbol() view returns (string)',
 ]
 
-/** The ZKWagerPoolFactory address for `chainId`, or undefined if not deployed there. */
+/** The WagerPoolFactory address for `chainId`, or undefined if not deployed there. */
 export function getFactoryAddress(chainId) {
-  return getContractAddressForChain('zkWagerPoolFactory', chainId)
+  return getContractAddressForChain('wagerPoolFactory', chainId)
 }
 
 /** Build the factory contract bound to `runner` (signer or provider). Throws if not deployed. */
 export function getFactory(runner, chainId) {
   const address = getFactoryAddress(chainId)
-  if (!address) throw new Error(`ZK-Wager Pools are not available on this network (chain ${chainId}).`)
-  return new ethers.Contract(address, ZK_WAGER_POOL_FACTORY_ABI, runner)
+  if (!address) throw new Error(`Wager Pools are not available on this network (chain ${chainId}).`)
+  return new ethers.Contract(address, WAGER_POOL_FACTORY_ABI, runner)
 }
 
 /** Build a pool contract bound to `runner`. */
 export function getPool(address, runner) {
-  return new ethers.Contract(address, ZK_WAGER_POOL_ABI, runner)
+  return new ethers.Contract(address, WAGER_POOL_ABI, runner)
 }
 
 export const POOL_STATE = ['JoiningOpen', 'JoiningClosed', 'Resolved', 'Cancelled']
@@ -44,9 +44,4 @@ export const POOL_STATE_DISPLAY = ['Open', 'Closed — resolving', 'Resolved', '
 /** User-facing label for a pool state (falls back to 'Unknown' for an unrecognized value). */
 export function poolStateDisplay(state) {
   return POOL_STATE_DISPLAY[Number(state)] ?? 'Unknown'
-}
-
-/** The pool's fixed claim scope: keccak256(abi.encodePacked(pool, "ZKPOOL_CLAIM")) — matches the contract. */
-export function poolClaimScope(poolAddress) {
-  return BigInt(ethers.keccak256(ethers.solidityPacked(['address', 'string'], [poolAddress, 'ZKPOOL_CLAIM'])))
 }

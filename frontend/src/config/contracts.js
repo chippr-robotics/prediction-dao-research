@@ -37,9 +37,10 @@ const MORDOR_CONTRACTS = {
   tokenFactory: '0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62',
   externalDAORegistry: '0xcEE0fb2e1407f0A0d19Bcf4Fee2726A3005FA3C0',
   backupPointerRegistry: '0x664ACAd4d604c626A6160948Df9C10FE38010E11',
-  // ZK-Wager Pools (spec 034) — factory (UUPS proxy) + self-deployed Semaphore V4 singleton.
-  zkWagerPoolFactory: '0x33cDfa339AbE993FEfEB9fE1A8341105ba55D586',
-  zkWagerPoolSemaphore: '0x710fC7Bce842C0f888524633785ed0E981D7B77d',
+  // Wager Pools (spec 034, address-based — Semaphore removed). Pending the fresh WagerPoolFactory
+  // deploy; populated by `npm run sync:frontend-contracts` after `deploy-wager-pool-factory.js`.
+  // The prior Semaphore-based factory (0x33cD…) is abandoned and intentionally NOT wired here.
+  wagerPoolFactory: '0xac78B4EdeF96e74a2653028dF93A26acFCfC613F',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -121,7 +122,7 @@ export const DEPLOYED_CONTRACTS =
  * support legacy Mordor reads while Amoy migrates.
  */
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315 },
+  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
   137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344, membershipVoucher: 0 },
 }

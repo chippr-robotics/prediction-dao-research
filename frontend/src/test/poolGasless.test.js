@@ -43,10 +43,13 @@ describe('pool gasless (client-side, no backend)', () => {
     expect(auth.to).toBe(to)
   })
 
-  it('relays through a configured relayer, and errors clearly without one', async () => {
+  it('relays an identity-free join through a configured relayer, and errors clearly without one', async () => {
     const relayer = vi.fn().mockResolvedValue({ txHash: '0xabc' })
-    const res = await relayGaslessJoin(relayer, { foo: 1 }, { pool: '0xaa', identityCommitment: 7n })
+    const res = await relayGaslessJoin(relayer, { foo: 1 }, { pool: '0xaa' })
     expect(res.txHash).toBe('0xabc')
+    // The relay context is identity-free: only the pool address is forwarded (no commitment).
+    expect(relayer).toHaveBeenCalledWith({ foo: 1 }, { pool: '0xaa' })
+    expect(relayer.mock.calls[0][1]).not.toHaveProperty('identityCommitment')
     await expect(relayGaslessJoin(null, {}, {})).rejects.toThrow(/no gasless relayer/i)
   })
 })
