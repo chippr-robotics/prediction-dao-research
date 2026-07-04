@@ -183,11 +183,11 @@ correctly; default view still hides expired wagers.
 
 ### Tests for User Story 6
 
-- [ ] T031 [US6] Test that the status `<select>` no longer offers Disputed/Expired and remaining options still filter, in `frontend/src/test/MyMarketsModal.test.jsx` (shares the file with T012/T033 — sequence, do not parallelize)
+- [X] T031 [US6] Test that the status `<select>` no longer offers Disputed/Expired and remaining options still filter, in `frontend/src/test/MyMarketsModal.test.jsx` (shares the file with T012/T033 — sequence, do not parallelize)
 
 ### Implementation for User Story 6
 
-- [ ] T032 [US6] Remove the `Disputed` and `Expired` `<option>`s from the status filter in `frontend/src/components/fairwins/MyMarketsModal.jsx` (leave `getMarketStatus`/categorization untouched)
+- [X] T032 [US6] Remove the `Disputed` and `Expired` `<option>`s from the status filter in `frontend/src/components/fairwins/MyMarketsModal.jsx` (leave `getMarketStatus`/categorization untouched)
 
 **Checkpoint**: Filter offers only reachable statuses; expired wagers stay hidden by default.
 
@@ -202,11 +202,11 @@ correctly; default view still hides expired wagers.
 
 ### Tests for User Story 7
 
-- [ ] T033 [US7] Test that the header renders no `mm-network-tag` pill and the subtitle still states the active network, in `frontend/src/test/MyMarketsModal.test.jsx` (shares the file with T012/T031 — sequence, do not parallelize)
+- [X] T033 [US7] Test that the header renders no `mm-network-tag` pill and the subtitle still states the active network, in `frontend/src/test/MyMarketsModal.test.jsx` (shares the file with T012/T031 — sequence, do not parallelize)
 
 ### Implementation for User Story 7
 
-- [ ] T034 [US7] Remove the `mm-network-tag` `<span>` from the header in `frontend/src/components/fairwins/MyMarketsModal.jsx` and delete the `.mm-network-tag*` rules from `frontend/src/components/fairwins/MyMarketsModal.css`
+- [X] T034 [US7] Remove the `mm-network-tag` `<span>` from the header in `frontend/src/components/fairwins/MyMarketsModal.jsx` and delete the `.mm-network-tag*` rules from `frontend/src/components/fairwins/MyMarketsModal.css`
 
 **Checkpoint**: Network name appears once (subtitle); the redundant pill is gone.
 

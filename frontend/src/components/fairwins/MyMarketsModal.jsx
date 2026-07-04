@@ -850,14 +850,8 @@ function MyMarketsModal({
             <div className="mm-brand">
               <span className="mm-brand-icon">&#128202;</span>
               <h2 id="my-markets-modal-title">My Wagers</h2>
-              {activeNetwork && (
-                <span
-                  className={`mm-network-tag${activeNetwork.isTestnet ? ' mm-network-tag-testnet' : ''}`}
-                  title={`Showing wagers on ${activeNetwork.name}`}
-                >
-                  {activeNetwork.name}
-                </span>
-              )}
+              {/* Network pill removed (spec 040 US7) — the subtitle below already
+                  names the active network, so a separate pill was redundant. */}
             </div>
             <p className="mm-subtitle">
               Manage your wagers and positions on {activeNetwork?.name || 'the current network'}
@@ -970,13 +964,14 @@ function MyMarketsModal({
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mm-filter-select"
             >
+              {/* Disputed and Expired options removed (spec 040 US6): Expired is
+                  hidden from the default view, and Disputed is not a reachable
+                  state here — offering them returned empty/misleading results. */}
               <option value="all">All Status</option>
               <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance</option>
               <option value={MarketStatus.ACTIVE}>Active</option>
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
-              <option value={MarketStatus.DISPUTED}>Disputed</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
-              <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
         </div>
