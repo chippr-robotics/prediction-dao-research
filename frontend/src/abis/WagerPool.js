@@ -1,6 +1,5 @@
-// ZKWagerPool ABI (spec 034)
-// Mirrored from the compiled artifact (contracts/pools/ZKWagerPool.sol). Keep in sync with the contract.
-export const ZK_WAGER_POOL_ABI = [
+// Auto-derived from artifacts/contracts/pools/WagerPool.sol (spec 034, address-based). Regenerate after contract changes.
+export const WAGER_POOL_ABI = [
   {
     "inputs": [],
     "stateMutability": "nonpayable",
@@ -8,7 +7,22 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
+    "name": "AlreadyApproved",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "AlreadyClaimed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AlreadyJoined",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "BadIntentSigner",
     "type": "error"
   },
   {
@@ -23,7 +37,54 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
+    "name": "ECDSAInvalidSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "length",
+        "type": "uint256"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ECDSAInvalidSignatureS",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptyMatrix",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "IndexOOB",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "IntentExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "IntentNotYetValid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "IntentReplayed",
     "type": "error"
   },
   {
@@ -58,12 +119,17 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
-    "name": "NothingToRefund",
+    "name": "NotMember",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "NullifierMismatch",
+    "name": "NotWinner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NothingToRefund",
     "type": "error"
   },
   {
@@ -78,22 +144,12 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
-    "name": "RecipientNotBound",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "ResolutionWindowClosed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ResolutionWindowOpen",
     "type": "error"
   },
   {
@@ -109,12 +165,12 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
-    "name": "WrongScope",
+    "name": "WrongState",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "WrongState",
+    "name": "ZeroWinner",
     "type": "error"
   },
   {
@@ -127,16 +183,10 @@ export const ZK_WAGER_POOL_ABI = [
         "type": "bytes32"
       },
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "nullifier",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "message",
-        "type": "uint256"
+        "indexed": true,
+        "internalType": "address",
+        "name": "member",
+        "type": "address"
       }
     ],
     "name": "Approved",
@@ -147,9 +197,9 @@ export const ZK_WAGER_POOL_ABI = [
     "inputs": [
       {
         "indexed": true,
-        "internalType": "bytes32",
-        "name": "shareRef",
-        "type": "bytes32"
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
       },
       {
         "indexed": false,
@@ -165,6 +215,12 @@ export const ZK_WAGER_POOL_ABI = [
       }
     ],
     "name": "Claimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "EIP712DomainChanged",
     "type": "event"
   },
   {
@@ -185,9 +241,9 @@ export const ZK_WAGER_POOL_ABI = [
     "inputs": [
       {
         "indexed": true,
-        "internalType": "uint256",
-        "name": "identityCommitment",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "member",
+        "type": "address"
       }
     ],
     "name": "Joined",
@@ -211,6 +267,25 @@ export const ZK_WAGER_POOL_ABI = [
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "NonceInvalidated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "bytes32",
         "name": "proposalId",
         "type": "bytes32"
@@ -227,6 +302,24 @@ export const ZK_WAGER_POOL_ABI = [
         "internalType": "bytes32",
         "name": "proposalId",
         "type": "bytes32"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct PayoutEntry[]",
+        "name": "entries",
+        "type": "tuple[]"
       }
     ],
     "name": "OutcomeProposed",
@@ -258,48 +351,109 @@ export const ZK_WAGER_POOL_ABI = [
     "type": "event"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "acceptDeadline",
+    "outputs": [
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "merkleTreeDepth",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "merkleTreeRoot",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "nullifier",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "message",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "scope",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256[8]",
-            "name": "points",
-            "type": "uint256[8]"
-          }
-        ],
-        "internalType": "struct ISemaphore.SemaphoreProof",
-        "name": "proof",
-        "type": "tuple"
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
       }
     ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "approve",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "proposalId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "approveWithSig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "approvedBy",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "authorizationState",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -325,11 +479,44 @@ export const ZK_WAGER_POOL_ABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "cancelWithSig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "components": [
           {
-            "internalType": "uint256",
-            "name": "claimNullifier",
-            "type": "uint256"
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
           },
           {
             "internalType": "uint256",
@@ -347,43 +534,6 @@ export const ZK_WAGER_POOL_ABI = [
         "type": "uint256"
       },
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "merkleTreeDepth",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "merkleTreeRoot",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "nullifier",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "message",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "scope",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256[8]",
-            "name": "points",
-            "type": "uint256[8]"
-          }
-        ],
-        "internalType": "struct ISemaphore.SemaphoreProof",
-        "name": "proof",
-        "type": "tuple"
-      },
-      {
         "internalType": "address",
         "name": "recipient",
         "type": "address"
@@ -395,8 +545,120 @@ export const ZK_WAGER_POOL_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct PayoutEntry[]",
+        "name": "entries",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "claimWithSig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimedIndex",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "closeJoining",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "closeJoiningWithSig",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -442,6 +704,49 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
+    "name": "eip712Domain",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "fields",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "verifyingContract",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "extensions",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "escrowTotal",
     "outputs": [
       {
@@ -480,19 +785,6 @@ export const ZK_WAGER_POOL_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "groupId",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -520,16 +812,6 @@ export const ZK_WAGER_POOL_ABI = [
       },
       {
         "internalType": "address",
-        "name": "semaphore_",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "groupId_",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
         "name": "creator_",
         "type": "address"
       },
@@ -550,12 +832,12 @@ export const ZK_WAGER_POOL_ABI = [
       },
       {
         "internalType": "uint64",
-        "name": "joinDeadline_",
+        "name": "acceptDeadline_",
         "type": "uint64"
       },
       {
         "internalType": "uint64",
-        "name": "resolutionWindow_",
+        "name": "resolveDeadline_",
         "type": "uint64"
       }
     ],
@@ -567,36 +849,25 @@ export const ZK_WAGER_POOL_ABI = [
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "identityCommitment",
-        "type": "uint256"
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
       }
     ],
-    "name": "join",
+    "name": "invalidateNonce",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [],
-    "name": "joinDeadline",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
+    "name": "join",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "identityCommitment",
-        "type": "uint256"
-      },
       {
         "internalType": "address",
         "name": "from",
@@ -711,9 +982,21 @@ export const ZK_WAGER_POOL_ABI = [
   {
     "inputs": [
       {
-        "internalType": "bytes32",
-        "name": "proposalId",
-        "type": "bytes32"
+        "components": [
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct PayoutEntry[]",
+        "name": "entries",
+        "type": "tuple[]"
       }
     ],
     "name": "proposeOutcome",
@@ -722,8 +1005,91 @@ export const ZK_WAGER_POOL_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct PayoutEntry[]",
+        "name": "entries",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "proposeOutcomeWithSig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "refund",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "refundWithSig",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -749,25 +1115,12 @@ export const ZK_WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
-    "name": "resolutionWindow",
+    "name": "resolveDeadline",
     "outputs": [
       {
         "internalType": "uint64",
         "name": "",
         "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "semaphore",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
       }
     ],
     "stateMutability": "view",

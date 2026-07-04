@@ -7,38 +7,40 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {UUPSManaged} from "../upgradeable/UUPSManaged.sol";
 import {ISanctionsGuard} from "../interfaces/ISanctionsGuard.sol";
 import {IMembershipManager} from "../interfaces/IMembershipManager.sol";
-import {IZKWagerPoolFactory} from "./interfaces/IZKWagerPoolFactory.sol";
-import {ISemaphore} from "./interfaces/ISemaphore.sol";
-import {ZKWagerPool} from "./ZKWagerPool.sol";
+import {IWagerPoolFactory} from "./interfaces/IWagerPoolFactory.sol";
+import {WagerPool} from "./WagerPool.sol";
 
-/// @title ZKWagerPoolFactory — authority & registry for ZK-Wager Pools (spec 034)
-/// @notice The single upgradeable, state-bearing contract that clones isolated {ZKWagerPool}
-///         instances. It screens the creator (sanctions + `POOL_PARTICIPANT_ROLE` membership),
-///         assigns a unique language-independent 4-word BIP-39 index tuple, creates a per-pool
-///         Semaphore group (with the new pool as admin), deploys the pool as an immutable ERC-1167
-///         clone, and records it in a network-scoped registry.
+/// @title WagerPoolFactory — authority & registry for group-wager pools (spec 034, address-based)
+/// @notice The single upgradeable, state-bearing contract that clones isolated {WagerPool} instances. It
+///         screens the creator (sanctions + `POOL_PARTICIPANT_ROLE` membership), assigns a unique
+///         language-independent 4-word BIP-39 index tuple, deploys the pool as an immutable ERC-1167
+///         clone, and records it in a network-scoped registry. No Semaphore / anonymity primitive is
+///         involved — membership and voting are by public wallet address.
 /// @dev    Inherits {UUPSManaged} (UUPS + AccessControl + non-brickable upgrade gate + impl-init
 ///         lockout) and {ReentrancyGuardUpgradeable}. Storage is append-only with a trailing `__gap`
-///         (register in `npm run check:storage-layout`). Pools are IMMUTABLE clones — only this
-///         factory is upgradeable. Compliance is enforced on the real wallet (FR-021); when
-///         `screeningRequired` is set (value-bearing networks) a sanctions guard AND membership
-///         manager MUST be configured, and create/join revert otherwise (FR-021a). It also serves the
-///         pools' compliance callbacks via {screen}/{requireMembership}.
-contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuardUpgradeable {
+///         (register in `npm run check:storage-layout`). Pools are IMMUTABLE clones — only this factory
+///         is upgradeable. Compliance is enforced on the real wallet (FR-021); when `screeningRequired`
+///         is set (value-bearing networks) a sanctions guard AND membership manager MUST be configured,
+///         and create/join revert otherwise (FR-021a). It also serves the pools' compliance callbacks
+///         via {screen}/{requireMembership}. Timing mirrors the 1v1/oracle {WagerRegistry}: two absolute
+///         deadlines (`acceptDeadline`, `resolveDeadline`), bounded + ordered by {_checkDeadlines}.
+contract WagerPoolFactory is IWagerPoolFactory, UUPSManaged, ReentrancyGuardUpgradeable {
     /// @notice Membership role gating pool participation, distinct from `WAGER_PARTICIPANT_ROLE`
     ///         (FR-021b).
     bytes32 public constant POOL_PARTICIPANT_ROLE = keccak256("POOL_PARTICIPANT_ROLE");
 
-    /// @notice Hard cap on members per pool (fixed anonymity-set capacity, FR-002a / SC-012).
+    /// @notice Hard cap on members per pool (FR-002a / SC-012).
     uint32 public constant MAX_MEMBERS_CAP = 1000;
+
+    /// @notice Deadline bounds, mirroring {WagerRegistry} so pools and 1v1/oracle wagers behave
+    ///         identically (30-day accept horizon, 180-day resolve horizon).
+    uint64 public constant MAX_ACCEPT_WINDOW = 30 days;
+    uint64 public constant MAX_RESOLVE_WINDOW = 180 days;
 
     // ---- Append-only storage (never insert/reorder/remove above __gap) ----
 
-    /// @notice Immutable pool implementation cloned per group (replaceable by admin via {setTemplate}).
+    /// @notice Immutable pool implementation cloned per pool (replaceable by admin via {setTemplate}).
     address public poolImpl;
-
-    /// @notice Semaphore V4 singleton for this network (self-deployed on ETC).
-    ISemaphore public semaphore;
 
     /// @notice Sanctions screen for creators + joiners. address(0) disables (only allowed when
     ///         `screeningRequired` is false — local/dev/test).
@@ -63,9 +65,15 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     mapping(bytes32 => address) private _phraseToPool;
     mapping(address => uint32[4]) private _poolToPhrase;
 
-    uint256[50] private __gap;
+    /// @notice Buy-in token allowlist (FR-024). Enforced only when `screeningRequired` (value-bearing
+    ///         networks); on local/dev/test any token is accepted so fixtures can use a mock USDC.
+    mapping(address => bool) public allowedToken;
+
+    uint256[49] private __gap;
 
     error InvalidParams();
+    error BadDeadlines();
+    error TokenNotAllowed();
     error ScreeningNotConfigured();
     error MembershipNotConfigured();
     error MembershipDenied();
@@ -75,19 +83,17 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     function initialize(
         address admin,
         address poolImpl_,
-        address semaphore_,
         address sanctionsGuard_,
         address membershipManager_,
         bool screeningRequired_
     ) external initializer {
         __UUPSManaged_init(admin);
         __ReentrancyGuard_init();
-        if (poolImpl_ == address(0) || semaphore_ == address(0)) revert InvalidParams();
+        if (poolImpl_ == address(0)) revert InvalidParams();
         if (screeningRequired_ && (sanctionsGuard_ == address(0) || membershipManager_ == address(0))) {
             revert InvalidParams();
         }
         poolImpl = poolImpl_;
-        semaphore = ISemaphore(semaphore_);
         sanctionsGuard = ISanctionsGuard(sanctionsGuard_);
         membershipManager = IMembershipManager(membershipManager_);
         screeningRequired = screeningRequired_;
@@ -97,7 +103,7 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     // Create
     // ---------------------------------------------------------------------
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function createPool(CreatePoolParams calldata p)
         external
         nonReentrant
@@ -109,26 +115,19 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
 
         if (
             p.token == address(0) || p.buyIn == 0 || p.maxMembers < 2 || p.maxMembers > MAX_MEMBERS_CAP
-                || p.thresholdBips == 0 || p.thresholdBips > 10000 || p.joinDeadline <= block.timestamp
-                || p.resolutionWindow == 0
+                || p.thresholdBips == 0 || p.thresholdBips > 10000
         ) revert InvalidParams();
+        // Buy-in must be an allowlisted token on value-bearing networks (FR-024). escrowTotal is derived
+        // arithmetically (memberCount * buyIn), which only holds for a well-behaved (non fee-on-transfer,
+        // non-rebasing) token — so the token set is curated by the admin, not creator-chosen.
+        if (screeningRequired && !allowedToken[p.token]) revert TokenNotAllowed();
+        _checkDeadlines(p.acceptDeadline, p.resolveDeadline);
 
         poolId = ++poolCount;
         pool = Clones.clone(poolImpl);
 
-        // The new pool is the Semaphore group admin — the only path to addMember (research §1).
-        uint256 gid = semaphore.createGroup(pool);
-
-        ZKWagerPool(pool).initialize(
-            p.token,
-            address(semaphore),
-            gid,
-            msg.sender,
-            p.buyIn,
-            p.maxMembers,
-            p.thresholdBips,
-            p.joinDeadline,
-            p.resolutionWindow
+        WagerPool(pool).initialize(
+            p.token, msg.sender, p.buyIn, p.maxMembers, p.thresholdBips, p.acceptDeadline, p.resolveDeadline
         );
 
         uint32[4] memory wordIndices = _assignPhrase(poolId, pool);
@@ -137,8 +136,26 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
         poolAddressToId[pool] = poolId;
 
         emit PoolCreated(
-            poolId, pool, msg.sender, wordIndices, p.token, p.buyIn, p.maxMembers, p.thresholdBips, p.joinDeadline
+            poolId,
+            pool,
+            msg.sender,
+            wordIndices,
+            p.token,
+            p.buyIn,
+            p.maxMembers,
+            p.thresholdBips,
+            p.acceptDeadline,
+            p.resolveDeadline
         );
+    }
+
+    /// @dev Deadline bounds + ordering, mirroring {WagerRegistry._checkDeadlines}: acceptance in the
+    ///      future and within 30 days; resolution strictly after acceptance and within 180 days.
+    function _checkDeadlines(uint64 acceptDeadline, uint64 resolveDeadline) internal view {
+        if (acceptDeadline <= block.timestamp) revert BadDeadlines();
+        if (resolveDeadline <= acceptDeadline) revert BadDeadlines();
+        if (acceptDeadline > block.timestamp + MAX_ACCEPT_WINDOW) revert BadDeadlines();
+        if (resolveDeadline > block.timestamp + MAX_RESOLVE_WINDOW) revert BadDeadlines();
     }
 
     /// @dev Derive a unique 4-word BIP-39 index tuple (each 0..2047) for `poolId`, collision-checked
@@ -171,18 +188,18 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     // Gateway resolution + registry views
     // ---------------------------------------------------------------------
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function poolByPhrase(uint32[4] calldata wordIndices) external view returns (address pool) {
         uint32[4] memory idx = wordIndices;
         return _phraseToPool[_phraseKey(idx)];
     }
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function phraseOfPool(address pool) external view returns (uint32[4] memory wordIndices) {
         return _poolToPhrase[pool];
     }
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function poolById(uint256 poolId) external view returns (address pool) {
         return _pools[poolId];
     }
@@ -217,14 +234,14 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     // Admin
     // ---------------------------------------------------------------------
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function setTemplate(address newPoolImpl) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newPoolImpl == address(0)) revert InvalidParams();
         poolImpl = newPoolImpl;
         emit TemplateUpdated(newPoolImpl);
     }
 
-    /// @inheritdoc IZKWagerPoolFactory
+    /// @inheritdoc IWagerPoolFactory
     function setSanctionsGuard(address guard) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (screeningRequired && guard == address(0)) revert ScreeningNotConfigured();
         sanctionsGuard = ISanctionsGuard(guard);
@@ -235,5 +252,12 @@ contract ZKWagerPoolFactory is IZKWagerPoolFactory, UUPSManaged, ReentrancyGuard
     function setMembershipManager(address manager) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (screeningRequired && manager == address(0)) revert MembershipNotConfigured();
         membershipManager = IMembershipManager(manager);
+    }
+
+    /// @notice Allow/deny a buy-in token (FR-024). Curate the canonical USDC per network here; on
+    ///         value-bearing networks {createPool} rejects any token not on this list.
+    function setAllowedToken(address token, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        allowedToken[token] = allowed;
+        emit TokenAllowed(token, allowed);
     }
 }

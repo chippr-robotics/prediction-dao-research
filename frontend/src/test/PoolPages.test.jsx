@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
-// PoolPage (spec 034): the routed pool-management view — live state + the member's nickname + the
-// state-driven actions (creator close/cancel, member approve w/ progress, refund, resolved). The
-// create/join entry flows are now the GroupPoolModal bottom-sheet (see GroupPoolModal.test.jsx).
+// PoolPage (spec 034, address-based): the routed pool-management view — live state + the member's
+// address-derived alias (no signature, no reveal/restore) + the state-driven actions (creator
+// close/cancel, member approve w/ progress, refund, resolved). The create/join entry flows are the
+// GroupPoolModal bottom-sheet (see GroupPoolModal.test.jsx).
 
 vi.mock('../hooks/useWalletManagement', () => ({ useWallet: vi.fn() }))
 vi.mock('../hooks/usePools', () => ({ usePools: vi.fn() }))
@@ -23,11 +24,8 @@ function base(overrides = {}) {
   return {
     status: 'idle', error: null,
     createPool: vi.fn(), resolvePhrase: vi.fn(), getPoolSummary: vi.fn(), joinPool: vi.fn(),
-    getMyNickname: vi.fn(), getMyClaimCode: vi.fn(), getMemberCommitments: vi.fn(),
-    peekPoolIdentity: vi.fn().mockResolvedValue(null),
-    restorePoolIdentity: vi.fn().mockResolvedValue({
-      commitment: '123', claimCode: '987654321', nickname: { label: 'Prismatic Fox', suffix: '7b' },
-    }),
+    getMembers: vi.fn().mockResolvedValue([]),
+    getMyNickname: vi.fn().mockResolvedValue({ label: 'Prismatic Fox', suffix: '7b' }),
     closeJoining: vi.fn().mockResolvedValue('0xtx'), cancelPool: vi.fn().mockResolvedValue('0xtx'),
     proposeOutcome: vi.fn(), vote: vi.fn().mockResolvedValue('0xtx'), claimWinnings: vi.fn(),
     refund: vi.fn().mockResolvedValue('0xtx'),
@@ -58,31 +56,14 @@ describe('PoolPage', () => {
     expect(state).not.toHaveTextContent('JoiningOpen')
   })
 
-  it('auto-shows a joined member’s nickname from the device cache (no click, no signature)', async () => {
+  it('auto-shows a joined member’s alias derived from their address (no click, no signature)', async () => {
     const sum = { ...openSummary, hasJoined: true }
-    const peekPoolIdentity = vi.fn().mockResolvedValue({
-      commitment: '123', claimCode: null, nickname: { label: 'Prismatic Fox', suffix: '7b' },
-    })
-    const restorePoolIdentity = vi.fn()
-    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), peekPoolIdentity, restorePoolIdentity }))
+    const getMyNickname = vi.fn().mockResolvedValue({ label: 'Prismatic Fox', suffix: '7b' })
+    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), getMyNickname }))
     renderPoolAt(sum)
     expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Prismatic Fox')
     expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
-    expect(restorePoolIdentity).not.toHaveBeenCalled() // cache hit — no signature path
-  })
-
-  it('auto-RESTORES the identity when nothing is cached — still no click (live-app tester feedback)', async () => {
-    const sum = { ...openSummary, hasJoined: true }
-    const restorePoolIdentity = vi.fn().mockResolvedValue({
-      commitment: '123', claimCode: '987654321', nickname: { label: 'Gentle Fox', suffix: '14' },
-    })
-    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), restorePoolIdentity }))
-    renderPoolAt(sum)
-    expect(await screen.findByTestId('my-nickname')).toHaveTextContent('Gentle Fox')
-    expect(restorePoolIdentity).toHaveBeenCalledWith(sum.address)
-    expect(screen.queryByRole('button', { name: /reveal my nickname/i })).toBeNull()
-    // The raw claim code is never rendered — it's system-managed now (no scary integer on screen).
-    expect(screen.queryByText('987654321')).toBeNull()
+    await waitFor(() => expect(getMyNickname).toHaveBeenCalledWith(sum.address))
   })
 
   it('lets a not-yet-joined viewer (including the creator) join while joining is open', async () => {
@@ -100,14 +81,6 @@ describe('PoolPage', () => {
     const details = await screen.findByTestId('pool-summary')
     expect(details.tagName).toBe('DETAILS')
     expect(details.open).toBe(false)
-  })
-
-  it('falls back to the Reveal button only when the automatic restore fails (declined signature)', async () => {
-    const sum = { ...openSummary, hasJoined: true }
-    const restorePoolIdentity = vi.fn().mockRejectedValue(new Error('user rejected signature'))
-    usePools.mockReturnValue(base({ getPoolSummary: vi.fn().mockResolvedValue(sum), restorePoolIdentity }))
-    renderPoolAt(sum)
-    expect(await screen.findByRole('button', { name: /reveal my nickname/i })).toBeInTheDocument()
   })
 
   it('shows no identity section to a viewer who has not joined (e.g. a creator outside the pool)', async () => {

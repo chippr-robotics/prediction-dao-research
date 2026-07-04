@@ -253,9 +253,119 @@ winner's **wallet address** the public claim code.
    `claim(entries, index, recipient)` where the app picks the row whose `winner == connected account`.
    Deferred until the contract direction passes review, to avoid rework against a changing interface.
 
+### Semaphore removed — address-based pools, relayer-ready (round 7)
+
+Round 6 landed the address-based pool as a **drop-in `PublicWagerPool` template** that kept the
+Semaphore init-selector and left the factory's per-pool group inert (compat scaffolding). The user
+confirmed the anonymity direction is dead for good, so round 7 finishes the job: a **clean
+Semaphore-ectomy + rename**, no dead ZK scaffolding left behind.
+
+- **Full Semaphore-ectomy + rename.** `ZKWagerPool → WagerPool`, `ZKWagerPoolFactory →
+  WagerPoolFactory`, interfaces `IWagerPool` / `IWagerPoolFactory`. The old
+  `ZKWagerPool.sol` / `ZKWagerPoolFactory.sol` / `PublicWagerPool.sol` (the round-6 shim) /
+  `interfaces/ISemaphore.sol` / `mocks/MockSemaphore.sol` / `scripts/deploy/deploy-semaphore.js`
+  are **deleted**. The factory no longer creates or references a Semaphore group at all —
+  `initialize(...)` drops the `semaphore_`/`groupId_` args, and the pool's init takes exactly the
+  config it needs (`token, creator, buyIn, maxMembers, thresholdBips, acceptDeadline,
+  resolveDeadline`). Membership (`hasJoined`), voting (`approvedBy[pid][member]`), and claims
+  (`entries[index].winner == claimant`) are all by **public wallet address**; the winner's address
+  IS the claim code, derivable by every party from the public roster — which is exactly the "claim
+  code must be derivable from public knowledge by both parties, or not exist" requirement that round
+  6 proved impossible while anonymous. No Groth16, no in-browser WASM — so the CSP/proof-generation
+  failure surface that consumed rounds 4–5 is gone for pools entirely.
+- **Timing now mirrors `WagerRegistry` (user directive).** Round 6 (and everything before it) used a
+  `joinDeadline` plus a **relative** resolution window measured from close — a design that drifts
+  from how 1v1/oracle wagers express time and made pools feel like a different product. The user's
+  explicit requirement was "acceptance, close, resolution times configurable, same as 1v1/oracle."
+  So pools now carry **two absolute `uint64` deadlines**, `acceptDeadline` (joining/acceptance
+  closes) and `resolveDeadline` (resolution must complete by), and `WagerPoolFactory._checkDeadlines`
+  validates them **byte-for-byte like `WagerRegistry`**: `acceptDeadline ∈ (now, now +
+  MAX_ACCEPT_WINDOW=30d]`; `resolveDeadline ∈ (acceptDeadline, now + MAX_RESOLVE_WINDOW=180d]`.
+  Resolution actions are gated on `state == JoiningClosed && block.timestamp < resolveDeadline`;
+  after `resolveDeadline` with no locked outcome, `refund()` opens for every member. Beyond matching
+  the sibling surface, absolute deadlines remove the round-6 relative-window drift (the effective
+  resolution deadline no longer depends on *when* joining happened to close).
+- **Per-INDEX claim fix (security).** The prior guard was `claimed[msg.sender]` — one claim per
+  winner **address**. A legitimate payout matrix can list the same winner in more than one row
+  (e.g. a split where one wallet holds two winning positions); under the old guard the winner could
+  claim only the first row and the rest of the escrow **stranded permanently**, since escrow only
+  exits via `claim`/`refund` and the pool is `Resolved` (no refund). Round 7 tracks claims by
+  **payout-matrix row index** (`claimedIndex[index]`): `claim` re-checks `sum(entries) ==
+  escrowTotal` and `keccak256(entries) == lockedOutcome`, then marks the specific `index` claimed.
+  A matrix that sums to escrow is therefore always fully claimable, however winners repeat. (A
+  malformed *approved* matrix — sum ≠ escrow, or a zero-address winner row — can still strand funds;
+  that's inherent to the commit-hash-then-reveal design and unchanged, and is called out in the
+  contract NatSpec for the security review.)
+- **`SignerIntentBase` + `…WithSig` twins, baked into the immutable template.** New reusable base
+  `contracts/upgradeable/SignerIntentBase.sol` (EIP-712 typed-data + an **ERC-7201-namespaced**,
+  single-use 256-bit replay nonce, `_verifyIntent`, plus `invalidateNonce`/`authorizationState` for
+  pre-emptive cancel). `WagerPool` gains a signature-verified twin for every actor-attributed action
+  — `approveWithSig` / `claimWithSig` / `proposeOutcomeWithSig` / `closeJoiningWithSig` /
+  `cancelWithSig` / `refundWithSig` — each of which recovers the EOA `signer` from the signature and
+  authorizes **that** address instead of `msg.sender`, so a **relayer can submit on a member's
+  behalf**. `approveWithSig`/`claimWithSig` bind `proposalId` / (`index`+`recipient`) into the signed
+  struct so a relayer can't retarget them. The money-in join keeps its EIP-3009 relayable form
+  (`joinWithAuthorization`). This is the deliberate alignment with the intent-based/relayer work
+  (spec 035/036): the endgame is **batched + gasless via EOA-signature → relayer**. Crucially, these
+  are baked into the clone template **now, at deploy time** — pools are **immutable ERC-1167 clones**
+  and cannot be retrofitted, so a later "add relayer support" upgrade is impossible for pools already
+  created. Getting the twins in before the fresh deploy is the only window. Self-submit entrypoints
+  remain the primary path; the twins are purely additive (nonce namespace is separate storage, no
+  `__gap` cost).
+- **Deploy plan.** Fresh deploy of `WagerPoolFactory` + `WagerPool` — **Amoy (staging) → Polygon
+  mainnet → Mordor**. There are no existing address-based pools to migrate; round-6 `ZKWagerPool`
+  pools (if any were ever created on a live net) are immutable and simply age out. Removing Semaphore
+  **unblocks Mordor/ETC**: there is no longer an anonymity primitive to self-deploy, and the
+  contracts compile paris/shanghai-safe, so ETC moves from "later increment" into the launch
+  sequence. Actual mainnet deploys stay gated on the **formal smart-contract security review**
+  (`.github/agents/smart-contract-security`, scope = the address-based custody surface) + floppy key
+  + explicit go. The frontend rewire (plain-tx join/approve/claim, roster + payout-by-address,
+  nickname from the public address) is a separate workstream in scope this session.
+
+### Pre-security-review adversarial pass — findings + fixes (round 7)
+
+Before staging the deploy we ran a multi-agent adversarial correctness pass over the address-based
+custody surface (`WagerPool` + `WagerPoolFactory` + `SignerIntentBase`). Because pools are **immutable
+ERC-1167 clones deployed fresh**, the pool template is the only cheap moment to fix custody bugs — a
+flaw baked into the first deployed clone cannot be upgraded away. Three findings were CONFIRMED and
+fixed in the template **before deploy**:
+
+1. **[HIGH] A garbage / unclaimable outcome could lock and burn all escrow.** The old
+   `proposeOutcome(bytes32)` committed an arbitrary hash with no proof a well-formed matrix existed; if
+   the locked hash had no valid preimage (or its preimage summed wrong / named a zero-address winner),
+   `claim` could never satisfy `hash == lockedOutcome && sum == escrowTotal`, and `refund` is
+   unreachable once `Resolved` → **escrow permanently stranded**. **Fix:** `proposeOutcome` now takes the
+   **full `PayoutEntry[]`** and validates it **on-chain** — non-empty, every winner non-zero, amounts sum
+   to the exact escrow — before it can be proposed/locked, then **emits the matrix** in `OutcomeProposed`.
+   A locked outcome is therefore *always* fully claimable, and members can read the exact split
+   on-chain before approving (this also removes the off-chain-reveal trust gap that motivated the
+   redesign). `proposeOutcomeWithSig` binds the creator's intent to `keccak256(entries)`.
+2. **[HIGH] The creator could unilaterally force a payout at low thresholds.** With `required == 1`
+   (e.g. 50% of 2, or any small fraction of a large pool) the creator — who is also a member — could
+   propose + self-approve and lock a self-dealing payout, violating FR-020b. **Fix:** `_requiredApprovals`
+   floors to **2 approvals for any multi-member pool** (`frozenDenominator >= 2`), so no single member,
+   the proposer included, can resolve alone.
+3. **[HIGH] `createPool` accepted any ERC-20, not allowlisted USDC (FR-024 unenforced).** `escrowTotal`
+   is derived arithmetically (`memberCount * buyIn`), which only holds for a well-behaved token; a
+   fee-on-transfer / rebasing / malicious token makes real balance < `escrowTotal` and strands the tail
+   claim. **Fix:** the factory now keeps an **admin-curated token allowlist** (`allowedToken` +
+   `setAllowedToken`, event `TokenAllowed`); when `screeningRequired` (value-bearing networks)
+   `createPool` reverts `TokenNotAllowed` for any non-allowlisted token. Local/dev/test (screening off)
+   still accepts a mock token. The deploy script allowlists the canonical `POOL_USDC_<chainId>` as admin
+   right after the proxy comes up.
+
+A fourth flag — re-proposing an abandoned `proposalId` retains its prior approval count — was
+**REFUTED** as intended (approvals are keyed by id; a member's approval of matrix *X* remains valid if
+*X* is re-proposed). Coverage added: `proposeOutcome` sum/zero-winner/empty guards, the min-2
+single-member-can't-lock case, and factory `TokenNotAllowed` allowlist enforcement. Contract suite
+**42 passing**; storage-layout gate green; frontend reconciled (`usePools.proposeOutcome(entries)`,
+`PoolResolutionActions` commits the full matrix). The **formal** security review
+(`.github/agents/smart-contract-security`) still gates the actual value-bearing deploy.
+
 ## Actual on-chain deployment (ops, post-merge)
 
-Not a tasks.md code task. Sequence: adversarial pre-deploy audit → Amoy (`deploy-zk-wager-pool-factory.js`)
-→ validate end-to-end → `sync:frontend-contracts` + add the factory address/startBlock to
-`subgraph/networks.json` + publish the subgraph → Polygon mainnet (pause for explicit go; real POL;
-requires the formal security review) → Mordor/ETC (self-deploy Semaphore first, T057).
+Not a tasks.md code task. Sequence: formal security review → Amoy (`deploy-wager-pool-factory.js`,
+which allowlists `POOL_USDC_80002` on the way up) → validate end-to-end → `sync:frontend-contracts` +
+add the factory address/startBlock to `subgraph/networks.json` + publish the subgraph → Polygon
+mainnet (pause for explicit go; real POL; requires the formal security review) → Mordor/ETC (deploys
+directly now — no Semaphore to self-deploy).

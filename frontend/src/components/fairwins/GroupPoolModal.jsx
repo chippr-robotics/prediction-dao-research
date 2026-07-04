@@ -99,21 +99,22 @@ function CreatePanel({ onClose }) {
   const [buyIn, setBuyIn] = useState('10.00')
   const [maxMembers, setMaxMembers] = useState('10')
   const [thresholdPct, setThresholdPct] = useState(THRESHOLD_CHOICES[0].pct)
-  // Windows as concrete instants (tester feedback): the same slider + tap-to-type timeline as the
-  // open challenge, instead of bare day counts. joinBy → the on-chain joinDeadline; resolveBy − joinBy
-  // → the resolutionWindow that starts when joining actually closes. Mount-time "now" anchors the
-  // future check (same anchor the timeline's sliders use); the contract re-checks at create time.
-  const [mountedAtMs] = useState(() => Date.now())
-  const [joinBy, setJoinBy] = useState(() => toDatetimeLocal(mountedAtMs + 7 * DAY_MS))
-  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(mountedAtMs + 10 * DAY_MS))
+  // Windows as two ABSOLUTE instants (tester + user directive): pools now time exactly like the
+  // 1v1/open-challenge flow — an `acceptDeadline` (joining closes) and a `resolveDeadline` (resolution
+  // must complete by), each picked with the shared slider + tap-to-type timeline. No relative
+  // resolution window / drift math: both instants are passed straight through to createPool. Mount-time
+  // "now" anchors the defaults and the future check (the contract re-checks at create time).
+  const [nowMs] = useState(() => Date.now())
+  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(nowMs + 7 * DAY_MS))
+  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(nowMs + 10 * DAY_MS))
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const joinMs = joinBy ? new Date(joinBy).getTime() : NaN
+  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
   const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
   const deadlinesValid =
-    Number.isFinite(joinMs) && Number.isFinite(resolveMs) &&
-    joinMs > mountedAtMs && resolveMs > joinMs
+    Number.isFinite(acceptMs) && Number.isFinite(resolveMs) &&
+    acceptMs > nowMs && resolveMs > acceptMs
   const membersValid = Number(maxMembers) >= 2 && Number(maxMembers) <= 1000
   const canCreate = Number(buyIn) > 0 && membersValid && deadlinesValid && isConnected && status !== 'creating'
   const chosen = THRESHOLD_CHOICES.find((c) => c.pct === thresholdPct) || THRESHOLD_CHOICES[0]
@@ -125,8 +126,8 @@ function CreatePanel({ onClose }) {
         buyIn,
         maxMembers,
         thresholdPct,
-        joinDeadline: Math.floor(joinMs / 1000),
-        resolutionWindow: Math.max(1, Math.floor((resolveMs - joinMs) / 1000)),
+        acceptDeadline: Math.floor(acceptMs / 1000),
+        resolveDeadline: Math.floor(resolveMs / 1000),
       }))
     } catch {
       /* surfaced via hook error */
@@ -250,9 +251,9 @@ function CreatePanel({ onClose }) {
       {/* Windows (tester feedback): the open-challenge timeline element — slide to pick each time,
           or tap a tile to type the exact date & time. */}
       <DeadlineTimeline
-        acceptBy={joinBy}
+        acceptBy={acceptBy}
         resolveBy={resolveBy}
-        onAcceptChange={setJoinBy}
+        onAcceptChange={setAcceptBy}
         onResolveChange={setResolveBy}
         disabled={status === 'creating'}
         idPrefix="gp"
@@ -260,11 +261,11 @@ function CreatePanel({ onClose }) {
         acceptHint="Friends can join with the four words until this time. You can also close joining early once everyone is in."
         acceptTileHead="Join by"
         resolveLabel="Must be resolved by"
-        resolveHint="After joining closes, the group has until about this time to approve the payout — otherwise buy-ins become refundable."
+        resolveHint="After joining closes, the group has until this time to approve the payout — otherwise buy-ins become refundable."
         resolveTileHead="Resolve by"
         summary={(openSpan, settleSpan) => `Open ${openSpan} for friends to join · then up to ${settleSpan} to settle`}
       />
-      {!deadlinesValid && (joinBy || resolveBy) && (
+      {!deadlinesValid && (acceptBy || resolveBy) && (
         <p className="fm-hint oc-deadline-warn" role="alert">
           Pick a join time in the future and a resolve time after it.
         </p>

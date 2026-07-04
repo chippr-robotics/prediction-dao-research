@@ -190,8 +190,7 @@ function main() {
         tokenFactory: deployed.tokenFactory, // spec 028 — token issuance (only present where deployed)
         externalDAORegistry: deployed.externalDAORegistry, // spec 030 — ClearPath external-DAO registry
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
-        zkWagerPoolFactory: deployed.zkWagerPoolFactory, // spec 034 — ZK-Wager Pools factory (only where deployed)
-        zkWagerPoolSemaphore: deployed.zkWagerPoolSemaphore, // spec 034 — Semaphore singleton (canonical or self-deployed)
+        wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
         polymarketAdapter: deployed.polymarketAdapter,
         chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
         chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,

@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePools } from '../hooks/usePools'
 import { poolStateDisplay } from '../lib/pools/poolContracts'
-import { deriveNickname } from '../lib/pools/nickname'
-import { payoutDisplayMap } from '../lib/pools/payout'
 import { readProposedMatrix, readStoredMatrix } from '../lib/pools/proposalStore'
 import Button from '../components/ui/Button'
 import PoolParticipants from '../components/pools/PoolParticipants'
@@ -11,7 +9,7 @@ import PoolResolutionActions from '../components/pools/PoolResolutionActions'
 import './pools.css'
 
 // Creator's device-local rank arrangement (until a cross-member sync channel ships, so other members
-// keep the alphabetical view).
+// keep the alphabetical view). Keyed by member wallet address.
 const rankKey = (pool) => `fairwins_pool_rank_v1_${String(pool || '').toLowerCase()}`
 function readRankOrder(pool) {
   try {
@@ -31,27 +29,29 @@ function writeRankOrder(pool, order) {
 }
 
 /**
- * PoolPage (spec 034) — view a pool's live, on-chain state and take the state-appropriate action. The
- * roster, standings, and proposed payout are unified into one display (UX round 3): once a payout is
- * proposed, the members' cards show medals + amounts. Honest finality (Principle III): pending, closed,
- * resolved, and refund-eligible states are surfaced truthfully.
+ * PoolPage (spec 034, address-based) — view a pool's live, on-chain state and take the state-appropriate
+ * action. Membership, voting, and claims are by PUBLIC WALLET ADDRESS: the roster comes from
+ * `Joined(address)` events, a member's nickname is a friendly label derived from their address (no
+ * signature, no "reveal"), and the payout matrix keys on the winner's address. The roster, standings, and
+ * proposed payout are unified into one display: once a payout is proposed, the members' cards show medals
+ * + amounts. Honest finality (Principle III): pending, closed, resolved, and refund-eligible states are
+ * surfaced truthfully.
  */
 export default function PoolPage() {
   const { address } = useParams()
   const pools = usePools()
   const {
-    getPoolSummary, peekPoolIdentity, restorePoolIdentity, getMemberCommitments,
+    getPoolSummary, getMembers, getMyNickname,
     joinPool, closeJoining, cancelPool, vote, refund, status,
   } = pools
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState(null)
-  // The member's display identity ({ nickname, claimCode, commitment }) — auto-restored, never click-gated.
-  const [identity, setIdentity] = useState(null)
-  const [identityStatus, setIdentityStatus] = useState('idle') // idle | restoring | failed
+  // The connected member's friendly alias ({ label, suffix }) — derived from their wallet address.
+  const [myNickname, setMyNickname] = useState(null)
   const [notice, setNotice] = useState(null)
   const [voteProgress, setVoteProgress] = useState(null)
 
-  // The anonymous participant roster (alias cards) + the creator's device-local rank arrangement.
+  // The participant roster (alias cards) + the creator's device-local rank arrangement (addresses).
   const [participants, setParticipants] = useState(null)
   const [rankOrder, setRankOrder] = useState(() => readRankOrder(address))
   const handleReorder = (order) => {
@@ -87,54 +87,31 @@ export default function PoolPage() {
 
   const loaded = summary && summary.address === address
 
-  // Load the anonymous roster from PUBLIC Joined-event commitments (no signature) and derive each alias.
+  // Load the roster from PUBLIC Joined(address) events — each member with an address-derived alias.
   useEffect(() => {
     if (!loaded) return undefined
     let active = true
-    Promise.resolve()
-      .then(() => getMemberCommitments(address))
-      .then((commitments) => {
-        if (!active || !Array.isArray(commitments)) return
-        setParticipants(
-          commitments.map((c) => {
-            const n = deriveNickname(c, address)
-            return { commitment: c.toString(), label: n.label, suffix: n.suffix }
-          })
-        )
+    getMembers(address)
+      .then((members) => {
+        if (active && Array.isArray(members)) setParticipants(members)
       })
       .catch(() => {})
     return () => {
       active = false
     }
-  }, [loaded, address, getMemberCommitments])
+  }, [loaded, address, getMembers])
 
-  // ALWAYS auto-show a joined member's identity: cache-first (no prompt on the device they joined from);
-  // when the cache is missing, restore it automatically with one wallet signature. Declining falls back
-  // to the manual Reveal button.
+  // A joined member's alias is derived from their public wallet address — no signature, no "restore".
   useEffect(() => {
-    if (!loaded || !summary.hasJoined || identity) return undefined
+    if (!loaded || !summary.hasJoined) return undefined
     let active = true
-    ;(async () => {
-      try {
-        const peeked = await peekPoolIdentity?.(address)
-        if (!active) return
-        if (peeked?.nickname) {
-          setIdentity({ nickname: peeked.nickname, claimCode: peeked.claimCode || null, commitment: peeked.commitment || null })
-          return
-        }
-        setIdentityStatus('restoring')
-        const restored = await restorePoolIdentity(address)
-        if (!active) return
-        setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode, commitment: restored.commitment })
-        setIdentityStatus('idle')
-      } catch {
-        if (active) setIdentityStatus('failed')
-      }
-    })()
+    getMyNickname(address)
+      .then((n) => active && setMyNickname(n))
+      .catch(() => {})
     return () => {
       active = false
     }
-  }, [loaded, summary, identity, address, peekPoolIdentity, restorePoolIdentity])
+  }, [loaded, summary?.hasJoined, address, getMyNickname])
 
   // Read the device-local proposal that matches the current on-chain proposalId (or the locked outcome
   // once resolved), so the roster can render medals/amounts and the claim can auto-fill.
@@ -142,27 +119,22 @@ export default function PoolPage() {
     if (!loaded) return
     if (summary.state === 1 && summary.currentProposalId) {
       const stored = readProposedMatrix(address, summary.currentProposalId)
-      setVerifiedProposal(stored ? { entries: stored.entries, display: stored.display } : null)
+      setVerifiedProposal(stored ? { entries: stored.entries } : null)
     } else if (summary.state === 2) {
       const stored = readStoredMatrix(address)
-      setVerifiedProposal(stored ? { entries: stored.entries, display: stored.display } : null)
+      setVerifiedProposal(stored ? { entries: stored.entries } : null)
     } else {
       setVerifiedProposal(null)
     }
   }, [loaded, summary?.state, summary?.currentProposalId, address, proposalNonce])
 
-  // { commitment → amount } for the roster. Prefer the creator's shared display map; else fall back to
-  // just the member's own row (so they at least see their own payout highlighted).
-  const payoutByCommitment = useMemo(() => {
+  // { addressLower → amount } for the roster, built directly from the verified matrix (winner = address).
+  const payoutByAddress = useMemo(() => {
     if (!verifiedProposal) return null
-    const map = payoutDisplayMap(verifiedProposal.entries, verifiedProposal.display)
-    if (map) return map
-    if (identity?.claimCode && identity?.commitment) {
-      const mine = verifiedProposal.entries.find((e) => String(e.claimNullifier) === String(identity.claimCode))
-      if (mine) return new Map([[String(identity.commitment), BigInt(mine.amount)]])
-    }
-    return null
-  }, [verifiedProposal, identity])
+    const map = new Map()
+    for (const e of verifiedProposal.entries) map.set(String(e.winner).toLowerCase(), BigInt(e.amount))
+    return map
+  }, [verifiedProposal])
 
   const run = async (fn) => {
     setNotice(null)
@@ -174,28 +146,15 @@ export default function PoolPage() {
     }
   }
 
-  const joinThisPool = () =>
-    run(async () => {
-      await joinPool(address)
-      setIdentity(null) // force a fresh identity restore now that we're a member
-    })
+  const joinThisPool = () => run(() => joinPool(address))
 
   const approve = () =>
     run(async () => {
-      setVoteProgress('Preparing your anonymous approval…')
       try {
         await vote(address, (msg) => setVoteProgress(msg))
       } finally {
         setVoteProgress(null)
       }
-    })
-
-  // Manual fallback, only reached when the automatic identity restore failed (declined signature).
-  const revealNickname = () =>
-    run(async () => {
-      const restored = await restorePoolIdentity(address)
-      setIdentity({ nickname: restored.nickname, claimCode: restored.claimCode, commitment: restored.commitment })
-      setIdentityStatus('idle')
     })
 
   if (error) {
@@ -244,18 +203,10 @@ export default function PoolPage() {
         </dl>
       </details>
 
-      {/* Identity is only meaningful for joined members. */}
-      {summary.hasJoined && (
+      {/* Identity is only meaningful for joined members — a friendly alias derived from your address. */}
+      {summary.hasJoined && myNickname && (
         <section className="pool-identity" aria-label="Your identity">
-          {identity?.nickname ? (
-            <p>You are <strong data-testid="my-nickname">{identity.nickname.label}</strong> in this pool.</p>
-          ) : identityStatus === 'restoring' ? (
-            <p data-testid="identity-restoring">
-              Restoring your pool identity… confirm the signature in your wallet if prompted.
-            </p>
-          ) : (
-            <Button variant="secondary" onClick={revealNickname}>Reveal my nickname</Button>
-          )}
+          <p>You are <strong data-testid="my-nickname">{myNickname.label}</strong> in this pool.</p>
         </section>
       )}
 
@@ -276,7 +227,7 @@ export default function PoolPage() {
           isCreator={summary.isCreator}
           order={rankOrder}
           onReorder={handleReorder}
-          payoutByCommitment={payoutByCommitment}
+          payoutByAddress={payoutByAddress}
           tokenSymbol={summary.tokenSymbol}
           tokenDecimals={summary.tokenDecimals}
           resolved={summary.state === 2}
@@ -333,13 +284,12 @@ export default function PoolPage() {
       {/* Resolution loop: creator propose/revise, member receive+dispute, winner claim */}
       {(summary.hasJoined || summary.isCreator || summary.state === 2) && summary.state !== 3 && (
         <PoolResolutionActions
-          summary={{ ...summary, myCommitment: identity?.commitment || null }}
+          summary={summary}
           pools={pools}
           participants={participants}
           rankOrder={rankOrder}
-          claimCode={identity?.claimCode || null}
           verifiedProposal={verifiedProposal}
-          payoutByCommitment={payoutByCommitment}
+          payoutByAddress={payoutByAddress}
           onProposalReceived={() => setProposalNonce((n) => n + 1)}
           onChanged={reload}
         />

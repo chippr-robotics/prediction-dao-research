@@ -1,4 +1,5 @@
-[
+// Auto-derived from artifacts/contracts/pools/WagerPoolFactory.sol (spec 034, address-based). Regenerate after contract changes.
+export const WAGER_POOL_FACTORY_ABI = [
   {
     "inputs": [],
     "name": "AccessControlBadConfirmation",
@@ -29,6 +30,11 @@
       }
     ],
     "name": "AddressEmptyCode",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "BadDeadlines",
     "type": "error"
   },
   {
@@ -106,6 +112,11 @@
   {
     "inputs": [],
     "name": "ScreeningNotConfigured",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TokenNotAllowed",
     "type": "error"
   },
   {
@@ -196,7 +207,13 @@
       {
         "indexed": false,
         "internalType": "uint64",
-        "name": "joinDeadline",
+        "name": "acceptDeadline",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "resolveDeadline",
         "type": "uint64"
       }
     ],
@@ -310,6 +327,25 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "allowed",
+        "type": "bool"
+      }
+    ],
+    "name": "TokenAllowed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "implementation",
         "type": "address"
       }
@@ -332,12 +368,38 @@
   },
   {
     "inputs": [],
+    "name": "MAX_ACCEPT_WINDOW",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_MEMBERS_CAP",
     "outputs": [
       {
         "internalType": "uint32",
         "name": "",
         "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_RESOLVE_WINDOW",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -385,6 +447,25 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "allowedToken",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "components": [
           {
             "internalType": "address",
@@ -408,16 +489,16 @@
           },
           {
             "internalType": "uint64",
-            "name": "joinDeadline",
+            "name": "acceptDeadline",
             "type": "uint64"
           },
           {
             "internalType": "uint64",
-            "name": "resolutionWindow",
+            "name": "resolveDeadline",
             "type": "uint64"
           }
         ],
-        "internalType": "struct IZKWagerPoolFactory.CreatePoolParams",
+        "internalType": "struct IWagerPoolFactory.CreatePoolParams",
         "name": "p",
         "type": "tuple"
       }
@@ -509,11 +590,6 @@
       {
         "internalType": "address",
         "name": "poolImpl_",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "semaphore_",
         "type": "address"
       },
       {
@@ -754,16 +830,21 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "semaphore",
-    "outputs": [
+    "inputs": [
       {
-        "internalType": "contract ISemaphore",
-        "name": "",
+        "internalType": "address",
+        "name": "token",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "allowed",
+        "type": "bool"
       }
     ],
-    "stateMutability": "view",
+    "name": "setAllowedToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

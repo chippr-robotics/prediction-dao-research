@@ -188,6 +188,32 @@ SC-010).
 
 ---
 
+## Phase 8: Address-based redesign (Semaphore removal, round 7)
+
+**Purpose**: Pivot to non-anonymous, address-based pools (Semaphore/Groth16/WASM removed),
+mirror `WagerRegistry` timing, and make pools relayer-ready. Supersedes the anonymity
+requirements (spec.md "Redesign addendum (round 7)"; see also implementation-notes round 7).
+The old ZK surface is deleted; new pools resolve by winner **address**.
+
+- [X] T059 Write the address-based `contracts/pools/WagerPool.sol` (immutable clone: `initialize`, `join`, `closeJoining`/`pokeDeadline`, `proposeOutcome`, `approve`, `claim`, `refund`, `cancel`) — membership/voting/claims by public wallet address, `PayoutEntry{ address winner, uint256 amount }`, CEI + reentrancy guards, escrow-only-exits
+- [X] T060 [P] Write the address-based `contracts/pools/WagerPoolFactory.sol` (UUPSManaged proxy: rename from `ZKWagerPoolFactory`, drop all Semaphore group creation, keep sanctions + `POOL_PARTICIPANT_ROLE` gating, 4-word index registry, `_checkDeadlines`)
+- [X] T061 [P] Write interfaces `contracts/pools/interfaces/IWagerPool.sol` and `IWagerPoolFactory.sol` (address-based surface, `…WithSig` twins, absolute deadlines) replacing `IZKWagerPool`/`IZKWagerPoolFactory`
+- [X] T062 Add reusable EIP-712 base `contracts/upgradeable/SignerIntentBase.sol` (ERC-7201-namespaced single-use replay nonce, `_verifyIntent`, `invalidateNonce`, `authorizationState`) for the intent/relayer architecture (spec 035/036)
+- [X] T063 Add signature-verified "twin" entrypoints to `WagerPool` — `approveWithSig` / `claimWithSig` / `proposeOutcomeWithSig` / `closeJoiningWithSig` / `cancelWithSig` / `refundWithSig` (authorize recovered EOA signer); keep `joinWithAuthorization` (EIP-3009) as the relayable join
+- [X] T064 Change pool timing to mirror `WagerRegistry`: two ABSOLUTE `uint64` deadlines `acceptDeadline` + `resolveDeadline` (replace `joinDeadline` + relative `resolutionWindow`); enforce bounds/ordering in `WagerPoolFactory._checkDeadlines` (`MAX_ACCEPT_WINDOW=30d`, `MAX_RESOLVE_WINDOW=180d`)
+- [X] T065 Security fix: replace the per-address double-claim guard (`claimed[msg.sender]`) with **per-INDEX** claim tracking (`claimedIndex[index]`) so a payout matrix that lists the same winner twice is fully claimable and never strands escrow
+- [X] T066 Delete the Semaphore surface: `ZKWagerPool.sol`, `ZKWagerPoolFactory.sol`, `PublicWagerPool.sol`, `interfaces/ISemaphore.sol`, `mocks/MockSemaphore.sol`, and `scripts/deploy/deploy-semaphore.js`; rename deployment keys `zkWagerPoolFactory → wagerPoolFactory`, `zkWagerPoolFactoryImpl → wagerPoolFactoryImpl` (`poolImpl` unchanged)
+- [X] T067 [P] Rewrite the contract tests for the address-based pool/factory (full lifecycle: join/auto-close, threshold approval + lock, address-keyed claim incl. same-winner-twice, creator revise, timeout refund, cancel, `…WithSig` twins + replay-nonce, deadline bounds) replacing the Semaphore/fork tests
+- [X] T068 [P] Rewrite the deploy scripts for `WagerPoolFactory` + `WagerPool` (fresh deploy, no Semaphore config); update `check-storage-layout.js` registration and the deploy runbook
+- [X] T069 [P] Frontend rewire (separate workstream this session): join/approve/claim as plain txs (no identity/proof/WASM), roster + payout-by-address from the public roster, nickname derived from the public address, `getContractAddressForChain('wagerPoolFactory', chainId)`
+- [X] T070 [P] Docs: rewrite CLAUDE.md carve-out, spec.md addendum, plan.md Constitution addendum, tasks Phase 8, implementation-notes round 7
+- [ ] T071 Formal smart-contract security review (`.github/agents/smart-contract-security`) of the address-based custody surface (CEI/reentrancy, escrow-only-exits, per-index single-claim, `resolveDeadline` refund path, EIP-712 replay-nonce) — MUST pass before any value-bearing deploy
+- [ ] T072 Deploy + validate `WagerPoolFactory` + `WagerPool` end-to-end on **Amoy** (staging), then **Polygon** mainnet, then **Mordor** (Semaphore removal unblocks ETC) — gated on T071 + floppy key + explicit go
+
+**Checkpoint**: Address-based pools implemented + tested; deploy/validate pending review
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

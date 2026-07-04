@@ -3,7 +3,8 @@ import { render } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
-// Accessibility (WCAG 2.1 AA) checks for the ZK-Wager Pool UI (spec 034; constitution Principle V).
+// Accessibility (WCAG 2.1 AA) checks for the Wager Pool UI (spec 034, address-based; constitution
+// Principle V).
 
 vi.mock('../hooks/useWalletManagement', () => ({ useWallet: vi.fn() }))
 vi.mock('../hooks/usePools', () => ({ usePools: vi.fn() }))
@@ -38,17 +39,16 @@ function poolsMock(overrides = {}) {
     status: 'idle', error: null,
     createPool: vi.fn(), resolvePhrase: vi.fn(),
     getPoolSummary: vi.fn().mockResolvedValue(summary),
-    joinPool: vi.fn(), getMyNickname: vi.fn(),
-    peekPoolIdentity: vi.fn().mockResolvedValue(null),
-    restorePoolIdentity: vi.fn().mockResolvedValue({ commitment: '1', claimCode: null, nickname: { label: 'Prismatic Fox', suffix: '7b' } }),
-    getMemberCommitments: vi.fn().mockResolvedValue([]),
+    joinPool: vi.fn(),
+    getMembers: vi.fn().mockResolvedValue([]),
+    getMyNickname: vi.fn().mockResolvedValue({ label: 'Prismatic Fox', suffix: '7b' }),
     closeJoining: vi.fn(), cancelPool: vi.fn(), proposeOutcome: vi.fn(),
     vote: vi.fn(), claimWinnings: vi.fn(), refund: vi.fn(),
     ...overrides,
   }
 }
 
-describe('ZK-Wager Pool UI accessibility', () => {
+describe('Wager Pool UI accessibility', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useWallet.mockReturnValue({ account: '0x1111111111111111111111111111111111111111', isConnected: true })
@@ -74,12 +74,15 @@ describe('ZK-Wager Pool UI accessibility', () => {
 
   it('PoolParticipants roster with a proposed payout has no a11y violations', async () => {
     const participants = [
-      { commitment: '1', label: 'Prismatic Fox', suffix: '7b' },
-      { commitment: '2', label: 'Thunder Eagle', suffix: '0c' },
+      { address: '0x1111111111111111111111111111111111111111', nickname: { label: 'Prismatic Fox', suffix: '7b' } },
+      { address: '0x2222222222222222222222222222222222222222', nickname: { label: 'Thunder Eagle', suffix: '0c' } },
     ]
-    const payout = new Map([['1', 10000000n], ['2', 0n]])
+    const payout = new Map([
+      ['0x1111111111111111111111111111111111111111', 10000000n],
+      ['0x2222222222222222222222222222222222222222', 0n],
+    ])
     const { container } = render(
-      <PoolParticipants participants={participants} isCreator payoutByCommitment={payout} tokenSymbol="USDC" tokenDecimals={6} />
+      <PoolParticipants participants={participants} isCreator payoutByAddress={payout} tokenSymbol="USDC" tokenDecimals={6} />
     )
     expect(await axe(container)).toHaveNoViolations()
   })

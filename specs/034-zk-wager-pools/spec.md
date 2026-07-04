@@ -26,6 +26,90 @@ converge with the wider wager ecosystem later. The anonymous-identity and
 nickname layer is designed as a **reusable module** that could improve privacy
 for existing one-to-one wagers in a future feature (out of scope here).
 
+## Redesign addendum (round 7): address-based pools, Semaphore removed
+
+**Supersedes the anonymity requirements below.** After testers rejected the
+private per-member "claim code" (a Semaphore nullifier the winner had to hand the
+creator, not derivable from public data — see implementation-notes round 6), the
+feature was pivoted (confirmed with the user) to **drop pool anonymity entirely**.
+The `Semaphore V4` / Groth16 / in-browser-WASM stack is **removed from both the
+pool and the factory**; membership, voting, and claims are now by **public wallet
+address**. The contracts were renamed `ZKWagerPool → WagerPool` /
+`ZKWagerPoolFactory → WagerPoolFactory` (interfaces `IWagerPool` /
+`IWagerPoolFactory`); deployment keys `zkWagerPoolFactory → wagerPoolFactory`,
+`zkWagerPoolFactoryImpl → wagerPoolFactoryImpl` (`poolImpl` unchanged). The rest of
+this document is retained for history; where it conflicts with this addendum, the
+addendum governs.
+
+### Requirements superseded (restated address-based)
+
+- **FR-010 (vote unlinkability) — SUPERSEDED.** Votes are **not** unlinkable; a
+  member `approve()`s the current proposal with their **real wallet** (`msg.sender`,
+  or the recovered EOA on a `…WithSig` relay), and the `Approved(proposalId, member)`
+  event records that address. There is no wallet↔identity boundary to protect and no
+  "relayed path breaks the link" property.
+- **FR-011 / FR-012 (nickname from a public identity commitment) — SUPERSEDED.** The
+  two-word nickname is now derived deterministically from the member's **public
+  wallet address** (still client-side display only, never on-chain — FR-009 stands).
+- **FR-013 ("anonymous fraction-of-joined" resolution) — SUPERSEDED as to
+  anonymity.** The fraction-of-joined threshold semantics are **retained** (denominator
+  = joined count frozen at close; approvals required = `ceil(frozenDenominator *
+  thresholdBips / 10000)`, min 1), but approvals are plain, address-attributed on-chain
+  votes — nothing anonymous.
+- **FR-014 (one vote per outcome) — RETAINED, address-based.** Enforced per
+  `(proposalId, member address)` via `approvedBy[pid][member]`; a repeat approval
+  reverts. No nullifier.
+- **FR-015 (Semaphore-proof anonymous vote) — SUPERSEDED.** A vote is a plain
+  transaction from a joined member address (membership checked via `hasJoined[member]`);
+  there is no zero-knowledge proof and the "voter identity is anonymous" clause no
+  longer holds. The approved outcome remains public.
+- **FR-017 / FR-018 (payout keyed by anonymous in-pool identity, claimed by proof)
+  — SUPERSEDED.** The payout matrix is `PayoutEntry{ address winner, uint256 amount }`
+  keyed by the **winner's public address** — the address is the claim code, derivable
+  by every party straight from the public roster with no off-chain secret exchange. A
+  winner `claim(entries, index, recipient)`s by being `entries[index].winner`; funds go
+  to any `recipient` they choose. Claims are tracked **per row index**
+  (`claimedIndex[index]`), not per address, so a matrix listing the same winner in
+  multiple rows is fully claimable and never strands escrow (security fix; see plan
+  Constitution addendum + tasks Phase 8). The matrix preimage must hash to the locked
+  outcome and its amounts must sum to the escrow.
+- **FR-021d (anonymity must not bypass compliance) — MOOT.** With no anonymization
+  step, sanctions + `POOL_PARTICIPANT_ROLE` membership are simply enforced on the acting
+  wallet at create/join (FR-021/FR-021a/FR-021b/FR-021c unchanged; `screeningRequired`
+  gate stands).
+- **FR-002a (anonymity-set capacity) — RETAINED as a plain member cap.** The
+  ~1,000-member cap (`MAX_MEMBERS_CAP`) remains, but its rationale is no longer a fixed
+  anonymity set — there is no per-proof verification cost to hold constant.
+- **Privacy-boundary language throughout (Overview, Assumptions "Privacy boundary
+  (honest scope)", the two 2026-06-27-analyze clarifications on vote unlinkability, and
+  SC-004 / SC-012 / SC-013) — SUPERSEDED.** Pools make no anonymity claim; membership
+  and governance footprint are fully public on-chain, exactly like 1v1 wagers.
+
+### Retained / newly reaffirmed
+
+- **Configurable timing, matching WagerRegistry.** Replacing the old `joinDeadline` +
+  relative resolution window, pools now carry **two absolute `uint64` deadlines** —
+  `acceptDeadline` (joining/acceptance closes) and `resolveDeadline` (resolution must
+  complete by). The factory validates them with `_checkDeadlines` mirroring
+  `WagerRegistry`: `acceptDeadline ∈ (now, now + 30 days]`; `resolveDeadline ∈
+  (acceptDeadline, now + 180 days]`. This makes acceptance/close/resolution times
+  configurable exactly as they are for 1v1/oracle wagers (explicit user requirement)
+  and fixes the resolution-window drift of the round-6 design. After `resolveDeadline`
+  with no locked outcome, the pool is refund-only (FR-019 stands).
+- **Mordor/ETC is now IN launch scope.** Removing Semaphore removes the only reason ETC
+  was deferred (no more self-deploying the anonymity primitive); the contracts compile
+  paris/shanghai-safe. Launch sequence is **Amoy → Polygon → Mordor** (supersedes the
+  Polygon/Amoy-only launch in Assumptions "Network").
+- **Relayer-ready (spec 035/036 alignment).** A reusable base
+  `contracts/upgradeable/SignerIntentBase.sol` (EIP-712 + ERC-7201-namespaced,
+  single-use replay nonce, `_verifyIntent`) backs a `…WithSig` twin for every
+  actor-attributed action — `approveWithSig` / `claimWithSig` / `proposeOutcomeWithSig`
+  / `closeJoiningWithSig` / `cancelWithSig` / `refundWithSig` — authorizing the recovered
+  EOA signer instead of `msg.sender`, so a relayer can submit on a member's behalf. The
+  money-in join keeps its gasless form `joinWithAuthorization` (EIP-3009). Self-submit
+  entrypoints remain the primary path; the twins are additive and, because clones are
+  immutable, are baked into the template at deploy time.
+
 ## Clarifications
 
 ### Session 2026-06-27
