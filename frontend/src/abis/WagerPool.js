@@ -22,11 +22,6 @@ export const WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
-    "name": "BadIntentSigner",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "BadValue",
     "type": "error"
   },
@@ -69,6 +64,16 @@ export const WAGER_POOL_ABI = [
   },
   {
     "inputs": [],
+    "name": "FeeExceedsCap",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "FeeRecipientUnset",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "IndexOOB",
     "type": "error"
   },
@@ -83,13 +88,34 @@ export const WAGER_POOL_ABI = [
     "type": "error"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      }
+    ],
     "name": "IntentReplayed",
     "type": "error"
   },
   {
     "inputs": [],
+    "name": "IntentSignerZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidInitialization",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidIntentSignature",
     "type": "error"
   },
   {
@@ -135,6 +161,11 @@ export const WAGER_POOL_ABI = [
   {
     "inputs": [],
     "name": "OutcomeMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PaymentAuthMismatch",
     "type": "error"
   },
   {
@@ -234,6 +265,25 @@ export const WAGER_POOL_ABI = [
       }
     ],
     "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "IntentNonceUsed",
     "type": "event"
   },
   {
@@ -349,6 +399,19 @@ export const WAGER_POOL_ABI = [
     ],
     "name": "Refunded",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DOMAIN_SEPARATOR",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -855,6 +918,34 @@ export const WAGER_POOL_ABI = [
       }
     ],
     "name": "invalidateNonce",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      }
+    ],
+    "name": "invalidateNonceWithSig",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

@@ -23,12 +23,12 @@ contract MockSignerIntent is SignerIntentBase {
 
     /// @notice One-time init; sets the EIP-712 domain the tests sign against.
     function initialize() external initializer {
-        __SignerIntent_init("Mock", "1");
+        __EIP712_init("Mock", "1");
     }
 
     /// @notice A single nonce-consuming action: builds the intent struct hash, verifies + burns the
     ///         nonce, then records `x`. Reverts (before any effect) with the base's intent errors
-    ///         (IntentNotYetValid / IntentExpired / IntentReplayed / BadIntentSigner) on a bad intent.
+    ///         (IntentNotYetValid / IntentExpired / IntentReplayed / InvalidIntentSignature) on a bad intent.
     function doThing(
         uint256 x,
         address signer,

@@ -395,11 +395,11 @@ describe('WagerPool (address-based)', function () {
     const pid = matrixHash(entries);
     await pool.connect(creator).proposeOutcome(entries);
 
-    // signature by outsider but claiming to be m2 -> BadIntentSigner
+    // signature by outsider but claiming to be m2 -> InvalidIntentSignature
     const bad = await signApprove(pool, m2, pid);
     await expect(
       pool.connect(relayer).approveWithSig(pid, outsider.address, bad.nonce, bad.validAfter, bad.validBefore, bad.sig)
-    ).to.be.revertedWithCustomError(pool, 'BadIntentSigner');
+    ).to.be.revertedWithCustomError(pool, 'InvalidIntentSignature');
 
     // expired intent
     const now = (await ethers.provider.getBlock('latest')).timestamp;

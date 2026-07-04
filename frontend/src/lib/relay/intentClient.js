@@ -1,0 +1,310 @@
+/**
+ * Shared intent-relay client (specs 035 + 036) — generalizes the dormant spec-034 prototypes
+ * (lib/pools/gasless.js + lib/pools/relayerClient.js) into the one client every gasless flow uses.
+ *
+ * The relayer is GAS INFRASTRUCTURE, not an app backend: when `VITE_RELAYER_URL` is unset,
+ * `makeRelayer()` returns null and every flow self-submits (the safe, zero-footprint default).
+ * The relayer is untrusted — it can censor, never steal: every consequential parameter is inside the
+ * signed EIP-712 struct, and the money leg is a recipient-bound EIP-3009 `receiveWithAuthorization`
+ * stapled to the action via `paymentNonce` (FR-007/FR-013).
+ *
+ * Error contract (see ./errors.js): RelayerUnavailable (429/503/network/timeout — self-submit),
+ * PaymentUnsupportedOnChain (FR-020 pre-sign domain check — self-submit),
+ * RelayRejected (gateway validation verdict — surface `code`/`reason`).
+ */
+import { ethers } from 'ethers'
+import {
+  INTENT_ACTIONS,
+  INTENT_TYPES,
+  RECEIVE_WITH_AUTHORIZATION_TYPES,
+  membershipManagerDomain,
+  stablecoinDomain,
+  wagerRegistryDomain,
+} from './intentTypes'
+import { PaymentUnsupportedOnChain, RelayRejected, RelayerUnavailable } from './errors'
+
+const DEFAULT_VALIDITY_SECONDS = 3600
+const RELAY_TIMEOUT_MS = 15000
+const HEALTH_BUDGET_MS = 2000
+
+/** The configured relay-gateway base URL, or '' when unset. Read at call time so tests can stub the env. */
+export function relayerBaseUrl() {
+  return (import.meta.env.VITE_RELAYER_URL || '').trim().replace(/\/$/, '')
+}
+
+/** A fresh random 32-byte nonce (2-D replay nonce / EIP-3009 nonce / uniquenessMarker). */
+export function randomNonce() {
+  return ethers.hexlify(ethers.randomBytes(32))
+}
+
+/** Serialize a uint-ish value (bigint/number/string) to a JSON-safe decimal string. */
+function toUintString(v) {
+  if (typeof v === 'bigint') return v.toString()
+  if (typeof v === 'number') return Math.trunc(v).toString()
+  return String(v)
+}
+
+/** Shallow-serialize signed params for the gateway body (bigints → decimal strings). */
+function serializeParams(params) {
+  const out = {}
+  for (const [key, value] of Object.entries(params || {})) {
+    out[key] = typeof value === 'bigint' ? value.toString() : value
+  }
+  return out
+}
+
+/** `fetch` with a bounded budget; any transport failure or timeout maps to RelayerUnavailable. */
+async function boundedFetch(url, options, timeoutMs) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } catch (e) {
+    throw new RelayerUnavailable(`Relayer unreachable: ${e?.message || e}`, {
+      code: e?.name === 'AbortError' ? 'timeout' : 'network_error',
+      cause: e,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Best-effort JSON body (the gateway always sends JSON, but never trust a failing proxy). */
+async function readJson(res) {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Sign one intent and build the gateway Intent body (spec 036 relay-gateway-api.md / spec 035
+ * data-model.md "Client-side: Intent"). ONE wallet interaction per leg: the action intent under the
+ * verifying contract's domain, plus — for payment-class actions — an EIP-3009
+ * `ReceiveWithAuthorization` under the stablecoin's own domain, its nonce stapled into the struct's
+ * `paymentNonce` so the relayer cannot pair the action with a different authorization (FR-007).
+ *
+ * FR-020 pre-sign check: payment-class on a chain whose stablecoin has `domainVersion: null` throws
+ * PaymentUnsupportedOnChain BEFORE any wallet prompt — the caller self-submits.
+ *
+ * @param {object} args
+ * @param {import('ethers').Signer} args.signer - wallet signer (must support signTypedData)
+ * @param {number} args.chainId
+ * @param {string} args.action - gateway action name (key of INTENT_ACTIONS)
+ * @param {string} args.targetContract - verifying contract (proxy) address on `chainId`
+ * @param {object} [args.params] - action struct fields EXCEPT the auto-filled actor field,
+ *   paymentNonce, nonce, validAfter, validBefore
+ * @param {{value: bigint|number|string}} [args.payment] - money leg (required for payment-class actions)
+ * @param {number} [args.validAfter=0] - earliest execution (unix seconds)
+ * @param {number} [args.validBefore] - expiry (unix seconds); defaults to now + validitySeconds
+ * @param {number} [args.validitySeconds=3600]
+ * @param {'sponsored'|'fee-netted'} [args.fundingMode='sponsored']
+ * @param {bigint|number|string} [args.maxFee] - bounded fee cap (fee-netted mode)
+ * @param {'wagerRegistry'|'membershipManager'} [args.verifier] - override for actions both contracts
+ *   expose (invalidateNonce); otherwise taken from INTENT_ACTIONS
+ * @param {number} [args.nowSeconds] - injectable clock for tests
+ * @returns {Promise<object>} the gateway Intent body (POST /v1/intents)
+ */
+export async function signIntent({
+  signer,
+  chainId,
+  action,
+  targetContract,
+  params = {},
+  payment,
+  validAfter = 0,
+  validBefore,
+  validitySeconds = DEFAULT_VALIDITY_SECONDS,
+  fundingMode = 'sponsored',
+  maxFee,
+  verifier,
+  nowSeconds,
+}) {
+  const meta = INTENT_ACTIONS[action]
+  if (!meta) throw new Error(`signIntent: unknown intent action '${action}'`)
+  if (!targetContract) throw new Error('signIntent: targetContract is required')
+  if (chainId == null) throw new Error('signIntent: chainId is required')
+
+  const verifierKind = verifier || meta.verifier
+  if (!verifierKind) throw new Error(`signIntent: action '${action}' needs an explicit verifier ('wagerRegistry' | 'membershipManager')`)
+  const domain =
+    verifierKind === 'membershipManager'
+      ? membershipManagerDomain(chainId, targetContract)
+      : wagerRegistryDomain(chainId, targetContract)
+
+  // FR-020: resolve the token domain BEFORE any wallet prompt — throws PaymentUnsupportedOnChain on
+  // chains whose stablecoin lacks EIP-3009 (Mordor/ETC USC), so the flow self-submits with zero
+  // wasted signatures.
+  const tokenDomain = meta.intentClass === 'payment' ? stablecoinDomain(chainId) : null
+
+  const from = await signer.getAddress()
+  const now = nowSeconds != null ? nowSeconds : Math.floor(Date.now() / 1000)
+  const before = validBefore != null ? validBefore : now + validitySeconds
+  const nonce = randomNonce()
+
+  const fields = INTENT_TYPES[meta.primaryType]
+  const hasField = (name) => fields.some((f) => f.name === name)
+
+  // The actor field is ALWAYS the wallet's own address — signer attribution is not caller-spoofable.
+  const message = { ...params, [meta.actorField]: from }
+
+  // Payment leg: sign the token's ReceiveWithAuthorization and staple its nonce into the struct.
+  // ONE marker for the whole payment intent (data-model.md: the uniquenessMarker IS the EIP-3009
+  // nonce): paymentNonce == struct nonce == uniquenessMarker. The registry's replay map and the
+  // token's authorizationState are separate state spaces, so sharing the value is safe — and the
+  // gateway enforces the equality (param_binding_mismatch otherwise).
+  let authorization = null
+  if (meta.intentClass === 'payment') {
+    if (payment == null || payment.value == null) throw new Error(`signIntent: action '${action}' is payment-class and requires payment.value`)
+    const paymentNonce = nonce
+    const authMessage = {
+      from,
+      to: targetContract,
+      value: toUintString(payment.value),
+      validAfter,
+      validBefore: before,
+      nonce: paymentNonce,
+    }
+    const sig = ethers.Signature.from(
+      await signer.signTypedData(tokenDomain, RECEIVE_WITH_AUTHORIZATION_TYPES, authMessage)
+    )
+    authorization = { ...authMessage, validAfter: toUintString(validAfter), validBefore: toUintString(before), v: sig.v, r: sig.r, s: sig.s }
+    if (hasField('paymentNonce')) message.paymentNonce = paymentNonce
+  }
+
+  message.nonce = nonce
+  if (hasField('validAfter')) message.validAfter = validAfter
+  message.validBefore = before
+
+  const signature = await signer.signTypedData(domain, { [meta.primaryType]: fields }, message)
+
+  const intent = {
+    intentClass: meta.intentClass,
+    chainId: Number(chainId),
+    targetContract,
+    action,
+    params: serializeParams(message),
+    signature,
+    validAfter,
+    validBefore: before,
+    uniquenessMarker: nonce,
+    fundingMode,
+  }
+  if (authorization) intent.authorization = authorization
+  if (maxFee != null) intent.maxFee = toUintString(maxFee)
+  return intent
+}
+
+/**
+ * POST the signed intent to the gateway (`POST /v1/intents`).
+ *
+ * @param {object} intent - the body built by signIntent
+ * @param {{baseUrl?: string, timeoutMs?: number}} [opts]
+ * @returns {Promise<{intentId: string, status: string, txHash?: string}>}
+ * @throws {RelayerUnavailable} on unset base URL, network error, timeout, 429 or 503 → self-submit
+ * @throws {RelayRejected} on any other non-2xx (gateway `error.code` preserved)
+ */
+export async function relayIntent(intent, { baseUrl, timeoutMs = RELAY_TIMEOUT_MS } = {}) {
+  const base = baseUrl != null ? baseUrl.replace(/\/$/, '') : relayerBaseUrl()
+  if (!base) throw new RelayerUnavailable('No relayer configured (VITE_RELAYER_URL unset)', { code: 'relayer_unset' })
+
+  const res = await boundedFetch(
+    `${base}/v1/intents`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(intent) },
+    timeoutMs
+  )
+  const data = await readJson(res)
+
+  if (res.status === 429 || res.status === 503) {
+    const retryAfter = Number(res.headers?.get?.('Retry-After'))
+    throw new RelayerUnavailable(data?.error?.reason || `Relayer unavailable (HTTP ${res.status})`, {
+      code: data?.error?.code || (res.status === 429 ? 'backpressure' : 'unavailable'),
+      status: res.status,
+      retryAfterSeconds: Number.isFinite(retryAfter) ? retryAfter : null,
+    })
+  }
+  if (!res.ok) {
+    throw new RelayRejected(data?.error?.reason || `Relay rejected (HTTP ${res.status})`, {
+      code: data?.error?.code,
+      status: res.status,
+      reason: data?.error?.reason,
+    })
+  }
+  if (!data || typeof data.intentId !== 'string') {
+    throw new RelayerUnavailable('Relayer returned no intentId', { code: 'bad_response', status: res.status })
+  }
+  return { intentId: data.intentId, status: data.status, ...(data.txHash ? { txHash: data.txHash } : {}) }
+}
+
+/**
+ * Fetch relay status for an accepted intent (`GET /v1/intents/{id}`) — drives the honest status UI
+ * (`queued | submitted | confirmed | rejected | failed`; `confirmed` always carries `txHash`).
+ *
+ * @param {string} intentId
+ * @param {{baseUrl?: string, timeoutMs?: number}} [opts]
+ * @returns {Promise<{intentId: string, status: string, txHash?: string, reason?: string}>}
+ */
+export async function pollStatus(intentId, { baseUrl, timeoutMs = RELAY_TIMEOUT_MS } = {}) {
+  const base = baseUrl != null ? baseUrl.replace(/\/$/, '') : relayerBaseUrl()
+  if (!base) throw new RelayerUnavailable('No relayer configured (VITE_RELAYER_URL unset)', { code: 'relayer_unset' })
+
+  const res = await boundedFetch(`${base}/v1/intents/${encodeURIComponent(intentId)}`, { method: 'GET' }, timeoutMs)
+  const data = await readJson(res)
+  if (!res.ok || !data) {
+    throw new RelayerUnavailable(`Relayer status check failed (HTTP ${res.status})`, {
+      code: data?.error?.code || 'status_unavailable',
+      status: res.status,
+    })
+  }
+  return data
+}
+
+/**
+ * Probe `GET /healthz` within a bounded (~2s) budget. Returns true only when the gateway reports
+ * `status: 'ok'`, the kill switch is off, and — when the response itemizes chains — `chainId`'s RPC
+ * is up. Any failure, timeout, or unset relayer returns false (never throws): a failed probe routes
+ * the flow to self-submit BEFORE the user signs (FR-016).
+ *
+ * @param {number} chainId
+ * @param {{baseUrl?: string, budgetMs?: number}} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function probeHealth(chainId, { baseUrl, budgetMs = HEALTH_BUDGET_MS } = {}) {
+  const base = baseUrl != null ? baseUrl.replace(/\/$/, '') : relayerBaseUrl()
+  if (!base) return false
+  try {
+    const res = await boundedFetch(`${base}/healthz`, { method: 'GET' }, budgetMs)
+    if (!res.ok) return false
+    const data = await readJson(res)
+    if (!data || data.status !== 'ok' || data.killSwitch === true) return false
+    if (chainId != null && data.chains && data.chains[String(chainId)]) {
+      return data.chains[String(chainId)].rpc === 'up'
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Build a relayer handle bound to `chainId`, or null when gasless is disabled — the null return IS
+ * the never-stranded switch: every caller treats it as "self-submit" (spec 036 frontend-relay-client.md).
+ *
+ * @param {number} chainId
+ * @returns {null | {chainId: number, baseUrl: string,
+ *   relayIntent: (intent: object, opts?: object) => Promise<object>,
+ *   pollStatus: (intentId: string, opts?: object) => Promise<object>,
+ *   probeHealth: (opts?: object) => Promise<boolean>}}
+ */
+export function makeRelayer(chainId) {
+  const base = relayerBaseUrl()
+  if (!base) return null // gasless disabled → every flow self-submits (safe default)
+  return {
+    chainId: chainId != null ? Number(chainId) : null,
+    baseUrl: base,
+    relayIntent: (intent, opts = {}) => relayIntent(intent, { baseUrl: base, ...opts }),
+    pollStatus: (intentId, opts = {}) => pollStatus(intentId, { baseUrl: base, ...opts }),
+    probeHealth: (opts = {}) => probeHealth(chainId, { baseUrl: base, ...opts }),
+  }
+}

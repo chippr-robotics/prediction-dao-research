@@ -168,7 +168,7 @@ contract WagerPool is Initializable, ReentrancyGuardUpgradeable, SignerIntentBas
         uint64 resolveDeadline_
     ) external initializer {
         __ReentrancyGuard_init();
-        __SignerIntent_init("FairWins WagerPool", "1");
+        __EIP712_init("FairWins WagerPool", "1");
         factory = msg.sender;
         _token = IERC20(token_);
         creator = creator_;

@@ -70,20 +70,20 @@ describe('SignerIntentBase (EIP-712 intent verifier)', function () {
     ).to.be.revertedWithCustomError(mock, 'IntentReplayed');
   });
 
-  it('rejects when the recovered signer != the claimed signer (BadIntentSigner)', async function () {
+  it('rejects when the recovered signer != the claimed signer (InvalidIntentSignature)', async function () {
     // alice signs, but the call claims bob as the signer — the recovered key won't match bob.
     const s = await signDoThing(mock, alice, 1);
     await expect(
       mock.connect(relayer).doThing(1, bob.address, s.nonce, s.validAfter, s.validBefore, s.sig)
-    ).to.be.revertedWithCustomError(mock, 'BadIntentSigner');
+    ).to.be.revertedWithCustomError(mock, 'InvalidIntentSignature');
   });
 
-  it('rejects a tampered action field (structHash mismatch -> BadIntentSigner)', async function () {
+  it('rejects a tampered action field (structHash mismatch -> InvalidIntentSignature)', async function () {
     // alice signs for x=1 but the relayer submits x=2 — the struct hash differs, recovery misses.
     const s = await signDoThing(mock, alice, 1);
     await expect(
       mock.connect(relayer).doThing(2, alice.address, s.nonce, s.validAfter, s.validBefore, s.sig)
-    ).to.be.revertedWithCustomError(mock, 'BadIntentSigner');
+    ).to.be.revertedWithCustomError(mock, 'InvalidIntentSignature');
   });
 
   it('rejects an intent whose validAfter is in the future (IntentNotYetValid)', async function () {
@@ -172,11 +172,11 @@ describe('SignerIntentBase (EIP-712 intent verifier)', function () {
     const other = await deployMock();
     expect(await mock.domainSeparator()).to.not.equal(await other.domainSeparator()); // distinct verifyingContract
 
-    // Sign against `mock`'s domain, then submit to `other` — recovery fails (BadIntentSigner).
+    // Sign against `mock`'s domain, then submit to `other` — recovery fails (InvalidIntentSignature).
     const s = await signDoThing(mock, alice, 55);
     await expect(
       other.connect(relayer).doThing(55, alice.address, s.nonce, s.validAfter, s.validBefore, s.sig)
-    ).to.be.revertedWithCustomError(other, 'BadIntentSigner');
+    ).to.be.revertedWithCustomError(other, 'InvalidIntentSignature');
 
     // ...and the very same intent IS accepted by the instance it was signed for.
     await expect(mock.connect(relayer).doThing(55, alice.address, s.nonce, s.validAfter, s.validBefore, s.sig)).to.not

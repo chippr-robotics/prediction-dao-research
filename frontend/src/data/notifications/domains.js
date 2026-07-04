@@ -9,6 +9,8 @@ export const DOMAIN_META = {
   token: { label: 'Token' },
   membership: { label: 'Membership' },
   pools: { label: 'Pool' },
+  // Spec 035 intent lifecycle entries (emitted via useIntentAction's onActivity callback).
+  intents: { label: 'Gasless' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */

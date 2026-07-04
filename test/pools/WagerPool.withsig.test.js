@@ -199,14 +199,14 @@ describe('WagerPool — relayer twins (…WithSig)', function () {
         );
       });
 
-      it('wrong claimed signer -> BadIntentSigner', async function () {
+      it('wrong claimed signer -> InvalidIntentSignature', async function () {
         const { pool, ctx } = await cfg.setup();
         const signer = cfg.validSigner();
         const s = await cfg.sign(pool, signer, ctx); // signed by validSigner...
         // ...but submitted claiming `outsider` as the signer: recovery misses.
         await expect(cfg.submit(pool, relayer, outsider.address, s, ctx)).to.be.revertedWithCustomError(
           pool,
-          'BadIntentSigner'
+          'InvalidIntentSignature'
         );
       });
 

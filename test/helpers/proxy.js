@@ -1,9 +1,33 @@
 const { ethers } = require("hardhat");
 
+/// Merge contract interfaces into one ABI fragment list (constructor/fallback dropped, duplicates
+/// deduped). Used to bind a single ethers.Contract to a proxy served by multiple facets (spec 035:
+/// WagerRegistry + WagerRegistryIntents behind one proxy address).
+function mergeAbis(...interfaces) {
+  const seen = new Set();
+  const fragments = [];
+  for (const iface of interfaces) {
+    for (const f of iface.fragments) {
+      if (f.type === "constructor" || f.type === "fallback" || f.type === "receive") continue;
+      const key = f.format("full");
+      if (!seen.has(key)) {
+        seen.add(key);
+        fragments.push(f);
+      }
+    }
+  }
+  return fragments;
+}
+
 /// Deploy WagerRegistry behind an ERC1967 UUPS proxy and return the contract bound to the proxy address.
 /// Mirrors production (the implementation's initializers are disabled by UUPSManaged; the proxy is
 /// initialized once). `initArgs` is the same ordered list the former constructor took:
 ///   [admin, membershipManager, polymarketAdapter, initialTokens]
+/// Since spec 035 the registry is two facets: the main implementation plus the WagerRegistryIntents
+/// extension (signer-attributed twins + relocated cold paths like batchExpireOpen/autoResolve*),
+/// reached through the main facet's fallback. This helper deploys BOTH, wires setIntentExtension
+/// (when a signer for `initArgs[0]` is available), and returns a contract carrying the MERGED ABI —
+/// exactly what integrators see at the proxy address.
 /// Manual proxy wiring (not the hardhat-upgrades plugin) keeps the large existing suite fast and free of the
 /// plugin's build-info coupling; the plugin's storage-layout/safety validation is exercised separately in
 /// test/upgradeable/ and via `npm run check:storage-layout`.
@@ -16,8 +40,21 @@ async function deployWagerRegistry(initArgs) {
   const Proxy = await ethers.getContractFactory("ERC1967Proxy");
   const proxy = await Proxy.deploy(await impl.getAddress(), initData);
   await proxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
 
-  return Impl.attach(await proxy.getAddress());
+  const IntentsImpl = await ethers.getContractFactory("WagerRegistryIntents");
+  const intentsImpl = await IntentsImpl.deploy();
+  await intentsImpl.waitForDeployment();
+
+  // Wire the extension facet as the admin (initArgs[0] holds UPGRADER_ROLE from initialize).
+  const signers = await ethers.getSigners();
+  const adminSigner = signers.find((s) => s.address === initArgs[0]);
+  if (adminSigner) {
+    const asAdmin = Impl.attach(proxyAddress).connect(adminSigner);
+    await asAdmin.setIntentExtension(await intentsImpl.getAddress());
+  }
+
+  return new ethers.Contract(proxyAddress, mergeAbis(Impl.interface, IntentsImpl.interface), signers[0]);
 }
 
 /// Deploy MembershipManager behind an ERC1967 UUPS proxy and return the contract bound to the proxy address
@@ -114,6 +151,7 @@ async function deployTokenFactoryV2({ adminSigner, sanctionsGuard = ethers.ZeroA
 }
 
 module.exports = {
+  mergeAbis,
   deployWagerRegistry,
   deployMembershipManager,
   deployTokenTemplates,

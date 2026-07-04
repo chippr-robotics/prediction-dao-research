@@ -1,76 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IWagerRegistryTypes} from "./IWagerRegistryTypes.sol";
+
 /// @title IWagerRegistry
-/// @notice Public surface area for off-chain integrators (frontend, indexers).
-interface IWagerRegistry {
-    enum ResolutionType { Either, Creator, Opponent, ThirdParty, Polymarket, ChainlinkDataFeed, ChainlinkFunctions, UMA }
-    enum Status { None, Open, Active, Resolved, Cancelled, Refunded, Draw }
-
-    struct Wager {
-        address creator;
-        address opponent;
-        address arbitrator;
-        address token;
-        uint128 creatorStake;
-        uint128 opponentStake;
-        uint64  acceptDeadline;
-        uint64  resolveDeadline;
-        ResolutionType resolutionType;
-        Status  status;
-        bool    paid;
-        bool    creatorIsYes;
-        address winner;
-        bytes32 metadataHash;
-        bytes32 polymarketConditionId;
-        string  metadataUri;
-    }
-
-    event WagerCreated(
-        uint256 indexed wagerId,
-        address indexed creator,
-        address indexed opponent,
-        address token,
-        uint128 creatorStake,
-        uint128 opponentStake,
-        ResolutionType resolutionType,
-        bytes32 metadataHash,
-        string  metadataUri
-    );
-    event WagerAccepted(uint256 indexed wagerId, address indexed opponent);
-    event WagerCancelled(uint256 indexed wagerId);
-    event WagerDeclined(uint256 indexed wagerId, address indexed opponent);
-    event WagerResolved(uint256 indexed wagerId, address indexed winner, address indexed by);
-    event WagerRefunded(uint256 indexed wagerId, address indexed creator, address indexed opponent);
-    event WagerDrawn(uint256 indexed wagerId, address indexed creator, address indexed opponent, address by);
-    event DrawProposed(uint256 indexed wagerId, address indexed proposer);
-    event DrawRevoked(uint256 indexed wagerId, address indexed proposer);
-    event PayoutClaimed(uint256 indexed wagerId, address indexed winner, uint256 amount);
-    event PolymarketLinked(uint256 indexed wagerId, bytes32 indexed conditionId, bool creatorIsYes);
-    event OracleAdapterUpdated(ResolutionType indexed resolutionType, address indexed adapter);
-    event OracleConditionLinked(
-        uint256 indexed wagerId,
-        ResolutionType indexed resolutionType,
-        bytes32 indexed conditionId,
-        bool creatorIsYes
-    );
-
-    event AccountFrozen(address indexed user, address indexed by, string reason);
-    event AccountUnfrozen(address indexed user, address indexed by);
-
-    /// @notice Emitted when an open challenge (no named opponent, code-gated) is created (feature 024).
-    ///         The opponent is bound later via {WagerAccepted} on acceptOpenWager.
-    event OpenWagerCreated(
-        uint256 indexed wagerId,
-        address indexed creator,
-        address indexed claimAuthority,
-        address token,
-        uint128 stake,
-        ResolutionType resolutionType,
-        bytes32 metadataHash,
-        string  metadataUri
-    );
-
+/// @notice Public surface area for off-chain integrators (frontend, indexers). Types and events
+///         live in {IWagerRegistryTypes} (shared with the intents extension facet, spec 035).
+/// @dev    `batchExpireOpen` and the signer-attributed `…WithSig`/`…WithAuthorization` twins are
+///         served at the SAME proxy address but declared on {IWagerRegistryIntents} — they execute
+///         in the {WagerRegistryIntents} extension facet via the registry's fallback (spec 035;
+///         the main implementation sits against the 24 KB code-size limit).
+interface IWagerRegistry is IWagerRegistryTypes {
     function createWager(
         address opponent,
         address arbitrator,
@@ -112,11 +52,8 @@ interface IWagerRegistry {
     function declareWinner(uint256 wagerId, address winner) external;
     function declareDraw(uint256 wagerId) external;
     function revokeDraw(uint256 wagerId) external;
-    function autoResolveFromPolymarket(uint256 wagerId) external;
-    function autoResolveFromOracle(uint256 wagerId) external;
     function claimPayout(uint256 wagerId) external;
     function claimRefund(uint256 wagerId) external;
-    function batchExpireOpen(uint256[] calldata wagerIds) external;
 
     function freezeAccount(address user, string calldata reason) external;
     function unfreezeAccount(address user) external;

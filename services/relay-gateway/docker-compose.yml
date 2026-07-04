@@ -1,0 +1,54 @@
+# FairWins relayer stack — local development wiring (spec 036).
+#
+#   relay-gateway  (this service; FairWins policy)  :8788
+#   oz-relayer     (OpenZeppelin Relayer engine)    :8080
+#   redis          (engine queue store; also the gateway's Phase-2 shared limiter/dedup store)
+#
+# Secrets come from a local `.env` (copy .env.example -> .env) — never commit `.env`.
+# Production runs the gateway on Cloud Run behind the Cloudflare 451 geo-gate + origin-lock;
+# this compose file is for local validation only (quickstart.md).
+#
+# Run from this directory:  docker compose up --build
+services:
+  relay-gateway:
+    build:
+      context: ../..                          # repo root: the image bakes in deployments/ (FR-025)
+      dockerfile: services/relay-gateway/Dockerfile
+    image: fairwins-relay-gateway:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENGINE_URL: http://oz-relayer:8080
+    ports:
+      - "${PORT:-8788}:${PORT:-8788}"
+    depends_on:
+      - oz-relayer
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+  oz-relayer:
+    # PIN an exact 1.x tag before relying on this (see ../oz-relayer/README.md).
+    image: ghcr.io/openzeppelin/openzeppelin-relayer:v1.4.0
+    restart: unless-stopped
+    volumes:
+      - ../oz-relayer/config:/app/config:ro
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379
+      GATEWAY_WEBHOOK_URL: http://relay-gateway:8788/v1/engine/webhook
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # ephemeral by design: state is reconstructed from chain
+    ports:
+      - "6379:6379"
