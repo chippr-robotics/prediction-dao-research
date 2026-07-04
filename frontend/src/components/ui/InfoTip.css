@@ -2,9 +2,13 @@
   position: relative;
   display: inline-flex;
   vertical-align: middle;
-  margin-left: 0.35rem;
+  margin-left: 0.2rem;
 }
 
+/* The trigger is a borderless glyph so it blends into the label text instead
+   of reading as a second bordered control. The 24×24 hit area (contract
+   requirement) stays intact; only the visible chrome is dropped, and the ⓘ
+   SVG itself supplies the ring. */
 .infotip-btn {
   display: inline-flex;
   align-items: center;
@@ -13,17 +17,24 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #94a3b8);
+  opacity: 0.75;
   cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
 
 .infotip-btn:hover,
 .infotip-btn:focus-visible {
   color: var(--accent, #2563eb);
-  border-color: var(--accent, #2563eb);
+  opacity: 1;
+}
+
+.infotip-btn[aria-expanded='true'] {
+  color: var(--accent, #2563eb);
+  opacity: 1;
 }
 
 .infotip-btn:focus-visible {
