@@ -231,6 +231,15 @@ describe('MyMarketsModal', () => {
       expect(screen.getByText(/Manage your wagers and positions/)).toBeInTheDocument()
     })
 
+    it('no longer renders the redundant network pill (spec 040 US7)', async () => {
+      const { container } = renderWithProviders(
+        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+      )
+      // The pill is gone; the network name still lives in the subtitle.
+      expect(container.querySelector('.mm-network-tag')).toBeNull()
+      expect(screen.getByText(/Manage your wagers and positions/)).toBeInTheDocument()
+    })
+
     it('should have close button', async () => {
       await act(async () => {
         renderWithProviders(
@@ -366,6 +375,23 @@ describe('MyMarketsModal', () => {
         expect(screen.getByText('Sort:')).toBeInTheDocument()
       })
       expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
+    })
+
+    it('drops the Expired and Disputed status options (spec 040 US6)', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => expect(screen.getByText('Status:')).toBeInTheDocument())
+      const statusSelect = screen.getByText('Status:').nextElementSibling
+      const optionValues = Array.from(statusSelect.options).map((o) => o.value)
+      expect(optionValues).toEqual([
+        'all', 'pending_acceptance', 'active', 'pending_resolution', 'resolved',
+      ])
+      expect(optionValues).not.toContain('expired')
+      expect(optionValues).not.toContain('disputed')
     })
   })
 
@@ -520,50 +546,9 @@ describe('MyMarketsModal', () => {
       expect(screen.getByText(/No Active Positions/i)).toBeInTheDocument()
     })
 
-    it('shows expired offers with "Expired" time-left and Clear button when filter is Expired', async () => {
-      const user = userEvent.setup()
-      const dismissMarket = vi.fn()
-      const expiredMarket = {
-        id: '99',
-        description: 'Expired Offer',
-        creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
-        participants: ['0x1234567890123456789012345678901234567890'],
-        status: 'pending_acceptance',
-        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
-        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        marketType: 'friend'
-      }
-
-      await act(async () => {
-        renderWithProviders(
-          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[expiredMarket]} />,
-          {
-            friendMarketsContext: {
-              ...defaultFriendMarketsContext,
-              dismissMarket,
-            }
-          }
-        )
-      })
-
-      const statusSelect = screen.getAllByRole('combobox')[1]
-      await user.selectOptions(statusSelect, 'expired')
-
-      await waitFor(() => {
-        expect(screen.getByText('Expired Offer')).toBeInTheDocument()
-      })
-
-      // Status pill reads "Expired" while collapsed.
-      expect(screen.getAllByText('Expired').length).toBeGreaterThan(0)
-
-      // Expand the card to reveal its actions, then clear.
-      await user.click(screen.getByText('Expired Offer'))
-
-      // Invitee (not creator) → button label is just "Clear"
-      const clearBtn = await screen.findByRole('button', { name: /^clear$/i })
-      await user.click(clearBtn)
-      expect(dismissMarket).toHaveBeenCalledWith('99')
-    })
+    // The "Expired" status filter was removed (spec 040 US6): expired offers stay
+    // hidden from the default view and are no longer selectable via the dropdown,
+    // so the former filter-to-Expired-then-Clear flow no longer applies here.
 
   })
 

@@ -17,8 +17,13 @@ import OpenChallengeDecryptModal from './OpenChallengeDecryptModal'
 import WagerList from './WagerList'
 import MyPoolsSection from './MyPoolsSection'
 import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
+import { fetchDrawProposals } from '../../data/notifications/drawProposalScan'
+import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
+import { findSavedCode, decryptWithCode } from '../../lib/openChallenge/autoUnlock'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
+import OpponentName from './OpponentName'
+import { useOpponentName } from '../../hooks/useOpponentName'
 import './MyMarketsModal.css'
 import './WagerCard.css'
 
@@ -62,12 +67,22 @@ function MyMarketsModal({
   // to collect the four-word code. Holds the target market id + its envelope.
   const [codeDecrypt, setCodeDecrypt] = useState(null)
 
+  // Open-challenge code vault (spec 040 US3). Lets us auto-unlock a challenge the
+  // member already saved a code for (one cached wallet signature, no re-typing),
+  // and remember codes entered manually so they aren't asked again.
+  const { canUse: canUseVault, hasBackup, recoverCodes, saveCode } = useOpenChallengeCodeVault()
+
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
 
   // Markets data state
   const [markets, setMarkets] = useState([])
   const [userPositions, setUserPositions] = useState([])
+
+  // Open draw proposals per wager (spec 040 US2). The proposer is not in the
+  // WagerRegistry struct, so it's read from the subgraph scan and mapped onto
+  // each wager so the card can show who has submitted a draw. { wagerId: proposer }.
+  const [drawProposerById, setDrawProposerById] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -127,6 +142,47 @@ function MyMarketsModal({
     return () => clearInterval(id)
   }, [isOpen, account, refreshFriendMarkets])
 
+  // Draw-proposal scan (spec 040 US2). Keeps the per-wager draw proposer current
+  // while the modal is open (same 30s cadence as the market refresh). A failed
+  // read retains prior state rather than fabricating revokes (honest state).
+  const drawScanKey = useMemo(
+    () => decryptableMarkets.map(m => String(m.id)).sort().join(','),
+    [decryptableMarkets]
+  )
+  useEffect(() => {
+    if (!isOpen || !account) return
+    const wagerIds = drawScanKey ? drawScanKey.split(',').filter(Boolean) : []
+    if (wagerIds.length === 0) { setDrawProposerById({}); return }
+    let alive = true
+    const run = async () => {
+      const { proposals, ok } = await fetchDrawProposals({ chainId, wagerIds })
+      if (!alive || !ok) return
+      const map = {}
+      for (const p of proposals) map[String(p.wagerId)] = p.proposer
+      setDrawProposerById(map)
+    }
+    run()
+    const id = setInterval(run, 30000)
+    return () => { alive = false; clearInterval(id) }
+  }, [isOpen, account, chainId, drawScanKey])
+
+  // Auto-unlock an open challenge from a saved code (spec 040 US3). Returns true
+  // when it decrypted without prompting. Only attempts when the member has a
+  // vault (avoids a needless signature for takers with nothing saved), and any
+  // failure falls back to the manual prompt.
+  const tryAutoUnlockCode = useCallback(async (marketId, envelope) => {
+    if (!hasBackup) return false
+    try {
+      const codes = await recoverCodes()
+      const saved = findSavedCode(codes, marketId)
+      if (!saved) return false
+      setDecryptedMetadata(marketId, decryptWithCode(envelope, saved.code))
+      return true
+    } catch {
+      return false
+    }
+  }, [hasBackup, recoverCodes, setDecryptedMetadata])
+
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
       // Pass the just-fetched envelope straight into decryptMarket. The merged
@@ -135,17 +191,19 @@ function MyMarketsModal({
       // pass instead of the old fetch-then-(re-click)-to-decrypt flow.
       const envelope = await fetchEnvelope(marketId)
       // Open challenges (feature 024) seal their terms under the four-word code, not a
-      // recipient key — the wallet-key path can't read them. Route those to the code
-      // prompt instead; everything else decrypts with the connected wallet as before.
+      // recipient key — the wallet-key path can't read them. Try a saved code first
+      // (spec 040 US3), then fall back to the code prompt; everything else decrypts
+      // with the connected wallet as before.
       if (isCodeEnvelope(envelope)) {
-        setCodeDecrypt({ marketId, envelope })
+        const unlocked = await tryAutoUnlockCode(marketId, envelope)
+        if (!unlocked) setCodeDecrypt({ marketId, envelope })
         return
       }
       await decryptMarket(marketId, envelope)
     } catch (err) {
       console.error('[MyMarketsModal] Decryption failed:', err)
     }
-  }, [fetchEnvelope, decryptMarket])
+  }, [fetchEnvelope, decryptMarket, tryAutoUnlockCode])
 
   // Fetch markets data (friend markets are passed via props)
   const fetchMarketsData = useCallback(async () => {
@@ -326,7 +384,11 @@ function MyMarketsModal({
       if (dismissedIds?.has(String(market.id))) return
 
       const status = getMarketStatus(market)
-      const marketWithStatus = { ...market, computedStatus: status }
+      const marketWithStatus = {
+        ...market,
+        computedStatus: status,
+        drawProposedBy: drawProposerById[String(market.id)] ?? null,
+      }
 
       // Apply status filter. The default ("all") view also hides expired
       // offers so they don't clutter the list — pick "Expired" explicitly
@@ -400,7 +462,7 @@ function MyMarketsModal({
     history.sort(comparator)
 
     return { participating, created, arbitrating, history }
-  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId])
+  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId, drawProposerById])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -814,14 +876,8 @@ function MyMarketsModal({
             <div className="mm-brand">
               <span className="mm-brand-icon">&#128202;</span>
               <h2 id="my-markets-modal-title">My Wagers</h2>
-              {activeNetwork && (
-                <span
-                  className={`mm-network-tag${activeNetwork.isTestnet ? ' mm-network-tag-testnet' : ''}`}
-                  title={`Showing wagers on ${activeNetwork.name}`}
-                >
-                  {activeNetwork.name}
-                </span>
-              )}
+              {/* Network pill removed (spec 040 US7) — the subtitle below already
+                  names the active network, so a separate pill was redundant. */}
             </div>
             <p className="mm-subtitle">
               Manage your wagers and positions on {activeNetwork?.name || 'the current network'}
@@ -934,21 +990,23 @@ function MyMarketsModal({
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mm-filter-select"
             >
+              {/* Disputed and Expired options removed (spec 040 US6): Expired is
+                  hidden from the default view, and Disputed is not a reachable
+                  state here — offering them returned empty/misleading results. */}
               <option value="all">All Status</option>
               <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance</option>
               <option value={MarketStatus.ACTIVE}>Active</option>
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
-              <option value={MarketStatus.DISPUTED}>Disputed</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
-              <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
         </div>
 
         {/* Content Area */}
         <div className="mm-content">
-          {/* Group pools (spec 037) — self-hides when the user has none, so the wager view is unchanged. */}
-          <MyPoolsSection />
+          {/* Group pools (spec 037; spec 040 US5) — tab-aware: active pools show in the active
+              tabs, terminal pools move to History. Self-hides when the user has none for the tab. */}
+          <MyPoolsSection activeTab={activeTab} />
           {!isConnected ? (
             <div className="mm-empty-state">
               <div className="mm-empty-icon">&#128274;</div>
@@ -1250,7 +1308,13 @@ function MyMarketsModal({
           isOpen
           envelope={codeDecrypt.envelope}
           onClose={() => setCodeDecrypt(null)}
-          onDecrypted={(metadata) => setDecryptedMetadata(codeDecrypt.marketId, metadata)}
+          onDecrypted={(metadata, code) => {
+            setDecryptedMetadata(codeDecrypt.marketId, metadata)
+            // Remember the code so this challenge auto-unlocks next time (spec 040 US3).
+            if (code && canUseVault) {
+              saveCode({ code, wagerId: String(codeDecrypt.marketId) }).catch(() => {})
+            }
+          }}
         />
       )}
 
@@ -1524,8 +1588,7 @@ function MarketDetailView({
         <div className="mm-detail-item">
           <span className="mm-detail-label">Creator</span>
           <span className="mm-detail-value">
-            {formatAddress(market.creator)}
-            {isCreator && <span className="mm-you-tag">You</span>}
+            <OpponentName address={market.creator} isSelf={isCreator} />
           </span>
         </div>
         <div className="mm-detail-item">
@@ -1788,15 +1851,23 @@ function ResolutionModal({
 
   // Participant-anchored display labels so the resolver clearly sees which party each
   // choice pays out, instead of an ambiguous "Pass/Fail" (Bug #2).
-  const fmtParty = (addr) => {
+  // Resolve both parties to friendly names (spec 040). Fixed two calls, so the
+  // hook order is stable across renders.
+  const creatorName = useOpponentName(market.creator)
+  const opponentName = useOpponentName(market.opponent)
+
+  // Friendly party names (spec 040) so the resolver sees who each choice pays,
+  // by name, alongside the short address for certainty.
+  const fmtParty = (addr, resolvedName) => {
     if (!addr) return 'Unknown'
     const short = `${addr.slice(0, 6)}…${addr.slice(-4)}`
     const isYou = account && addr.toLowerCase() === account.toLowerCase()
-    return isYou ? `${short} (You)` : short
+    const name = isYou ? 'You' : (resolvedName || short)
+    return name === short ? short : `${name} · ${short}`
   }
   const outcomeLabels = {
-    [outcomes[0]]: { title: 'Creator wins', who: fmtParty(market.creator) },
-    [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent) },
+    [outcomes[0]]: { title: 'Creator wins', who: fmtParty(market.creator, creatorName.displayName) },
+    [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent, opponentName.displayName) },
   }
   const labelFor = (outcome) => {
     if (outcome === DRAW) return 'Draw — both parties refunded'

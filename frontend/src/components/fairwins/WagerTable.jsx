@@ -3,6 +3,7 @@ import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { buildWagerVm } from './wagerVm'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
+import OpponentName from './OpponentName'
 
 const VARIANT_CLASS = {
   primary: 'wc-action-primary',
@@ -104,16 +105,28 @@ export default function WagerTable({
                 <span className="mm-table-market-title">
                   <span>{vm.displayTitle}</span>
                 </span>
+                {vm.opponentAddress && (
+                  <span className="mm-table-market-opponent">
+                    <OpponentName address={vm.opponentAddress} interactive={false} />
+                  </span>
+                )}
               </td>
               <td className="wc-table-amount">
                 <strong>{vm.stake}</strong> {vm.tokenSymbol}
                 {vm.outcome && (
-                  <span className={`wc-outcome ${vm.outcome.tone}`} style={{ marginLeft: 6 }}>{vm.outcome.label}</span>
+                  <span className={`wc-outcome ${vm.outcome.tone}`} style={{ marginLeft: 6 }}>
+                    {vm.outcome.address
+                      ? <OpponentName address={vm.outcome.address} interactive={false} />
+                      : vm.outcome.label}
+                  </span>
                 )}
               </td>
               <td className="mm-table-time">{vm.meta[1]?.value}</td>
               <td>
                 <span className={`mm-status-badge ${vm.statusClass}`}>{vm.statusText}</span>
+                {vm.draw?.phase === 'proposed' && (
+                  <span className="mm-table-draw" title={vm.draw.label}>Draw pending</span>
+                )}
               </td>
               {hasActionsColumn && (
                 <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>

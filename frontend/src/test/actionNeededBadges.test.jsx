@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
+import WagerCardGrid from '../components/fairwins/WagerCardGrid'
 import {
   WalletContext,
   ThemeContext,
@@ -339,13 +340,17 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
     it('suppresses the "refund" badge when the row shows a Clear/Reclaim button', async () => {
       const user = userEvent.setup()
       // An expired pending offer → computedStatus EXPIRED → the row renders a
-      // Clear button, which makes the "refund" action badge redundant.
+      // Clear button, which makes the "refund" action badge redundant. The
+      // My Wagers modal no longer surfaces expired offers (spec 040 US6 removed
+      // the Expired filter), so this suppression is exercised at the card level
+      // where the logic lives.
       const expired = {
         id: '7',
         description: 'Expired Offer',
         creator: OTHER,
         participants: [ME],
         status: 'pending_acceptance',
+        computedStatus: 'expired',
         acceptanceDeadline: Date.now() - 60 * 60 * 1000,
         endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         marketType: 'friend'
@@ -354,15 +359,21 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         actionNeededByWagerId: { '7': 'refund' }
       })
 
-      await act(async () => {
-        render(modalUi([expired]))
-      })
-
-      // Expired offers are hidden under the default "all" filter — switch to Expired.
-      const statusSelect = screen.getAllByRole('combobox')[1]
-      await act(async () => {
-        await user.selectOptions(statusSelect, 'expired')
-      })
+      render(
+        <WagerCardGrid
+          markets={[expired]}
+          account={ME}
+          getStatusClass={() => 'status-expired'}
+          getStatusLabel={() => 'Expired'}
+          getTimeRemaining={() => 'Expired'}
+          formatDate={() => 'Jun 1, 2026'}
+          onClearExpired={vi.fn()}
+          onResolve={vi.fn()}
+          onAccept={vi.fn()}
+          onClaim={vi.fn()}
+          onRefund={vi.fn()}
+        />
+      )
 
       expect(screen.getByText('Expired Offer')).toBeInTheDocument()
       // Expand the card to reveal its actions.
