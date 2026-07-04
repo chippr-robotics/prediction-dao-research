@@ -1,0 +1,212 @@
+{
+  "relayers": [
+    {
+      "id": "polygon-137",
+      "name": "FairWins Polygon (137)",
+      "network": "polygon",
+      "network_type": "evm",
+      "paused": false,
+      "signer_id": "gas-key-polygon",
+      "notification_id": "relay-gateway-webhook",
+      "policies": {
+        "eip1559_pricing": true,
+        "gas_price_cap": 1000000000000,
+        "min_balance": 500000000000000000,
+        "whitelist_receivers": [
+          "0x5023765809fDA93ab9F11B684fdb76521eD31774",
+          "0x00c3ef4e02Ef00Ad6eE955dF5022A22F6ea73dae"
+        ]
+      }
+    },
+    {
+      "id": "amoy-80002",
+      "name": "FairWins Amoy (80002)",
+      "network": "amoy",
+      "network_type": "evm",
+      "paused": false,
+      "signer_id": "gas-key-amoy",
+      "notification_id": "relay-gateway-webhook",
+      "policies": {
+        "eip1559_pricing": true,
+        "gas_price_cap": 500000000000,
+        "min_balance": 500000000000000000,
+        "whitelist_receivers": [
+          "0xA429CdaD3E1497e33BEA7D6FE7d6913fE880241b",
+          "0x89158f2E044C73c687dA12B7FA42b94F9A6D8465"
+        ]
+      }
+    },
+    {
+      "id": "etc-61",
+      "name": "FairWins Ethereum Classic (61)",
+      "network": "ethereum-classic",
+      "network_type": "evm",
+      "paused": true,
+      "signer_id": "gas-key-etc",
+      "notification_id": "relay-gateway-webhook",
+      "policies": {
+        "eip1559_pricing": false,
+        "gas_price_cap": 2000000000000,
+        "min_balance": 1000000000000000000
+      }
+    },
+    {
+      "id": "mordor-63",
+      "name": "FairWins Mordor (63)",
+      "network": "mordor",
+      "network_type": "evm",
+      "paused": false,
+      "signer_id": "gas-key-mordor",
+      "notification_id": "relay-gateway-webhook",
+      "policies": {
+        "eip1559_pricing": false,
+        "gas_price_cap": 2000000000000,
+        "min_balance": 1000000000000000000,
+        "whitelist_receivers": [
+          "0x3ccB144d8aa838e8d4D695867cC72e548117830C",
+          "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541"
+        ]
+      }
+    }
+  ],
+  "networks": [
+    {
+      "network": "polygon",
+      "type": "evm",
+      "chain_id": 137,
+      "symbol": "POL",
+      "required_confirmations": 30,
+      "average_blocktime_ms": 2100,
+      "is_testnet": false,
+      "features": ["eip1559"],
+      "rpc_urls": [
+        "${RPC_URL_137_PRIMARY:-https://polygon-rpc.com}",
+        "${RPC_URL_137_SECONDARY:-https://polygon-bor-rpc.publicnode.com}"
+      ],
+      "explorer_urls": ["https://polygonscan.com"],
+      "tags": ["mainnet", "fairwins"]
+    },
+    {
+      "network": "amoy",
+      "type": "evm",
+      "chain_id": 80002,
+      "symbol": "POL",
+      "required_confirmations": 3,
+      "average_blocktime_ms": 2100,
+      "is_testnet": true,
+      "features": ["eip1559"],
+      "rpc_urls": [
+        "${RPC_URL_80002_PRIMARY:-https://rpc-amoy.polygon.technology}",
+        "${RPC_URL_80002_SECONDARY:-https://polygon-amoy-bor-rpc.publicnode.com}"
+      ],
+      "explorer_urls": ["https://amoy.polygonscan.com"],
+      "tags": ["testnet", "fairwins"]
+    },
+    {
+      "network": "ethereum-classic",
+      "type": "evm",
+      "chain_id": 61,
+      "symbol": "ETC",
+      "required_confirmations": 12,
+      "average_blocktime_ms": 13000,
+      "is_testnet": false,
+      "features": [],
+      "rpc_urls": [
+        "${RPC_URL_61_PRIMARY:-https://etc.rivet.link}",
+        "${RPC_URL_61_SECONDARY:-https://etc.etcdesktop.com}"
+      ],
+      "explorer_urls": ["https://etc.blockscout.com"],
+      "tags": ["mainnet", "fairwins", "legacy-gas", "no-batch"]
+    },
+    {
+      "network": "mordor",
+      "type": "evm",
+      "chain_id": 63,
+      "symbol": "METC",
+      "required_confirmations": 6,
+      "average_blocktime_ms": 13000,
+      "is_testnet": true,
+      "features": [],
+      "rpc_urls": [
+        "${RPC_URL_63_PRIMARY:-https://rpc.mordor.etccooperative.org}",
+        "${RPC_URL_63_SECONDARY:-https://geth-mordor.etc-network.info}"
+      ],
+      "explorer_urls": ["https://etc-mordor.blockscout.com"],
+      "tags": ["testnet", "fairwins", "legacy-gas", "no-batch"]
+    }
+  ],
+  "signers": [
+    {
+      "id": "gas-key-polygon",
+      "type": "google_cloud_kms",
+      "config": {
+        "service_account": {
+          "project_id": { "type": "env", "value": "GCP_PROJECT_ID" },
+          "credentials": { "type": "env", "value": "GOOGLE_APPLICATION_CREDENTIALS_JSON" }
+        },
+        "key": {
+          "location": "us-central1",
+          "key_ring_id": "fairwins-relayer",
+          "key_id": "gas-key-polygon",
+          "key_version": 1
+        }
+      }
+    },
+    {
+      "id": "gas-key-amoy",
+      "type": "google_cloud_kms",
+      "config": {
+        "service_account": {
+          "project_id": { "type": "env", "value": "GCP_PROJECT_ID" },
+          "credentials": { "type": "env", "value": "GOOGLE_APPLICATION_CREDENTIALS_JSON" }
+        },
+        "key": {
+          "location": "us-central1",
+          "key_ring_id": "fairwins-relayer",
+          "key_id": "gas-key-amoy",
+          "key_version": 1
+        }
+      }
+    },
+    {
+      "id": "gas-key-etc",
+      "type": "google_cloud_kms",
+      "config": {
+        "service_account": {
+          "project_id": { "type": "env", "value": "GCP_PROJECT_ID" },
+          "credentials": { "type": "env", "value": "GOOGLE_APPLICATION_CREDENTIALS_JSON" }
+        },
+        "key": {
+          "location": "us-central1",
+          "key_ring_id": "fairwins-relayer",
+          "key_id": "gas-key-etc",
+          "key_version": 1
+        }
+      }
+    },
+    {
+      "id": "gas-key-mordor",
+      "type": "google_cloud_kms",
+      "config": {
+        "service_account": {
+          "project_id": { "type": "env", "value": "GCP_PROJECT_ID" },
+          "credentials": { "type": "env", "value": "GOOGLE_APPLICATION_CREDENTIALS_JSON" }
+        },
+        "key": {
+          "location": "us-central1",
+          "key_ring_id": "fairwins-relayer",
+          "key_id": "gas-key-mordor",
+          "key_version": 1
+        }
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "relay-gateway-webhook",
+      "type": "webhook",
+      "url": "${GATEWAY_WEBHOOK_URL:-http://relay-gateway:8788/v1/engine/webhook}",
+      "signing_key": { "type": "env", "value": "WEBHOOK_SIGNING_KEY" }
+    }
+  ]
+}

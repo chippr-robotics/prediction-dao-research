@@ -1,0 +1,28 @@
+{
+  "name": "fairwins-relay-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FairWins intent relay gateway (spec 036): policy front-end for the OSS submission engine. Recovers/screens the SIGNER, validates intent binding, dedups, rate-limits, then hands built calldata to OpenZeppelin Relayer. Untrusted-by-design: can censor, never steal.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "load": "k6 run load/k6-intents.js",
+    "lint": "echo 'no standalone linter wired; relies on repo-level review' && exit 0"
+  },
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^4.0.18"
+  }
+}

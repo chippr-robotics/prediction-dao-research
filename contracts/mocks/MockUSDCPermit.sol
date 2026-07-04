@@ -20,6 +20,9 @@ contract MockUSDCPermit is ERC20Permit {
     /// @notice authorizer => nonce => used.
     mapping(address => mapping(bytes32 => bool)) public authorizationState;
 
+    bytes32 public constant CANCEL_AUTHORIZATION_TYPEHASH =
+        keccak256("CancelAuthorization(address authorizer,bytes32 nonce)");
+
     error AuthorizationExpired();
     error AuthorizationNotYetValid();
     error AuthorizationUsed();
@@ -27,6 +30,7 @@ contract MockUSDCPermit is ERC20Permit {
     error CallerNotPayee();
 
     event AuthorizationUsedEvent(address indexed authorizer, bytes32 indexed nonce);
+    event AuthorizationCanceled(address indexed authorizer, bytes32 indexed nonce);
 
     constructor() ERC20("USD Coin", "USDC") ERC20Permit("USD Coin") {}
 
@@ -65,5 +69,18 @@ contract MockUSDCPermit is ERC20Permit {
         authorizationState[from][nonce] = true;
         emit AuthorizationUsedEvent(from, nonce);
         _transfer(from, to, value);
+    }
+
+    /// @notice EIP-3009: cancel an unused authorization so it can never be consumed (spec 035 FR-006 —
+    ///         payment-leg invalidation). Anyone may submit the authorizer-signed cancellation.
+    function cancelAuthorization(address authorizer, bytes32 nonce, uint8 v, bytes32 r, bytes32 s) external {
+        if (authorizationState[authorizer][nonce]) revert AuthorizationUsed();
+
+        bytes32 structHash = keccak256(abi.encode(CANCEL_AUTHORIZATION_TYPEHASH, authorizer, nonce));
+        address signer = ECDSA.recover(_hashTypedDataV4(structHash), v, r, s);
+        if (signer != authorizer) revert InvalidSignature();
+
+        authorizationState[authorizer][nonce] = true;
+        emit AuthorizationCanceled(authorizer, nonce);
     }
 }

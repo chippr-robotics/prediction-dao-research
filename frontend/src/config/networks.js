@@ -57,6 +57,9 @@ const NETWORKS = {
       symbol: 'USDC',
       name: 'USD Coin',
       decimals: 6,
+      // EIP-712 domain version for the EIP-3009 payment leg (spec 035 FR-020):
+      // native Circle USDC signs under version '2' (bridged USDC.e would be '1').
+      domainVersion: '2',
     },
     // Uniswap V3 has no canonical deployment on Polygon Amoy. Community
     // deployments exist; supply them via VITE_AMOY_UNISWAP_* env vars to
@@ -120,6 +123,9 @@ const NETWORKS = {
       symbol: 'USC',
       name: 'Classic USD',
       decimals: 6,
+      // USC has no EIP-3009 receiveWithAuthorization — null disables payment-class
+      // gasless intents on this chain (self-submit only; spec 035 FR-020).
+      domainVersion: null,
     },
     // ETCswap (Uniswap V3 fork on Ethereum Classic). Supply all addresses via
     // VITE_MORDOR_ETCSWAP_* + VITE_MORDOR_WETC to enable in-app swaps on Mordor.
@@ -185,6 +191,9 @@ const NETWORKS = {
       symbol: 'USC',
       name: 'Classic USD',
       decimals: 6,
+      // USC has no EIP-3009 receiveWithAuthorization — null disables payment-class
+      // gasless intents on this chain (self-submit only; spec 035 FR-020).
+      domainVersion: null,
     },
     // ETCswap V3 (a Uniswap V3 deployment on Ethereum Classic). Addresses are the
     // on-chain-verified canonical deployment (Spec 033 research R1); override via
@@ -242,6 +251,9 @@ const NETWORKS = {
       symbol: 'USDC',
       name: 'USD Coin',
       decimals: 6,
+      // EIP-712 domain version for the EIP-3009 payment leg (spec 035 FR-020):
+      // native Circle USDC signs under version '2' (bridged USDC.e would be '1').
+      domainVersion: '2',
     },
     // Canonical Uniswap V3 deployment on Polygon Mainnet.
     // https://docs.uniswap.org/contracts/v3/reference/deployments
