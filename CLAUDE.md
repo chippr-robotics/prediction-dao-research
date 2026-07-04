@@ -68,6 +68,19 @@ artifacts live under `specs/<feature>/`.
   `getContractAddressForChain('wagerRegistry', chainId)` and read `WagerRegistry`
   events; do not depend on `friendGroupMarketFactory` except as an explicit
   legacy fallback.
+- **Gasless intents (specs 035 + 036).** The wager registry is TWO facets behind one proxy:
+  `WagerRegistry` (main impl) delegatecalls unknown selectors to `WagerRegistryIntents`
+  (the `…WithSig`/`…WithAuthorization` twins + relocated `batchExpireOpen`/`autoResolveFrom*`)
+  because the main impl sits against the 24 KB code limit. BOTH facets MUST inherit
+  `WagerRegistryCore` — the single storage-layout definition; never declare registry state
+  anywhere else — and `check:storage-layout` validates the pair. In tests use
+  `test/helpers/proxy.js#deployWagerRegistry` (deploys + wires both facets, returns a merged-ABI
+  contract). The EIP-712 intent structs exist in THREE places that must stay byte-identical:
+  the contract typehashes, `frontend/src/lib/relay/intentTypes.js`, and
+  `services/relay-gateway/src/intent/intentTypes.js`. The relayer (spec 036:
+  `services/relay-gateway` policy gateway + `services/oz-relayer` engine config) is optional
+  infrastructure — every gasless flow keeps a self-submit fallback (never-stranded rule).
+  See `docs/developer-guide/gasless-intents.md` + `docs/runbooks/relayer-operations.md`.
 - **ZK-Wager Pools (spec 034) are a documented exception to the "route escrow
   through `wagerRegistry`" rule.** Group wager pools are a **parallel system**: the
   `ZKWagerPoolFactory` (UUPS proxy, deployment keys `zkWagerPoolFactory` /

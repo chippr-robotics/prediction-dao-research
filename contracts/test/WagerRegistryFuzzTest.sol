@@ -41,7 +41,7 @@ contract WagerRegistryFuzzTest {
     // Snapshot of per-wager status for forward-only state check.
     // Medusa calls property functions between arbitrary tx sequences, so we
     // record the last-seen status of each wager to detect backward transitions.
-    mapping(uint256 => IWagerRegistry.Status) private _lastSeenStatus;
+    mapping(uint256 => IWagerRegistryTypes.Status) private _lastSeenStatus;
 
     // ---------- constructor ----------
 
@@ -115,7 +115,7 @@ contract WagerRegistryFuzzTest {
             opponentStake,
             accept,
             resolve,
-            IWagerRegistry.ResolutionType.Either,
+            IWagerRegistryTypes.ResolutionType.Either,
             bytes32(0),
             false,
             keccak256("fuzz"),
@@ -144,12 +144,12 @@ contract WagerRegistryFuzzTest {
         uint256 totalLocked = 0;
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            if (w.status == IWagerRegistry.Status.Open) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            if (w.status == IWagerRegistryTypes.Status.Open) {
                 totalLocked += w.creatorStake;
-            } else if (w.status == IWagerRegistry.Status.Active && !w.paid) {
+            } else if (w.status == IWagerRegistryTypes.Status.Active && !w.paid) {
                 totalLocked += uint256(w.creatorStake) + uint256(w.opponentStake);
-            } else if (w.status == IWagerRegistry.Status.Resolved && !w.paid) {
+            } else if (w.status == IWagerRegistryTypes.Status.Resolved && !w.paid) {
                 totalLocked += uint256(w.creatorStake) + uint256(w.opponentStake);
             }
         }
@@ -163,8 +163,8 @@ contract WagerRegistryFuzzTest {
     function property_winner_is_participant() public view returns (bool) {
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            if (w.status == IWagerRegistry.Status.Resolved) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            if (w.status == IWagerRegistryTypes.Status.Resolved) {
                 if (w.winner == address(0)) return false;
                 if (w.winner != w.creator && w.winner != w.opponent) return false;
             }
@@ -181,10 +181,10 @@ contract WagerRegistryFuzzTest {
     function property_no_double_claim() public view returns (bool) {
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            if (w.status == IWagerRegistry.Status.Resolved && w.paid) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            if (w.status == IWagerRegistryTypes.Status.Resolved && w.paid) {
                 // Re-read to verify the paid flag is still set (storage consistency)
-                IWagerRegistry.Wager memory w2 = registry.getWager(i);
+                IWagerRegistryTypes.Wager memory w2 = registry.getWager(i);
                 if (!w2.paid) return false;
             }
         }
@@ -204,33 +204,33 @@ contract WagerRegistryFuzzTest {
     function property_state_only_progresses_forward() public returns (bool) {
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            IWagerRegistry.Status current = w.status;
-            IWagerRegistry.Status previous = _lastSeenStatus[i];
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            IWagerRegistryTypes.Status current = w.status;
+            IWagerRegistryTypes.Status previous = _lastSeenStatus[i];
 
             // Record current for next call
             _lastSeenStatus[i] = current;
 
             // First time we see this wager, skip comparison
-            if (previous == IWagerRegistry.Status.None && current != IWagerRegistry.Status.None) {
+            if (previous == IWagerRegistryTypes.Status.None && current != IWagerRegistryTypes.Status.None) {
                 continue;
             }
 
             // Terminal states must never change
-            if (previous == IWagerRegistry.Status.Resolved && current != IWagerRegistry.Status.Resolved) {
+            if (previous == IWagerRegistryTypes.Status.Resolved && current != IWagerRegistryTypes.Status.Resolved) {
                 return false;
             }
-            if (previous == IWagerRegistry.Status.Refunded && current != IWagerRegistry.Status.Refunded) {
+            if (previous == IWagerRegistryTypes.Status.Refunded && current != IWagerRegistryTypes.Status.Refunded) {
                 return false;
             }
 
             // Active must not go back to Open
-            if (previous == IWagerRegistry.Status.Active && current == IWagerRegistry.Status.Open) {
+            if (previous == IWagerRegistryTypes.Status.Active && current == IWagerRegistryTypes.Status.Open) {
                 return false;
             }
 
             // Resolved wager must have a winner set
-            if (current == IWagerRegistry.Status.Resolved) {
+            if (current == IWagerRegistryTypes.Status.Resolved) {
                 if (w.winner == address(0)) return false;
             }
         }
@@ -247,8 +247,8 @@ contract WagerRegistryFuzzTest {
     function property_payout_equals_total_stakes() public view returns (bool) {
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            if (w.status == IWagerRegistry.Status.Resolved && w.paid) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            if (w.status == IWagerRegistryTypes.Status.Resolved && w.paid) {
                 // Both stakes must be > 0 (enforced at creation)
                 if (w.creatorStake == 0 || w.opponentStake == 0) return false;
             }
@@ -311,8 +311,8 @@ contract WagerRegistryFuzzTest {
     function property_refund_preserves_stake_values() public view returns (bool) {
         uint256 count = registry.nextWagerId();
         for (uint256 i = 1; i < count; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(i);
-            if (w.status == IWagerRegistry.Status.Refunded) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(i);
+            if (w.status == IWagerRegistryTypes.Status.Refunded) {
                 // Stakes should still be recorded (not zeroed)
                 if (w.creatorStake == 0) return false;
                 // If the wager was Active before refund, opponentStake > 0 too
@@ -362,7 +362,7 @@ contract WagerRegistryFuzzTest {
             stake,
             accept,
             resolve,
-            IWagerRegistry.ResolutionType.Either,
+            IWagerRegistryTypes.ResolutionType.Either,
             bytes32(0),
             false,
             keccak256("fuzz-open"),
@@ -380,8 +380,8 @@ contract WagerRegistryFuzzTest {
     function cancelOpenWagerAction(uint256 idxSeed) public {
         if (_openWagerIds.length == 0) return;
         uint256 id = _openWagerIds[idxSeed % _openWagerIds.length];
-        IWagerRegistry.Wager memory w = registry.getWager(id);
-        if (w.status != IWagerRegistry.Status.Open) return;
+        IWagerRegistryTypes.Wager memory w = registry.getWager(id);
+        if (w.status != IWagerRegistryTypes.Status.Open) return;
         try registry.cancelOpen(id) {} catch {}
     }
 
@@ -396,9 +396,9 @@ contract WagerRegistryFuzzTest {
         for (uint256 i = 0; i < _openWagerIds.length; i++) {
             uint256 id = _openWagerIds[i];
             address authority = _openClaimAuthority[id];
-            IWagerRegistry.Wager memory w = registry.getWager(id);
+            IWagerRegistryTypes.Wager memory w = registry.getWager(id);
             uint256 resolved = registry.openWagerIdForClaim(authority);
-            if (w.status == IWagerRegistry.Status.Open) {
+            if (w.status == IWagerRegistryTypes.Status.Open) {
                 if (resolved != id) return false;
             } else if (resolved != 0) {
                 return false; // claim slot released on leaving Open
@@ -410,8 +410,8 @@ contract WagerRegistryFuzzTest {
     // ---- OPEN INVARIANT B: single-binding + equal stakes while Open ----
     function property_open_no_opponent_and_equal_stakes_while_open() public view returns (bool) {
         for (uint256 i = 0; i < _openWagerIds.length; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(_openWagerIds[i]);
-            if (w.status == IWagerRegistry.Status.Open) {
+            IWagerRegistryTypes.Wager memory w = registry.getWager(_openWagerIds[i]);
+            if (w.status == IWagerRegistryTypes.Status.Open) {
                 if (w.opponent != address(0)) return false;
                 if (w.creatorStake != w.opponentStake) return false;
             }
@@ -425,8 +425,8 @@ contract WagerRegistryFuzzTest {
     // property_escrow_covers_active_stakes this also guards the open escrow path.)
     function property_open_never_active_without_signature() public view returns (bool) {
         for (uint256 i = 0; i < _openWagerIds.length; i++) {
-            IWagerRegistry.Wager memory w = registry.getWager(_openWagerIds[i]);
-            if (w.status == IWagerRegistry.Status.Active) return false;
+            IWagerRegistryTypes.Wager memory w = registry.getWager(_openWagerIds[i]);
+            if (w.status == IWagerRegistryTypes.Status.Active) return false;
         }
         return true;
     }

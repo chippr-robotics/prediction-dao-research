@@ -44,8 +44,31 @@ function loadDeployedImpl(deploymentsKey) {
   return null;
 }
 
+// Facet pairs sharing ONE proxy's storage (spec 035): the extension facet is delegatecalled from the
+// main facet's fallback, so its storage layout MUST be compatible with the main implementation's.
+// Validated by treating the facet as if it were an upgrade of the main implementation.
+const FACET_PAIRS = [
+  { main: "WagerRegistry", facet: "WagerRegistryIntents" },
+];
+
 async function main() {
   let failed = false;
+  for (const { main: mainName, facet: facetName } of FACET_PAIRS) {
+    try {
+      const MainFactory = await ethers.getContractFactory(mainName);
+      const FacetFactory = await ethers.getContractFactory(facetName);
+      // Main → facet: every sequential slot the main facet defines must line up in the extension
+      // (both inherit the same storage core; this catches any drift). The reverse direction is NOT
+      // validated: the extension additionally carries SignerIntentBase's ERC-7201 namespace, which
+      // the main facet legitimately does not declare — that namespace lives at a fixed
+      // keccak-derived slot that can never collide with sequential/gap slots.
+      await upgrades.validateUpgrade(MainFactory, FacetFactory, { kind: "uups" });
+      console.log(`✓ ${mainName} → ${facetName}: facet storage layouts are consistent`);
+    } catch (e) {
+      failed = true;
+      console.error(`✗ ${mainName} ⇄ ${facetName}: ${e.message}`);
+    }
+  }
   for (const { name, deploymentsKey } of UPGRADEABLE_CONTRACTS) {
     const Factory = await ethers.getContractFactory(name);
     const deployedImpl = loadDeployedImpl(deploymentsKey);

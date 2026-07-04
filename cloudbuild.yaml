@@ -58,9 +58,51 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
+  # --- Relay gateway (spec 036) ---------------------------------------------------------------
+  # Build from the REPO ROOT context so deployments/ is baked into the image (the FR-025
+  # startup consistency check pins target addresses to those records).
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'services/relay-gateway/Dockerfile'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway']
+
+  # Deploy the relay gateway to Cloud Run (Phase 1: single instance — in-process dedup/quota
+  # state stays correct; see services/relay-gateway/README.md "Phase 1 vs Phase 2").
+  # Secrets (ORIGIN_AUTH_SECRET, WEBHOOK_SHARED_SECRET) are configured on the Cloud Run service
+  # from Secret Manager — like ORIGIN_LOCK_SECRET above, they are intentionally NOT set here so
+  # deploys don't fail before the secrets exist. Once created, wire them declaratively with:
+  #   - '--update-secrets'
+  #   - 'ORIGIN_AUTH_SECRET=origin-lock-secret:latest,WEBHOOK_SHARED_SECRET=relay-webhook-secret:latest'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'fairwins-relay-gateway'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--max-instances'
+      - '1'
+
 images:
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:latest'
+  - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
