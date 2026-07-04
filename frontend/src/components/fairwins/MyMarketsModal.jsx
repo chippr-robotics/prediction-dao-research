@@ -18,6 +18,8 @@ import WagerList from './WagerList'
 import MyPoolsSection from './MyPoolsSection'
 import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import { fetchDrawProposals } from '../../data/notifications/drawProposalScan'
+import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
+import { findSavedCode, decryptWithCode } from '../../lib/openChallenge/autoUnlock'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
 import OpponentName from './OpponentName'
@@ -64,6 +66,11 @@ function MyMarketsModal({
   // read with the wallet-key path, so a click on a code-keyed wager routes here
   // to collect the four-word code. Holds the target market id + its envelope.
   const [codeDecrypt, setCodeDecrypt] = useState(null)
+
+  // Open-challenge code vault (spec 040 US3). Lets us auto-unlock a challenge the
+  // member already saved a code for (one cached wallet signature, no re-typing),
+  // and remember codes entered manually so they aren't asked again.
+  const { canUse: canUseVault, hasBackup, recoverCodes, saveCode } = useOpenChallengeCodeVault()
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
@@ -159,6 +166,23 @@ function MyMarketsModal({
     return () => { alive = false; clearInterval(id) }
   }, [isOpen, account, chainId, drawScanKey])
 
+  // Auto-unlock an open challenge from a saved code (spec 040 US3). Returns true
+  // when it decrypted without prompting. Only attempts when the member has a
+  // vault (avoids a needless signature for takers with nothing saved), and any
+  // failure falls back to the manual prompt.
+  const tryAutoUnlockCode = useCallback(async (marketId, envelope) => {
+    if (!hasBackup) return false
+    try {
+      const codes = await recoverCodes()
+      const saved = findSavedCode(codes, marketId)
+      if (!saved) return false
+      setDecryptedMetadata(marketId, decryptWithCode(envelope, saved.code))
+      return true
+    } catch {
+      return false
+    }
+  }, [hasBackup, recoverCodes, setDecryptedMetadata])
+
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
       // Pass the just-fetched envelope straight into decryptMarket. The merged
@@ -167,17 +191,19 @@ function MyMarketsModal({
       // pass instead of the old fetch-then-(re-click)-to-decrypt flow.
       const envelope = await fetchEnvelope(marketId)
       // Open challenges (feature 024) seal their terms under the four-word code, not a
-      // recipient key — the wallet-key path can't read them. Route those to the code
-      // prompt instead; everything else decrypts with the connected wallet as before.
+      // recipient key — the wallet-key path can't read them. Try a saved code first
+      // (spec 040 US3), then fall back to the code prompt; everything else decrypts
+      // with the connected wallet as before.
       if (isCodeEnvelope(envelope)) {
-        setCodeDecrypt({ marketId, envelope })
+        const unlocked = await tryAutoUnlockCode(marketId, envelope)
+        if (!unlocked) setCodeDecrypt({ marketId, envelope })
         return
       }
       await decryptMarket(marketId, envelope)
     } catch (err) {
       console.error('[MyMarketsModal] Decryption failed:', err)
     }
-  }, [fetchEnvelope, decryptMarket])
+  }, [fetchEnvelope, decryptMarket, tryAutoUnlockCode])
 
   // Fetch markets data (friend markets are passed via props)
   const fetchMarketsData = useCallback(async () => {
@@ -1282,7 +1308,13 @@ function MyMarketsModal({
           isOpen
           envelope={codeDecrypt.envelope}
           onClose={() => setCodeDecrypt(null)}
-          onDecrypted={(metadata) => setDecryptedMetadata(codeDecrypt.marketId, metadata)}
+          onDecrypted={(metadata, code) => {
+            setDecryptedMetadata(codeDecrypt.marketId, metadata)
+            // Remember the code so this challenge auto-unlocks next time (spec 040 US3).
+            if (code && canUseVault) {
+              saveCode({ code, wagerId: String(codeDecrypt.marketId) }).catch(() => {})
+            }
+          }}
         />
       )}
 

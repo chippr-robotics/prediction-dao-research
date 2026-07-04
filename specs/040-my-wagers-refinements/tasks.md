@@ -120,14 +120,14 @@ open a pool → no decrypt-words prompt at any point.
 
 ### Tests for User Story 3
 
-- [ ] T021 [P] [US3] Unit test the auto-unlock decision (saved code → auto-decrypt, no prompt; no saved code → prompt once then `addEntry`) in `frontend/src/test/decryptAutoUnlock.test.js`
+- [X] T021 [P] [US3] Unit test the auto-unlock decision (saved code → auto-decrypt, no prompt; no saved code → prompt once then `addEntry`) in `frontend/src/test/decryptAutoUnlock.test.js`
 - [X] T022 [P] [US3] Regression test that viewing a member's own pool triggers no decrypt-words prompt in `frontend/src/test/MyPoolsSection.test.jsx`
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Add an in-memory session vault-key cache (`getSessionVaultKey(wallet)` derived once from `CODE_VAULT_SIGN_MESSAGE`, cleared on wallet change) in `frontend/src/lib/openChallenge/codeVault.js` (or a small `sessionKey.js` sibling)
-- [ ] T024 [US3] Wire auto-decrypt into the open-challenge open handler in `frontend/src/components/fairwins/MyMarketsModal.jsx`: check the vault (`readEntries`) before showing `OpenChallengeDecryptModal`; on successful manual entry, `addEntry` the code (depends on T023)
-- [ ] T025 [US3] Confirm the pool view path (`MyPoolsSection` / `useMyPools`) reuses the device-persisted pool identity and never prompts for words; document/adjust if a prompt exists
+- [X] T023 [US3] Add an in-memory session vault-key cache (`getSessionVaultKey(wallet)` derived once from `CODE_VAULT_SIGN_MESSAGE`, cleared on wallet change) in `frontend/src/lib/openChallenge/codeVault.js` (or a small `sessionKey.js` sibling)
+- [X] T024 [US3] Wire auto-decrypt into the open-challenge open handler in `frontend/src/components/fairwins/MyMarketsModal.jsx`: check the vault (`readEntries`) before showing `OpenChallengeDecryptModal`; on successful manual entry, `addEntry` the code (depends on T023)
+- [X] T025 [US3] Confirm the pool view path (`MyPoolsSection` / `useMyPools`) reuses the device-persisted pool identity and never prompts for words; document/adjust if a prompt exists
 
 **Checkpoint**: Challenges auto-unlock after first entry; pools never ask for words.
 

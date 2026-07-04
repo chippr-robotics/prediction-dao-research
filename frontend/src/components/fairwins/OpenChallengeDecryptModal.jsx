@@ -44,7 +44,9 @@ export default function OpenChallengeDecryptModal({ isOpen, onClose, envelope, o
       }
       const { symKey } = deriveFromCode(code)
       const terms = decryptEnvelopeCode(envelope, symKey) // throws on a wrong code / tampered bytes
-      onDecrypted?.(typeof terms === 'string' ? { description: terms } : terms)
+      // Pass the validated code back so the caller can remember it (spec 040 US3),
+      // sparing the member from re-entering it next time.
+      onDecrypted?.(typeof terms === 'string' ? { description: terms } : terms, code)
       onClose()
     } catch {
       // Wrong code and tampered bytes both surface as a decryption failure; don't distinguish (no oracle).
