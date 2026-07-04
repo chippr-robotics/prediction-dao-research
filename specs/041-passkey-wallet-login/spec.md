@@ -66,7 +66,8 @@ planning starts from the same decisions:
 - **Networks** — Polygon (137) and Amoy (80002) first, where cheap P-256
   verification exists. ETC (61) and Mordor (63) are a **later increment**
   (no P-256 precompile there; needs a costlier deployed verifier — same
-  posture as spec 034's deferred self-deploy of Semaphore).
+  posture as spec 034's original plan of self-deploying missing primitives
+  on Classic later).
 
 ## Clarifications
 
@@ -586,10 +587,15 @@ outcomes to a classic wallet account.
   controls this feature must preserve and extend to a new account type.
 - **Spec 027 (MembershipManager)** — roles bind to the passkey account
   address; purchase flow must work from a contract account.
-- **Spec 034 (ZK-wager pools)** — pool participation gates on the real
-  wallet; for passkey users the passkey account is that wallet.
-- **Specs 035/036 (intent signatures, relayer)** — drafts; this feature must
-  not block on them and must compose with them later (contract-account
-  intent signing, relayer as alternative submission path).
+- **Spec 034 (wager pools; address-based since PR #793)** — pool
+  participation gates on the real wallet; for passkey users the passkey
+  account is that wallet.
+- **Specs 035/036 (intent signatures, relayer)** — implemented and merged
+  (PR #800, 2026-07-04) after this spec was written; the maintainer
+  sequenced 041 to follow them, so this feature composes with the live
+  rails (contract-account intent signing, relay gateway as first-party
+  submission path). Note: the merged rails verify intent signers with ECDSA
+  only — accepting contract-account (ERC-1271) signatures is enabling work
+  tracked in this feature's plan/tasks.
 - **Spec 011 (wallet address QR)** — receive flows reused for passkey
   account funding, including the never-transacted state.

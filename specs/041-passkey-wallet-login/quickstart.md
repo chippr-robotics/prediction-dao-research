@@ -9,12 +9,18 @@ authenticator); local stack per spec 006 (`npm run dev:local` environment).
 ```bash
 npm run compile
 npx hardhat test test/account/            # vendored stack: owners, ERC-1271, executeBatch, factory determinism, P-256 fallback verify
+npx hardhat test test/intent/SignerIntentBase.erc1271.test.js   # contract-account intent signers accepted, EOA path unchanged
 npx hardhat test test/integration/passkey-account.e2e.test.js
+npm run check:storage-layout              # gates the SignerIntentBase in-place upgrades (both facets + membershipManagerImpl)
+npx hardhat test test/fork/usdc-erc1271-authorization.test.js   # native USDC accepts smart-account EIP-3009 auth (fork)
+cd services/relay-gateway && npm test     # gateway ERC-1271 verify fallback
 ```
 
 Expected: all green. The integration test proves membership purchase, wager
 create/accept/claim, and sanctions-block work when `msg.sender` is a smart
-account (no changes to MembershipManager/WagerRegistry/SanctionsGuard).
+account (no interface changes to MembershipManager/WagerRegistry/
+SanctionsGuard; the only contract change is the `SignerIntentBase`
+signature-verification extension, storage-layout gated).
 
 ## 2. Deployment determinism (Amoy, then Polygon)
 

@@ -53,8 +53,9 @@ account release ↔ EntryPoint pairing at implementation start). Use the
 canonical existing EntryPoint deployment on Polygon/Amoy; record its address
 per network in `deployments/` under key `entryPoint` rather than assuming it
 in code. For the ETC/Mordor increment, self-deploy the same EntryPoint
-bytecode deterministically (same address), like the spec-034 self-deploy-
-Semaphore posture.
+bytecode deterministically (same address), following the spec-034 precedent of
+self-deploying missing primitives on Classic (originally Semaphore, since
+removed by the address-based pools rework in PR #793).
 
 **Rationale**: The account and EntryPoint are a matched pair; mixing versions
 is a known foot-gun. Recording the address in `deployments/` keeps
@@ -72,13 +73,18 @@ where the address must be produced by our own deploy).
 1. **035-covered product actions** (create/accept wager, claim, refund,
    membership purchase, pool join, voucher redeem …): the passkey account
    signs the **035 intent** via ERC-1271 (WebAuthn ceremony → account
-   signature envelope) and submits through the **036 relayer** — user pays no
-   gas; relayer screens the signer (= account address) per 036.
+   signature envelope; requires the §11 enablement) and submits through the
+   merged relay stack — `frontend/src/lib/relay/intentClient.js` /
+   `useIntentAction.js` → `services/relay-gateway` → `services/oz-relayer`
+   engine — user pays no gas; the gateway screens the signer (= account
+   address) per 036. EIP-712 types come from
+   `frontend/src/lib/relay/intentTypes.js` (three-way byte-identical rule;
+   never redefined).
 2. **Account-native operations** (first deployment, add/remove controller,
    account upgrade) and **any action when the relayer path is down**:
    ERC-4337 **UserOperation** via bundler. Bundler endpoints are per-network
    config: primary = **self-hosted `alto` (Pimlico OSS, MIT)** colocated with
-   the 036 relayer deployment behind the same edge perimeter; fallback =
+   the relay-gateway deployment behind the same edge perimeter; fallback =
    configured third-party public bundlers (Polygon/Amoy only).
 3. Account deployment is **counterfactual**: the account contract deploys via
    the UserOp `initCode` bundled into the user's first on-chain action
@@ -252,3 +258,42 @@ compliance machinery.
 (credentials have no addresses — nothing to screen); on-chain
 controller-set screening in the account contract (would require forking the
 vendored audited contract — rejected).
+
+## 11. ERC-1271 enablement of the merged intent rails (post-merge finding)
+
+**Decision**: Extend intent-signer verification from ECDSA-only to
+**OpenZeppelin `SignatureChecker.isValidSignatureNow`** (ECDSA first,
+ERC-1271 `isValidSignature` fallback for signers with code) in two places,
+shipped as part of 041's foundational phase:
+
+1. **On-chain** — `contracts/upgradeable/SignerIntentBase.sol` (both
+   `recover` sites). Logic-only; no storage changes (ERC-7201 nonce layout
+   untouched); intent struct typehashes unchanged, so the three-way
+   byte-identical rule is unaffected. Shipped as **in-place upgrades** of
+   both registry facets (`WagerRegistry` + `WagerRegistryIntents`, storage
+   defined solely in `WagerRegistryCore`) and `membershipManagerImpl`, via
+   the `scripts/deploy/upgrade-gasless-intents.js` pattern with
+   `check:storage-layout` gating. Pools: `WagerPool` clones are **immutable**
+   — publish a new `poolImpl` so future clones accept ERC-1271 `…WithSig`
+   intents; existing clones stay ECDSA-only (passkey users can still act on
+   them via direct account transactions).
+2. **Gateway** — `services/relay-gateway/src/intent/verify.js`: when ECDSA
+   recovery does not match a claimed signer that has code on the bound
+   chain, `eth_call isValidSignature(digest, signature)` against the signer
+   before accepting.
+
+**Rationale**: Discovered by `/speckit-analyze` against the merged #800 code:
+`SignerIntentBase` uses `digest.recover(sig) != signer` and the gateway uses
+`ethers.verifyTypedData` — both ECDSA-only, and a contract account can never
+produce a signature that ECDSA-recovers to its own address. Without this
+enablement the entire intent-first architecture (§3 row 1) silently degrades
+to UserOps-for-everything for passkey users. `SignatureChecker` is the
+standard, audited way to accept both signer kinds without touching struct
+hashing, nonces, or storage.
+
+**Alternatives considered**: UserOp-only routing for passkey accounts
+(doubles gas + infra for 90% of traffic; abandons the deployed relayer
+rails); a parallel passkey-specific intent path (violates "do not invent a
+parallel action path" and the three-way type-sync guardrail); wrapping every
+intent in an EOA session key held client-side (reintroduces exportable key
+material — defeats the passkey security model).

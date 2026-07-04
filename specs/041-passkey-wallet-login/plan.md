@@ -6,26 +6,51 @@
 
 ## Sequencing decision (binding for this plan)
 
-The maintainer has decided that **041 implementation begins only after specs
-035 (intent-based signatures) and 036 (self-hosted relayer) are implemented
-and deployed**. This plan therefore assumes:
+The maintainer decided that **041 implementation begins only after specs 035
+(intent-based signatures) and 036 (self-hosted relayer) are implemented and
+deployed**. That gate has since been satisfied: **PR #800 merged the 035/036
+implementation** (intent facets + `services/relay-gateway` policy gateway +
+`services/oz-relayer` engine config), and **PR #793 merged the spec-034
+rework** (Semaphore removed; address-based `WagerPool`/`WagerPoolFactory`
+with `SignerIntentBase`-powered `…WithSig` twins). This plan therefore
+assumes:
 
-- The FairWins **relayer is live** on all platform networks and is the
-  **first-party submission path**; the spec's "third-party, replaceable
-  submission infrastructure" posture remains as fallback/defense-in-depth.
-  Spec FR-013 is interpreted as **"the design must not hard-depend on the
-  relayer"**, not "the relayer won't exist".
+- The FairWins **relayer is live** (`services/relay-gateway` +
+  `services/oz-relayer`) and is the **first-party submission path**; the
+  spec's "third-party, replaceable submission infrastructure" posture remains
+  as fallback/defense-in-depth. Spec FR-013 is interpreted as **"the design
+  must not hard-depend on the relayer"**, not "the relayer won't exist".
 - **Platform-wide intents (035) exist on the contracts.** Passkey smart
   accounts sign those intents as contract accounts (ERC-1271 per USDC v2.2 /
   ERC-7598); we do not invent a parallel action path.
+  **Post-merge finding (analysis C1)**: the merged rails verify intent
+  signers with **ECDSA only** (`SignerIntentBase.sol` `digest.recover`,
+  gateway `verify.js` `ethers.verifyTypedData`) — a contract account can
+  never satisfy them. **Enabling ERC-1271 signers is foundational work in
+  this feature** (research.md §11; tasks T011–T015): a logic-only
+  `SignatureChecker` extension shipped as in-place upgrades of both registry
+  facets + `membershipManagerImpl` (storage-layout gated), a matching
+  gateway fallback, and a new `poolImpl` for future pool clones (existing
+  clones are immutable and stay ECDSA-only).
 - The relayer's compliance screening, self-submit fallback, and edge
   perimeter (036) apply to passkey traffic too.
 
 Consequence: most user actions from a passkey account are **intents relayed
-by the 036 relayer** (fully gasless for the user). The ERC-4337 UserOperation
-path is needed for (a) operations on the smart account itself (deploy, add/
-remove controllers, upgrades), (b) actions not covered by 035 intents, and
-(c) the self-sufficiency fallback when the relayer is down (FR-013/FR-014).
+by the relay gateway** (fully gasless for the user). The ERC-4337
+UserOperation path is needed for (a) operations on the smart account itself
+(deploy, add/remove controllers, upgrades), (b) actions not covered by 035
+intents, and (c) the self-sufficiency fallback when the relayer is down
+(FR-013/FR-014).
+
+> **Open point for the maintainer**: PR #793 moved the *pools* launch
+> sequence to **Mordor → Polygon (no Amoy)**. 041's clarified network scope
+> (Polygon 137 + Amoy 80002 first; ETC/Mordor later) is driven by a physical
+> constraint — Mordor has no RIP-7212 precompile, no canonical EntryPoint,
+> and no bundler infrastructure — so this plan keeps Amoy as the passkey
+> validation network. If the platform standardizes on Mordor-first testing,
+> the ETC/Mordor increment (self-deploy EntryPoint + FCL fallback verifier +
+> self-hosted-bundler-only) moves forward in priority and should be
+> re-scoped via `/speckit-clarify`.
 
 ## Summary
 
@@ -40,11 +65,14 @@ management and fallback route as UserOperations through a bundler (self-
 hosted alongside the relayer, with configurable third-party fallback).
 Encryption keys derive from the **WebAuthn PRF extension** (device-dependent
 degradation per the clarification session), with a per-account master key
-wrapped per-credential so all controllers derive the same keys. The site-wide
-login manager unifies passkey + injected + WalletConnect behind the existing
-`WalletContext` single source of truth; no existing flow changes for classic
-wallets. See [research.md](./research.md) for the technology decisions and
-alternatives.
+wrapped per-credential so all controllers derive the same keys. One
+contract-side enabler ships with this feature: the merged intent rails are
+extended from ECDSA-only to **`SignatureChecker` (ERC-1271) signer
+verification** so contract accounts can sign intents at all (analysis C1,
+research.md §11). The site-wide login manager unifies passkey + injected +
+WalletConnect behind the existing `WalletContext` single source of truth; no
+existing flow changes for classic wallets. See [research.md](./research.md)
+for the technology decisions and alternatives.
 
 ## Technical Context
 
@@ -66,7 +94,14 @@ deploy/verify glue), JavaScript ES2022 / React 18 + Vite (frontend), Node 20
 - ERC-4337 `EntryPoint` (canonical deployment on Polygon/Amoy; self-deployed
   deterministically on ETC/Mordor in the later increment)
 - Self-hosted open-source bundler (Pimlico `alto`, MIT) colocated with the
-  036 relayer; third-party public bundler endpoints as configured fallback
+  036 relayer deployment (`services/relay-gateway` + `services/oz-relayer`);
+  third-party public bundler endpoints as configured fallback
+- Merged relay stack (specs 035/036): `frontend/src/lib/relay/`
+  (`intentClient.js`, `intentTypes.js`, `useIntentAction.js`, `errors.js`,
+  `IntentStatus.jsx`) — the passkey intent path builds ON these, never beside
+  them; EIP-712 intent structs stay byte-identical in three places (contract
+  typehashes ↔ `frontend/src/lib/relay/intentTypes.js` ↔
+  `services/relay-gateway/src/intent/intentTypes.js`)
 - Existing: ethers v6 (legacy EOA signer paths), MembershipManager /
   WagerRegistry / SanctionsGuard ABIs via `sync:frontend-contracts`
 
@@ -122,7 +157,7 @@ Phase 0; re-checked after Phase 1 design.*
 | IV. Fail loudly in CI | PASS | New CI jobs (contract tests for `contracts/account/`, Cypress passkey e2e) gate normally; no `continue-on-error`. |
 | V. Accessible, consistent frontend | PASS | Login surface + account management meet WCAG 2.1 AA (axe/Lighthouse in CI); all new addresses (entryPoint, accountFactory, p256Verifier) flow through `deployments/` + `sync:frontend-contracts` — never hardcoded. |
 | Tech stack constraint | PASS (justified) | New "core technology" = WebAuthn + ERC-4337 via viem's built-in module and vendored BSD-3 contracts; no proprietary SDK, no new framework. Justification: required by the feature (P-256 credentials cannot control EOAs). |
-| Upgradeable-contracts guardrail (CLAUDE.md/specs 025/027) | PASS (scoped exception, documented) | The UUPSManaged/append-only/`check:storage-layout` regime governs **FairWins-managed** proxies. Smart-wallet instances are **user-owned** proxies upgradable only by their owners; FairWins never holds upgrade authority and ships no in-place upgrades to them. The factory itself is deployed **immutable** (not a FairWins UUPS proxy). Recorded in Complexity Tracking. |
+| Upgradeable-contracts guardrail (CLAUDE.md/specs 025/027) | PASS (scoped exception, documented) | The UUPSManaged/append-only/`check:storage-layout` regime governs **FairWins-managed** proxies. Smart-wallet instances are **user-owned** proxies upgradable only by their owners; FairWins never holds upgrade authority and ships no in-place upgrades to them. The factory itself is deployed **immutable** (not a FairWins UUPS proxy). Recorded in Complexity Tracking. The ERC-1271 enablement (analysis C1) touches FairWins-managed contracts and follows the sanctioned path exactly: logic-only `SignerIntentBase` change, in-place upgrade of both registry facets (storage from `WagerRegistryCore`, `check:storage-layout` gating) + `membershipManagerImpl` via the `upgrade-gasless-intents.js` pattern; pools get a new `poolImpl` for future clones (existing clones immutable by design). |
 | No-backend rule (spec 007, as amended by 036) | PASS (extends 036 exception) | The bundler is a stateless-authority, operationally-stateful process colocated with the 036 relayer, same "can censor, cannot steal" bound, same edge perimeter, same self-submit-style fallback (third-party bundlers + native-gas path). No new user-data backend. Recorded in Complexity Tracking. |
 
 **Post-Phase-1 re-check**: design artifacts (data-model.md, contracts/,
@@ -184,9 +219,14 @@ frontend/src/
 └── hooks/
     └── usePasskeyAccount.js        # NEW: account state, controllers, capability + degradation flags
 
-frontend/src/lib/pools/gasless.js   # REUSED: EIP-3009 signing generalized by 035; passkey path signs via ERC-1271
+frontend/src/lib/relay/             # 035/036-owned intent stack; REUSED as-is (intentClient, intentTypes,
+                                    #   useIntentAction, errors, IntentStatus) — passkey intentSigner builds on it
 
-services/relayer/                   # 036-owned; EXTENDED by ops config only: colocated alto bundler + endpoints
+contracts/upgradeable/SignerIntentBase.sol   # EXTENDED: ECDSA-only recover → SignatureChecker (ERC-1271 fallback);
+                                             #   shipped via in-place upgrade of both registry facets + membershipManagerImpl
+services/relay-gateway/src/intent/verify.js  # EXTENDED: ERC-1271 eth_call fallback for contract-account signers
+services/relay-gateway/ + services/oz-relayer/  # 036-owned; otherwise EXTENDED by ops config only:
+                                                #   colocated alto bundler + endpoints (docs/runbooks/relayer-operations.md)
 ```
 
 **Structure Decision**: Follow the existing three-workspace layout
