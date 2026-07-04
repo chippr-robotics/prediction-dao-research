@@ -1,0 +1,80 @@
+/**
+ * PillSelect — shared pill/segmented single-select control (spec 038).
+ * Relocated from the FriendMarketsModal-local `.fm-resolution-tab` styling
+ * so every "who settles" selection in the app looks and behaves the same.
+ */
+
+.pill-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.pill-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* The reason span lives outside the button (not a name-polluting descendant);
+   `display: contents` keeps the wrapper out of the flex layout so pills still
+   wrap and space exactly as if the button were a direct flex child. */
+.pill-select-option-wrap {
+  display: contents;
+}
+
+.pill-select-multiline {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.pill-select-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 999px;
+  color: var(--text-primary, #1F2933);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pill-select-option:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36B37E);
+}
+
+.pill-select-option:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 2px;
+}
+
+.pill-select-option.active {
+  border-color: var(--brand-primary, #36B37E);
+  background: rgba(54, 179, 126, 0.12);
+  color: var(--brand-primary, #36B37E);
+}
+
+.pill-select-option.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pill-select-option:disabled:not(.locked) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pill-select-option-lock {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.pill-select-option-icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}

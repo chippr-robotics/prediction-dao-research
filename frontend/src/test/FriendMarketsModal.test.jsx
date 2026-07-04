@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
@@ -57,6 +57,10 @@ vi.mock('../hooks', () => {
 })
 
 // Mock useEncryption — only the create-flow methods are exercised now.
+// lookupOpponentKey is hoisted to a stable reference so a single test (spec
+// 038 R1 — honest-state error when the opponent has no published key) can
+// override its resolved value for one call without touching every other test.
+const mockLookupOpponentKey = vi.hoisted(() => vi.fn().mockResolvedValue(new Uint8Array(32)))
 vi.mock('../hooks/useEncryption', () => ({
   useEncryption: () => ({
     createEncrypted: vi.fn().mockResolvedValue({
@@ -69,7 +73,7 @@ vi.mock('../hooks/useEncryption', () => ({
     canUserDecrypt: vi.fn().mockReturnValue(true),
     isEncrypted: vi.fn().mockReturnValue(false),
     getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey'),
-    lookupOpponentKey: vi.fn().mockResolvedValue(new Uint8Array(32)),
+    lookupOpponentKey: mockLookupOpponentKey,
     opponentHasKey: vi.fn().mockResolvedValue(true),
     addRecipientByPublicKey: vi.fn().mockReturnValue({ version: '1.0', recipients: [] }),
     isInitialized: true,
@@ -256,11 +260,22 @@ describe('FriendMarketsModal', () => {
   })
 
   describe('Private Wager encryption disclosure', () => {
-    it('collapses the whole encryption explainer behind one disclosure, keeping toggle + badge', async () => {
+    it('has no encryption on/off selector — a compact badge + disclosure only (spec 038 FR-001/FR-002)', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      // No toggle/checkbox of any kind controls encryption.
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      expect(screen.queryByText(/private wager$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/publicly visible on the blockchain/i)).not.toBeInTheDocument()
+      // The always-on indicator is present and compact (badge + one disclosure control).
+      expect(screen.getByText(/End-to-End Encrypted/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /how encryption works/i })).toBeInTheDocument()
+    })
+
+    it('collapses the whole encryption explainer behind one disclosure, keeping the badge visible', async () => {
       const user = userEvent.setup()
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      // Encryption is on by default: the toggle + badge stay visible…
+      // Encryption is always on: the badge stays visible…
       const toggle = await screen.findByRole('button', { name: /how encryption works/i })
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.getByText(/End-to-End Encrypted/i)).toBeInTheDocument()
@@ -276,6 +291,23 @@ describe('FriendMarketsModal', () => {
       await user.click(toggle)
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByText(/Bet description & terms/i)).not.toBeInTheDocument()
+    })
+
+    it('surfaces a truthful error and blocks submit when the opponent has no published encryption key (research R1)', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'should-not-be-called' })
+      mockLookupOpponentKey.mockResolvedValueOnce(null)
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+
+      expect(await screen.findByText(/has not registered their encryption key yet/i)).toBeInTheDocument()
+      // The wager was never created without encryption — onCreate never ran.
+      expect(onCreate).not.toHaveBeenCalled()
     })
   })
 
@@ -328,7 +360,7 @@ describe('FriendMarketsModal', () => {
   describe('Direct-to-form behavior', () => {
     it('opens directly into the 1v1 form when no initialType is passed', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.getByLabelText(/what's the bet/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/what's the bet/i, { selector: 'input' })).toBeInTheDocument()
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
     })
 
@@ -351,11 +383,11 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
       )
-      expect(screen.getByRole('tab', { name: /^me$/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^them$/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^friend$/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^oracle$/i })).toBeInTheDocument()
-      expect(screen.queryByRole('tab', { name: /either party/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^me$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^them$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^friend$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^oracle$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: /either party/i })).not.toBeInTheDocument()
     })
 
     it('choosing "Them" flips the odds ownership to the creator (Your Odds)', async () => {
@@ -367,7 +399,7 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByLabelText(/opponent.*odds/i)).toBeInTheDocument()
       // Switch the settler to "Them": the opponent now carries the majority
       // (insurer) stake, so the creator becomes the underdog ("Your Odds").
-      await user.click(screen.getByRole('tab', { name: /^them$/i }))
+      await user.click(screen.getByRole('radio', { name: /^them$/i }))
       expect(screen.getByLabelText(/your odds/i)).toBeInTheDocument()
       expect(screen.queryByLabelText(/opponent.*odds/i)).not.toBeInTheDocument()
     })
@@ -382,8 +414,8 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />
       )
-      const select = screen.getByLabelText(/who can resolve/i)
-      const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
+      const group = screen.getByRole('radiogroup', { name: /who can resolve/i })
+      const labels = within(group).getAllByRole('radio').map((r) => r.textContent)
       // "Either of Us" lets either side submit the outcome — re-enabled but only
       // on even-money (equal-stakes) wagers, so it appears here. ThirdParty
       // ("A Friend") is indexed for discovery and encrypted-for so the named
@@ -403,10 +435,10 @@ describe('FriendMarketsModal', () => {
       // The Offer flow renders settlers as a tab strip. "Either" is not sound on
       // asymmetric stakes, so it must not appear (the contract would revert
       // EitherRequiresEqualStakes).
-      expect(screen.queryByRole('tab', { name: /^either$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: /^either$/i })).not.toBeInTheDocument()
       // The single-settler tabs are still present.
-      expect(screen.getByRole('tab', { name: /^me$/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^them$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^me$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^them$/i })).toBeInTheDocument()
     })
 
     it('selecting Third Party reveals a required arbitrator address input', async () => {
@@ -414,12 +446,11 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />
       )
-      const select = screen.getByLabelText(/who can resolve/i)
       // No arbitrator input until Third Party is chosen…
-      expect(screen.queryByLabelText(/arbitrator address/i)).not.toBeInTheDocument()
-      await user.selectOptions(select, '3') // ResolutionType.ThirdParty
+      expect(screen.queryByLabelText(/arbitrator address/i, { selector: 'input' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('radio', { name: /a friend \(arbitrator\)/i })) // ResolutionType.ThirdParty
       // …then the arbitrator input appears.
-      expect(await screen.findByLabelText(/arbitrator address/i)).toBeInTheDocument()
+      expect(await screen.findByLabelText(/arbitrator address/i, { selector: 'input' })).toBeInTheDocument()
     })
 
     it('oracle category shows oracle resolution tabs (not a dropdown)', () => {
@@ -429,11 +460,11 @@ describe('FriendMarketsModal', () => {
       // The oracle flow renders settlement sources as tabs at the top of the
       // form (no <select> dropdown), and excludes the participant-settled options.
       expect(screen.queryByRole('combobox', { name: /which oracle settles this/i })).not.toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /oracle/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^uma$/i })).toBeInTheDocument()
-      expect(screen.queryByRole('tab', { name: /either party/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /oracle/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /chainlink data feed/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /chainlink functions/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^uma$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: /either party/i })).not.toBeInTheDocument()
     })
 
     it('shows the Polymarket search in the oracle flow (visible even when the tab strip is suppressed)', async () => {
@@ -451,14 +482,14 @@ describe('FriendMarketsModal', () => {
       expect(await screen.findByTestId('mock-polymarket-browser')).toBeInTheDocument()
     })
 
-    it('locks oracle tabs whose source is unavailable on the active chain', () => {
+    it('locks oracle pills whose source is unavailable on the active chain', () => {
       // On Hardhat (1337) the Polymarket CTF is unreachable, so the Polymarket
-      // tab is shown locked/disabled rather than hidden.
+      // pill is shown locked/disabled rather than hidden (spec 038 FR-010).
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} resolutionCategory="oracle" />,
         { chainId: 1337 }
       )
-      expect(screen.getByRole('tab', { name: /oracle/i })).toBeDisabled()
+      expect(screen.getByRole('radio', { name: /oracle/i })).toBeDisabled()
     })
 
     it('no longer renders a type-selector or Back link', () => {
@@ -468,15 +499,27 @@ describe('FriendMarketsModal', () => {
     })
 
     it('no longer renders the Active/Past tab strip', () => {
-      // The modal's only tablist is now the resolution-source strip; the old
-      // Active/Past navigation tabs are gone.
+      // The old Active/Past navigation tabs are gone, and the settlement-source
+      // selector is a pill radiogroup (spec 038), not a tablist — no role="tab"
+      // elements remain anywhere in this modal.
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.queryByRole('tab', { name: /^active$/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('tab', { name: /^past$/i })).not.toBeInTheDocument()
+      expect(screen.queryAllByRole('tab')).toHaveLength(0)
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     })
   })
 
   describe('Create Form', () => {
+    it('puts stake amount and stake token on one line, with the token always interactive (spec 038 FR-011)', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      const amountInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
+      const tokenSelect = screen.getByLabelText(/^stake token$/i)
+      // Same wrapper row, not two separate stacked groups.
+      expect(amountInput.closest('.fm-stake-input-wrapper')).toBe(tokenSelect.closest('.fm-stake-input-wrapper'))
+      expect(tokenSelect.tagName).toBe('SELECT')
+      expect(tokenSelect).not.toBeDisabled()
+      expect(tokenSelect.querySelectorAll('option').length).toBeGreaterThan(1)
+    })
+
     it('should validate required fields', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
@@ -490,7 +533,7 @@ describe('FriendMarketsModal', () => {
     it('should validate description minimum length', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Short')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Short')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
@@ -501,7 +544,7 @@ describe('FriendMarketsModal', () => {
     it('should validate opponent address for 1v1', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(screen.getByLabelText(/opponent address/i), 'invalid-address')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
@@ -515,7 +558,7 @@ describe('FriendMarketsModal', () => {
     it('should not allow betting against yourself', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0x1234567890123456789012345678901234567890'
@@ -530,7 +573,7 @@ describe('FriendMarketsModal', () => {
     it('should have stake input with default value', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      const stakeInput = screen.getByLabelText(/stake amount/i)
+      const stakeInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
       expect(stakeInput).toHaveValue(10)
       expect(stakeInput).toHaveAttribute('min', '0.1')
     })
@@ -540,7 +583,7 @@ describe('FriendMarketsModal', () => {
         <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
       )
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
@@ -552,7 +595,7 @@ describe('FriendMarketsModal', () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
@@ -598,7 +641,7 @@ describe('FriendMarketsModal', () => {
 
   describe('Success State', () => {
     const fillAndSubmit = async () => {
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(screen.getByLabelText(/what's the bet/i, { selector: 'input' }), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
@@ -664,7 +707,7 @@ describe('FriendMarketsModal', () => {
       // Back on a fresh 1v1 form, NOT a (removed) type selector.
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
       expect(screen.queryByText('Choose Wager Type')).not.toBeInTheDocument()
-      expect(screen.getByLabelText(/what's the bet/i)).toHaveValue('')
+      expect(screen.getByLabelText(/what's the bet/i, { selector: 'input' })).toHaveValue('')
     })
 
     it('should have Copy Link button in success state', async () => {
@@ -740,7 +783,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -773,7 +816,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -800,7 +843,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -828,7 +871,7 @@ describe('FriendMarketsModal', () => {
       )
 
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Patriots win the Super Bowl - pegged to Polymarket'
       )
       await userEvent.type(
@@ -854,7 +897,7 @@ describe('FriendMarketsModal', () => {
 
       // Switch resolution type to Polymarket (via the tab strip) so the inline
       // browser renders.
-      await userEvent.click(screen.getByRole('tab', { name: /oracle/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /oracle/i }))
 
       // Pick the (single) mocked market.
       await userEvent.click(screen.getByTestId(`pmb-pick-${polymarketMarket.conditionId}`))
@@ -882,7 +925,7 @@ describe('FriendMarketsModal', () => {
 
     async function pickKindAndSide(kind, sideLabel) {
       // Switch to the desired oracle via the resolution-type tab strip.
-      await userEvent.click(screen.getByRole('tab', { name: TAB_NAME[kind] }))
+      await userEvent.click(screen.getByRole('radio', { name: TAB_NAME[kind] }))
       // Click the stub picker's "Pick" button → conditionId lands in formData.
       await userEvent.click(await screen.findByTestId(`mock-pick-${kind}`))
       // Side picker: generic YES/NO buttons.
@@ -891,14 +934,14 @@ describe('FriendMarketsModal', () => {
 
     it('renders the 3 new oracle tabs on a Polygon-family chain', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
-      expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^uma$/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /chainlink data feed/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /chainlink functions/i })).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /^uma$/i })).toBeInTheDocument()
     })
 
     it('renders the picker + generic side picker for ChainlinkDataFeed', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
-      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /chainlink data feed/i }))
       expect(await screen.findByTestId('mock-oracle-picker-datafeed')).toBeInTheDocument()
       // Generic YES/NO buttons.
       expect(screen.getByRole('button', { name: /I'm taking YES/i })).toBeInTheDocument()
@@ -912,7 +955,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'ETH closes above 3000 by year end — Chainlink Data Feed test'
       )
       await userEvent.type(
@@ -936,7 +979,7 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'UMA assertion: Patriots win Super Bowl LX'
       )
       await userEvent.type(
@@ -960,14 +1003,14 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Chainlink Functions: some custom request'
       )
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('tab', { name: /chainlink functions/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /chainlink functions/i }))
       // Don't pick a condition — go straight to submit. Side stays empty too.
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
       await waitFor(() => {
@@ -983,14 +1026,14 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       await userEvent.type(
-        screen.getByLabelText(/what's the bet/i),
+        screen.getByLabelText(/what's the bet/i, { selector: 'input' }),
         'Chainlink Data Feed test — no side picked'
       )
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /chainlink data feed/i }))
       await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
       // Don't click YES/NO.
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
@@ -1007,10 +1050,10 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       // Pick a DataFeed condition first.
-      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /chainlink data feed/i }))
       await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
       // Switch to UMA → picker should reset (data-value attribute on the stub goes back to '').
-      await userEvent.click(screen.getByRole('tab', { name: /^uma$/i }))
+      await userEvent.click(screen.getByRole('radio', { name: /^uma$/i }))
       const umaPicker = await screen.findByTestId('mock-oracle-picker-uma')
       expect(umaPicker).toHaveAttribute('data-value', '')
     })
@@ -1058,6 +1101,40 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByText('Start Fresh'))
 
       expect(onClearPendingTransaction).toHaveBeenCalled()
+    })
+  })
+
+  describe('explainers behind info icons (spec 039 US1)', () => {
+    it('hides static field explainers by default and reveals each from its icon, one at a time', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      expect(screen.queryByText(/your opponent takes the opposite side/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/enter amount in usd/i)).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: "About: What's the bet?" }))
+      expect(screen.getByRole('note')).toHaveTextContent(/your opponent takes the opposite side/i)
+
+      fireEvent.click(screen.getByRole('button', { name: 'About: Stake Amount' }))
+      expect(screen.getAllByRole('note')).toHaveLength(1)
+      expect(screen.getByRole('note')).toHaveTextContent(/enter amount in usd/i)
+    })
+
+    it('the stake guidance bubble reflects the currently selected token (FR-009)', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      fireEvent.click(screen.getByRole('button', { name: 'About: Stake Amount' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/enter amount in usd/i)
+
+      fireEvent.change(screen.getByLabelText(/^stake token$/i), { target: { value: 'NATIVE' } })
+      expect(screen.getByRole('note')).toHaveTextContent(/the chain native token/i)
+    })
+
+    it('moves the arbitrator explainer behind an icon on the third-party path', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />)
+      await user.click(screen.getByRole('radio', { name: /a friend \(arbitrator\)/i }))
+      await screen.findByLabelText(/arbitrator address/i, { selector: 'input' })
+      expect(screen.queryByText(/they cannot take a side/i)).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'About: Arbitrator Address' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/they cannot take a side/i)
     })
   })
 })

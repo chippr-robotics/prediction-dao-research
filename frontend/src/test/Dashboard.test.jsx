@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
+import { setCardVisible } from '../utils/quickAccessPreference'
 
 // Stub the create modal to record the props each QuickActions card opens it with,
 // so we can assert the button → flow wiring (participant / oracle / all) without
@@ -323,6 +324,38 @@ describe('Dashboard Component', () => {
       const modal = screen.getByTestId('unified-modal')
       expect(modal).toHaveAttribute('data-phrase', 'river tiger kite zoo')
       expect(modal).toHaveAttribute('data-auto', 'true')
+    })
+  })
+
+  describe('Quick access card visibility (spec 038 US5)', () => {
+    afterEach(() => {
+      localStorage.removeItem('fairwins_quickaccess_v1')
+    })
+
+    it('hides a card that has been turned off in Preferences and reflows the rest', () => {
+      setCardVisible('scan-qr', false)
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByText('Scan QR Code')).not.toBeInTheDocument()
+      // The rest of the grid is unaffected.
+      expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
+      expect(screen.getByText('Share Account')).toBeInTheDocument()
+    })
+
+    it('a card left visible (the default) still renders', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('My Wagers')).toBeInTheDocument()
+    })
+
+    it('shows a recoverable empty state pointing at Preferences when every card is hidden', () => {
+      const allCardIds = [
+        'create-1v1-friends', 'create-1v1-oracle', 'create-offer', 'open-challenge', 'create-pool',
+        'enter-phrase', 'my-wagers', 'scan-qr', 'share-account',
+      ]
+      allCardIds.forEach((id) => setCardVisible(id, false))
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText(/all quick access cards are hidden/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open preferences/i })).toBeInTheDocument()
+      expect(screen.queryByText('Friends Decide (1v1)')).not.toBeInTheDocument()
     })
   })
 

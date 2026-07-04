@@ -3,14 +3,27 @@
   display: inline-flex;
 }
 
-/* Matches the .theme-toggle header action pattern (36px circular button). */
+/* Matches the .theme-toggle header action pattern (36px circular button).
+   Explicit padding/border/box-sizing (spec 038 FR-012) so the bell can never
+   inherit the global `button { padding: 0.6em 1.2em }` rule (index.css) —
+   that padding, combined with the app's border-box reset, was shrinking the
+   18px icon to a sliver whenever the button had more than one child (i.e.
+   whenever an unread badge or action dot was present, since the icon-only
+   `button:has(> svg:only-child)` carve-out no longer applied). Sizing this
+   component's own CSS explicitly means it never depends on that fragile
+   :has() selector at all. */
 .notification-bell {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
   border-radius: 50%;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);

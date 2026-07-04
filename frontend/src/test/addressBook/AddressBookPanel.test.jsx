@@ -45,7 +45,7 @@ describe('AddressBookPanel', () => {
     render(<AddressBookPanel address={walletState.address} />)
     expect(screen.getByText(/No saved contacts yet/)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '+ Add contact' }))
+    await user.click(screen.getByRole('button', { name: 'Add contact' }))
     await user.type(screen.getByLabelText('Nickname *'), 'Alex')
     await user.type(screen.getByLabelText('Address *'), ADDR)
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -56,7 +56,7 @@ describe('AddressBookPanel', () => {
   it('persists across remount (FR-006)', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<AddressBookPanel address={walletState.address} />)
-    await user.click(screen.getByRole('button', { name: '+ Add contact' }))
+    await user.click(screen.getByRole('button', { name: 'Add contact' }))
     await user.type(screen.getByLabelText('Nickname *'), 'Alex')
     await user.type(screen.getByLabelText('Address *'), ADDR)
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -77,7 +77,7 @@ describe('AddressBookPanel', () => {
     const user = userEvent.setup()
     statusMap[ADDR.toLowerCase()] = 'restricted'
     render(<AddressBookPanel address={walletState.address} />)
-    await user.click(screen.getByRole('button', { name: '+ Add contact' }))
+    await user.click(screen.getByRole('button', { name: 'Add contact' }))
     await user.type(screen.getByLabelText('Nickname *'), 'Sanctioned')
     await user.type(screen.getByLabelText('Address *'), ADDR)
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -90,7 +90,7 @@ describe('AddressBookPanel', () => {
   it('has no accessibility violations with a contact present', async () => {
     const user = userEvent.setup()
     const { container } = render(<AddressBookPanel address={walletState.address} />)
-    await user.click(screen.getByRole('button', { name: '+ Add contact' }))
+    await user.click(screen.getByRole('button', { name: 'Add contact' }))
     await user.type(screen.getByLabelText('Nickname *'), 'Alex')
     await user.type(screen.getByLabelText('Address *'), ADDR)
     await user.click(screen.getByRole('button', { name: 'Save' }))

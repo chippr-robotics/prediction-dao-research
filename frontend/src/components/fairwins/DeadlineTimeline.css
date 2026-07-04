@@ -1,0 +1,62 @@
+/* DeadlineTimeline — drag/keyboard affordances layered on top of the shared
+   fm-timeline-track / fm-timeline-node / fm-stat-tile styles (spec 038 US1).
+   Track/tile/node base styles live in FriendMarketsModal.css so every
+   timeline surface (1v1, open challenge, group pool) shares one visual
+   language; this file only adds the interaction-specific rules. */
+
+.dt-track {
+  /* A little taller hit area than the visual 6px bar so touch drags land
+     reliably without shrinking the slim accent look. */
+  padding: 10px 0;
+  margin: 0.25rem 0;
+  background-clip: content-box;
+  box-sizing: content-box;
+}
+
+.dt-node-draggable {
+  cursor: grab;
+  touch-action: none;
+  /* Larger invisible hit area than the visible 14-18px dot, centered on it,
+     so dragging works comfortably on touchscreens (edge case: small hit
+     targets). box-sizing:content-box makes the padding grow the box rather
+     than shrink the visible dot, and the base class's translate(-50%,-50%)
+     re-centers the now-larger box on the same anchor point automatically —
+     no margin offset needed. */
+  padding: 12px;
+  background-clip: content-box;
+  box-sizing: content-box;
+}
+
+.dt-node-draggable:active {
+  cursor: grabbing;
+}
+
+.dt-node-draggable:focus-visible {
+  outline: 2px solid var(--timeline-active, var(--brand-primary, #36B37E));
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Milestone hints render as a corner InfoTip on each tile (spec 039); the
+   wrapper exists because the editable tile is itself a button, so the two
+   controls must be siblings, not nested. */
+.dt-tile-wrap {
+  position: relative;
+  display: flex;
+}
+
+.dt-tile-wrap > .fm-stat-tile {
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-tile-wrap .fm-stat-head {
+  padding-right: 26px;
+}
+
+.dt-tile-info {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  margin-left: 0;
+}

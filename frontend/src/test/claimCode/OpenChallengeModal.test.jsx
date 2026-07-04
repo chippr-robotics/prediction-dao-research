@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 // Mock the create flow so the modal renders deterministically (no chain/IPFS).
 const createOpenChallenge = vi.fn()
@@ -23,7 +23,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
     expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.getByLabelText(/what's the wager/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/what's the wager/i, { selector: 'input' })).toBeInTheDocument()
   })
 
   it('Maker: gates create until description + stake, then shows the generated code + a scannable QR', async () => {
@@ -31,7 +31,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeDisabled()
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     expect(createBtn).toBeEnabled()
     fireEvent.click(createBtn)
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
@@ -50,7 +50,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
   it('Maker: passes the chosen accept/resolve deadlines (seconds) to createOpenChallenge', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     const form = createOpenChallenge.mock.calls[0][0]
@@ -60,45 +60,59 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(form.acceptDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
   })
 
-  it('Maker: deadlines use the timeline element — sliders plus tap-to-type manual entry', () => {
+  it('Maker: deadlines use the shared timeline element — draggable dots plus tap-to-set modal', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // Slide the acceptance deadline out to 72h — the resolve deadline keeps its gap.
-    const acceptSlider = screen.getByLabelText(/open for acceptance until/i)
-    const resolveSlider = screen.getByLabelText(/must be resolved by/i)
-    expect(acceptSlider).toHaveAttribute('type', 'range')
-    expect(resolveSlider).toHaveAttribute('type', 'range')
-    fireEvent.change(acceptSlider, { target: { value: '72' } })
-    expect(Number(acceptSlider.value)).toBe(72)
-    expect(Number(resolveSlider.value)).toBe(7 * 24)
+    const acceptDot = screen.getByRole('slider', { name: /open for acceptance until/i })
+    const resolveDot = screen.getByRole('slider', { name: /must be resolved by/i })
+    expect(acceptDot).toBeInTheDocument()
+    expect(resolveDot).toBeInTheDocument()
+    // No native picker field or "type a date" link anywhere in the form (FR-005).
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(screen.queryByText(/tap to type a date/i)).toBeNull()
 
-    // No manual input until a tile is tapped.
-    expect(screen.queryByLabelText(/exact date & time/i)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
-    expect(screen.getByLabelText(/exact date & time/i)).toBeInTheDocument()
+    // Stepping the accept dot's keyboard control drags the resolve deadline
+    // with it, keeping the original gap (legacy slider behavior, preserved).
+    const before = resolveDot.getAttribute('aria-valuenow')
+    fireEvent.keyDown(acceptDot, { key: 'ArrowRight', shiftKey: true })
+    expect(Number(resolveDot.getAttribute('aria-valuenow'))).toBe(Number(before) + 60 * 60 * 1000)
+
+    // Tapping a tile opens the shared set-time modal, not an inline input.
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
+    expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
   })
 
-  it('Maker: disables create when the resolve time is not after the accept time', () => {
+  it('Maker: the set-time modal rejects a resolve time outside the allowed range', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.change(screen.getByLabelText(/what's the wager/i), { target: { value: 'Will it rain?' } })
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeEnabled()
-    // Tap the Resolve-by tile to type an exact (past) time manually.
-    fireEvent.click(screen.getByRole('button', { name: /resolve by/i }))
-    fireEvent.change(screen.getByLabelText(/exact date & time/i), { target: { value: '2000-01-01T00:00' } })
-    expect(createBtn).toBeDisabled()
-    expect(screen.getByRole('alert')).toHaveTextContent(/future/i)
+
+    // Tap the Resolve-by tile and try to type a time before the allowed window.
+    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
+    const dialog = screen.getByRole('dialog', { name: /set date and time/i })
+    const input = within(dialog).getByLabelText(/must be resolved by/i)
+    fireEvent.change(input, { target: { value: '2000-01-01T00:00' } })
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/pick a time between/i)
+    expect(within(dialog).getByRole('button', { name: 'Set' })).toBeDisabled()
+    // Out-of-range input never reaches form state, so create stays enabled.
+    expect(createBtn).toBeEnabled()
   })
 
-  it('Maker: the USDC stake entry is formatted as money ($ prefix, 2-decimal blur)', () => {
+  it('Maker: the USDC stake entry is formatted as money ($ prefix, interactive token control, 2-decimal blur)', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const stake = screen.getByLabelText(/stake — each side/i)
+    const stake = screen.getByLabelText(/stake — each side/i, { selector: 'input' })
     expect(stake).toHaveValue(10) // default 10.00
     fireEvent.change(stake, { target: { value: '12.5' } })
     fireEvent.blur(stake)
     expect(stake.value).toBe('12.50')
     // Money chrome around the input.
     expect(screen.getByText('$')).toBeInTheDocument()
-    expect(screen.getByText('USDC')).toBeInTheDocument()
+    // Stake token control is always interactive (spec 038 FR-011), even
+    // though open challenges only support USDC on this network today.
+    const tokenControl = screen.getByLabelText(/^stake token$/i)
+    expect(tokenControl.tagName).toBe('SELECT')
+    expect(tokenControl).not.toBeDisabled()
+    expect(tokenControl.value).toBe('USDC')
   })
 
   it('deep-link helpers round-trip the code through a take URL', () => {
@@ -107,5 +121,44 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     const { search } = new URL(url)
     expect(parseTakeChallengeParams(search)).toBe('river tiger kite zoo')
     expect(parseTakeChallengeParams('?foo=bar')).toBeNull()
+  })
+})
+
+describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () => {
+  beforeEach(() => { createOpenChallenge.mockReset() })
+
+  it('hides the static field explainers by default and reveals each from its icon, one at a time', () => {
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    expect(screen.queryByText(/the taker takes the opposite/i)).toBeNull()
+    expect(screen.queryByText(/only USDC is supported/i)).toBeNull()
+    expect(screen.queryByText(/single-party self-resolution/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
+    expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
+
+    fireEvent.click(screen.getByRole('button', { name: 'About: Stake — each side' }))
+    expect(screen.getAllByRole('note')).toHaveLength(1)
+    expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
+
+    fireEvent.click(screen.getByRole('button', { name: 'About: How is it resolved?' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/single-party self-resolution/i)
+  })
+
+  it('keeps dynamic text inline on the success screen: security warning visible, backup explainer behind its icon', async () => {
+    createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
+    await screen.findByText('river tiger kite zoo')
+
+    // The four-word-code risk warning is a security disclosure — always inline (FR-005).
+    expect(screen.getByText(/brute-force/i)).toBeInTheDocument()
+    expect(screen.getByText(/Save this code now/i)).toBeInTheDocument()
+
+    // The backup explainer sits behind an icon and shows the current-state variant (FR-009).
+    expect(screen.queryByText(/encrypted copy of this code/i)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'About: Encrypted backup' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/encrypted copy/i)
   })
 })

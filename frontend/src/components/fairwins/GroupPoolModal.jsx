@@ -5,7 +5,9 @@ import { usePools } from '../../hooks/usePools'
 import WagerQRCode from '../ui/WagerQRCode'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
-import { toDatetimeLocal } from './wagerTimeline'
+import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
+import PillSelect from '../ui/PillSelect'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 import '../../pages/pools.css'
@@ -64,7 +66,13 @@ export default function GroupPoolModal({ isOpen, onClose }) {
               <span className="fm-brand-icon" aria-hidden="true">&#128101;</span>
               <h2 id="group-pool-title">Group Pool</h2>
             </div>
-            <p className="fm-subtitle">A larger pool — share four words so friends can join</p>
+            <p className="fm-subtitle">
+              A larger pool — share four words so friends can join
+              <InfoTip label="About group pools">
+                Everyone pays the same buy-in into one pot. When it&apos;s decided, you propose the payout and the
+                group approves it anonymously.
+              </InfoTip>
+            </p>
           </div>
           <button className="fm-close-btn" onClick={onClose} aria-label="Close modal">
             <CloseIcon />
@@ -90,7 +98,11 @@ const THRESHOLD_CHOICES = [
   { pct: 100, label: 'Everyone', detail: 'Every member must approve the payout — one holdout blocks it.' },
 ]
 
-const DAY_MS = 24 * 3600 * 1000
+// Same bounds the previous slider-based timeline used: joining can stay open
+// up to 30 days, and the resolve window can run up to 90 days after joining
+// closes.
+const JOIN_MAX_MS = 30 * DAY_MS
+const RESOLVE_MAX_GAP_MS = 90 * DAY_MS
 
 function CreatePanel({ onClose }) {
   const { isConnected } = useWallet()
@@ -99,25 +111,61 @@ function CreatePanel({ onClose }) {
   const [buyIn, setBuyIn] = useState('10.00')
   const [maxMembers, setMaxMembers] = useState('10')
   const [thresholdPct, setThresholdPct] = useState(THRESHOLD_CHOICES[0].pct)
-  // Windows as two ABSOLUTE instants (tester + user directive): pools now time exactly like the
-  // 1v1/open-challenge flow — an `acceptDeadline` (joining closes) and a `resolveDeadline` (resolution
-  // must complete by), each picked with the shared slider + tap-to-type timeline. No relative
-  // resolution window / drift math: both instants are passed straight through to createPool. Mount-time
-  // "now" anchors the defaults and the future check (the contract re-checks at create time).
-  const [nowMs] = useState(() => Date.now())
-  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(nowMs + 7 * DAY_MS))
-  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(nowMs + 10 * DAY_MS))
+  // Windows as two ABSOLUTE instants (spec 034 address-based redesign): the same slider + tap-to-type
+  // timeline as the open challenge, instead of bare day counts. joinBy → the on-chain `acceptDeadline`
+  // (joining closes); resolveBy → the on-chain `resolveDeadline` (resolution must complete by). No
+  // relative resolution-window / drift math — both instants pass straight through to createPool, exactly
+  // like the 1v1/open-challenge flow. Mount-time "now" anchors the future check (same anchor the
+  // timeline's sliders use); the contract re-checks at create time.
+  const [mountedAtMs] = useState(() => Date.now())
+  const [joinBy, setJoinBy] = useState(() => toDatetimeLocal(mountedAtMs + 7 * DAY_MS))
+  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(mountedAtMs + 10 * DAY_MS))
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
-  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
+  const joinMs = fromDatetimeLocal(joinBy)
+  const resolveMs = fromDatetimeLocal(resolveBy)
   const deadlinesValid =
-    Number.isFinite(acceptMs) && Number.isFinite(resolveMs) &&
-    acceptMs > nowMs && resolveMs > acceptMs
+    Number.isFinite(joinMs) && Number.isFinite(resolveMs) &&
+    joinMs > mountedAtMs && resolveMs > joinMs
   const membersValid = Number(maxMembers) >= 2 && Number(maxMembers) <= 1000
   const canCreate = Number(buyIn) > 0 && membersValid && deadlinesValid && isConnected && status !== 'creating'
   const chosen = THRESHOLD_CHOICES.find((c) => c.pct === thresholdPct) || THRESHOLD_CHOICES[0]
+
+  // Milestones for the shared DeadlineTimeline control (spec 038 US1).
+  const timelineMilestones = [
+    {
+      key: 'accept',
+      label: 'Joining open until',
+      tileHead: 'Join by',
+      value: Number.isFinite(joinMs) ? joinMs : mountedAtMs + 7 * DAY_MS,
+      min: mountedAtMs + HOUR_MS,
+      max: mountedAtMs + JOIN_MAX_MS,
+      editable: true,
+      hint: 'Friends can join with the four words until this time. You can also close joining early once everyone is in.',
+      segmentColor: 'var(--timeline-accept)',
+      dotClass: 'is-accept',
+      tileClass: 'is-accept',
+    },
+    {
+      key: 'resolve',
+      label: 'Must be resolved by',
+      tileHead: 'Resolve by',
+      value: Number.isFinite(resolveMs) ? resolveMs : (Number.isFinite(joinMs) ? joinMs : mountedAtMs + 7 * DAY_MS) + 3 * DAY_MS,
+      min: (Number.isFinite(joinMs) ? joinMs : mountedAtMs + 7 * DAY_MS) + HOUR_MS,
+      max: (Number.isFinite(joinMs) ? joinMs : mountedAtMs + 7 * DAY_MS) + RESOLVE_MAX_GAP_MS,
+      editable: true,
+      hint: 'After joining closes, the group has until about this time to approve the payout — otherwise buy-ins become refundable.',
+      segmentColor: 'var(--timeline-active)',
+      dotClass: 'is-resolve',
+      tileClass: 'is-resolve',
+    },
+  ]
+  const handleTimelineChange = (key, ms) => {
+    const str = toDatetimeLocal(ms)
+    if (key === 'accept') setJoinBy(str)
+    else if (key === 'resolve') setResolveBy(str)
+  }
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -126,7 +174,7 @@ function CreatePanel({ onClose }) {
         buyIn,
         maxMembers,
         thresholdPct,
-        acceptDeadline: Math.floor(acceptMs / 1000),
+        acceptDeadline: Math.floor(joinMs / 1000),
         resolveDeadline: Math.floor(resolveMs / 1000),
       }))
     } catch {
@@ -170,12 +218,13 @@ function CreatePanel({ onClose }) {
 
         <div className="oc-qr">
           <WagerQRCode value={buildTakeChallengeUrl(result.phrase)} size={180} ariaLabel="QR code to join this pool" />
-          <span className="oc-qr-caption">Scan to join — opens the app with the words filled in</span>
+          <span className="oc-qr-caption">
+            Scan to join — opens the app with the words filled in
+            <InfoTip label="About sharing the words">
+              Anyone you give the words to can join (after paying the buy-in), so share them with the group you mean.
+            </InfoTip>
+          </span>
         </div>
-
-        <p className="fm-hint">
-          Anyone you give the words to can join (after paying the buy-in), so share them with the group you mean.
-        </p>
 
         <div className="fm-success-actions">
           <button
@@ -193,14 +242,14 @@ function CreatePanel({ onClose }) {
 
   return (
     <form className="fm-form" onSubmit={onSubmit}>
-      <p className="fm-hint">
-        Everyone pays the same buy-in into one pot. When it&apos;s decided, you propose the payout and the
-        group approves it anonymously.
-      </p>
-
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
-        <div className="fm-stake-input-wrapper">
+        <span className="fm-label-row">
+          <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
+          <InfoTip label="About: Buy-in — each member">
+            Enter the amount in USD. Only USDC is supported for group pools on this network.
+          </InfoTip>
+        </span>
+        <div className="fm-stake-input-wrapper fm-stake-row">
           <span className="fm-stake-prefix">$</span>
           <input
             id="gp-buyin" type="number" inputMode="decimal" min="0" step="0.01"
@@ -213,59 +262,54 @@ function CreatePanel({ onClose }) {
             }}
             required
           />
-          <span className="fm-stake-suffix">USDC</span>
+          {/* Stake token control is always interactive (spec 038 FR-011), even
+              though group pools only support the chain stablecoin today. */}
+          <select id="gp-buyin-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" value="USDC" onChange={() => {}}>
+            <option value="USDC">💵 USDC</option>
+          </select>
         </div>
-        <span className="fm-hint">Enter the amount in USD — every member pays this much in USDC to join.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
+        <span className="fm-label-row">
+          <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
+          <InfoTip label="About: Maximum members">
+            Joining closes automatically once the pool fills.
+          </InfoTip>
+        </span>
         <input
           id="gp-max" type="number" min="2" max="1000"
           value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} required
         />
-        <span className="fm-hint">Joining closes automatically once the pool fills.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <span className="fm-label" id="gp-threshold-label">Who must approve the payout? <span className="fm-required">*</span></span>
-        <div className="fm-resolution-tabs" role="radiogroup" aria-labelledby="gp-threshold-label">
-          {THRESHOLD_CHOICES.map((c) => (
-            <button
-              key={c.pct}
-              type="button"
-              role="radio"
-              aria-checked={thresholdPct === c.pct}
-              className={`fm-resolution-tab ${thresholdPct === c.pct ? 'active' : ''}`}
-              onClick={() => setThresholdPct(c.pct)}
-            >
-              <span className="fm-resolution-tab-label">{c.label}</span>
-            </button>
-          ))}
-        </div>
-        <span className="fm-hint">
-          {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
-        </span>
+        <PillSelect
+          label={<>Who must approve the payout? <span className="fm-required">*</span></>}
+          options={THRESHOLD_CHOICES.map((c) => ({ value: c.pct, label: c.label }))}
+          value={thresholdPct}
+          onChange={setThresholdPct}
+          info={(
+            <InfoTip label="About: Who must approve the payout?">
+              {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
+            </InfoTip>
+          )}
+        />
       </div>
 
-      {/* Windows (tester feedback): the open-challenge timeline element — slide to pick each time,
-          or tap a tile to type the exact date & time. */}
+      {/* Windows (tester feedback): the shared deadline timeline — drag a dot to pick each
+          time, or tap a tile to open the exact date & time modal. */}
       <DeadlineTimeline
-        acceptBy={acceptBy}
-        resolveBy={resolveBy}
-        onAcceptChange={setAcceptBy}
-        onResolveChange={setResolveBy}
+        milestones={timelineMilestones}
+        onChange={handleTimelineChange}
         disabled={status === 'creating'}
         idPrefix="gp"
-        acceptLabel="Joining open until"
-        acceptHint="Friends can join with the four words until this time. You can also close joining early once everyone is in."
-        acceptTileHead="Join by"
-        resolveLabel="Must be resolved by"
-        resolveHint="After joining closes, the group has until this time to approve the payout — otherwise buy-ins become refundable."
-        resolveTileHead="Resolve by"
-        summary={(openSpan, settleSpan) => `Open ${openSpan} for friends to join · then up to ${settleSpan} to settle`}
+        summary={deadlinesValid
+          ? `Open ${formatTimelineSpan(new Date(mountedAtMs), new Date(joinMs))} for friends to join · ` +
+            `then up to ${formatTimelineSpan(new Date(joinMs), new Date(resolveMs))} to settle`
+          : null}
       />
-      {!deadlinesValid && (acceptBy || resolveBy) && (
+      {!deadlinesValid && (joinBy || resolveBy) && (
         <p className="fm-hint oc-deadline-warn" role="alert">
           Pick a join time in the future and a resolve time after it.
         </p>

@@ -35,33 +35,41 @@ describe('GroupPoolModal', () => {
     expect(screen.getByRole('dialog')).toHaveClass('friend-markets-modal-backdrop')
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
     expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.getByLabelText(/buy-in — each member/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/buy-in — each member/i, { selector: 'input' })).toBeInTheDocument()
   })
 
-  it('the buy-in entry is formatted as money ($ prefix, USDC suffix, 2-decimal blur)', () => {
+  it('the buy-in entry is formatted as money ($ prefix, interactive USDC token control, 2-decimal blur)', () => {
     usePools.mockReturnValue(pools())
     renderModal()
-    const buyIn = screen.getByLabelText(/buy-in — each member/i)
+    const buyIn = screen.getByLabelText(/buy-in — each member/i, { selector: 'input' })
     expect(buyIn).toHaveValue(10) // default 10.00
     fireEvent.change(buyIn, { target: { value: '12.5' } })
     fireEvent.blur(buyIn)
     expect(buyIn.value).toBe('12.50')
     expect(screen.getByText('$')).toBeInTheDocument()
-    expect(screen.getByText('USDC')).toBeInTheDocument()
+    // Stake token control is always interactive (spec 038 FR-011), even
+    // though group pools only support USDC on this network today.
+    const tokenControl = screen.getByLabelText(/^stake token$/i)
+    expect(tokenControl.tagName).toBe('SELECT')
+    expect(tokenControl).not.toBeDisabled()
+    expect(tokenControl.value).toBe('USDC')
   })
 
-  it('join/resolve windows use the timeline element — sliders plus tap-to-type manual entry', () => {
+  it('join/resolve windows use the shared timeline element — draggable dots plus tap-to-set modal', () => {
     usePools.mockReturnValue(pools())
     renderModal()
-    const joinSlider = screen.getByLabelText(/joining open until/i)
-    const resolveSlider = screen.getByLabelText(/must be resolved by/i)
-    expect(joinSlider).toHaveAttribute('type', 'range')
-    expect(resolveSlider).toHaveAttribute('type', 'range')
+    const joinDot = screen.getByRole('slider', { name: /joining open until/i })
+    const resolveDot = screen.getByRole('slider', { name: /must be resolved by/i })
+    expect(joinDot).toBeInTheDocument()
+    expect(resolveDot).toBeInTheDocument()
+    // No native picker field or "type a date" link anywhere in the form (FR-005).
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
+    expect(screen.queryByText(/tap to type a date/i)).toBeNull()
 
-    // No manual input until a tile is tapped.
-    expect(screen.queryByLabelText(/exact date & time/i)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /join by/i }))
-    expect(screen.getByLabelText(/exact date & time — joining open until/i)).toBeInTheDocument()
+    // Tapping a tile opens the shared set-time modal, not an inline input.
+    fireEvent.click(screen.getByRole('button', { name: /join by:/i }))
+    expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
+    expect(screen.getByText(/joining open until/i)).toBeInTheDocument()
   })
 
   it('the approval threshold is a named selector, not a raw percent field', async () => {
@@ -109,5 +117,42 @@ describe('GroupPoolModal', () => {
     expect(screen.getByLabelText(/QR code to join this pool/i)).toBeInTheDocument()
     expect(screen.getByText(/scan to join/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open my pool/i })).toBeInTheDocument()
+  })
+
+  describe('explainers behind info icons (spec 039 US2)', () => {
+    it('hides the static explainers by default and reveals each from its icon, one at a time', () => {
+      usePools.mockReturnValue(pools())
+      renderModal()
+      expect(screen.queryByText(/everyone pays the same buy-in/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/only USDC is supported/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/joining closes automatically/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/take their buy-in back/i)).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'About group pools' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/everyone pays the same buy-in/i)
+
+      fireEvent.click(screen.getByRole('button', { name: 'About: Buy-in — each member' }))
+      expect(screen.getAllByRole('note')).toHaveLength(1)
+      expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
+
+      fireEvent.click(screen.getByRole('button', { name: 'About: Maximum members' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/joining closes automatically/i)
+
+      fireEvent.click(screen.getByRole('button', { name: 'About: Who must approve the payout?' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/take their buy-in back/i)
+    })
+
+    it('moves the share-words caution behind an icon on the share view', async () => {
+      const createPool = vi.fn().mockResolvedValue({ pool: POOL_ADDR, phrase: 'able acid also apex' })
+      usePools.mockReturnValue(pools({ createPool }))
+      renderModal()
+      fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
+      await waitFor(() => expect(createPool).toHaveBeenCalled())
+      await screen.findByTestId('pool-phrase')
+
+      expect(screen.queryByText(/share them with the group you mean/i)).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'About sharing the words' }))
+      expect(screen.getByRole('note')).toHaveTextContent(/share them with the group you mean/i)
+    })
   })
 })

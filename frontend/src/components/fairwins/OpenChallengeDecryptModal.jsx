@@ -4,6 +4,7 @@ import { isValidCode, CLAIM_CODE_WORD_COUNT } from '../../utils/claimCode/wordli
 import { decryptEnvelopeCode, isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+import InfoTip from '../ui/InfoTip'
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -43,7 +44,9 @@ export default function OpenChallengeDecryptModal({ isOpen, onClose, envelope, o
       }
       const { symKey } = deriveFromCode(code)
       const terms = decryptEnvelopeCode(envelope, symKey) // throws on a wrong code / tampered bytes
-      onDecrypted?.(typeof terms === 'string' ? { description: terms } : terms)
+      // Pass the validated code back so the caller can remember it (spec 040 US3),
+      // sparing the member from re-entering it next time.
+      onDecrypted?.(typeof terms === 'string' ? { description: terms } : terms, code)
       onClose()
     } catch {
       // Wrong code and tampered bytes both surface as a decryption failure; don't distinguish (no oracle).
@@ -80,14 +83,16 @@ export default function OpenChallengeDecryptModal({ isOpen, onClose, envelope, o
         <div className="fm-content">
           <div className="fm-panel">
             <form className="fm-form" onSubmit={handleSubmit}>
-              <p className="fm-hint">
-                This is an open challenge — its terms are locked to the four-word code, not your wallet.
-                Enter the code you saved when you created or took it to read the terms.
-              </p>
               <div className="fm-form-group fm-form-full">
-                <label htmlFor="oc-decrypt-code">
-                  Your {CLAIM_CODE_WORD_COUNT}-word code <span className="fm-required">*</span>
-                </label>
+                <span className="fm-label-row">
+                  <label htmlFor="oc-decrypt-code">
+                    Your {CLAIM_CODE_WORD_COUNT}-word code <span className="fm-required">*</span>
+                  </label>
+                  <InfoTip label="About reading this challenge">
+                    This is an open challenge — its terms are locked to the four-word code, not your wallet.
+                    Enter the code you saved when you created or took it to read the terms.
+                  </InfoTip>
+                </span>
                 <input
                   id="oc-decrypt-code" type="text" autoComplete="off" spellCheck="false"
                   placeholder="e.g. river tiger kite zoo"

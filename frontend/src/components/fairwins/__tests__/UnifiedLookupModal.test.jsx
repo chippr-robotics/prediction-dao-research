@@ -29,12 +29,20 @@ describe('UnifiedLookupModal (spec 037, US1)', () => {
   it('shows one phrase input (no type selector) and submits the phrase without any signature', () => {
     setState({})
     render(<UnifiedLookupModal isOpen onClose={() => {}} />)
-    const input = screen.getByLabelText(/four-word phrase/i)
+    const input = screen.getByLabelText(/four-word phrase/i, { selector: 'input' })
     fireEvent.change(input, { target: { value: 'crystal orbit harbor violet' } })
     fireEvent.click(screen.getByRole('button', { name: /^find$/i }))
     expect(submit).toHaveBeenCalledWith('crystal orbit harbor violet')
     // No "take a challenge" / "join a pool" type tabs — a single entry point (FR-001/002).
     expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('moves the lookup guidance behind an info icon (spec 039 US2)', () => {
+    setState({})
+    render(<UnifiedLookupModal isOpen onClose={() => {}} />)
+    expect(screen.queryByText(/whatever the words point to/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'About: Four-word phrase' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/whatever the words point to/i)
   })
 
   it('routes a challenge result to the take panel with the normalized code', () => {

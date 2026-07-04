@@ -54,6 +54,18 @@ export function useMyPools() {
     return aggregateMyItems({ createdPools, joinedPools: [...joinedPools, ...fallback] })
   }, [account, chainId, getPoolSummary])
 
+  // Manual refresh — re-run the idempotent load. Used by callers and the poll.
+  const refresh = useCallback(() => {
+    if (!account) { setItems([]); return Promise.resolve() }
+    return load()
+      .then((list) => setItems(list))
+      .catch(() => { /* keep prior items on a transient failure */ })
+  }, [account, load])
+
+  // Load on mount and auto-refresh on an interval while mounted (spec 040 US4 /
+  // FR-012..014), so pools stay current alongside wagers without a manual
+  // refresh. The interval is cleared on unmount, so polling stops when My
+  // Wagers closes.
   useEffect(() => {
     let alive = true
     if (!account) {
@@ -65,10 +77,17 @@ export function useMyPools() {
       .then((list) => { if (alive) setItems(list) })
       .catch(() => { if (alive) setItems([]) })
       .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+
+    const id = setInterval(() => {
+      load()
+        .then((list) => { if (alive) setItems(list) })
+        .catch(() => { /* retain prior items */ })
+    }, 30000)
+
+    return () => { alive = false; clearInterval(id) }
   }, [account, load])
 
-  return { items, loading }
+  return { items, loading, refresh }
 }
 
 export default useMyPools

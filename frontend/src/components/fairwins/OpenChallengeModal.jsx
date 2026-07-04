@@ -9,9 +9,18 @@ import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
-import { toDatetimeLocal } from './wagerTimeline'
+import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
+import PillSelect from '../ui/PillSelect'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+
+// Deadline bounds (unchanged from the previous slider-based timeline):
+// acceptance window caps at the open-challenge contract's MAX_ACCEPT_WINDOW
+// (30 days); the resolve window caps comfortably under the 180-day contract
+// resolve window.
+const ACCEPT_MAX_MS = 30 * DAY_MS
+const RESOLVE_MAX_GAP_MS = 90 * DAY_MS
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -64,7 +73,13 @@ function OpenChallengeModal({ isOpen, onClose }) {
               <span className="fm-brand-icon">&#127915;</span>
               <h2 id="open-challenge-title">Open Challenge</h2>
             </div>
-            <p className="fm-subtitle">A code-gated wager — no opponent named up front</p>
+            <p className="fm-subtitle">
+              A code-gated wager — no opponent named up front
+              <InfoTip label="About open challenges">
+                An open challenge has no named opponent — anyone you share the code with can take the other side.
+                Equal stakes. Creating one requires a Silver membership or above.
+              </InfoTip>
+            </p>
           </div>
           <button className="fm-close-btn" onClick={onClose} aria-label="Close modal">
             <CloseIcon />
@@ -95,8 +110,10 @@ function MakerPanel({ onClose }) {
   // Deadlines (feature 024 feedback): the maker sets when the challenge can still be taken and when it must
   // be resolved by, so the time constraints aren't hidden defaults. Stored as <input type="datetime-local">
   // strings and converted to unix seconds on submit.
-  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * 3600 * 1000))
-  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * 3600 * 1000))
+  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * HOUR_MS))
+  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * HOUR_MS))
+  // Mount-time "now" anchors the timeline's track/bounds so positions don't drift while the form is open.
+  const [nowMs] = useState(() => Date.now())
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
@@ -110,12 +127,48 @@ function MakerPanel({ onClose }) {
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const arbitratorAddr = arbitratorResolved || arbitrator
   const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
-  const acceptMs = acceptBy ? new Date(acceptBy).getTime() : NaN
-  const resolveMs = resolveBy ? new Date(resolveBy).getTime() : NaN
+  const acceptMs = fromDatetimeLocal(acceptBy)
+  const resolveMs = fromDatetimeLocal(resolveBy)
   const deadlinesValid =
     Number.isFinite(acceptMs) && Number.isFinite(resolveMs) &&
     acceptMs > Date.now() && resolveMs > acceptMs
   const canCreate = description.trim().length > 0 && Number(stake) > 0 && arbitratorValid && deadlinesValid && !busy
+
+  // Milestones for the shared DeadlineTimeline control (spec 038 US1): both
+  // deadlines are directly editable via drag or the tap-to-set modal.
+  const timelineMilestones = [
+    {
+      key: 'accept',
+      label: 'Open for acceptance until',
+      tileHead: 'Open until',
+      value: Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS,
+      min: nowMs + HOUR_MS,
+      max: nowMs + ACCEPT_MAX_MS,
+      editable: true,
+      hint: 'After this, the challenge can no longer be taken and your stake is refundable.',
+      segmentColor: 'var(--timeline-accept)',
+      dotClass: 'is-accept',
+      tileClass: 'is-accept',
+    },
+    {
+      key: 'resolve',
+      label: 'Must be resolved by',
+      tileHead: 'Resolve by',
+      value: Number.isFinite(resolveMs) ? resolveMs : (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + 7 * DAY_MS,
+      min: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + HOUR_MS,
+      max: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + RESOLVE_MAX_GAP_MS,
+      editable: true,
+      hint: 'The outcome must be submitted before this time.',
+      segmentColor: 'var(--timeline-active)',
+      dotClass: 'is-resolve',
+      tileClass: 'is-resolve',
+    },
+  ]
+  const handleTimelineChange = (key, ms) => {
+    const str = toDatetimeLocal(ms)
+    if (key === 'accept') setAcceptBy(str)
+    else if (key === 'resolve') setResolveBy(str)
+  }
 
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()
@@ -218,18 +271,20 @@ function MakerPanel({ onClose }) {
             </p>
           ) : (
             <>
-              <button
-                type="button"
-                className="fm-btn-secondary"
-                onClick={handleSaveBackup}
-                disabled={!canBackup}
-              >
-                Save encrypted backup to this device
-              </button>
-              <span className="fm-hint">
-                {canBackup
-                  ? 'Stores an encrypted copy of the code on this device so you can recover it later if you forget it. Readable only with this wallet.'
-                  : 'Connect your wallet to save a recoverable encrypted copy of this code.'}
+              <span className="fm-label-row">
+                <button
+                  type="button"
+                  className="fm-btn-secondary"
+                  onClick={handleSaveBackup}
+                  disabled={!canBackup}
+                >
+                  Save encrypted backup to this device
+                </button>
+                <InfoTip label="About: Encrypted backup">
+                  {canBackup
+                    ? 'Stores an encrypted copy of the code on this device so you can recover it later if you forget it. Readable only with this wallet.'
+                    : 'Connect your wallet to save a recoverable encrypted copy of this code.'}
+                </InfoTip>
               </span>
               {backupState === 'error' && backupError && (
                 <div className="fm-error-banner" role="alert">{backupError}</div>
@@ -251,24 +306,28 @@ function MakerPanel({ onClose }) {
 
   return (
     <form className="fm-form" onSubmit={handleCreate}>
-      <p className="fm-hint">
-        An open challenge has no named opponent — anyone you share the code with can take the other side.
-        Equal stakes. Creating one requires a Silver membership or above.
-      </p>
-
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-desc">What&apos;s the wager? <span className="fm-required">*</span></label>
+        <span className="fm-label-row">
+          <label htmlFor="oc-desc">What&apos;s the wager? <span className="fm-required">*</span></label>
+          <InfoTip label="About: What's the wager?">
+            Phrase it so it&apos;s clear which side you&apos;re on; the taker takes the opposite.
+          </InfoTip>
+        </span>
         <input
           id="oc-desc" type="text" maxLength={200}
           placeholder="e.g. I'm betting NO that it rains in Denver tomorrow"
           value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy}
         />
-        <span className="fm-hint">Phrase it so it&apos;s clear which side you&apos;re on; the taker takes the opposite.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-stake">Stake — each side <span className="fm-required">*</span></label>
-        <div className="fm-stake-input-wrapper">
+        <span className="fm-label-row">
+          <label htmlFor="oc-stake">Stake — each side <span className="fm-required">*</span></label>
+          <InfoTip label="About: Stake — each side">
+            Enter the amount in USD. Only USDC is supported for open challenges on this network.
+          </InfoTip>
+        </span>
+        <div className="fm-stake-input-wrapper fm-stake-row">
           <span className="fm-stake-prefix">$</span>
           <input
             id="oc-stake" type="number" inputMode="decimal" min="0" step="0.01"
@@ -281,20 +340,30 @@ function MakerPanel({ onClose }) {
             }}
             disabled={busy}
           />
-          <span className="fm-stake-suffix">USDC</span>
+          {/* Stake token control is always interactive (spec 038 FR-011), even
+              though open challenges only support the chain stablecoin today. */}
+          <select id="oc-stake-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" disabled={busy} value="USDC" onChange={() => {}}>
+            <option value="USDC">💵 USDC</option>
+          </select>
         </div>
-        <span className="fm-hint">Enter the amount in USD — both sides stake this much in USDC.</span>
       </div>
 
       <div className="fm-form-group fm-form-full">
-        <label htmlFor="oc-resolution">How is it resolved? <span className="fm-required">*</span></label>
-        <select id="oc-resolution" className="fm-select" value={resolutionType} onChange={(e) => setResolutionType(e.target.value)} disabled={busy}>
-          <option value={OPEN_RESOLUTION_TYPES.Either}>Either side submits the outcome</option>
-          <option value={OPEN_RESOLUTION_TYPES.ThirdParty}>A named third-party arbitrator decides</option>
-        </select>
-        <span className="fm-hint">
-          Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
-        </span>
+        <PillSelect
+          label={<>How is it resolved? <span className="fm-required">*</span></>}
+          info={(
+            <InfoTip label="About: How is it resolved?">
+              Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
+            </InfoTip>
+          )}
+          options={[
+            { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side submits the outcome' },
+            { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'A named third-party arbitrator decides' },
+          ]}
+          value={resolutionType}
+          onChange={setResolutionType}
+          disabled={busy}
+        />
       </div>
 
       {isThirdParty && (
@@ -306,14 +375,17 @@ function MakerPanel({ onClose }) {
         />
       )}
 
-      {/* Time constraints (testing feedback): the 1v1-wager timeline element — slide to pick each
-          time, or tap a tile to type the exact date & time. */}
+      {/* Time constraints (testing feedback): the shared deadline timeline — drag a dot to
+          pick each time, or tap a tile to open the exact date & time modal. */}
       <DeadlineTimeline
-        acceptBy={acceptBy}
-        resolveBy={resolveBy}
-        onAcceptChange={setAcceptBy}
-        onResolveChange={setResolveBy}
+        milestones={timelineMilestones}
+        onChange={handleTimelineChange}
         disabled={busy}
+        idPrefix="oc"
+        summary={deadlinesValid
+          ? `Open ${formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · ` +
+            `then up to ${formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle`
+          : null}
       />
       {!deadlinesValid && (acceptBy || resolveBy) && (
         <p className="fm-hint oc-deadline-warn" role="alert">
@@ -357,7 +429,12 @@ function ArbitratorField({ value, onChange, onResolvedChange, disabled }) {
 
   return (
     <div className="fm-form-group fm-form-full">
-      <label htmlFor="oc-arb">Arbitrator address <span className="fm-required">*</span></label>
+      <span className="fm-label-row">
+        <label htmlFor="oc-arb">Arbitrator address <span className="fm-required">*</span></label>
+        <InfoTip label="About: Arbitrator address">
+          The arbitrator can read and resolve this challenge, and cannot also take it.
+        </InfoTip>
+      </span>
       <div className="fm-input-with-action">
         <div className="fm-address-input-wrap">
           <AddressInput
@@ -387,7 +464,6 @@ function ArbitratorField({ value, onChange, onResolvedChange, disabled }) {
           </svg>
         </button>
       </div>
-      <span className="fm-hint">The arbitrator can read and resolve this challenge, and cannot also take it.</span>
       <QRScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScanSuccess={handleScan} />
     </div>
   )

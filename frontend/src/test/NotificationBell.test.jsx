@@ -9,6 +9,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { MemoryRouter } from 'react-router-dom'
+// Raw source check (spec 038 FR-012): jsdom doesn't apply real stylesheets
+// (Vitest's default `css: false`), so computed-style assertions can't catch
+// a padding regression here — reading the shipped CSS text directly can.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const bellCss = readFileSync(
+  resolve(process.cwd(), 'src/components/notifications/NotificationBell.css'),
+  'utf-8'
+)
 
 const { ctx, walletState, navigateSpy } = vi.hoisted(() => {
   const ctx = {
@@ -130,6 +140,39 @@ describe('NotificationBell visibility + a11y', () => {
     walletState.providerAbsent = true
     renderBell()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('caps a large unread count display at "99+" without breaking the header (spec 038 FR-012)', () => {
+    ctx.unreadCount = 250
+    renderBell()
+    expect(screen.getByTestId('bell-count').textContent).toBe('99+')
+    expect(screen.getByRole('button', { name: 'Notifications, 250 unread' })).toBeInTheDocument()
+  })
+
+  it('.notification-bell resets padding/border so it never inherits the global button rule (spec 038 FR-012)', () => {
+    // The global `button { padding: 0.6em 1.2em }` (index.css), combined with
+    // the app's border-box reset, crushed the 18px icon whenever the button
+    // had more than one child (icon + unread badge) — the shipped CSS must
+    // reset padding/box-sizing on this component directly rather than relying
+    // on the fragile `button:has(> svg:only-child)` carve-out.
+    expect(bellCss).toMatch(/\.notification-bell\s*\{[^}]*padding:\s*0\s*;/)
+    expect(bellCss).toMatch(/\.notification-bell\s*\{[^}]*box-sizing:\s*border-box\s*;/)
+    expect(bellCss).toMatch(/\.notification-bell\s*\{[^}]*min-width:\s*36px\s*;/)
+  })
+
+  it('the bell is keyboard-focusable with an accessible name', () => {
+    ctx.unreadCount = 1
+    renderBell()
+    const btn = screen.getByRole('button', { name: /notifications/i })
+    btn.focus()
+    expect(btn).toHaveFocus()
+  })
+
+  it('has no accessibility violations with an unread badge and action dot both present', async () => {
+    ctx.unreadCount = 4
+    ctx.actionNeededCount = 1
+    const { container } = renderBell()
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 

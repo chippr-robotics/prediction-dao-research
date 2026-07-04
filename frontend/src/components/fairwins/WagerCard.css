@@ -167,6 +167,63 @@
 
 .wc-action-needed { vertical-align: middle; }
 
+/* Draw submission state (spec 040 US2) — evident on the card, text + icon (not colour alone). */
+.wc-draw-badge { vertical-align: middle; }
+
+.wc-draw {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  background: rgba(159, 122, 234, 0.1);
+  border: 1px solid rgba(159, 122, 234, 0.28);
+}
+
+.wc-draw-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #9F7AEA;
+}
+
+.wc-draw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.wc-draw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.wc-draw-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.wc-draw-chip--done { background: rgba(54, 179, 126, 0.15); color: #36B37E; }
+.wc-draw-chip--pending { background: rgba(245, 166, 35, 0.15); color: #C77700; }
+
+.mm-table-draw {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9F7AEA;
+}
+
 .wc-chevron {
   color: var(--text-muted, #7A8590);
   transition: transform 0.2s;

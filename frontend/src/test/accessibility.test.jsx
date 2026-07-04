@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import Button from '../components/ui/Button'
 import StatusIndicator from '../components/ui/StatusIndicator'
@@ -250,9 +251,32 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
     expect(results).toHaveNoViolations()
   })
 
+  it('has no axe violations with an info bubble open (spec 039 FR-007)', async () => {
+    const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'About: How is it resolved?' }))
+    expect(screen.getByRole('note')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('info icons are keyboard operable: focus, Enter opens, Escape closes and restores focus (spec 039 FR-007)', async () => {
+    const user = userEvent.setup()
+    render(<OpenChallengeModal isOpen onClose={() => {}} />)
+    const icon = screen.getByRole('button', { name: 'About: Stake — each side' })
+    icon.focus()
+    expect(icon).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(icon).toHaveFocus()
+  })
+
   it('the residual-risk / save-your-code notice is conveyed as TEXT, not color alone', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // Create form residual-risk disclosure: text is present (not color-only signaling).
+    // The open-challenge explainer moved behind an info icon (spec 039) to cut
+    // text density, but it is still conveyed as TEXT (not color-only signaling):
+    // reachable on demand from the subtitle's info button.
+    fireEvent.click(screen.getByRole('button', { name: 'About open challenges' }))
     expect(
       screen.getByText(/anyone you share the code with can take the other side/i)
     ).toBeInTheDocument()

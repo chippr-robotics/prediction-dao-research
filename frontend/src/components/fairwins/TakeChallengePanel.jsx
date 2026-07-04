@@ -1,6 +1,7 @@
 import { useState, useCallback, useContext } from 'react'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
 import { UIContext } from '../../contexts/UIContext'
+import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 
@@ -85,7 +86,6 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
         </>
       ) : (
         <>
-          <p className="fm-hint">Accepting binds you as the opponent and escrows your equal stake. This takes a few steps:</p>
           <ol className="oc-steps">
             <li className={stepClass(progress?.step, 'approve')}>Approve the stake token (lets the wager contract escrow your stake)</li>
             <li className={stepClass(progress?.step, 'sign')}>Sign to authorize acceptance with your code</li>
@@ -93,9 +93,13 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
           </ol>
           {progress && <p className="fm-hint" role="status">{progress.message}</p>}
           {error && <div className="fm-error-banner" role="alert">{error}</div>}
-          <p className="fm-hint">Save your code to re-read the terms later.</p>
           <div className="fm-success-actions">
-            <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
+            <span className="fm-label-row">
+              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
+              <InfoTip label="About accepting">
+                Accepting binds you as the opponent and escrows your equal stake. Save your code to re-read the terms later.
+              </InfoTip>
+            </span>
             {onBack && <button type="button" className="fm-btn-secondary" onClick={onBack} disabled={busy}>Back</button>}
           </div>
         </>

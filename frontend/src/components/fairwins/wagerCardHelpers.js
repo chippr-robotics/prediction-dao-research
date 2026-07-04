@@ -84,7 +84,8 @@ export function getRowOutcome(market, account) {
       if (isCreator || isParticipant) return { label: 'Lost', tone: 'negative' }
     }
     if (market.winner) {
-      return { label: `${market.winner.slice(0, 6)}…${market.winner.slice(-4)}`, tone: 'neutral' }
+      // Carry the winner address so views can render a friendly name (spec 040).
+      return { label: formatShortAddress(market.winner), tone: 'neutral', address: market.winner }
     }
     return { label: 'Resolved', tone: 'neutral' }
   }
