@@ -12,6 +12,7 @@
  */
 import { keccak256, toUtf8Bytes, getBigInt } from 'ethers'
 import { ADJECTIVES, NOUNS } from '../pools/nicknameWords'
+import { isValidEthereumAddress } from '../../utils/validation'
 
 const DOMAIN = 'FAIRWINS_ADDRESS_NAME_v1'
 
@@ -23,8 +24,8 @@ const DOMAIN = 'FAIRWINS_ADDRESS_NAME_v1'
  * @throws if `address` is not a hex-like string
  */
 export function deriveAddressName(address) {
-  if (typeof address !== 'string' || !address.startsWith('0x')) {
-    throw new Error('deriveAddressName: a 0x-prefixed address is required')
+  if (!isValidEthereumAddress(address)) {
+    throw new Error('deriveAddressName: a valid 20-byte (0x + 40 hex) address is required')
   }
   // Lowercase so a checksummed `0xAbC…` and a lowercase `0xabc…` — the same account — hash identically.
   const normalized = address.toLowerCase()

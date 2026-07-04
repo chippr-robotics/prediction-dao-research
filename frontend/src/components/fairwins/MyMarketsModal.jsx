@@ -144,7 +144,9 @@ function MyMarketsModal({
 
   // Draw-proposal scan (spec 040 US2). Keeps the per-wager draw proposer current
   // while the modal is open (same 30s cadence as the market refresh). A failed
-  // read retains prior state rather than fabricating revokes (honest state).
+  // read retains prior state rather than fabricating revokes (honest state). The
+  // scanned ids are already active-chain-scoped (they come from the wagers shown
+  // here), and the subgraph endpoint is a single env — so no chainId is passed.
   const drawScanKey = useMemo(
     () => decryptableMarkets.map(m => String(m.id)).sort().join(','),
     [decryptableMarkets]
@@ -155,7 +157,7 @@ function MyMarketsModal({
     if (wagerIds.length === 0) { setDrawProposerById({}); return }
     let alive = true
     const run = async () => {
-      const { proposals, ok } = await fetchDrawProposals({ chainId, wagerIds })
+      const { proposals, ok } = await fetchDrawProposals({ wagerIds })
       if (!alive || !ok) return
       const map = {}
       for (const p of proposals) map[String(p.wagerId)] = p.proposer
@@ -164,7 +166,7 @@ function MyMarketsModal({
     run()
     const id = setInterval(run, 30000)
     return () => { alive = false; clearInterval(id) }
-  }, [isOpen, account, chainId, drawScanKey])
+  }, [isOpen, account, drawScanKey])
 
   // Auto-unlock an open challenge from a saved code (spec 040 US3). Returns true
   // when it decrypted without prompting. Only attempts when the member has a

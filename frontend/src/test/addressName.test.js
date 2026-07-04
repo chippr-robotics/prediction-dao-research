@@ -31,4 +31,10 @@ describe('deriveAddressName', () => {
     expect(() => deriveAddressName('not-an-address')).toThrow()
     expect(() => deriveAddressName(null)).toThrow()
   })
+
+  it('rejects malformed 0x values (strict 20-byte validation)', () => {
+    expect(() => deriveAddressName('0x1')).toThrow()
+    expect(() => deriveAddressName('0x123')).toThrow()
+    expect(() => deriveAddressName('0xZZ11111111111111111111111111111111111111')).toThrow()
+  })
 })

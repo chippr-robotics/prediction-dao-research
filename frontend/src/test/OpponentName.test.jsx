@@ -6,7 +6,14 @@ vi.mock('../hooks/useWalletManagement', () => ({
   useWallet: () => ({ chainId: 1, account: '0x9999999999999999999999999999999999999999' }),
 }))
 vi.mock('../hooks/useOpponentName', () => ({
-  useOpponentName: () => ({ displayName: 'Cobalt Otter', source: 'generated', address: ADDR, isLoading: false }),
+  // Literal address (not a top-level const) so the hoisted mock factory has no
+  // dependency on later module init.
+  useOpponentName: () => ({
+    displayName: 'Cobalt Otter',
+    source: 'generated',
+    address: '0x1234567890123456789012345678901234567890',
+    isLoading: false,
+  }),
 }))
 
 import OpponentName from '../components/fairwins/OpponentName'
@@ -32,7 +39,8 @@ describe('OpponentName', () => {
     const user = userEvent.setup()
     render(<OpponentName address={ADDR} />)
     await user.click(screen.getByRole('button', { name: /show full address/i }))
-    expect(screen.getByText('0x1234…7890')).toBeInTheDocument()
+    // The full address is shown (not a shortened form) so the member can verify it.
+    expect(screen.getByText(ADDR)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /copy address/i })).toBeInTheDocument()
   })
 

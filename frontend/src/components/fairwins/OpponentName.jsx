@@ -25,8 +25,6 @@ export default function OpponentName({ address, isSelf = false, interactive = tr
     return <span className="opponent-name">{formatShortAddress(address)}</span>
   }
 
-  const full = formatShortAddress(address)
-
   if (!interactive) {
     return <span className="opponent-name">{displayName}</span>
   }
@@ -49,7 +47,8 @@ export default function OpponentName({ address, isSelf = false, interactive = tr
       </button>
       {revealed && (
         <span className="opponent-name-address">
-          <code className="opponent-name-full" title={address}>{full}</code>
+          {/* Show the FULL address so the member can verify the exact counterparty. */}
+          <code className="opponent-name-full" title={address}>{address}</code>
           <button
             type="button"
             className="opponent-name-copy"

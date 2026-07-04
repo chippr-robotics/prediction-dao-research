@@ -193,9 +193,10 @@ describe('WagerCard (via WagerCardGrid)', () => {
     const toggle = screen.getByRole('button', { name: new RegExp(`show full address for ${oppName}`, 'i') })
     expect(toggle).toBeInTheDocument()
     // Raw address hidden until revealed; creator side is "You".
-    expect(screen.queryByText('0xABCD…EF12')).not.toBeInTheDocument()
+    expect(screen.queryByText(OTHER)).not.toBeInTheDocument()
     expect(screen.getByText('You')).toBeInTheDocument()
     await user.click(toggle)
-    expect(screen.getByText('0xABCD…EF12')).toBeInTheDocument()
+    // The full address is revealed for verification.
+    expect(screen.getByText(OTHER)).toBeInTheDocument()
   })
 })

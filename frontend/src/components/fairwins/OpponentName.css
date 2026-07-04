@@ -45,6 +45,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
   opacity: 0.85;
+  word-break: break-all;
 }
 
 .opponent-name-copy {
