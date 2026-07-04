@@ -31,7 +31,9 @@
     "poseidonT3": "0xC855eCa5f522Be73cEF1E3Db2bd1E66B2287e687",
     "zkWagerPoolFactory": "0x33cDfa339AbE993FEfEB9fE1A8341105ba55D586",
     "zkWagerPoolFactoryImpl": "0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD",
-    "poolImpl": "0x6da67B58a5191906B5037CF1168539694a099eB2"
+    "poolImpl": "0xb7E29BD303e6Fb85a321bE68EFe5E95b3D45b149",
+    "wagerPoolFactory": "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F",
+    "wagerPoolFactoryImpl": "0xD69a175a0a2CD0564A62384a0687A2908DDf632c"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -62,7 +64,8 @@
     "externalDAORegistryImpl": [],
     "backupPointerRegistry": [],
     "zkWagerPoolFactoryImpl": [],
-    "poolImpl": []
+    "poolImpl": [],
+    "wagerPoolFactoryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -71,12 +74,15 @@
     "membershipManager": 16404308,
     "membershipVoucher": 16404315,
     "voucherBatchMinter": 16407208,
-    "backupPointerRegistry": 16430733
+    "backupPointerRegistry": 16430733,
+    "wagerPoolFactory": 16495564,
+    "poolImpl": 16495564
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
   "tokenV2TemplatesSyncedAt": "2026-06-23T23:32:04.921Z",
   "clearpathDeployedAt": "2026-06-24T13:16:39.566Z",
   "semaphoreSelfDeployedAt": "2026-07-01T00:03:56.515Z",
-  "zkWagerPoolsDeployedAt": "2026-07-01T00:06:05.668Z"
+  "zkWagerPoolsDeployedAt": "2026-07-01T00:06:05.668Z",
+  "wagerPoolsDeployedAt": "2026-07-04T15:27:55.875Z"
 }

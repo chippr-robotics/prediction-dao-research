@@ -40,7 +40,7 @@ const MORDOR_CONTRACTS = {
   // Wager Pools (spec 034, address-based — Semaphore removed). Pending the fresh WagerPoolFactory
   // deploy; populated by `npm run sync:frontend-contracts` after `deploy-wager-pool-factory.js`.
   // The prior Semaphore-based factory (0x33cD…) is abandoned and intentionally NOT wired here.
-  wagerPoolFactory: '',
+  wagerPoolFactory: '0xac78B4EdeF96e74a2653028dF93A26acFCfC613F',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -122,7 +122,7 @@ export const DEPLOYED_CONTRACTS =
  * support legacy Mordor reads while Amoy migrates.
  */
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315 },
+  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
   137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344, membershipVoucher: 0 },
 }
