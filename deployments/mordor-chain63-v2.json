@@ -31,7 +31,7 @@
     "poseidonT3": "0xC855eCa5f522Be73cEF1E3Db2bd1E66B2287e687",
     "zkWagerPoolFactory": "0x33cDfa339AbE993FEfEB9fE1A8341105ba55D586",
     "zkWagerPoolFactoryImpl": "0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD",
-    "poolImpl": "0xb7E29BD303e6Fb85a321bE68EFe5E95b3D45b149",
+    "poolImpl": "0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277",
     "wagerPoolFactory": "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F",
     "wagerPoolFactoryImpl": "0xD69a175a0a2CD0564A62384a0687A2908DDf632c"
   },
@@ -76,7 +76,7 @@
     "voucherBatchMinter": 16407208,
     "backupPointerRegistry": 16430733,
     "wagerPoolFactory": 16495564,
-    "poolImpl": 16495564
+    "poolImpl": 16497337
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
@@ -84,5 +84,6 @@
   "clearpathDeployedAt": "2026-06-24T13:16:39.566Z",
   "semaphoreSelfDeployedAt": "2026-07-01T00:03:56.515Z",
   "zkWagerPoolsDeployedAt": "2026-07-01T00:06:05.668Z",
-  "wagerPoolsDeployedAt": "2026-07-04T15:27:55.875Z"
+  "wagerPoolsDeployedAt": "2026-07-04T15:27:55.875Z",
+  "poolTemplateResyncedAt": "2026-07-04T21:47:07.000Z"
 }
