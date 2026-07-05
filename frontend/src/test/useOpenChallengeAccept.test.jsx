@@ -11,7 +11,7 @@ const ACCOUNT = '0x3333333333333333333333333333333333333333'
 const STAKE = 10_000_000n // 10 USDC (6 decimals)
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false },
+  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '' },
   calls: [],
 }))
 
@@ -54,7 +54,12 @@ vi.mock('ethers', async () => {
         openWagerIdForClaim: () => state.throwLookup
           ? Promise.reject(new Error('rpc down'))
           : Promise.resolve(state.wagerId),
-        getWager: () => Promise.resolve({ token: TOKEN, opponentStake: STAKE, creator: '0xCreator', metadataUri: '' }),
+        getWager: () => Promise.resolve({
+          token: TOKEN, opponentStake: STAKE, creatorStake: STAKE, creator: '0xCreator',
+          metadataUri: state.metadataUri,
+          // Oracle linkage fields (spec 041) — already part of the on-chain struct.
+          resolutionType: 4n, polymarketConditionId: '0xc0ffee', creatorIsYes: true,
+        }),
         acceptOpenWager,
       }
     }
@@ -156,5 +161,38 @@ describe('useOpenChallengeAccept.lookup (structured outcome)', () => {
     await act(async () => { res = await result.current.lookup('river tiger kite zoo') })
     expect(res.status).toBe('errored')
     expect(res.error).toBeInstanceOf(Error)
+  })
+})
+
+// Spec 041: the lookup payload must carry the on-chain oracle linkage untouched, and a
+// sealed terms bundle with an `oracle` block must reach the caller — the claimant view
+// (TakeChallengePanel) renders the bet from exactly these fields. Accept is unchanged.
+describe('useOpenChallengeAccept.lookup (oracle open challenges, spec 041)', () => {
+  beforeEach(() => { calls.length = 0; state.wagerId = 7n; state.throwLookup = false; state.metadataUri = 'ipfs-enc://cid' })
+
+  it('passes through resolutionType/polymarketConditionId/creatorIsYes and the sealed oracle block', async () => {
+    const { parseEncryptedIpfsReference, fetchEncryptedEnvelope } = await import('../utils/ipfsService')
+    const { decryptEnvelopeCode, isCodeEnvelope } = await import('../utils/crypto/envelopeEncryption.js')
+    parseEncryptedIpfsReference.mockReturnValue({ isIpfs: true, cid: 'cid' })
+    fetchEncryptedEnvelope.mockResolvedValue({ sealed: true })
+    isCodeEnvelope.mockReturnValue(true)
+    decryptEnvelopeCode.mockReturnValue({
+      description: 'Will ETH flip BTC? — creator takes Yes · settled automatically by Polymarket',
+      oracle: { source: 'polymarket', conditionId: '0xc0ffee', question: 'Will ETH flip BTC?', outcomes: ['Yes', 'No'], creatorSide: 0 },
+    })
+
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let res
+    await act(async () => { res = await result.current.lookup('river tiger kite zoo') })
+
+    expect(res.status).toBe('matched')
+    const { wager, terms, termsUnavailable } = res.payload
+    expect(termsUnavailable).toBe(false)
+    expect(wager.resolutionType).toBe(4n)
+    expect(wager.polymarketConditionId).toBe('0xc0ffee')
+    expect(wager.creatorIsYes).toBe(true)
+    expect(terms.oracle).toMatchObject({ source: 'polymarket', conditionId: '0xc0ffee', outcomes: ['Yes', 'No'] })
+    // Read-only — no approval/acceptance sent by a lookup.
+    expect(calls).toEqual([])
   })
 })

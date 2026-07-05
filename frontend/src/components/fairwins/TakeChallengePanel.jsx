@@ -1,9 +1,13 @@
 import { useState, useCallback, useContext } from 'react'
 import { useOpenChallengeAccept } from '../../hooks/useOpenChallengeAccept'
+import { usePolymarketMarket } from '../../hooks/usePolymarketMarket'
+import { useChainTokens } from '../../hooks/useChainTokens'
+import { ResolutionType } from '../../constants/wagerDefaults'
 import { UIContext } from '../../contexts/UIContext'
 import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+import './TakeChallengePanel.css'
 
 /**
  * Take-a-challenge presentation (spec 037, US1) — extracted verbatim from OpenChallengeModal's
@@ -22,6 +26,17 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
   const [txHash, setTxHash] = useState(null)
   const [error, setError] = useState(null)
   const found = match
+
+  // Oracle-settled open challenges (spec 041): the on-chain fields are authoritative for
+  // WHAT is bet (market linkage + side); live Gamma data is a disclosure layer on top.
+  const wager = found?.wager
+  const isPolymarket = Number(wager?.resolutionType ?? 0) === ResolutionType.Polymarket
+  const conditionId = wager?.polymarketConditionId
+  const live = usePolymarketMarket(conditionId, { enabled: isPolymarket })
+  // Accept gate (D8/FR-015): block only on a positively-known public outcome; a merely
+  // closed market warns but stays acceptable; unreachable live data never gates.
+  const resolvedOutcomeName = isPolymarket ? publiclyResolvedOutcome(live.market) : null
+  const blockedResolved = Boolean(resolvedOutcomeName)
 
   const handleAccept = useCallback(async () => {
     setError(null)
@@ -71,6 +86,17 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
         )}
       </div>
 
+      {/* What you'd be agreeing to — one view, no navigation (spec 041 FR-012). */}
+      <ChallengeStake wager={found.wager} />
+      {isPolymarket && (
+        <OracleBetSummary
+          wager={found.wager}
+          terms={found.terms}
+          live={live}
+          resolvedOutcomeName={resolvedOutcomeName}
+        />
+      )}
+
       <ChallengeDeadlines wager={found.wager} />
 
       {found.needsMembership ? (
@@ -93,9 +119,16 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
           </ol>
           {progress && <p className="fm-hint" role="status">{progress.message}</p>}
           {error && <div className="fm-error-banner" role="alert">{error}</div>}
+          {blockedResolved && (
+            <div className="oc-notice oc-notice--warn" role="alert">
+              This market has already resolved{resolvedOutcomeName ? <> (<strong>{resolvedOutcomeName}</strong>)</> : null} —
+              the outcome is public, so this challenge can no longer be taken fairly. It will expire and the
+              creator&apos;s stake will be refundable.
+            </div>
+          )}
           <div className="fm-success-actions">
             <span className="fm-label-row">
-              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
+              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy || blockedResolved}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
               <InfoTip label="About accepting">
                 Accepting binds you as the opponent and escrows your equal stake. Save your code to re-read the terms later.
               </InfoTip>
@@ -124,6 +157,170 @@ function stepClass(current, step) {
 
 function stepLabel(step) {
   return STEP_LABELS[step] || 'Accepting'
+}
+
+/** Stake + payout line for every open challenge (spec 041 FR-012) — open challenges are
+ *  equal-stakes in the chain stablecoin, so the on-chain opponentStake is the taker's stake. */
+function ChallengeStake({ wager }) {
+  const { stable, stableDecimals } = useChainTokens()
+  const amount = formatStake(wager?.opponentStake, stableDecimals)
+  const payout = formatStake(
+    wager?.opponentStake != null && wager?.creatorStake != null
+      ? BigInt(wager.opponentStake) + BigInt(wager.creatorStake)
+      : null,
+    stableDecimals
+  )
+  if (!amount) return null
+  return (
+    <div className="tc-stake" aria-label="Stake and payout">
+      <span className="tc-stake-line">
+        You stake <strong>{amount} {stable}</strong> — winner takes <strong>{payout} {stable}</strong>
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Oracle bet summary (spec 041, US2): the market question, the side the TAKER gets,
+ * an unmistakable "settled by Polymarket" badge, and live market context. On-chain
+ * `creatorIsYes`/`polymarketConditionId` are authoritative; the sealed terms' oracle
+ * block is display metadata and is cross-checked before being trusted (honest state).
+ */
+function OracleBetSummary({ wager, terms, live, resolvedOutcomeName }) {
+  const conditionId = wager?.polymarketConditionId
+  const creatorIsYes = Boolean(wager?.creatorIsYes)
+  const { market, isLoading, error } = live
+  // Mount-anchored clock: render must stay pure, and "has the event passed" doesn't
+  // need to tick while the panel is open.
+  const [nowMs] = useState(() => Date.now())
+
+  const sealed = terms && typeof terms === 'object' ? terms.oracle : null
+  const integrity = !sealed
+    ? 'unverifiable'
+    : hexEquals(sealed.conditionId, conditionId) ? 'ok' : 'mismatch'
+  const trusted = integrity === 'ok' ? sealed : null
+
+  // Best-available display data: verified sealed metadata first (works offline), then live.
+  const question = trusted?.question || market?.question || null
+  const labels = normalizeOutcomeLabels(trusted?.outcomes) || normalizeOutcomeLabels(market?.outcomes?.map((o) => o.name)) || ['YES', 'NO']
+  const takerLabel = labels[creatorIsYes ? 1 : 0]
+  const creatorLabel = labels[creatorIsYes ? 0 : 1]
+  const slug = trusted?.slug || market?.slug || null
+  const marketClosed = Boolean(market && (market.closed || (market.endDate && Date.parse(market.endDate) < nowMs)))
+
+  return (
+    <div className="tc-oracle" aria-label="How this bet settles">
+      {/* Settlement source — always shown, live or degraded (FR-013/SC-005). */}
+      <div className="tc-oracle-badge">
+        <span className="tc-oracle-badge-icon" aria-hidden="true">&#128302;</span>
+        <span className="tc-oracle-badge-text">Settled automatically by <strong>Polymarket</strong></span>
+      </div>
+      <p className="tc-oracle-explain">
+        The winner is decided by the linked public Polymarket market&apos;s resolution — neither you,
+        the creator, nor anyone else in the app judges the outcome.
+      </p>
+
+      <div className="tc-oracle-question">
+        {question ? (
+          <strong>{question}</strong>
+        ) : (
+          <span className="tc-oracle-question-fallback">
+            Market details unavailable — linked market <code>{shortenHex(conditionId)}</code>
+          </span>
+        )}
+        {slug && (
+          <a
+            className="tc-oracle-link"
+            href={`https://polymarket.com/market/${slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View on Polymarket
+          </a>
+        )}
+      </div>
+
+      <div className="tc-oracle-sides">
+        <span>You take: <strong>{takerLabel}</strong></span>
+        <span className="tc-oracle-sides-sep" aria-hidden="true">·</span>
+        <span>Creator holds: {creatorLabel}</span>
+      </div>
+
+      {integrity === 'mismatch' && (
+        <div className="oc-notice oc-notice--warn" role="alert">
+          The stored description doesn&apos;t match the market this challenge is actually linked to
+          on-chain. Trust the on-chain linkage shown here — not the description text.
+        </div>
+      )}
+
+      {/* Live market context (FR-014): odds/status when reachable, disclosed degradation when not. */}
+      <div className="tc-oracle-live" role="status">
+        {isLoading ? (
+          <span className="tc-oracle-live-loading">Checking the live market…</span>
+        ) : error ? (
+          <span className="tc-oracle-live-degraded">
+            Live market info unavailable right now — the bet terms above are binding.
+          </span>
+        ) : market ? (
+          <>
+            <span className="tc-oracle-live-prices">
+              Now: {market.outcomes
+                .map((o) => `${o.name}${o.price != null ? ` ${Math.round(o.price * 100)}¢` : ''}`)
+                .join(' · ')}
+            </span>
+            <span className={`tc-oracle-live-status ${marketClosed ? 'is-closed' : 'is-open'}`}>
+              {marketClosed ? 'Market closed' : 'Market open'}
+            </span>
+          </>
+        ) : null}
+      </div>
+
+      {marketClosed && !resolvedOutcomeName && (
+        <div className="oc-notice oc-notice--warn" role="alert">
+          This market has already closed. The outcome may be decided soon — make sure you still
+          want to take this bet.
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A live market whose outcome is already public: closed with a near-certain price.
+ *  Returns that outcome's name, or null. Deliberately conservative — only a positively
+ *  known result blocks acceptance (D8); stale/ambiguous data merely warns. */
+function publiclyResolvedOutcome(market) {
+  if (!market || market.closed !== true) return null
+  const winner = (market.outcomes || []).find((o) => o.price != null && o.price >= 0.999)
+  return winner ? winner.name : null
+}
+
+function normalizeOutcomeLabels(list) {
+  if (!Array.isArray(list) || list.length < 2) return null
+  const a = String(list[0] ?? '').trim()
+  const b = String(list[1] ?? '').trim()
+  return a && b ? [a, b] : null
+}
+
+function hexEquals(a, b) {
+  if (!a || !b) return false
+  return String(a).toLowerCase() === String(b).toLowerCase()
+}
+
+function shortenHex(h) {
+  const s = String(h || '')
+  return s.length > 14 ? `${s.slice(0, 10)}…${s.slice(-4)}` : s
+}
+
+function formatStake(value, decimals = 6) {
+  if (value == null) return ''
+  let n
+  try {
+    n = Number(BigInt(value)) / 10 ** decimals
+  } catch {
+    return ''
+  }
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return n.toLocaleString([], { maximumFractionDigits: 2 })
 }
 
 /** Show an open challenge's accept/resolve deadlines (feature 024). Reads the on-chain wager struct. */

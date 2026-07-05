@@ -11,6 +11,7 @@ export const QUICK_ACCESS_CARDS = [
   { id: 'create-1v1-oracle', label: 'Oracle Settles (1v1)' },
   { id: 'create-offer', label: 'Make an Offer' },
   { id: 'open-challenge', label: 'Open Challenge' },
+  { id: 'oracle-open-challenge', label: 'Oracle Open Challenge' },
   { id: 'create-pool', label: 'Group Pool' },
   { id: 'enter-phrase', label: 'Enter a Phrase' },
   { id: 'my-wagers', label: 'My Wagers' },

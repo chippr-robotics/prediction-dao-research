@@ -11,9 +11,9 @@ describe('PreferencesPanel (spec 038 US5)', () => {
     localStorage.clear()
   })
 
-  it('lists all 9 quick access cards, each visible by default', () => {
+  it('lists all 10 quick access cards, each visible by default', () => {
     render(<PreferencesPanel />)
-    expect(QUICK_ACCESS_CARDS).toHaveLength(9)
+    expect(QUICK_ACCESS_CARDS).toHaveLength(10) // +oracle-open-challenge (spec 041)
     QUICK_ACCESS_CARDS.forEach((card) => {
       const toggle = screen.getByRole('switch', { name: card.label })
       expect(toggle).toHaveAttribute('aria-checked', 'true')

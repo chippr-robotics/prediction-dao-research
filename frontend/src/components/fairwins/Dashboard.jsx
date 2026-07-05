@@ -9,6 +9,7 @@ import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import { isCardVisible, subscribe as subscribeQuickAccess } from '../../utils/quickAccessPreference'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
+import OracleOpenChallengeModal from './OracleOpenChallengeModal'
 import GroupPoolModal from './GroupPoolModal'
 import UnifiedLookupModal from './UnifiedLookupModal'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
@@ -152,6 +153,21 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
       ),
       title: 'Open Challenge',
       description: 'Post without naming an opponent — share a four-word code to create or take'
+    },
+    {
+      id: 'oracle-open-challenge',
+      category: 'create',
+      tag: 'Oracle settles',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+          <circle cx="12" cy="16" r="1" />
+          <path d="M19 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
+        </svg>
+      ),
+      title: 'Oracle Open Challenge',
+      description: 'Pick a Polymarket market, share a code — Polymarket settles it automatically'
     },
     {
       id: 'create-pool',
@@ -530,6 +546,7 @@ function Dashboard() {
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
+  const [showOracleOpenChallenge, setShowOracleOpenChallenge] = useState(false)
   const [showGroupPool, setShowGroupPool] = useState(false)
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
@@ -603,6 +620,9 @@ function Dashboard() {
         break
       case 'open-challenge':
         setShowOpenChallenge(true)
+        break
+      case 'oracle-open-challenge':
+        setShowOracleOpenChallenge(true)
         break
       case 'create-pool':
         setShowGroupPool(true)
@@ -764,6 +784,13 @@ function Dashboard() {
           setShowOpenChallenge(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
         }}
+      />
+
+      {/* Oracle Open Challenge (spec 041) — code-gated open challenge settled by a linked Polymarket market. */}
+      <OracleOpenChallengeModal
+        key={showOracleOpenChallenge ? 'ooc-open' : 'ooc-closed'}
+        isOpen={showOracleOpenChallenge}
+        onClose={() => setShowOracleOpenChallenge(false)}
       />
 
       {/* Unified phrase lookup (spec 037) — one entry point: enter four words to take a challenge or join a pool. */}
