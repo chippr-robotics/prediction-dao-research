@@ -366,20 +366,12 @@ function MarketAcceptanceModal({
         )
       }
 
-      const currentAllowance = await tokenContract.allowance(account, contractAddress)
-      if (currentAllowance < stakeAmount) {
-        console.log('Approving stake token for WagerRegistry...')
-        const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
-        await approveTx.wait()
-      }
-
-      let tx
-      console.log('Sending acceptWager transaction...')
-      const feeOverrides = await getFeeOverrides(signer.provider)
-      tx = await contract.acceptWager(marketId, feeOverrides)
-
-      setTxHash(tx.hash)
-      await tx.wait()
+      // Gasless-or-self-submit acceptance: the self-submit closure keeps the existing
+      // approve → acceptWager flow; the gasless path skips the approve (EIP-3009 pulls the
+      // acceptor's stake) and lets the relayer pay gas. Stake + token come from getWager above.
+      const result = await acceptWagerTx.run(marketId, stakeAmount, stakeTokenAddress)
+      if (result?.error) throw result.error
+      if (result?.txHash) setTxHash(result.txHash)
 
       setStep('success')
       if (onAccepted) onAccepted(marketId)
@@ -439,6 +431,39 @@ function MarketAcceptanceModal({
       setStep('error')
     }
   }
+
+  // Gasless acceptWager (spec 035/036): relayed where the relayer serves the chain and the stake
+  // token supports EIP-3009 (Polygon USDC), transparent self-submit otherwise (Mordor USC →
+  // auto self-submit). The payment leg authorizes the acceptor's stake via EIP-3009, so the gasless
+  // path skips the approve the self-submit closure performs. targetContract is pinned to this modal's
+  // own registry address so the relayed target can never diverge from the self-submit one.
+  const acceptWagerTx = useGaslessWrite('acceptWager', {
+    targetContract: contractAddress,
+    params: (wagerId) => ({ wagerId }),
+    payment: (wagerId, stakeAmount) => ({ value: stakeAmount }),
+    selfSubmit: async (wagerId, stakeAmount, stakeTokenAddress) => {
+      const contract = new ethers.Contract(contractAddress, contractABI, signer)
+      const tokenContract = new ethers.Contract(
+        stakeTokenAddress,
+        [
+          'function approve(address,uint256) returns (bool)',
+          'function allowance(address,address) view returns (uint256)',
+        ],
+        signer
+      )
+      const currentAllowance = await tokenContract.allowance(account, contractAddress)
+      if (currentAllowance < stakeAmount) {
+        console.log('Approving stake token for WagerRegistry...')
+        const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
+        await approveTx.wait()
+      }
+      console.log('Sending acceptWager transaction...')
+      const feeOverrides = await getFeeOverrides(signer.provider)
+      const tx = await contract.acceptWager(wagerId, feeOverrides)
+      setTxHash(tx.hash)
+      return tx.wait()
+    },
+  })
 
   // Gasless declineWager (spec 035/036): relayed where the relayer serves the chain, transparent
   // self-submit otherwise. targetContract is pinned to this modal's own registry address so the

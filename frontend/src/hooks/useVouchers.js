@@ -6,6 +6,7 @@ import { MEMBERSHIP_VOUCHER_ABI } from '../abis/MembershipVoucher'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import { VOUCHER_BATCH_MINTER_ABI } from '../abis/VoucherBatchMinter'
 import { ERC20_ABI } from '../abis/ERC20'
+import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 
 /**
  * useVouchers — buy and redeem membership voucher NFTs (spec 026).
@@ -42,6 +43,19 @@ export function useVouchers() {
     setError(null)
     setLastTxHash(null)
   }, [])
+
+  // Gasless seam (specs 035 + 036): relay the redeem when a relayer is live, else self-submit the
+  // MembershipManager.redeemVoucher call (never-stranded). Signer-attributed (no payment) — the
+  // redeemer is the connected wallet, auto-filled by signIntent, so it's omitted from params.
+  const voucherTx = useGaslessWrite('redeemVoucher', {
+    params: (tokenId, termsHash) => ({ voucherId: tokenId, acceptedTermsHash: termsHash || ethers.ZeroHash }),
+    selfSubmit: async (tokenId, termsHash) => {
+      const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
+      const tx = await manager.redeemVoucher(tokenId, termsHash || ethers.ZeroHash)
+      setLastTxHash(tx.hash)
+      return tx.wait()
+    },
+  })
 
   /**
    * Buy `quantity` vouchers of `(roleHash, tierId)` and send them to `recipient` (defaults to the buyer).
@@ -164,19 +178,18 @@ export function useVouchers() {
       setError(null)
       setLastTxHash(null)
       try {
-        const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
-        const tx = await manager.redeemVoucher(tokenId, termsHash || ethers.ZeroHash)
-        setLastTxHash(tx.hash)
-        await tx.wait()
+        const result = await voucherTx.run(tokenId, termsHash)
+        if (result?.error) throw result.error
+        setLastTxHash(result.txHash || lastTxHash)
         setStatus('success')
-        return { txHash: tx.hash }
+        return { txHash: result.txHash || lastTxHash }
       } catch (e) {
         setStatus('error')
         setError(e?.shortMessage || e?.message || 'Redemption failed.')
         throw e
       }
     },
-    [signer, voucherAvailable, managerAddress]
+    [signer, voucherAvailable, voucherTx, lastTxHash]
   )
 
   /**
