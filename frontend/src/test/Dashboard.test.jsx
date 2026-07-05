@@ -20,6 +20,12 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
 
 // Stub the unified phrase lookup (spec 037) so we assert the Dashboard wiring — the "Enter a Phrase"
 // quick action and the ?oc=take&code= deep-link reroute — without its resolver/hook internals.
+// Stub the oracle open challenge modal (spec 041) to assert the Dashboard card wiring
+// without the picker/create internals (covered by OracleOpenChallengeModal.test.jsx).
+vi.mock('../components/fairwins/OracleOpenChallengeModal', () => ({
+  default: ({ isOpen }) => isOpen ? <div data-testid="oracle-open-challenge-modal" /> : null,
+}))
+
 vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
   default: ({ isOpen, initialPhrase, autoResolve }) => isOpen ? (
     <div data-testid="unified-modal" data-phrase={initialPhrase} data-auto={String(autoResolve)} />
@@ -348,7 +354,8 @@ describe('Dashboard Component', () => {
 
     it('shows a recoverable empty state pointing at Preferences when every card is hidden', () => {
       const allCardIds = [
-        'create-1v1-friends', 'create-1v1-oracle', 'create-offer', 'open-challenge', 'create-pool',
+        'create-1v1-friends', 'create-1v1-oracle', 'create-offer', 'open-challenge',
+        'oracle-open-challenge', 'create-pool',
         'enter-phrase', 'my-wagers', 'scan-qr', 'share-account',
       ]
       allCardIds.forEach((id) => setCardVisible(id, false))
@@ -377,6 +384,38 @@ describe('Dashboard Component', () => {
       const toggle = screen.getByRole('button', { name: /How P2P Wagers Work/i })
         || screen.getByText('How P2P Wagers Work').closest('button')
       expect(toggle).toHaveAttribute('aria-expanded')
+    })
+  })
+
+  describe('Oracle Open Challenge entry (spec 041)', () => {
+    it('renders the card with its oracle-settles description', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Oracle Open Challenge')).toBeInTheDocument()
+      expect(screen.getByText(/share a code — Polymarket settles it automatically/i)).toBeInTheDocument()
+    })
+
+    it('clicking the card opens the oracle open challenge modal (not the 1v1 flow)', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
+      fireEvent.click(screen.getByText('Oracle Open Challenge'))
+      expect(screen.getByTestId('oracle-open-challenge-modal')).toBeInTheDocument()
+      expect(screen.queryByTestId('friend-modal')).toBeNull()
+    })
+
+    it('the card is toggleable via quick-access preferences like any other (spec 038 US5)', () => {
+      setCardVisible('oracle-open-challenge', false)
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByText('Oracle Open Challenge')).toBeNull()
+      setCardVisible('oracle-open-challenge', true)
+    })
+
+    it('the user-defined Open Challenge card still opens its own modal unchanged (FR-018)', () => {
+      renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText('Open Challenge'))
+      // The user-defined modal renders its own dialog header (not the oracle stub);
+      // the card itself is an h4, the modal title an h2.
+      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
+      expect(screen.getByRole('heading', { level: 2, name: 'Open Challenge' })).toBeInTheDocument()
     })
   })
 })

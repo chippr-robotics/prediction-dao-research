@@ -109,7 +109,7 @@ sees the event-derived timeline, creates, and gets the shareable four-word code.
 end-to-end from the new section; verify escrow, code issuance, on-chain market linkage
 + side, and deadlines consistent with the event (quickstart §3 steps 1–3).
 
-- [ ] T011 [US1] Create `frontend/src/components/fairwins/OracleOpenChallengeModal.jsx`
+- [X] T011 [US1] Create `frontend/src/components/fairwins/OracleOpenChallengeModal.jsx`
       per contracts/create-flow.md — structure + discovery step: `fm-*` modal shell
       (mirror `OpenChallengeModal.jsx` header/close/backdrop/Escape patterns), gating
       (`useChainTokens().capabilities.polymarketSidebets` +
@@ -119,7 +119,7 @@ end-to-end from the new section; verify escrow, code issuance, on-chain market l
       onSelectMarket selectedConditionId>`; selecting a market runs
       `deriveOracleChallengeTimeline(market.endDate, nowMs)` (mount-anchored `nowMs`)
       and refuses ineligible markets with the returned `reason` displayed.
-- [ ] T012 [US1] Add the configure step to `OracleOpenChallengeModal.jsx`: selected
+- [X] T012 [US1] Add the configure step to `OracleOpenChallengeModal.jsx`: selected
       market summary (question, image, end date, live outcome prices); side picker —
       two labelled buttons from `market.outcomes[].name` (fallback Yes/No) with prices,
       `aria-pressed`, index 0 → `creatorIsYes: true` (D6); stake input identical to
@@ -127,29 +127,29 @@ end-to-end from the new section; verify escrow, code issuance, on-chain market l
       timeline summary ("Takeable until … · settles by …", provenance "from the
       event", disclosure when `acceptCapped`); "change market" affordance back to the
       picker.
-- [ ] T013 [US1] Wire submit in `OracleOpenChallengeModal.jsx`: compose `description`
+- [X] T013 [US1] Wire submit in `OracleOpenChallengeModal.jsx`: compose `description`
       (market question + chosen side label), call `createOpenChallenge({ description,
       stake, resolutionType: ResolutionType.Polymarket, oracleConditionId:
       market.conditionId, creatorIsYes, acceptDeadline, resolveDeadline, oracleMeta })`
       with progress states; on success render `ClaimCodeResultPanel`; surface
       translated reverts (incl. `ConditionAlreadyResolved` → back to picker per
       FR-008).
-- [ ] T014 [P] [US1] Create `frontend/src/components/fairwins/OracleOpenChallengeModal.css`
+- [X] T014 [P] [US1] Create `frontend/src/components/fairwins/OracleOpenChallengeModal.css`
       (section-specific styles over the shared `fm-*`/`OpenChallengeModal.css` base;
       side-picker buttons meet contrast + focus-visible requirements).
-- [ ] T015 [US1] Dashboard entry point: add `oracle-open-challenge` to
+- [X] T015 [US1] Dashboard entry point: add `oracle-open-challenge` to
       `frontend/src/constants/quickAccessCards.js`; in
       `frontend/src/components/fairwins/Dashboard.jsx` add the card to `createActions`
       (capability-aware like `create-1v1-oracle`), a `handleQuickAction` case opening
       the new modal, and the `<OracleOpenChallengeModal>` instance beside
       `<OpenChallengeModal>` (FR-001, FR-004).
-- [ ] T016 [P] [US1] Create `frontend/src/test/claimCode/OracleOpenChallengeModal.test.jsx`:
+- [X] T016 [P] [US1] Create `frontend/src/test/claimCode/OracleOpenChallengeModal.test.jsx`:
       renders feed with no input; ineligible market unselectable with reason; side/stake
       step gates create button; submit passes `resolutionType=4`, conditionId,
       `creatorIsYes` per side, derived deadlines, and `oracleMeta` (mock
       `useOpenChallengeCreate`); success shows the code result panel; hidden/locked
       when capability or oracle-model exposure is off.
-- [ ] T017 [P] [US1] Extend `frontend/src/test/Dashboard.test.jsx`: new card appears
+- [X] T017 [P] [US1] Extend `frontend/src/test/Dashboard.test.jsx`: new card appears
       (and is gated by `polymarketSidebets`), quick action opens the oracle modal, the
       existing `open-challenge` card still opens the user-defined modal.
 

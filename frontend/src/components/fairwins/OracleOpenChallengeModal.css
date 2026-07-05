@@ -1,0 +1,26 @@
+/* Oracle Open Challenge modal (spec 041) — section-specific styles layered over the
+   shared fm-* / OpenChallengeModal.css base. Keep additions minimal: the flow reuses
+   fm-polymarket-selected, fm-side-picker, oc-deadlines, etc. */
+
+/* Live price chip inside a side button (text + number, not color-only). */
+.ooc-side-price {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* Refused-market notice sits above the picker so the reason is read before re-picking. */
+.ooc-ineligible {
+  margin-bottom: 10px;
+}
+
+/* Derived timeline: visually the same tiles as oc-deadlines, but flagged read-only. */
+.ooc-derived-timeline {
+  cursor: default;
+}
+
+.ooc-timeline-provenance {
+  display: block;
+  margin-top: 6px;
+}
