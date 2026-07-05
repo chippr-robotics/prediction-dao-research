@@ -1953,6 +1953,60 @@ function ResolutionModal({
   )
   const isDrawSelected = selectedOutcome === DRAW
 
+  // Gasless declareDraw / declareWinner (spec 035/036): both are signer-attributed resolution
+  // actions (no payment), so they relay where the relayer serves the chain (user pays no gas) and
+  // transparently self-submit otherwise. The self-submit closures carry the existing fee overrides
+  // and receipt-status guards; the draw closure also inspects the WagerDrawn event to decide the
+  // proposed-vs-settled messaging (a receipt-only signal, so it lives where the receipt exists).
+  const declareDrawTx = useGaslessWrite('declareDraw', {
+    params: (wagerId) => ({ wagerId }),
+    selfSubmit: async (wagerId) => {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const feeOverrides = await getFeeOverrides(signer.provider)
+      const tx = await registry.declareDraw(wagerId, feeOverrides)
+      const receipt = await tx.wait()
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted on-chain. Draw failed.')
+      }
+      if (!receipt) {
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+      // A WagerDrawn event means the draw settled now; otherwise it's a pending
+      // proposal awaiting the counterparty's confirmation.
+      const settled = receipt.logs.some((l) => {
+        try { return registry.interface.parseLog(l)?.name === 'WagerDrawn' } catch { return false }
+      })
+      setDrawSettled(settled)
+      return receipt
+    },
+  })
+
+  const declareWinnerTx = useGaslessWrite('declareWinner', {
+    params: (wagerId, winner) => ({ wagerId, winner }),
+    selfSubmit: async (wagerId, winner) => {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const feeOverrides = await getFeeOverrides(signer.provider)
+      const tx = await registry.declareWinner(wagerId, winner, feeOverrides)
+      const receipt = await tx.wait()
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted on-chain. Resolution failed.')
+      }
+      if (!receipt) {
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+      console.log('Market resolution proposed:', receipt)
+      return receipt
+    },
+  })
+
   const handleSubmit = async () => {
     if (!selectedOutcome) {
       setError('Please select an outcome')
@@ -1986,26 +2040,13 @@ function ResolutionModal({
     )
 
     try {
-      const feeOverrides = await getFeeOverrides(signer.provider)
-
       // Draw: returns each party their own stake. For participant types the
       // first call only proposes (awaiting the counterparty); the second settles.
+      // The self-submit closure inspects the WagerDrawn event to set drawSettled.
       if (isDrawSelected) {
-        const tx = await registry.declareDraw(market.id, feeOverrides)
-        setTxHash(tx.hash)
-        const receipt = await tx.wait()
-        if (receipt && receipt.status === 0) {
-          throw new Error('Transaction reverted on-chain. Draw failed.')
-        }
-        if (!receipt) {
-          throw new Error('Transaction was dropped or replaced. Please try again.')
-        }
-        // A WagerDrawn event means the draw settled now; otherwise it's a pending
-        // proposal awaiting the counterparty's confirmation.
-        const settled = receipt.logs.some((l) => {
-          try { return registry.interface.parseLog(l)?.name === 'WagerDrawn' } catch { return false }
-        })
-        setDrawSettled(settled)
+        const result = await declareDrawTx.run(market.id)
+        if (result?.error) throw result.error
+        if (result?.txHash) setTxHash(result.txHash)
         setStep('success')
         return
       }
@@ -2023,19 +2064,10 @@ function ResolutionModal({
         notes: resolutionNotes,
       })
 
-      const tx = await registry.declareWinner(market.id, winner, feeOverrides)
-      setTxHash(tx.hash)
+      const result = await declareWinnerTx.run(market.id, winner)
+      if (result?.error) throw result.error
+      if (result?.txHash) setTxHash(result.txHash)
 
-      const receipt = await tx.wait()
-
-      if (receipt && receipt.status === 0) {
-        throw new Error('Transaction reverted on-chain. Resolution failed.')
-      }
-      if (!receipt) {
-        throw new Error('Transaction was dropped or replaced. Please try again.')
-      }
-
-      console.log('Market resolution proposed:', receipt)
       setStep('success')
     } catch (err) {
       console.error('Error resolving market:', err)

@@ -26,6 +26,17 @@ vi.mock('../hooks/useEncryption', () => ({
   }))
 }))
 
+// The gasless accept/decline wiring (useGaslessWrite) imports useWeb3 from the direct module, not
+// the ../hooks barrel these tests mock — stub it so the component renders without a WalletProvider.
+vi.mock('../hooks/useWeb3', () => ({
+  useWeb3: () => ({
+    signer: { provider: { getBalance: vi.fn() } },
+    chainId: 137,
+    isCorrectNetwork: true,
+    switchNetwork: vi.fn()
+  })
+}))
+
 import { useWallet, useWeb3 } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
 

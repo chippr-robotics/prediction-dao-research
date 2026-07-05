@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
+import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { getContractAddressForChain, getContractAddress } from '../config/contracts'
 import { fetchEncryptedEnvelope, parseEncryptedIpfsReference } from '../utils/ipfsService'
@@ -31,6 +32,44 @@ export function useOpenChallengeAccept() {
   const { signer, account, chainId, provider } = useWeb3()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+
+  // Gasless acceptOpenWager (spec 035/036): relayed where the relayer serves the chain and the stake
+  // token supports EIP-3009 (Polygon USDC); transparent self-submit otherwise (Mordor USC → auto
+  // self-submit). This is AcceptWagerIntent PLUS the separate claim-code proof (signOpenAccept): the
+  // relay path carries the proof in params (the contract twin rebinds it to taker=signer, keeping the
+  // front-running defense under a relayer, FR-011); the self-submit path passes it straight to
+  // acceptOpenWager. The payment leg authorizes the taker's stake via EIP-3009, so the gasless path
+  // skips the approve the self-submit closure performs.
+  const acceptOpenWagerTx = useGaslessWrite('acceptOpenWager', {
+    params: (wagerId, claimCodeSig) => ({ wagerId, claimCodeSig }),
+    payment: (wagerId, claimCodeSig, stake) => ({ value: stake }),
+    selfSubmit: async (wagerId, claimCodeSig, stake, tokenAddr, registryAddr, symbol, onProgress = () => {}) => {
+      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
+      const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
+
+      // Approve the registry to escrow the stake (skip if already approved). Kept in the self-submit
+      // closure because the gasless path never approves — EIP-3009 pulls the stake instead.
+      const allowance = await token.allowance(account, registryAddr)
+      if (allowance < stake) {
+        onProgress({ step: 'approve', message: `Approve ${symbol} spending in your wallet…` })
+        const approveTx = await token.approve(registryAddr, ethers.MaxUint256)
+        await approveTx.wait()
+      }
+
+      // Pre-flight to surface a clear revert reason before the final wallet prompt.
+      try {
+        await registry.acceptOpenWager.staticCall(wagerId, claimCodeSig)
+      } catch (sim) {
+        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
+      }
+
+      onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
+      const tx = await registry.acceptOpenWager(wagerId, claimCodeSig)
+      const receipt = await tx.wait()
+      if (!receipt || receipt.status === 0) throw new Error('Acceptance reverted on-chain.')
+      return receipt
+    },
+  })
 
   const resolveRegistry = useCallback(() => {
     const addr = chainId != null ? getContractAddressForChain('wagerRegistry', chainId) : getContractAddress('wagerRegistry')
@@ -157,16 +196,9 @@ export function useOpenChallengeAccept() {
         )
       }
 
-      // 2. Approve the registry to escrow your stake (skip if already approved). This is the step whose
-      //    absence caused the allowance revert — it must land before the staticCall and send below.
-      const allowance = await token.allowance(account, registryAddr)
-      if (allowance < stake) {
-        onProgress({ step: 'approve', message: `Approve ${symbol} spending in your wallet…` })
-        const approveTx = await token.approve(registryAddr, ethers.MaxUint256)
-        await approveTx.wait()
-      }
-
-      // 3. Sign the code-derived acceptance (bound to this taker, single-use).
+      // 2. Sign the code-derived acceptance (bound to this taker, single-use). Produced here — not
+      //    inside the send — because the relay path carries it through as an intent param (rebound to
+      //    taker=signer on-chain, FR-011), while self-submit passes it straight to acceptOpenWager.
       onProgress({ step: 'sign', message: 'Sign to authorize acceptance…' })
       const signature = await signOpenAccept(code, {
         wagerId,
@@ -175,25 +207,20 @@ export function useOpenChallengeAccept() {
         verifyingContract: registryAddr,
       })
 
-      // 4. Pre-flight to surface a clear revert reason before the final wallet prompt.
-      try {
-        await registry.acceptOpenWager.staticCall(wagerId, signature)
-      } catch (sim) {
-        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
-      }
-
-      onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
-      const tx = await registry.acceptOpenWager(wagerId, signature)
-      const receipt = await tx.wait()
-      if (!receipt || receipt.status === 0) throw new Error('Acceptance reverted on-chain.')
-      return { txHash: receipt.hash }
+      // 3. Take it: relayed where the relayer serves the chain (gasless, skips the approve — EIP-3009
+      //    pulls the stake), transparent self-submit otherwise (approve → pre-flight → send). The
+      //    approval, whose absence caused the allowance revert, stays inside the self-submit closure
+      //    where a self-submitted accept still needs it.
+      const result = await acceptOpenWagerTx.run(wagerId, signature, stake, tokenAddr, registryAddr, symbol, onProgress)
+      if (result?.error) throw result.error
+      return { txHash: result?.txHash }
     } catch (e) {
       setError(e.message)
       throw e
     } finally {
       setBusy(false)
     }
-  }, [signer, account, resolveRegistry])
+  }, [signer, account, resolveRegistry, acceptOpenWagerTx])
 
   return { lookup, discover, accept, busy, error }
 }

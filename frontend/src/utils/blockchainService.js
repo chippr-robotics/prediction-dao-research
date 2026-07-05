@@ -1395,6 +1395,67 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
 }
 
 /**
+ * Specs 035 + 036: resolve the exact EIP-712 intent parameters for a membership
+ * payment action (purchase / upgrade / extend) so a gasless relay can authorize
+ * the precise USDC amount the contract will pull. Read-only — issues no wallet
+ * prompt and moves no funds. The returned `price` is the exact `receiveWithAuthorization`
+ * value; it MUST match what MembershipManager charges (any mismatch is rejected).
+ *
+ * Mirrors the price/terms resolution in {@link purchaseRoleWithStablecoin}:
+ *   - purchase & extend: price = getTierConfig(role, validTier).priceUSDC
+ *   - upgrade:           price = getTierConfig(role, newTier).priceUSDC
+ *                                - getTierConfig(role, currentTier).priceUSDC
+ *   - terms:             normalize to a 0x-prefixed bytes32, or ZeroHash when none
+ *
+ * @param {ethers.Signer} signer - Connected wallet signer (its provider is read for the chain + tiers)
+ * @param {string} roleName - Name of the role being purchased/upgraded/extended
+ * @param {number} tier - Target membership tier (1=Bronze..4=Platinum), clamped to [1,4]
+ * @param {string} [action='purchase'] - 'purchase' (default), 'upgrade', or 'extend'
+ * @param {string|null} [termsHash=null] - accepted T&C version hash (bare 64-hex or 0x-prefixed)
+ * @returns {Promise<{roleHash: string, validTier: number, price: bigint, acceptedTermsHash: string}>}
+ */
+export async function resolveMembershipIntentParams(signer, roleName, tier = MembershipTier.BRONZE, action = 'purchase', termsHash = null) {
+  if (!signer) throw new Error('Wallet not connected')
+  const roleHash = getRoleHash(roleName)
+  if (!roleHash) throw new Error(`Unknown role: ${roleName}`)
+  const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+
+  // Resolve the MembershipManager for the wallet's CURRENT chain (matches purchaseRoleWithStablecoin).
+  let walletChainId = null
+  try {
+    walletChainId = Number((await signer.provider.getNetwork()).chainId)
+  } catch { /* provider without a network; fall back to build-time chain */ }
+  const mmAddress = getContractAddressForChain('membershipManager', walletChainId)
+  if (!mmAddress) {
+    throw new Error(`No membership contract is configured on the connected network (chain ${walletChainId ?? 'unknown'}).`)
+  }
+
+  const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, signer)
+  const userAddress = await signer.getAddress()
+
+  // Determine the price the contract will charge (exact — this becomes the EIP-3009 value).
+  let price
+  if (action === 'upgrade') {
+    const membership = await mm.getMembership(userAddress, roleHash)
+    const currentCfg = await mm.getTierConfig(roleHash, membership.tier)
+    const newCfg = await mm.getTierConfig(roleHash, validTier)
+    price = newCfg.priceUSDC - currentCfg.priceUSDC
+  } else {
+    const tierCfg = await mm.getTierConfig(roleHash, validTier)
+    price = tierCfg.priceUSDC
+  }
+
+  // Normalize the accepted-terms hash exactly as purchaseRoleWithStablecoin does (bare 64-hex → 0x…).
+  const normTerms = typeof termsHash === 'string'
+    ? (termsHash.startsWith('0x') ? termsHash : '0x' + termsHash)
+    : null
+  const hasTerms = normTerms !== null && /^0x[0-9a-fA-F]{64}$/.test(normTerms)
+  const acceptedTermsHash = hasTerms ? normTerms : ethers.ZeroHash
+
+  return { roleHash, validTier, price, acceptedTermsHash }
+}
+
+/**
  * Spec 022: read-only pre-flight to decide whether the membership purchase will
  * require a separate ERC-20 approval prompt. Lets the progress indicator build the
  * exact step list up front and OMIT the approval step entirely when the member
