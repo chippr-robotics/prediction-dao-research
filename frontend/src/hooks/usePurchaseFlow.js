@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
-import { purchaseRoleWithStablecoin, checkApprovalNeeded } from '../utils/blockchainService'
+import { purchaseRoleWithStablecoin, checkApprovalNeeded, resolveMembershipIntentParams } from '../utils/blockchainService'
 import { ensureKeyRegistered } from '../utils/keyRegistryService'
+import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 
 /**
  * Spec 022 — Membership Purchase Progress Indicator.
@@ -61,6 +62,30 @@ export function usePurchaseFlow(deps = {}) {
     else if (phase === 'confirmed') updateStep(step, { state: 'completed', txHash })
   }, [updateStep])
 
+  // Gasless seam (specs 035 + 036): relay the payment when a relayer is live, else self-submit via the
+  // existing approve+pay service call (never-stranded). The EIP-3009 `value` is the exact price the
+  // contract pulls (resolveMembershipIntentParams). Self-submit reads live params from paramsRef and
+  // reuses handleProgress so approve/pay step events fire identically on the fallback path.
+  const selfSubmitPurchase = () => purchaseFn(
+    paramsRef.current.signer, paramsRef.current.roleName, paramsRef.current.priceUSD,
+    paramsRef.current.tier, paramsRef.current.action, paramsRef.current.termsHash, handleProgress,
+  )
+  const purchaseTx = useGaslessWrite('purchaseTier', {
+    params: (ip) => ({ role: ip.roleHash, tier: ip.validTier, acceptedTermsHash: ip.acceptedTermsHash }),
+    payment: (ip) => ({ value: ip.price }),
+    selfSubmit: selfSubmitPurchase,
+  })
+  const upgradeTx = useGaslessWrite('upgradeTier', {
+    params: (ip) => ({ role: ip.roleHash, tier: ip.validTier, acceptedTermsHash: ip.acceptedTermsHash }),
+    payment: (ip) => ({ value: ip.price }),
+    selfSubmit: selfSubmitPurchase,
+  })
+  const extendTx = useGaslessWrite('extendMembership', {
+    params: (ip) => ({ role: ip.roleHash }),
+    payment: (ip) => ({ value: ip.price }),
+    selfSubmit: selfSubmitPurchase,
+  })
+
   // Mark the in-flight (or next pending) step as failed and attribute the reason.
   const markFailed = useCallback((reason) => {
     setSteps((prev) => {
@@ -81,17 +106,22 @@ export function usePurchaseFlow(deps = {}) {
     setStatus('running')
     try {
       if (fromSegment === 'purchase') {
+        // Passkey smart accounts (spec 041, FR-016) batch approve+purchase into ONE biometric
+        // confirmation via the 4337 bundler — a single 'pay' step, no approve step. Everyone else
+        // routes the pay through the spec-035/036 gasless seam: relay when a relayer is live, else
+        // self-submit approve+pay (resolveMembershipIntentParams gives the exact price the contract
+        // pulls). Same on-chain result either way.
         let receipt
         if (p.batchPurchase) {
-          // Passkey smart accounts (spec 041, FR-016): approve+purchase run as
-          // ONE batched confirmation — a single 'pay' step, no approve step.
           updateStep('pay', { state: 'active', failureReason: null })
           receipt = await p.batchPurchase()
           updateStep('pay', { state: 'completed', txHash: receipt?.txHash })
         } else {
-          receipt = await purchaseFn(
-            p.signer, p.roleName, p.priceUSD, p.tier, p.action, p.termsHash, handleProgress,
-          )
+          const ip = await resolveMembershipIntentParams(p.signer, p.roleName, p.tier, p.action, p.termsHash)
+          const tx = p.action === 'upgrade' ? upgradeTx : (p.action === 'extend' ? extendTx : purchaseTx)
+          const result = await tx.run(ip)
+          if (result?.error) throw result.error
+          receipt = result
         }
         receiptRef.current = receipt
         // Defensively ensure approve (if present) + pay show completed.
@@ -137,7 +167,7 @@ export function usePurchaseFlow(deps = {}) {
       markFailed(err?.message || 'Step failed')
       setStatus('failed')
     }
-  }, [purchaseFn, registerKeyFn, handleProgress, updateStep, markFailed])
+  }, [registerKeyFn, updateStep, markFailed, purchaseTx, upgradeTx, extendTx])
 
   /**
    * Begin a fresh purchase flow. Builds the step list (omitting approval when not

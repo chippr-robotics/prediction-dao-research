@@ -11,7 +11,7 @@ const ACCOUNT = '0x3333333333333333333333333333333333333333'
 const STAKE = 10_000_000n // 10 USDC (6 decimals)
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '' },
+  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '', acceptArgs: null },
   calls: [],
 }))
 
@@ -45,8 +45,9 @@ vi.mock('ethers', async () => {
   const real = await vi.importActual('ethers')
   function FakeContract(address) {
     if (address === REGISTRY) {
-      const acceptOpenWager = (..._a) => {
+      const acceptOpenWager = (...a) => {
         calls.push('accept')
+        state.acceptArgs = a
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1, hash: '0xtxhash' }) })
       }
       acceptOpenWager.staticCall = () => Promise.resolve()
@@ -91,6 +92,7 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     calls.length = 0
     state.allowance = 0n
     state.balance = 100_000_000n
+    state.acceptArgs = null
   })
 
   it('approves the registry BEFORE sending acceptOpenWager when allowance is short', async () => {
@@ -105,6 +107,17 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     expect(calls).toEqual(['approve', 'accept'])
     // Steps are surfaced for the UI checklist.
     expect(steps).toEqual(expect.arrayContaining(['check', 'approve', 'sign', 'accept']))
+  })
+
+  it('routes the send through the gasless seam, threading the claim-code proof to acceptOpenWager', async () => {
+    // With no relayer configured (VITE_RELAYER_URL unset in tests) useGaslessWrite self-submits, so
+    // acceptOpenWager(wagerId, claimCodeSig) must still receive the code-derived signature verbatim —
+    // the same proof the relay path would carry in its intent params (rebound to taker=signer on-chain).
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    await act(async () => {
+      await result.current.accept('river tiger kite zoo', 4n)
+    })
+    expect(state.acceptArgs).toEqual([4n, '0xsignature'])
   })
 
   it('skips approval when the existing allowance already covers the stake', async () => {

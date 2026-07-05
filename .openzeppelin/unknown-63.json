@@ -56,7 +56,7 @@
             "label": "membershipManager",
             "offset": 0,
             "slot": "50",
-            "type": "t_contract(IMembershipManager)13808",
+            "type": "t_contract(IMembershipManager)22674",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:47"
           },
@@ -64,7 +64,7 @@
             "label": "polymarketAdapter",
             "offset": 0,
             "slot": "51",
-            "type": "t_contract(IOracleAdapter)14452",
+            "type": "t_contract(IOracleAdapter)24742",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:48"
           },
@@ -72,7 +72,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "52",
-            "type": "t_contract(ISanctionsGuard)13874",
+            "type": "t_contract(ISanctionsGuard)22831",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:52"
           },
@@ -80,7 +80,7 @@
             "label": "oracleAdapters",
             "offset": 0,
             "slot": "53",
-            "type": "t_mapping(t_enum(ResolutionType)13886,t_contract(IOracleAdapter)14452)",
+            "type": "t_mapping(t_enum(ResolutionType)22843,t_contract(IOracleAdapter)24742)",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:56"
           },
@@ -96,7 +96,7 @@
             "label": "_wagers",
             "offset": 0,
             "slot": "55",
-            "type": "t_mapping(t_uint256,t_struct(Wager)13929_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Wager)22886_storage)",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:59"
           },
@@ -136,7 +136,7 @@
             "label": "_userWagerIds",
             "offset": 0,
             "slot": "60",
-            "type": "t_mapping(t_address,t_struct(UintSet)11394_storage)",
+            "type": "t_mapping(t_address,t_struct(UintSet)18699_storage)",
             "contract": "WagerRegistry",
             "src": "contracts/wagers/WagerRegistry.sol:84"
           },
@@ -182,7 +182,7 @@
             "label": "mapping(address => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+          "t_mapping(t_bytes32,t_struct(RoleData)973_storage)": {
             "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
             "numberOfBytes": "32"
           },
@@ -190,19 +190,19 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(AccessControlStorage)36_storage": {
+          "t_struct(AccessControlStorage)983_storage": {
             "label": "struct AccessControlUpgradeable.AccessControlStorage",
             "members": [
               {
                 "label": "_roles",
-                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(EIP712Storage)425_storage": {
+          "t_struct(EIP712Storage)2321_storage": {
             "label": "struct EIP712Upgradeable.EIP712Storage",
             "members": [
               {
@@ -232,7 +232,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)1258_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -250,7 +250,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)298_storage": {
+          "t_struct(PausableStorage)2194_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -262,7 +262,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)362_storage": {
+          "t_struct(ReentrancyGuardStorage)2258_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -274,7 +274,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(RoleData)26_storage": {
+          "t_struct(RoleData)973_storage": {
             "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
@@ -312,19 +312,19 @@
             "label": "uint256[50]",
             "numberOfBytes": "1600"
           },
-          "t_contract(IMembershipManager)13808": {
+          "t_contract(IMembershipManager)22674": {
             "label": "contract IMembershipManager",
             "numberOfBytes": "20"
           },
-          "t_contract(IOracleAdapter)14452": {
+          "t_contract(IOracleAdapter)24742": {
             "label": "contract IOracleAdapter",
             "numberOfBytes": "20"
           },
-          "t_contract(ISanctionsGuard)13874": {
+          "t_contract(ISanctionsGuard)22831": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
-          "t_enum(ResolutionType)13886": {
+          "t_enum(ResolutionType)22843": {
             "label": "enum IWagerRegistry.ResolutionType",
             "members": [
               "Either",
@@ -338,7 +338,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_enum(Status)13894": {
+          "t_enum(Status)22851": {
             "label": "enum IWagerRegistry.Status",
             "members": [
               "None",
@@ -351,7 +351,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_mapping(t_address,t_struct(UintSet)11394_storage)": {
+          "t_mapping(t_address,t_struct(UintSet)18699_storage)": {
             "label": "mapping(address => struct EnumerableSet.UintSet)",
             "numberOfBytes": "32"
           },
@@ -363,7 +363,7 @@
             "label": "mapping(bytes32 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_enum(ResolutionType)13886,t_contract(IOracleAdapter)14452)": {
+          "t_mapping(t_enum(ResolutionType)22843,t_contract(IOracleAdapter)24742)": {
             "label": "mapping(enum IWagerRegistry.ResolutionType => contract IOracleAdapter)",
             "numberOfBytes": "32"
           },
@@ -375,7 +375,7 @@
             "label": "mapping(uint256 => bytes32)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Wager)13929_storage)": {
+          "t_mapping(t_uint256,t_struct(Wager)22886_storage)": {
             "label": "mapping(uint256 => struct IWagerRegistry.Wager)",
             "numberOfBytes": "32"
           },
@@ -383,7 +383,7 @@
             "label": "mapping(uint256 => uint8)",
             "numberOfBytes": "32"
           },
-          "t_struct(Set)10702_storage": {
+          "t_struct(Set)18007_storage": {
             "label": "struct EnumerableSet.Set",
             "members": [
               {
@@ -401,19 +401,19 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(UintSet)11394_storage": {
+          "t_struct(UintSet)18699_storage": {
             "label": "struct EnumerableSet.UintSet",
             "members": [
               {
                 "label": "_inner",
-                "type": "t_struct(Set)10702_storage",
+                "type": "t_struct(Set)18007_storage",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Wager)13929_storage": {
+          "t_struct(Wager)22886_storage": {
             "label": "struct IWagerRegistry.Wager",
             "members": [
               {
@@ -466,13 +466,13 @@
               },
               {
                 "label": "resolutionType",
-                "type": "t_enum(ResolutionType)13886",
+                "type": "t_enum(ResolutionType)22843",
                 "offset": 16,
                 "slot": "5"
               },
               {
                 "label": "status",
-                "type": "t_enum(Status)13894",
+                "type": "t_enum(Status)22851",
                 "offset": 17,
                 "slot": "5"
               },
@@ -583,7 +583,7 @@
             {
               "contract": "AccessControlUpgradeable",
               "label": "_roles",
-              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
               "offset": 0,
               "slot": "0"
@@ -2461,6 +2461,610 @@
           }
         },
         "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "c4ee497f899669580d6795ed664ec67c15ce040fec7ed29e3d85e11c9a109987": {
+      "address": "0x9FfE701be18Ff033706f2df19cd8730F5CB884B2",
+      "txHash": "0x8f2990cce9da763986c63338f7550ac68653cec9a1bd52a0a72d4fce0a2e1727",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSManaged",
+            "src": "contracts/upgradeable/UUPSManaged.sol:46"
+          },
+          {
+            "label": "membershipManager",
+            "offset": 0,
+            "slot": "50",
+            "type": "t_contract(IMembershipManager)17940",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:59"
+          },
+          {
+            "label": "polymarketAdapter",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_contract(IOracleAdapter)19263",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:60"
+          },
+          {
+            "label": "sanctionsGuard",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_contract(ISanctionsGuard)18042",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:64"
+          },
+          {
+            "label": "oracleAdapters",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_mapping(t_enum(ResolutionType)18512,t_contract(IOracleAdapter)19263)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:68"
+          },
+          {
+            "label": "_allowedTokens",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:70"
+          },
+          {
+            "label": "_wagers",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_mapping(t_uint256,t_struct(Wager)18555_storage)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:71"
+          },
+          {
+            "label": "_frozen",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:72"
+          },
+          {
+            "label": "wagerTermsVersionHash",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_mapping(t_uint256,t_bytes32)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:77"
+          },
+          {
+            "label": "_nextWagerId",
+            "offset": 0,
+            "slot": "58",
+            "type": "t_uint256",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:80"
+          },
+          {
+            "label": "_drawConsent",
+            "offset": 0,
+            "slot": "59",
+            "type": "t_mapping(t_uint256,t_uint8)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:88"
+          },
+          {
+            "label": "_userWagerIds",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_mapping(t_address,t_struct(UintSet)14242_storage)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:96"
+          },
+          {
+            "label": "claimAuthority",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:101"
+          },
+          {
+            "label": "openWagerIdByClaim",
+            "offset": 0,
+            "slot": "62",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:104"
+          },
+          {
+            "label": "_feeNettingEnabled",
+            "offset": 0,
+            "slot": "63",
+            "type": "t_bool",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:112"
+          },
+          {
+            "label": "_gasFeeRecipient",
+            "offset": 1,
+            "slot": "63",
+            "type": "t_address",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:115"
+          },
+          {
+            "label": "_maxGasFee",
+            "offset": 0,
+            "slot": "64",
+            "type": "t_uint256",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:117"
+          },
+          {
+            "label": "intentExtension",
+            "offset": 0,
+            "slot": "65",
+            "type": "t_address",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:122"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "66",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "WagerRegistryCore",
+            "src": "contracts/wagers/WagerRegistryCore.sol:130"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)36_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(EIP712Storage)425_storage": {
+            "label": "struct EIP712Upgradeable.EIP712Storage",
+            "members": [
+              {
+                "label": "_hashedName",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_hashedVersion",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_version",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(InitializableStorage)147_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)298_storage": {
+            "label": "struct PausableUpgradeable.PausableStorage",
+            "members": [
+              {
+                "label": "_paused",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)362_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)26_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_contract(IMembershipManager)17940": {
+            "label": "contract IMembershipManager",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IOracleAdapter)19263": {
+            "label": "contract IOracleAdapter",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISanctionsGuard)18042": {
+            "label": "contract ISanctionsGuard",
+            "numberOfBytes": "20"
+          },
+          "t_enum(ResolutionType)18512": {
+            "label": "enum IWagerRegistryTypes.ResolutionType",
+            "members": [
+              "Either",
+              "Creator",
+              "Opponent",
+              "ThirdParty",
+              "Polymarket",
+              "ChainlinkDataFeed",
+              "ChainlinkFunctions",
+              "UMA"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(Status)18520": {
+            "label": "enum IWagerRegistryTypes.Status",
+            "members": [
+              "None",
+              "Open",
+              "Active",
+              "Resolved",
+              "Cancelled",
+              "Refunded",
+              "Draw"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(UintSet)14242_storage)": {
+            "label": "mapping(address => struct EnumerableSet.UintSet)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_enum(ResolutionType)18512,t_contract(IOracleAdapter)19263)": {
+            "label": "mapping(enum IWagerRegistryTypes.ResolutionType => contract IOracleAdapter)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_bytes32)": {
+            "label": "mapping(uint256 => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Wager)18555_storage)": {
+            "label": "mapping(uint256 => struct IWagerRegistryTypes.Wager)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint8)": {
+            "label": "mapping(uint256 => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Set)13550_storage": {
+            "label": "struct EnumerableSet.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_positions",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(UintSet)14242_storage": {
+            "label": "struct EnumerableSet.UintSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)13550_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Wager)18555_storage": {
+            "label": "struct IWagerRegistryTypes.Wager",
+            "members": [
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "opponent",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "arbitrator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "creatorStake",
+                "type": "t_uint128",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "opponentStake",
+                "type": "t_uint128",
+                "offset": 16,
+                "slot": "4"
+              },
+              {
+                "label": "acceptDeadline",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "resolveDeadline",
+                "type": "t_uint64",
+                "offset": 8,
+                "slot": "5"
+              },
+              {
+                "label": "resolutionType",
+                "type": "t_enum(ResolutionType)18512",
+                "offset": 16,
+                "slot": "5"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(Status)18520",
+                "offset": 17,
+                "slot": "5"
+              },
+              {
+                "label": "paid",
+                "type": "t_bool",
+                "offset": 18,
+                "slot": "5"
+              },
+              {
+                "label": "creatorIsYes",
+                "type": "t_bool",
+                "offset": 19,
+                "slot": "5"
+              },
+              {
+                "label": "winner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "metadataHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "polymarketConditionId",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "metadataUri",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "9"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_uint128": {
+            "label": "uint128",
+            "numberOfBytes": "16"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.EIP712": [
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedName",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:38",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedVersion",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:40",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_name",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:42",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_version",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:43",
+              "offset": 0,
+              "slot": "3"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Pausable": [
+            {
+              "contract": "PausableUpgradeable",
+              "label": "_paused",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
           "erc7201:openzeppelin.storage.ReentrancyGuard": [
             {
               "contract": "ReentrancyGuardUpgradeable",

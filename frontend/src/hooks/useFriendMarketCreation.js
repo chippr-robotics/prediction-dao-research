@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
+import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 import { getContractAddress, getContractAddressForChain } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
@@ -110,6 +111,32 @@ export const clearPendingTransaction = () => {
  */
 export function useFriendMarketCreation({ onMarketCreated } = {}) {
   const { signer } = useWeb3()
+
+  // Gasless createWager (spec 035/036): relayed where the relayer serves the chain and the stake token
+  // supports EIP-3009 (Polygon USDC); transparent self-submit otherwise (Mordor USC → auto self-submit).
+  // run() takes one context object carrying the exact values the self-submit flow already computed. The
+  // payment leg authorizes the creator's stake via EIP-3009, so the gasless path skips the approve the
+  // self-submit closure (ctx.performSelfSubmit) performs. Params mirror the CreateWagerIntent struct
+  // (creator is auto-filled from the signer).
+  const createWagerTx = useGaslessWrite('createWager', {
+    params: (ctx) => ({
+      opponent: ctx.opponent,
+      arbitrator: ctx.arbitrator,
+      token: ctx.stakeTokenAddress,
+      creatorStake: ctx.creatorStakeWei,
+      opponentStake: ctx.opponentStakeWei,
+      acceptDeadline: ctx.acceptDeadline,
+      resolveDeadline: ctx.resolveDeadline,
+      resolutionType: ctx.resolutionType,
+      conditionId: ctx.polymarketConditionId,
+      creatorIsYes: ctx.creatorIsYes,
+      metadataHash: ctx.metadataHash,
+      metadataUri: ctx.metadataReference,
+      termsVersionHash: ctx.termsVersionHash,
+    }),
+    payment: (ctx) => ({ value: ctx.creatorStakeWei }),
+    selfSubmit: (ctx) => ctx.performSelfSubmit(),
+  })
 
   const createFriendMarket = useCallback(async (data, modalSigner) => {
     const activeSigner = modalSigner || signer
@@ -328,44 +355,6 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       const metadataHash = ethers.keccak256(ethers.toUtf8Bytes(metadataReference))
 
-      // Approve stake token if needed. We approve the full uint256 max rather
-      // than the exact stake so (a) subsequent wagers don't need a fresh
-      // approval each time (the exact-stake approval left allowance at 0 after
-      // every wager) and (b) a stale read on a load-balanced RPC node can't
-      // under-approve. After approving we poll the allowance until the freshly
-      // mined approval is actually visible to the RPC — otherwise createWager's
-      // gas estimation can land on a node that still sees allowance 0, and the
-      // transferFrom reverts ("transfer amount exceeds allowance", surfaced as
-      // an opaque "missing revert data" by some wallet RPCs).
-      let currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
-      if (currentAllowance < creatorStakeWei) {
-        onProgress({ step: 'approve', message: 'Approving token spend...' })
-        const approveTx = await stakeToken.approve(wagerRegistryAddress, ethers.MaxUint256)
-        onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: approveTx.hash })
-        await approveTx.wait()
-
-        // Wait until the approval is observable before continuing. Public RPCs
-        // are often load-balanced, so the node answering the next read/estimate
-        // may briefly lag the node that mined the approval.
-        for (let attempt = 0; attempt < 6; attempt++) {
-          currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
-          if (currentAllowance >= creatorStakeWei) break
-          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
-        }
-        if (currentAllowance < creatorStakeWei) {
-          throw new Error(
-            'Your token approval has not been confirmed yet. Please wait a few ' +
-            'seconds for it to finalize, then try creating the wager again.'
-          )
-        }
-      }
-
-      // Auto-cleanup expired Open wagers that still count toward the
-      // concurrent limit. Without this, acceptDeadline-expired wagers
-      // inflate activeCount and block new creation even when the user
-      // has fewer truly-active wagers than their tier allows.
-      await expireStaleWagers(registry, userAddress, onProgress)
-
       // Spec 007 (FR-056/FR-058): bind the in-force T&C version hash on-chain when the
       // registry supports it. legalDocs hashes are bare 64-hex → normalize to bytes32.
       // Falls back to plain createWager on older registries lacking the overload.
@@ -382,65 +371,138 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         ...(useTerms ? [termsBytes32] : []),
       ]
 
-      // Simulate to catch reverts pre-wallet-prompt
-      try {
-        onProgress({ step: 'create', message: 'Validating transaction...' })
-        await registry[createMethod].staticCall(...createArgs)
-      } catch (simError) {
-        const reason = simError.reason || simError.shortMessage || simError.message || ''
-        throw new Error(translateRevert(reason))
-      }
+      // Self-submit leg: the existing approve → cleanup → simulate → estimate → send flow verbatim.
+      // The gasless path skips ALL of this — EIP-3009 pulls the stake (no approve) and the relayer
+      // estimates/pays gas. Captures the mined receipt so the shared code below can read WagerCreated.
+      let minedReceipt = null
+      const performSelfSubmit = async () => {
+        // Approve stake token if needed. We approve the full uint256 max rather
+        // than the exact stake so (a) subsequent wagers don't need a fresh
+        // approval each time (the exact-stake approval left allowance at 0 after
+        // every wager) and (b) a stale read on a load-balanced RPC node can't
+        // under-approve. After approving we poll the allowance until the freshly
+        // mined approval is actually visible to the RPC — otherwise createWager's
+        // gas estimation can land on a node that still sees allowance 0, and the
+        // transferFrom reverts ("transfer amount exceeds allowance", surfaced as
+        // an opaque "missing revert data" by some wallet RPCs).
+        let currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+        if (currentAllowance < creatorStakeWei) {
+          onProgress({ step: 'approve', message: 'Approving token spend...' })
+          const approveTx = await stakeToken.approve(wagerRegistryAddress, ethers.MaxUint256)
+          onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: approveTx.hash })
+          await approveTx.wait()
 
-      onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
-      const feeOverrides = await getFeeOverrides(activeSigner.provider)
-
-      // Estimate gas explicitly with a short retry so a transient stale read on
-      // a load-balanced RPC doesn't surface a raw "missing revert data" error.
-      // The staticCall above already validated the args, so a failure here is
-      // almost always RPC lag rather than a genuine revert; fall back to a fixed
-      // limit after exhausting retries.
-      let gasLimit
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const estimate = await registry[createMethod].estimateGas(...createArgs)
-          gasLimit = (estimate * 120n) / 100n // +20% headroom
-          break
-        } catch {
-          if (attempt === 2) {
-            gasLimit = 800000n // generous fallback; the staticCall already passed
-            break
+          // Wait until the approval is observable before continuing. Public RPCs
+          // are often load-balanced, so the node answering the next read/estimate
+          // may briefly lag the node that mined the approval.
+          for (let attempt = 0; attempt < 6; attempt++) {
+            currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+            if (currentAllowance >= creatorStakeWei) break
+            await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+          if (currentAllowance < creatorStakeWei) {
+            throw new Error(
+              'Your token approval has not been confirmed yet. Please wait a few ' +
+              'seconds for it to finalize, then try creating the wager again.'
+            )
+          }
         }
+
+        // Auto-cleanup expired Open wagers that still count toward the
+        // concurrent limit. Without this, acceptDeadline-expired wagers
+        // inflate activeCount and block new creation even when the user
+        // has fewer truly-active wagers than their tier allows.
+        await expireStaleWagers(registry, userAddress, onProgress)
+
+        // Simulate to catch reverts pre-wallet-prompt
+        try {
+          onProgress({ step: 'create', message: 'Validating transaction...' })
+          await registry[createMethod].staticCall(...createArgs)
+        } catch (simError) {
+          const reason = simError.reason || simError.shortMessage || simError.message || ''
+          throw new Error(translateRevert(reason))
+        }
+
+        onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
+        const feeOverrides = await getFeeOverrides(activeSigner.provider)
+
+        // Estimate gas explicitly with a short retry so a transient stale read on
+        // a load-balanced RPC doesn't surface a raw "missing revert data" error.
+        // The staticCall above already validated the args, so a failure here is
+        // almost always RPC lag rather than a genuine revert; fall back to a fixed
+        // limit after exhausting retries.
+        let gasLimit
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const estimate = await registry[createMethod].estimateGas(...createArgs)
+            gasLimit = (estimate * 120n) / 100n // +20% headroom
+            break
+          } catch {
+            if (attempt === 2) {
+              gasLimit = 800000n // generous fallback; the staticCall already passed
+              break
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+          }
+        }
+
+        const tx = await registry[createMethod](
+          ...createArgs,
+          { ...feeOverrides, gasLimit }
+        )
+        onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
+        savePendingTransaction({ step: 'create', txHash: tx.hash, data: data.data })
+
+        minedReceipt = await tx.wait()
+        return minedReceipt
       }
 
-      const tx = await registry[createMethod](
-        ...createArgs,
-        { ...feeOverrides, gasLimit }
-      )
-      onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
-      savePendingTransaction({ step: 'create', txHash: tx.hash, data: data.data })
+      // Gasless-or-self-submit send (spec 035/036). Params mirror the CreateWagerIntent struct; the
+      // creator is auto-filled from the signer. The relayer only serves EIP-3009 chains — everywhere
+      // else this transparently self-submits with identical on-chain effect.
+      const runResult = await createWagerTx.run({
+        opponent, arbitrator, stakeTokenAddress, creatorStakeWei, opponentStakeWei,
+        acceptDeadline, resolveDeadline, resolutionType, polymarketConditionId,
+        creatorIsYes, metadataHash, metadataReference,
+        termsVersionHash: termsBytes32 || ethers.ZeroHash,
+        performSelfSubmit,
+      })
+      if (runResult?.error) throw runResult.error
 
-      const receipt = await tx.wait()
-      if (!receipt || receipt.status === 0) {
+      // Only the self-submit leg guarantees a mined receipt in hand; treat a missing/failed one as a
+      // revert exactly as before. A relayed intent may still be pending (no receipt yet) — not a failure.
+      const selfSubmitted = runResult?.via === 'self-submit'
+      if (selfSubmitted && (!minedReceipt || minedReceipt.status === 0)) {
         clearPendingTransaction()
         throw new Error('Transaction reverted on-chain. The wager was not created.')
       }
       clearPendingTransaction()
 
-      // Parse WagerCreated event
-      let wagerId = null
-      for (const log of receipt.logs) {
+      // Resolve the receipt to read WagerCreated: self-submit captured it directly; the relayed path
+      // exposes only a txHash, so fetch it when available (still-queued intents have none yet).
+      let receipt = minedReceipt
+      if (!receipt && runResult?.txHash) {
         try {
-          const parsed = registry.interface.parseLog(log)
-          if (parsed?.name === 'WagerCreated') {
-            wagerId = parsed.args.wagerId.toString()
-            break
-          }
-        } catch { /* localStorage may be unavailable; ignore */ }
+          receipt = await activeSigner.provider.getTransactionReceipt(runResult.txHash)
+        } catch { /* relayer still landing it; wager id resolves once mined */ }
       }
 
-      onProgress({ step: 'complete', message: 'Wager created!', txHash: receipt.hash })
+      // Parse WagerCreated event
+      let wagerId = null
+      if (receipt) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = registry.interface.parseLog(log)
+            if (parsed?.name === 'WagerCreated') {
+              wagerId = parsed.args.wagerId.toString()
+              break
+            }
+          } catch { /* not a WagerRegistry log; ignore */ }
+        }
+      }
+
+      const txHash = receipt?.hash || runResult?.txHash || null
+      onProgress({ step: 'complete', message: 'Wager created!', txHash })
 
       const newMarket = {
         id: wagerId || `wager-${Date.now()}`,
@@ -469,12 +531,12 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         tradingPeriod: Math.max(1, Math.ceil(tradingPeriodSeconds / 86400)).toString(),
         createdAt: new Date().toISOString(),
         status: 'pending',
-        txHash: receipt.hash,
+        txHash,
       }
 
       if (onMarketCreated) onMarketCreated(newMarket)
 
-      return { id: wagerId, txHash: receipt.hash, status: 'pending', ipfsCid, metadataHash }
+      return { id: wagerId, txHash, status: 'pending', ipfsCid, metadataHash }
     } catch (error) {
       console.error('Error creating wager:', error)
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
@@ -485,7 +547,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       throw error
     }
-  }, [signer, onMarketCreated])
+  }, [signer, onMarketCreated, createWagerTx])
 
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }

@@ -6,14 +6,44 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 vi.mock('../utils/blockchainService', () => ({
   purchaseRoleWithStablecoin: vi.fn(),
   checkApprovalNeeded: vi.fn(),
+  resolveMembershipIntentParams: vi.fn(),
 }))
 vi.mock('../utils/keyRegistryService', () => ({
   ensureKeyRegistered: vi.fn(),
 }))
 
+// Specs 035 + 036: the hook now routes the pay through useGaslessWrite. With no relayer configured
+// (test default) the real seam self-submits anyway, but useGaslessWrite calls useWeb3() which throws
+// outside a WalletProvider — so mock it to run the caller's selfSubmit directly. selfSubmit is the
+// existing purchaseFn (approve+pay) call, so the step-machine assertions are unchanged. The
+// self-submit leg returns errors in `result.error` (never throws), matching useIntentAction.
+vi.mock('../lib/relay/useGaslessWrite', () => ({
+  useGaslessWrite: (_action, cfg) => ({
+    run: async (...args) => {
+      try {
+        const receipt = await cfg.selfSubmit(...args)
+        return { via: 'self-submit', receipt, txHash: receipt?.hash ?? receipt?.transactionHash }
+      } catch (error) {
+        return { via: 'self-submit', error }
+      }
+    },
+    status: 'idle', intent: null, result: null, error: null,
+    invalidate: vi.fn(), selfSubmitNow: vi.fn(), reset: vi.fn(),
+  }),
+}))
+
 import { usePurchaseFlow } from '../hooks/usePurchaseFlow'
-import { purchaseRoleWithStablecoin, checkApprovalNeeded } from '../utils/blockchainService'
+import { purchaseRoleWithStablecoin, checkApprovalNeeded, resolveMembershipIntentParams } from '../utils/blockchainService'
 import { ensureKeyRegistered } from '../utils/keyRegistryService'
+
+// A resolved intent-params object; its exact contents don't matter to the step machine (the mocked
+// gasless seam forwards straight to selfSubmit), only that it resolves so the purchase segment proceeds.
+const INTENT_PARAMS = {
+  roleHash: '0x' + '11'.repeat(32),
+  validTier: 1,
+  price: 2000000n,
+  acceptedTermsHash: '0x' + '00'.repeat(32),
+}
 
 const baseParams = (overrides = {}) => ({
   signer: { getAddress: async () => '0xabc' },
@@ -31,6 +61,7 @@ const baseParams = (overrides = {}) => ({
 describe('usePurchaseFlow — step list construction (FR-009)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolveMembershipIntentParams.mockResolvedValue(INTENT_PARAMS)
     purchaseRoleWithStablecoin.mockResolvedValue({ hash: '0xpay' })
     ensureKeyRegistered.mockResolvedValue(true)
   })
@@ -75,6 +106,7 @@ describe('usePurchaseFlow — step list construction (FR-009)', () => {
 describe('usePurchaseFlow — happy path & progress (US2)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolveMembershipIntentParams.mockResolvedValue(INTENT_PARAMS)
     checkApprovalNeeded.mockResolvedValue(false)
     ensureKeyRegistered.mockResolvedValue(true)
   })
@@ -112,6 +144,7 @@ describe('usePurchaseFlow — happy path & progress (US2)', () => {
 describe('usePurchaseFlow — failure attribution & recovery (US3)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolveMembershipIntentParams.mockResolvedValue(INTENT_PARAMS)
     checkApprovalNeeded.mockResolvedValue(false)
   })
 

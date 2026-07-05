@@ -4,6 +4,7 @@
  * (ethers v6) against the version-pinned addresses from deployments/.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
+import crypto from 'node:crypto'
 import request from 'supertest'
 import { ethers } from 'ethers'
 import { createApp } from '../src/server.js'
@@ -40,6 +41,15 @@ function build({ config = testConfig(), providers, engine = mockEngine(), killSw
 const post = (app, body) =>
   request(app).post('/v1/intents').set('X-Origin-Auth', ORIGIN_SECRET).send(body)
 
+// The engine authenticates each webhook with `X-Signature: base64(HMAC-SHA256(rawBody, secret))`
+// (secret === WEBHOOK_SECRET). supertest serializes the body with JSON.stringify, which is the exact
+// byte string the gateway HMACs over.
+const postWebhook = (app, body, { secret = WEBHOOK_SECRET, sign = true } = {}) => {
+  const req = request(app).post('/v1/engine/webhook')
+  if (sign) req.set('X-Signature', crypto.createHmac('sha256', secret).update(JSON.stringify(body)).digest('base64'))
+  return req.send(body)
+}
+
 describe('config / startup consistency check (FR-025)', () => {
   it('pins targets from deployments and fails loudly for a chain without a record', () => {
     const config = testConfig()
@@ -69,6 +79,22 @@ describe('origin lock (FR-029, SC-016)', () => {
     const { app } = build()
     const res = await request(app).get('/healthz')
     expect(res.status).toBe(200)
+  })
+})
+
+describe('CORS (cross-origin SPA -> relay subdomain)', () => {
+  it('answers preflight and echoes an allow-listed Origin; ignores others', async () => {
+    const { app } = build({ config: testConfig({ ALLOWED_ORIGINS: 'https://fairwins.app' }) })
+    const pre = await request(app).options('/v1/intents').set('Origin', 'https://fairwins.app')
+    expect(pre.status).toBe(204)
+    expect(pre.headers['access-control-allow-origin']).toBe('https://fairwins.app')
+    expect(pre.headers['access-control-allow-methods']).toContain('POST')
+
+    const status = await request(app).get('/status').set('Origin', 'https://fairwins.app')
+    expect(status.headers['access-control-allow-origin']).toBe('https://fairwins.app')
+
+    const evil = await request(app).get('/status').set('Origin', 'https://evil.example')
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined()
   })
 })
 
@@ -209,11 +235,7 @@ describe('dedup idempotency (FR-008, SC-006)', () => {
     expect(ctx.engine.submissions).toHaveLength(1)
 
     // Engine reports mined -> intent confirmed; replay now returns the original result (200).
-    await request(ctx.app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', WEBHOOK_SECRET)
-      .send({ id: 'engine-tx-1', hash: txHash, status: 'mined' })
-      .expect(200)
+    await postWebhook(ctx.app, { id: 'engine-tx-1', hash: txHash, status: 'mined' }).expect(200)
 
     const replay = await post(ctx.app, intent)
     expect(replay.status).toBe(200)
@@ -226,11 +248,7 @@ describe('dedup idempotency (FR-008, SC-006)', () => {
     const intent = await signedIntent(ctx.config)
     const first = await post(ctx.app, intent)
     expect(first.status).toBe(202)
-    await request(ctx.app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', WEBHOOK_SECRET)
-      .send({ id: 'engine-tx-1', status: 'failed', reason: 'out of gas' })
-      .expect(200)
+    await postWebhook(ctx.app, { id: 'engine-tx-1', status: 'failed', reason: 'out of gas' }).expect(200)
     const retry = await post(ctx.app, intent)
     expect(retry.status).toBe(202)
     expect(ctx.engine.submissions).toHaveLength(2)
@@ -317,14 +335,10 @@ describe('kill switch (FR-015) + engine failure', () => {
 })
 
 describe('webhook + status lifecycle (FR-006: never confirmed before inclusion)', () => {
-  it('rejects a missing/wrong webhook secret (timing-safe shared secret)', async () => {
+  it('rejects a missing/wrong webhook signature (timing-safe HMAC)', async () => {
     const { app } = build()
-    await request(app).post('/v1/engine/webhook').send({ id: 'x', status: 'mined' }).expect(403)
-    await request(app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', 'wrong')
-      .send({ id: 'x', status: 'mined' })
-      .expect(403)
+    await postWebhook(app, { id: 'x', status: 'mined' }, { sign: false }).expect(403)
+    await postWebhook(app, { id: 'x', status: 'mined' }, { secret: 'wrong' }).expect(403)
   })
 
   it('maps engine statuses honestly: pending -> submitted, mined -> confirmed, failed -> failed', async () => {
@@ -334,50 +348,76 @@ describe('webhook + status lifecycle (FR-006: never confirmed before inclusion)'
     const { intentId } = accepted.body
 
     // Engine says pending — status must NOT be confirmed.
-    await request(ctx.app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', WEBHOOK_SECRET)
-      .send({ id: 'engine-tx-1', hash: accepted.body.txHash, status: 'pending' })
-      .expect(200)
+    await postWebhook(ctx.app, { id: 'engine-tx-1', hash: accepted.body.txHash, status: 'pending' }).expect(200)
     let status = await request(ctx.app).get(`/v1/intents/${intentId}`).set('X-Origin-Auth', ORIGIN_SECRET)
     expect(status.body.status).toBe('submitted')
 
     // Only mined/confirmed flips it to confirmed.
-    await request(ctx.app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', WEBHOOK_SECRET)
-      .send({ id: 'engine-tx-1', hash: accepted.body.txHash, status: 'mined' })
-      .expect(200)
+    await postWebhook(ctx.app, { id: 'engine-tx-1', hash: accepted.body.txHash, status: 'mined' }).expect(200)
     status = await request(ctx.app).get(`/v1/intents/${intentId}`).set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(status.body).toMatchObject({ intentId, status: 'confirmed', txHash: accepted.body.txHash })
+  })
+
+  it('accepts the REAL OZ engine nested payload (tx fields under payload; outer id ignored)', async () => {
+    const ctx = build()
+    const intent = await signedIntent(ctx.config)
+    const accepted = await post(ctx.app, intent)
+    const { intentId } = accepted.body
+
+    // The engine wraps updates as { id: <notificationId>, event, payload: {...}, timestamp }; the
+    // transaction id/hash/status live INSIDE payload (payload_type "transaction"). The outer id is the
+    // notification id and must NOT be used to look up the intent.
+    await postWebhook(ctx.app, {
+      id: 'notif-xyz',
+      event: 'transaction_update',
+      timestamp: '2026-01-01T00:00:00Z',
+      payload: { payload_type: 'transaction', id: 'engine-tx-1', hash: accepted.body.txHash, status: 'mined' },
+    }).expect(200)
+    const status = await request(ctx.app).get(`/v1/intents/${intentId}`).set('X-Origin-Auth', ORIGIN_SECRET)
     expect(status.body).toMatchObject({ intentId, status: 'confirmed', txHash: accepted.body.txHash })
   })
 
   it('unknown engine tx id -> 404; unknown intent id -> 404', async () => {
     const { app } = build()
-    await request(app)
-      .post('/v1/engine/webhook')
-      .set('X-Webhook-Secret', WEBHOOK_SECRET)
-      .send({ id: 'nope', status: 'mined' })
-      .expect(404)
+    await postWebhook(app, { id: 'nope', status: 'mined' }).expect(404)
     const res = await request(app).get('/v1/intents/does-not-exist').set('X-Origin-Auth', ORIGIN_SECRET)
     expect(res.status).toBe(404)
   })
 })
 
-describe('GET /healthz shape', () => {
-  it('reports per-chain rpc state, runway, and kill switch', async () => {
+describe('GET /healthz + /status (cached, gated telemetry)', () => {
+  it('discloses gas runway only to edge-authenticated callers; public view is rpc-only', async () => {
     const config = testConfig({ GAS_WALLET_137: '0x52502d049571C7893447b86c4d8B38e6184bF6e1' })
     const providers = mockProviders(config)
     providers[63] = { ...providers[63], getBlockNumber: async () => { throw new Error('down') } }
     const { app } = build({ config, providers })
-    const res = await request(app).get('/healthz')
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('ok')
-    expect(res.body.killSwitch).toBe(false)
-    expect(res.body.chains['137'].rpc).toBe('up')
-    expect(res.body.chains['137'].gasWalletRunwayHrs).toBeGreaterThan(0)
-    expect(res.body.chains['63'].rpc).toBe('down')
-    expect(res.body.chains['80002']).toEqual({ rpc: 'up', gasWalletRunwayHrs: null })
+
+    // Public caller (no X-Origin-Auth) — rpc up/down only, NO gas-runway telemetry leaked.
+    const pub = await request(app).get('/status')
+    expect(pub.status).toBe(200)
+    expect(pub.body.status).toBe('ok')
+    expect(pub.body.killSwitch).toBe(false)
+    expect(pub.body.chains['137']).toEqual({ rpc: 'up' })
+    expect(pub.body.chains['137'].gasWalletRunwayHrs).toBeUndefined()
+    expect(pub.body.chains['63']).toEqual({ rpc: 'down' })
+    expect(pub.body.chains['80002']).toEqual({ rpc: 'up' })
+
+    // Edge/operator caller (valid X-Origin-Auth) — runway disclosed.
+    const auth = await request(app).get('/status').set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(auth.body.chains['137'].gasWalletRunwayHrs).toBeGreaterThan(0)
+    expect(auth.body.chains['80002']).toEqual({ rpc: 'up', gasWalletRunwayHrs: null })
+  })
+
+  it('caches the RPC fan-out so a request loop cannot amplify upstream load', async () => {
+    const config = testConfig()
+    let blockCalls = 0
+    const providers = mockProviders(config)
+    providers[63] = { ...providers[63], getBlockNumber: async () => { blockCalls += 1; return 1 } }
+    const { app } = build({ config, providers })
+    await request(app).get('/status')
+    await request(app).get('/status')
+    await request(app).get('/status')
+    expect(blockCalls).toBe(1) // three hits, one fan-out within the cache window
   })
 })
 

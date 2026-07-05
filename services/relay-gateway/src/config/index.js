@@ -184,6 +184,13 @@ export function loadConfig(env = process.env, opts = {}) {
     port: int(env, 'PORT', 8788),
     originAuthSecret: opt(env, 'ORIGIN_AUTH_SECRET', null),
     webhookSecret: opt(env, 'WEBHOOK_SHARED_SECRET', null),
+    // Browser origins allowed to call the gateway cross-origin (CORS). The SPA lives on a different
+    // host than the relay subdomain (fairwins.app -> relay.fairwins.app), so it needs an explicit
+    // allow-list. Comma-separated; unset => no CORS headers (same-origin / server-to-server only).
+    allowedOrigins: opt(env, 'ALLOWED_ORIGINS', '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     engine: {
       url: opt(env, 'ENGINE_URL', 'http://localhost:8080'),
       apiKey: opt(env, 'ENGINE_API_KEY', null),
@@ -200,5 +207,8 @@ export function loadConfig(env = process.env, opts = {}) {
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),
     defaultGasLimit: bigInt(env, 'DEFAULT_GAS_LIMIT', 300_000n),
     rpcTimeoutMs: int(env, 'RPC_TIMEOUT_MS', 4000),
+    // /healthz + /status cache window: caps upstream RPC fan-out from the origin-lock-exempt health
+    // route so it can't be looped to amplify load onto the operator's public RPCs.
+    healthCacheMs: int(env, 'HEALTH_CACHE_MS', 5000),
   }
 }
