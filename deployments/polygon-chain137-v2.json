@@ -9,7 +9,7 @@
   "contracts": {
     "polymarketAdapter": "0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4",
     "membershipManager": "0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a",
-    "membershipManagerImpl": "0x8018D8C85C1e22C785b384854e328b43158c0eCD",
+    "membershipManagerImpl": "0x7177470fE3c5D89CEf965A596540E57cE290C939",
     "membershipVoucher": "0xCB28DC438564672067a6f84131B5130e6Cf7ECC6",
     "voucherBatchMinter": "0x4b50d24ca28CbDC029714e5830f7D16a0ebEDb0e",
     "wagerRegistry": "0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89",
@@ -24,10 +24,14 @@
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
     "chainlinkFunctionsAdapter": "0x148C2E347a601AC1a680b17321529b0Ffc31AeFc",
     "umaAdapter": "0x8224433d099Af6cd30540A78421aBFd6e044E949",
-    "wagerRegistryIntents": "0x9e4338E12A30a98eaa0dE58b2c4d7B562f5eB438",
+    "wagerRegistryIntents": "0x8878C8d6822De61cA8886Ae1D8BDA60b61ca1d81",
     "wagerPoolFactory": "0x420aEC3c76859eB74ab21c769c16AcdAB221f723",
     "wagerPoolFactoryImpl": "0x2ad0F9Fe788F35F8edbaCA35346Da22792c5d18e",
-    "poolImpl": "0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277"
+    "poolImpl": "0xB153e4456FaD1A7E96e35e14094Cf6964348BC40",
+    "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+    "accountFactory": "0xd519C25e9dEd0DAC586B764574100479CB318734",
+    "accountImpl": "0xfC5086A397e4FbAAF8f73892807415Da8d255E61",
+    "p256Verifier": null
   },
   "mocks": null,
   "constructorArgs": {
@@ -71,5 +75,6 @@
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
   "gaslessIntentsUpgradedAt": "2026-07-05T20:10:24.755Z",
-  "wagerPoolsDeployedAt": "2026-07-05T21:15:07.971Z"
+  "wagerPoolsDeployedAt": "2026-07-05T21:15:07.971Z",
+  "erc1271IntentsUpgradedAt": "2026-07-05T23:24:19.415Z"
 }
