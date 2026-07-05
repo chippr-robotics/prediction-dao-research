@@ -66,8 +66,18 @@ export function useOpenChallengeCreate() {
       onProgress({ step: 'upload', message: 'Encrypting and uploading terms…' })
       const termsDoc = getCurrentDocument('terms')
       const termsVersion = termsDoc ? { id: termsDoc.id, hash: termsDoc.hash } : null
+      // Oracle-settled challenges (spec 041) seal the market metadata alongside the
+      // description so a code-holder can read the bet (question, outcome labels, side)
+      // even when live market data is unreachable. The on-chain fields
+      // (resolutionType / polymarketConditionId / creatorIsYes) stay authoritative —
+      // the claimant view cross-checks this block against them. Never on-chain plaintext:
+      // a public market reference would break code-gated indistinguishability (spec 024).
       const envelope = encryptEnvelopeCode(
-        { description: form.description || 'Open challenge', createdAt: undefined },
+        {
+          description: form.description || 'Open challenge',
+          createdAt: new Date().toISOString(),
+          ...(form.oracleMeta ? { oracle: form.oracleMeta } : {}),
+        },
         symKey,
         termsVersion
       )
@@ -143,6 +153,12 @@ export function translateOpenCreateRevert(reason) {
   if (r.includes('BadDeadlines')) return 'The accept/resolve deadlines are outside the allowed window.'
   if (r.includes('NotAllowedToken')) return 'That stake token is not allowed.'
   if (r.includes('ZeroStake')) return 'Enter a stake greater than zero.'
+  // Oracle-linked open challenges (spec 041).
+  if (r.includes('ConditionAlreadyResolved')) return 'That market has already resolved — pick a market that is still live.'
+  if (r.includes('PolymarketRequired')) return 'Pick a Polymarket market to link this challenge to.'
+  if (r.includes('PolymarketDisallowed')) return 'A market can only be linked when the challenge is oracle-settled.'
+  if (r.includes('AdapterNotSet') || r.includes('OracleAdapterNotSet')) return 'Polymarket settlement isn’t available on this network yet.'
+  if (r.includes('OracleConditionRequired')) return 'Pick an oracle condition to link this challenge to.'
   return reason || 'Could not create the open challenge. Please try again.'
 }
 

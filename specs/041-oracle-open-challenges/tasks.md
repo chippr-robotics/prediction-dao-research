@@ -27,7 +27,7 @@ Web app: product code under `frontend/src/`, contract JS tests under `test/`
 
 **Purpose**: Anchor the zero-regression guarantee (SC-007) before any edits.
 
-- [ ] T001 Record a green baseline: run `npm test` (contract suite) and
+- [X] T001 Record a green baseline: run `npm test` (contract suite) and
       `npm run test:frontend`; note current pass counts in the PR description or
       commit message so SC-007 regressions are attributable. No file changes.
 
@@ -40,7 +40,7 @@ Web app: product code under `frontend/src/`, contract JS tests under `test/`
 **⚠️ CRITICAL**: T002 is the constitutional risk gate (oracle-resolution path); the
 shared helpers/hooks (T003–T009) block both US1 and US2.
 
-- [ ] T002 [P] Contract lifecycle proof (D1, FR-017, SC-006, SC-008): create
+- [X] T002 [P] Contract lifecycle proof (D1, FR-017, SC-006, SC-008): create
       `test/integration/oracle/WagerRegistry_PolymarketOpenChallenge.test.js` modeled
       on `test/integration/oracle/WagerRegistry_Polymarket.test.js` fixtures
       (`MockPolymarketCTF` → `PolymarketOracleAdapter` → `deployWagerRegistry` from
@@ -55,42 +55,42 @@ shared helpers/hooks (T003–T009) block both US1 and US2.
       then `autoResolveFromPolymarket` settles YES-win, NO-win, tie→draw, and reverts
       `ConditionNotResolved` when unresolved; winner claims payout; (d) untaken oracle
       open challenge expires → creator refund.
-- [ ] T003 [P] Create `frontend/src/lib/openChallenge/oracleTimeline.js` per
+- [X] T003 [P] Create `frontend/src/lib/openChallenge/oracleTimeline.js` per
       contracts/timeline-derivation.md: export `deriveOracleChallengeTimeline(marketEndIso, nowMs)`
       and constants `MIN_LEAD_MS` (1h), `ACCEPT_CAP_MS` (30d−1h), `SETTLE_BUFFER_MS`
       (7d), `RESOLVE_CAP_MS` (180d−1h); pure, injected clock, returns
       `{ eligible, reason, acceptDeadlineMs, resolveDeadlineMs, acceptCapped }`.
-- [ ] T004 [P] Create `frontend/src/test/oracleTimeline.test.js`: eligibility floor,
+- [X] T004 [P] Create `frontend/src/test/oracleTimeline.test.js`: eligibility floor,
       cap behavior (`acceptCapped`), settle buffer, invariants
       `now < accept < resolve ≤ now+180d` across near/far/absent/garbage end dates
       (SC-003).
-- [ ] T005 [P] Export `normaliseGammaMarket` from
+- [X] T005 [P] Export `normaliseGammaMarket` from
       `frontend/src/hooks/usePolymarketSearch.js` (named export; no behavior change —
       existing search/browse hooks keep using it internally).
-- [ ] T006 Create `frontend/src/hooks/usePolymarketMarket.js` per
+- [X] T006 Create `frontend/src/hooks/usePolymarketMarket.js` per
       contracts/polymarket-market-hook.md: fetch
       `{gammaBase}/markets?condition_ids=<id>&limit=1` (gamma base resolved like
       `usePolymarketSearch`), normalize via `normaliseGammaMarket`, return
       `{ market, isLoading, error, refresh }`; no fetch when conditionId is
       falsy/ZeroHash or `enabled:false`; AbortController on unmount/param change;
       never throws into render. (Depends on T005.)
-- [ ] T007 [P] Create `frontend/src/test/usePolymarketMarket.test.jsx`: success
+- [X] T007 [P] Create `frontend/src/test/usePolymarketMarket.test.jsx`: success
       normalization, not-found, network error → `{market:null, error}`, disabled/zero
       conditionId skips fetch, `refresh()` refetches.
-- [ ] T008 Extract `ClaimCodeResultPanel` per contracts/create-flow.md: new
+- [X] T008 Extract `ClaimCodeResultPanel` per contracts/create-flow.md: new
       `frontend/src/components/fairwins/ClaimCodeResultPanel.jsx` carrying the
       post-create result UI currently inside
       `frontend/src/components/fairwins/OpenChallengeModal.jsx` (one-time code display,
       copy-with-check, `WagerQRCode` + `buildTakeChallengeUrl` deep link,
       `useOpenChallengeCodeVault` auto-backup states); rewire `OpenChallengeModal.jsx`
       to render it with zero user-visible behavior change (FR-018).
-- [ ] T009 Extend `frontend/src/hooks/useOpenChallengeCreate.js` per
+- [X] T009 Extend `frontend/src/hooks/useOpenChallengeCreate.js` per
       contracts/create-flow.md: accept optional `form.oracleMeta`; seal
       `{ description, createdAt: <ISO now>, oracle: oracleMeta }` when present
       (unchanged payload otherwise); add oracle revert translations to
       `translateOpenCreateRevert` (`PolymarketRequired`, `AdapterNotSet`,
       `ConditionAlreadyResolved`, `PolymarketDisallowed`).
-- [ ] T010 Extend `frontend/src/test/claimCode/OpenChallengeModal.test.jsx` (and add
+- [X] T010 Extend `frontend/src/test/claimCode/OpenChallengeModal.test.jsx` (and add
       hook-level assertions there or in a sibling test) to cover: result-panel
       extraction leaves the user-defined flow identical, sealed payload includes
       `createdAt` + `oracle` block only when `oracleMeta` given, and the new revert

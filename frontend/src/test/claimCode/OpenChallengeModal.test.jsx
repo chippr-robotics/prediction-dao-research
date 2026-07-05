@@ -162,3 +162,54 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
     expect(screen.getByRole('note')).toHaveTextContent(/encrypted copy/i)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Spec 041 foundational changes: oracle-aware revert translation and the sealed
+// `oracle` metadata block (the claimant reads the bet even with live data down).
+// ---------------------------------------------------------------------------
+import { translateOpenCreateRevert } from '../../hooks/useOpenChallengeCreate'
+import { deriveFromCode } from '../../utils/claimCode/deriveFromCode.js'
+import { generateCode } from '../../utils/claimCode/wordlist.js'
+import { encryptEnvelopeCode, decryptEnvelopeCode } from '../../utils/crypto/envelopeEncryption.js'
+
+describe('Oracle open challenges — create-hook foundations (spec 041)', () => {
+  it('translates the oracle-linkage reverts to actionable messages (FR-008)', () => {
+    expect(translateOpenCreateRevert('ConditionAlreadyResolved()')).toMatch(/already resolved/i)
+    expect(translateOpenCreateRevert('PolymarketRequired()')).toMatch(/pick a polymarket market/i)
+    expect(translateOpenCreateRevert('PolymarketDisallowed()')).toMatch(/oracle-settled/i)
+    expect(translateOpenCreateRevert('AdapterNotSet()')).toMatch(/available on this network/i)
+    // Existing translations are untouched.
+    expect(translateOpenCreateRevert('InsufficientMembershipTier()')).toMatch(/silver/i)
+  })
+
+  it('a sealed payload with an oracle block round-trips through the code envelope (D4/FR-014)', () => {
+    const code = generateCode()
+    const { symKey } = deriveFromCode(code)
+    const plaintext = {
+      description: '"Will ETH flip BTC?" — creator takes Yes',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      oracle: {
+        source: 'polymarket',
+        conditionId: '0xabc123',
+        question: 'Will ETH flip BTC?',
+        outcomes: ['Yes', 'No'],
+        creatorSide: 0,
+        endDate: '2026-12-31T00:00:00Z',
+        slug: 'will-eth-flip-btc',
+      },
+    }
+    const envelope = encryptEnvelopeCode(plaintext, symKey)
+    const { symKey: rederived } = deriveFromCode(code)
+    expect(decryptEnvelopeCode(envelope, rederived)).toEqual(plaintext)
+  })
+
+  it('legacy payloads without an oracle block still round-trip unchanged (FR-018 of 024)', () => {
+    const code = generateCode()
+    const { symKey } = deriveFromCode(code)
+    const plaintext = { description: 'Plain user-defined challenge', createdAt: undefined }
+    const envelope = encryptEnvelopeCode(plaintext, symKey)
+    const recovered = decryptEnvelopeCode(envelope, symKey)
+    expect(recovered.description).toBe('Plain user-defined challenge')
+    expect(recovered.oracle).toBeUndefined()
+  })
+})
