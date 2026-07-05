@@ -14,9 +14,29 @@ import { renderHook, act } from '@testing-library/react'
 vi.mock('../utils/blockchainService', () => ({
   purchaseRoleWithStablecoin: vi.fn(),
   checkApprovalNeeded: vi.fn(),
+  resolveMembershipIntentParams: vi.fn().mockResolvedValue({ roleHash: '0xrole', validTier: 1, price: 0n, acceptedTermsHash: '0x0' }),
 }))
 vi.mock('../utils/keyRegistryService', () => ({
   ensureKeyRegistered: vi.fn(),
+}))
+
+// Specs 035 + 036 (merged from main): usePurchaseFlow now calls useGaslessWrite at the top, which
+// calls useWeb3() and throws outside a WalletProvider. The passkey batch path never uses this seam
+// (batchPurchase short-circuits it), so a minimal stub that forwards run()→selfSubmit is enough to
+// let the hook render. Matches useIntentAction: run() returns {error} rather than throwing.
+vi.mock('../lib/relay/useGaslessWrite', () => ({
+  useGaslessWrite: (_action, cfg) => ({
+    run: async (...args) => {
+      try {
+        const receipt = await cfg.selfSubmit(...args)
+        return { via: 'self-submit', receipt, txHash: receipt?.hash ?? receipt?.transactionHash }
+      } catch (error) {
+        return { via: 'self-submit', error }
+      }
+    },
+    status: 'idle', intent: null, result: null, error: null,
+    invalidate: vi.fn(), selfSubmitNow: vi.fn(), reset: vi.fn(),
+  }),
 }))
 
 import { usePurchaseFlow } from '../hooks/usePurchaseFlow'
