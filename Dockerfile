@@ -23,6 +23,8 @@ ARG VITE_IPFS_GATEWAY
 # v2 WagerRegistry subgraph (Spec 017 / #707) — public, build-time only.
 ARG VITE_SUBGRAPH_URL
 ARG VITE_WAGER_SOURCE
+# Gasless relayer base URL (spec 036). Unset => gasless disabled, everything self-submits.
+ARG VITE_RELAYER_URL
 
 # Set environment variables from build args
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
@@ -32,6 +34,7 @@ ENV VITE_RPC_URL=${VITE_RPC_URL}
 ENV VITE_IPFS_GATEWAY=${VITE_IPFS_GATEWAY}
 ENV VITE_SUBGRAPH_URL=${VITE_SUBGRAPH_URL}
 ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
+ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 
 # Build the application
 RUN npm run build

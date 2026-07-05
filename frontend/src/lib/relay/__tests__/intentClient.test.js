@@ -306,6 +306,9 @@ describe('intent relay client', () => {
       })
       await expect(probeHealth(137)).resolves.toBe(true)
       await expect(probeHealth(80002)).resolves.toBe(false)
+      // Chain the relayer doesn't serve (absent from the map) must probe FALSE so the caller
+      // self-submits instead of signing and then hard-failing on chain_mismatch (never-stranded).
+      await expect(probeHealth(63)).resolves.toBe(false)
     })
 
     it('probeHealth is false (never throws) on kill switch, error, or unset relayer', async () => {

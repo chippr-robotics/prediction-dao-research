@@ -33,6 +33,10 @@ LICENSE
 # Smart contracts and blockchain
 contracts
 deployments
+# ...but the relay-gateway image (services/relay-gateway/Dockerfile) bakes the deployment
+# records for its FR-025 version-pinned target check. Re-include them (last match wins; harmless
+# to the SPA build, which doesn't COPY them).
+!deployments
 artifacts
 cache
 typechain-types

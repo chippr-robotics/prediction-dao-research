@@ -101,14 +101,32 @@ export function createApp(config, deps = {}) {
   const app = express()
   app.disable('x-powered-by')
   app.use(helmet())
-  app.use(express.json({ limit: '32kb' })) // intents are small fixed-shape JSON; nothing large is legitimate
+
+  // ---- CORS: the SPA calls the gateway cross-origin (fairwins.app -> relay.fairwins.app). Echo an
+  // allow-listed Origin and answer preflight BEFORE the origin lock — browsers cannot attach
+  // X-Origin-Auth (Cloudflare injects it in transit) and preflight OPTIONS carry no credentials.
+  app.use((req, res, next) => {
+    const origin = req.get('origin')
+    if (origin && config.allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.setHeader('Access-Control-Max-Age', '600')
+    }
+    if (req.method === 'OPTIONS') return res.status(204).end()
+    next()
+  })
+  // Capture the raw body so the engine-webhook route can verify the HMAC over the exact bytes
+  // the engine signed (re-serializing could reorder keys and break the signature).
+  app.use(express.json({ limit: '32kb', verify: (req, _res, buf) => { req.rawBody = buf } })) // intents are small fixed-shape JSON; nothing large is legitimate
 
   // ---- Origin-lock middleware (FR-029, SC-016): client-facing routes require X-Origin-Auth.
   // The Cloudflare Transform Rule injects the header zone-wide; a direct *.run.app hit lacks it.
   // Exempt: /healthz (probes) and /v1/engine/webhook — the engine calls from inside the private
   // network (not through the edge) and authenticates with its own timing-safe shared secret.
   app.use((req, res, next) => {
-    if (req.path === '/healthz' || req.path === '/v1/engine/webhook') return next()
+    if (req.path === '/healthz' || req.path === '/status' || req.path === '/v1/engine/webhook') return next()
     if (!config.originAuthSecret) return next() // dev only; loudly warned at boot
     const header = req.get('x-origin-auth')
     if (!header || !timingSafeEqual(header, config.originAuthSecret)) {
@@ -118,8 +136,20 @@ export function createApp(config, deps = {}) {
     next()
   })
 
-  // ---- GET /healthz (origin-lock exempt) --------------------------------------------------
-  app.get('/healthz', async (_req, res) => {
+  // ---- GET /healthz + /status (origin-lock exempt) ----------------------------------------
+  // Google's GFE intercepts the literal `/healthz` on *.run.app (it never reaches the container),
+  // so `/status` is the externally reachable alias used by the client self-submit probe and the
+  // Cloudflare-fronted URL. `/healthz` stays for the in-container Docker HEALTHCHECK / TCP probe.
+  //
+  // Because /status is origin-lock exempt AND (unlike /healthz) not GFE-intercepted, it is reachable
+  // unauthenticated on the raw *.run.app URL. Two hardenings so that exposure can't be abused:
+  //  1. The upstream RPC fan-out (getBlockNumber + getBalance per chain) is CACHED for a short window
+  //     and de-duped across concurrent callers — a client looping GET can't amplify load onto the
+  //     operator's public RPCs (at most one fan-out per HEALTH_CACHE_MS regardless of request rate).
+  //  2. gasWalletRunwayHrs is operator telemetry (burn rate + time-to-empty) the SPA probe never reads;
+  //     it is disclosed ONLY to callers that present a valid X-Origin-Auth (i.e. arrived via the trusted
+  //     edge, or the lock is disabled in dev). Public callers see only per-chain rpc up/down.
+  const computeHealthChains = async () => {
     const chains = {}
     await Promise.all(
       config.enabledChainIds.map(async (chainId) => {
@@ -144,8 +174,48 @@ export function createApp(config, deps = {}) {
         chains[chainId] = { rpc, gasWalletRunwayHrs }
       })
     )
+    return chains
+  }
+  let healthCache = { at: 0, chains: null }
+  let healthInflight = null
+  const refreshHealth = () => {
+    if (!healthInflight) {
+      healthInflight = computeHealthChains().then(
+        (chains) => {
+          healthCache = { at: Date.now(), chains }
+          healthInflight = null
+          return chains
+        },
+        (err) => {
+          healthInflight = null
+          throw err
+        }
+      )
+    }
+    return healthInflight
+  }
+  const edgeAuthorized = (req) => {
+    if (!config.originAuthSecret) return true // lock disabled (dev) — nothing to protect
+    const header = req.get('x-origin-auth')
+    return !!header && timingSafeEqual(header, config.originAuthSecret)
+  }
+  const healthHandler = async (req, res) => {
+    if (!healthCache.chains || Date.now() - healthCache.at >= config.healthCacheMs) {
+      try {
+        await refreshHealth()
+      } catch {
+        // upstream RPC hiccup — serve the last good snapshot (or empty on cold start) rather than 500
+      }
+    }
+    const disclose = edgeAuthorized(req)
+    const chains = {}
+    for (const [id, c] of Object.entries(healthCache.chains || {})) {
+      chains[id] = disclose ? c : { rpc: c.rpc }
+    }
     res.json({ status: 'ok', chains, killSwitch: killSwitch.isActive() })
-  })
+  }
+  app.get('/healthz', healthHandler)
+  app.get('/status', healthHandler)
 
   // ---- POST /v1/intents --------------------------------------------------------------------
   app.post('/v1/intents', async (req, res) => {
@@ -334,9 +404,15 @@ export function createApp(config, deps = {}) {
 
   // ---- POST /v1/engine/webhook ----------------------------------------------------------------
   app.post('/v1/engine/webhook', (req, res) => {
-    // Shared-secret auth, timing-safe. Fail closed: no configured secret => nothing is accepted.
-    const presented = req.get('x-webhook-secret') ?? (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
-    if (!config.webhookSecret || !presented || !timingSafeEqual(presented, config.webhookSecret)) {
+    // Engine authenticity: the OZ Relayer signs each webhook as `X-Signature:
+    // base64(HMAC-SHA256(rawBody, signing_key))` (services/oz-relayer — notification signing_key ===
+    // our WEBHOOK_SHARED_SECRET). Verify timing-safe over the exact received bytes. Fail closed:
+    // no configured secret, no header, or mismatch => nothing is accepted.
+    const presented = req.get('x-signature') ?? ''
+    const expected = config.webhookSecret
+      ? crypto.createHmac('sha256', config.webhookSecret).update(req.rawBody ?? Buffer.alloc(0)).digest('base64')
+      : ''
+    if (!config.webhookSecret || !presented || !timingSafeEqual(presented, expected)) {
       res.status(403).json({ error: { code: 'origin_denied', reason: 'invalid webhook credentials' } })
       return
     }
