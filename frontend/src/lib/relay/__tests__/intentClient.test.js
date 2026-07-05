@@ -8,6 +8,7 @@
  * src/test/setup.js; we override it per test.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { ethers } from 'ethers'
 import { makeRelayer, signIntent, relayIntent, pollStatus, probeHealth, randomNonce } from '../intentClient'
 import { PaymentUnsupportedOnChain, RelayRejected, RelayerUnavailable } from '../errors'
 import { stablecoinDomain, wagerRegistryDomain, membershipManagerDomain } from '../intentTypes'
@@ -131,6 +132,42 @@ describe('intent relay client', () => {
       expect(Object.keys(call.types)).toEqual(['ClaimPayoutIntent'])
       expect(call.message.claimant).toBe(SIGNER_ADDRESS)
       expect(call.message.nonce).toBe(intent.uniquenessMarker)
+    })
+
+    it('produces a real signature that recovers to the signer under the contract EIP-712 domain (frontend↔contract parity)', async () => {
+      // Not a mock signer: a real ethers wallet signs, and we recover under the LITERAL domain +
+      // struct the on-chain WagerRegistry intents facet verifies against — the same domain the live
+      // Mordor relay E2E accepted. This is the guard that the frontend's intentTypes never drift from
+      // the contract typehashes (the "three byte-identical places" invariant, per CLAUDE.md).
+      // Fixed key (createRandom's mnemonic entropy is stubbed in the test env); any valid key works.
+      const wallet = new ethers.Wallet('0x' + '11'.repeat(32))
+      const intent = await signIntent({
+        signer: wallet,
+        chainId: 63,
+        action: 'cancelOpen',
+        targetContract: REGISTRY,
+        params: { wagerId: 7n },
+        nowSeconds: 1_000_000,
+        validitySeconds: 600,
+      })
+      const domain = { name: 'FairWins WagerRegistry', version: '1', chainId: 63, verifyingContract: REGISTRY }
+      const types = {
+        CancelOpenIntent: [
+          { name: 'wagerId', type: 'uint256' },
+          { name: 'actor', type: 'address' },
+          { name: 'nonce', type: 'bytes32' },
+          { name: 'validAfter', type: 'uint256' },
+          { name: 'validBefore', type: 'uint256' },
+        ],
+      }
+      const message = {
+        wagerId: intent.params.wagerId,
+        actor: wallet.address,
+        nonce: intent.uniquenessMarker,
+        validAfter: intent.validAfter,
+        validBefore: intent.validBefore,
+      }
+      expect(ethers.verifyTypedData(domain, types, message, intent.signature)).toBe(wallet.address)
     })
 
     it('staples the EIP-3009 authorization to a payment-class intent (paymentNonce binding, FR-007)', async () => {

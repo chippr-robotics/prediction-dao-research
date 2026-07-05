@@ -9,6 +9,7 @@ import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MyWagersView } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
+import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -752,6 +753,21 @@ function MyMarketsModal({
   const [claimingId, setClaimingId] = useState(null)
   const [claimError, setClaimError] = useState(null)
 
+  // Gasless claimPayout (spec 035/036): relayed where the relayer serves the chain (user pays no gas),
+  // transparent self-submit otherwise. One in-flight claim at a time (claimingId), so one hook suffices.
+  const claimPayoutTx = useGaslessWrite('claimPayout', {
+    params: (wagerId) => ({ wagerId }),
+    selfSubmit: async (wagerId) => {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimPayout(wagerId)
+      return tx.wait()
+    },
+  })
+
   const handleClaimPayout = useCallback(async (market) => {
     if (!signer) return
     const id = String(market.id)
@@ -769,17 +785,12 @@ function MyMarketsModal({
     setClaimError(null)
 
     try {
-      const registry = new ethers.Contract(
-        getContractAddressForChain('wagerRegistry', chainId),
-        WAGER_REGISTRY_ABI,
-        signer
-      )
-      const tx = await registry.claimPayout(market.wagerId ?? market.id)
-      await tx.wait()
+      const result = await claimPayoutTx.run(market.wagerId ?? market.id)
+      if (result?.error) throw result.error
       // Pull fresh on-chain data so the claimed wager flips to paid (which
       // hides the Claim affordances) and clear its unread activity.
       markWagerRead?.(id)
-      fireToast('Winnings claimed 🎉')
+      fireToast(result?.txHash ? 'Winnings claimed 🎉' : 'Claim submitted — confirming…')
       await refreshFriendMarkets?.()
     } catch (err) {
       const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
@@ -800,7 +811,7 @@ function MyMarketsModal({
     } finally {
       setClaimingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets, fireToast])
+  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx])
 
   // Participant reclaims their stake on a wager that ran past its resolution
   // window without a winner being declared (the "refundable" state). Mirrors
@@ -810,6 +821,20 @@ function MyMarketsModal({
   // handled separately by handleClearExpired's "Reclaim & Clear".
   const [refundingId, setRefundingId] = useState(null)
   const [refundError, setRefundError] = useState(null)
+
+  // Gasless claimRefund for the list row (spec 035/036); one in-flight refund at a time (refundingId).
+  const claimRefundRowTx = useGaslessWrite('claimRefund', {
+    params: (wagerId) => ({ wagerId }),
+    selfSubmit: async (wagerId) => {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimRefund(wagerId)
+      return tx.wait()
+    },
+  })
 
   const handleClaimRefund = useCallback(async (market) => {
     if (!signer) return
@@ -828,17 +853,12 @@ function MyMarketsModal({
     setRefundError(null)
 
     try {
-      const registry = new ethers.Contract(
-        getContractAddressForChain('wagerRegistry', chainId),
-        WAGER_REGISTRY_ABI,
-        signer
-      )
-      const tx = await registry.claimRefund(market.wagerId ?? market.id)
-      await tx.wait()
+      const result = await claimRefundRowTx.run(market.wagerId ?? market.id)
+      if (result?.error) throw result.error
       // Pull fresh on-chain data so the refunded wager leaves the list and clear
       // its unread activity.
       markWagerRead?.(id)
-      fireToast('Refund claimed')
+      fireToast(result?.txHash ? 'Refund claimed' : 'Refund submitted — confirming…')
       await refreshFriendMarkets?.()
     } catch (err) {
       const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
@@ -857,7 +877,7 @@ function MyMarketsModal({
     } finally {
       setRefundingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets, fireToast])
+  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
 
   if (!isOpen) return null
 
@@ -1392,6 +1412,22 @@ function MarketDetailView({
   const [withdrawSuccess, setWithdrawSuccess] = useState(false)
   const [withdrawTxHash, setWithdrawTxHash] = useState(null)
 
+  // Gasless cancelOpen (spec 035/036): relayed where the relayer serves the chain (user pays no gas),
+  // otherwise a transparent self-submit — identical on-chain result, and the UI below is unchanged.
+  const cancelOpenTx = useGaslessWrite('cancelOpen', {
+    params: (wagerId) => ({ wagerId }),
+    selfSubmit: async (wagerId) => {
+      const contract = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await contract.cancelOpen(wagerId)
+      setWithdrawTxHash(tx.hash)
+      return tx.wait()
+    },
+  })
+
   const handleWithdraw = async () => {
     if (!signer) return
 
@@ -1408,16 +1444,17 @@ function MarketDetailView({
     setWithdrawError(null)
 
     try {
-      const contract = new ethers.Contract(
-        getContractAddressForChain('wagerRegistry', chainId),
-        WAGER_REGISTRY_ABI,
-        signer
-      )
-      const tx = await contract.cancelOpen(market.wagerId ?? market.id)
-      setWithdrawTxHash(tx.hash)
-      await tx.wait()
-      setWithdrawSuccess(true)
-      onWithdraw?.(market)
+      const result = await cancelOpenTx.run(market.wagerId ?? market.id)
+      if (result?.error) throw result.error
+      if (result?.txHash) {
+        setWithdrawTxHash(result.txHash)
+        setWithdrawSuccess(true)
+        onWithdraw?.(market)
+      } else {
+        // Relay accepted but not yet mined within the poll budget (rare on Mordor) — stay honest: no
+        // false success. A refresh will show it withdrawn, or the idempotent retry reverts NotOpen.
+        setWithdrawError('Still processing — check back in a moment.')
+      }
     } catch (err) {
       const reason = err?.reason || err?.data?.message || err?.message || ''
       if (reason.includes('user rejected') || reason.includes('ACTION_REJECTED')) {
@@ -1446,6 +1483,21 @@ function MarketDetailView({
   const showRefundButton = isParticipant && signer &&
     status === MarketStatus.PENDING_RESOLUTION && !refundSuccess
 
+  // Gasless claimRefund (spec 035/036): relayed where available, transparent self-submit otherwise.
+  const claimRefundTx = useGaslessWrite('claimRefund', {
+    params: (wagerId) => ({ wagerId }),
+    selfSubmit: async (wagerId) => {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimRefund(wagerId)
+      setRefundTxHash(tx.hash)
+      return tx.wait()
+    },
+  })
+
   const handleClaimRefund = async () => {
     if (!signer) return
 
@@ -1462,16 +1514,15 @@ function MarketDetailView({
     setRefundError(null)
 
     try {
-      const registry = new ethers.Contract(
-        getContractAddressForChain('wagerRegistry', chainId),
-        WAGER_REGISTRY_ABI,
-        signer
-      )
-      const tx = await registry.claimRefund(market.wagerId ?? market.id)
-      setRefundTxHash(tx.hash)
-      await tx.wait()
-      setRefundSuccess(true)
-      onRefunded?.(market)
+      const result = await claimRefundTx.run(market.wagerId ?? market.id)
+      if (result?.error) throw result.error
+      if (result?.txHash) {
+        setRefundTxHash(result.txHash)
+        setRefundSuccess(true)
+        onRefunded?.(market)
+      } else {
+        setRefundError('Still processing — check back in a moment.')
+      }
     } catch (err) {
       const reason = err?.reason || err?.shortMessage || err?.message || ''
       if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 ||
