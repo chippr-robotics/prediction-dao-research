@@ -104,5 +104,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/040-my-wagers-refinements/plan.md
+at specs/041-oracle-open-challenges/plan.md
 <!-- SPECKIT END -->
