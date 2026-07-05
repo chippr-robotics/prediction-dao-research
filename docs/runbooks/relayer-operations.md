@@ -71,3 +71,29 @@ secrets and no PII beyond on-chain-public addresses. On-chain remains the record
   no EIP-3009. No-stake intents relay normally; money-in flows self-submit.
 - Chain 61 stays `paused` in the engine and unlisted in the gateway until the spec-025/027 proxies
   exist there (the gateway refuses to start for a chain without a deployments record).
+
+## Colocated ERC-4337 bundler (spec 041 passkey accounts)
+
+Passkey smart accounts submit UserOperations through an ordered bundler list
+(`VITE_BUNDLER_URLS_<NET>`): **self-hosted [alto](https://github.com/pimlicolabs/alto)
+first**, public fallbacks after. Deploy alto alongside `relay-gateway` /
+`oz-relayer` — same host class, same edge perimeter and origin-lock (spec 036
+FR-029), same "can censor, cannot steal" bound (a bundler carries only
+user-signed UserOps; it can never alter or originate them).
+
+- **Config**: one alto instance per chain, pointed at the chain's RPC set and
+  the canonical EntryPoint v0.6 (`deployments/` key `entryPoint`); expose only
+  the standard ERC-4337 RPC (`eth_sendUserOperation`,
+  `eth_estimateUserOperationGas`, `eth_getUserOperationReceipt`,
+  `eth_supportedEntryPoints`).
+- **Funding**: alto's beneficiary/executor wallet needs native gas like the
+  oz-relayer hot wallet — include it in the existing balance monitoring and
+  rotation procedures (same thresholds).
+- **Health**: probe `eth_supportedEntryPoints` (the frontend uses the same
+  probe for its fallback matrix); degraded bundler ⇒ clients fall through to
+  the configured public endpoints, so an alto outage is UX degradation, not
+  fund inaccessibility (FR-013).
+- **Fee-in-USDC (optional)**: `VITE_ERC20_PAYMASTER_<NET>` may point at a
+  third-party ERC-20 paymaster; unset ⇒ UserOp fees fall back to the
+  account's native balance (spec 041 clarification Q3). FairWins operates no
+  paymaster and sponsors nothing.

@@ -61,3 +61,18 @@ export async function screenAddress(account, provider) {
 export function isClear(result) {
   return Boolean(result && result.available && result.allowed)
 }
+
+/**
+ * Spec 041 (clarification Q2) — controller screening for passkey accounts.
+ * A linked wallet address is screened AT LINK TIME with the same fail-closed
+ * semantics as user screening: flagged OR unscreenable ⇒ not clear ⇒ the link
+ * is refused. Also used by the periodic account re-screen so a controller
+ * that becomes flagged flags the account for gated actions (on-chain guards
+ * remain authoritative).
+ *
+ * @returns {{ clear: boolean, available: boolean }}
+ */
+export async function screenController(controllerAddress, provider) {
+  const result = await screenAddress(controllerAddress, provider)
+  return { clear: isClear(result), available: result.available }
+}

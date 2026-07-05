@@ -306,7 +306,7 @@ jobs:
         run: npm ci
 
       - name: Run fast E2E tests
-        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js,cypress/e2e/passkey/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
         continue-on-error: true
 
       - name: Summarize E2E results

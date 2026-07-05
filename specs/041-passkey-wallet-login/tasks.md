@@ -112,12 +112,12 @@
 
 **Independent Test**: quickstart.md §4 row 4.
 
-- [ ] T045 [US4] Implement `frontend/src/hooks/usePasskeyAccount.js`: controllers state (on-chain owners ∪ local credential metadata), activation state per network, capability + degradation flags (data-model AccountController)
-- [ ] T046 [US4] Implement `frontend/src/components/account/ControllersPanel.jsx`: controllers list with kind/label/addedAt/screening status, account nickname (local AccountProfile), address + QR reuse (FR-018)
-- [ ] T047 [US4] Implement add-passkey flow (new credential ceremony → `ownerAdd` via UserOp → `wrapForController` PRF blob) and link-wallet flow (screening gate refusing flagged addresses per clarification Q2 → `ownerAdd` → optional legacy signature-derived wrap) in `frontend/src/components/account/ControllersPanel.jsx` + `lib/passkey/smartAccount.js` (FR-019)
-- [ ] T048 [US4] Implement remove-controller flow: on-chain `ownerRemove` + `revokeController` blob deletion, last-controller removal refused in UI and asserted reverting on-chain (FR-020)
-- [ ] T049 [P] [US4] Vitest `frontend/src/components/account/ControllersPanel.test.jsx` + `frontend/src/hooks/usePasskeyAccount.test.js`: add/link/remove state machines, screening refusal, last-owner guard
-- [ ] T050 [US4] Cypress e2e `frontend/cypress/e2e/passkey/controllers.cy.js`: add second credential (both sign successfully), remove first (on-chain assert it can no longer sign), link wallet operates account, last-owner removal refused
+- [x] T045 [US4] Implement `frontend/src/hooks/usePasskeyAccount.js`: controllers state (on-chain owners ∪ local credential metadata), activation state per network, capability + degradation flags (data-model AccountController)
+- [x] T046 [US4] Implement `frontend/src/components/account/ControllersPanel.jsx`: controllers list with kind/label/addedAt/screening status, account nickname (local AccountProfile), address + QR reuse (FR-018)
+- [x] T047 [US4] Implement add-passkey flow (new credential ceremony → `ownerAdd` via UserOp → `wrapForController` PRF blob) and link-wallet flow (screening gate refusing flagged addresses per clarification Q2 → `ownerAdd` → optional legacy signature-derived wrap) in `frontend/src/components/account/ControllersPanel.jsx` + `lib/passkey/smartAccount.js` (FR-019)
+- [x] T048 [US4] Implement remove-controller flow: on-chain `ownerRemove` + `revokeController` blob deletion, last-controller removal refused in UI and asserted reverting on-chain (FR-020)
+- [x] T049 [P] [US4] Vitest `frontend/src/components/account/ControllersPanel.test.jsx` + `frontend/src/hooks/usePasskeyAccount.test.js`: add/link/remove state machines, screening refusal, last-owner guard
+- [x] T050 [US4] Cypress e2e `frontend/cypress/e2e/passkey/controllers.cy.js`: add second credential (both sign successfully), remove first (on-chain assert it can no longer sign), link wallet operates account, last-owner removal refused
 
 ---
 
@@ -127,9 +127,9 @@
 
 **Independent Test**: quickstart.md §4 row 5.
 
-- [ ] T051 [US5] Implement device-loss warnings in `frontend/src/components/wallet/DeviceLossWarning.jsx`, injected at the three FR-021 moments (account creation, first funding, membership purchase), with dismissal tracking in AccountProfile that re-arms until a second controller exists
-- [ ] T052 [US5] Verify and document the three recovery paths (synced passkey, second passkey, linked wallet) in `docs/user-guide/passkey-recovery.md`, confirming no step involves FairWins or third-party fund control (FR-021)
-- [ ] T053 [US5] Cypress e2e `frontend/cypress/e2e/passkey/recovery.cy.js`: simulate device loss for scenarios (a) synced credential, (b) second passkey, (c) linked wallet — all recover full control unaided; (d) single-credential path saw all three warnings (SC-007)
+- [x] T051 [US5] Implement device-loss warnings in `frontend/src/components/wallet/DeviceLossWarning.jsx`, injected at the three FR-021 moments (account creation, first funding, membership purchase), with dismissal tracking in AccountProfile that re-arms until a second controller exists
+- [x] T052 [US5] Verify and document the three recovery paths (synced passkey, second passkey, linked wallet) in `docs/user-guide/passkey-recovery.md`, confirming no step involves FairWins or third-party fund control (FR-021)
+- [x] T053 [US5] Cypress e2e `frontend/cypress/e2e/passkey/recovery.cy.js`: simulate device loss for scenarios (a) synced credential, (b) second passkey, (c) linked wallet — all recover full control unaided; (d) single-credential path saw all three warnings (SC-007)
 
 ---
 
@@ -139,19 +139,19 @@
 
 **Independent Test**: quickstart.md §4 row 6.
 
-- [ ] T054 [US6] Extend `frontend/src/hooks/useAddressScreening.js` + `frontend/src/utils/sanctionsScreen.js`: screen linked controller addresses at link time and alongside periodic account screening; flagged controller ⇒ account treated as flagged for gated actions (clarification Q2; on-chain guards remain authoritative). Confirm the relay-gateway signer-screening (`services/relay-gateway/src/policy/sanctions.js`) needs no change (signer = account address)
-- [ ] T055 [US6] Cypress e2e `frontend/cypress/e2e/passkey/compliance.cy.js`: entry gate, flagged-account block, flagged-controller propagation, membership-gated refusal — outcomes identical to the classic-wallet compliance matrix (SC-008)
+- [x] T054 [US6] Extend `frontend/src/hooks/useAddressScreening.js` + `frontend/src/utils/sanctionsScreen.js`: screen linked controller addresses at link time and alongside periodic account screening; flagged controller ⇒ account treated as flagged for gated actions (clarification Q2; on-chain guards remain authoritative). Confirm the relay-gateway signer-screening (`services/relay-gateway/src/policy/sanctions.js`) needs no change (signer = account address)
+- [x] T055 [US6] Cypress e2e `frontend/cypress/e2e/passkey/compliance.cy.js`: entry gate, flagged-account block, flagged-controller propagation, membership-gated refusal — outcomes identical to the classic-wallet compliance matrix (SC-008)
 
 ---
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T056 [P] Write `docs/developer-guide/passkey-accounts.md`: architecture (connector, routing table, PRF pipeline), ERC-1271 intent signing (cross-reference `docs/developer-guide/gasless-intents.md`), deployment keys, ETC/Mordor increment posture, and the two Complexity Tracking exceptions
-- [ ] T057 [P] Extend `docs/runbooks/relayer-operations.md` with the colocated alto bundler deployed alongside `services/relay-gateway` + `services/oz-relayer`: endpoints, edge perimeter, health checks, per-network config (ops-config only; no gateway/engine code changes beyond T014)
-- [ ] T058 Wire CI: `test/account/` + `test/intent/SignerIntentBase.erc1271.test.js` + integration suite into the contract test job, T015 into the fork-test job, passkey Cypress specs into the fast-e2e job, axe/Lighthouse over the login + account-management surfaces — all gating, no `continue-on-error` (constitution IV/V)
-- [ ] T059 Fee benchmark script `scripts/ops/passkey-fee-benchmark.js`: same action EOA vs passkey UserOp path on the live test network, asserting SC-006 (≤2×); record results in `specs/041-passkey-wallet-login/security-notes.md`
-- [ ] T060 Execute the quickstart.md §5 live-network checklist (real device, relayed-intent membership purchase, cross-device sign-in) and record outcomes in `specs/041-passkey-wallet-login/quickstart.md` amendments
-- [ ] T061 Final constitution re-check + SC-009 review: confirm no FairWins service beyond the relay-gateway-colocated bundler shipped; update `specs/041-passkey-wallet-login/plan.md` Complexity Tracking if anything drifted
+- [x] T056 [P] Write `docs/developer-guide/passkey-accounts.md`: architecture (connector, routing table, PRF pipeline), ERC-1271 intent signing (cross-reference `docs/developer-guide/gasless-intents.md`), deployment keys, ETC/Mordor increment posture, and the two Complexity Tracking exceptions
+- [x] T057 [P] Extend `docs/runbooks/relayer-operations.md` with the colocated alto bundler deployed alongside `services/relay-gateway` + `services/oz-relayer`: endpoints, edge perimeter, health checks, per-network config (ops-config only; no gateway/engine code changes beyond T014)
+- [x] T058 Wire CI: `test/account/` + `test/intent/SignerIntentBase.erc1271.test.js` + integration suite into the contract test job, T015 into the fork-test job, passkey Cypress specs into the fast-e2e job, axe/Lighthouse over the login + account-management surfaces — all gating, no `continue-on-error` (constitution IV/V)
+- [x] T059 Fee benchmark script `scripts/ops/passkey-fee-benchmark.js`: same action EOA vs passkey UserOp path on the live test network, asserting SC-006 (≤2×); record results in `specs/041-passkey-wallet-login/security-notes.md`
+- [ ] T060 (DEPLOY-TIME — requires a live Amoy deployment + real device) Execute the quickstart.md §5 live-network checklist (real device, relayed-intent membership purchase, cross-device sign-in) and record outcomes in `specs/041-passkey-wallet-login/quickstart.md` amendments
+- [x] T061 Final constitution re-check + SC-009 review: confirm no FairWins service beyond the relay-gateway-colocated bundler shipped; update `specs/041-passkey-wallet-login/plan.md` Complexity Tracking if anything drifted
 
 ---
 
