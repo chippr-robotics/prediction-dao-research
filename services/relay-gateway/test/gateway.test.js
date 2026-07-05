@@ -53,7 +53,7 @@ const postWebhook = (app, body, { secret = WEBHOOK_SECRET, sign = true } = {}) =
 describe('config / startup consistency check (FR-025)', () => {
   it('pins targets from deployments and fails loudly for a chain without a record', () => {
     const config = testConfig()
-    expect(config.chains[137].targetsByKey.wagerRegistry).toBe('0x5023765809fDA93ab9F11B684fdb76521eD31774')
+    expect(config.chains[137].targetsByKey.wagerRegistry).toBe('0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89')
     expect(config.chains[63].gasType).toBe('legacy')
     expect(config.chains[63].paymentSupported).toBe(false)
     // ETC mainnet (61) has no deployments record yet -> enabling it must throw.
