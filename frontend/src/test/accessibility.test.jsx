@@ -291,3 +291,104 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
     expect(screen.getByText('Open Challenge')).toBeInTheDocument()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Spec 041 — oracle open challenge surfaces (WCAG 2.1 AA, Constitution V).
+// vi.mock calls are hoisted, so these stubs coexist with the sections above.
+// ---------------------------------------------------------------------------
+vi.mock('../components/fairwins/PolymarketBrowser', () => ({
+  default: ({ onSelectMarket }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelectMarket({
+          id: 'm1',
+          slug: 'will-eth-flip-btc',
+          question: 'Will ETH flip BTC?',
+          conditionId: '0xc0ffee',
+          endDate: new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString(),
+          active: true,
+          closed: false,
+          outcomes: [{ name: 'Yes', price: 0.62 }, { name: 'No', price: 0.38 }],
+        })}
+      >
+        pick market
+      </button>
+    </div>
+  ),
+}))
+vi.mock('../hooks/useChainTokens', () => ({
+  useChainTokens: () => ({ capabilities: { polymarketSidebets: true }, stable: 'USDC', stableDecimals: 6 }),
+}))
+vi.mock('../hooks/usePolymarketMarket', () => ({
+  usePolymarketMarket: () => ({
+    market: {
+      id: 'm1',
+      slug: 'will-eth-flip-btc',
+      question: 'Will ETH flip BTC?',
+      conditionId: '0xc0ffee',
+      endDate: '2026-12-31T00:00:00Z',
+      active: true,
+      closed: false,
+      outcomes: [{ name: 'Yes', price: 0.62 }, { name: 'No', price: 0.38 }],
+    },
+    isLoading: false,
+    error: null,
+    refresh: () => {},
+  }),
+}))
+
+import OracleOpenChallengeModal from '../components/fairwins/OracleOpenChallengeModal'
+import TakeChallengePanel from '../components/fairwins/TakeChallengePanel'
+
+describe('Oracle open challenge accessibility (spec 041)', () => {
+  it('has no axe violations on the market-picker step', async () => {
+    const { container } = render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no axe violations on the configure step (side picker + stake + derived timeline)', async () => {
+    const { container } = render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /pick market/i }))
+    fireEvent.click(screen.getByRole('button', { name: /taking yes/i }))
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no axe violations on the claimant oracle bet summary', async () => {
+    const { container } = render(
+      <TakeChallengePanel
+        code="river tiger kite zoo"
+        match={{
+          wagerId: 1n,
+          wager: {
+            resolutionType: 4n,
+            polymarketConditionId: '0xc0ffee',
+            creatorIsYes: true,
+            creatorStake: 10_000_000n,
+            opponentStake: 10_000_000n,
+            acceptDeadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+            resolveDeadline: BigInt(Math.floor(Date.now() / 1000) + 86400),
+          },
+          terms: {
+            description: 'Will ETH flip BTC? — creator takes Yes · settled automatically by Polymarket',
+            oracle: {
+              source: 'polymarket',
+              conditionId: '0xc0ffee',
+              question: 'Will ETH flip BTC?',
+              outcomes: ['Yes', 'No'],
+              creatorSide: 0,
+              slug: 'will-eth-flip-btc',
+            },
+          },
+          termsUnavailable: false,
+          needsMembership: false,
+        }}
+        onClose={() => {}}
+      />
+    )
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+})
