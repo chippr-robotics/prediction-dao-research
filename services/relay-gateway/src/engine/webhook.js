@@ -28,14 +28,32 @@ export function mapEngineStatus(engineStatus) {
 }
 
 /**
+ * Normalize an engine webhook body to { id, status, hash, reason }. The real OZ Relayer wraps every
+ * tx update as `{ id: <notificationId>, event, payload, timestamp }` — the TRANSACTION fields (its own
+ * id/hash/status) live INSIDE `payload`: flattened for `payload_type: "transaction"`, nested under
+ * `payload.transaction` (+ `failure_reason`) for `"transaction_failure"`. NB the outer `event.id` is
+ * the notification id, NOT the tx id. Also accepts a flat `{ id, status, hash }` (the shape
+ * engine-integration.md originally assumed / the unit tests use) so both are handled.
+ */
+export function normalizeEngineEvent(event) {
+  const p = event?.payload
+  if (p && typeof p === 'object') {
+    const tx = p.payload_type === 'transaction_failure' ? (p.transaction ?? {}) : p
+    return { id: tx.id, status: tx.status, hash: tx.hash, reason: p.failure_reason ?? tx.status_reason ?? p.reason }
+  }
+  return { id: event?.id, status: event?.status, hash: event?.hash, reason: event?.reason ?? event?.status_reason }
+}
+
+/**
  * Apply one engine webhook event. Pure of HTTP concerns (server.js owns auth + parsing).
  * @returns {{ ok: boolean, code?: string, record?: object }}
  */
 export function applyEngineEvent({ store, dedup, audit }, event) {
-  const engineTxId = event?.id != null ? String(event.id) : null
+  const n = normalizeEngineEvent(event)
+  const engineTxId = n.id != null ? String(n.id) : null
   if (!engineTxId) return { ok: false, code: 'missing_id' }
 
-  const mapped = mapEngineStatus(event.status)
+  const mapped = mapEngineStatus(n.status)
   if (!mapped) return { ok: false, code: 'unknown_status' }
 
   const record = store.getByEngineTxId(engineTxId)
@@ -46,8 +64,8 @@ export function applyEngineEvent({ store, dedup, audit }, event) {
     return { ok: true, record }
   }
 
-  const txHash = event.hash ?? record.txHash ?? null
-  const reason = mapped === 'failed' ? (event.reason ?? event.status_reason ?? 'transaction failed on-chain') : null
+  const txHash = n.hash ?? record.txHash ?? null
+  const reason = mapped === 'failed' ? (n.reason ?? 'transaction failed on-chain') : null
   store.setStatus(record.intentId, mapped, { txHash, reason })
 
   if (mapped === 'confirmed') {

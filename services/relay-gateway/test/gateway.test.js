@@ -358,6 +358,25 @@ describe('webhook + status lifecycle (FR-006: never confirmed before inclusion)'
     expect(status.body).toMatchObject({ intentId, status: 'confirmed', txHash: accepted.body.txHash })
   })
 
+  it('accepts the REAL OZ engine nested payload (tx fields under payload; outer id ignored)', async () => {
+    const ctx = build()
+    const intent = await signedIntent(ctx.config)
+    const accepted = await post(ctx.app, intent)
+    const { intentId } = accepted.body
+
+    // The engine wraps updates as { id: <notificationId>, event, payload: {...}, timestamp }; the
+    // transaction id/hash/status live INSIDE payload (payload_type "transaction"). The outer id is the
+    // notification id and must NOT be used to look up the intent.
+    await postWebhook(ctx.app, {
+      id: 'notif-xyz',
+      event: 'transaction_update',
+      timestamp: '2026-01-01T00:00:00Z',
+      payload: { payload_type: 'transaction', id: 'engine-tx-1', hash: accepted.body.txHash, status: 'mined' },
+    }).expect(200)
+    const status = await request(ctx.app).get(`/v1/intents/${intentId}`).set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(status.body).toMatchObject({ intentId, status: 'confirmed', txHash: accepted.body.txHash })
+  })
+
   it('unknown engine tx id -> 404; unknown intent id -> 404', async () => {
     const { app } = build()
     await postWebhook(app, { id: 'nope', status: 'mined' }).expect(404)

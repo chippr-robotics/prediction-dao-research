@@ -1,0 +1,70 @@
+{
+  "relayers": [
+    {
+      "id": "mordor-63",
+      "name": "FairWins Mordor (63)",
+      "network": "mordor",
+      "network_type": "evm",
+      "paused": false,
+      "signer_id": "gas-key-mordor",
+      "notification_id": "relay-gateway-webhook",
+      "policies": {
+        "eip1559_pricing": false,
+        "gas_price_cap": 2000000000000,
+        "min_balance": 1000000000000000000,
+        "whitelist_receivers": [
+          "0x3ccB144d8aa838e8d4D695867cC72e548117830C",
+          "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541"
+        ]
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "relay-gateway-webhook",
+      "type": "webhook",
+      "url": "http://localhost:8788/v1/engine/webhook",
+      "signing_key": { "type": "env", "value": "WEBHOOK_SIGNING_KEY" }
+    }
+  ],
+  "signers": [
+    {
+      "id": "gas-key-mordor",
+      "type": "google_cloud_kms",
+      "config": {
+        "service_account": {
+          "project_id": "chippr-bots-site-wp",
+          "private_key_id": { "type": "env", "value": "GCP_PRIVATE_KEY_ID" },
+          "private_key": { "type": "env", "value": "GCP_PRIVATE_KEY" },
+          "client_email": { "type": "env", "value": "GCP_CLIENT_EMAIL" },
+          "client_id": "105464822134406954574"
+        },
+        "key": {
+          "location": "us-central1",
+          "key_ring_id": "fairwins-relayer",
+          "key_id": "gas-key-mordor",
+          "key_version": 1
+        }
+      }
+    }
+  ],
+  "networks": [
+    {
+      "network": "mordor",
+      "type": "evm",
+      "chain_id": 63,
+      "symbol": "METC",
+      "required_confirmations": 6,
+      "average_blocktime_ms": 13000,
+      "is_testnet": true,
+      "features": [],
+      "rpc_urls": [
+        "https://rpc.mordor.etccooperative.org",
+        "https://geth-mordor.etc-network.info"
+      ],
+      "explorer_urls": ["https://etc-mordor.blockscout.com"],
+      "tags": ["testnet", "fairwins", "legacy-gas", "no-batch"]
+    }
+  ],
+  "plugins": []
+}

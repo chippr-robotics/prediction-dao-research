@@ -30,9 +30,17 @@ Project `chippr-bots-site-wp`, region/KMS location `us-central1` (matches
 > - **One Cloud Run service, 3 sidecar containers** (gateway+engine+redis over localhost) — *not* a
 >   separate internal engine service; no Memorystore/VPC (Redis is an ephemeral sidecar).
 > - **Config must use literal RPC/webhook URLs** (engine doesn't expand `${VAR}`) and `plugins: []`.
-> - **Gateway verifies the engine's `X-Signature` HMAC**; the external health path is **`/status`**
->   (`/healthz` is GFE-intercepted on `*.run.app`).
+> - **Gateway verifies the engine's `X-Signature` HMAC** over a **nested** body — the engine wraps every
+>   update as `{ id: <notificationId>, event, payload, timestamp }` and the tx `id`/`hash`/`status` live
+>   INSIDE `payload` (flattened for `payload_type:"transaction"`, under `payload.transaction` for
+>   `"transaction_failure"`); the outer `id` is the *notification* id, not the tx id. `normalizeEngineEvent`
+>   handles both this and the flat shape. The external health path is **`/status`** (`/healthz` is
+>   GFE-intercepted on `*.run.app`).
 > - KMS secp256k1 must be **HSM** protection; `PORT` is reserved on the ingress container.
+> - **The target registry MUST already expose the gasless-intent facet.** The relayer only submits
+>   `…WithSig` calls, which revert on a pre-intents `WagerRegistry`. Confirm the proxy is upgraded
+>   (`intentExtension()` returns the facet, `DOMAIN_SEPARATOR()` does not revert) — for Mordor this was
+>   `scripts/deploy/upgrade-gasless-intents.js` (impl `0x9FfE…`, facet `0x81a9…`; see the deploy record).
 
 ## 0. Prerequisites (BLOCKER: interactive)
 
@@ -61,17 +69,28 @@ gcloud iam service-accounts create fairwins-relay-engine \
 
 ## 1. Secrets (Secret Manager)
 
+> ⚠️ **Strip the trailing newline.** `openssl rand -hex 32` emits a `\n`, and `gcloud secrets … --data-file=-`
+> stores stdin **verbatim, including that newline**. The engine (Rust) uses the raw secret bytes for both
+> the Bearer API key and the webhook HMAC key, so a stray `\n` silently breaks auth in two different ways:
+> the HTTP layer trims it off the `Authorization` header (→ engine 401 → gateway `503 chain_unavailable`),
+> while the gateway's config loader `.trim()`s the webhook secret but the engine does not (→ HMAC key
+> mismatch → every status webhook rejected → intents hang at `queued`). **Always pipe through `tr -d '\n'`.**
+
 ```bash
 # Origin lock — SHARED with the SPA's spec-007 origin lock; it very likely already exists.
 gcloud secrets describe origin-lock-secret >/dev/null 2>&1 \
   && echo "origin-lock-secret exists (reuse)" \
-  || { openssl rand -hex 32 | gcloud secrets create origin-lock-secret --data-file=- ; }
+  || { openssl rand -hex 32 | tr -d '\n' | gcloud secrets create origin-lock-secret --data-file=- ; }
 
 # Shared gateway<->engine webhook secret (WEBHOOK_SHARED_SECRET / WEBHOOK_SIGNING_KEY — same value).
-openssl rand -hex 32 | gcloud secrets create relay-webhook-secret --data-file=-
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create relay-webhook-secret --data-file=-
 
 # Engine REST API key (gateway sends it as ENGINE_API_KEY; engine checks it as API_KEY).
-openssl rand -hex 32 | gcloud secrets create relay-engine-api-key --data-file=-
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create relay-engine-api-key --data-file=-
+
+# Already created a secret WITH a newline? Add a clean version + pin the service.yaml refs to it:
+#   gcloud secrets versions access latest --secret=NAME | tr -d '\n' \
+#     | gcloud secrets versions add NAME --data-file=-
 ```
 
 Grant each runtime SA `roles/secretmanager.secretAccessor` on exactly the secrets it reads
@@ -111,6 +130,13 @@ cast balance $GAS_ADDR --rpc-url https://rpc.mordor.etccooperative.org
 ```
 
 ## 4. Engine (oz-relayer) → Cloud Run (internal)
+
+> **As-built shortcut.** Steps 4–5 below are the *illustrative* two-separate-services path. What is
+> actually live is a **single Cloud Run service with three sidecar containers** (gateway + engine +
+> redis), captured verbatim in **`services/oz-relayer/deploy/mordor/service.yaml`** with the engine
+> config in **`services/oz-relayer/deploy/mordor/config.json`**. To reproduce the live topology, build
+> the two images (below), then `gcloud run services replace services/oz-relayer/deploy/mordor/service.yaml
+> --region=us-central1`. Read steps 4–5 for the *why* behind each field.
 
 ```bash
 AR=us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research

@@ -338,6 +338,9 @@ export function createApp(config, deps = {}) {
         })
       } catch (e) {
         if (e instanceof EngineUnavailableError) {
+          // Surface WHY the engine was unavailable (auth, non-2xx, timeout) — the client only ever
+          // sees the generic 503, so without this an engine outage is invisible in the logs.
+          console.error('[relay-gateway] engine submission failed:', e.message, e.cause ? `| cause: ${e.cause?.message ?? e.cause}` : '')
           throw new GatewayError(503, 'chain_unavailable', 'submission engine unavailable; use self-submit')
         }
         throw e
