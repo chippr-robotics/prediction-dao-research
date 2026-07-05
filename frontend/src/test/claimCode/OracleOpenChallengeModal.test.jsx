@@ -155,3 +155,56 @@ describe('OracleOpenChallengeModal (spec 041, US1)', () => {
     expect(screen.getByRole('button', { name: /change/i })).toBeInTheDocument()
   })
 })
+
+// ---------------------------------------------------------------------------
+// US3 — fast discovery & effortless sharing (SC-001). Feed internals (grouping,
+// category chips, retry, a11y) are covered by PolymarketBrowser.test.jsx; here we
+// pin the modal-level interaction budget and state transitions.
+// ---------------------------------------------------------------------------
+describe('OracleOpenChallengeModal — discovery speed & sharing (spec 041, US3)', () => {
+  beforeEach(() => {
+    createOpenChallenge.mockReset()
+    capsHolder.capabilities = { polymarketSidebets: true }
+  })
+
+  it('the picker is browsable with zero input the moment the section opens', () => {
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    expect(screen.getByTestId('pm-browser')).toBeInTheDocument()
+    // No search/typing is required before markets are pickable.
+    expect(screen.getByRole('button', { name: /pick eligible/i })).toBeInTheDocument()
+  })
+
+  it('feed → side picked takes at most 3 interactions (SC-001)', () => {
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    // 1: pick a market from the feed; 2: pick a side. (3rd would be a category/search refinement.)
+    fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
+    fireEvent.click(screen.getByRole('button', { name: /taking yes/i }))
+    expect(screen.getByRole('button', { name: /taking yes/i })).toHaveAttribute('aria-pressed', 'true')
+    // Stake is pre-filled, so the create button is already enabled after 2 interactions.
+    expect(screen.getByRole('button', { name: /create & generate code/i })).toBeEnabled()
+  })
+
+  it('a refused (too-soon) pick does not strand the flow — the next valid pick clears the notice', () => {
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /pick soon/i }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/too soon/i)
+    fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
+    expect(screen.queryByText(/too soon/i)).toBeNull()
+    expect(screen.getByText('Will ETH flip BTC?')).toBeInTheDocument()
+  })
+
+  it('after create, the share tools are immediately at hand: copy, QR deep link, device backup (FR-010)', async () => {
+    createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 3n, txHash: '0x1' })
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
+    fireEvent.click(screen.getByRole('button', { name: /taking no/i }))
+    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+
+    expect(await screen.findByText('river tiger kite zoo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/qr code to take this challenge/i)).toBeInTheDocument()
+    // The retention warning tells the sharer the code is also how the bet is READ later.
+    expect(screen.getByText(/only way to take, read, or re-read/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save encrypted backup/i })).toBeInTheDocument()
+  })
+})

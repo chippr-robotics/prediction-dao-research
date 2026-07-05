@@ -213,17 +213,17 @@ grouped events stay scannable; share tools at hand — SC-001/SC-002 interaction
 hand in under 2 minutes, ≤ 3 interactions from feed to side-picked market; feed/search
 under ~2 s typical.
 
-- [ ] T022 [US3] Discovery polish in `OracleOpenChallengeModal.jsx` +
+- [X] T022 [US3] Discovery polish in `OracleOpenChallengeModal.jsx` +
       `OracleOpenChallengeModal.css`: default feed opens expanded with popular markets
       (no input required), event-grouped rows expand inline, ineligible-market reason
       copy is friendly ("ends too soon…"), selection → configure step transition is a
       single tap, and an `InfoTip` explains the section ("Polymarket settles it — you
       just pick a side and share the code").
-- [ ] T023 [US3] Share-readiness pass on `ClaimCodeResultPanel.jsx`: copy / QR /
+- [X] T023 [US3] Share-readiness pass on `ClaimCodeResultPanel.jsx`: copy / QR /
       take-challenge deep link and vault-backup states visible without scrolling on
       mobile-width viewport; code-retention prompt copy mentions the taker needs the
       code to read the bet (parity with FR-010; no new mechanics).
-- [ ] T024 [P] [US3] Extend `frontend/src/test/claimCode/OracleOpenChallengeModal.test.jsx`
+- [X] T024 [P] [US3] Extend `frontend/src/test/claimCode/OracleOpenChallengeModal.test.jsx`
       for US3 acceptance: feed renders with zero input, grouped event expands, ≤ 3
       interactions from feed to side selection (assert step transitions), stale-result
       guard (loading state shown while switching filters).
@@ -232,18 +232,18 @@ under ~2 s typical.
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T025 [P] Accessibility audit additions in
+- [X] T025 [P] Accessibility audit additions in
       `frontend/src/test/accessibility.test.jsx`: axe checks over
       `OracleOpenChallengeModal` (both steps) and the oracle-summary
       `TakeChallengePanel` state (WCAG 2.1 AA — Constitution V).
-- [ ] T026 [P] Update `docs/` developer notes: brief section in the wagers/oracle
+- [X] T026 [P] Update `docs/` developer notes: brief section in the wagers/oracle
       developer guide (e.g. `docs/developer-guide/` alongside existing guides) covering
       the sealed `oracle` terms block, timeline-derivation constants, and the
       chain-authoritative display rule (D4).
-- [ ] T027 Full verification sweep per quickstart: `npm run compile`, `npm test`,
+- [X] T027 Full verification sweep per quickstart: `npm run compile`, `npm test`,
       `npm run test:frontend`, frontend lint — all green with zero regressions
       (SC-007); compare against the T001 baseline.
-- [ ] T028 Manual quickstart §3 walkthrough on Amoy (create → share → second-wallet
+- [ ] T028 (PENDING — needs a wallet on Amoy; see PR description) Manual quickstart §3 walkthrough on Amoy (create → share → second-wallet
       claim view incl. degraded state → accept) and record outcomes in the PR
       description (SC-001/SC-004/SC-005 evidence).
 

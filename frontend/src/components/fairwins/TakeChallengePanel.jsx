@@ -190,6 +190,9 @@ function OracleBetSummary({ wager, terms, live, resolvedOutcomeName }) {
   const conditionId = wager?.polymarketConditionId
   const creatorIsYes = Boolean(wager?.creatorIsYes)
   const { market, isLoading, error } = live
+  // Mount-anchored clock: render must stay pure, and "has the event passed" doesn't
+  // need to tick while the panel is open.
+  const [nowMs] = useState(() => Date.now())
 
   const sealed = terms && typeof terms === 'object' ? terms.oracle : null
   const integrity = !sealed
@@ -203,7 +206,7 @@ function OracleBetSummary({ wager, terms, live, resolvedOutcomeName }) {
   const takerLabel = labels[creatorIsYes ? 1 : 0]
   const creatorLabel = labels[creatorIsYes ? 0 : 1]
   const slug = trusted?.slug || market?.slug || null
-  const marketClosed = Boolean(market && (market.closed || (market.endDate && Date.parse(market.endDate) < Date.now())))
+  const marketClosed = Boolean(market && (market.closed || (market.endDate && Date.parse(market.endDate) < nowMs)))
 
   return (
     <div className="tc-oracle" aria-label="How this bet settles">

@@ -24,3 +24,11 @@
   display: block;
   margin-top: 6px;
 }
+
+/* Keep the inline picker usable inside the modal on small screens: the feed scrolls
+   within its own region instead of stretching the whole sheet (US3). */
+#ooc-market-picker {
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  border-radius: 12px;
+}
