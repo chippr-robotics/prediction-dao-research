@@ -261,10 +261,14 @@ export async function pollStatus(intentId, { baseUrl, timeoutMs = RELAY_TIMEOUT_
 }
 
 /**
- * Probe `GET /healthz` within a bounded (~2s) budget. Returns true only when the gateway reports
+ * Probe `GET /status` within a bounded (~2s) budget. Returns true only when the gateway reports
  * `status: 'ok'`, the kill switch is off, and — when the response itemizes chains — `chainId`'s RPC
  * is up. Any failure, timeout, or unset relayer returns false (never throws): a failed probe routes
  * the flow to self-submit BEFORE the user signs (FR-016).
+ *
+ * NOTE: the path is `/status`, not `/healthz` — Google's GFE intercepts the literal `/healthz` on
+ * Cloud Run (*.run.app), so it never reaches the gateway. `/status` is the same handler at a
+ * non-reserved path.
  *
  * @param {number} chainId
  * @param {{baseUrl?: string, budgetMs?: number}} [opts]
@@ -274,12 +278,17 @@ export async function probeHealth(chainId, { baseUrl, budgetMs = HEALTH_BUDGET_M
   const base = baseUrl != null ? baseUrl.replace(/\/$/, '') : relayerBaseUrl()
   if (!base) return false
   try {
-    const res = await boundedFetch(`${base}/healthz`, { method: 'GET' }, budgetMs)
+    const res = await boundedFetch(`${base}/status`, { method: 'GET' }, budgetMs)
     if (!res.ok) return false
     const data = await readJson(res)
     if (!data || data.status !== 'ok' || data.killSwitch === true) return false
-    if (chainId != null && data.chains && data.chains[String(chainId)]) {
-      return data.chains[String(chainId)].rpc === 'up'
+    // A caller that names a chain the relayer doesn't serve (absent from the map) must fall back to
+    // self-submit — returning true here would prompt a signature and then hard-fail on chain_mismatch,
+    // stranding the action (never-stranded, FR-002/FR-003). Only chainId==null (caller doesn't care)
+    // trusts the top-level status.
+    if (chainId != null) {
+      const c = data.chains && data.chains[String(chainId)]
+      return !!c && c.rpc === 'up'
     }
     return true
   } catch {
