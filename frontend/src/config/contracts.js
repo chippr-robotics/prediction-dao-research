@@ -100,6 +100,7 @@ const POLYGON_CONTRACTS = {
   membershipVoucher: '0xCB28DC438564672067a6f84131B5130e6Cf7ECC6',
   voucherBatchMinter: '0x4b50d24ca28CbDC029714e5830f7D16a0ebEDb0e',
   tokenFactory: '0x5806e76cA3c838524E7cF43db7625bdFBA0783a0',
+  wagerPoolFactory: '0x420aEC3c76859eB74ab21c769c16AcdAB221f723',
 }
 
 const NETWORK_CONTRACTS = {
@@ -127,7 +128,7 @@ export const DEPLOYED_CONTRACTS =
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 89717915, membershipVoucher: 89717915 },
+  137: { friendGroupMarketFactory: 0, wagerRegistry: 89717915, membershipVoucher: 89717915, wagerPoolFactory: 89720731 },
 }
 
 export const DEPLOYMENT_BLOCKS =

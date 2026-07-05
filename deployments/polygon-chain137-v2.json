@@ -24,7 +24,10 @@
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
     "chainlinkFunctionsAdapter": "0x148C2E347a601AC1a680b17321529b0Ffc31AeFc",
     "umaAdapter": "0x8224433d099Af6cd30540A78421aBFd6e044E949",
-    "wagerRegistryIntents": "0x9e4338E12A30a98eaa0dE58b2c4d7B562f5eB438"
+    "wagerRegistryIntents": "0x9e4338E12A30a98eaa0dE58b2c4d7B562f5eB438",
+    "wagerPoolFactory": "0x420aEC3c76859eB74ab21c769c16AcdAB221f723",
+    "wagerPoolFactoryImpl": "0x2ad0F9Fe788F35F8edbaCA35346Da22792c5d18e",
+    "poolImpl": "0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277"
   },
   "mocks": null,
   "constructorArgs": {
@@ -61,9 +64,12 @@
       "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
       "0x5953f2538F613E05bAED8A5AeFa8e6622467AD3D"
     ],
-    "wagerRegistryIntents": []
+    "wagerRegistryIntents": [],
+    "wagerPoolFactoryImpl": [],
+    "poolImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
-  "gaslessIntentsUpgradedAt": "2026-07-05T20:10:24.755Z"
+  "gaslessIntentsUpgradedAt": "2026-07-05T20:10:24.755Z",
+  "wagerPoolsDeployedAt": "2026-07-05T21:15:07.971Z"
 }
