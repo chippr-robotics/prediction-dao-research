@@ -83,11 +83,11 @@
 
 **Independent Test**: quickstart.md §4 rows 2–3; existing wallet suites pass unchanged (SC-004).
 
-- [ ] T036 [US2] Audit and remove EOA assumptions across feature code: every identity/gating read uses `address` from `useWallet()` (never connector type or `signer` presence); guard the remaining ethers-signer call sites in `frontend/src/utils/blockchainService.js` behind the WalletContext signing abstraction (FR-002)
-- [ ] T037 [US2] Implement passkey session persistence + sign-out in `frontend/src/contexts/WalletContext.jsx` + connector storage: silent reconnect on reload, no self-expiry (clarification Q4), sign-out atomically clears session/account/cached-role state (FR-003)
-- [ ] T038 [US2] Implement clean identity switching between passkey and classic wallet in `frontend/src/contexts/WalletContext.jsx`: full LoginSession swap, no balance/role/history bleed (FR-024)
-- [ ] T039 [P] [US2] Vitest `frontend/src/contexts/WalletContext.passkey.test.jsx`: persistence, sign-out clearing, switch-identity isolation, role-gating parity with a mocked smart-account address
-- [ ] T040 [US2] Cypress e2e `frontend/cypress/e2e/passkey/unified-login.cy.js`: same gates/balances/roles resolve for both account types across wagers/pools/membership/account pages; reload persists; sign-out clears — plus a CI assertion that all pre-existing wallet/connect Cypress specs run unchanged (SC-003/SC-004)
+- [x] T036 [US2] Audit and remove EOA assumptions across feature code: every identity/gating read uses `address` from `useWallet()` (never connector type or `signer` presence); guard the remaining ethers-signer call sites in `frontend/src/utils/blockchainService.js` behind the WalletContext signing abstraction (FR-002)
+- [x] T037 [US2] Implement passkey session persistence + sign-out in `frontend/src/contexts/WalletContext.jsx` + connector storage: silent reconnect on reload, no self-expiry (clarification Q4), sign-out atomically clears session/account/cached-role state (FR-003)
+- [x] T038 [US2] Implement clean identity switching between passkey and classic wallet in `frontend/src/contexts/WalletContext.jsx`: full LoginSession swap, no balance/role/history bleed (FR-024)
+- [x] T039 [P] [US2] Vitest `frontend/src/contexts/WalletContext.passkey.test.jsx`: persistence, sign-out clearing, switch-identity isolation, role-gating parity with a mocked smart-account address
+- [x] T040 [US2] Cypress e2e `frontend/cypress/e2e/passkey/unified-login.cy.js`: same gates/balances/roles resolve for both account types across wagers/pools/membership/account pages; reload persists; sign-out clears — plus a CI assertion that all pre-existing wallet/connect Cypress specs run unchanged (SC-003/SC-004)
 
 **Checkpoint**: Both P1 stories complete — site-wide login manager is shippable.
 
@@ -99,10 +99,10 @@
 
 **Independent Test**: quickstart.md §4 row 3 + §5.3.
 
-- [ ] T041 [US3] Implement returning sign-in in `frontend/src/lib/passkey/credentials.js` + `connectors/passkey.js`: credential discovery, platform picker for multiple site credentials (never guess — edge case), credential→address resolution surviving cleared browser data (re-derive via on-chain owner lookup with local mapping as cache)
-- [ ] T042 [US3] Handle synced-passkey and cross-device (hybrid transport) sign-in in `frontend/src/components/wallet/PasskeySignIn.jsx`, reaching the identical account with full state (FR-009)
-- [ ] T043 [P] [US3] Vitest `frontend/src/lib/passkey/signin.test.js`: multi-credential picker, cleared-storage recovery of the address mapping, wrong-credential error paths
-- [ ] T044 [US3] Cypress e2e `frontend/cypress/e2e/passkey/returning-user.cy.js`: reload/sign-in ≤10 s and one prompt (SC-005); second virtual authenticator simulating a synced device reaches the same address/balances/roles
+- [x] T041 [US3] Implement returning sign-in in `frontend/src/lib/passkey/credentials.js` + `connectors/passkey.js`: credential discovery, platform picker for multiple site credentials (never guess — edge case), credential→address resolution surviving cleared browser data (re-derive via on-chain owner lookup with local mapping as cache)
+- [x] T042 [US3] Handle synced-passkey and cross-device (hybrid transport) sign-in in `frontend/src/components/wallet/PasskeySignIn.jsx`, reaching the identical account with full state (FR-009)
+- [x] T043 [P] [US3] Vitest `frontend/src/lib/passkey/signin.test.js`: multi-credential picker, cleared-storage recovery of the address mapping, wrong-credential error paths
+- [x] T044 [US3] Cypress e2e `frontend/cypress/e2e/passkey/returning-user.cy.js`: reload/sign-in ≤10 s and one prompt (SC-005); second virtual authenticator simulating a synced device reaches the same address/balances/roles
 
 ---
 

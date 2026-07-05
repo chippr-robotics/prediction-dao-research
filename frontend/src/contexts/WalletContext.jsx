@@ -471,6 +471,11 @@ export function WalletProvider({ children }) {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
+
+      // Spec 041 FR-003: sign-out clears the passkey session atomically too.
+      // (Credential bookkeeping and wrapped key blobs stay — they are not
+      // session state; the passkey itself lives in the platform authenticator.)
+      localStorage.removeItem('fairwins.passkey.session.v1')
     } catch (error) {
       console.error('Error clearing wallet persistence:', error)
     }
