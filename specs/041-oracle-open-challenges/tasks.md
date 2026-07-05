@@ -169,7 +169,7 @@ closed/resolved markets.
 single-view summary in live, degraded (Gamma offline), closed, and resolved states;
 accept and confirm standard oracle settlement (quickstart §3.4–3.6).
 
-- [ ] T018 [US2] Extend `frontend/src/components/fairwins/TakeChallengePanel.jsx` per
+- [X] T018 [US2] Extend `frontend/src/components/fairwins/TakeChallengePanel.jsx` per
       contracts/claimant-view.md — bet summary + oracle block: for
       `Number(wager.resolutionType) === ResolutionType.Polymarket`, render between the
       terms `<pre>` and `<ChallengeDeadlines>`: market question (verified
@@ -180,7 +180,7 @@ accept and confirm standard oracle settlement (quickstart §3.4–3.6).
       line renders for non-oracle challenges too). Include the integrity check:
       `terms.oracle.conditionId` vs `wager.polymarketConditionId` mismatch → warning +
       prefer live data (Constitution III).
-- [ ] T019 [US2] Add the settlement-source badge + live context to
+- [X] T019 [US2] Add the settlement-source badge + live context to
       `TakeChallengePanel.jsx`: distinct text+glyph badge "Settled automatically by
       Polymarket" with the plain-language explanation (shown in live AND degraded
       states), public market link when slug known; wire
@@ -189,13 +189,13 @@ accept and confirm standard oracle settlement (quickstart §3.4–3.6).
       unavailable" on error with accept still enabled); accept gate per D8 —
       closed/past-end → prominent warning, publicly resolved outcome → accept button
       disabled with adjacent explanation (FR-013..FR-015).
-- [ ] T020 [P] [US2] Create `frontend/src/test/claimCode/TakeChallengePanel.oracle.test.jsx`:
+- [X] T020 [P] [US2] Create `frontend/src/test/claimCode/TakeChallengePanel.oracle.test.jsx`:
       full summary fields present on one view (SC-004); Polymarket named in live and
       degraded states (SC-005); side labels follow `creatorIsYes` both ways; integrity
       mismatch warning; closed-market warning vs resolved-market accept block;
       non-oracle challenge unchanged except stake/payout line; a11y roles
       (`role="status"`, button semantics).
-- [ ] T021 [P] [US2] Extend `frontend/src/test/useOpenChallengeAccept.test.jsx`:
+- [X] T021 [P] [US2] Extend `frontend/src/test/useOpenChallengeAccept.test.jsx`:
       lookup payload passes through `resolutionType`, `polymarketConditionId`,
       `creatorIsYes` untouched, and decrypted terms with an `oracle` block reach the
       caller (accept flow itself unchanged — FR-016).

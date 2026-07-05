@@ -1,0 +1,85 @@
+/* Take-a-challenge bet summary additions (spec 041). Meaning is carried by text +
+   icon, never color alone (WCAG); layered over FriendMarketsModal/OpenChallengeModal css. */
+
+.tc-stake {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.95rem;
+}
+
+.tc-oracle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tc-oracle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.tc-oracle-badge-icon {
+  font-size: 1.15rem;
+}
+
+.tc-oracle-explain {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.tc-oracle-question {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 1rem;
+}
+
+.tc-oracle-question-fallback {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.tc-oracle-link {
+  font-size: 0.82rem;
+  text-decoration: underline;
+  width: fit-content;
+}
+
+.tc-oracle-sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
+.tc-oracle-sides-sep {
+  opacity: 0.5;
+}
+
+.tc-oracle-live {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.tc-oracle-live-degraded,
+.tc-oracle-live-loading {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.tc-oracle-live-status.is-closed {
+  font-weight: 600;
+}
