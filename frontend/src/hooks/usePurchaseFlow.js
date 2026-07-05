@@ -81,9 +81,18 @@ export function usePurchaseFlow(deps = {}) {
     setStatus('running')
     try {
       if (fromSegment === 'purchase') {
-        const receipt = await purchaseFn(
-          p.signer, p.roleName, p.priceUSD, p.tier, p.action, p.termsHash, handleProgress,
-        )
+        let receipt
+        if (p.batchPurchase) {
+          // Passkey smart accounts (spec 041, FR-016): approve+purchase run as
+          // ONE batched confirmation — a single 'pay' step, no approve step.
+          updateStep('pay', { state: 'active', failureReason: null })
+          receipt = await p.batchPurchase()
+          updateStep('pay', { state: 'completed', txHash: receipt?.txHash })
+        } else {
+          receipt = await purchaseFn(
+            p.signer, p.roleName, p.priceUSD, p.tier, p.action, p.termsHash, handleProgress,
+          )
+        }
         receiptRef.current = receipt
         // Defensively ensure approve (if present) + pay show completed.
         setSteps((prev) => prev.map((s) =>
@@ -97,10 +106,25 @@ export function usePurchaseFlow(deps = {}) {
 
       if (fromSegment === 'purchase' || fromSegment === 'sign') {
         updateStep('sign', { state: 'active', failureReason: null })
-        const keys = await p.ensureInitialized()
-        if (!keys?.publicKey) throw new Error('Could not derive encryption keys')
-        publicKeyRef.current = keys.publicKey
-        updateStep('sign', { state: 'completed' })
+        try {
+          const keys = await p.ensureInitialized()
+          if (!keys?.publicKey) throw new Error('Could not derive encryption keys')
+          publicKeyRef.current = keys.publicKey
+          updateStep('sign', { state: 'completed' })
+        } catch (err) {
+          // Device-dependent degradation (spec 041, clarification Q1): a
+          // passkey/authenticator without deterministic key material keeps the
+          // membership fully valid — only encrypted features gate off, and the
+          // UI says so explicitly instead of failing the whole purchase.
+          if (err?.name === 'EncryptionUnavailable') {
+            updateStep('sign', { state: 'skipped', failureReason: err.message })
+            updateStep('register', { state: 'skipped', failureReason: 'Encrypted features unavailable on this device' })
+            setKeyRegOutcome('unavailable')
+            setStatus('succeeded')
+            return
+          }
+          throw err
+        }
       }
 
       // register
@@ -126,9 +150,12 @@ export function usePurchaseFlow(deps = {}) {
     setKeyRegOutcome(null)
     setStatus('running')
 
-    const approvalNeeded = await approvalCheckFn(
-      params.signer, params.roleName, params.priceUSD, params.tier, params.action,
-    )
+    // Passkey batch path never shows a separate approve step (FR-016).
+    const approvalNeeded = params.batchPurchase
+      ? false
+      : await approvalCheckFn(
+          params.signer, params.roleName, params.priceUSD, params.tier, params.action,
+        )
     const ids = approvalNeeded ? ['approve', 'pay', 'sign', 'register'] : ['pay', 'sign', 'register']
     setSteps(ids.map(makeStep))
 
