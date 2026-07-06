@@ -16,6 +16,8 @@ import { useNotification } from '../hooks/useUI'
 import { activitySources } from '../data/notifications/sources'
 import { defaultStore, loadStore, saveStore, appendEntries, markRead, setSourceSlice } from '../data/notifications/activityStore'
 import { detectAll, countActionNeeded } from '../data/notifications/activityEngine'
+import { resolveDelivery } from '../lib/notifications/deliveryPreferences'
+import { showSystemNotification } from '../lib/notifications/pushDelivery'
 
 const MAX_TOASTS_PER_CYCLE = 3
 const TOAST_DURATION_MS = 6000
@@ -101,11 +103,21 @@ export function ActivityProvider({ children, sources = activitySources }) {
       const isCatchUp = firstPollRef.current
       firstPollRef.current = false
       if (!isCatchUp && added.length > 0) {
-        for (const entry of added.slice(0, MAX_TOASTS_PER_CYCLE)) {
+        // Route each fresh entry by its domain's delivery mode (per-device
+        // preference): 'silent' → feed only (already persisted above);
+        // 'app' → in-app toast; 'push' → in-app toast + a system notification on
+        // this device. The toast cap applies to non-silent entries; system
+        // notifications are capped the same way so a busy cycle can't spam.
+        const toastable = added.filter((e) => resolveDelivery(e.domain || 'wagers') !== 'silent')
+        for (const entry of toastable.slice(0, MAX_TOASTS_PER_CYCLE)) {
           showNotification(entry.message, entry.severity, TOAST_DURATION_MS)
         }
-        if (added.length > MAX_TOASTS_PER_CYCLE) {
-          showNotification(`+${added.length - MAX_TOASTS_PER_CYCLE} more updates in activity`, 'info', TOAST_DURATION_MS)
+        if (toastable.length > MAX_TOASTS_PER_CYCLE) {
+          showNotification(`+${toastable.length - MAX_TOASTS_PER_CYCLE} more updates in activity`, 'info', TOAST_DURATION_MS)
+        }
+        const pushable = added.filter((e) => resolveDelivery(e.domain || 'wagers') === 'push')
+        for (const entry of pushable.slice(0, MAX_TOASTS_PER_CYCLE)) {
+          showSystemNotification(entry)
         }
       }
       if (anyFailure && !failureNoticedRef.current) {

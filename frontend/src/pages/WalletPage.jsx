@@ -14,6 +14,7 @@ import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
+import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
@@ -525,6 +526,10 @@ function WalletPage() {
 
                 {activeTab === 'preferences' && (
                   <div className="preferences-section" role="tabpanel">
+                    <div className="section">
+                      <NotificationPreferencesPanel />
+                    </div>
+
                     <div className="section">
                       <h3>Install App</h3>
                       <p className="section-description">

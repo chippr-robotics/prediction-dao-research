@@ -137,6 +137,11 @@ function MarketAcceptanceModal({
   const [envelopeLoading, setEnvelopeLoading] = useState(false)
 
   useEffect(() => {
+    // Guard against setState-after-unmount: navigating away (e.g. Back from a
+    // notification-launched accept screen) can unmount this modal while the IPFS
+    // fetch is still in flight. `alive` is cleared on cleanup so the awaited
+    // result is dropped instead of writing into a torn-down component.
+    let alive = true
     const resolveEnvelope = async () => {
       if (!marketData?.isEncrypted) return
 
@@ -145,7 +150,7 @@ function MarketAcceptanceModal({
         try {
           const parsed = JSON.parse(marketData.rawDescription)
           if (parsed.version && parsed.algorithm && parsed.content) {
-            setResolvedEnvelope(parsed)
+            if (alive) setResolvedEnvelope(parsed)
             return
           }
         } catch {
@@ -157,19 +162,20 @@ function MarketAcceptanceModal({
       const cid = marketData.ipfsCid
       if (cid) {
         try {
-          setEnvelopeLoading(true)
+          if (alive) setEnvelopeLoading(true)
           const envelope = await fetchEncryptedEnvelope(cid)
-          setResolvedEnvelope(envelope)
+          if (alive) setResolvedEnvelope(envelope)
         } catch (err) {
           console.error('Failed to fetch encrypted envelope from IPFS:', err)
         } finally {
-          setEnvelopeLoading(false)
+          if (alive) setEnvelopeLoading(false)
         }
       }
     }
 
     setResolvedEnvelope(null)
     resolveEnvelope()
+    return () => { alive = false }
   }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.ipfsCid])
 
   // Legacy fallback: decrypt using shared creator signature from old invitation URLs

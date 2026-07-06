@@ -24,6 +24,7 @@ import PoolPage from './pages/PoolPage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
+import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -42,6 +43,8 @@ function AppLayout() {
        below consume it (wagers + DAO/token/membership sources); landing pages never poll. */
     <ActivityProvider>
       <Header appMode />
+      {/* Spec 041: route a tapped push notification into in-app navigation. */}
+      <ActivityNotificationBridge />
       {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
       <EntryGate />
       <Outlet />

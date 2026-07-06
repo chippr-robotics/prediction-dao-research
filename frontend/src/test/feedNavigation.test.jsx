@@ -211,6 +211,29 @@ describe('Feed → wager navigation (spec 012 T018, FR-004/FR-016)', () => {
     ).toBeInTheDocument()
   })
 
+  it('closing the wager modal after a feed open does not reopen it (regression: back/click-away error)', async () => {
+    await renderDashboard(
+      [{ pathname: '/app', state: { openWagerId: '42' } }],
+      [wager42()]
+    )
+
+    // Opened on the wager detail view via router state.
+    await screen.findByRole('button', { name: /back to list/i })
+
+    // Click away (the modal close). Previously the router state was consumed via
+    // a render-phase setState + deferred navigate, so closing raced a not-yet-
+    // cleared state and reopened the modal / threw. It must now close and stay
+    // closed — the state was cleared atomically in the open effect.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /close modal/i }))
+    })
+
+    expect(screen.queryByRole('button', { name: /back to list/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { level: 3, name: /feed target wager/i })
+    ).not.toBeInTheDocument()
+  })
+
   it('marks the wager read when opened via router state (FR-004)', async () => {
     await renderDashboard(
       [{ pathname: '/app', state: { openWagerId: '42' } }],
