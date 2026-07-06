@@ -89,6 +89,44 @@
   color: var(--color-text-secondary, var(--text-secondary, #6b7280));
 }
 
+/* To — address entry row (AddressInput + address book + QR scan) */
+.pt-input-with-action {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.pt-input-with-action .pt-address-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.pt-scan-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 42px;
+  min-width: 42px;
+  height: 44px;
+  background: var(--color-surface, var(--surface-color, #fff));
+  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border-radius: 10px;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  cursor: pointer;
+}
+.pt-scan-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.pt-scan-btn:hover:not(:disabled) {
+  border-color: var(--color-primary, #6d28d9);
+  color: var(--color-primary, #6d28d9);
+}
+.pt-scan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Amount input row */
 .pt-amount-row {
   display: flex;
