@@ -39,6 +39,14 @@ const REQUIRED_RPCS = [
   'https://etc.rivet.link', // Ethereum Classic mainnet (61)
 ]
 
+// Gasless infrastructure the SPA POSTs to directly (specs 035/036 + 041). Without these in connect-src
+// the browser blocks the fetch and every relayed intent silently falls back to self-submit (and the
+// ERC-4337 bundler can't be reached at all) — the gasless path is dead in production despite shipping.
+const REQUIRED_GASLESS_HOSTS = [
+  'https://relay.fairwins.app', // relay-gateway (VITE_RELAYER_URL) — intent submission + status
+  'https://bundler.fairwins.app', // alto ERC-4337 bundler (edge-fronted target, spec 041)
+]
+
 describe('nginx CSP connect-src blockchain RPC allowlist', () => {
   it.each(CONFIGS)('%s allowlists every production RPC endpoint', (path) => {
     const conf = readFileSync(path, 'utf8')
@@ -57,6 +65,13 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
         connectSrc,
         `${path} connect-src is missing ${rpc} — reads on that chain will be blocked by CSP`,
       ).toContain(rpc)
+    }
+
+    for (const host of REQUIRED_GASLESS_HOSTS) {
+      expect(
+        connectSrc,
+        `${path} connect-src is missing ${host} — the gasless relay/bundler call will be blocked by CSP`,
+      ).toContain(host)
     }
 
     // The dev-only Hardhat RPC must never ship in the production policy.

@@ -1,0 +1,18 @@
+# Build + push the origin-lock nginx ingress image for the alto bundler.
+#   gcloud builds submit services/alto-bundler --config services/alto-bundler/cloudbuild.yaml
+# Then apply services/alto-bundler/deploy/service.yaml (see README) to roll out the multi-container
+# service (nginx ingress + alto sidecar).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:$SHORT_SHA
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:latest
+      - nginx
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:$SHORT_SHA
+  - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:latest
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,58 @@
+# Origin-lock ingress for the alto ERC-4337 bundler (spec 041 SC-009 / spec 036 FR-029 parity).
+#
+# The alto bundler (pimlico) has no auth of its own: as a bare public Cloud Run URL, anyone can spend
+# its executor gas by submitting UserOperations. This nginx ingress sidecar puts it behind the SAME
+# origin lock as the SPA and relay-gateway — Cloudflare injects `X-Origin-Auth: <secret>` (a zone-wide
+# Transform Rule on *.fairwins.app) and we accept a request only when it matches ORIGIN_LOCK_SECRET.
+# Enforcement is active only when ORIGIN_LOCK_ENABLED=1 (set by docker-entrypoint.sh iff the secret is
+# configured), so a pre-Cloudflare / secret-less deploy is behaviour-neutral and never bricks the bundler.
+#
+# $origin_denied = 1 => block (403). The secret is never written to logs. The bundler itself runs as a
+# localhost-only sidecar (alto binds 127.0.0.1:3000 in the same Cloud Run instance).
+
+map "${ORIGIN_LOCK_ENABLED}:$http_x_origin_auth" $origin_denied {
+    default                      1;   # enforcement on + header missing/mismatch => deny
+    "~^0:"                       0;   # enforcement off => allow everything
+    "1:${ORIGIN_LOCK_SECRET}"    0;   # enforcement on + exact secret match => allow
+}
+
+log_format bundler_edge '$remote_addr cf_ip=$http_cf_connecting_ip '
+                        'cf_country=$http_cf_ipcountry "$request" $status '
+                        '$body_bytes_sent rt=$request_time';
+
+upstream alto {
+    server 127.0.0.1:3000;   # alto sidecar (same Cloud Run instance)
+    keepalive 16;
+}
+
+server {
+    listen 8080;
+    server_name _;
+    access_log /dev/stdout bundler_edge;
+
+    # Unauthenticated health endpoint (origin-lock exempt) for Cloud Run + uptime probes. Does NOT
+    # proxy to alto so a health check can't be looped to amplify RPC load onto the bundler's provider.
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    # JSON-RPC surface (eth_sendUserOperation, eth_estimateUserOperationGas, pimlico_*). Only
+    # Cloudflare-proxied requests carrying the origin-lock secret may reach the bundler.
+    location / {
+        if ($origin_denied) { return 403; }
+
+        proxy_pass http://alto;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # UserOp simulation + submission can be slow under load; keep generous but bounded timeouts.
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+}
