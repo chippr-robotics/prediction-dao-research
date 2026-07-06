@@ -120,6 +120,9 @@ const NETWORKS = {
         dex: Boolean(this.dex),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
+        // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
+        // independent of whether an ExternalDAORegistry is deployed (registry-optional).
+        clearpath: true,
       }
     },
   },
@@ -194,6 +197,8 @@ const NETWORKS = {
         dex: Boolean(this.dex),
         friendMarkets: true,
         passkeyAccounts: false,
+        // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
+        clearpath: true,
       }
     },
   },
@@ -258,6 +263,8 @@ const NETWORKS = {
         dex: Boolean(this.dex),
         friendMarkets: true,
         passkeyAccounts: false,
+        // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
+        clearpath: true,
       }
     },
   },
@@ -318,6 +325,51 @@ const NETWORKS = {
         dex: Boolean(this.dex),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
+        // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
+        // independent of whether an ExternalDAORegistry is deployed (registry-optional).
+        clearpath: true,
+      }
+    },
+  },
+  1: {
+    chainId: 1,
+    name: 'Ethereum',
+    isTestnet: false,
+    isPrimary: false,
+    // Surfaced in the My Account → Network tab as a user-switchable network.
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+    // Ethereum mainnet is a ClearPath-ONLY network (spec 042): DAO governance (ENS/Uniswap/…) is
+    // the only enabled capability. No wager/DEX/passkey infra is deployed here, and each of those
+    // features self-discloses as unavailable rather than pretending to work (FR-002/FR-003).
+    rpcUrl: import.meta.env?.VITE_RPC_URL_MAINNET || 'https://ethereum-rpc.publicnode.com',
+    explorer: { name: 'Etherscan', baseUrl: 'https://etherscan.io' },
+    // No wager subgraph for this network. ClearPath reads a DAO's own data subgraph-first (per-DAO,
+    // see config/clearpath/daoSubgraphs.js) then falls back to a bounded on-chain scan.
+    subgraphUrl: null,
+    // Native Circle USDC on Ethereum mainnet — read for tracked-DAO treasury USDC balances only
+    // (ClearPath is non-custodial; no wager escrow uses it here). Override via VITE_MAINNET_USDC.
+    stablecoin: {
+      address: import.meta.env?.VITE_MAINNET_USDC || '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      domainVersion: '2',
+    },
+    // No in-app DEX/swap on this network in this cut (ClearPath-only).
+    dex: null,
+    contracts: {}, // no wager/membership deployment — ClearPath needs none (registry-optional)
+    polymarket: null,
+    // Passkey smart accounts are not enabled on this ClearPath-only network in this cut.
+    passkey: null,
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: false,
+        friendMarkets: false,
+        passkeyAccounts: false,
+        // The single enabled capability: ClearPath DAO governance (ENS, Uniswap, …).
+        clearpath: true,
       }
     },
   },
@@ -346,6 +398,8 @@ const NETWORKS = {
         dex: false,
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
+        // Local Hardhat sandbox is not a ClearPath governance network.
+        clearpath: false,
       }
     },
   },

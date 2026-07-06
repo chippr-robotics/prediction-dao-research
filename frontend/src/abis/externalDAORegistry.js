@@ -64,12 +64,53 @@ export const GOVERNOR_WRITE_ABI = [
   'function propose(address[] targets, uint256[] values, bytes[] calldatas, string description) returns (uint256)',
 ]
 
-/** Vote support values (GovernorCountingSimple: 0 Against, 1 For, 2 Abstain). */
+/** Vote support values. OZ GovernorCountingSimple AND Compound GovernorBravo both use 0 Against, 1 For, 2 Abstain. */
 export const VOTE_SUPPORT = { Against: 0, For: 1, Abstain: 2 }
 
-/** Frameworks the registry recognizes (matches the on-chain enum order). */
-export const DAO_FRAMEWORK = { OZGovernor: 0 }
-export const DAO_FRAMEWORK_LABEL = { 0: 'OpenZeppelin Governor' }
+// --- Spec 042: GovernorBravo / Compound read+write surface (Uniswap and any Bravo-style DAO) ---
+// Bravo differs from OZ IGovernor: proposals()/getReceipt() carry the tallies + per-voter receipt, queue/execute
+// take only the proposal id, propose carries an extra `signatures` array, and voting power is read from the
+// TOKEN's getPriorVotes(). The `ProposalCreated` event has the SAME signature/topic as OZ, so the OZ log parser
+// is reused. The token getter is non-standard across forks (comp()/uni()/token()), so the connector probes all.
+
+/** GovernorBravo read surface. */
+export const BRAVO_READ_ABI = [
+  'function name() view returns (string)',
+  'function proposalCount() view returns (uint256)',
+  'function quorumVotes() view returns (uint256)',
+  'function proposalThreshold() view returns (uint256)',
+  'function votingDelay() view returns (uint256)',
+  'function votingPeriod() view returns (uint256)',
+  'function timelock() view returns (address)',
+  'function state(uint256 proposalId) view returns (uint8)',
+  'function proposals(uint256 proposalId) view returns (uint256 id, address proposer, uint256 eta, uint256 startBlock, uint256 endBlock, uint256 forVotes, uint256 againstVotes, uint256 abstainVotes, bool canceled, bool executed)',
+  'function getReceipt(uint256 proposalId, address voter) view returns (bool hasVoted, uint8 support, uint96 votes)',
+  'function getActions(uint256 proposalId) view returns (address[] targets, uint256[] values, string[] signatures, bytes[] calldatas)',
+  // Non-standard token getters — probed in order; the first that answers wins.
+  'function token() view returns (address)',
+  'function comp() view returns (address)',
+  'function uni() view returns (address)',
+]
+
+/** GovernorBravo governance token — voting power at a past block. */
+export const BRAVO_TOKEN_ABI = [
+  'function getPriorVotes(address account, uint256 blockNumber) view returns (uint96)',
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+]
+
+/** GovernorBravo user-signed actions (id-based queue/execute; propose carries `signatures`). */
+export const BRAVO_WRITE_ABI = [
+  'function castVote(uint256 proposalId, uint8 support) returns (uint256)',
+  'function castVoteWithReason(uint256 proposalId, uint8 support, string reason)',
+  'function queue(uint256 proposalId)',
+  'function execute(uint256 proposalId) payable',
+  'function propose(address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, string description) returns (uint256)',
+]
+
+/** Frameworks ClearPath connects to (matches the on-chain enum order for 0; 1 is a frontend-only mirror). */
+export const DAO_FRAMEWORK = { OZGovernor: 0, GovernorBravo: 1 }
+export const DAO_FRAMEWORK_LABEL = { 0: 'OpenZeppelin Governor', 1: 'Governor Bravo' }
 
 /** OZ IGovernor.ProposalState enum (for rendering proposal status when available). */
 export const PROPOSAL_STATE_LABEL = {

@@ -31,6 +31,40 @@ vi.mock('../governorConnector', () => ({
   executeProposal: vi.fn(),
   proposeAction: vi.fn(),
 }))
+// Spec 042 — ExternalDaoView now resolves reads/actions through the pluggable connector layer + data-source
+// router, so drive those instead of the relocated governorConnector module.
+vi.mock('../connectors', () => ({
+  getConnector: () => ({
+    framework: 0,
+    readSummary: (...a) => h.readGovernorSummary(...a),
+    readTreasuries: (...a) => h.readTreasuries(...a),
+    extraTreasuries: () => [],
+    detectTreasuryFunding: () => Promise.resolve(null),
+    readVoterState: () => Promise.resolve({ hasVoted: null, votingPower: null, support: null }),
+    readProposalEta: () => Promise.resolve(null),
+    explainTxError: (e) => e?.shortMessage || e?.reason || e?.message || 'Transaction failed.',
+    castVote: (...a) => h.castVote(...a),
+    queue: vi.fn(),
+    execute: vi.fn(),
+    propose: vi.fn(),
+  }),
+  detectFramework: () => Promise.resolve(0),
+}))
+vi.mock('../daoDataSource', () => ({
+  fetchDaoProposals: async () => {
+    const r = await h.fetchGovernorProposals()
+    return {
+      ok: r.ok,
+      kind: 'onchain',
+      proposals: r.proposals || [],
+      status: r.ok ? (r.proposals?.length ? 'ok' : 'empty') : 'error',
+      partial: !!r.partial,
+      scannedFrom: r.scannedFrom,
+      scannedTo: r.scannedTo,
+      error: r.error,
+    }
+  },
+}))
 vi.mock('../../../config/networks', () => ({
   getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { baseUrl: 'https://etc-mordor.blockscout.com' }, nativeCurrency: { symbol: 'ETC' } }),
 }))
