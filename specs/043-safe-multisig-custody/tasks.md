@@ -99,19 +99,19 @@ from chain and approves, it flips to ready, any owner executes, balance moves, e
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Write `frontend/src/test/custody/proposalStatus.test.js` — status derivation (pending/ready/executed/failed/superseded) from approvals + nonce (data-model.md state machine)
+- [X] T024 [P] [US2] Write `frontend/src/test/custody/proposalStatus.test.js` — status derivation (pending/ready/executed/failed/superseded) from approvals + nonce (data-model.md state machine)
 - [ ] T025 [P] [US2] Extend `test/fork/safe-mordor-polygon.fork.js` — full propose→`approveHash`→`execTransaction` (pre-validated sigs) round-trip for a token transfer, plus negative cases (execute below threshold reverts, duplicate approval idempotent, same-nonce supersession)
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement `frontend/src/lib/custody/proposalHub.js` — `emitProposal`, `readProposals` (decode `Proposed`, **recompute + verify** `safeTxHash` before trusting), `cancelProposal`, and the EIP-712 payload `encodePayloadLink`/`parsePayloadLink` never-stranded fallback (research.md Decision 4)
-- [ ] T027 [P] [US2] Write `frontend/src/test/custody/proposalHub.test.js` — tampered-preimage rejection (hash mismatch), payload link round-trip
-- [ ] T028 [US2] Implement `frontend/src/hooks/useVaultProposals.js` — build the pending queue + history from Safe events, hub events, and `approvedHashes`; expose approve/execute actions
-- [ ] T029 [P] [US2] Build `frontend/src/components/custody/ProposeTransactionForm.jsx` — native + supported-token transfer proposal (FR-009); insufficient-balance surfaced honestly
-- [ ] T030 [P] [US2] Build `frontend/src/components/custody/ProposalQueue.jsx` and `ProposalDetail.jsx` — approvals-remaining, approve/execute buttons, blocked-state messaging, history view (FR-011, FR-015)
-- [ ] T031 [US2] Wire approve (`approveHash`) and execute (`execTransaction` with ascending-sorted pre-validated sigs) through `useVaultProposals`, enforcing guards: threshold met, `nonce == Safe.nonce()`, no double execution, non-owners read-only (FR-012, FR-013, FR-016)
-- [ ] T032 [US2] Handle network-mismatch (prompt switch) and non-owner view-only state in the proposal UI (edge cases)
-- [ ] T033 [US2] Write `frontend/src/test/custody/useVaultProposals.test.js`, `ProposalQueue.test.jsx`, `ProposeTransactionForm.test.jsx` (+ axe)
+- [X] T026 [US2] Implement `frontend/src/lib/custody/proposalHub.js` — `emitProposal`, `readProposals` (decode `Proposed`, **recompute + verify** `safeTxHash` before trusting), `cancelProposal`, and the EIP-712 payload `encodePayloadLink`/`parsePayloadLink` never-stranded fallback (research.md Decision 4)
+- [X] T027 [P] [US2] Write `frontend/src/test/custody/proposalHub.test.js` — tampered-preimage rejection (hash mismatch), payload link round-trip
+- [X] T028 [US2] Implement `frontend/src/hooks/useVaultProposals.js` — build the pending queue + history from Safe events, hub events, and `approvedHashes`; expose approve/execute actions
+- [X] T029 [P] [US2] Build `frontend/src/components/custody/ProposeTransactionForm.jsx` — native + supported-token transfer proposal (FR-009); insufficient-balance surfaced honestly
+- [X] T030 [P] [US2] Build `frontend/src/components/custody/ProposalQueue.jsx` and `ProposalDetail.jsx` — approvals-remaining, approve/execute buttons, blocked-state messaging, history view (FR-011, FR-015)
+- [X] T031 [US2] Wire approve (`approveHash`) and execute (`execTransaction` with ascending-sorted pre-validated sigs) through `useVaultProposals`, enforcing guards: threshold met, `nonce == Safe.nonce()`, no double execution, non-owners read-only (FR-012, FR-013, FR-016)
+- [X] T032 [US2] Handle network-mismatch (prompt switch) and non-owner view-only state in the proposal UI (edge cases)
+- [X] T033 [US2] Write `frontend/src/test/custody/useVaultProposals.test.js`, `ProposalQueue.test.jsx`, `ProposeTransactionForm.test.jsx` (+ axe)
 
 **Checkpoint**: Full on-chain multisig lifecycle works — this + US1 is the complete P1 MVP.
 

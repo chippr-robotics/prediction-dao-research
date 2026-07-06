@@ -8,6 +8,7 @@ import { useCustodyVaults } from '../../hooks/useCustodyVaults'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
 import VaultList from './VaultList'
 import VaultDetail from './VaultDetail'
+import VaultProposalsPanel from './VaultProposalsPanel'
 import CreateVaultWizard from './CreateVaultWizard'
 import LoadVaultForm from './LoadVaultForm'
 import './Custody.css'
@@ -58,7 +59,12 @@ function OnChainSection() {
 
       <div className="custody-onchain-body">
         <VaultList vaults={vaults} activeAddress={activeAddress} onSelect={selectVault} />
-        {activeVault && <VaultDetail vault={activeVault} onForget={forget} />}
+        {activeVault && (
+          <div className="custody-vault-column">
+            <VaultDetail vault={activeVault} onForget={forget} />
+            <VaultProposalsPanel vault={activeVault} />
+          </div>
+        )}
       </div>
     </div>
   )
