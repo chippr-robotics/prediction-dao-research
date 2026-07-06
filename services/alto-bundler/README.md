@@ -19,47 +19,49 @@ browser ─▶ bundler.fairwins.app ─▶ Cloudflare (Transform Rule: +X-Origin
 | `nginx/bundler.conf.template` | origin-lock map (`$origin_denied`) + `/healthz` exempt + proxy to `127.0.0.1:3000` |
 | `nginx/docker-entrypoint.sh` | derives `ORIGIN_LOCK_ENABLED` from whether `ORIGIN_LOCK_SECRET` is set (fail-open, never a 403-brick) |
 | `nginx/Dockerfile` | `nginx:1.27-alpine` + `envsubst` |
-| `cloudbuild.yaml` | build/push `alto-bundler-nginx` |
-| `deploy/service.yaml` | multi-container Cloud Run (nginx ingress + alto sidecar) — **alto env must be reconciled from the live service first** |
+| `cloudbuild.yaml` | manual/isolated rollout — build the nginx image + `gcloud run services replace` the full 2-container spec |
+| `deploy/service.yaml` | multi-container Cloud Run (nginx ingress + alto sidecar) — **alto env reconciled to live `alto:v1.2.7` / Polygon 137 (2026-07-06)** |
+
+**Auto-deploy:** the root `cloudbuild.yaml` (fired by the `^main$` Cloud Build trigger on every merge)
+builds `alto-bundler-nginx:$COMMIT_SHA` and `gcloud run services replace`s this service — so merging a
+change here rolls the bundler out automatically. (It redeploys on *every* main merge; add a
+`--included-files services/alto-bundler/**` trigger later if you want to scope it.)
 
 The origin lock is **fail-open by design**: no `ORIGIN_LOCK_SECRET` → `ORIGIN_LOCK_ENABLED=0` → all
 traffic allowed. Mounting the Secret-Manager `origin-lock-secret` is the single switch that arms it, so
 you cannot half-configure it into a deny-everything state.
 
-## Staged rollout (never break the live bundler)
+## Rollout status + remaining steps
 
-Because the SPA currently calls the bare `run.app` URL, and passkey is OFF until the bundler is wired,
-roll out in this order so nothing 403s before its front door exists:
+Progress as of 2026-07-06:
+- ✅ nginx ingress image + `deploy/service.yaml` reconciled to the live `alto:v1.2.7` / Polygon 137 config.
+- ✅ Auto-deploy wired into the root `cloudbuild.yaml` — **merging brings up the 2-container service
+  LOCK-OFF** (fail-open): the nginx ingress goes live without breaking the working `run.app` URL.
+- ✅ `bundler.fairwins.app` CNAME created (Cloudflare-proxied).
+- ✅ Zone-wide `X-Origin-Auth` Transform Rule already in place (covers `*.fairwins.app`).
+- ⚠️ **`bundler.fairwins.app` does NOT route to the service yet.** It returns Google's HTML 404 (the GFE
+  doesn't recognize the Host), whereas the `run.app` URL returns alto's JSON 404. A bare CNAME→`*.run.app`
+  is insufficient — Cloud Run routes by Host. Fix with **either** a Cloudflare **Host-header override** to
+  the `*.run.app` origin (Origin Rule / Transform Rule → Rewrite Host), **or** a Cloud Run domain-mapping.
 
-1. **Build the ingress image**
+### Arm the lock (only after the front door works)
+
+1. Confirm routing: `curl -s https://bundler.fairwins.app/` must return **alto's** JSON 404
+   (`{"message":"Route GET:/ not found",...}`), not Google's HTML 404.
+2. Point the SPA at the edge host: set `VITE_BUNDLER_URLS_POLYGON=https://bundler.fairwins.app` in the root
+   `cloudbuild.yaml` (currently the transitional `run.app` URL). CSP already allows both hosts, so no CSP change.
+3. Uncomment the `ORIGIN_LOCK_SECRET` env in `deploy/service.yaml` and merge (or run the manual config below).
+4. Verify:
    ```sh
-   gcloud builds submit services/alto-bundler --config services/alto-bundler/cloudbuild.yaml
+   curl -sI https://bundler.fairwins.app/healthz                                            # 200 (health exempt)
+   curl -s -o /dev/null -w '%{http_code}\n' https://bundler.fairwins.app/                   # 200 (CF injects header)
+   curl -s -o /dev/null -w '%{http_code}\n' https://fairwins-alto-bundler-<hash>.run.app/   # 403 (no CF header — locked)
    ```
-2. **Reconcile alto's env** into `deploy/service.yaml` from the live service (do NOT guess it):
-   ```sh
-   gcloud run services describe fairwins-alto-bundler --region us-central1 --format export
-   ```
-   Copy the live `ALTO_*` env + the executor/utility key secret refs into the `alto` container block.
-3. **Deploy the sidecar with the lock OFF** (omit `ORIGIN_LOCK_SECRET`) — behaviour-neutral; the bundler
-   keeps working on the `run.app` URL while gaining the nginx ingress:
-   ```sh
-   gcloud run services replace services/alto-bundler/deploy/service.yaml --region us-central1
-   ```
-4. **Cloudflare (dashboard — needs CF access; no API creds in this repo):**
-   - Add `bundler` CNAME → the Cloud Run service (or map the custom domain:
-     `gcloud run domain-mappings create --service fairwins-alto-bundler --domain bundler.fairwins.app --region us-central1`).
-   - Confirm the existing zone-wide Transform Rule injecting `X-Origin-Auth: <origin-lock-secret>`
-     covers `bundler.fairwins.app` (it is scoped to `*.fairwins.app`, so it should already apply —
-     verify with `curl -sI https://bundler.fairwins.app/healthz`).
-5. **Arm the lock:** add the `ORIGIN_LOCK_SECRET` secret ref (already in `service.yaml`) and redeploy.
-   Verify: a request **without** the header now 403s, a Cloudflare-proxied request 200s.
-   ```sh
-   curl -sI https://bundler.fairwins.app/healthz          # 200 (health is exempt)
-   curl -s -o /dev/null -w '%{http_code}\n' https://fairwins-alto-bundler-<hash>.run.app/   # 403 (no CF header)
-   ```
-6. **Point the SPA at the edge host:** set `VITE_BUNDLER_URLS_POLYGON=https://bundler.fairwins.app` in
-   `cloudbuild.yaml` and redeploy the SPA. The SPA CSP already allows both `bundler.fairwins.app` and the
-   transitional `run.app` host (`frontend/nginx.conf*` connect-src), so no CSP change is needed.
+
+To roll the bundler alone (without a frontend build), run the manual config:
+```sh
+gcloud builds submit . --config services/alto-bundler/cloudbuild.yaml
+```
 
 ## Rollback
 

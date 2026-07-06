@@ -1,14 +1,14 @@
 # Cloud Run multi-container service: origin-lock nginx ingress + alto ERC-4337 bundler sidecar.
 # Spec 041 SC-009 / spec 036 FR-029: put the bundler behind the same origin lock as the SPA + gateway.
 #
-# INGRESS container = nginx (the only one with a `ports:` entry, receives all traffic on 8080).
+# INGRESS container = nginx (the only one with a `ports:` entry — receives all traffic on 8080).
 # SIDECAR  container = alto  (localhost-only; nginx proxies to 127.0.0.1:3000).
 #
-# ⚠️  The `alto` container's env below is the DOCUMENTED baseline (spec 041 + project memory). Before
-#     first apply, RECONCILE it against the currently-live service so no runtime setting is lost:
-#         gcloud run services describe fairwins-alto-bundler --region us-central1 --format export
-#     Copy the live ALTO_* env + the executor-key secret ref into the alto container here, then apply.
-#     (The README walks through this — it is the one step that must not be guessed.)
+# The `alto` container below is RECONCILED to the live service (`fairwins-alto-bundler`, alto v1.2.7,
+# Polygon 137) as of 2026-07-06 — image, all ALTO_* env, and the executor-key secret ref match what
+# was running standalone, so flipping to this 2-container spec changes ONLY the ingress path, never the
+# bundler's runtime. Applied via `gcloud run services replace` (a single-container `gcloud run deploy`
+# would drop the alto sidecar).
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
@@ -17,31 +17,38 @@ metadata:
     app: fairwins-alto-bundler
   annotations:
     run.googleapis.com/launch-stage: BETA          # multi-container (sidecars) is BETA-gated
-    run.googleapis.com/ingress: all                # Cloudflare fronts it; origin lock is the gate
+    run.googleapis.com/ingress: all                # Cloudflare fronts it; the origin lock is the gate
 spec:
   template:
     metadata:
       annotations:
         run.googleapis.com/container-dependencies: '{"nginx":["alto"]}'  # start alto before nginx
         autoscaling.knative.dev/minScale: "1"      # keep one warm (executor nonce continuity)
-        autoscaling.knative.dev/maxScale: "3"
+        autoscaling.knative.dev/maxScale: "2"
+        run.googleapis.com/cpu-throttling: "false"     # bundler must keep processing between requests
+        run.googleapis.com/startup-cpu-boost: "true"
     spec:
+      serviceAccountName: 266380754692-compute@developer.gserviceaccount.com
       containers:
-        # ---- Ingress: origin-lock nginx ----
+        # ---- Ingress: origin-lock nginx (validates Cloudflare's X-Origin-Auth) ----
         - name: nginx
-          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/fairwins/alto-bundler-nginx:latest
+          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:latest
           ports:
             - name: http1
               containerPort: 8080
-          env:
-            # Arms the origin lock (docker-entrypoint derives ORIGIN_LOCK_ENABLED). Same secret Cloudflare
-            # injects as X-Origin-Auth zone-wide. OMIT this on the first (pre-Cloudflare) rollout so the
-            # bundler stays open until bundler.fairwins.app is fronted, then add it to arm enforcement.
-            - name: ORIGIN_LOCK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: origin-lock-secret
-                  key: latest
+          # env: ORIGIN_LOCK_SECRET is intentionally OMITTED here so this merges LOCK-OFF (fail-open) —
+          # the 2-container ingress goes live without breaking anything while the front door is finished.
+          # ARM the lock ONLY AFTER both are true, or the bundler becomes unreachable:
+          #   (1) bundler.fairwins.app actually routes to this service — a bare CNAME→*.run.app returns a
+          #       Google 404 (Cloud Run doesn't recognize the Host); add a Cloudflare Host-header override
+          #       to the *.run.app origin, or a Cloud Run domain-mapping, until it returns alto's response.
+          #   (2) the SPA's VITE_BUNDLER_URLS_POLYGON points at https://bundler.fairwins.app (not the bare
+          #       run.app URL) — else the SPA hits run.app directly and the armed lock 403s it.
+          # Then arm by uncommenting:
+          #   env:
+          #     - name: ORIGIN_LOCK_SECRET
+          #       valueFrom:
+          #         secretKeyRef: { name: origin-lock-secret, key: latest }
           resources:
             limits:
               cpu: "1"
@@ -52,21 +59,35 @@ spec:
               port: 8080
             failureThreshold: 10
             periodSeconds: 3
-        # ---- Sidecar: alto bundler (localhost only) ----
+        # ---- Sidecar: alto bundler (localhost only; reconciled to live v1.2.7 / Polygon 137) ----
         - name: alto
-          image: ghcr.io/pimlicolabs/alto:v1.2.7
-          # RECONCILE from the live service (see header). Documented baseline:
+          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto:v1.2.7
           env:
-            - name: ALTO_PORT
-              value: "3000"
             - name: ALTO_ENTRYPOINTS
               value: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
+            - name: ALTO_RPC_URL
+              value: "https://polygon-bor-rpc.publicnode.com"
+            - name: ALTO_SAFE_MODE
+              value: "false"
+            - name: ALTO_PORT
+              value: "3000"
+            - name: ALTO_API_VERSION
+              value: "v1,v2"
+            - name: ALTO_NETWORK_NAME
+              value: "polygon"
             - name: ALTO_DEPLOY_SIMULATIONS_CONTRACT
               value: "false"   # v0.6 has built-in simulation; the sim contract fails EIP-170 on Polygon
-            # - name: ALTO_RPC_URL            # <-- copy from the live service
-            # - name: ALTO_EXECUTOR_PRIVATE_KEYS   # <-- from Secret Manager (executor gas key)
-            # - name: ALTO_UTILITY_PRIVATE_KEY     # <-- from Secret Manager
+            - name: ALTO_EXECUTOR_PRIVATE_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: alto-executor-key-137
+                  key: latest
+            - name: ALTO_UTILITY_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: alto-executor-key-137
+                  key: latest
           resources:
             limits:
               cpu: "1"
-              memory: 512Mi
+              memory: 1Gi
