@@ -50,8 +50,12 @@ describe("SafeProposalHub", function () {
       .withArgs(SAFE, alice.address, HASH);
   });
 
-  it("has no state — bytecode holds no storage getters and no ether can accrue", async () => {
-    // The contract is not payable at construction and exposes no read methods; balance stays zero.
-    expect(await ethers.provider.getBalance(await hub.getAddress())).to.equal(0n);
+  it("rejects plain ETH transfers (no receive/payable fallback) and holds no balance", async () => {
+    // The hub has no receive() and no payable fallback, so an ordinary value transfer reverts. (Forced ETH
+    // via SELFDESTRUCT is not preventable by any contract, so we assert the reachable property: normal sends
+    // revert and the balance stays zero.)
+    const addr = await hub.getAddress();
+    await expect(alice.sendTransaction({ to: addr, value: 1n })).to.be.reverted;
+    expect(await ethers.provider.getBalance(addr)).to.equal(0n);
   });
 });

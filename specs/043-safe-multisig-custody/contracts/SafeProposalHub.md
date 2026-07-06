@@ -12,8 +12,8 @@ proposer's own gas.
 ## Interface
 
 ```solidity
-// SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
 
 /// @notice Events-only broadcaster of Safe transaction preimages for serverless co-owner discovery.
 /// @dev No state, no funds, no authority. Integrity is enforced by owners recomputing the hash off-chain.
