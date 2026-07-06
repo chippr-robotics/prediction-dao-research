@@ -1,36 +1,72 @@
-// Spec 043 — Custody surface shell. Lives under My Wallet → Finance → Custody with two sub-sections:
-// "On chain" (Safe multisig; filled in by later tasks) and "Off chain" (reserved, disabled). Gated by Safe
-// availability: on a network without a configured Safe deployment, the On chain section shows an honest
-// "unavailable on this network" state rather than a broken UI (FR-030).
+// Spec 043 — Custody surface. Lives under My Wallet → Finance → Custody with two sub-sections: "On chain"
+// (Safe multisig) and "Off chain" (reserved, disabled). Gated by Safe availability: on a network without a
+// configured Safe deployment, the On chain section shows an honest "unavailable on this network" state (FR-030).
 
+import { useState } from 'react'
 import { useWallet } from '../../hooks'
+import { useCustodyVaults } from '../../hooks/useCustodyVaults'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
+import VaultList from './VaultList'
+import VaultDetail from './VaultDetail'
+import CreateVaultWizard from './CreateVaultWizard'
+import LoadVaultForm from './LoadVaultForm'
 import './Custody.css'
 
-function OnChainSection({ chainId }) {
-  const supported = isCustodySupported(chainId)
-  if (!supported) {
-    return (
-      <div className="custody-unavailable" role="status">
-        <p>Custody is not available on this network.</p>
-        <p className="custody-hint">
-          Switch to a supported network to create or manage a multisig vault.
-        </p>
-      </div>
-    )
-  }
-  // Vault list / create / load are wired in by subsequent custody tasks (US1+). The shell renders the
-  // onboarding empty state so the section is usable and testable on its own.
+function OnChainSection() {
+  const { address } = useWallet()
+  const {
+    vaults,
+    activeVault,
+    activeAddress,
+    selectVault,
+    loading,
+    error,
+    loadByAddress,
+    createVault,
+    previewVaultAddress,
+    forget,
+  } = useCustodyVaults()
+  const [mode, setMode] = useState(null) // null | 'create' | 'load'
+
   return (
-    <div className="custody-onchain-empty" role="region" aria-label="On-chain vaults">
-      <p>No vaults yet.</p>
-      <p className="custody-hint">Create a new multisig vault or load an existing one by address.</p>
+    <div className="custody-onchain" role="region" aria-label="On-chain vaults">
+      <div className="custody-actions">
+        <button type="button" onClick={() => setMode(mode === 'create' ? null : 'create')}>
+          Create vault
+        </button>
+        <button type="button" onClick={() => setMode(mode === 'load' ? null : 'load')}>
+          Load existing
+        </button>
+      </div>
+
+      {mode === 'create' && (
+        <CreateVaultWizard
+          connectedAddress={address}
+          onCreate={createVault}
+          onPreview={previewVaultAddress}
+          onDone={() => setMode(null)}
+        />
+      )}
+      {mode === 'load' && <LoadVaultForm onLoad={loadByAddress} onDone={() => setMode(null)} />}
+
+      {loading && <p className="custody-hint">Loading vaults…</p>}
+      {error && (
+        <p className="custody-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="custody-onchain-body">
+        <VaultList vaults={vaults} activeAddress={activeAddress} onSelect={selectVault} />
+        {activeVault && <VaultDetail vault={activeVault} onForget={forget} />}
+      </div>
     </div>
   )
 }
 
 export default function CustodyPanel() {
   const { chainId } = useWallet()
+  const supported = isCustodySupported(chainId)
 
   return (
     <div className="custody-panel">
@@ -40,7 +76,16 @@ export default function CustodyPanel() {
         <h3 id="custody-onchain-title" className="custody-subsection-title">
           On chain
         </h3>
-        <OnChainSection chainId={chainId} />
+        {supported ? (
+          <OnChainSection />
+        ) : (
+          <div className="custody-unavailable" role="status">
+            <p>Custody is not available on this network.</p>
+            <p className="custody-hint">
+              Switch to a supported network to create or manage a multisig vault.
+            </p>
+          </div>
+        )}
       </section>
 
       <section

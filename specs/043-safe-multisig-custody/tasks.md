@@ -70,19 +70,19 @@ chain; load a pre-existing vault by address and see the same live state (quickst
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Write `frontend/src/test/custody/safeVault.test.js` — createVault initializer/predicted-address, loadVault parses owners/threshold/version, threshold>owners rejected (FR-005)
+- [X] T014 [P] [US1] Write `frontend/src/test/custody/safeVault.test.js` — createVault initializer/predicted-address, loadVault parses owners/threshold/version, threshold>owners rejected (FR-005)
 - [ ] T015 [P] [US1] Write `test/fork/safe-mordor-polygon.fork.js` create+load leg — deploy a 2-of-3 Safe via `SafeProxyFactory` and read back owners/threshold (fork test against live Safe v1.4.1)
 
 ### Implementation for User Story 1
 
 - [X] T016 [P] [US1] Implement `frontend/src/lib/custody/vaultReferences.js` — local store of `{chainId,address,label,addedAt,role}[]` with load/save/upsert (data-model.md)
-- [ ] T017 [US1] Implement `frontend/src/lib/custody/safeVault.js` — `createVault`, `loadVault`, `readVaultState` (owners/threshold/nonce/version/balances; validates the address is a Safe) per `contracts/vault-transactions.md`
-- [ ] T018 [US1] Implement `frontend/src/hooks/useCustodyVaults.js` — vault list from `vaultReferences`, load-by-address, refresh, active-vault selection
-- [ ] T019 [P] [US1] Build `frontend/src/components/custody/CreateVaultWizard.jsx` — owners + threshold inputs, live validation (FR-005), predicted address shown before signing
-- [ ] T020 [P] [US1] Build `frontend/src/components/custody/LoadVaultForm.jsx` — load by address; distinguish "not a vault", "view-only (not an owner)", and "owned" (edge cases)
-- [ ] T021 [P] [US1] Build `frontend/src/components/custody/VaultList.jsx` and `VaultDetail.jsx` — address, network, owners, threshold, balances; switch between multiple vaults (FR-007)
-- [ ] T022 [US1] Wire CreateVaultWizard/LoadVaultForm/VaultList/VaultDetail into the On chain sub-section of `CustodyPanel.jsx`, persisting references with labels on create/load
-- [ ] T023 [US1] Write `frontend/src/test/custody/CreateVaultWizard.test.jsx`, `LoadVaultForm.test.jsx`, `VaultDetail.test.jsx` (+ axe), covering the empty/onboarding state
+- [X] T017 [US1] Implement `frontend/src/lib/custody/safeVault.js` — `createVault`, `loadVault`, `readVaultState` (owners/threshold/nonce/version/balances; validates the address is a Safe) per `contracts/vault-transactions.md`
+- [X] T018 [US1] Implement `frontend/src/hooks/useCustodyVaults.js` — vault list from `vaultReferences`, load-by-address, refresh, active-vault selection
+- [X] T019 [P] [US1] Build `frontend/src/components/custody/CreateVaultWizard.jsx` — owners + threshold inputs, live validation (FR-005), predicted address shown before signing
+- [X] T020 [P] [US1] Build `frontend/src/components/custody/LoadVaultForm.jsx` — load by address; distinguish "not a vault", "view-only (not an owner)", and "owned" (edge cases)
+- [X] T021 [P] [US1] Build `frontend/src/components/custody/VaultList.jsx` and `VaultDetail.jsx` — address, network, owners, threshold, balances; switch between multiple vaults (FR-007)
+- [X] T022 [US1] Wire CreateVaultWizard/LoadVaultForm/VaultList/VaultDetail into the On chain sub-section of `CustodyPanel.jsx`, persisting references with labels on create/load
+- [X] T023 [US1] Write `frontend/src/test/custody/CreateVaultWizard.test.jsx`, `LoadVaultForm.test.jsx`, `VaultDetail.test.jsx` (+ axe), covering the empty/onboarding state
 
 **Checkpoint**: MVP — a member can create/load vaults and see honest on-chain state.
 
