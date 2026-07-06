@@ -16,6 +16,10 @@ import {
   mockEngine,
   signedIntent,
   signedPaymentIntent,
+  signedPoolIntent,
+  signedPoolJoinIntent,
+  poolMatrixHash,
+  POOL_ADDRESS,
   randomMarker,
   wallet,
   ORIGIN_SECRET,
@@ -23,6 +27,7 @@ import {
   TEST_NOW,
   DEPLOYMENTS_DIR,
 } from './helpers.js'
+import { entrypointInterface } from '../src/intent/intentTypes.js'
 
 const now = () => TEST_NOW
 
@@ -216,6 +221,141 @@ describe('POST /v1/intents validation', () => {
     const res = await post(ctx.app, intent)
     expect(res.status).toBe(503)
     expect(res.body.error.code).toBe('payment_unsupported_on_chain')
+  })
+})
+
+describe('Tier-2 group pools (spec 035/036 — factory-forwarder)', () => {
+  let ctx
+  const entries = [
+    { winner: wallet.address, amount: 15_000_000n },
+    { winner: '0x2222222222222222222222222222222222222222', amount: 5_000_000n },
+  ]
+
+  beforeEach(() => {
+    ctx = build()
+  })
+
+  const factoryOf = (chainId = 137) => ctx.config.chains[chainId].targetsByKey.wagerPoolFactory
+
+  it('poolApprove — verified under the CLONE domain, submitted to the FACTORY with pool as arg 0', async () => {
+    const proposalId = poolMatrixHash(entries)
+    const intent = await signedPoolIntent(ctx.config, { action: 'poolApprove', params: { proposalId } })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    expect(ctx.engine.submissions).toHaveLength(1)
+    const { args } = ctx.engine.submissions[0]
+    // tx.to is the whitelisted FACTORY, never the dynamic clone.
+    expect(args.to.toLowerCase()).toBe(factoryOf().toLowerCase())
+    const decoded = entrypointInterface.decodeFunctionData('approveWithSigFor', args.data)
+    expect(decoded[0].toLowerCase()).toBe(POOL_ADDRESS.toLowerCase()) // pool
+    expect(decoded[1].toLowerCase()).toBe(proposalId.toLowerCase()) // proposalId
+    expect(decoded[2].toLowerCase()).toBe(wallet.address.toLowerCase()) // signer
+  })
+
+  it('poolClaim — binds entries/index/recipient, forwarded to the factory', async () => {
+    const intent = await signedPoolIntent(ctx.config, {
+      action: 'poolClaim',
+      params: { entries, index: 0, recipient: wallet.address },
+    })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    const decoded = entrypointInterface.decodeFunctionData('claimWithSigFor', ctx.engine.submissions[0].args.data)
+    expect(decoded[0].toLowerCase()).toBe(POOL_ADDRESS.toLowerCase())
+    expect(decoded[2]).toBe(0n) // index
+    expect(decoded[3].toLowerCase()).toBe(wallet.address.toLowerCase()) // recipient
+  })
+
+  it('poolProposeOutcome — accepts a matching proposalId, rejects a mismatched one', async () => {
+    const good = await signedPoolIntent(ctx.config, {
+      action: 'poolProposeOutcome',
+      params: { entries, proposalId: poolMatrixHash(entries) },
+    })
+    expect((await post(ctx.app, good)).status).toBe(202)
+
+    const bad = await signedPoolIntent(ctx.config, {
+      action: 'poolProposeOutcome',
+      params: { entries, proposalId: ethers.ZeroHash }, // != keccak256(entries)
+    })
+    const res = await post(ctx.app, bad)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('param_binding_mismatch')
+  })
+
+  it('poolCreate — verified under the FACTORY domain (no clone yet), attributed to the signer', async () => {
+    const intent = await signedPoolIntent(ctx.config, {
+      action: 'poolCreate',
+      params: {
+        token: ctx.config.chains[137].paymentToken,
+        buyIn: 10_000_000n,
+        maxMembers: 5,
+        thresholdBips: 6000,
+        acceptDeadline: TEST_NOW + 7 * 86400,
+        resolveDeadline: TEST_NOW + 14 * 86400,
+      },
+    })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    const { args } = ctx.engine.submissions[0]
+    expect(args.to.toLowerCase()).toBe(factoryOf().toLowerCase())
+    const decoded = entrypointInterface.decodeFunctionData('createPoolWithSig', args.data)
+    expect(decoded[1].toLowerCase()).toBe(wallet.address.toLowerCase()) // signer == creator
+  })
+
+  it('poolJoin — EIP-3009 into the clone, forwarded via the factory (authorization.to == pool)', async () => {
+    const intent = await signedPoolJoinIntent(ctx.config, { value: 10_000_000n })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    const { args } = ctx.engine.submissions[0]
+    expect(args.to.toLowerCase()).toBe(factoryOf().toLowerCase())
+    const decoded = entrypointInterface.decodeFunctionData('joinWithAuthorizationFor', args.data)
+    expect(decoded[0].toLowerCase()).toBe(POOL_ADDRESS.toLowerCase()) // pool
+    expect(decoded[1].toLowerCase()).toBe(wallet.address.toLowerCase()) // from
+    expect(decoded[2]).toBe(10_000_000n) // value
+  })
+
+  it('poolJoin — 400 param_binding_mismatch when authorization.to is not the pool', async () => {
+    const intent = await signedPoolJoinIntent(ctx.config, {})
+    intent.authorization.to = ethers.Wallet.createRandom().address // redirect the money
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('param_binding_mismatch')
+    expect(ctx.engine.submissions).toHaveLength(0)
+  })
+
+  it('provenance — 400 target_not_allowlisted for a pool the factory did not create (poolAddressToId == 0)', async () => {
+    const ctx0 = build({ providers: mockProviders(testConfig(), { poolId: 0n }) })
+    const intent = await signedPoolIntent(ctx0.config, { action: 'poolApprove', params: { proposalId: poolMatrixHash(entries) } })
+    const res = await post(ctx0.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('target_not_allowlisted')
+    expect(ctx0.engine.submissions).toHaveLength(0)
+  })
+
+  it('provenance — 503 (self-submit) when the provenance eth_call fails', async () => {
+    const ctx503 = build({ providers: mockProviders(testConfig(), { screenError: true }) })
+    const intent = await signedPoolIntent(ctx503.config, { action: 'poolApprove', params: { proposalId: poolMatrixHash(entries) } })
+    const res = await post(ctx503.app, intent)
+    expect(res.status).toBe(503)
+    expect(ctx503.engine.submissions).toHaveLength(0)
+  })
+
+  it('targeting the clone directly is rejected — only the factory is pinned', async () => {
+    const intent = await signedPoolIntent(ctx.config, { action: 'poolApprove', params: { proposalId: poolMatrixHash(entries) } })
+    intent.targetContract = POOL_ADDRESS // clone address is not in the pinned target set
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('target_not_allowlisted')
+  })
+
+  it('signer-attributed pool actions work on Mordor (63), which pins the factory but has no EIP-3009', async () => {
+    const intent = await signedPoolIntent(ctx.config, {
+      chainId: 63,
+      action: 'poolClaim',
+      params: { entries, index: 0, recipient: wallet.address },
+    })
+    const res = await post(ctx.app, intent)
+    expect(res.status).toBe(202)
+    expect(ctx.engine.submissions[0].args.relayerId).toBe('mordor-63')
   })
 })
 

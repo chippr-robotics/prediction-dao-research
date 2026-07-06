@@ -14,7 +14,8 @@
         "min_balance": 1000000000000000000,
         "whitelist_receivers": [
           "0x3ccB144d8aa838e8d4D695867cC72e548117830C",
-          "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541"
+          "0x68bCBA1055DAbe11b98Bb8425A16e648Ad65d541",
+          "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F"
         ]
       }
     },
@@ -32,7 +33,8 @@
         "min_balance": 500000000000000000,
         "whitelist_receivers": [
           "0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89",
-          "0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a"
+          "0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a",
+          "0x420aEC3c76859eB74ab21c769c16AcdAB221f723"
         ]
       }
     }

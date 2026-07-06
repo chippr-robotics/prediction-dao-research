@@ -17,6 +17,7 @@
  *   which keeps the request shape to a single `uniquenessMarker` field.
  */
 import { ethers } from 'ethers'
+import { GatewayError } from '../errors.js'
 
 // ---------------------------------------------------------------------------
 // EIP-712 domains (per verifying contract; chainId + verifyingContract added at runtime)
@@ -25,6 +26,12 @@ import { ethers } from 'ethers'
 export const CONTRACT_DOMAINS = {
   wagerRegistry: { name: 'FairWins WagerRegistry', version: '1' },
   membershipManager: { name: 'FairWins MembershipManager', version: '1' },
+  // Tier-2 group pools (spec 035/036). The FACTORY verifies createPoolWithSig against its own domain;
+  // the CLONE verifies the six actor twins against a per-clone domain (verifyingContract = the clone),
+  // so pool signer-attributed actions target the factory but recover under `wagerPool` with the pool
+  // address as verifyingContract (the domain/target split — see ACTIONS + verify.js).
+  wagerPool: { name: 'FairWins WagerPool', version: '1' },
+  wagerPoolFactory: { name: 'FairWins WagerPoolFactory', version: '1' },
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +133,48 @@ export const INTENT_TYPES = {
     { name: 'redeemer', type: 'address' },
     ...TAIL,
   ],
+
+  // ---- Tier-2 group pools (spec 035/036) ----
+  // Byte-identical to the on-chain typehashes: the six actor twins verify against the CLONE's domain
+  // (contracts/pools/WagerPool.sol), CreatePool against the FACTORY's domain (WagerPoolFactory.sol).
+  ApproveOutcome: [
+    { name: 'member', type: 'address' },
+    { name: 'proposalId', type: 'bytes32' },
+    ...TAIL,
+  ],
+  ClaimShare: [
+    { name: 'winner', type: 'address' },
+    { name: 'index', type: 'uint256' },
+    { name: 'recipient', type: 'address' },
+    ...TAIL,
+  ],
+  ProposeOutcome: [
+    { name: 'creator', type: 'address' },
+    { name: 'proposalId', type: 'bytes32' },
+    ...TAIL,
+  ],
+  CloseJoining: [
+    { name: 'creator', type: 'address' },
+    ...TAIL,
+  ],
+  Cancel: [
+    { name: 'creator', type: 'address' },
+    ...TAIL,
+  ],
+  Refund: [
+    { name: 'member', type: 'address' },
+    ...TAIL,
+  ],
+  CreatePool: [
+    { name: 'creator', type: 'address' },
+    { name: 'token', type: 'address' },
+    { name: 'buyIn', type: 'uint256' },
+    { name: 'maxMembers', type: 'uint32' },
+    { name: 'thresholdBips', type: 'uint16' },
+    { name: 'acceptDeadline', type: 'uint64' },
+    { name: 'resolveDeadline', type: 'uint64' },
+    ...TAIL,
+  ],
 }
 
 // EIP-3009 payment-leg typed data (token's own domain — native USDC version "2").
@@ -147,6 +196,10 @@ export const RECEIVE_WITH_AUTHORIZATION_TYPES = {
 const AUTH_TUPLE = '(uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce,uint8 v,bytes32 r,bytes32 s)'
 const CREATE_ARGS_TUPLE =
   '(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 conditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri,bytes32 termsVersionHash,bytes32 paymentNonce)'
+// Tier-2 pool tuples: WagerPoolFactory.CreatePoolParams and WagerPool.PayoutEntry[].
+const POOL_CREATE_PARAMS_TUPLE =
+  '(address token,uint256 buyIn,uint32 maxMembers,uint16 thresholdBips,uint64 acceptDeadline,uint64 resolveDeadline)'
+const POOL_ENTRIES_TUPLE = '(address winner,uint256 amount)[]'
 
 export const ENTRYPOINT_ABI = [
   // WagerRegistry — no-stake …WithSig twins
@@ -166,6 +219,16 @@ export const ENTRYPOINT_ABI = [
   `function upgradeTierWithAuthorization(bytes32 role, uint8 tier, bytes32 termsHash, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes intentSig, ${AUTH_TUPLE} priceAuth, ${AUTH_TUPLE} feeAuth)`,
   `function extendMembershipWithAuthorization(bytes32 role, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes intentSig, ${AUTH_TUPLE} priceAuth, ${AUTH_TUPLE} feeAuth)`,
   'function redeemVoucherWithSig(uint256 voucherId, bytes32 termsHash, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  // WagerPoolFactory — Tier-2 forwarders (route a clone's twin through the whitelisted factory).
+  // Each checks poolAddressToId[pool] != 0 on-chain, then calls the clone twin (pure pass-through).
+  `function createPoolWithSig(${POOL_CREATE_PARAMS_TUPLE} p, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig) returns (uint256, address)`,
+  `function joinWithAuthorizationFor(address pool, address from, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)`,
+  'function closeJoiningWithSigFor(address pool, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function cancelWithSigFor(address pool, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  `function proposeOutcomeWithSigFor(address pool, ${POOL_ENTRIES_TUPLE} entries, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)`,
+  'function approveWithSigFor(address pool, bytes32 proposalId, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  `function claimWithSigFor(address pool, ${POOL_ENTRIES_TUPLE} entries, uint256 index, address recipient, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)`,
+  'function refundWithSigFor(address pool, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
 ]
 
 export const entrypointInterface = new ethers.Interface(ENTRYPOINT_ABI)
@@ -250,6 +313,59 @@ const sigArgs = (first) => (params, signer, intent) => [
   intent.validBefore,
   intent.signature,
 ]
+
+// ---- Tier-2 pool action helpers (spec 035/036) ----------------------------
+//
+// The domain/target SPLIT: a pool signer-attributed action TARGETS the factory (`contract`, pinned +
+// engine-whitelisted) but its EIP-712 signature is verified under the CLONE's domain
+// (`domainContract: 'wagerPool'`, `verifyingContractParam: 'pool'`). `provenanceParam: 'pool'` tells
+// verify.js to eth_call factory.poolAddressToId(pool) != 0 before trusting a dynamic clone address.
+// `pool` is a calldata + domain input, NOT an EIP-712 struct field, so buildMessage never emits it.
+
+function poolBuildMessage(typeName, actorField) {
+  return (params, signer, intent) => {
+    const msg = {}
+    for (const f of INTENT_TYPES[typeName]) {
+      if (f.name === actorField) msg[f.name] = signer
+      else if (f.name === 'nonce') msg[f.name] = intent.uniquenessMarker
+      else if (f.name === 'validAfter') msg[f.name] = intent.validAfter
+      else if (f.name === 'validBefore') msg[f.name] = intent.validBefore
+      else msg[f.name] = params[f.name]
+    }
+    return msg
+  }
+}
+
+/**
+ * A pool signer-attributed forwarder: verified under the clone domain, submitted via the factory.
+ * `extraParams` are the calldata args BETWEEN `pool` and `signer` (e.g. proposalId, entries, index).
+ * `buildExtraArgs(params)` returns those same values in forwarder order.
+ */
+function poolSigAction({ typeName, actorField, fn, extraParams = [], buildExtraArgs = () => [], verifyParams }) {
+  return {
+    intentClass: 'signer-attributed',
+    contract: 'wagerPoolFactory',
+    domainContract: 'wagerPool',
+    verifyingContractParam: 'pool',
+    provenanceParam: 'pool',
+    typeName,
+    actorField,
+    fn,
+    paramNames: ['pool', ...extraParams],
+    verifyParams,
+    buildMessage: poolBuildMessage(typeName, actorField),
+    encode: (params, signer, intent) =>
+      entrypointInterface.encodeFunctionData(fn, [
+        params.pool,
+        ...buildExtraArgs(params),
+        signer,
+        intent.uniquenessMarker,
+        intent.validAfter,
+        intent.validBefore,
+        intent.signature,
+      ]),
+  }
+}
 
 const stakeAuthOf = (intent) => authTuple({
   value: intent.authorization.value,
@@ -368,6 +484,78 @@ export const ACTIONS = {
       intent.validAfter, intent.validBefore, intent.signature,
     ],
   }),
+
+  // ---- Tier-2 group pools (spec 035/036) ----
+  // Signer-attributed: verified under the clone domain, forwarded through the whitelisted factory.
+  poolCloseJoining: poolSigAction({ typeName: 'CloseJoining', actorField: 'creator', fn: 'closeJoiningWithSigFor' }),
+  poolCancel: poolSigAction({ typeName: 'Cancel', actorField: 'creator', fn: 'cancelWithSigFor' }),
+  poolRefund: poolSigAction({ typeName: 'Refund', actorField: 'member', fn: 'refundWithSigFor' }),
+  poolApprove: poolSigAction({
+    typeName: 'ApproveOutcome', actorField: 'member', fn: 'approveWithSigFor',
+    extraParams: ['proposalId'], buildExtraArgs: (p) => [p.proposalId],
+  }),
+  poolProposeOutcome: poolSigAction({
+    // proposalId is signed in the struct; entries is the calldata preimage the contract re-hashes.
+    typeName: 'ProposeOutcome', actorField: 'creator', fn: 'proposeOutcomeWithSigFor',
+    extraParams: ['entries', 'proposalId'], buildExtraArgs: (p) => [p.entries],
+    // The signed proposalId MUST be the hash of the revealed matrix (the contract asserts the same),
+    // so a mismatched pair is rejected before the engine wastes a submission.
+    verifyParams: (p) => {
+      const got = ethers.keccak256(
+        ethers.AbiCoder.defaultAbiCoder().encode(
+          ['tuple(address winner,uint256 amount)[]'],
+          [p.entries.map((e) => ({ winner: e.winner, amount: e.amount }))]
+        )
+      )
+      if (got.toLowerCase() !== String(p.proposalId).toLowerCase()) {
+        throw new GatewayError(400, 'param_binding_mismatch', 'proposalId must equal keccak256(entries)')
+      }
+    },
+  }),
+  poolClaim: poolSigAction({
+    typeName: 'ClaimShare', actorField: 'winner', fn: 'claimWithSigFor',
+    extraParams: ['entries', 'index', 'recipient'], buildExtraArgs: (p) => [p.entries, p.index, p.recipient],
+  }),
+
+  // createPool is verified under the FACTORY's own domain (no clone exists yet); attributed to `creator`.
+  poolCreate: {
+    intentClass: 'signer-attributed',
+    contract: 'wagerPoolFactory',
+    domainContract: 'wagerPoolFactory',
+    typeName: 'CreatePool',
+    actorField: 'creator',
+    fn: 'createPoolWithSig',
+    paramNames: ['token', 'buyIn', 'maxMembers', 'thresholdBips', 'acceptDeadline', 'resolveDeadline'],
+    buildMessage: poolBuildMessage('CreatePool', 'creator'),
+    encode: (params, signer, intent) =>
+      entrypointInterface.encodeFunctionData('createPoolWithSig', [
+        [params.token, params.buyIn, params.maxMembers, params.thresholdBips, params.acceptDeadline, params.resolveDeadline],
+        signer,
+        intent.uniquenessMarker,
+        intent.validAfter,
+        intent.validBefore,
+        intent.signature,
+      ]),
+  },
+
+  // Payment (EIP-3009): attribution comes SOLELY from the token authorization — no separate intent
+  // struct. `authOnly` skips the intent-leg recovery; `authToParam: 'pool'` binds the money to the
+  // clone (not the factory). The token enforces to == caller (the clone) so a relayer can't redirect.
+  poolJoin: {
+    intentClass: 'payment',
+    contract: 'wagerPoolFactory',
+    authOnly: true,
+    authToParam: 'pool',
+    provenanceParam: 'pool',
+    fn: 'joinWithAuthorizationFor',
+    paramNames: ['pool'],
+    encode: (params, signer, intent) => {
+      const a = intent.authorization
+      return entrypointInterface.encodeFunctionData('joinWithAuthorizationFor', [
+        params.pool, a.from, a.value, a.validAfter, a.validBefore, a.nonce, a.v, a.r, a.s,
+      ])
+    },
+  },
 }
 
 /** Allowed action names per target contract key — the version-pinned allow-list (FR-025). */
