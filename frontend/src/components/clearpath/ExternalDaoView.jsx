@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
+import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from '../../abis/externalDAORegistry'
 import { getConnector, detectFramework } from './connectors'
 import { fetchDaoProposals } from './daoDataSource'
@@ -105,6 +106,7 @@ function CopyableId({ id }) {
 
 export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
   const { showNotification } = useNotification()
+  const { screenOne } = useAddressScreening()
   const net = getNetwork(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
 
@@ -227,6 +229,18 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       showNotification('Connect a wallet to act on this DAO.', 'warning')
       return false
     }
+    // Sanctions posture (FR-013, spec 042): screen the connected signer where a platform sanctions source exists.
+    // A confirmed `restricted` result (only possible where a SanctionsGuard is deployed) blocks the action,
+    // fail-closed. `uncertain` (no source on this network, e.g. Ethereum mainnet, or an unreadable guard) does
+    // NOT block — external-DAO governance proceeds under the DAO's own rules, since ClearPath is non-custodial
+    // and must not fabricate a screening result it cannot produce.
+    if (account && screenOne) {
+      const status = await screenOne(account, chainId).catch(() => 'uncertain')
+      if (status === 'restricted') {
+        showNotification('This wallet is restricted by sanctions screening — it cannot act on this DAO.', 'error')
+        return false
+      }
+    }
     setBusy(true)
     try {
       showNotification(`${label}: confirm in your wallet…`, 'info', 0)
@@ -322,6 +336,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
 
         <ProposalBuilder
           record={record}
+          connector={connector}
           signer={signer}
           reader={reader}
           account={account}

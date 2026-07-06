@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { ERC20_BALANCE_ABI } from '../../abis/externalDAORegistry'
-import { proposeAction } from './governorConnector'
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from './proposalEncoding'
 import CpAddressField from './CpAddressField'
 import CpBottomSheet from './CpBottomSheet'
@@ -16,7 +15,7 @@ const EXECUTE_TREASURY_IFACE = new ethers.Interface(['function executeTreasury(a
 const EXECUTE_TREASURY_SELECTOR = EXECUTE_TREASURY_IFACE.getFunction('executeTreasury').selector
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—')
 
-export default function ProposalBuilder({ record, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], fundingSources = [], proposals = [], run, busy, onSubmitted }) {
+export default function ProposalBuilder({ record, connector, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], fundingSources = [], proposals = [], run, busy, onSubmitted }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -109,8 +108,12 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
   const overNative = valid && anyNativeKnown && nativeTotal > nativeHeld
   const overUsdc = valid && anyUsdcKnown && usdcTotal > usdcHeld
   const overTreasury = valid && fundingSources.length > 0 && treasuryTotal > treasuryHeld
-  const dupId = valid ? predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash) : null
   // FR-025 duplicate pre-check: an identical action set + description hashes to the same id as a live proposal.
+  // This id derivation is OpenZeppelin-Governor-specific (keccak of targets/values/calldatas/descriptionHash).
+  // GovernorBravo assigns SEQUENTIAL ids, so the payload can't predict them — skip the pre-check for Bravo (it
+  // never fabricates; the DAO's own propose() still guards against a live duplicate from the same proposer).
+  const supportsIdPrediction = (connector?.framework ?? record?.framework) === 0
+  const dupId = valid && supportsIdPrediction ? predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash) : null
   const isDuplicate = !!dupId && proposals.some((p) => p.id === dupId)
 
   function setAction(id, patch) {
@@ -126,9 +129,11 @@ export default function ProposalBuilder({ record, signer, reader, account, usdcA
     setTitle(''); setBody(''); setActions([newAction(ACTION_TYPE.TOKEN)]); setShowPayload(false)
   }
   function submit() {
-    // Only reset/close/reload on a CONFIRMED tx — a reverted propose must not look like success (US5 #9).
+    // Route through the DAO's own connector so the framework-correct propose() is used (OZ:
+    // targets/values/calldatas/description; Bravo: adds the parallel `signatures` array). Only reset/close/reload
+    // on a CONFIRMED tx — a reverted propose must not look like success (US5 #9).
     run('Propose', () =>
-      proposeAction(signer, record.dao, { targets: A.targets, values: A.values, calldatas: A.calldatas, description: A.description })
+      connector.propose(signer, record.dao, { targets: A.targets, values: A.values, calldatas: A.calldatas, description: A.description })
     ).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
   }
 

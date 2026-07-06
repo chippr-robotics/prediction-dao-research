@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   readGovernorSummary: vi.fn(),
   readTreasuries: vi.fn(),
   fetchGovernorProposals: vi.fn(),
+  screenStatus: 'clear',
 }))
 
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: h.showNotification }) }))
@@ -70,20 +71,23 @@ vi.mock('../../../config/networks', () => ({
 }))
 // ProposalBuilder → CpAddressField → AddressBookButton → useWallet would throw without a provider.
 vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
+vi.mock('../../../hooks/useAddressScreening', () => ({
+  useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve(h.screenStatus) }),
+}))
 
 const record = { id: 1, dao: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', framework: 0, label: 'Olympia DAO' }
 const HASH = '0xabcdef0000000000000000000000000000000000000000000000000000001234' // short() → 0xabcd…1234
 
-function renderView(signer) {
+function renderView(signer, account = '0x0000000000000000000000000000000000000Acc') {
   return render(
-    <ExternalDaoView record={record} reader={{}} signer={signer} chainId={63} usdcAddress="0x00000000000000000000000000000000000000dc" onBack={() => {}} />
+    <ExternalDaoView record={record} reader={{}} signer={signer} account={account} chainId={63} usdcAddress="0x00000000000000000000000000000000000000dc" onBack={() => {}} />
   )
 }
 
 describe('ExternalDaoView notifications (spec 030 / US5)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    h.screenStatus = 'clear'
     h.readGovernorSummary.mockResolvedValue({
       name: 'OlympiaGovernor', tokenAddr: '0x0000000000000000000000000000000000000111', tokenName: 'Olympia Member',
       tokenSymbol: 'OLYM', timelock: '0x0000000000000000000000000000000000000222', treasuryNative: 0n,
@@ -124,6 +128,16 @@ describe('ExternalDaoView notifications (spec 030 / US5)', () => {
     renderView({})
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
     await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith('execution reverted', 'error'))
+  })
+
+  it('spec 042 (FR-013): blocks a sanctions-restricted signer and does not send', async () => {
+    h.screenStatus = 'restricted'
+    h.castVote.mockReturnValue({ hash: HASH, wait: vi.fn().mockResolvedValue({ status: 1 }) })
+    const user = userEvent.setup()
+    renderView({})
+    await user.click(await screen.findByRole('button', { name: /vote for/i }))
+    await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('restricted by sanctions'), 'error'))
+    expect(h.castVote).not.toHaveBeenCalled()
   })
 
   it('treats a confirmation timeout as "may still confirm" (warning) and releases the busy lock', async () => {
