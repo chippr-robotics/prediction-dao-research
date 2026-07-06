@@ -7,6 +7,13 @@
 # arms enforcement — you can never half-configure it into a 403-everything brick.
 set -eu
 
+# Cloud Run injects Secret Manager values VERBATIM, including any trailing newline the secret file was
+# created with. nginx does an EXACT string match in the origin-lock map, so a stray newline (or space)
+# makes the ARMED lock 403 every request — the X-Origin-Auth header Cloudflare sends carries no newline.
+# The secret is `openssl rand -hex 32` (no internal whitespace), so stripping all whitespace is safe and
+# is a no-op for an already-clean value. (This is why the Node relay-gateway works but raw nginx didn't.)
+ORIGIN_LOCK_SECRET="$(printf '%s' "${ORIGIN_LOCK_SECRET:-}" | tr -d '[:space:]')"
+
 if [ -n "${ORIGIN_LOCK_SECRET:-}" ]; then
     export ORIGIN_LOCK_ENABLED=1
     echo "[bundler-nginx] origin lock ENABLED (X-Origin-Auth required)"

@@ -32,7 +32,10 @@ steps:
       # relay gateway (SC-009). Baked in at build; passkeyConfig(137) is null without it, so passkey
       # accounts stay disabled on Polygon until this is set. EntryPoint v0.6; FairWins sponsors no gas.
       - '--build-arg'
-      - 'VITE_BUNDLER_URLS_POLYGON=https://fairwins-alto-bundler-266380754692.us-central1.run.app'
+      # Cloudflare-fronted edge host (origin-lock ARMED 2026-07-06). Cloudflare injects X-Origin-Auth on
+      # *.fairwins.app; the bare run.app URL now 403s (no header), so the SPA MUST use this host. CSP
+      # connect-src already allows it (frontend/nginx.conf).
+      - 'VITE_BUNDLER_URLS_POLYGON=https://bundler.fairwins.app'
       - '-t'
       - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
       - '-t'

@@ -16,8 +16,8 @@ browser ─▶ bundler.fairwins.app ─▶ Cloudflare (Transform Rule: +X-Origin
 
 | File | Purpose |
 |---|---|
-| `nginx/bundler.conf.template` | origin-lock map (`$origin_denied`) + `/healthz` exempt + proxy to `127.0.0.1:3000` |
-| `nginx/docker-entrypoint.sh` | derives `ORIGIN_LOCK_ENABLED` from whether `ORIGIN_LOCK_SECRET` is set (fail-open, never a 403-brick) |
+| `nginx/bundler.conf.template` | origin-lock map (`$origin_denied`, `map_hash_bucket_size 128`) + `/healthz` exempt + proxy to `127.0.0.1:3000` |
+| `nginx/docker-entrypoint.sh` | derives `ORIGIN_LOCK_ENABLED` from whether `ORIGIN_LOCK_SECRET` is set (fail-open, never a 403-brick); trims the secret |
 | `nginx/Dockerfile` | `nginx:1.27-alpine` + `envsubst` |
 | `cloudbuild.yaml` | manual/isolated rollout — build the nginx image + `gcloud run services replace` the full 2-container spec |
 | `deploy/service.yaml` | multi-container Cloud Run (nginx ingress + alto sidecar) — **alto env reconciled to live `alto:v1.2.7` / Polygon 137 (2026-07-06)** |
@@ -31,34 +31,42 @@ The origin lock is **fail-open by design**: no `ORIGIN_LOCK_SECRET` → `ORIGIN_
 traffic allowed. Mounting the Secret-Manager `origin-lock-secret` is the single switch that arms it, so
 you cannot half-configure it into a deny-everything state.
 
-## Rollout status + remaining steps
+## Rollout status
 
-Progress as of 2026-07-06:
-- ✅ nginx ingress image + `deploy/service.yaml` reconciled to the live `alto:v1.2.7` / Polygon 137 config.
-- ✅ Auto-deploy wired into the root `cloudbuild.yaml` — **merging brings up the 2-container service
-  LOCK-OFF** (fail-open): the nginx ingress goes live without breaking the working `run.app` URL.
-- ✅ `bundler.fairwins.app` CNAME created (Cloudflare-proxied).
-- ✅ Zone-wide `X-Origin-Auth` Transform Rule already in place (covers `*.fairwins.app`).
-- ⚠️ **`bundler.fairwins.app` does NOT route to the service yet.** It returns Google's HTML 404 (the GFE
-  doesn't recognize the Host), whereas the `run.app` URL returns alto's JSON 404. A bare CNAME→`*.run.app`
-  is insufficient — Cloud Run routes by Host. Fix with **either** a Cloudflare **Host-header override** to
-  the `*.run.app` origin (Origin Rule / Transform Rule → Rewrite Host), **or** a Cloud Run domain-mapping.
+**LIVE + origin-lock ARMED on Polygon 137 (2026-07-06).** 2-container service (nginx ingress + alto
+`v1.2.7` sidecar), SPA points at `bundler.fairwins.app`, Cloudflare Host-override routes it to the
+`*.run.app` origin and injects `X-Origin-Auth` zone-wide. Verified:
 
-### Arm the lock (only after the front door works)
+```sh
+# direct run.app (no Cloudflare header)         -> 403 (locked)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://fairwins-alto-bundler-<hash>.run.app/ \
+  -H 'content-type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'
+# bundler.fairwins.app (Cloudflare injects header) -> 200 {"result":"0x89"}
+curl -s -X POST https://bundler.fairwins.app/ \
+  -H 'content-type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'
+```
 
-1. Confirm routing: `curl -s https://bundler.fairwins.app/` must return **alto's** JSON 404
-   (`{"message":"Route GET:/ not found",...}`), not Google's HTML 404.
-2. Point the SPA at the edge host: set `VITE_BUNDLER_URLS_POLYGON=https://bundler.fairwins.app` in the root
-   `cloudbuild.yaml` (currently the transitional `run.app` URL). CSP already allows both hosts, so no CSP change.
-3. Uncomment the `ORIGIN_LOCK_SECRET` env in `deploy/service.yaml` and merge (or run the manual config below).
-4. Verify:
-   ```sh
-   curl -sI https://bundler.fairwins.app/healthz                                            # 200 (health exempt)
-   curl -s -o /dev/null -w '%{http_code}\n' https://bundler.fairwins.app/                   # 200 (CF injects header)
-   curl -s -o /dev/null -w '%{http_code}\n' https://fairwins-alto-bundler-<hash>.run.app/   # 403 (no CF header — locked)
-   ```
+Use a **JSON-RPC POST** (`eth_chainId`) for external health checks — **not** `/healthz`: Cloud Run's GFE
+intercepts the startup-probe path `/healthz` and returns its own 404 for *external* requests (the internal
+probe hits nginx:8080 directly and passes fine). `curl https://bundler.fairwins.app/health` → `"OK"` also
+works (alto's own route, proxied).
 
-To roll the bundler alone (without a frontend build), run the manual config:
+### Deploy gotchas (all three cost a failed rollout — baked into the config now)
+
+1. **alto needs a `startupProbe`** — Cloud Run rejects the spec because nginx `depends_on` alto
+   (`container-dependencies`); the depended-upon container must declare one. TCP probe on `:3000`.
+2. **`map_hash_bucket_size 128`** in `bundler.conf.template` — the *armed* map key `"1:<64-hex secret>"`
+   is 66 bytes, over nginx's default 64-byte bucket, so **armed** nginx fails to boot (`could not build
+   map_hash`). Lock-off is fine (`"1:__unset__"` is short), which is why this only bites on arming.
+3. **The entrypoint trims `ORIGIN_LOCK_SECRET`** — Cloud Run injects Secret Manager values verbatim
+   including a trailing newline; nginx exact-matches, so an untrimmed secret 403s *every* Cloudflare
+   request (the Node relay-gateway trims, so it was unaffected — that's the tell).
+
+**Manual `services replace` caveat:** the `:latest` tag gets deduped/cached by Cloud Run, so a manual
+`gcloud run services replace` may keep the old image. Pin the digest (`alto-bundler-nginx@sha256:…`) for a
+one-off deploy. CI is unaffected — it seds `:latest`→`:$COMMIT_SHA` (a unique tag) before replacing.
+
+To roll the bundler alone (without a frontend build):
 ```sh
 gcloud builds submit . --config services/alto-bundler/cloudbuild.yaml
 ```
