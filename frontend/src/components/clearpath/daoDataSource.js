@@ -109,6 +109,9 @@ export async function fetchDaoProposals({ chainId, address, framework, reader, o
     status,
     partial: !!res.partial,
     error: res.error,
+    // Pass through the live-indexer scan bounds so the UI can show the scanned range + timeline "now".
+    scannedFrom: res.scannedFrom ?? null,
+    scannedTo: res.scannedTo ?? null,
   }
 }
 

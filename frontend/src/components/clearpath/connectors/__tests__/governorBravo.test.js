@@ -8,7 +8,7 @@ const calls = vi.hoisted(() => ({ last: null }))
 
 vi.mock('ethers', async (importOriginal) => {
   const actual = await importOriginal()
-  function FakeContract(address, _abi, _runner) {
+  function FakeContract(_address, _abi, _runner) {
     return {
       // reads
       proposalCount: async () => 5n,

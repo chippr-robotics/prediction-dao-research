@@ -228,6 +228,12 @@ export function propose(signer, address, { targets, values, calldatas, descripti
   return writeContract(signer, address).propose(targets, values, sigs, calldatas, description)
 }
 
+// Bravo timelocks hold funds directly — there is no ECIP-1112/1113 executor-gated vault to detect. Return null
+// uniformly so ExternalDaoView can call detectTreasuryFunding across frameworks without branching.
+export async function detectTreasuryFunding() {
+  return null
+}
+
 /** The pluggable connector object (framework 1). */
 export const governorBravoConnector = {
   framework: 1,
@@ -236,6 +242,7 @@ export const governorBravoConnector = {
   readSummary,
   readTreasuries,
   extraTreasuries,
+  detectTreasuryFunding,
   fetchProposals,
   readVoterState,
   readProposalEta,

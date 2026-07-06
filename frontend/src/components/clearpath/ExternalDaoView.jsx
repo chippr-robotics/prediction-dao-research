@@ -3,20 +3,14 @@ import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
 import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from '../../abis/externalDAORegistry'
-import {
-  readGovernorSummary,
-  readTreasuries,
-  extraTreasuries,
-  detectTreasuryFunding,
-  fetchGovernorProposals,
-  readVoterState,
-  readProposalEta,
-  explainTxError,
-  castVote,
-  queueProposal,
-  executeProposal,
-} from './governorConnector'
+import { getConnector, detectFramework } from './connectors'
+import { fetchDaoProposals } from './daoDataSource'
 import ProposalBuilder from './ProposalBuilder'
+
+// Spec 042 — resolve the per-framework connector (OZ Governor / GovernorBravo). A registry entry may carry a
+// coarse framework; a device-local entry carries the detected one. Fall back to the OZ connector so the view
+// never renders empty while detection resolves (reads degrade honestly regardless).
+const SOURCE_LABEL = { subgraph: 'The Graph', onchain: 'On-chain scan' }
 
 // Spec 030 (US3 + US5) — tracking + management view for a registered external DAO (e.g. Olympia). Reads the
 // DAO's LIVE state via the standard IGovernor connector, its treasuries (timelock + known vaults) native+USDC,
@@ -114,6 +108,22 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   const net = getNetwork(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
 
+  // Resolve the per-framework connector. A registry entry may carry a coarse framework and a device-local entry
+  // the detected one; if it's absent/unknown, detect it live. Fall back to the OZ connector (framework 0) while
+  // detection resolves — reads degrade honestly regardless of framework.
+  const [fw, setFw] = useState(record.framework)
+  useEffect(() => {
+    if (fw != null && fw !== 'unknown') return undefined
+    let cancelled = false
+    detectFramework(reader, record.dao).then((f) => {
+      if (!cancelled && f !== 'unknown') setFw(f)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [reader, record.dao, fw])
+  const connector = getConnector(fw) || getConnector(0)
+
   const [sum, setSum] = useState({ key: null, summary: null, error: null })
   const sumLoading = sum.key !== record.dao
   const [treasuries, setTreasuries] = useState([])
@@ -129,7 +139,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   useEffect(() => {
     let cancelled = false
     setTreasuries([])
-    readGovernorSummary(reader, record.dao)
+    connector.readSummary(reader, record.dao)
       .then(async (summary) => {
         if (cancelled) return
         setSum({ key: record.dao, summary, error: null })
@@ -137,15 +147,15 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
         if (summary?.timelock && ethers.isAddress(summary.timelock) && summary.timelock !== ethers.ZeroAddress) {
           vaults.push({ label: 'Timelock', address: summary.timelock })
         }
-        vaults.push(...extraTreasuries(chainId, record.dao))
+        vaults.push(...connector.extraTreasuries(chainId, record.dao))
         if (vaults.length) {
           try {
-            const t = await readTreasuries(reader, vaults, usdcAddress)
+            const t = await connector.readTreasuries(reader, vaults, usdcAddress)
             // Detect the executor-gated funding pattern per vault (ECIP-1112/1113) so the UI can both label it
             // and offer the correct "Fund from treasury" proposal action. Plain timelock vaults stay funding=null.
             const enriched = await Promise.all(
               t.map(async (entry) => {
-                const funding = await detectTreasuryFunding(reader, entry.address, summary?.timelock)
+                const funding = await connector.detectTreasuryFunding(reader, entry.address, summary?.timelock)
                 return funding ? { ...entry, funding } : entry
               })
             )
@@ -155,13 +165,14 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       })
       .catch((e) => { if (!cancelled) setSum({ key: record.dao, summary: null, error: e?.message || 'Could not read the DAO.' }) })
     return () => { cancelled = true }
-  }, [reader, record.dao, chainId, usdcAddress])
+  }, [reader, record.dao, chainId, usdcAddress, fw, connector])
 
-  // Proposals via the bounded live indexer (subgraph-less fallback).
+  // Proposals via the per-DAO data source: The Graph subgraph where indexed, else the bounded on-chain live
+  // indexer (subgraph-less fallback) — with a truthful source/status (FR-008, SC-011).
   const loadProposals = useCallback(async () => {
-    const res = await fetchGovernorProposals(reader, record.dao)
+    const res = await fetchDaoProposals({ chainId, address: record.dao, framework: fw, reader })
     setProps({ key: record.dao, ...res })
-  }, [reader, record.dao])
+  }, [reader, record.dao, chainId, fw])
   useEffect(() => { loadProposals() }, [loadProposals])
 
   // Per-user voting state (have I voted, my power at the snapshot, how I voted) for each listed proposal, keyed
@@ -174,12 +185,12 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     let cancelled = false
     ;(async () => {
       const entries = await Promise.all(
-        props.proposals.map(async (p) => [p.id, await readVoterState(reader, record.dao, p, account)])
+        props.proposals.map(async (p) => [p.id, await connector.readVoterState(reader, record.dao, p, account)])
       )
       if (!cancelled) setVoterStates(Object.fromEntries(entries))
     })()
     return () => { cancelled = true }
-  }, [reader, account, record.dao, props.key, props.ok, props.proposals])
+  }, [reader, account, record.dao, props.key, props.ok, props.proposals, fw, connector])
 
   // Execution ETA for queued proposals (no wallet needed). A queued proposal can only execute once the
   // timelock delay elapses; without this the Execute button reverts early with the timelock's custom error.
@@ -189,11 +200,11 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     if (!queued.length) { setEtas({}); return undefined }
     let cancelled = false
     ;(async () => {
-      const entries = await Promise.all(queued.map(async (p) => [p.id, await readProposalEta(reader, record.dao, p.id)]))
+      const entries = await Promise.all(queued.map(async (p) => [p.id, await connector.readProposalEta(reader, record.dao, p.id)]))
       if (!cancelled) setEtas(Object.fromEntries(entries))
     })()
     return () => { cancelled = true }
-  }, [reader, record.dao, props.key, props.ok, props.proposals])
+  }, [reader, record.dao, props.key, props.ok, props.proposals, fw, connector])
 
   // Tick once a second only while some queued proposal is still waiting on its ETA, so the countdown stays live
   // and the Execute button auto-enables the moment the delay passes. No timer otherwise.
@@ -231,7 +242,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       if (e?.code === 'TIMEOUT') {
         showNotification(`${label} is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.`, 'warning', 0)
       } else {
-        showNotification(explainTxError(e), 'error')
+        showNotification(connector.explainTxError(e), 'error')
       }
       return false
     } finally {
@@ -246,7 +257,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       <div className="cp-card" style={{ marginTop: '0.6rem' }}>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <h2>{record.label || s?.name || 'External DAO'}</h2>
-          <span className="cp-badge cp-badge-ext">External · {DAO_FRAMEWORK_LABEL[record.framework] || 'Unknown'}</span>
+          <span className="cp-badge cp-badge-ext">External · {DAO_FRAMEWORK_LABEL[fw] || 'Unknown'}</span>
         </div>
         <div className="cp-row-sub" style={{ marginTop: '0.3rem' }}>{record.dao}</div>
         <p className="cp-intro" style={{ marginTop: '0.6rem' }}>
@@ -293,11 +304,20 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       <div className="cp-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h4>Proposals</h4>
-          <button type="button" className="cp-btn" onClick={loadProposals} disabled={propsLoading || busy}>Refresh</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {!propsLoading && props.ok && props.kind && (
+              <span className="cp-badge" title={props.partial ? 'Partial — some data beyond the scanned range may be missing' : `Source: ${SOURCE_LABEL[props.kind] || props.kind}`}>
+                {SOURCE_LABEL[props.kind] || props.kind}{props.partial ? ' · partial' : ''}
+              </span>
+            )}
+            <button type="button" className="cp-btn" onClick={loadProposals} disabled={propsLoading || busy}>Refresh</button>
+          </div>
         </div>
         <p className="cp-intro" style={{ marginTop: '0.4rem' }}>
-          Live on-chain scan (no subgraph on {net?.name || 'this network'}). Actions are signed by your wallet and
-          gated by the DAO's own rules.
+          {props.kind === 'subgraph'
+            ? 'Indexed via The Graph. '
+            : `Live on-chain scan (no subgraph on ${net?.name || 'this network'}). `}
+          Actions are signed by your wallet and gated by the DAO's own rules.
         </p>
 
         <ProposalBuilder
@@ -383,12 +403,12 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
               <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
                 {canVote && (
                   <>
-                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.For))}>Vote For</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against))}>Against</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', () => castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain))}>Abstain</button>
+                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For))}>Vote For</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against))}>Against</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain))}>Abstain</button>
                   </>
                 )}
-                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => queueProposal(signer, record.dao, p))}>Queue</button>}
+                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => connector.queue(signer, record.dao, p))}>Queue</button>}
                 {p.state === 5 && (
                   <button
                     type="button"
@@ -396,7 +416,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
                     disabled={busy || !executeReady}
                     aria-disabled={busy || !executeReady}
                     title={executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
-                    onClick={() => run('Execute', () => executeProposal(signer, record.dao, p))}
+                    onClick={() => run('Execute', () => connector.execute(signer, record.dao, p))}
                   >
                     Execute
                   </button>

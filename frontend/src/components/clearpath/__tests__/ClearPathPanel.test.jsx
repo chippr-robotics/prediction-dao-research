@@ -35,6 +35,40 @@ vi.mock('../governorConnector', () => ({
   executeProposal: vi.fn(),
   proposeAction: vi.fn(),
 }))
+// Spec 042 — ExternalDaoView reads/acts through the connector resolver + data-source router; mock those with the
+// same fakes so the live tracking view renders deterministically.
+vi.mock('../connectors', () => ({
+  getConnector: () => ({
+    framework: 0,
+    readSummary: (...a) => conn.readGovernorSummary(...a),
+    readTreasuries: (...a) => conn.readTreasuries(...a),
+    extraTreasuries: () => [{ label: 'Olympia Treasury', address: '0x035b2e3c189B772e52F4C3DA6c45c84A3bB871bf' }],
+    detectTreasuryFunding: (...a) => conn.detectTreasuryFunding(...a),
+    readVoterState: (...a) => conn.readVoterState(...a),
+    readProposalEta: (...a) => conn.readProposalEta(...a),
+    explainTxError: (e) => e?.shortMessage || e?.reason || e?.message || 'Transaction failed.',
+    castVote: vi.fn(),
+    queue: vi.fn(),
+    execute: vi.fn(),
+    propose: vi.fn(),
+  }),
+  detectFramework: () => Promise.resolve(0),
+}))
+vi.mock('../daoDataSource', () => ({
+  fetchDaoProposals: async () => {
+    const r = await conn.fetchGovernorProposals()
+    return {
+      ok: r.ok,
+      kind: 'onchain',
+      proposals: r.proposals || [],
+      status: r.ok ? (r.proposals?.length ? 'ok' : 'empty') : 'error',
+      partial: !!r.partial,
+      scannedFrom: r.scannedFrom,
+      scannedTo: r.scannedTo,
+      error: r.error,
+    }
+  },
+}))
 
 vi.mock('../../../config/networks', () => ({
   getNetwork: () => ({
