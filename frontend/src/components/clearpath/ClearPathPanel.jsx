@@ -56,8 +56,9 @@ export default function ClearPathPanel() {
     return (
       <div className="clearpath">
         <div className="cp-disabled" role="status">
-          ClearPath isn’t deployed on {net?.name || 'this network'}. Switch to a supported network (e.g. Ethereum
-          Classic Mordor) to track and manage DAOs.
+          ClearPath isn’t available on {net?.name || 'this network'}. Switch to a network that supports DAO
+          governance (e.g. Ethereum for ENS/Uniswap, or Ethereum Classic Mordor for Olympia) to track and
+          manage DAOs.
         </div>
       </div>
     )

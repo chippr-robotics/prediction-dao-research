@@ -34,8 +34,8 @@ Web app — frontend at `frontend/src/`; tests at `frontend/src/test/**` and
 
 **Purpose**: Environment + scaffolding for the new modules.
 
-- [ ] T001 Add new frontend env vars to `.env.example`: `VITE_RPC_URL_MAINNET` (Ethereum mainnet read RPC) and `VITE_CLEARPATH_GRAPH_KEY` (The Graph gateway API key; optional — absence falls back to on-chain reads), with comments matching research.md D1/D6.
-- [ ] T002 [P] Create the connector package directory `frontend/src/components/clearpath/connectors/` and the config directory `frontend/src/config/clearpath/` with placeholder index files, per plan Project Structure.
+- [X] T001 Add new frontend env vars to `.env.example`: `VITE_RPC_URL_MAINNET` (Ethereum mainnet read RPC) and `VITE_CLEARPATH_GRAPH_KEY` (The Graph gateway API key; optional — absence falls back to on-chain reads), with comments matching research.md D1/D6.
+- [X] T002 [P] Create the connector package directory `frontend/src/components/clearpath/connectors/` and the config directory `frontend/src/config/clearpath/` with placeholder index files, per plan Project Structure.
 
 ---
 
@@ -48,30 +48,30 @@ router, and the decoupled `useClearPath` hook — every user story depends on th
 
 ### Connector interface + resolver (OZ relocation)
 
-- [ ] T003 [P] Write Vitest for `detectFramework()` (OZ → returns 0; non-governor → 'unknown') and OZ-connector interface conformance in `frontend/src/components/clearpath/connectors/__tests__/resolver.test.js` (assert against mocked providers; MUST fail first).
-- [ ] T004 Relocate the existing OZ-Governor reader/action logic from `frontend/src/components/clearpath/governorConnector.js` into `frontend/src/components/clearpath/connectors/ozGovernor.js`, implementing the interface in `contracts/connector-interface.md` (framework 0). Reduce `governorConnector.js` to a thin re-export shim so existing imports keep working.
-- [ ] T005 Create `frontend/src/components/clearpath/connectors/index.js` exporting `detectFramework(reader, address)` (OZ probe + 'unknown'; Bravo branch added in US3) and `getConnector(framework)`.
+- [X] T003 [P] Write Vitest for `detectFramework()` (OZ → returns 0; non-governor → 'unknown') and OZ-connector interface conformance in `frontend/src/components/clearpath/connectors/__tests__/resolver.test.js` (assert against mocked providers; MUST fail first).
+- [X] T004 Relocate the existing OZ-Governor reader/action logic from `frontend/src/components/clearpath/governorConnector.js` into `frontend/src/components/clearpath/connectors/ozGovernor.js`, implementing the interface in `contracts/connector-interface.md` (framework 0). Reduce `governorConnector.js` to a thin re-export shim so existing imports keep working.
+- [X] T005 Create `frontend/src/components/clearpath/connectors/index.js` exporting `detectFramework(reader, address)` (OZ probe + 'unknown'; Bravo branch added in US3) and `getConnector(framework)`.
 
 ### Per-chain `clearpath` capability
 
-- [ ] T006 [P] Write Vitest asserting `capabilities.clearpath` resolves per network and `getNetworkFeatures` exposes a `clearpath` tag, in `frontend/src/test/networkCapabilities.clearpath.test.js` (MUST fail first).
-- [ ] T007 Add a `clearpath` flag to each network's `capabilities` getter in `frontend/src/config/networks.js` (true where ClearPath runs — Mordor 63 at minimum; Amoy/Polygon opt-in per research D1), and add a `clearpath` entry to `NETWORK_FEATURES` in `frontend/src/config/networkCapabilities.js` (deployed = capability present).
+- [X] T006 [P] Write Vitest asserting `capabilities.clearpath` resolves per network and `getNetworkFeatures` exposes a `clearpath` tag, in `frontend/src/test/networkCapabilities.clearpath.test.js` (MUST fail first).
+- [X] T007 Add a `clearpath` flag to each network's `capabilities` getter in `frontend/src/config/networks.js` (true where ClearPath runs — Mordor 63 at minimum; Amoy/Polygon opt-in per research D1), and add a `clearpath` entry to `NETWORK_FEATURES` in `frontend/src/config/networkCapabilities.js` (deployed = capability present).
 
 ### Device-local tracked-DAO store
 
-- [ ] T008 [P] Write Vitest for the tracked store (add/list/remove/has, dedupe, per-(chainId,wallet) scoping, versioned key) in `frontend/src/components/clearpath/__tests__/trackedDaoStore.test.js` (MUST fail first).
-- [ ] T009 [P] Implement `frontend/src/components/clearpath/trackedDaoStore.js` (localStorage key `clearpath.tracked.v1.<chainId>.<lowercased wallet>`) per data-model §3.
+- [X] T008 [P] Write Vitest for the tracked store (add/list/remove/has, dedupe, per-(chainId,wallet) scoping, versioned key) in `frontend/src/components/clearpath/__tests__/trackedDaoStore.test.js` (MUST fail first).
+- [X] T009 [P] Implement `frontend/src/components/clearpath/trackedDaoStore.js` (localStorage key `clearpath.tracked.v1.<chainId>.<lowercased wallet>`) per data-model §3.
 
 ### Data-source router + config
 
-- [ ] T010 [P] Create config scaffolds `frontend/src/config/clearpath/knownDaos.js` (verified seeded DAOs per chain — start empty; ENS/Uniswap added in US2/US3) and `frontend/src/config/clearpath/daoSubgraphs.js` (per-(chainId,dao) gateway endpoints built from `VITE_CLEARPATH_GRAPH_KEY`; empty → on-chain fallback), per research D6.
-- [ ] T011 [P] Write Vitest for the data-source router precedence (subgraph when configured → on-chain otherwise; normalized proposal shape; truthful empty/partial/error) in `frontend/src/components/clearpath/__tests__/daoDataSource.test.js` (MUST fail first).
-- [ ] T012 Implement `frontend/src/components/clearpath/daoDataSource.js`: `resolveDataSource(chainId, address)` + a subgraph GraphQL reader that normalizes to the on-chain proposal shape (data-model §7; contracts/connector-interface.md NormalizedProposal).
+- [X] T010 [P] Create config scaffolds `frontend/src/config/clearpath/knownDaos.js` (verified seeded DAOs per chain — start empty; ENS/Uniswap added in US2/US3) and `frontend/src/config/clearpath/daoSubgraphs.js` (per-(chainId,dao) gateway endpoints built from `VITE_CLEARPATH_GRAPH_KEY`; empty → on-chain fallback), per research D6.
+- [X] T011 [P] Write Vitest for the data-source router precedence (subgraph when configured → on-chain otherwise; normalized proposal shape; truthful empty/partial/error) in `frontend/src/components/clearpath/__tests__/daoDataSource.test.js` (MUST fail first).
+- [X] T012 Implement `frontend/src/components/clearpath/daoDataSource.js`: `resolveDataSource(chainId, address)` + a subgraph GraphQL reader that normalizes to the on-chain proposal shape (data-model §7; contracts/connector-interface.md NormalizedProposal).
 
 ### Decouple `useClearPath` from the registry
 
-- [ ] T013 Write Vitest for `useClearPath` availability = capability + reader (NOT registry), `hasRegistry` flag, merged+deduped network-scoped list, and read-route selection, in `frontend/src/components/clearpath/__tests__/useClearPath.test.js` (extend existing; MUST fail first).
-- [ ] T014 Edit `frontend/src/components/clearpath/useClearPath.js`: set `isSupported = capabilities.clearpath && !!reader`; expose `hasRegistry`/`registryAddress`/`hasSanctionsSource`; make `listExternalDAOs()` merge on-chain registry (iff `hasRegistry`) with `trackedDaoStore` entries deduped by lowercased address; add `readRoute`/`setReadRoute` (reads only) and `trackDAO`/`untrackDAO` routing to registry-or-store per ui-contract.md.
+- [X] T013 Write Vitest for `useClearPath` availability = capability + reader (NOT registry), `hasRegistry` flag, merged+deduped network-scoped list, and read-route selection, in `frontend/src/components/clearpath/__tests__/useClearPath.test.js` (extend existing; MUST fail first).
+- [X] T014 Edit `frontend/src/components/clearpath/useClearPath.js`: set `isSupported = capabilities.clearpath && !!reader`; expose `hasRegistry`/`registryAddress`/`hasSanctionsSource`; make `listExternalDAOs()` merge on-chain registry (iff `hasRegistry`) with `trackedDaoStore` entries deduped by lowercased address; add `readRoute`/`setReadRoute` (reads only) and `trackDAO`/`untrackDAO` routing to registry-or-store per ui-contract.md.
 
 **Checkpoint**: Connector resolver (OZ), capability flag, tracked store, data-source router, and the decoupled hook are in place and unit-tested. User stories can begin.
 
@@ -85,12 +85,12 @@ self-discloses as unavailable there (no fabrication).
 **Independent Test**: Switch to Ethereum mainnet → ClearPath tab enabled; wagers/swap/passkey
 each show a truthful "not available on this network" state; no crash, no fabricated data.
 
-- [ ] T015 [P] [US1] Write Vitest for the Ethereum-mainnet (1) capability profile (`clearpath:true`, all others false; `wagerRegistry` address undefined) in `frontend/src/test/networks.mainnet.test.js` (MUST fail first).
-- [ ] T016 [P] [US1] Write Vitest asserting each non-ClearPath surface self-disables on chain 1 — wager create/list, swap/DEX, passkey option — in `frontend/src/test/reports/clearpathOnlyNetwork.test.jsx` (MUST fail first).
-- [ ] T017 [US1] Add the Ethereum mainnet entry (chainId 1) to `NETWORKS` in `frontend/src/config/networks.js` — `capabilities.clearpath:true`, dex/passkey/polymarket off, `subgraphUrl:null`, `stablecoin` = mainnet USDC, `rpcUrl` from `VITE_RPC_URL_MAINNET`, `explorer` Etherscan, `selectable:true` (research D1).
+- [X] T015 [P] [US1] Write Vitest for the Ethereum-mainnet (1) capability profile (`clearpath:true`, all others false; `wagerRegistry` address undefined) in `frontend/src/test/networks.mainnet.test.js` (MUST fail first).
+- [X] T016 [P] [US1] Write Vitest asserting each non-ClearPath surface self-disables on chain 1 — wager create/list, swap/DEX, passkey option — in `frontend/src/test/reports/clearpathOnlyNetwork.test.jsx` (MUST fail first).
+- [X] T017 [US1] Add the Ethereum mainnet entry (chainId 1) to `NETWORKS` in `frontend/src/config/networks.js` — `capabilities.clearpath:true`, dex/passkey/polymarket off, `subgraphUrl:null`, `stablecoin` = mainnet USDC, `rpcUrl` from `VITE_RPC_URL_MAINNET`, `explorer` Etherscan, `selectable:true` (research D1).
 - [ ] T018 [US1] Audit + guard non-ClearPath surfaces so each gates on its per-chain address/capability and renders a truthful unavailable state when absent (research D8) — fix any surface that assumes a wager network unconditionally (touch the specific wager/swap/passkey gate components identified in the audit).
-- [ ] T019 [US1] Update `frontend/src/components/clearpath/ClearPathPanel.jsx` disabled state to key off `capabilities.clearpath` with network-accurate copy (drop the "switch to Mordor" wording); confirm the tab renders for a mainnet reader.
-- [ ] T020 [US1] Ensure the network switcher (`frontend/src/components/wallet/NetworkSettings.jsx` via `getSelectableNetworks`) labels mainnet by supported capabilities (DAO governance), and extend `frontend/src/test/NetworkSettings.test.jsx` accordingly.
+- [X] T019 [US1] Update `frontend/src/components/clearpath/ClearPathPanel.jsx` disabled state to key off `capabilities.clearpath` with network-accurate copy (drop the "switch to Mordor" wording); confirm the tab renders for a mainnet reader.
+- [X] T020 [US1] Ensure the network switcher (`frontend/src/components/wallet/NetworkSettings.jsx` via `getSelectableNetworks`) labels mainnet by supported capabilities (DAO governance), and extend `frontend/src/test/NetworkSettings.test.jsx` accordingly.
 
 **Checkpoint**: A ClearPath-only network works and every other feature is honestly disabled — MVP.
 

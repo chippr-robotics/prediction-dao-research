@@ -69,6 +69,12 @@ export const NETWORK_FEATURES = [
     description: 'In-app token swaps via the network’s DEX (Uniswap or ETCswap).',
     deployed: (chainId) => Boolean(getNetwork(chainId)?.capabilities?.dex),
   },
+  {
+    key: 'clearpath',
+    label: 'ClearPath DAOs',
+    description: 'Discover, track, and act on governance DAOs (OpenZeppelin Governor, Governor Bravo).',
+    deployed: (chainId) => Boolean(getNetwork(chainId)?.capabilities?.clearpath),
+  },
 ]
 
 /**

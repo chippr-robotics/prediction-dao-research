@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
@@ -6,10 +6,22 @@ import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { makeReadProvider } from '../../utils/rpcProvider'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../abis/externalDAORegistry'
+import * as trackedDaoStore from './trackedDaoStore'
 
 // Upper bound on awaiting a confirmation — a broadcast-but-dropped tx must not hang wait() forever (it would
 // orphan the persistent in-flight toast). 120s is well beyond a normal confirmation on the live networks.
 const CONFIRM_TIMEOUT_MS = 120000
+
+const READ_ROUTE_KEY = 'clearpath.readRoute.v1'
+const readStoredRoute = () => {
+  try {
+    return typeof window !== 'undefined' && window.localStorage.getItem(READ_ROUTE_KEY) === 'wallet'
+      ? 'wallet'
+      : 'public'
+  } catch {
+    return 'public'
+  }
+}
 
 // Cache read providers by (chainId → rpcUrl) so the same network always yields the SAME provider instance
 // across renders — dependent effects (ExternalDaoView keys reads on `reader`) must not see a fresh provider
@@ -26,33 +38,56 @@ function cachedReadProvider(rpcUrl, chainId) {
 }
 
 /**
- * Spec 030 — ClearPath hook (external-DAO pillar). Resolves the per-chain ExternalDAORegistry, exposes whether
- * the feature is available on the active network (FR-016/FR-020: truthful self-disable when absent), reads the
- * live registry over RPC (works on subgraph-less Mordor where Olympia lives), and wraps the register write as a
- * real on-chain tx with honest pending/confirmed/failed state surfaced through the app notification system.
+ * Spec 030 + 042 — ClearPath hook.
+ *
+ * Availability is now capability-driven (spec 042): ClearPath runs on any network that declares the `clearpath`
+ * capability AND has a live reader — it does NOT require a deployed ExternalDAORegistry. Where a registry exists
+ * (e.g. Mordor) it is used as a shared-discovery overlay and MERGED with the member's device-local tracked list;
+ * where it does not (e.g. Ethereum mainnet), the device-local list is the source and a member tracks a DAO by
+ * address with no on-chain write. Everything stays strictly network-scoped (FR-014). Reads default to the
+ * network's public RPC with a wallet-managed routing option (FR-019); writes always use the wallet signer.
  */
 export function useClearPath() {
   const { account, signer, provider, chainId, isConnected } = useWallet()
   const { showNotification } = useNotification()
 
+  const net = getNetwork(chainId)
   const registryAddress = getContractAddressForChain('externalDAORegistry', chainId)
   const usdcAddress = getContractAddressForChain('paymentToken', chainId) // per-network USDC for treasury balances
-  const isSupported = ethers.isAddress(registryAddress || '')
+  const hasRegistry = ethers.isAddress(registryAddress || '')
+  const hasSanctionsSource = ethers.isAddress(getContractAddressForChain('sanctionsGuard', chainId) || '')
 
-  // Read over the active network's OWN RPC, not the wallet provider. ClearPath's proposal indexer runs wide
-  // `eth_getLogs` scans, which injected/mobile wallet RPC backends routinely reject or choke on (the public
-  // node handles them reliably); `makeReadProvider` also disables JSON-RPC batching on ETC/Mordor. The wallet
-  // (`signer`) is still used for every write. Falls back to the wallet provider only if no RPC is configured.
-  const net = getNetwork(chainId)
-  const reader = net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : (provider || signer?.provider || null)
+  const [readRoute, setReadRouteState] = useState(readStoredRoute)
+
+  // Read routing (FR-019): 'public' → the network's own RPC (default; handles the wide eth_getLogs scans that
+  // injected/mobile wallet backends reject; `makeReadProvider` also disables batching on ETC/Mordor). 'wallet' →
+  // the connected wallet's provider. Writes ALWAYS use `signer`, independent of this setting.
+  const reader = useMemo(() => {
+    if (readRoute === 'wallet') return provider || signer?.provider || (net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : null)
+    return net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : provider || signer?.provider || null
+  }, [readRoute, provider, signer, net, chainId])
+
+  // Spec 042: available when the network declares ClearPath AND we have something to read with — NOT gated on a
+  // deployed registry (its reads are pure client-side RPC/subgraph).
+  const isSupported = Boolean(net?.capabilities?.clearpath) && !!reader
+
+  const setReadRoute = useCallback((route) => {
+    const next = route === 'wallet' ? 'wallet' : 'public'
+    try {
+      if (typeof window !== 'undefined') window.localStorage.setItem(READ_ROUTE_KEY, next)
+    } catch {
+      // storage unavailable — keep the in-memory setting
+    }
+    setReadRouteState(next)
+  }, [])
 
   const registryReader = useCallback(() => {
-    if (!isSupported || !reader) return null
+    if (!hasRegistry || !reader) return null
     return new ethers.Contract(registryAddress, EXTERNAL_DAO_REGISTRY_ABI, reader)
-  }, [isSupported, registryAddress, reader])
+  }, [hasRegistry, registryAddress, reader])
 
-  /** Read every external DAO registered on the active network (network-scoped, real on-chain). */
-  const listExternalDAOs = useCallback(async () => {
+  /** On-chain registry entries for the active network (empty when no registry is deployed). */
+  const listRegistryDAOs = useCallback(async () => {
     const reg = registryReader()
     if (!reg) return []
     const n = Number(await reg.externalCount())
@@ -66,17 +101,45 @@ export function useClearPath() {
         label,
         registrant,
         registeredAt: Number(registeredAt),
+        source: 'registry',
       })
     }
     return out
   }, [registryReader])
 
-  /** Register an external DAO. Real on-chain tx; honest state + notifications. Returns the receipt. */
+  /**
+   * Every external DAO on the active network: on-chain registry entries (if a registry is deployed) MERGED with
+   * the member's device-local tracked list, de-duplicated by lowercased address (registry wins on conflict).
+   * Strictly network-scoped — nothing crosses chains or accounts.
+   */
+  const listExternalDAOs = useCallback(async () => {
+    const registryList = await listRegistryDAOs()
+    const localList = trackedDaoStore.list(chainId, account).map((e) => ({
+      id: `local:${String(e.address).toLowerCase()}`,
+      dao: e.address,
+      framework: e.framework,
+      label: e.label,
+      registrant: account,
+      registeredAt: e.addedAt,
+      source: 'local',
+    }))
+    const seen = new Set(registryList.map((d) => String(d.dao).toLowerCase()))
+    const merged = [...registryList]
+    for (const d of localList) {
+      if (!seen.has(String(d.dao).toLowerCase())) {
+        merged.push(d)
+        seen.add(String(d.dao).toLowerCase())
+      }
+    }
+    return merged
+  }, [listRegistryDAOs, chainId, account])
+
+  /** Register an external DAO on-chain (registry networks). Real tx; honest state + notifications. */
   const registerExternalDAO = useCallback(
     async ({ dao, framework = 0, label = '' }) => {
-      if (!isSupported) {
-        showNotification('ClearPath is not available on this network.', 'warning')
-        throw new Error('unsupported network')
+      if (!hasRegistry) {
+        showNotification('This network has no on-chain DAO registry.', 'warning')
+        throw new Error('no registry')
       }
       if (!signer) {
         showNotification('Connect a wallet to register a DAO.', 'warning')
@@ -84,8 +147,6 @@ export function useClearPath() {
       }
       const reg = new ethers.Contract(registryAddress, EXTERNAL_DAO_REGISTRY_ABI, signer)
       try {
-        // Persistent (duration 0) wallet + mining toasts so the user stays aware across the whole on-chain
-        // activity; each is replaced by the next, ending in a confirmed (with tx hash) / failed toast.
         showNotification('Register DAO: confirm in your wallet…', 'info', 0)
         const tx = await reg.registerExternalDAO(dao, framework, label)
         showNotification('Register DAO submitted — awaiting confirmation…', 'info', 0)
@@ -94,7 +155,6 @@ export function useClearPath() {
         showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
         return receipt
       } catch (e) {
-        // Timeout ≠ confirmed failure — the register may still mine; say so honestly rather than "failed".
         if (e?.code === 'TIMEOUT') {
           showNotification('Register DAO is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.', 'warning', 0)
         } else {
@@ -103,11 +163,48 @@ export function useClearPath() {
         throw e
       }
     },
-    [isSupported, signer, registryAddress, showNotification]
+    [hasRegistry, signer, registryAddress, showNotification]
+  )
+
+  /**
+   * Track a DAO. On a registry network this is the on-chain register (above); on a registry-less network it is a
+   * device-local add (immediate, no tx) — honest "tracked on this device" note, duplicate → truthful notice, no
+   * phantom row. The caller validates + framework-detects before calling.
+   */
+  const trackDAO = useCallback(
+    async ({ address, framework = null, label = '' }) => {
+      if (hasRegistry) {
+        return registerExternalDAO({ dao: address, framework: framework ?? 0, label })
+      }
+      if (!account) {
+        showNotification('Connect a wallet to track a DAO.', 'warning')
+        throw new Error('no account')
+      }
+      const res = trackedDaoStore.add(chainId, account, { address, framework, label })
+      if (!res.added && res.reason === 'exists') {
+        showNotification('That DAO is already tracked.', 'warning')
+        return res
+      }
+      if (!res.added) {
+        showNotification('Could not track this DAO.', 'error')
+        throw new Error('track failed')
+      }
+      showNotification(`Tracking ${label || 'DAO'} on this device.`, 'success')
+      return res
+    },
+    [hasRegistry, registerExternalDAO, account, chainId, showNotification]
+  )
+
+  /** Remove a device-local tracked DAO (on-chain registry entries are not removable here). */
+  const untrackDAO = useCallback(
+    (address) => trackedDaoStore.remove(chainId, account, address),
+    [chainId, account]
   )
 
   return {
     isSupported,
+    hasRegistry,
+    hasSanctionsSource,
     registryAddress,
     usdcAddress,
     chainId,
@@ -115,7 +212,11 @@ export function useClearPath() {
     isConnected,
     reader,
     signer,
+    readRoute,
+    setReadRoute,
     listExternalDAOs,
     registerExternalDAO,
+    trackDAO,
+    untrackDAO,
   }
 }

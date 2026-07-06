@@ -68,7 +68,7 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
   it('self-disables truthfully on an unsupported network', async () => {
     cp.isSupported = false
     render(<ClearPathPanel />)
-    expect(screen.getByText(/ClearPath isn’t deployed/i)).toBeInTheDocument()
+    expect(screen.getByText(/ClearPath isn’t available/i)).toBeInTheDocument()
   })
 
   it('lists external DAOs from the on-chain registry', async () => {
