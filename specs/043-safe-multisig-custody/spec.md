@@ -24,7 +24,8 @@ Custody presents two sub-sections: **On chain** (the multisig functionality) and
 platform's existing **encrypted backup and recovery** so a member never loses track of the vaults
 they belong to. Vault activity flows into the platform's **notification and activity system** with
 per-source controls, and Custody controls surface in the places a member already works — wager
-creation and Pay & Transfer — through an **"operate as" the vault** switch.
+creation, Pay & Transfer, ClearPath, Token Mint, Membership, and Trade/Swap — through an
+**"operate as" the vault** switch.
 
 ## Clarifications
 
@@ -38,6 +39,21 @@ creation and Pay & Transfer — through an **"operate as" the vault** switch.
 - Q: Which networks should Custody support at launch? → A: **Ethereum Classic plus the platform's existing
   deployment targets** (e.g. Mordor testnet, Polygon), each gated by the availability of the Safe multisig
   contracts on that network. Custody is only offered on networks where those contracts are deployed.
+- Q: What does "backup and recovery of the Safe wallet" cover? → A: **Vault references and labels only.** The
+  app-wide encrypted backup stores the list of vaults a member belongs to plus their local labels/metadata.
+  The vault itself lives on-chain and is re-loadable by address; no key material is backed up and no on-chain
+  recovery module is introduced.
+- Q: How broad is "operate as the vault" for v1? → A: **Wagers, Pay & Transfer, plus ClearPath DAO actions,
+  Token Mint, and Membership purchase, and Trade/Swap.** Operate-as-vault applies across all of these
+  money-moving surfaces; each such action becomes a vault transaction subject to the vault's threshold.
+- Q: Where does a not-yet-approved vault action (wager/payment/other) appear in the UI before it reaches
+  threshold? → A: **In the vault's pending transaction queue only.** It is a single entry in the vault queue
+  and only materializes as a real wager/transfer/etc. once the vault transaction executes on-chain — it is not
+  separately shown as a "pending" placeholder in domain-specific lists (e.g. My Wagers).
+- Q: Does moving funds INTO the vault (e.g. claiming a vault-created wager's winnings to the vault address)
+  require threshold approval? → A: **No.** Any single owner may trigger a claim or receipt of funds to the
+  vault address without threshold approval, because the destination is the vault itself. Only movements that
+  take funds OUT of the vault require threshold approval.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -102,10 +118,13 @@ becomes executable at 2 approvals, execute it, and verify the balance change and
 
 While using the app as a normal member, a member can switch to **operate as** one of their vaults. In that
 mode, actions that move or commit money are prepared as vault transactions requiring co-owner approval rather
-than as single-signer actions. Specifically, the member can **create a wager as the vault** (co-owners
-approve the stake before it is committed) and **send a payment as the vault** from the **Pay & Transfer**
-section. A persistent, clearly visible indicator shows which identity (personal wallet vs. a named vault) is
-currently active, and the member can switch back at any time.
+than as single-signer actions. This applies across every money-moving surface: **creating a wager**,
+**sending a payment** in **Pay & Transfer**, **ClearPath DAO actions**, **Token Mint**, **Membership
+purchase**, and **Trade/Swap**. In each case the action becomes an entry in the vault's pending queue and
+only takes effect once approved to threshold and executed. A persistent, clearly visible indicator shows
+which identity (personal wallet vs. a named vault) is currently active, and the member can switch back at any
+time. A not-yet-approved action is represented **only** as an entry in the vault's pending queue — it does
+not appear as a separate pending placeholder in the domain-specific lists (e.g. My Wagers) until it executes.
 
 **Why this priority**: This is what makes custody useful inside FairWins rather than a standalone tool. It is
 P2 because Stories 1–2 already deliver a governable vault; "operate as" extends that value into the product's
@@ -120,11 +139,16 @@ Transfer as the vault and confirm it becomes a pending vault transaction.
 1. **Given** a member who owns a vault, **When** they choose "operate as" that vault, **Then** a persistent
    indicator shows the vault as the active identity across the app.
 2. **Given** operate-as-vault is active, **When** the member creates a wager, **Then** the wager's stake is
-   sourced from the vault and requires co-owner approval before the wager becomes active.
+   sourced from the vault, the action appears as an entry in the vault's pending queue, and it requires
+   co-owner approval to threshold before the wager becomes active — with no separate placeholder in My Wagers
+   until it executes.
 3. **Given** operate-as-vault is active, **When** the member sends a payment in Pay & Transfer, **Then** the
    payment is created as a pending vault transaction subject to the vault's threshold rather than sent
    immediately.
-4. **Given** operate-as-vault is active, **When** the member switches back to their personal wallet, **Then**
+4. **Given** operate-as-vault is active, **When** the member initiates a ClearPath DAO action, a Token Mint, a
+   Membership purchase, or a Trade/Swap, **Then** that action likewise becomes a threshold-gated entry in the
+   vault's pending queue rather than a single-signer action.
+5. **Given** operate-as-vault is active, **When** the member switches back to their personal wallet, **Then**
    subsequent actions are single-signer again and the indicator updates.
 
 ---
@@ -212,6 +236,11 @@ confirm no new vault notifications arrive.
   was removed reflects the current owner set and threshold when evaluated for execution.
 - **Insufficient vault balance**: proposing or executing a transfer that exceeds the vault's balance is
   surfaced honestly and cannot silently succeed.
+- **Inbound funds while below threshold**: receiving funds into the vault, or an owner claiming winnings owed
+  to the vault, succeeds without threshold approval because it does not remove funds from the vault.
+- **Not-yet-approved vault action**: a vault-originated wager/payment/DAO action that has not reached
+  threshold exists only as a pending vault-queue entry and does not appear in domain lists (e.g. My Wagers) or
+  affect balances until it executes.
 - **Network mismatch**: acting on a vault while connected to a different network than the vault is deployed on
   is prevented or clearly prompts a network switch.
 - **Sanctions / membership gates**: vault-originated wagers and payments are subject to the same eligibility
@@ -289,16 +318,29 @@ confirm no new vault notifications arrive.
   require co-owner approval to threshold before the wager becomes active.
 - **FR-022**: While operating as a vault, sending a payment in the **Pay & Transfer** section MUST create a
   pending vault transaction subject to the vault's threshold rather than an immediate single-signer send.
+- **FR-022a**: Operate-as-vault MUST also cover the app's other money-moving surfaces — **ClearPath DAO
+  actions**, **Token Mint**, **Membership purchase**, and **Trade/Swap** — such that each such action, while
+  operating as the vault, becomes a threshold-gated vault transaction rather than a single-signer action.
+- **FR-022b**: A vault-originated action that has not reached threshold MUST be represented **only** as an
+  entry in the vault's pending transaction queue; it MUST NOT appear as a pending placeholder in
+  domain-specific lists (e.g. My Wagers, transfer activity) or affect balances until the vault transaction
+  executes.
+- **FR-022c**: Movements of funds **into** the vault — receiving funds, or an owner claiming/collecting funds
+  owed to the vault address (e.g. a vault-created wager's winnings) — MUST NOT require threshold approval and
+  MAY be triggered by any single owner; only movements that take funds **out** of the vault require threshold
+  approval.
 - **FR-023**: Members MUST be able to switch back to their personal wallet at any time, after which actions
   are single-signer again.
-- **FR-024**: Vault-originated wagers and payments MUST be subject to the same eligibility and compliance
-  checks (e.g. sanctions screening, membership roles) applied to personal-wallet actions.
+- **FR-024**: Vault-originated actions (wagers, payments, and the surfaces in FR-022a) MUST be subject to the
+  same eligibility and compliance checks (e.g. sanctions screening, membership roles) applied to
+  personal-wallet actions.
 
 **Backup & recovery**
 
 - **FR-025**: A member's vault references and member-authored labels/metadata MUST be included in the
   platform's existing app-wide **encrypted backup and recovery**, restorable with only control of the
-  member's wallet.
+  member's wallet. The backup scope is references and labels **only** — no owner key material is stored and no
+  on-chain recovery module is introduced (the vault itself lives on-chain and is re-loadable by address).
 - **FR-026**: Backed-up vault data MUST NOT be readable by anyone other than the member, even when stored in a
   publicly readable location.
 
@@ -311,8 +353,9 @@ confirm no new vault notifications arrive.
   other notification sources, including enabling/disabling the Custody source, without affecting other
   sources.
 - **FR-029**: Custody control surfaces MUST be integrated into the relevant existing surfaces across the app
-  (at minimum: the wager creation flow and the Pay & Transfer section for "operate as," and the notification
-  preferences surface), consistent with the app's established navigation and accessibility conventions.
+  (at minimum: the wager creation flow, the Pay & Transfer section, ClearPath DAO actions, Token Mint,
+  Membership purchase, and Trade/Swap for "operate as," plus the notification preferences surface),
+  consistent with the app's established navigation and accessibility conventions.
 
 **Scope & networks**
 
@@ -327,10 +370,12 @@ confirm no new vault notifications arrive.
   set of owner addresses, approval threshold, balances. Lives on-chain; the source of truth is the chain.
 - **Vault Reference / Label**: A member's local record that they are associated with a given vault, plus a
   human-friendly name and metadata. Included in encrypted backup; never authoritative over on-chain state.
-- **Vault Transaction (Proposal)**: A proposed movement or governance action from a vault. Attributes:
-  originating vault, type (transfer, wager stake, governance change), parameters (recipient/amount/asset or
-  owner/threshold change), collected approvals, status (pending, ready, executed, rejected/replaced), and
-  history placement.
+- **Vault Transaction (Proposal)**: A proposed movement or governance action from a vault, and the sole
+  representation of a not-yet-approved vault-originated action. Attributes: originating vault, type (transfer,
+  wager stake, ClearPath/DAO action, Token Mint, Membership purchase, Trade/Swap, governance change),
+  parameters (recipient/amount/asset or owner/threshold change), collected approvals, status (pending, ready,
+  executed, rejected/replaced), and history placement. Inbound movements to the vault are not modeled as
+  threshold-gated proposals.
 - **Approval**: An owner's endorsement of a specific vault transaction; counts once per owner toward the
   threshold.
 - **Active Identity**: The identity a member is currently operating as — their personal wallet or a specific
@@ -348,9 +393,10 @@ confirm no new vault notifications arrive.
   owner approvals — verified across normal, duplicate-approval, and concurrent-execution cases (0 violations).
 - **SC-003**: A member can load an existing vault by address and see its owners, threshold, and balances match
   independent on-chain inspection 100% of the time.
-- **SC-004**: A member operating "as a vault" can, from an ordinary wager-creation or Pay & Transfer flow,
-  produce a co-owner-approved fund movement without leaving those flows, and 90% of test users correctly
-  identify which identity is active from the on-screen indicator.
+- **SC-004**: A member operating "as a vault" can, from any supported money-moving flow (wager creation, Pay
+  & Transfer, ClearPath DAO actions, Token Mint, Membership purchase, or Trade/Swap), produce a
+  co-owner-approved fund movement without leaving that flow, and 90% of test users correctly identify which
+  identity is active from the on-screen indicator.
 - **SC-005**: After backing up and restoring on a fresh device/browser, 100% of a member's previously known
   vaults and labels reappear in Custody.
 - **SC-006**: When a co-owner proposes a transaction needing the member's approval, a "needs your action"
@@ -363,8 +409,16 @@ confirm no new vault notifications arrive.
 ## Assumptions
 
 - **Reuse of existing platform infrastructure**: The feature reuses the platform's existing encrypted
-  backup/recovery (spec 032), notification & activity system (spec 031), sanctions/membership gating, and
-  wager/transfer flows rather than introducing parallel mechanisms.
+  backup/recovery (spec 032), notification & activity system (spec 031), sanctions/membership gating, and the
+  existing wager/transfer/ClearPath/Token Mint/Membership/Trade flows rather than introducing parallel
+  mechanisms.
+- **Operate-as breadth**: Operate-as-vault covers all of the app's money-moving surfaces — wager creation,
+  Pay & Transfer, ClearPath DAO actions, Token Mint, Membership purchase, and Trade/Swap. Read-only or
+  non-fund-moving surfaces are unaffected.
+- **Backup is references only**: The encrypted backup stores vault references and labels only; there is no
+  owner-key backup and no on-chain recovery/guardian module in scope.
+- **Inbound is unrestricted**: Only outbound movements (funds leaving the vault) are threshold-gated;
+  receiving or claiming funds to the vault address is single-owner and needs no approval.
 - **Established multisig standard**: "Vault" refers to the widely deployed Safe multisignature pattern (as
   used by the Ethereum Classic Cooperative and mirrored by the referenced `etclabscore/web-core`), so that
   vaults created or loaded here are interoperable with that ecosystem rather than a bespoke scheme.
@@ -387,6 +441,7 @@ confirm no new vault notifications arrive.
 
 - Encrypted backup & recovery (spec 032) for FR-025/FR-026.
 - Platform notification & activity system (spec 031) for FR-027/FR-028.
-- Existing wager creation and Pay & Transfer flows for FR-021/FR-022.
+- Existing wager creation, Pay & Transfer, ClearPath, Token Mint, Membership, and Trade/Swap flows for
+  FR-021/FR-022/FR-022a.
 - Existing sanctions/membership eligibility checks for FR-024.
 - Availability of the Safe multisig contracts on each in-scope network (FR-030).

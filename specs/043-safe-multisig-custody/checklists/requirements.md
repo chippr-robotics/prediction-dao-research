@@ -31,9 +31,16 @@
 
 ## Notes
 
-- All checklist items pass. Both prior clarifications were resolved with the user (2026-07-06):
+- All checklist items pass. Clarifications resolved with the user (2026-07-06), across two rounds:
   - **FR-017** — co-signer coordination: **on-chain only** (each approval is an on-chain transaction; the
     vault's on-chain state is the shared source of truth; no platform backend).
   - **FR-030** — supported networks: **Ethereum Classic + platform deployment targets** (e.g. Mordor,
     Polygon), gated by Safe contract availability per network.
-- Spec is ready for `/speckit-plan` (or optional `/speckit-clarify` for finer-grained de-risking).
+  - **FR-025** — backup scope: **vault references + labels only** (no owner-key backup, no on-chain recovery
+    module).
+  - **FR-021/FR-022a/FR-029** — operate-as breadth: **wagers, Pay & Transfer, ClearPath, Token Mint,
+    Membership, and Trade/Swap**.
+  - **FR-022b** — not-yet-approved vault actions live **only** in the vault's pending queue (no domain-list
+    placeholders until execution).
+  - **FR-022c** — **inbound** movements to the vault need no threshold approval; only outbound does.
+- Spec is ready for `/speckit-plan`.
