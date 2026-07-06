@@ -5,21 +5,22 @@ import { DAO_FRAMEWORK_LABEL } from '../../abis/externalDAORegistry'
 import { useClearPath } from './useClearPath'
 import RegisterExternalDao from './RegisterExternalDao'
 import ExternalDaoView from './ExternalDaoView'
+import ReadRouteToggle from './ReadRouteToggle'
 
 // Spec 030 — ClearPath module (external-DAO pillar), embedded as the My Account "ClearPath" tab. Lists DAOs
 // deployed by other platforms registered in the on-chain ExternalDAORegistry (read live over RPC — works on
 // subgraph-less Mordor, where Olympia lives), lets a member register a new one, and opens a per-DAO tracking
 // view. Network-scoped; self-disables truthfully where ClearPath isn't deployed (FR-016). Real on-chain only.
 
-const TABS = [
-  { id: 'daos', label: 'External DAOs' },
-  { id: 'register', label: 'Register' },
-]
-
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 export default function ClearPathPanel() {
-  const { isSupported, chainId, reader, signer, account, usdcAddress, listExternalDAOs, registerExternalDAO } = useClearPath()
+  const { isSupported, hasRegistry, chainId, reader, signer, account, usdcAddress, readRoute, setReadRoute, listExternalDAOs, trackDAO, untrackDAO } = useClearPath()
+  // Tab label follows the mechanism: an on-chain register where a registry is deployed, else device-local track.
+  const TABS = [
+    { id: 'daos', label: 'DAOs' },
+    { id: 'register', label: hasRegistry ? 'Register' : 'Track' },
+  ]
   const [tab, setTab] = useState('daos')
   const [loading, setLoading] = useState(true)
   const [daos, setDaos] = useState([])
@@ -75,9 +76,10 @@ export default function ClearPathPanel() {
   return (
     <div className="clearpath">
       <p className="cp-intro">
-        ClearPath — track and manage DAOs across platforms on {net?.name || 'this network'}. Add an existing DAO
-        (e.g. an OpenZeppelin Governor like Olympia) and inspect its live governance + treasury. Native ClearPath
-        DAOs are coming next.
+        ClearPath — track and manage DAOs across networks on {net?.name || 'this network'}. Add an existing DAO by
+        address — an OpenZeppelin Governor (e.g. ENS, Olympia) or a Governor Bravo DAO (e.g. Uniswap) — and inspect
+        its live governance + treasury.
+        {!hasRegistry && ' On this network, DAOs you add are tracked on this device.'}
       </p>
 
       <div className="cp-tabs" role="tablist">
@@ -90,13 +92,16 @@ export default function ClearPathPanel() {
 
       {tab === 'daos' && (
         <div role="tabpanel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span className="cp-row-sub">DAOs registered on {net?.name || 'this network'}</span>
-            <button type="button" className="cp-btn" onClick={refresh} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <span className="cp-row-sub">DAOs on {net?.name || 'this network'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <ReadRouteToggle value={readRoute} onChange={setReadRoute} />
+              <button type="button" className="cp-btn" onClick={refresh} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+            </div>
           </div>
           {error && <div className="cp-error" role="alert">{error}</div>}
           {!loading && daos.length === 0 && !error && (
-            <p className="cp-empty">No external DAOs registered yet. Use “Register” to add one.</p>
+            <p className="cp-empty">No DAOs tracked yet. Use “{hasRegistry ? 'Register' : 'Track'}” to add one.</p>
           )}
           {daos.map((d) => (
             <div key={d.id} className="cp-row" role="button" tabIndex={0}
@@ -107,6 +112,16 @@ export default function ClearPathPanel() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span className="cp-badge cp-badge-ext">{DAO_FRAMEWORK_LABEL[d.framework] || 'Unknown'}</span>
+                {d.source === 'local' && (
+                  <button
+                    type="button"
+                    className="cp-btn-link"
+                    aria-label={`Untrack ${d.label || short(d.dao)}`}
+                    onClick={(e) => { e.stopPropagation(); untrackDAO(d.dao); load() }}
+                  >
+                    Untrack
+                  </button>
+                )}
                 <span aria-hidden="true" style={{ color: 'var(--cp-text-3)' }}>›</span>
               </div>
             </div>
@@ -118,7 +133,8 @@ export default function ClearPathPanel() {
         <div role="tabpanel">
           <RegisterExternalDao
             reader={reader}
-            register={registerExternalDAO}
+            track={trackDAO}
+            hasRegistry={hasRegistry}
             onRegistered={() => { setTab('daos'); load() }}
           />
         </div>

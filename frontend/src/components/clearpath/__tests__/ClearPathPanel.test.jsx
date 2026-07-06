@@ -9,12 +9,17 @@ import ClearPathPanel from '../ClearPathPanel'
 
 const cp = {
   isSupported: true,
+  hasRegistry: true,
   chainId: 63,
   reader: {},
   account: '0xabc',
   isConnected: true,
+  readRoute: 'public',
+  setReadRoute: vi.fn(),
   listExternalDAOs: vi.fn(),
   registerExternalDAO: vi.fn(),
+  trackDAO: vi.fn(),
+  untrackDAO: vi.fn(),
 }
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))

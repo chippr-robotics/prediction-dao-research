@@ -105,13 +105,13 @@ each show a truthful "not available on this network" state; no crash, no fabrica
 list (device-local) → detail shows real treasury/proposals/membership with a source chip;
 switching networks proves strict scoping.
 
-- [ ] T021 [P] [US2] Write Vitest for the registry-less register flow (client-side validate + `detectFramework` = 0 + write to `trackedDaoStore`; duplicate → "already tracked"; no phantom on invalid) in `frontend/src/components/clearpath/__tests__/RegisterExternalDao.test.jsx` (extend; MUST fail first).
+- [X] T021 [P] [US2] Write Vitest for the registry-less register flow (client-side validate + `detectFramework` = 0 + write to `trackedDaoStore`; duplicate → "already tracked"; no phantom on invalid) in `frontend/src/components/clearpath/__tests__/RegisterExternalDao.test.jsx` (extend; MUST fail first).
 - [ ] T022 [P] [US2] Write Vitest for `ExternalDaoView` reading through the resolved connector + `daoDataSource` and rendering a truthful source/status chip (subgraph/on-chain/partial/unavailable) in `frontend/src/components/clearpath/__tests__/ExternalDaoView.test.jsx` (MUST fail first).
-- [ ] T023 [US2] Edit `frontend/src/components/clearpath/RegisterExternalDao.jsx` to validate + framework-detect client-side and, on a registry-less network, persist via `trackDAO` (device-local) with an honest "tracked on this device" note; keep the on-chain register path where `hasRegistry`.
+- [X] T023 [US2] Edit `frontend/src/components/clearpath/RegisterExternalDao.jsx` to validate + framework-detect client-side and, on a registry-less network, persist via `trackDAO` (device-local) with an honest "tracked on this device" note; keep the on-chain register path where `hasRegistry`.
 - [X] T024 [US2] Edit `frontend/src/components/clearpath/ExternalDaoView.jsx` to resolve the connector via `getConnector`/`detectFramework` and read via `daoDataSource` (per-DAO subgraph-first), rendering the source/status chip; remove direct `governorConnector` coupling.
-- [ ] T025 [US2] Edit `frontend/src/components/clearpath/ClearPathPanel.jsx` list rendering to show merged registry+local DAOs with framework badge (`DAO_FRAMEWORK_LABEL`) and network label; wire `untrackDAO` for device-local entries.
+- [X] T025 [US2] Edit `frontend/src/components/clearpath/ClearPathPanel.jsx` list rendering to show merged registry+local DAOs with framework badge (`DAO_FRAMEWORK_LABEL`) and network label; wire `untrackDAO` for device-local entries.
 - [ ] T026 [P] [US2] Add the verified **ENS** Governor to `frontend/src/config/clearpath/knownDaos.js` (address + framework 0 + label) and, if available, its governance subgraph to `daoSubgraphs.js` — confirm both on-chain/gateway before committing (research VERIFY).
-- [ ] T027 [P] [US2] Add a `ReadRouteToggle` component `frontend/src/components/clearpath/ReadRouteToggle.jsx` (public-RPC vs wallet-managed; reads only) and its Vitest; wire it to `useClearPath.readRoute`/`setReadRoute` (FR-019).
+- [X] T027 [P] [US2] Add a `ReadRouteToggle` component `frontend/src/components/clearpath/ReadRouteToggle.jsx` (public-RPC vs wallet-managed; reads only) and its Vitest; wire it to `useClearPath.readRoute`/`setReadRoute` (FR-019).
 - [ ] T028 [US2] Extend `frontend/src/test/clearpath.accessibility.test.jsx` to cover the registry-less register + tracked-list + detail states (axe, zero violations).
 
 **Checkpoint**: Registry-less OZ-Governor tracking works end-to-end on mainnet, network-scoped and honest.
