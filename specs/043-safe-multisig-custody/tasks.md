@@ -32,10 +32,10 @@ Web-app monorepo (per plan.md): contracts under `contracts/`, tests under `test/
 
 **Purpose**: Scaffolding and external Safe wiring that every later phase reuses.
 
-- [ ] T001 [P] Add hand-maintained Safe v1.4.1 ABIs in `frontend/src/abis/Safe.js`, `frontend/src/abis/SafeProxyFactory.js`, `frontend/src/abis/MultiSendCallOnly.js` (only the methods/events in `contracts/vault-transactions.md`)
-- [ ] T002 [P] Create `frontend/src/config/safeContracts.js` with the verified canonical v1.4.1 addresses for chainId 63 and 137 (`safe`, `safeL2`, `proxyFactory`, `fallbackHandler`, `multiSendCallOnly`) plus `getSafeContracts(chainId)` returning `undefined` on unsupported chains (research.md Decision 1 & 8)
-- [ ] T003 [P] Create feature directories: `contracts/custody/`, `test/custody/`, `frontend/src/lib/custody/`, `frontend/src/components/custody/`, and a `frontend/src/components/custody/Custody.css` scaffold
-- [ ] T004 [P] Add a `custody` entry to `frontend/src/data/notifications/domains.js` `DOMAIN_META` (label "Custody") so the domain resolves early (used by US6, harmless now)
+- [X] T001 [P] Add hand-maintained Safe v1.4.1 ABIs in `frontend/src/abis/Safe.js`, `frontend/src/abis/SafeProxyFactory.js`, `frontend/src/abis/MultiSendCallOnly.js` (only the methods/events in `contracts/vault-transactions.md`)
+- [X] T002 [P] Create `frontend/src/config/safeContracts.js` with the verified canonical v1.4.1 addresses for chainId 63 and 137 (`safe`, `safeL2`, `proxyFactory`, `fallbackHandler`, `multiSendCallOnly`) plus `getSafeContracts(chainId)` returning `undefined` on unsupported chains (research.md Decision 1 & 8)
+- [X] T003 [P] Create feature directories: `contracts/custody/`, `test/custody/`, `frontend/src/lib/custody/`, `frontend/src/components/custody/`, and a `frontend/src/components/custody/Custody.css` scaffold
+- [X] T004 [P] Add a `custody` entry to `frontend/src/data/notifications/domains.js` `DOMAIN_META` (label "Custody") so the domain resolves early (used by US6, harmless now)
 
 ---
 
@@ -46,15 +46,15 @@ shell. **No user story can be completed until this phase is done.**
 
 **⚠️ CRITICAL**: Blocks all user stories.
 
-- [ ] T005 Implement `contracts/custody/SafeProposalHub.sol` — events-only broadcaster per `contracts/SafeProposalHub.md` (`propose`, `cancel`, `Proposed`, `Cancelled`; optional `operation <= 1` guard; no state, no funds)
-- [ ] T006 [P] Write `test/custody/SafeProposalHub.test.js` FIRST (assert events emitted with exact args, no state writes, invalid operation reverts) and confirm it fails before T005 is wired
-- [ ] T007 Create `scripts/deploy/custody/deploy-safe-proposal-hub.js` (deploy, record under `safeProposalHub` in `deployments/<network>-chain<id>-v2.json`)
+- [X] T005 Implement `contracts/custody/SafeProposalHub.sol` — events-only broadcaster per `contracts/SafeProposalHub.md` (`propose`, `cancel`, `Proposed`, `Cancelled`; optional `operation <= 1` guard; no state, no funds)
+- [X] T006 [P] Write `test/custody/SafeProposalHub.test.js` FIRST (assert events emitted with exact args, no state writes, invalid operation reverts) and confirm it fails before T005 is wired
+- [X] T007 Create `scripts/deploy/custody/deploy-safe-proposal-hub.js` (deploy, record under `safeProposalHub` in `deployments/<network>-chain<id>-v2.json`)
 - [ ] T008 Deploy `SafeProposalHub` to Mordor (63) and run `npm run sync:frontend-contracts -- --network mordor --chainId 63`, adding the `safeProposalHub` address to `MORDOR_CONTRACTS` in `frontend/src/config/contracts.js`
-- [ ] T009 [P] Add `frontend/src/abis/SafeProposalHub.js` ABI
-- [ ] T010 Implement shared transaction encoders in `frontend/src/lib/custody/vaultTransaction.js` (`buildSafeTx`, `computeSafeTxHash`, `buildPrevalidatedSignatures` with ascending-owner ordering, `encodeMultiSend`, `encodeExecTransaction`, and governance builders) per `contracts/vault-transactions.md`
-- [ ] T011 [P] Write `frontend/src/test/custody/vaultTransaction.test.js` — known-answer vectors for `getTransactionHash`, pre-validated signature byte layout (`r=owner`, `s=0`, `v=1`) and mandatory ascending sort, and MultiSend packing
-- [ ] T012 Add the Custody tab shell: insert `{ id: 'custody', label: 'Custody' }` into the **Finance** group in `frontend/src/pages/WalletPage.jsx` and render `frontend/src/components/custody/CustodyPanel.jsx` with **On chain** and **Off chain** (disabled) sub-sections, an empty/onboarding state, and network gating (`getSafeContracts(chainId)` undefined → "unavailable on this network")
-- [ ] T013 [P] Write `frontend/src/test/custody/CustodyPanel.test.jsx` (renders both sub-sections, Off chain disabled, unsupported-network message) and `CustodyPanel.axe.test.jsx` (WCAG 2.1 AA)
+- [X] T009 [P] Add `frontend/src/abis/SafeProposalHub.js` ABI
+- [X] T010 Implement shared transaction encoders in `frontend/src/lib/custody/vaultTransaction.js` (`buildSafeTx`, `computeSafeTxHash`, `buildPrevalidatedSignatures` with ascending-owner ordering, `encodeMultiSend`, `encodeExecTransaction`, and governance builders) per `contracts/vault-transactions.md`
+- [X] T011 [P] Write `frontend/src/test/custody/vaultTransaction.test.js` — known-answer vectors for `getTransactionHash`, pre-validated signature byte layout (`r=owner`, `s=0`, `v=1`) and mandatory ascending sort, and MultiSend packing
+- [X] T012 Add the Custody tab shell: insert `{ id: 'custody', label: 'Custody' }` into the **Finance** group in `frontend/src/pages/WalletPage.jsx` and render `frontend/src/components/custody/CustodyPanel.jsx` with **On chain** and **Off chain** (disabled) sub-sections, an empty/onboarding state, and network gating (`getSafeContracts(chainId)` undefined → "unavailable on this network")
+- [X] T013 [P] Write `frontend/src/test/custody/CustodyPanel.test.jsx` (renders both sub-sections, Off chain disabled, unsupported-network message) and `CustodyPanel.axe.test.jsx` (WCAG 2.1 AA)
 
 **Checkpoint**: Safe wiring, hub, encoders, and Custody shell exist — stories can begin.
 
@@ -75,7 +75,7 @@ chain; load a pre-existing vault by address and see the same live state (quickst
 
 ### Implementation for User Story 1
 
-- [ ] T016 [P] [US1] Implement `frontend/src/lib/custody/vaultReferences.js` — local store of `{chainId,address,label,addedAt,role}[]` with load/save/upsert (data-model.md)
+- [X] T016 [P] [US1] Implement `frontend/src/lib/custody/vaultReferences.js` — local store of `{chainId,address,label,addedAt,role}[]` with load/save/upsert (data-model.md)
 - [ ] T017 [US1] Implement `frontend/src/lib/custody/safeVault.js` — `createVault`, `loadVault`, `readVaultState` (owners/threshold/nonce/version/balances; validates the address is a Safe) per `contracts/vault-transactions.md`
 - [ ] T018 [US1] Implement `frontend/src/hooks/useCustodyVaults.js` — vault list from `vaultReferences`, load-by-address, refresh, active-vault selection
 - [ ] T019 [P] [US1] Build `frontend/src/components/custody/CreateVaultWizard.jsx` — owners + threshold inputs, live validation (FR-005), predicted address shown before signing
@@ -179,9 +179,9 @@ confirm new config governs the next transaction (quickstart Scenario 4).
 
 ### Implementation for User Story 5
 
-- [ ] T049 [US5] Add the `vaultReferences` entry to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: true`, `load/apply/merge` delegating to `frontend/src/lib/custody/vaultReferences.js`) (FR-025)
-- [ ] T050 [US5] Extend `assertNetworkTagged` in `frontend/src/lib/backup/backupBundle.js` to validate the `chainId` tag on `vaultReferences`
-- [ ] T051 [US5] Write `frontend/src/test/backup/backupBundle.vaultReferences.test.js` confirming the bundle includes and restores vault references and stays encrypted (FR-026)
+- [X] T049 [US5] Add the `vaultReferences` entry to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: true`, `load/apply/merge` delegating to `frontend/src/lib/custody/vaultReferences.js`) (FR-025)
+- [X] T050 [US5] Extend `assertNetworkTagged` in `frontend/src/lib/backup/backupBundle.js` to validate the `chainId` tag on `vaultReferences`
+- [X] T051 [US5] Write `frontend/src/test/backup/backupBundle.vaultReferences.test.js` confirming the bundle includes and restores vault references and stays encrypted (FR-026)
 
 **Checkpoint**: Vault references survive device/browser loss.
 

@@ -1,0 +1,40 @@
+/* Spec 043 — Custody surface styles. Mirrors the app's existing section spacing/typography tokens. */
+
+.custody-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.custody-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.custody-subsection {
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.25));
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+}
+
+.custody-subsection-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.custody-subsection--disabled {
+  opacity: 0.55;
+}
+
+.custody-hint {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.custody-unavailable,
+.custody-onchain-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
