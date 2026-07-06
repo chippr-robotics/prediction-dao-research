@@ -2,7 +2,7 @@
 // deploy. Validation mirrors validateVaultConfig (FR-005). Presentational; all chain work is delegated to the
 // injected callbacks so the component is unit-testable.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { validateVaultConfig } from '../../lib/custody/safeVault'
 
 export default function CreateVaultWizard({ connectedAddress, onCreate, onPreview, onDone }) {
@@ -21,6 +21,12 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
     } catch (e) {
       return e.message
     }
+  }, [owners, threshold])
+
+  // A previewed address is only valid for the exact owners+threshold it was computed from; clear it whenever
+  // the config changes so the user never sees a stale address that won't match what "Create vault" deploys.
+  useEffect(() => {
+    setPredicted(null)
   }, [owners, threshold])
 
   const cleanedOwners = () => owners.map((o) => o.trim()).filter(Boolean)

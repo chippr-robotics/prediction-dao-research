@@ -49,7 +49,11 @@ export function saveVaultReferences(account, refs) {
   return clean
 }
 
-/** Insert or update one reference by (chainId, address); newest label wins. Returns the new array. */
+/**
+ * Insert or update one reference by (chainId, address). On update, `addedAt` is bumped to the edit time so a
+ * fresh label/role edit wins the backup merge (mergeVaultReferences resolves conflicts by newest `addedAt`);
+ * it never moves backwards. Returns the new array.
+ */
 export function upsertVaultReference(account, entry, nowMs = 0) {
   const next = sanitize(entry)
   if (!next) return loadVaultReferences(account)
@@ -57,8 +61,13 @@ export function upsertVaultReference(account, entry, nowMs = 0) {
   const current = loadVaultReferences(account)
   const key = vaultKey(next.chainId, next.address)
   const idx = current.findIndex((r) => vaultKey(r.chainId, r.address) === key)
-  if (idx === -1) current.push(next)
-  else current[idx] = { ...current[idx], ...next, addedAt: current[idx].addedAt || next.addedAt }
+  if (idx === -1) {
+    current.push(next)
+  } else {
+    // Bump addedAt so an edit is "newer" than the prior entry (and any other device's copy) at merge time.
+    const addedAt = Math.max(current[idx].addedAt || 0, next.addedAt || 0)
+    current[idx] = { ...current[idx], ...next, addedAt }
+  }
   return saveVaultReferences(account, current)
 }
 

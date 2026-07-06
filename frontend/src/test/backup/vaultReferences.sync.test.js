@@ -34,6 +34,17 @@ describe('vaultReferences store', () => {
     expect(loadVaultReferences(ACCOUNT).map((r) => vaultKey(r.chainId, r.address))).toEqual([vaultKey(137, V1)])
   })
 
+  it('bumps addedAt on update so an edited label wins a later merge', () => {
+    upsertVaultReference(ACCOUNT, { chainId: 63, address: V1, label: 'Original' }, 100)
+    // A newer edit on this device.
+    upsertVaultReference(ACCOUNT, { chainId: 63, address: V1, label: 'Edited' }, 300)
+    const edited = loadVaultReferences(ACCOUNT).find((r) => r.chainId === 63)
+    expect(edited.addedAt).toBe(300)
+    // Another device still holds the older copy (addedAt 100); the edit must win the merge.
+    const { value } = mergeVaultReferences([{ chainId: 63, address: V1, label: 'Stale', addedAt: 100 }], [edited])
+    expect(value.find((r) => r.address.toLowerCase() === V1.toLowerCase()).label).toBe('Edited')
+  })
+
   it('ignores invalid addresses / missing chainId', () => {
     upsertVaultReference(ACCOUNT, { chainId: 63, address: 'not-an-address', label: 'x' }, 1)
     upsertVaultReference(ACCOUNT, { chainId: NaN, address: V2, label: 'y' }, 1)

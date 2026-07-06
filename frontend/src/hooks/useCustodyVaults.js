@@ -74,7 +74,7 @@ export function useCustodyVaults() {
       upsertVaultReference(
         address,
         { chainId: Number(chainId), address: state.address, label, role: owner ? 'owner' : 'watch' },
-        nowMs,
+        nowMs || Date.now(),
       )
       await refresh()
       setActiveAddress(state.address)
@@ -98,7 +98,7 @@ export function useCustodyVaults() {
       upsertVaultReference(
         address,
         { chainId: Number(chainId), address: vaultAddress, label, role: 'owner' },
-        nowMs,
+        nowMs || Date.now(),
       )
       await refresh()
       setActiveAddress(vaultAddress)
