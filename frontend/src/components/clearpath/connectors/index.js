@@ -6,11 +6,11 @@
 // new module + one entry in ORDERED — no consumer change (SC-006). See contracts/connector-interface.md.
 
 import { ozGovernorConnector } from './ozGovernor'
+import { governorBravoConnector } from './governorBravo'
 
 // Detection order matters: OZ first (its COUNTING_MODE() probe is the tightest discriminator), then Bravo
-// (proposalCount()+quorumVotes(), which OZ lacks). Append new connectors here. GovernorBravo (framework 1) is
-// added alongside its module in the US3 phase.
-const ORDERED = [ozGovernorConnector]
+// (proposalCount()+quorumVotes(), which OZ lacks). Append new connectors here.
+const ORDERED = [ozGovernorConnector, governorBravoConnector]
 
 const BY_FRAMEWORK = ORDERED.reduce((m, c) => {
   m[c.framework] = c
@@ -39,4 +39,4 @@ export async function detectFramework(reader, address) {
   return 'unknown'
 }
 
-export { ozGovernorConnector }
+export { ozGovernorConnector, governorBravoConnector }
