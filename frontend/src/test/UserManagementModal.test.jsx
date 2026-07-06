@@ -113,7 +113,7 @@ describe('UserManagementModal', () => {
       
       expect(screen.getByRole('tab', { name: /Profile/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Search Markets/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /Swap Tokens/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /Trade/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Launch Market/i })).toBeInTheDocument()
     })
 
@@ -153,13 +153,13 @@ describe('UserManagementModal', () => {
       expect(screen.getByPlaceholderText(/Search for markets.../i)).toBeInTheDocument()
     })
 
-    it('should switch to swap tab when clicked', () => {
+    it('should switch to trade tab when clicked', () => {
       renderWithProviders(<UserManagementModal />)
-      
-      const swapTab = screen.getByRole('tab', { name: /Swap Tokens/i })
-      fireEvent.click(swapTab)
-      
-      expect(swapTab).toHaveAttribute('aria-selected', 'true')
+
+      const tradeTab = screen.getByRole('tab', { name: /Trade/i })
+      fireEvent.click(tradeTab)
+
+      expect(tradeTab).toHaveAttribute('aria-selected', 'true')
     })
 
     it('should switch to launch tab when clicked', () => {

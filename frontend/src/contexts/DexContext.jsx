@@ -9,6 +9,7 @@ import { WNATIVE_ABI } from '../abis/WNative'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
 import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 import { DexContext } from './DexContext'
+import { toSdkToken, buildTradeMetrics, ROUTED_FEE_TIERS } from '../lib/uniswap/trade'
 import logger from '../utils/logger'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
@@ -224,6 +225,15 @@ export function DexProvider({ children }) {
     return 18
   }, [addresses, tokens.STABLE.decimals])
 
+  // Symbol lookup for a token by address, used to label SDK Token instances so
+  // the trade surface reads the right ticker on every chain.
+  const symbolOf = useCallback((tokenAddress) => {
+    const lower = tokenAddress?.toLowerCase?.()
+    if (lower === addresses.STABLECOIN.toLowerCase()) return tokens.STABLE.symbol
+    if (lower === addresses.WNATIVE.toLowerCase()) return tokens.WNATIVE.symbol
+    return 'TOKEN'
+  }, [addresses, tokens.STABLE.symbol, tokens.WNATIVE.symbol])
+
   const getQuote = useCallback(async (tokenIn, tokenOut, amountIn, feeTier = FEE_TIERS.MEDIUM) => {
     if (!contracts) {
       throw new Error('DEX is not available on the current network')
@@ -253,7 +263,104 @@ export function DexProvider({ children }) {
     }
   }, [contracts, decimalsOf])
 
-  const swap = useCallback(async (tokenIn, tokenOut, amountIn, feeTier = FEE_TIERS.MEDIUM) => {
+  // Route a quote across the common V3 fee tiers and return the best-execution
+  // result decorated with Uniswap SDK figures (execution price, minimum
+  // received after slippage, price impact) — the numbers a trading UI shows.
+  const getBestQuote = useCallback(async (tokenIn, tokenOut, amountIn) => {
+    if (!contracts) {
+      throw new Error('DEX is not available on the current network')
+    }
+
+    setQuotingPrice(true)
+    try {
+      const decIn = decimalsOf(tokenIn)
+      const decOut = decimalsOf(tokenOut)
+      const amountInWei = ethers.parseUnits(amountIn, decIn)
+      if (amountInWei <= 0n) {
+        throw new Error('Enter an amount greater than zero')
+      }
+
+      // Probe each fee tier; QuoterV2 reverts where no pool exists, so we keep
+      // the deepest output across the tiers that do quote — a lightweight route.
+      let best = null
+      for (const fee of ROUTED_FEE_TIERS) {
+        try {
+          const res = await contracts.quoter.quoteExactInputSingle.staticCall({
+            tokenIn,
+            tokenOut,
+            amountIn: amountInWei,
+            fee,
+            sqrtPriceLimitX96: 0,
+          })
+          const out = res[0]
+          if (out > 0n && (!best || out > best.amountOutWei)) {
+            best = { fee, amountOutWei: out, gasEstimate: res[3] }
+          }
+        } catch {
+          // No pool for this fee tier — skip it.
+        }
+      }
+
+      if (!best) {
+        throw new Error('No liquidity route available for this pair')
+      }
+
+      // Near-spot reference quote (a fraction of the size) on the winning tier,
+      // used to derive price impact via the SDK. Optional — impact is hidden if
+      // the reference quote is unavailable.
+      let refInWei = amountInWei / 1000n
+      if (refInWei <= 0n) refInWei = 1n
+      let refAmountInRaw = null
+      let refAmountOutRaw = null
+      try {
+        const refRes = await contracts.quoter.quoteExactInputSingle.staticCall({
+          tokenIn,
+          tokenOut,
+          amountIn: refInWei,
+          fee: best.fee,
+          sqrtPriceLimitX96: 0,
+        })
+        if (refRes[0] > 0n) {
+          refAmountInRaw = refInWei
+          refAmountOutRaw = refRes[0]
+        }
+      } catch {
+        // Impact figure is best-effort.
+      }
+
+      const sdkIn = toSdkToken(chainId, tokenIn, decIn, symbolOf(tokenIn))
+      const sdkOut = toSdkToken(chainId, tokenOut, decOut, symbolOf(tokenOut))
+      const metrics = buildTradeMetrics({
+        tokenIn: sdkIn,
+        tokenOut: sdkOut,
+        amountInRaw: amountInWei,
+        amountOutRaw: best.amountOutWei,
+        refAmountInRaw,
+        refAmountOutRaw,
+        slippageBps: slippage,
+      })
+
+      return {
+        amountOut: ethers.formatUnits(best.amountOutWei, decOut),
+        amountOutWei: best.amountOutWei,
+        feeTier: best.fee,
+        gasEstimate: best.gasEstimate,
+        executionPrice: metrics.executionPrice.toSignificant(6),
+        executionPriceInverted: metrics.executionPrice.invert().toSignificant(6),
+        minimumReceived: ethers.formatUnits(metrics.minimumReceivedRaw, decOut),
+        minimumReceivedWei: metrics.minimumReceivedRaw,
+        priceImpactPercent: metrics.priceImpact
+          ? parseFloat(metrics.priceImpact.toSignificant(4))
+          : null,
+        tokenInSymbol: symbolOf(tokenIn),
+        tokenOutSymbol: symbolOf(tokenOut),
+      }
+    } finally {
+      setQuotingPrice(false)
+    }
+  }, [contracts, decimalsOf, symbolOf, chainId, slippage])
+
+  const swap = useCallback(async (tokenIn, tokenOut, amountIn) => {
     if (!signer || !contracts || !address) {
       throw new Error('Wallet not connected')
     }
@@ -261,13 +368,13 @@ export function DexProvider({ children }) {
     try {
       setLoading(true)
 
-      const decIn = decimalsOf(tokenIn)
-      const decOut = decimalsOf(tokenOut)
-      const amountOut = await getQuote(tokenIn, tokenOut, amountIn, feeTier)
-      const minAmountOut = (parseFloat(amountOut) * (10000 - slippage) / 10000).toFixed(decOut)
+      // Re-quote at execution time so the route and minimum-received we enforce
+      // on-chain match the freshest price, not a stale on-screen figure.
+      const quote = await getBestQuote(tokenIn, tokenOut, amountIn)
 
+      const decIn = decimalsOf(tokenIn)
       const amountInWei = ethers.parseUnits(amountIn, decIn)
-      const minAmountOutWei = ethers.parseUnits(minAmountOut, decOut)
+      const minAmountOutWei = quote.minimumReceivedWei
 
       const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
       const allowance = await tokenInContract.allowance(address, addresses.SWAP_ROUTER_02)
@@ -284,7 +391,7 @@ export function DexProvider({ children }) {
       const params = {
         tokenIn,
         tokenOut,
-        fee: feeTier,
+        fee: quote.feeTier,
         recipient: address,
         amountIn: amountInWei,
         amountOutMinimum: minAmountOutWei,
@@ -302,7 +409,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, address, slippage, getQuote, fetchBalances, decimalsOf, addresses])
+  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses])
 
   const value = {
     balances,
@@ -315,6 +422,7 @@ export function DexProvider({ children }) {
     wrapNative,
     unwrapNative,
     getQuote,
+    getBestQuote,
     swap,
     setSlippage,
 

@@ -9,8 +9,8 @@ import { WalletContext, UIContext } from '../contexts'
 // context level per repo convention — never raw wagmi hooks.
 
 // Stub heavy children that are irrelevant to the entry-point contract.
-vi.mock('../components/fairwins/SwapPanel', () => ({
-  default: () => <div data-testid="swap-panel" />,
+vi.mock('../components/fairwins/TradePanel', () => ({
+  default: () => <div data-testid="trade-panel" />,
 }))
 vi.mock('../components/ui/PremiumPurchaseModal', () => ({
   default: () => <div data-testid="premium-modal" />,

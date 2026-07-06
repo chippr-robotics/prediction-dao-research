@@ -6,7 +6,7 @@ import { useModal } from '../../hooks/useUI'
 import { usePrice } from '../../contexts/PriceContext'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
-import SwapPanel from '../fairwins/SwapPanel'
+import TradePanel from '../fairwins/TradePanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
 import './FairWinsUserModal.css'
@@ -103,7 +103,7 @@ function FairWinsUserModal() {
     { id: 'profile', label: 'Profile', icon: '👤' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
     { id: 'search', label: 'Search', icon: '🔍' },
-    { id: 'swap', label: 'Swap', icon: '🔄' },
+    { id: 'trade', label: 'Trade', icon: '🔄' },
     { id: 'launch', label: 'Launch', icon: '🚀' }
   ]
 
@@ -453,10 +453,10 @@ function FairWinsUserModal() {
           </div>
         )}
 
-        {/* Swap Tab */}
-        {activeTab === 'swap' && (
-          <div id="panel-swap" role="tabpanel" className="fwum-panel fwum-panel-swap">
-            <SwapPanel />
+        {/* Trade Tab */}
+        {activeTab === 'trade' && (
+          <div id="panel-trade" role="tabpanel" className="fwum-panel fwum-panel-swap">
+            <TradePanel />
           </div>
         )}
 

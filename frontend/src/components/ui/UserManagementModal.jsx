@@ -4,7 +4,7 @@ import { useWallet, useWalletConnection, useWalletRoles, useNetworkMode } from '
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
-import SwapPanel from '../fairwins/SwapPanel'
+import TradePanel from '../fairwins/TradePanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
 import './UserManagementModal.css'
@@ -106,11 +106,11 @@ function UserManagementModal({ onScanMarket }) {
         </button>
         <button
           role="tab"
-          aria-selected={activeTab === 'swap'}
-          className={`tab ${activeTab === 'swap' ? 'active' : ''}`}
-          onClick={() => setActiveTab('swap')}
+          aria-selected={activeTab === 'trade'}
+          className={`tab ${activeTab === 'trade' ? 'active' : ''}`}
+          onClick={() => setActiveTab('trade')}
         >
-          Swap Tokens
+          Trade
         </button>
         <button
           role="tab"
@@ -266,9 +266,9 @@ function UserManagementModal({ onScanMarket }) {
           </div>
         )}
 
-        {activeTab === 'swap' && (
+        {activeTab === 'trade' && (
           <div className="swap-section" role="tabpanel">
-            <SwapPanel />
+            <TradePanel />
           </div>
         )}
 

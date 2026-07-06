@@ -9,7 +9,7 @@ import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
-import SwapPanel from '../components/fairwins/SwapPanel'
+import TradePanel from '../components/fairwins/TradePanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
@@ -39,8 +39,11 @@ const WALLET_TABS = [
   { id: 'reports', label: 'Reporting' },
   { id: 'tokens', label: 'Tokens' },
   { id: 'clearpath', label: 'ClearPath' },
-  { id: 'swap', label: 'Swap' },
+  { id: 'trade', label: 'Trade' },
 ]
+
+// Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade").
+const TAB_ALIASES = { swap: 'trade' }
 
 // Connector labels are resolved through the shared, vendor-neutral helper so
 // the generic injected option reads "Browser Wallet" rather than assuming a
@@ -86,7 +89,8 @@ function WalletPage() {
   // Allow deep-linking straight to a section (e.g. the update toast → ?tab=preferences).
   const [activeTab, setActiveTab] = useState(() => {
     const requested = searchParams.get('tab')
-    return WALLET_TABS.some((t) => t.id === requested) ? requested : 'account'
+    const resolved = TAB_ALIASES[requested] || requested
+    return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
   // On phones the section nav is a slide-over drawer that overlays the content,
   // so it starts closed; on wider screens it stays docked open like a portal.
@@ -634,9 +638,9 @@ function WalletPage() {
                     <ClearPathPanel />
                   </div>
                 )}
-                {activeTab === 'swap' && (
-                  <div className="swap-section" role="tabpanel">
-                    <SwapPanel />
+                {activeTab === 'trade' && (
+                  <div className="trade-section" role="tabpanel">
+                    <TradePanel />
                   </div>
                 )}
                 </div>
