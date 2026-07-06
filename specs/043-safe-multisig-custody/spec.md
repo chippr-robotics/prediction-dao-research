@@ -236,8 +236,10 @@ confirm no new vault notifications arrive.
   was removed reflects the current owner set and threshold when evaluated for execution.
 - **Insufficient vault balance**: proposing or executing a transfer that exceeds the vault's balance is
   surfaced honestly and cannot silently succeed.
-- **Inbound funds while below threshold**: receiving funds into the vault, or an owner claiming winnings owed
-  to the vault, succeeds without threshold approval because it does not remove funds from the vault.
+- **Inbound funds while below threshold**: receiving funds into the vault, or an owner triggering a refund owed
+  to the vault, succeeds without threshold approval because it does not remove funds from the vault. (A
+  vault-won wager *payout* claim is the documented exception in FR-022c — the wager contract binds the claimer,
+  so it is a threshold-approved vault transaction.)
 - **Not-yet-approved vault action**: a vault-originated wager/payment/DAO action that has not reached
   threshold exists only as a pending vault-queue entry and does not appear in domain lists (e.g. My Wagers) or
   affect balances until it executes.
@@ -325,10 +327,13 @@ confirm no new vault notifications arrive.
   entry in the vault's pending transaction queue; it MUST NOT appear as a pending placeholder in
   domain-specific lists (e.g. My Wagers, transfer activity) or affect balances until the vault transaction
   executes.
-- **FR-022c**: Movements of funds **into** the vault — receiving funds, or an owner claiming/collecting funds
-  owed to the vault address (e.g. a vault-created wager's winnings) — MUST NOT require threshold approval and
-  MAY be triggered by any single owner; only movements that take funds **out** of the vault require threshold
-  approval.
+- **FR-022c**: Movements of funds **into** the vault — receiving funds, or an owner triggering a **refund**
+  owed to the vault address — MUST NOT require threshold approval and MAY be triggered by any single owner;
+  only movements that take funds **out** of the vault require threshold approval. **Exception (honest-state
+  reconciliation, see plan.md research Decision 7):** claiming a **vault-won wager payout** is bound by the
+  wager contract to the winner as `msg.sender` and therefore MUST be executed as a threshold-approved vault
+  transaction in v1 — it cannot be a single-owner action without a contract change (adding EIP-1271 intent
+  verification), which is out of scope. Plain ERC-20 receipts and refunds remain approval-free.
 - **FR-023**: Members MUST be able to switch back to their personal wallet at any time, after which actions
   are single-signer again.
 - **FR-024**: Vault-originated actions (wagers, payments, and the surfaces in FR-022a) MUST be subject to the
@@ -417,8 +422,10 @@ confirm no new vault notifications arrive.
   non-fund-moving surfaces are unaffected.
 - **Backup is references only**: The encrypted backup stores vault references and labels only; there is no
   owner-key backup and no on-chain recovery/guardian module in scope.
-- **Inbound is unrestricted**: Only outbound movements (funds leaving the vault) are threshold-gated;
-  receiving or claiming funds to the vault address is single-owner and needs no approval.
+- **Inbound is unrestricted (with one exception)**: Only outbound movements (funds leaving the vault) are
+  threshold-gated; receiving funds and triggering refunds to the vault address is single-owner and needs no
+  approval. The lone exception is a vault-won wager payout claim, which the wager contract binds to the winner
+  as caller and so must be a threshold-approved vault transaction (FR-022c, plan research Decision 7).
 - **Established multisig standard**: "Vault" refers to the widely deployed Safe multisignature pattern (as
   used by the Ethereum Classic Cooperative and mirrored by the referenced `etclabscore/web-core`), so that
   vaults created or loaded here are interoperable with that ecosystem rather than a bespoke scheme.
