@@ -52,12 +52,13 @@ function OracleOpenChallengeModal({ isOpen, onClose }) {
               <h2 id="oracle-open-challenge-title">Oracle Open Challenge</h2>
             </div>
             <p className="fm-subtitle">
-              Pick a Polymarket market, share a code — Polymarket settles it
+              Bet head-to-head with whoever takes your code — Polymarket only settles the result
               <InfoTip label="About oracle open challenges">
-                No opponent named up front and nobody judges the outcome: whoever you share the
-                four-word code with can take the other side, and the linked Polymarket market&apos;s
-                public resolution settles the bet automatically. Equal stakes. The event sets the
-                timeline. Creating one requires a Silver membership or above.
+                This is a peer-to-peer wager: you&apos;re betting another person, not Polymarket.
+                Whoever you share the four-word code with takes the other side, and the linked
+                Polymarket market&apos;s public resolution just decides who was right — the stakes
+                are escrowed between the two of you. Equal stakes. The event sets the timeline.
+                Creating one requires a Silver membership or above.
               </InfoTip>
             </p>
           </div>
@@ -230,6 +231,16 @@ function OracleMakerPanel({ onClose }) {
                 )}
               </div>
               <code className="fm-polymarket-cid">{market.conditionId}</code>
+              {market.slug && (
+                <a
+                  className="ooc-polymarket-link"
+                  href={`https://polymarket.com/event/${market.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View on Polymarket &#8599;
+                </a>
+              )}
             </div>
             <button type="button" className="fm-link-btn" onClick={clearMarket} disabled={busy}>
               Change
@@ -263,7 +274,6 @@ function OracleMakerPanel({ onClose }) {
             <div className="fm-side-picker">
               {['0', '1'].map((idx) => {
                 const name = sideName(idx)
-                const price = market.outcomes?.[Number(idx)]?.price
                 const active = side === idx
                 return (
                   <button
@@ -275,9 +285,6 @@ function OracleMakerPanel({ onClose }) {
                     aria-pressed={active}
                   >
                     <span className="fm-side-btn-label">I&apos;m taking {name}</span>
-                    {price != null && (
-                      <span className="ooc-side-price">{Math.round(price * 100)}&cent; now</span>
-                    )}
                   </button>
                 )
               })}
@@ -326,16 +333,6 @@ function OracleMakerPanel({ onClose }) {
                   closes (capped at 30 days), and it settles once Polymarket resolves the market.
                 </InfoTip>
               </span>
-              <div className="oc-deadlines ooc-derived-timeline" aria-label="Challenge time constraints (derived from the event)">
-                <div className="oc-deadline">
-                  <span className="oc-deadline-label">Takeable until</span>
-                  <span className="oc-deadline-value">{formatDateTime(timeline.acceptDeadlineMs)}</span>
-                </div>
-                <div className="oc-deadline">
-                  <span className="oc-deadline-label">Settles by</span>
-                  <span className="oc-deadline-value">{formatDateTime(timeline.resolveDeadlineMs)}</span>
-                </div>
-              </div>
               <span className="fm-hint ooc-timeline-provenance">
                 {timeline.acceptCapped
                   ? 'This event ends more than 30 days out, so the challenge closes for takers after the 30-day maximum — settlement still follows the event.'
@@ -363,14 +360,6 @@ function formatDate(iso) {
     return new Date(iso).toLocaleDateString([], { dateStyle: 'medium' })
   } catch {
     return String(iso)
-  }
-}
-
-function formatDateTime(ms) {
-  try {
-    return new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-  } catch {
-    return ''
   }
 }
 

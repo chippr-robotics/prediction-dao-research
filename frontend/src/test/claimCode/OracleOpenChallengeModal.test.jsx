@@ -74,7 +74,7 @@ describe('OracleOpenChallengeModal (spec 041, US1)', () => {
     expect(screen.queryByText(/your side of the bet/i)).toBeNull()
   })
 
-  it('picking a market reveals side picker (market outcome labels + prices), stake, and the derived read-only timeline', () => {
+  it('picking a market reveals side picker (market outcome labels, no per-side prices), stake, and a Polymarket deep link', () => {
     render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
 
@@ -82,17 +82,23 @@ describe('OracleOpenChallengeModal (spec 041, US1)', () => {
     expect(screen.getByText('Will ETH flip BTC?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /change/i })).toBeInTheDocument()
 
-    // Side picker: two aria-pressed buttons carrying the market's own labels + live prices.
+    // Deep link out to the source market on Polymarket.
+    const pmLink = screen.getByRole('link', { name: /view on polymarket/i })
+    expect(pmLink).toHaveAttribute('href', expect.stringContaining('polymarket.com/event/'))
+
+    // Side picker: two aria-pressed buttons carrying the market's own labels. Per-side
+    // prices are intentionally omitted so they can't be mistaken for the cost of a side.
     const yesBtn = screen.getByRole('button', { name: /taking yes/i })
     const noBtn = screen.getByRole('button', { name: /taking no/i })
     expect(yesBtn).toHaveAttribute('aria-pressed', 'false')
-    expect(yesBtn).toHaveTextContent(/62¢/)
-    expect(noBtn).toHaveTextContent(/38¢/)
+    expect(yesBtn).not.toHaveTextContent(/¢/)
+    expect(noBtn).not.toHaveTextContent(/¢/)
 
-    // Derived timeline is presented as coming from the event, with no date inputs.
+    // Derived timeline is presented as coming from the event, with no date inputs and no
+    // empty deadline tiles.
     expect(screen.getByText(/timeline — set by the event/i)).toBeInTheDocument()
-    expect(screen.getByText('Takeable until')).toBeInTheDocument()
-    expect(screen.getByText('Settles by')).toBeInTheDocument()
+    expect(screen.queryByText('Takeable until')).toBeNull()
+    expect(screen.queryByText('Settles by')).toBeNull()
     expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
 
     // Taker side is spelled out once a side is picked.
