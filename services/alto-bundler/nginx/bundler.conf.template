@@ -10,6 +10,10 @@
 # $origin_denied = 1 => block (403). The secret is never written to logs. The bundler itself runs as a
 # localhost-only sidecar (alto binds 127.0.0.1:3000 in the same Cloud Run instance).
 
+# The armed map key is "1:<64-hex-char secret>" = 66 bytes, over nginx's default 64-byte hash bucket
+# (fine when lock-off — "1:__unset__" is short — but nginx fails to build the map when armed). Bump it.
+map_hash_bucket_size 128;
+
 map "${ORIGIN_LOCK_ENABLED}:$http_x_origin_auth" $origin_denied {
     default                      1;   # enforcement on + header missing/mismatch => deny
     "~^0:"                       0;   # enforcement off => allow everything

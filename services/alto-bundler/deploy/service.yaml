@@ -36,19 +36,16 @@ spec:
           ports:
             - name: http1
               containerPort: 8080
-          # env: ORIGIN_LOCK_SECRET is intentionally OMITTED here so this merges LOCK-OFF (fail-open) —
-          # the 2-container ingress goes live without breaking anything while the front door is finished.
-          # ARM the lock ONLY AFTER both are true, or the bundler becomes unreachable:
-          #   (1) bundler.fairwins.app actually routes to this service — a bare CNAME→*.run.app returns a
-          #       Google 404 (Cloud Run doesn't recognize the Host); add a Cloudflare Host-header override
-          #       to the *.run.app origin, or a Cloud Run domain-mapping, until it returns alto's response.
-          #   (2) the SPA's VITE_BUNDLER_URLS_POLYGON points at https://bundler.fairwins.app (not the bare
-          #       run.app URL) — else the SPA hits run.app directly and the armed lock 403s it.
-          # Then arm by uncommenting:
-          #   env:
-          #     - name: ORIGIN_LOCK_SECRET
-          #       valueFrom:
-          #         secretKeyRef: { name: origin-lock-secret, key: latest }
+          env:
+            # Origin lock ARMED (2026-07-06): bundler.fairwins.app routes correctly (Cloudflare Host
+            # override to the *.run.app origin) and the SPA points at bundler.fairwins.app, so the header
+            # is present on every real request. Same secret Cloudflare injects as X-Origin-Auth zone-wide.
+            # Fail-open: drop this ref and the lock disables itself rather than 403-bricking the bundler.
+            - name: ORIGIN_LOCK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: origin-lock-secret
+                  key: latest
           resources:
             limits:
               cpu: "1"
@@ -91,3 +88,12 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          # Required by Cloud Run because nginx `depends_on` alto (container-dependencies): the
+          # dependency ordering gates nginx startup on alto's port being live. TCP probe on alto's
+          # ALTO_PORT (3000); no HTTP health route exists on alto (GET / 404s).
+          startupProbe:
+            tcpSocket:
+              port: 3000
+            periodSeconds: 3
+            failureThreshold: 20
+            timeoutSeconds: 3
