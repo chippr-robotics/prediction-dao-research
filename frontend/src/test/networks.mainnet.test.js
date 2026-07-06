@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { getNetwork, getSelectableNetworks, isSupportedChainId } from '../config/networks'
 import { getContractAddressForChain } from '../config/contracts'
 import { getNetworkFeatures } from '../config/networkCapabilities'
+import { knownDaosForChain } from '../config/clearpath/knownDaos'
 
 // Spec 042 US1 — Ethereum mainnet (1) is a ClearPath-ONLY network: DAO governance is the only enabled
 // capability, and every other feature honestly self-discloses as unavailable (no fabricated infra).
@@ -37,5 +38,16 @@ describe('Ethereum mainnet ClearPath-only network (spec 042 US1)', () => {
     expect(net.rpcUrl).toMatch(/^https?:\/\//)
     expect(net.stablecoin?.decimals).toBe(6)
     expect(net.explorer?.baseUrl).toContain('etherscan')
+  })
+
+  it('seeds the verified ENS (OZ) and Uniswap (Bravo) DAOs so they surface by default', () => {
+    const known = knownDaosForChain(1)
+    const ens = known.find((d) => /ENS/i.test(d.label))
+    const uni = known.find((d) => /Uniswap/i.test(d.label))
+    expect(ens?.framework).toBe(0) // OpenZeppelin Governor
+    expect(uni?.framework).toBe(1) // Governor Bravo
+    // Addresses are the on-chain-verified governors (checksummed).
+    expect(ens.address).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    expect(uni.address).toMatch(/^0x[0-9a-fA-F]{40}$/)
   })
 })

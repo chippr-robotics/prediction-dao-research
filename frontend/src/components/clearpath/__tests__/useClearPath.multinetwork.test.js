@@ -11,6 +11,8 @@ vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotificat
 vi.mock('../../../hooks/useWalletManagement', () => ({
   useWallet: () => ({ account: ACCT, signer: {}, provider: {}, chainId: 1, isConnected: true }),
 }))
+// Isolate the tracked-list behavior from the curated known-DAO seeds (ENS/Uniswap) on mainnet.
+vi.mock('../../../config/clearpath/knownDaos', () => ({ knownDaosForChain: () => [] }))
 
 describe('useClearPath on a registry-less network (spec 042)', () => {
   beforeEach(() => window.localStorage.clear())

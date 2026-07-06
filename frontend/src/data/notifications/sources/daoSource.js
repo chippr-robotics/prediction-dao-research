@@ -14,6 +14,7 @@ import { makeReadProvider } from '../../../utils/rpcProvider'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../../abis/externalDAORegistry'
 import { getConnector, detectFramework } from '../../../components/clearpath/connectors'
 import * as trackedDaoStore from '../../../components/clearpath/trackedDaoStore'
+import { knownDaosForChain } from '../../../config/clearpath/knownDaos'
 import { pruneSnapshotMap } from '../activityStore'
 
 const STATE = { Pending: 0, Active: 1, Canceled: 2, Defeated: 3, Succeeded: 4, Queued: 5, Expired: 6, Executed: 7 }
@@ -100,6 +101,7 @@ async function listTrackedDaos(provider, chainId, account) {
     }
   }
   for (const e of trackedDaoStore.list(chainId, account)) push(e.address, e.framework)
+  for (const k of knownDaosForChain(chainId)) push(k.address, k.framework)
   return out
 }
 

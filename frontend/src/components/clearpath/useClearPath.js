@@ -7,6 +7,7 @@ import { getNetwork } from '../../config/networks'
 import { makeReadProvider } from '../../utils/rpcProvider'
 import { EXTERNAL_DAO_REGISTRY_ABI } from '../../abis/externalDAORegistry'
 import * as trackedDaoStore from './trackedDaoStore'
+import { knownDaosForChain } from '../../config/clearpath/knownDaos'
 
 // Upper bound on awaiting a confirmation — a broadcast-but-dropped tx must not hang wait() forever (it would
 // orphan the persistent in-flight toast). 120s is well beyond a normal confirmation on the live networks.
@@ -123,12 +124,24 @@ export function useClearPath() {
       registeredAt: e.addedAt,
       source: 'local',
     }))
+    // Curated, on-chain-verified DAOs for this network (e.g. ENS, Uniswap on mainnet) surface by default so a
+    // member doesn't have to paste an address to find them; still deduped against registry + local entries.
+    const knownList = knownDaosForChain(chainId).map((k) => ({
+      id: `known:${String(k.address).toLowerCase()}`,
+      dao: k.address,
+      framework: k.framework,
+      label: k.label,
+      registrant: null,
+      registeredAt: null,
+      source: 'known',
+    }))
     const seen = new Set(registryList.map((d) => String(d.dao).toLowerCase()))
     const merged = [...registryList]
-    for (const d of localList) {
-      if (!seen.has(String(d.dao).toLowerCase())) {
+    for (const d of [...localList, ...knownList]) {
+      const lc = String(d.dao).toLowerCase()
+      if (!seen.has(lc)) {
         merged.push(d)
-        seen.add(String(d.dao).toLowerCase())
+        seen.add(lc)
       }
     }
     return merged

@@ -110,7 +110,7 @@ switching networks proves strict scoping.
 - [X] T023 [US2] Edit `frontend/src/components/clearpath/RegisterExternalDao.jsx` to validate + framework-detect client-side and, on a registry-less network, persist via `trackDAO` (device-local) with an honest "tracked on this device" note; keep the on-chain register path where `hasRegistry`.
 - [X] T024 [US2] Edit `frontend/src/components/clearpath/ExternalDaoView.jsx` to resolve the connector via `getConnector`/`detectFramework` and read via `daoDataSource` (per-DAO subgraph-first), rendering the source/status chip; remove direct `governorConnector` coupling.
 - [X] T025 [US2] Edit `frontend/src/components/clearpath/ClearPathPanel.jsx` list rendering to show merged registry+local DAOs with framework badge (`DAO_FRAMEWORK_LABEL`) and network label; wire `untrackDAO` for device-local entries.
-- [ ] T026 [P] [US2] Add the verified **ENS** Governor to `frontend/src/config/clearpath/knownDaos.js` (address + framework 0 + label) and, if available, its governance subgraph to `daoSubgraphs.js` — confirm both on-chain/gateway before committing (research VERIFY).
+- [X] T026 [P] [US2] Add the verified **ENS** Governor to `frontend/src/config/clearpath/knownDaos.js` (address + framework 0 + label) and, if available, its governance subgraph to `daoSubgraphs.js` — confirm both on-chain/gateway before committing (research VERIFY).
 - [X] T027 [P] [US2] Add a `ReadRouteToggle` component `frontend/src/components/clearpath/ReadRouteToggle.jsx` (public-RPC vs wallet-managed; reads only) and its Vitest; wire it to `useClearPath.readRoute`/`setReadRoute` (FR-019).
 - [ ] T028 [US2] Extend `frontend/src/test/clearpath.accessibility.test.jsx` to cover the registry-less register + tracked-list + detail states (axe, zero violations).
 
@@ -133,7 +133,7 @@ unauthorized wallet gets the DAO's rejection reason.
 - [X] T033 [US3] Extend `detectFramework` in `frontend/src/components/clearpath/connectors/index.js` with the Bravo probe (order: OZ → Bravo → unknown).
 - [X] T034 [US3] Wire framework-agnostic actions in `frontend/src/components/clearpath/ExternalDaoView.jsx` (vote/queue/execute) through the resolved connector; unknown-framework DAOs render read-only + deep-link (FR-011).
 - [X] T035 [US3] Enforce the sanctions posture in the action path: screen the signer when `hasSanctionsSource` (block sanctioned, fail-closed); otherwise proceed under the DAO's own rules with no fabricated "screened" claim (research D9 / FR-013); add Vitest for both branches in `frontend/src/test/clearpath.sanctions.test.js`.
-- [ ] T036 [P] [US3] Add the verified **Uniswap** Governor (Bravo), UNI token, and Timelock to `frontend/src/config/clearpath/knownDaos.js` (+ subgraph in `daoSubgraphs.js` if available) — confirm on-chain before committing (research VERIFY).
+- [X] T036 [P] [US3] Add the verified **Uniswap** Governor (Bravo), UNI token, and Timelock to `frontend/src/config/clearpath/knownDaos.js` (+ subgraph in `daoSubgraphs.js` if available) — confirm on-chain before committing (research VERIFY).
 
 **Checkpoint**: OZ (ENS) and Bravo (Uniswap) DAOs both track + act through one UI, labeled by framework.
 
@@ -177,8 +177,8 @@ or an unauthorized wallet surfaces a truthful reason.
 
 **Purpose**: Docs, full validation, and honesty/a11y hardening across stories.
 
-- [ ] T043 [P] Update developer docs for the multi-network ClearPath model, connector-extension path (adding a framework), and the subgraph-first/read-route behavior in `docs/` (and note the ClearPath-only network concept).
-- [ ] T044 [P] Migrate remaining internal imports off the `governorConnector.js` shim to `connectors/`; once no importer remains, remove the shim (or document why it stays).
+- [X] T043 [P] Update developer docs for the multi-network ClearPath model, connector-extension path (adding a framework), and the subgraph-first/read-route behavior in `docs/` (and note the ClearPath-only network concept).
+- [X] T044 [P] Migrate remaining internal imports off the `governorConnector.js` shim to `connectors/`; once no importer remains, remove the shim (or document why it stays).
 - [ ] T045 Run `npm run lint --workspace frontend` and `npm run test:frontend` — resolve all ESLint errors and ensure Vitest + axe are green across the new states (Constitution IV/V; SC-009/SC-010/SC-012).
 - [ ] T046 Execute the `quickstart.md` scenarios A–F against real contracts (ENS + Uniswap on mainnet; Olympia on Mordor) and record results; confirm no fabricated rows, no phantom entries, strict network scoping.
 
