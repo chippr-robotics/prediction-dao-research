@@ -82,6 +82,11 @@ and non-bypassable sanctions screening on any value-moving ClearPath-mediated ac
   cut 1 ships read-only tracking AND member-signed governance actions on new networks,
   each gated by the DAO's own rules and by sanctions screening where a sanctions source is
   available (per FR-013); ClearPath still holds no custody/authority.
+- Q: How does the registry-less tracked-DAO list persist — device-local or synced across
+  the member's devices? → A: **Device-local only** — the list lives in the browser keyed by
+  wallet + chainId and is NOT synced across devices in this cut; cross-device sync (e.g. via
+  spec 032 encrypted data sync) is a deliberate follow-on that would not change the
+  connector or UI. A tracked entry is scoped to the origin/device that created it.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -303,7 +308,9 @@ reason honestly.
   ClearPath capability and has a usable read RPC.
 - **FR-005**: The system MUST let a member **register/track a DAO by address on any
   ClearPath-capable network with no on-chain registry**, storing it in a **per-member,
-  per-network** tracked list within the platform's no-backend footprint.
+  per-network, device-local** tracked list (browser storage keyed by wallet + chainId)
+  within the platform's no-backend footprint; cross-device sync is out of scope for this
+  cut (see Assumptions).
 - **FR-006**: Where an on-chain `ExternalDAORegistry` **is** deployed (e.g. Mordor), the
   system MUST continue to use it as the shared-discovery source and MUST **merge** its
   entries with the member's local entries for display — de-duplicated and strictly
@@ -371,7 +378,9 @@ reason honestly.
   surface operates, regardless of whether an on-chain `ExternalDAORegistry` is deployed.
 - **Tracked DAO (registry-less)**: A per-member, per-network record of a DAO the member is
   tracking on a network with no on-chain registry — (network, address, detected framework,
-  optional label) — held within the no-backend footprint and never crossing networks.
+  optional label) — held **device-local** (browser storage keyed by wallet + chainId)
+  within the no-backend footprint, never crossing networks, and not synced across devices
+  in this cut.
 - **External DAO Registry (optional)**: The existing on-chain, network-scoped shared
   registry (e.g. on Mordor) — now one of two discovery sources, merged with the member's
   local tracked list where present, granting ClearPath no authority.
@@ -447,8 +456,10 @@ reason honestly.
   and an env override), and reads must degrade truthfully where a public RPC caps
   `eth_getLogs` — reusing spec 030's bounded, chunked live-indexing fallback.
 - **Out of scope for the first cut**: deploying the registry to new L1s; native DAO
-  creation on new networks (spec 030's native pillar remains deferred / unchanged); and
-  enabling wagers, DEX/swaps, or passkey login on ClearPath-only networks.
+  creation on new networks (spec 030's native pillar remains deferred / unchanged);
+  enabling wagers, DEX/swaps, or passkey login on ClearPath-only networks; and
+  **cross-device sync of the device-local tracked-DAO list** (a deliberate follow-on that
+  could layer on spec 032's encrypted data sync without changing the connector or UI).
 - **Sanctions on new networks**: If the platform's sanctions source is not deployed on a
   new ClearPath-only network, value-moving ClearPath-mediated actions there are gated
   per the fail-closed policy (or limited to read-only + deep-link); this is confirmed in
