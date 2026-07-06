@@ -116,26 +116,124 @@ export function parseIntent(body) {
   }
 }
 
+function asBool(label, v) {
+  if (typeof v === 'boolean') return v
+  if (v === 'true') return true
+  if (v === 'false') return false
+  throw bad(`${label} must be a boolean`)
+}
+
+function asString(label, v) {
+  if (typeof v !== 'string') throw bad(`${label} must be a string`)
+  return v
+}
+
+/** A pool payout matrix: non-empty array of { winner: address, amount: uint256 } (spec 034). */
+function asPayoutEntries(label, v) {
+  if (!Array.isArray(v) || v.length === 0) throw bad(`${label} must be a non-empty array`)
+  return v.map((e, i) => {
+    if (!e || typeof e !== 'object') throw bad(`${label}[${i}] must be an object`)
+    return {
+      winner: asAddress(`${label}[${i}].winner`, e.winner),
+      amount: asUint(`${label}[${i}].amount`, e.amount),
+    }
+  })
+}
+
+// Param name -> canonical type. Coercion is DRIVEN BY TYPE, not name: an address stays a checksummed
+// address, a bool stays a bool, a string stays a string. (The prior name-list coerced everything not
+// explicitly special-cased through asUint, which silently corrupted address/bool/string/array params —
+// e.g. createWager's metadataUri/creatorIsYes and declareWinner's winner.)
+const PARAM_TYPES = {
+  // WagerRegistry
+  wagerId: 'uint256', winner: 'address', opponent: 'address', arbitrator: 'address',
+  token: 'address', creatorStake: 'uint128', opponentStake: 'uint128',
+  acceptDeadline: 'uint64', resolveDeadline: 'uint64', resolutionType: 'uint8',
+  conditionId: 'bytes32', creatorIsYes: 'bool', metadataHash: 'bytes32',
+  metadataUri: 'string', termsVersionHash: 'bytes32', claimCodeSig: 'bytes',
+  // MembershipManager
+  role: 'bytes32', tier: 'uint8', acceptedTermsHash: 'bytes32', voucherId: 'uint256',
+  // Tier-2 pools
+  pool: 'address', proposalId: 'bytes32', entries: 'entries', index: 'uint256',
+  recipient: 'address', buyIn: 'uint256', maxMembers: 'uint32', thresholdBips: 'uint16',
+}
+
+function coerceParam(type, label, v) {
+  switch (type) {
+    case 'address': return asAddress(label, v)
+    case 'bool': return asBool(label, v)
+    case 'bytes32': return asBytes32(label, v)
+    case 'bytes': return asHexBytes(label, v)
+    case 'string': return asString(label, v)
+    case 'entries': return asPayoutEntries(label, v)
+    case 'uint8':
+    case 'uint16':
+    case 'uint32':
+    case 'uint64':
+    case 'uint128':
+    case 'uint256':
+      return asUint(label, v)
+    default:
+      throw bad(`${label} has unsupported type ${type}`)
+  }
+}
+
 /** Normalize action params against the registry definition (rejects missing fields early). */
 function normalizeParams(actionDef, params) {
   const out = {}
   for (const name of actionDef.paramNames) {
     if (params[name] == null) throw bad(`params.${name} is required for action`)
-    if (name === 'claimCodeSig') out[name] = asHexBytes(`params.${name}`, params[name])
-    else if (name === 'role' || name === 'acceptedTermsHash') out[name] = asBytes32(`params.${name}`, params[name])
-    else if (name === 'tier') out[name] = Number(asUint(`params.${name}`, params[name]))
-    else out[name] = asUint(`params.${name}`, params[name])
+    const type = PARAM_TYPES[name]
+    if (!type) throw bad(`params.${name} has no registered type`)
+    out[name] = coerceParam(type, `params.${name}`, params[name])
   }
   return out
 }
 
-function domainFor(chainCfg, contractKey) {
+function domainFor(chainCfg, contractKey, verifyingContract) {
   const d = CONTRACT_DOMAINS[contractKey]
   return {
     name: d.name,
     version: d.version,
     chainId: chainCfg.chainId,
-    verifyingContract: chainCfg.targetsByKey[contractKey],
+    // Tier-2 pool signer actions verify under the CLONE's domain: verifyingContract is the pool
+    // address (from params), not the pinned target-by-key. Everything else uses the pinned target.
+    verifyingContract: verifyingContract ?? chainCfg.targetsByKey[contractKey],
+  }
+}
+
+const FACTORY_IFACE = new ethers.Interface(['function poolAddressToId(address) view returns (uint256)'])
+
+/**
+ * On-chain provenance for a dynamic pool clone (Tier 2). Clones are ERC-1167 addresses the gateway
+ * cannot pre-pin, so instead of an allow-list we ask the pinned factory: `poolAddressToId(pool) != 0`
+ * (ids start at 1). This mirrors the factory forwarders' own `_requirePool` guard, so the gateway
+ * never accepts a target the contract would reject. Fail modes: a genuine non-pool → 400 (hard reject,
+ * do not retry); an RPC/provider failure → 503 (retryable → the client self-submits, never-stranded).
+ */
+async function checkPoolProvenance(provider, factoryAddress, pool) {
+  if (!provider || !factoryAddress) {
+    throw new GatewayError(503, 'chain_unavailable', 'cannot verify pool provenance without a read provider; self-submit')
+  }
+  let ret
+  try {
+    const data = FACTORY_IFACE.encodeFunctionData('poolAddressToId', [pool])
+    ret = await provider.call({ to: factoryAddress, data })
+  } catch {
+    throw new GatewayError(503, 'chain_unavailable', 'pool provenance check failed (RPC error); retry or self-submit')
+  }
+  let id
+  try {
+    ;[id] = FACTORY_IFACE.decodeFunctionResult('poolAddressToId', ret)
+  } catch {
+    // A malformed/empty response (e.g. '0x' from a flaky node or a call to a non-contract) is a
+    // PROVIDER failure, not proof the pool is fake — treat it as retryable so the client self-submits
+    // (never-stranded), matching this function's contract. Only a cleanly-decoded id === 0 below is a
+    // genuine non-pool (hard 400).
+    throw new GatewayError(503, 'chain_unavailable', 'pool provenance response malformed (RPC issue); retry or self-submit')
+  }
+  if (id === 0n) {
+    throw new GatewayError(400, 'target_not_allowlisted', 'pool was not created by the pinned WagerPoolFactory')
   }
 }
 
@@ -203,17 +301,35 @@ export async function verifyIntent(intent, chainCfg, config, nowSec, provider = 
 
   const params = normalizeParams(actionDef, intent.params)
 
+  // Action-specific cross-param invariants (e.g. proposalId == keccak256(entries)) — a cheap
+  // pre-check that mirrors an on-chain assertion, so a doomed intent is rejected before the engine.
+  actionDef.verifyParams?.(params)
+
+  // Dynamic-clone provenance (Tier 2): the pinned target is the FACTORY; the acted-on pool is a
+  // clone proven on-chain via factory.poolAddressToId, not an allow-list.
+  if (actionDef.provenanceParam) {
+    await checkPoolProvenance(provider, chainCfg.targetsByKey[actionDef.contract], params[actionDef.provenanceParam])
+  }
+
+  // EIP-712 domain: name/version from `domainContract` (defaults to the target), verifyingContract
+  // from `verifyingContractParam` when set (the clone address) else the pinned target (the split).
+  const domainKey = actionDef.domainContract ?? actionDef.contract
+  const verifyingContract = actionDef.verifyingContractParam ? params[actionDef.verifyingContractParam] : undefined
+
   // --- signer recovery ---
   let signer
   if (intent.intentClass === 'payment') {
-    signer = recoverPaymentSigner(intent, chainCfg)
-    // Intent leg: the EIP-712 action struct must ALSO be signed by the same wallet — this is what
-    // binds params (role/tier/wagerId/...) to the money leg (FR-007/FR-013 in spec 035).
-    const domain = domainFor(chainCfg, actionDef.contract)
-    const message = actionDef.buildMessage(params, signer, intent)
-    const recovered = tryRecoverTyped(domain, typesFor(intent.action), message, intent.signature)
-    if (!recovered || recovered.toLowerCase() !== signer.toLowerCase()) {
-      throwSignatureError(intent, actionDef, params, signer, config, chainCfg)
+    signer = recoverPaymentSigner(intent, chainCfg, actionDef, params)
+    // Money-only forwarders (pool join) carry NO intent struct — the EIP-3009 authorization IS the
+    // attribution + binding. Otherwise the EIP-712 action struct must ALSO be signed by the same
+    // wallet, binding params (role/tier/wagerId/...) to the money leg (FR-007/FR-013).
+    if (!actionDef.authOnly) {
+      const domain = domainFor(chainCfg, domainKey, verifyingContract)
+      const message = actionDef.buildMessage(params, signer, intent)
+      const recovered = tryRecoverTyped(domain, typesFor(intent.action), message, intent.signature)
+      if (!recovered || recovered.toLowerCase() !== signer.toLowerCase()) {
+        throwSignatureError(intent, actionDef, params, signer, config, chainCfg, domainKey, verifyingContract)
+      }
     }
   } else {
     // Signer-attributed: the actor field of the signed struct IS the signer; the client supplies
@@ -221,13 +337,13 @@ export async function verifyIntent(intent, chainCfg, config, nowSec, provider = 
     // Contract accounts (spec 041 passkey smart wallets) cannot ECDSA-recover to their own
     // address — on mismatch, fall back to asking the actor contract via ERC-1271.
     const actor = asAddress(`params.${actionDef.actorField}`, intent.params[actionDef.actorField])
-    const domain = domainFor(chainCfg, actionDef.contract)
+    const domain = domainFor(chainCfg, domainKey, verifyingContract)
     const message = actionDef.buildMessage(params, actor, intent)
     const recovered = tryRecoverTyped(domain, typesFor(intent.action), message, intent.signature)
     if (!recovered || recovered.toLowerCase() !== actor.toLowerCase()) {
       const digest = ethers.TypedDataEncoder.hash(domain, typesFor(intent.action), message)
       const okVia1271 = await isValidErc1271Signature(provider, actor, digest, intent.signature)
-      if (!okVia1271) throwSignatureError(intent, actionDef, params, actor, config, chainCfg)
+      if (!okVia1271) throwSignatureError(intent, actionDef, params, actor, config, chainCfg, domainKey, verifyingContract)
     }
     signer = actor
   }
@@ -247,11 +363,14 @@ export async function verifyIntent(intent, chainCfg, config, nowSec, provider = 
 }
 
 /** Recover the payment-class signer from the EIP-3009 authorization under the token's domain. */
-function recoverPaymentSigner(intent, chainCfg) {
+function recoverPaymentSigner(intent, chainCfg, actionDef, params) {
   const a = intent.authorization
-  // The authorization MUST pay the allow-listed target (binds funds to the contract, not the relayer).
-  if (a.to.toLowerCase() !== intent.targetContract.toLowerCase()) {
-    throw new GatewayError(400, 'param_binding_mismatch', 'authorization.to must equal targetContract')
+  // The authorization MUST pay the bound recipient (binds funds to the contract, not the relayer).
+  // Normally that is the pinned targetContract; for a pool join the money goes into the CLONE
+  // (`authToParam: 'pool'`), which the token enforces is the caller, so a relayer can't redirect it.
+  const expectedTo = actionDef?.authToParam ? params[actionDef.authToParam] : intent.targetContract
+  if (a.to.toLowerCase() !== String(expectedTo).toLowerCase()) {
+    throw new GatewayError(400, 'param_binding_mismatch', 'authorization.to must equal the bound payment recipient')
   }
   // data-model.md: for the payment class the uniquenessMarker IS the EIP-3009 nonce.
   if (a.nonce.toLowerCase() !== intent.uniquenessMarker.toLowerCase()) {
@@ -283,11 +402,11 @@ function recoverPaymentSigner(intent, chainCfg) {
  * Distinguish a wrong-network signature (chain_mismatch, SC-014) from a plain bad signature:
  * re-try recovery under every other enabled chain's domain for the same contract key.
  */
-function throwSignatureError(intent, actionDef, params, expectedActor, config, chainCfg) {
+function throwSignatureError(intent, actionDef, params, expectedActor, config, chainCfg, domainKey, verifyingContract) {
   for (const otherId of config.enabledChainIds) {
     if (otherId === chainCfg.chainId) continue
     const other = config.chains[otherId]
-    const domain = domainFor(other, actionDef.contract)
+    const domain = domainFor(other, domainKey ?? actionDef.contract, verifyingContract)
     const message = actionDef.buildMessage(params, expectedActor, intent)
     const recovered = tryRecoverTyped(domain, typesFor(intent.action), message, intent.signature)
     if (recovered && recovered.toLowerCase() === expectedActor.toLowerCase()) {

@@ -19,6 +19,8 @@ import {
   RECEIVE_WITH_AUTHORIZATION_TYPES,
   membershipManagerDomain,
   stablecoinDomain,
+  wagerPoolDomain,
+  wagerPoolFactoryDomain,
   wagerRegistryDomain,
 } from './intentTypes'
 import { PaymentUnsupportedOnChain, RelayRejected, RelayerUnavailable } from './errors'
@@ -44,13 +46,30 @@ function toUintString(v) {
   return String(v)
 }
 
-/** Shallow-serialize signed params for the gateway body (bigints → decimal strings). */
+/** Serialize signed params for the gateway body — DEEP (bigints → decimal strings), so nested arrays
+ *  like a pool payout matrix ([{ winner, amount: bigint }]) survive JSON.stringify. */
 function serializeParams(params) {
-  const out = {}
-  for (const [key, value] of Object.entries(params || {})) {
-    out[key] = typeof value === 'bigint' ? value.toString() : value
+  const conv = (v) => {
+    if (typeof v === 'bigint') return v.toString()
+    if (Array.isArray(v)) return v.map(conv)
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, conv(x)]))
+    return v
   }
-  return out
+  return conv(params || {})
+}
+
+/** Resolve an intent's EIP-712 domain by verifier/domain key (the pool split adds wagerPool[Factory]). */
+function buildIntentDomain(kind, chainId, verifyingContract) {
+  switch (kind) {
+    case 'membershipManager':
+      return membershipManagerDomain(chainId, verifyingContract)
+    case 'wagerPool':
+      return wagerPoolDomain(chainId, verifyingContract)
+    case 'wagerPoolFactory':
+      return wagerPoolFactoryDomain(chainId, verifyingContract)
+    default:
+      return wagerRegistryDomain(chainId, verifyingContract)
+  }
 }
 
 /** `fetch` with a bounded budget; any transport failure or timeout maps to RelayerUnavailable. */
@@ -127,11 +146,19 @@ export async function signIntent({
   if (chainId == null) throw new Error('signIntent: chainId is required')
 
   const verifierKind = verifier || meta.verifier
-  if (!verifierKind) throw new Error(`signIntent: action '${action}' needs an explicit verifier ('wagerRegistry' | 'membershipManager')`)
-  const domain =
-    verifierKind === 'membershipManager'
-      ? membershipManagerDomain(chainId, targetContract)
-      : wagerRegistryDomain(chainId, targetContract)
+  if (!verifierKind) throw new Error(`signIntent: action '${action}' needs an explicit verifier`)
+
+  // Pool join (`authOnly`) carries no signer-attributed intent struct — the EIP-3009 authorization IS
+  // the whole intent (attribution + binding), so there is no action-domain signature to build.
+  const isAuthOnly = !!meta.authOnly
+
+  // Domain/target SPLIT (Tier-2 pools): the intent TARGET is `targetContract` (the factory, pinned +
+  // whitelisted at the engine), but the signature may verify under a DIFFERENT contract's domain — the
+  // CLONE for the six actor twins (verifyingContract = params[verifyingContractParam]), the FACTORY for
+  // createPool, else the target itself. Non-pool actions keep the original behavior (domain == target).
+  const domainKind = meta.domainVerifier || verifierKind
+  const domainVerifyingContract = meta.verifyingContractParam ? params[meta.verifyingContractParam] : targetContract
+  const domain = isAuthOnly ? null : buildIntentDomain(domainKind, chainId, domainVerifyingContract)
 
   // FR-020: resolve the token domain BEFORE any wallet prompt — throws PaymentUnsupportedOnChain on
   // chains whose stablecoin lacks EIP-3009 (Mordor/ETC USC), so the flow self-submits with zero
@@ -143,11 +170,11 @@ export async function signIntent({
   const before = validBefore != null ? validBefore : now + validitySeconds
   const nonce = randomNonce()
 
-  const fields = INTENT_TYPES[meta.primaryType]
+  const fields = isAuthOnly ? [] : INTENT_TYPES[meta.primaryType]
   const hasField = (name) => fields.some((f) => f.name === name)
 
   // The actor field is ALWAYS the wallet's own address — signer attribution is not caller-spoofable.
-  const message = { ...params, [meta.actorField]: from }
+  const message = isAuthOnly ? {} : { ...params, [meta.actorField]: from }
 
   // Payment leg: sign the token's ReceiveWithAuthorization and staple its nonce into the struct.
   // ONE marker for the whole payment intent (data-model.md: the uniquenessMarker IS the EIP-3009
@@ -160,7 +187,9 @@ export async function signIntent({
     const paymentNonce = nonce
     const authMessage = {
       from,
-      to: targetContract,
+      // Money is bound to the pinned target by default; for a pool join it flows into the CLONE
+      // (`authToParam: 'pool'`), which the token enforces is the caller so a relayer can't redirect it.
+      to: meta.authToParam ? params[meta.authToParam] : targetContract,
       value: toUintString(payment.value),
       validAfter,
       validBefore: before,
@@ -173,18 +202,23 @@ export async function signIntent({
     if (hasField('paymentNonce')) message.paymentNonce = paymentNonce
   }
 
-  message.nonce = nonce
-  if (hasField('validAfter')) message.validAfter = validAfter
-  message.validBefore = before
+  if (!isAuthOnly) {
+    message.nonce = nonce
+    if (hasField('validAfter')) message.validAfter = validAfter
+    message.validBefore = before
+  }
 
-  const signature = await signer.signTypedData(domain, { [meta.primaryType]: fields }, message)
+  const signature = isAuthOnly
+    ? '0x'
+    : await signer.signTypedData(domain, { [meta.primaryType]: fields }, message)
 
   const intent = {
     intentClass: meta.intentClass,
     chainId: Number(chainId),
     targetContract,
     action,
-    params: serializeParams(message),
+    // authOnly: the body params are the raw action params (e.g. { pool }); no struct fields to emit.
+    params: serializeParams(isAuthOnly ? params : message),
     signature,
     validAfter,
     validBefore: before,

@@ -175,6 +175,94 @@ const signCancel = (pool, signer, opts) =>
 const signRefund = (pool, signer, opts) =>
   signIntent(pool, signer, 'Refund', [{ name: 'member', type: 'address' }, ...TAIL], { member: signer.address }, opts);
 
+// ---------------------------------------------------------------------------
+// Factory-domain intent signing (spec 035/036 Tier 2 — createPoolWithSig)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sign a CreatePool intent against the FACTORY's own EIP-712 domain
+ * ("FairWins WagerPoolFactory"/"1"). Fields must match CREATE_POOL_TYPEHASH exactly.
+ * `params` is a CreatePoolParams-shaped object.
+ */
+async function signCreatePool(factory, signer, params, opts = {}) {
+  const { chainId } = await ethers.provider.getNetwork();
+  const now = (await ethers.provider.getBlock('latest')).timestamp;
+  const window = opts.window ?? 3600;
+  const nonce = opts.nonce ?? randNonce();
+  const validAfter = opts.validAfter ?? now - 60;
+  const validBefore = opts.validBefore ?? now + window;
+  const domain = {
+    name: 'FairWins WagerPoolFactory',
+    version: '1',
+    chainId: Number(chainId),
+    verifyingContract: await factory.getAddress(),
+  };
+  const types = {
+    CreatePool: [
+      { name: 'creator', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'buyIn', type: 'uint256' },
+      { name: 'maxMembers', type: 'uint32' },
+      { name: 'thresholdBips', type: 'uint16' },
+      { name: 'acceptDeadline', type: 'uint64' },
+      { name: 'resolveDeadline', type: 'uint64' },
+      ...TAIL,
+    ],
+  };
+  const message = {
+    creator: signer.address,
+    token: params.token,
+    buyIn: params.buyIn,
+    maxMembers: params.maxMembers,
+    thresholdBips: params.thresholdBips,
+    acceptDeadline: params.acceptDeadline,
+    resolveDeadline: params.resolveDeadline,
+    nonce,
+    validAfter,
+    validBefore,
+  };
+  const sig = await signer.signTypedData(domain, types, message);
+  return { sig, nonce, validAfter, validBefore };
+}
+
+/**
+ * Sign an EIP-3009 ReceiveWithAuthorization for a MockUSDCPermit-style token (the gasless join leg).
+ * Returns split { v, r, s } plus the window/nonce so callers can splat into joinWithAuthorization[For].
+ */
+async function signReceiveAuth(token, from, to, value, opts = {}) {
+  const { chainId } = await ethers.provider.getNetwork();
+  const now = (await ethers.provider.getBlock('latest')).timestamp;
+  const nonce = opts.nonce ?? randNonce();
+  const validAfter = opts.validAfter ?? 0;
+  const validBefore = opts.validBefore ?? now + (opts.window ?? 3600);
+  const domain = {
+    name: 'USD Coin',
+    version: '1',
+    chainId: Number(chainId),
+    verifyingContract: await token.getAddress(),
+  };
+  const types = {
+    ReceiveWithAuthorization: [
+      { name: 'from', type: 'address' },
+      { name: 'to', type: 'address' },
+      { name: 'value', type: 'uint256' },
+      { name: 'validAfter', type: 'uint256' },
+      { name: 'validBefore', type: 'uint256' },
+      { name: 'nonce', type: 'bytes32' },
+    ],
+  };
+  const sig = await from.signTypedData(domain, types, {
+    from: from.address,
+    to,
+    value,
+    validAfter,
+    validBefore,
+    nonce,
+  });
+  const { v, r, s } = ethers.Signature.from(sig);
+  return { v, r, s, nonce, validAfter, validBefore };
+}
+
 module.exports = {
   ZERO,
   usdc,
@@ -192,4 +280,6 @@ module.exports = {
   signClose,
   signCancel,
   signRefund,
+  signCreatePool,
+  signReceiveAuth,
 };

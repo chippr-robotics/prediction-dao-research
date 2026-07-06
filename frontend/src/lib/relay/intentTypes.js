@@ -114,6 +114,48 @@ export const INTENT_TYPES = {
     { name: 'nonce', type: 'bytes32' },
     { name: 'validBefore', type: 'uint256' },
   ],
+
+  // ---- Tier-2 group pools (spec 035/036) ----
+  // Byte-identical to the on-chain typehashes: the six actor twins verify against the CLONE's domain,
+  // CreatePool against the FACTORY's. `pool`/`entries` ride in intent.params (calldata), NOT the struct.
+  ApproveOutcome: [
+    { name: 'member', type: 'address' },
+    { name: 'proposalId', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  ClaimShare: [
+    { name: 'winner', type: 'address' },
+    { name: 'index', type: 'uint256' },
+    { name: 'recipient', type: 'address' },
+    ...TRAILING,
+  ],
+  ProposeOutcome: [
+    { name: 'creator', type: 'address' },
+    { name: 'proposalId', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  CloseJoining: [
+    { name: 'creator', type: 'address' },
+    ...TRAILING,
+  ],
+  Cancel: [
+    { name: 'creator', type: 'address' },
+    ...TRAILING,
+  ],
+  Refund: [
+    { name: 'member', type: 'address' },
+    ...TRAILING,
+  ],
+  CreatePool: [
+    { name: 'creator', type: 'address' },
+    { name: 'token', type: 'address' },
+    { name: 'buyIn', type: 'uint256' },
+    { name: 'maxMembers', type: 'uint32' },
+    { name: 'thresholdBips', type: 'uint16' },
+    { name: 'acceptDeadline', type: 'uint64' },
+    { name: 'resolveDeadline', type: 'uint64' },
+    ...TRAILING,
+  ],
 }
 
 /**
@@ -142,6 +184,22 @@ export const INTENT_ACTIONS = {
   extendMembership: { primaryType: 'ExtendMembershipIntent', verifier: 'membershipManager', intentClass: 'payment', actorField: 'member' },
   redeemVoucher: { primaryType: 'RedeemVoucherIntent', verifier: 'membershipManager', intentClass: 'signer-attributed', actorField: 'redeemer' },
   invalidateNonce: { primaryType: 'InvalidateNonce', verifier: null, intentClass: 'signer-attributed', actorField: 'signer' },
+
+  // ---- Tier-2 group pools (spec 035/036, factory-forwarder) ----
+  // `verifier` = the getContractAddressForChain KEY that resolves the intent TARGET (the factory, whose
+  //   forwarder the relayer calls — the only whitelisted pool address). `domainVerifier` = the EIP-712
+  //   domain the signature is verified under; `verifyingContractParam` names the param holding the
+  //   verifyingContract (the CLONE) — the domain/target SPLIT. The six actor twins sign under the clone;
+  //   createPool signs under the factory. `authOnly` (poolJoin) = no intent struct, the EIP-3009
+  //   authorization is the whole intent; `authToParam` binds the money to the clone, not the factory.
+  poolCloseJoining: { primaryType: 'CloseJoining', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'creator' },
+  poolCancel: { primaryType: 'Cancel', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'creator' },
+  poolRefund: { primaryType: 'Refund', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'member' },
+  poolApprove: { primaryType: 'ApproveOutcome', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'member' },
+  poolProposeOutcome: { primaryType: 'ProposeOutcome', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'creator' },
+  poolClaim: { primaryType: 'ClaimShare', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'winner' },
+  poolCreate: { primaryType: 'CreatePool', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPoolFactory', intentClass: 'signer-attributed', actorField: 'creator' },
+  poolJoin: { verifier: 'wagerPoolFactory', intentClass: 'payment', authOnly: true, authToParam: 'pool' },
 }
 
 /**
@@ -161,6 +219,27 @@ export function wagerRegistryDomain(chainId, verifyingContract) {
  */
 export function membershipManagerDomain(chainId, verifyingContract) {
   return { name: 'FairWins MembershipManager', version: '1', chainId: Number(chainId), verifyingContract }
+}
+
+/**
+ * EIP-712 domain for a WagerPool CLONE (spec 034/035). verifyingContract is the pool clone's own
+ * address — each clone is its own SignerIntentBase domain, so the six actor twins are verified there
+ * even though the relayer submits through the factory forwarder.
+ * @param {number} chainId
+ * @param {string} verifyingContract - the pool CLONE address
+ */
+export function wagerPoolDomain(chainId, verifyingContract) {
+  return { name: 'FairWins WagerPool', version: '1', chainId: Number(chainId), verifyingContract }
+}
+
+/**
+ * EIP-712 domain for the WagerPoolFactory (spec 035/036 Tier 2 — createPoolWithSig). verifyingContract
+ * is the factory PROXY address for this chain.
+ * @param {number} chainId
+ * @param {string} verifyingContract - the wagerPoolFactory PROXY address
+ */
+export function wagerPoolFactoryDomain(chainId, verifyingContract) {
+  return { name: 'FairWins WagerPoolFactory', version: '1', chainId: Number(chainId), verifyingContract }
 }
 
 /**

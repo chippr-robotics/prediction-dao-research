@@ -137,6 +137,20 @@ export function loadConfig(env = process.env, opts = {}) {
       [c.wagerRegistry.toLowerCase()]: { key: 'wagerRegistry', address: c.wagerRegistry, allowedActions: actionsForContract('wagerRegistry') },
       [c.membershipManager.toLowerCase()]: { key: 'membershipManager', address: c.membershipManager, allowedActions: actionsForContract('membershipManager') },
     }
+    const targetsByKey = { wagerRegistry: c.wagerRegistry, membershipManager: c.membershipManager }
+
+    // Tier-2 group pools (spec 035/036) are OPTIONAL per chain: only pin the WagerPoolFactory where the
+    // deployment record has one (Mordor/Polygon), so chains without pools still boot (pool actions there
+    // just self-submit). The factory is the only pool target the engine whitelists — clones are reached
+    // via its forwarders and proven on-chain (poolAddressToId), so no clone address is ever pinned.
+    if (ADDRESS_RE.test(c.wagerPoolFactory || '')) {
+      targets[c.wagerPoolFactory.toLowerCase()] = {
+        key: 'wagerPoolFactory',
+        address: c.wagerPoolFactory,
+        allowedActions: actionsForContract('wagerPoolFactory'),
+      }
+      targetsByKey.wagerPoolFactory = c.wagerPoolFactory
+    }
 
     const rpcUrls = opt(env, `RPC_URLS_${chainId}`, def.defaultRpcUrls.join(','))
       .split(',')
@@ -166,7 +180,7 @@ export function loadConfig(env = process.env, opts = {}) {
       paymentToken: deployment.paymentToken || null,
       sanctionsGuard: c.sanctionsGuard,
       targets,
-      targetsByKey: { wagerRegistry: c.wagerRegistry, membershipManager: c.membershipManager },
+      targetsByKey,
       rpcUrls,
       fundingMode: opt(env, `FUNDING_MODE_${chainId}`, 'sponsored'), // 'sponsored' | 'fee-netted'
       gasSpendCapWei: bigInt(env, `GAS_SPEND_CAP_WEI_${chainId}`, 500_000_000_000_000_000n), // 0.5 native / window

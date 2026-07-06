@@ -7,7 +7,18 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ethers } from 'ethers'
 import { loadConfig } from '../src/config/index.js'
-import { CONTRACT_DOMAINS, RECEIVE_WITH_AUTHORIZATION_TYPES, typesFor, ACTIONS } from '../src/intent/intentTypes.js'
+import { CONTRACT_DOMAINS, RECEIVE_WITH_AUTHORIZATION_TYPES, typesFor, ACTIONS, INTENT_TYPES } from '../src/intent/intentTypes.js'
+
+// Selector for WagerPoolFactory.poolAddressToId(address) — the Tier-2 provenance eth_call.
+const POOL_ID_SELECTOR = ethers.id('poolAddressToId(address)').slice(0, 10)
+
+/** Recursively convert BigInts to decimal strings so a body survives JSON.stringify (mirrors the client). */
+function jsonSafe(v) {
+  if (typeof v === 'bigint') return v.toString()
+  if (Array.isArray(v)) return v.map(jsonSafe)
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, jsonSafe(x)]))
+  return v
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const DEPLOYMENTS_DIR = path.resolve(__dirname, '../../../deployments')
@@ -46,10 +57,21 @@ export function mockProvider({
   // (selector 0x1626ba7e) on those addresses answer accordingly; addresses
   // not in the map behave like codeless accounts (eth_call returns '0x').
   erc1271 = {},
+  // Tier-2 pool provenance: WagerPoolFactory.poolAddressToId(address) answer. Default 1 (nonzero =>
+  // recognized clone). Set 0 to simulate an unknown/forged pool address (400 target_not_allowlisted).
+  poolId = 1n,
+  // When set, the provenance call returns this RAW hex verbatim (e.g. '0x' to simulate a
+  // malformed/empty node response). Overrides `poolId` — used to assert the decode-failure path
+  // maps to a retryable 503 (never-stranded), not a hard 400.
+  poolIdRaw = null,
 } = {}) {
   return {
     async call(tx) {
       if (screenError) throw new Error('rpc unreachable')
+      if (tx?.data?.startsWith(POOL_ID_SELECTOR)) {
+        if (poolIdRaw != null) return poolIdRaw
+        return abi.encode(['uint256'], [poolId])
+      }
       if (tx?.data?.startsWith('0x1626ba7e')) {
         const mode = erc1271[tx.to?.toLowerCase()]
         if (mode === 'magic') return '0x1626ba7e' + '0'.repeat(56)
@@ -218,4 +240,99 @@ export async function signedPaymentIntent(config, {
     uniquenessMarker: marker,
     fundingMode: 'sponsored',
   }
+}
+
+// A stand-in pool clone address for provenance-mocked tests (mockProvider answers poolAddressToId).
+export const POOL_ADDRESS = '0x1111111111111111111111111111111111111111'
+
+/**
+ * Build + sign a Tier-2 pool signer-attributed intent. Targets the factory, but signs under the CLONE's
+ * domain (verifyingContract = `pool`) for the six actor twins, or the FACTORY's domain for poolCreate.
+ * `params` supplies the action-specific struct/calldata fields (proposalId, entries, index, recipient,
+ * or the createPool tuple); the actor field is filled with the signer.
+ */
+export async function signedPoolIntent(config, {
+  chainId = 137,
+  action = 'poolApprove',
+  signer = wallet,
+  pool = POOL_ADDRESS,
+  params = {},
+  validAfter = 0,
+  validBefore = TEST_NOW + 3600,
+  marker = randomMarker(),
+  domainChainId,
+} = {}) {
+  const def = ACTIONS[action]
+  const chain = config.chains[chainId]
+  const domainCId = domainChainId ?? chainId
+  const usesCloneDomain = def.verifyingContractParam === 'pool'
+  const verifyingContract = usesCloneDomain ? pool : config.chains[domainCId].targetsByKey[def.contract]
+  const domain = { ...CONTRACT_DOMAINS[def.domainContract ?? def.contract], chainId: domainCId, verifyingContract }
+  const actor = signer.address
+  const message = {}
+  for (const f of INTENT_TYPES[def.typeName]) {
+    if (f.name === def.actorField) message[f.name] = actor
+    else if (f.name === 'nonce') message[f.name] = marker
+    else if (f.name === 'validAfter') message[f.name] = validAfter
+    else if (f.name === 'validBefore') message[f.name] = validBefore
+    else message[f.name] = params[f.name]
+  }
+  const signature = await signer.signTypedData(domain, typesFor(action), message)
+  const outParams = { ...params, [def.actorField]: actor }
+  if (usesCloneDomain) outParams.pool = pool
+  return {
+    intentClass: 'signer-attributed',
+    chainId,
+    targetContract: chain.targetsByKey[def.contract],
+    action,
+    // The wire body is JSON, so BigInts (entries amounts, buyIn) travel as decimal strings — exactly
+    // as the frontend serializes them; the gateway coerces them back via asUint before re-hashing.
+    params: jsonSafe(outParams),
+    signature,
+    validAfter,
+    validBefore,
+    uniquenessMarker: marker,
+    fundingMode: 'sponsored',
+  }
+}
+
+/** Build + sign a Tier-2 gasless pool JOIN (EIP-3009 into the clone; no separate intent struct). */
+export async function signedPoolJoinIntent(config, {
+  chainId = 137,
+  signer = wallet,
+  pool = POOL_ADDRESS,
+  value = 1_000_000n,
+  validAfter = 0,
+  validBefore = TEST_NOW + 3600,
+  marker = randomMarker(),
+} = {}) {
+  const chain = config.chains[chainId]
+  const tokenDomain = {
+    name: chain.tokenDomain.name,
+    version: chain.tokenDomain.version,
+    chainId,
+    verifyingContract: chain.paymentToken,
+  }
+  const auth = { from: signer.address, to: pool, value, validAfter, validBefore, nonce: marker }
+  const authSig = ethers.Signature.from(await signer.signTypedData(tokenDomain, RECEIVE_WITH_AUTHORIZATION_TYPES, auth))
+  return {
+    intentClass: 'payment',
+    chainId,
+    targetContract: chain.targetsByKey.wagerPoolFactory,
+    action: 'poolJoin',
+    params: { pool },
+    signature: '0x',
+    authorization: { ...auth, value: value.toString(), v: authSig.v, r: authSig.r, s: authSig.s },
+    validAfter,
+    validBefore,
+    uniquenessMarker: marker,
+    fundingMode: 'sponsored',
+  }
+}
+
+/** keccak256(abi.encode(PayoutEntry[])) — the pool proposalId / lockedOutcome. */
+export function poolMatrixHash(entries) {
+  return ethers.keccak256(
+    abi.encode(['tuple(address winner,uint256 amount)[]'], [entries.map((e) => ({ winner: e.winner, amount: e.amount }))])
+  )
 }
