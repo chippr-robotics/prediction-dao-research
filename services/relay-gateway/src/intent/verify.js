@@ -226,7 +226,11 @@ async function checkPoolProvenance(provider, factoryAddress, pool) {
   try {
     ;[id] = FACTORY_IFACE.decodeFunctionResult('poolAddressToId', ret)
   } catch {
-    id = 0n
+    // A malformed/empty response (e.g. '0x' from a flaky node or a call to a non-contract) is a
+    // PROVIDER failure, not proof the pool is fake — treat it as retryable so the client self-submits
+    // (never-stranded), matching this function's contract. Only a cleanly-decoded id === 0 below is a
+    // genuine non-pool (hard 400).
+    throw new GatewayError(503, 'chain_unavailable', 'pool provenance response malformed (RPC issue); retry or self-submit')
   }
   if (id === 0n) {
     throw new GatewayError(400, 'target_not_allowlisted', 'pool was not created by the pinned WagerPoolFactory')

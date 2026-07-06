@@ -60,11 +60,16 @@ export function mockProvider({
   // Tier-2 pool provenance: WagerPoolFactory.poolAddressToId(address) answer. Default 1 (nonzero =>
   // recognized clone). Set 0 to simulate an unknown/forged pool address (400 target_not_allowlisted).
   poolId = 1n,
+  // When set, the provenance call returns this RAW hex verbatim (e.g. '0x' to simulate a
+  // malformed/empty node response). Overrides `poolId` — used to assert the decode-failure path
+  // maps to a retryable 503 (never-stranded), not a hard 400.
+  poolIdRaw = null,
 } = {}) {
   return {
     async call(tx) {
       if (screenError) throw new Error('rpc unreachable')
       if (tx?.data?.startsWith(POOL_ID_SELECTOR)) {
+        if (poolIdRaw != null) return poolIdRaw
         return abi.encode(['uint256'], [poolId])
       }
       if (tx?.data?.startsWith('0x1626ba7e')) {

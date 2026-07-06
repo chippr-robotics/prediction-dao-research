@@ -339,6 +339,17 @@ describe('Tier-2 group pools (spec 035/036 — factory-forwarder)', () => {
     expect(ctx503.engine.submissions).toHaveLength(0)
   })
 
+  it('provenance — a malformed/empty (0x) provenance response is 503 (self-submit), not a hard 400', async () => {
+    // A flaky node returning '0x' fails to decode; that is a provider failure, not proof the pool is
+    // forged, so it must be retryable (client self-submits, never-stranded) — never a hard reject.
+    const ctxBad = build({ providers: mockProviders(testConfig(), { poolIdRaw: '0x' }) })
+    const intent = await signedPoolIntent(ctxBad.config, { action: 'poolApprove', params: { proposalId: poolMatrixHash(entries) } })
+    const res = await post(ctxBad.app, intent)
+    expect(res.status).toBe(503)
+    expect(res.body.error.code).toBe('chain_unavailable')
+    expect(ctxBad.engine.submissions).toHaveLength(0)
+  })
+
   it('targeting the clone directly is rejected — only the factory is pinned', async () => {
     const intent = await signedPoolIntent(ctx.config, { action: 'poolApprove', params: { proposalId: poolMatrixHash(entries) } })
     intent.targetContract = POOL_ADDRESS // clone address is not in the pinned target set

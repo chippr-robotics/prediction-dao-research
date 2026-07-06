@@ -271,10 +271,15 @@ export function usePools() {
       const result = await poolCreateTx.run(form, { factory, params, account })
       if (result?.error) throw result.error
       // run() surfaces only a txHash; re-read the receipt to recover the pool address + share phrase
-      // (the PoolCreated event) uniformly across the relay and self-submit paths.
-      const receipt = await waitReceipt(s, result.txHash)
+      // (the PoolCreated event) uniformly across the relay and self-submit paths. A relayed tx can lag
+      // well behind its ACK, so poll generously (~90s) — losing the receipt means losing the pool's
+      // address + share phrase + the device-local record, while the escrow has already succeeded.
+      const receipt = await waitReceipt(s, result.txHash, 45, 2000)
       setStatus('idle')
-      return parsePoolCreated(receipt, factory, account)
+      const parsed = parsePoolCreated(receipt, factory, account)
+      // Never drop the txHash even if the receipt hasn't landed in time — the UI needs it to show a
+      // pending pool the user can recover, not an all-null result that reads as a failure.
+      return { ...parsed, txHash: parsed.txHash ?? result.txHash ?? null }
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
