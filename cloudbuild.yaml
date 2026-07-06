@@ -66,6 +66,33 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
+  # --- Alto ERC-4337 bundler origin-lock ingress (spec 041 SC-009) --------------------------------
+  # The bundler is a MULTI-container service (nginx origin-lock ingress + alto sidecar), so it is
+  # rolled out with `gcloud run services replace` of the full 2-container spec — a single-container
+  # `gcloud run deploy` (like the SPA step above) would drop the alto sidecar. Build the nginx image,
+  # then replace the service pinned to this commit. The alto sidecar env is reconciled to live in
+  # services/alto-bundler/deploy/service.yaml; the origin lock arms itself iff ORIGIN_LOCK_SECRET is
+  # present (fail-open). NOTE: this redeploys the bundler on every main merge — acceptable for a
+  # low-traffic bundler with a Secret-Manager executor key; add a path-filtered trigger later to scope it.
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx:latest'
+      - 'services/alto-bundler/nginx'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/alto-bundler-nginx']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        sed "s|alto-bundler-nginx:latest|alto-bundler-nginx:$COMMIT_SHA|" \
+          services/alto-bundler/deploy/service.yaml > /workspace/alto-bundler.rendered.yaml
+        gcloud run services replace /workspace/alto-bundler.rendered.yaml --region us-central1 --quiet
+
   # --- Relay gateway (spec 036) — NOT built or deployed here -----------------------------------
   # The production relayer is a 3-CONTAINER Cloud Run service (policy gateway + from-source OZ
   # Relayer engine + redis) wired to a KMS-signed gas key. A single-container `gcloud run deploy`

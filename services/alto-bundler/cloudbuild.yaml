@@ -1,18 +1,29 @@
-# Build + push the origin-lock nginx ingress image for the alto bundler.
-#   gcloud builds submit services/alto-bundler --config services/alto-bundler/cloudbuild.yaml
-# Then apply services/alto-bundler/deploy/service.yaml (see README) to roll out the multi-container
-# service (nginx ingress + alto sidecar).
+# Manual / isolated rollout of the alto bundler origin-lock ingress (builds the nginx image AND
+# replaces the multi-container Cloud Run service). Auto-deploy on merge is handled by the ROOT
+# cloudbuild.yaml; use this to redeploy the bundler alone without a frontend build:
+#
+#   gcloud builds submit . --config services/alto-bundler/cloudbuild.yaml
+#
+# Run from the REPO ROOT (context needs services/alto-bundler/deploy/service.yaml + nginx/). Applied via
+# `gcloud run services replace` — a single-container `gcloud run deploy` would drop the alto sidecar.
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
       - -t
-      - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:$SHORT_SHA
+      - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/alto-bundler-nginx:$SHORT_SHA
       - -t
-      - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:latest
-      - nginx
-images:
-  - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:$SHORT_SHA
-  - us-central1-docker.pkg.dev/$PROJECT_ID/fairwins/alto-bundler-nginx:latest
+      - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/alto-bundler-nginx:latest
+      - services/alto-bundler/nginx
+  - name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/alto-bundler-nginx]
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        sed "s|alto-bundler-nginx:latest|alto-bundler-nginx:$SHORT_SHA|" \
+          services/alto-bundler/deploy/service.yaml > /workspace/alto-bundler.rendered.yaml
+        gcloud run services replace /workspace/alto-bundler.rendered.yaml --region us-central1 --quiet
 options:
   logging: CLOUD_LOGGING_ONLY
