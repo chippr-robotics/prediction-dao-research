@@ -1,0 +1,97 @@
+/* PWA "update available" toast — a compact, dismissible card pinned bottom-center that
+   routes the user to the Software Update section in Preferences. Theme-variable driven so
+   it tracks light/dark. Sits above app chrome but below modal overlays. */
+
+.pwa-update-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: calc(100% - 2rem);
+  max-width: 440px;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
+  animation: pwaToastUp 0.2s ease-out;
+}
+
+@keyframes pwaToastUp {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.pwa-update-toast-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand-primary, #36B37E) 16%, transparent);
+  color: var(--brand-primary, #36B37E);
+}
+
+.pwa-update-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pwa-update-toast-text strong { font-size: 0.92rem; font-weight: 600; }
+.pwa-update-toast-text span {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-update-toast-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pwa-update-toast-cta {
+  padding: 0.45rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--brand-primary, #36B37E);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.pwa-update-toast-cta:hover { filter: brightness(1.05); }
+.pwa-update-toast-cta:active { filter: brightness(0.96); }
+
+.pwa-update-toast-dismiss {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary, #777);
+  cursor: pointer;
+}
+.pwa-update-toast-dismiss:hover {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.06));
+  color: var(--text-primary, #111);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-update-toast { animation: none; }
+}

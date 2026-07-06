@@ -16,6 +16,7 @@ import {
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
+import { registerServiceWorker } from './lib/pwa/serviceWorkerUpdate'
 
 // Create query client for wagmi
 const queryClient = new QueryClient()
@@ -52,3 +53,11 @@ createRoot(document.getElementById('root')).render(
 requestAnimationFrame(() => {
   validateTheme()
 })
+
+// Register the PWA service worker so the app is installable, works offline, and can
+// surface a user-approved update when a new version ships (see serviceWorkerUpdate.js).
+// Dev is skipped: Vite serves modules the SW would otherwise intercept, and a stale
+// cache during HMR is a debugging footgun. Registration failures are non-fatal.
+if (import.meta.env.PROD) {
+  registerServiceWorker()
+}

@@ -1189,3 +1189,45 @@
 .polymarket-category-option input[type="checkbox"] {
   accent-color: #2d9cdb;
 }
+
+/* PWA install preference toggle (Preferences tab) */
+.pwa-pref-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.pwa-pref-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-primary, #36B37E);
+  cursor: pointer;
+}
+
+/* Software Update section (Preferences tab) */
+.pwa-update-status {
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+  color: var(--text-secondary);
+}
+
+.pwa-update-status.is-available {
+  border-color: color-mix(in srgb, var(--brand-primary, #36B37E) 45%, transparent);
+  background: color-mix(in srgb, var(--brand-primary, #36B37E) 12%, transparent);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.pwa-update-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

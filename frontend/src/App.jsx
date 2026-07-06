@@ -33,6 +33,8 @@ import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
+import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
+import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
 function AppLayout() {
   return (
@@ -78,6 +80,12 @@ function AppContent() {
 
       {/* Modal system */}
       <ModalSystem />
+
+      {/* PWA install bottom-sheet — shown to non-standalone visitors who haven't opted out */}
+      <PwaInstallPrompt />
+
+      {/* PWA update toast — routes to the Software Update section when a new version is ready */}
+      <PwaUpdateNotification />
 
       {/* Network error banner */}
       {networkError && isConnected && (

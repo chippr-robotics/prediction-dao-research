@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
 import { useUserPreferences } from '../hooks/useUserPreferences'
+import { usePwaInstall } from '../hooks/usePwaInstall'
+import { usePwaUpdate } from '../hooks/usePwaUpdate'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
@@ -67,8 +69,23 @@ function WalletPage() {
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
+  const {
+    isStandalone: pwaStandalone,
+    canPrompt: pwaCanPrompt,
+    isIos: pwaIsIos,
+    hidden: pwaPromptHidden,
+    setHidden: setPwaPromptHidden,
+    promptInstall: pwaPromptInstall,
+  } = usePwaInstall()
+  const { updateReady: pwaUpdateReady, applyUpdate: pwaApplyUpdate, checkForUpdate: pwaCheckForUpdate } = usePwaUpdate()
+  const [pwaChecking, setPwaChecking] = useState(false)
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('account')
+  const [searchParams] = useSearchParams()
+  // Allow deep-linking straight to a section (e.g. the update toast → ?tab=preferences).
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab')
+    return WALLET_TABS.some((t) => t.id === requested) ? requested : 'account'
+  })
   // On phones the section nav is a slide-over drawer that overlays the content,
   // so it starts closed; on wider screens it stays docked open like a portal.
   const [isMobile, setIsMobile] = useState(
@@ -200,6 +217,25 @@ function WalletPage() {
     setActiveTab(id)
     if (isMobile) setSidebarOpen(false)
   }, [isMobile])
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setPwaChecking(true)
+    try {
+      await pwaCheckForUpdate()
+    } finally {
+      setPwaChecking(false)
+    }
+  }, [pwaCheckForUpdate])
+
+  // When routed here from the update toast (#pwa-update), reveal the section.
+  useEffect(() => {
+    if (activeTab !== 'preferences') return
+    if (typeof window === 'undefined' || window.location.hash !== '#pwa-update') return
+    const id = window.setTimeout(() => {
+      document.getElementById('pwa-update')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+    return () => window.clearTimeout(id)
+  }, [activeTab])
 
   const selectedPolymarketCategories = useMemo(
     () => preferences?.polymarketCategories || [],
@@ -453,6 +489,86 @@ function WalletPage() {
 
                 {activeTab === 'preferences' && (
                   <div className="preferences-section" role="tabpanel">
+                    <div className="section">
+                      <h3>Install App</h3>
+                      <p className="section-description">
+                        FairWins is a progressive web app you can install to your device for
+                        quick, full-screen access — no app store, no download.
+                      </p>
+
+                      {pwaStandalone ? (
+                        <div className="key-status" role="note">
+                          FairWins is already installed and running as an app on this device.
+                        </div>
+                      ) : (
+                        <>
+                          <label className="pwa-pref-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!pwaPromptHidden}
+                              onChange={(e) => setPwaPromptHidden(!e.target.checked)}
+                            />
+                            <span>Show the install prompt when I visit in a browser</span>
+                          </label>
+
+                          {pwaCanPrompt && (
+                            <button
+                              type="button"
+                              className="key-action-btn primary"
+                              onClick={pwaPromptInstall}
+                            >
+                              Install now
+                            </button>
+                          )}
+
+                          {pwaIsIos && !pwaCanPrompt && (
+                            <p className="section-description">
+                              On iOS, open the Share menu in Safari and choose{' '}
+                              <strong>Add to Home Screen</strong> to install.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="section" id="pwa-update">
+                      <h3>Software Update</h3>
+                      <p className="section-description">
+                        FairWins checks for new versions automatically in the background.
+                        When an update is ready you can install it here — it takes a moment
+                        and reloads the app.
+                      </p>
+
+                      <div
+                        className={`pwa-update-status ${pwaUpdateReady ? 'is-available' : 'is-current'}`}
+                        role="status"
+                      >
+                        {pwaUpdateReady
+                          ? 'A new version is available.'
+                          : "You're running the latest version."}
+                      </div>
+
+                      <div className="pwa-update-buttons">
+                        {pwaUpdateReady && (
+                          <button
+                            type="button"
+                            className="key-action-btn primary"
+                            onClick={pwaApplyUpdate}
+                          >
+                            Update now
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="key-action-btn secondary"
+                          onClick={handleCheckForUpdate}
+                          disabled={pwaChecking}
+                        >
+                          {pwaChecking ? 'Checking…' : 'Check for updates'}
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="section">
                       <h3>Polymarket Categories</h3>
                       <p className="section-description">

@@ -1,0 +1,170 @@
+/* PWA install bottom-sheet — centered card on desktop, sheet rising from the bottom
+   on mobile. Self-contained styling that reads the shared theme CSS variables so it
+   tracks light/dark + platform themes. Mirrors the CpBottomSheet interaction model. */
+
+.pwa-install-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.pwa-install-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: var(--radius-lg, 14px);
+  padding: 1.25rem 1.25rem 1.4rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  animation: pwaSheetUp 0.2s ease-out;
+}
+
+@keyframes pwaSheetUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pwa-install-handle { display: none; }
+
+.pwa-install-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
+  color: var(--text-secondary, #555);
+  cursor: pointer;
+}
+.pwa-install-close:hover { background: var(--bg-tertiary, rgba(0, 0, 0, 0.1)); }
+
+.pwa-install-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin: 0.2rem 2rem 0.9rem 0;
+}
+
+.pwa-install-icon {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-primary, #36B37E) 14%, transparent);
+  overflow: hidden;
+}
+.pwa-install-icon img { display: block; width: 40px; height: 40px; }
+
+.pwa-install-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.pwa-install-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #555);
+}
+
+/* iOS manual steps */
+.pwa-install-ios-steps {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-primary, #111);
+}
+.pwa-install-ios-steps li { line-height: 1.5; }
+.pwa-install-ios-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0.3rem;
+  color: var(--brand-primary, #36B37E);
+}
+
+/* Primary install CTA (Chromium / desktop) */
+.pwa-install-cta {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.85rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--brand-primary, #36B37E);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.pwa-install-cta:hover { filter: brightness(1.05); }
+.pwa-install-cta:active { filter: brightness(0.96); }
+
+.pwa-install-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pwa-install-secondary,
+.pwa-install-dont-show {
+  border: none;
+  background: none;
+  padding: 0.35rem 0.15rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.pwa-install-secondary { color: var(--text-primary, #111); font-weight: 500; }
+.pwa-install-secondary:hover { text-decoration: underline; }
+.pwa-install-dont-show { color: var(--text-secondary, #777); }
+.pwa-install-dont-show:hover { color: var(--text-primary, #111); text-decoration: underline; }
+
+/* Mobile: dock to the bottom as a sheet with a grab handle. */
+@media (max-width: 768px) {
+  .pwa-install-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .pwa-install-sheet {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
+  }
+  .pwa-install-handle {
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-color, rgba(0, 0, 0, 0.2));
+    margin: 0 auto 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-install-sheet { animation: none; }
+}
