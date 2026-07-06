@@ -95,6 +95,15 @@ and non-bypassable sanctions screening on any value-moving ClearPath-mediated ac
   ClearPath is non-custodial and the external DAO's own contracts/rules authorize and route
   the value. ClearPath's OWN custodial value-moving flows (e.g. native treasury funding —
   out of scope here) always require the gate and are never offered ungated.
+- Q: How should a tracked DAO's data be sourced, and how should read requests be routed?
+  → A: **Subgraph-first, then on-chain; public RPC by default with a wallet-managed option.**
+  Where a DAO is indexed by **The Graph** (a known/configured governance subgraph exists for
+  it, e.g. ENS/Uniswap/Compound), ClearPath reads its proposals/tallies/states/membership
+  from that subgraph in preference to scanning the chain; otherwise it falls back to the
+  bounded, chunked on-chain live indexer, then to a truthful empty/partial/error state —
+  never fabricated. Read requests default to the network's **public RPC endpoint**, with an
+  option to let the **connected wallet manage routing** (use the wallet's own provider);
+  honest degradation applies when the chosen route caps `eth_getLogs`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -330,9 +339,13 @@ reason honestly.
   contract on the **active network** before adding it, and MUST reject EOAs,
   non-governance contracts, wrong-network addresses, and duplicates with truthful reasons.
 - **FR-008**: The system MUST track a registered DAO **read-only** — treasury balance,
-  proposals + vote tallies + states, and membership — sourced from the DAO's on-chain
-  state via subgraph where available or a bounded chunked on-chain log scan where not,
-  with truthful empty/partial/error states and no fabricated rows.
+  proposals + vote tallies + states, and membership — using a **per-DAO data-source
+  precedence**: (1) a **The Graph subgraph** where the DAO is indexed and a governance
+  subgraph endpoint is known/configured for it (preferred over chain reads); (2) the
+  **bounded, chunked on-chain live indexer** where no subgraph applies; (3) a **truthful
+  empty/partial/error state** where neither yields data — with **no fabricated rows** at any
+  tier. The precedence is resolved per DAO and per network, so an indexed DAO (e.g. ENS,
+  Uniswap) reads from its subgraph while a non-indexed DAO on the same network reads on-chain.
 
 **Pluggable multi-framework connectors (US3/US5)**
 
@@ -384,6 +397,17 @@ reason honestly.
   Center)** — not a standalone sub-app or a new top-level nav item — consistent with
   spec 030.
 
+**Data sourcing & read routing**
+
+- **FR-019**: ClearPath reads MUST default to the active network's **public RPC endpoint**
+  (with a sensible per-network default and an env/config override), and MUST offer an option
+  to let the **connected wallet manage routing** (route reads through the wallet's own
+  provider). Whichever route is used, reads MUST degrade **truthfully** when it caps or
+  rejects a wide `eth_getLogs` window (partial/error state, never fabricated), reusing the
+  bounded, chunked scan. Subgraph reads (FR-008 tier 1) are unaffected by the RPC-route
+  choice. Read routing is a read concern only — every **write** continues to go through the
+  connected wallet/signer.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Network Capability Profile**: The declared set of capabilities a network supports
@@ -409,6 +433,12 @@ reason honestly.
 - **Governance DAO (tracked)**: A DAO reached through ClearPath on any supported network —
   its detected framework, network, treasury/vault references, proposals, tallies, states,
   and membership, tracked read-only and managed only via the member's own authority.
+- **DAO Data Source**: The resolved read source for a tracked DAO — a **The Graph subgraph**
+  where the DAO is indexed (preferred), otherwise the **on-chain live indexer** — chosen per
+  DAO and per network, backing the truthful precedence in FR-008.
+- **Read Route**: How on-chain reads are transported — the network's **public RPC endpoint**
+  by default, or the **connected wallet's provider** when the member opts into wallet-managed
+  routing; a read concern that never affects write signing.
 
 ## Success Criteria *(mandatory)*
 
@@ -449,6 +479,11 @@ reason honestly.
 - **SC-010**: The full automated test suite (frontend Vitest incl. axe, plus any touched
   contract/subgraph suites) passes in CI, and security static analysis reports no new
   high/critical findings.
+- **SC-011**: A DAO indexed by The Graph (e.g. ENS or Uniswap) is read from its **subgraph**
+  rather than by scanning the chain, while a non-indexed DAO on the same network reads via the
+  on-chain live indexer — both showing real state or a truthful empty/partial/error state,
+  never fabricated rows; and reads default to the network's **public RPC** with a
+  **wallet-managed routing** option that changes only the read transport, not write signing.
 
 ## Assumptions
 
@@ -471,9 +506,15 @@ reason honestly.
   capability gating (`networkCapabilities.js` pattern), the ClearPath connector +
   live-indexing code (spec 030), the notification/theme systems, sanctions screening, and
   membership/access-control — extended, not replaced. No new backend is added.
-- **Read reliability**: Each new network needs a usable read RPC (with a sensible default
-  and an env override), and reads must degrade truthfully where a public RPC caps
-  `eth_getLogs` — reusing spec 030's bounded, chunked live-indexing fallback.
+- **Read reliability & data sourcing**: Reads are **subgraph-first** — where a DAO is indexed
+  by The Graph (ENS, Uniswap, Compound-family, and others publish governance subgraphs on The
+  Graph's network), ClearPath prefers that subgraph over chain reads; otherwise it uses the
+  bounded, chunked on-chain live indexer, then a truthful empty/partial/error state. Each new
+  network needs a usable read RPC (sensible default + env/config override); the default read
+  route is the network's **public RPC endpoint**, with an option for **wallet-managed
+  routing**. Known per-DAO subgraph endpoints and the public RPC defaults are configuration
+  (verified, never guessed) resolved during planning; reads degrade truthfully where any
+  route caps `eth_getLogs`.
 - **Out of scope for the first cut**: deploying the registry to new L1s; native DAO
   creation on new networks (spec 030's native pillar remains deferred / unchanged);
   enabling wagers, DEX/swaps, or passkey login on ClearPath-only networks; and
