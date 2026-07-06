@@ -108,3 +108,7 @@ export {
   useLazyMarketMetadata
 } from './useIpfs'
 
+
+// Pay & Transfer (wallet stablecoin/native send + activity)
+export { useTransfer, TRANSFER_KIND } from './useTransfer'
+export { useTransferActivity } from './useTransferActivity'

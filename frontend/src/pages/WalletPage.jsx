@@ -10,6 +10,7 @@ import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
+import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
@@ -28,6 +29,7 @@ import './WalletPage.css'
 // My Account sections, shown via the WalletTabMenu kebab menu.
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
+  { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'addressbook', label: 'Address Book' },
   { id: 'backup', label: 'Backup' },
   { id: 'membership', label: 'Membership' },
@@ -368,6 +370,12 @@ function WalletPage() {
                         <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === 'paytransfer' && (
+                  <div className="paytransfer-section" role="tabpanel">
+                    <PayTransferPanel />
                   </div>
                 )}
 
