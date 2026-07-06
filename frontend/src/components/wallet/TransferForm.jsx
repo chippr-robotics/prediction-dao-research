@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AddressInput from '../ui/AddressInput'
+import AddressBookButton from '../ui/AddressBookButton'
+import QRScanner from '../ui/QRScanner'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
+import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
@@ -28,6 +31,7 @@ export default function TransferForm({ onSent }) {
   const [previewing, setPreviewing] = useState(false)
   const [screening, setScreening] = useState(null) // null | 'clear' | 'restricted' | 'uncertain'
   const [formError, setFormError] = useState(null)
+  const [scanOpen, setScanOpen] = useState(false)
 
   const busy = status === 'signing' || status === 'submitting' || status === 'pending'
   const m = meta(kind)
@@ -72,6 +76,17 @@ export default function TransferForm({ onSent }) {
   const resetForm = useCallback(() => {
     setToRaw(''); setToResolved(''); setAmount(''); setPreviewing(false); setScreening(null); setFormError(null)
   }, [])
+
+  const applyAddress = useCallback((addr) => {
+    setToRaw(addr)
+    setToResolved(addr)
+  }, [])
+
+  const handleScan = useCallback((decodedText) => {
+    const addr = extractAddressFromScan(decodedText)
+    if (addr) applyAddress(addr)
+    setScanOpen(false)
+  }, [applyAddress])
 
   const handleSend = useCallback(async () => {
     setFormError(null)
@@ -137,19 +152,36 @@ export default function TransferForm({ onSent }) {
             </div>
           </div>
 
-          {/* To — reuses the standard address entry component (ENS + address book) */}
+          {/* To — the standard address entry (ENS resolution + address book + QR scan) used across the app */}
           <div className="pt-field">
             <label className="pt-label" htmlFor="pt-to">To</label>
-            <AddressInput
-              id="pt-to"
-              value={toRaw}
-              onChange={(e) => setToRaw(e.target.value)}
-              onResolvedChange={(addr) => setToResolved(addr || '')}
-              enableAddressBook
-              chainId={tokens.chainId}
-              placeholder="0x… or ENS name (e.g., vitalik.eth)"
-              disabled={busy}
-            />
+            <div className="pt-input-with-action">
+              <div className="pt-address-input-wrap">
+                <AddressInput
+                  id="pt-to"
+                  value={toRaw}
+                  onChange={(e) => setToRaw(e.target.value)}
+                  onResolvedChange={(addr) => setToResolved(addr || '')}
+                  chainId={tokens.chainId}
+                  placeholder="0x… or ENS name (e.g., vitalik.eth)"
+                  disabled={busy}
+                />
+              </div>
+              <AddressBookButton chainId={tokens.chainId} disabled={busy} onSelect={(entry) => applyAddress(entry.address)} />
+              <button
+                type="button"
+                className="pt-scan-btn"
+                onClick={() => setScanOpen(true)}
+                disabled={busy}
+                title="Scan QR code"
+                aria-label="Scan QR code"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+                </svg>
+              </button>
+            </div>
+            <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
             {screening === 'restricted' && (
               <div className="pt-notice pt-notice-error" role="alert">
                 This address is flagged by sanctions screening. Transfers to it are blocked.
