@@ -38,6 +38,24 @@
   padding: 8px;
 }
 
+/* Group heading for the grouped rail (Admin / Finance / Tools / Apps). Purely
+   presentational — the tabs beneath it stay part of the single tablist. */
+.portal-nav-group-label {
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+}
+
+/* First heading hugs the top; later ones get breathing room from the group above. */
+.portal-nav-group-label:not(:first-child) {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  padding-top: 12px;
+}
+
 .portal-nav-item {
   display: flex;
   align-items: center;

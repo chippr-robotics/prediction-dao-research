@@ -39,3 +39,47 @@ describe('PortalNav (vertical sidebar tabs)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 })
+
+const GROUPS = [
+  { label: 'Admin', items: [{ id: 'account', label: 'Account' }] },
+  {
+    label: 'Finance',
+    items: [
+      { id: 'trade', label: 'Trade' },
+      { id: 'paytransfer', label: 'Pay & Transfer' },
+    ],
+  },
+]
+
+describe('PortalNav (grouped rail)', () => {
+  it('renders a group heading for each group with its tabs beneath', () => {
+    render(<PortalNav groups={GROUPS} activeId="account" onSelect={vi.fn()} ariaLabel="Account sections" />)
+    expect(screen.getByText('Admin')).toBeInTheDocument()
+    expect(screen.getByText('Finance')).toBeInTheDocument()
+    for (const group of GROUPS) {
+      for (const item of group.items) {
+        expect(screen.getByRole('tab', { name: item.label })).toBeInTheDocument()
+      }
+    }
+  })
+
+  it('keeps every grouped entry inside the single tablist', () => {
+    render(<PortalNav groups={GROUPS} activeId="account" onSelect={vi.fn()} ariaLabel="Account sections" />)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(3)
+  })
+
+  it('calls onSelect with the item id when a grouped tab is clicked', () => {
+    const onSelect = vi.fn()
+    render(<PortalNav groups={GROUPS} activeId="account" onSelect={onSelect} ariaLabel="Account sections" />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Pay & Transfer' }))
+    expect(onSelect).toHaveBeenCalledWith('paytransfer')
+  })
+
+  it('has no axe violations when grouped', async () => {
+    const { container } = render(
+      <PortalNav groups={GROUPS} activeId="account" onSelect={vi.fn()} ariaLabel="Account sections" />
+    )
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})

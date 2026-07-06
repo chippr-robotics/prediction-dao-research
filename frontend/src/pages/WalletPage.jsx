@@ -26,21 +26,45 @@ import LoadingScreen from '../components/ui/LoadingScreen'
 import { getWalletLabel, getWalletIcon } from '../utils/walletLabel'
 import './WalletPage.css'
 
-// My Account sections, shown via the WalletTabMenu kebab menu.
-const WALLET_TABS = [
-  { id: 'account', label: 'Account' },
-  { id: 'paytransfer', label: 'Pay & Transfer' },
-  { id: 'addressbook', label: 'Address Book' },
-  { id: 'backup', label: 'Backup' },
-  { id: 'membership', label: 'Membership' },
-  { id: 'network', label: 'Network' },
-  { id: 'security', label: 'Security' },
-  { id: 'preferences', label: 'Preferences' },
-  { id: 'reports', label: 'Reporting' },
-  { id: 'tokens', label: 'Tokens' },
-  { id: 'clearpath', label: 'ClearPath' },
-  { id: 'trade', label: 'Trade' },
+// My Account sections, grouped by function so the section rail stays legible as
+// the number of tabs grows. Each group renders a heading in PortalNav; the tabs
+// themselves stay a single tablist. WALLET_TABS is the flat projection used for
+// deep-link/alias resolution and for looking up the active tab's label.
+const WALLET_TAB_GROUPS = [
+  {
+    label: 'Admin',
+    items: [
+      { id: 'account', label: 'Account' },
+      { id: 'membership', label: 'Membership' },
+      { id: 'network', label: 'Network' },
+      { id: 'preferences', label: 'Preferences' },
+      { id: 'security', label: 'Security' },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { id: 'trade', label: 'Trade' },
+      { id: 'paytransfer', label: 'Pay & Transfer' },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { id: 'addressbook', label: 'Address Book' },
+      { id: 'backup', label: 'Backup' },
+      { id: 'reports', label: 'Reporting' },
+    ],
+  },
+  {
+    label: 'Apps',
+    items: [
+      { id: 'clearpath', label: 'ClearPath' },
+      { id: 'tokens', label: 'Token Mint' },
+    ],
+  },
 ]
+const WALLET_TABS = WALLET_TAB_GROUPS.flatMap((group) => group.items)
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade").
 const TAB_ALIASES = { swap: 'trade' }
@@ -330,7 +354,7 @@ function WalletPage() {
                   <span className="status-dot connected" aria-hidden="true"></span>
                 </div>
                 <PortalNav
-                  items={WALLET_TABS}
+                  groups={WALLET_TAB_GROUPS}
                   activeId={activeTab}
                   onSelect={handleSelectTab}
                   ariaLabel="Account sections"
