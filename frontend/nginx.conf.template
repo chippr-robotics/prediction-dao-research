@@ -80,6 +80,21 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # Service worker: exact-match location wins over the .js rule below, so sw.js is
+    # never hard-cached — a stale worker would strand clients on old assets.
+    location = /sw.js {
+        if ($origin_denied) { return 403; }
+        add_header Cache-Control "no-cache";
+    }
+
+    # PWA manifest: pin the media type (independent of the bundled mime.types) and
+    # keep it revalidated so install metadata updates promptly.
+    location = /manifest.webmanifest {
+        if ($origin_denied) { return 403; }
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache";
+    }
+
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         if ($origin_denied) { return 403; }

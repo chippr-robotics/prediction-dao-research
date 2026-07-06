@@ -1,0 +1,28 @@
+{
+  "name": "FairWins — Prediction Markets for Friends",
+  "short_name": "FairWins",
+  "description": "Open prediction markets where anyone can create, join, and resolve markets. Fair participation, transparent resolution, and privacy-preserving mechanisms for collective wisdom.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#0E141B",
+  "theme_color": "#36B37E",
+  "categories": ["finance", "social"],
+  "icons": [
+    {
+      "src": "/assets/fairwins_no-text_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/fairwins_no-text_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

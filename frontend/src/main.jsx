@@ -52,3 +52,14 @@ createRoot(document.getElementById('root')).render(
 requestAnimationFrame(() => {
   validateTheme()
 })
+
+// Register the PWA service worker so the app is installable and works offline.
+// Dev is skipped: Vite serves modules the SW would otherwise intercept, and a stale
+// cache during HMR is a debugging footgun. Registration failures are non-fatal.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+      console.warn('Service worker registration failed:', error)
+    })
+  })
+}

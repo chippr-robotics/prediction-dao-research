@@ -1189,3 +1189,21 @@
 .polymarket-category-option input[type="checkbox"] {
   accent-color: #2d9cdb;
 }
+
+/* PWA install preference toggle (Preferences tab) */
+.pwa-pref-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.pwa-pref-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand-primary, #36B37E);
+  cursor: pointer;
+}
