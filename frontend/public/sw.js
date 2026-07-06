@@ -38,6 +38,51 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+// Activity notifications. When the running PWA raises a system
+// notification for a 'push'-mode activity entry (via registration.showNotification),
+// tapping it must focus the app and deep-link to that entry. The entry's router
+// link ({ to, state }) rides along in notification.data; we hand it to a focused
+// client (the ActivityNotificationBridge performs the in-app navigation) or, if
+// no window is open, open one at the link's path.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const link = (event.notification.data && event.notification.data.link) || null
+  const targetPath = (link && link.to) || '/app'
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.focus()
+          client.postMessage({ type: 'ACTIVITY_NAVIGATE', link: link || { to: targetPath } })
+          return undefined
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(targetPath) : undefined
+    })
+  )
+})
+
+// Forward-compat: real server-initiated Web Push. There is no push backend today
+// (notifications are derived client-side), but wiring this listener now means a
+// future backend can deliver push without another service-worker change.
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try {
+    payload = event.data ? event.data.json() : {}
+  } catch {
+    payload = {}
+  }
+  const title = payload.title || 'FairWins'
+  const options = {
+    body: payload.body || payload.message || 'New activity',
+    icon: '/assets/fairwins_no-text_logo.svg',
+    badge: '/assets/fairwins_no-text_logo.svg',
+    tag: payload.tag || 'fairwins-activity',
+    data: { link: payload.link || null },
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   // Only handle GET navigations for the offline fallback; everything else is network-only.

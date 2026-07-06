@@ -1,0 +1,183 @@
+/* NotificationPreferencesPanel — notification delivery controls on the
+   Preferences tab (mobile push / in-app / silent per category). Reuses the
+   PreferencesPanel switch look for the master toggle and adds a segmented
+   three-way control per category. */
+
+.notif-pref-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notif-pref-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notif-pref-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Master mobile-push toggle */
+.notif-pref-master {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notif-pref-master-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.notif-pref-master-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notif-pref-master-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.notif-pref-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--border-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-base, 0.2s ease);
+}
+
+.notif-pref-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text-muted, var(--text-secondary));
+  transition: transform var(--transition-base, 0.2s ease), background var(--transition-base, 0.2s ease);
+}
+
+.notif-pref-switch.on {
+  background: var(--brand-primary);
+}
+
+.notif-pref-switch.on::after {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.notif-pref-switch:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.notif-pref-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Per-category rows */
+.notif-pref-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.notif-pref-row:last-child {
+  border-bottom: none;
+}
+
+.notif-pref-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.notif-pref-row-label {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.notif-pref-row-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.notif-pref-row-warn {
+  font-size: 0.75rem;
+  color: var(--color-warning, #b45309);
+}
+
+/* Segmented three-way control (Push / In-app / Silent) */
+.notif-pref-segmented {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-secondary, var(--border-color));
+}
+
+.notif-pref-seg {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-base, 0.2s ease), color var(--transition-base, 0.2s ease);
+}
+
+.notif-pref-seg + .notif-pref-seg {
+  border-left: 1px solid var(--border-color);
+}
+
+.notif-pref-seg:hover {
+  color: var(--text-primary);
+}
+
+.notif-pref-seg.selected {
+  background: var(--brand-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.notif-pref-seg:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+}

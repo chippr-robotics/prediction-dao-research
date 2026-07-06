@@ -569,23 +569,22 @@ function Dashboard() {
   // Friend markets from shared context (single fetch, no duplication)
   const { friendMarkets } = useFriendMarkets()
 
-  // Feed → wager navigation (spec 012 T018/FR-004). The activity feed
-  // navigates to /app with { openWagerId } in router state. Stash the id and
-  // open My Wagers during render (React's "adjust state while rendering"
-  // pattern — guarded, so it settles after one extra render), then consume
-  // the router state in an effect so a refresh or back-navigation doesn't
-  // re-open the modal.
-  const routeWagerId = location.state?.openWagerId == null
-    ? null
-    : String(location.state.openWagerId)
-  if (routeWagerId != null && initialWagerId !== routeWagerId) {
-    setInitialWagerId(routeWagerId)
-    setShowMyWagers(true)
-  }
+  // Feed → wager navigation (spec 012 T018/FR-004). The activity feed navigates
+  // to /app with { openWagerId } in router state. Consume it in a SINGLE effect:
+  // open My Wagers on that wager, then immediately clear the history state so the
+  // modal's visibility is driven purely by component state, never the live
+  // history entry. Doing the open + clear render-safely in one effect (rather
+  // than a render-phase setState plus a deferred clearing navigate) keeps Back
+  // and click-away deterministic: pressing Back pops history without re-firing
+  // the modal, and closing never races a not-yet-cleared state (the bug where
+  // testers saw an error on back/away after accepting from a notification).
   useEffect(() => {
-    if (routeWagerId == null) return
+    const openWagerId = location.state?.openWagerId
+    if (openWagerId == null) return
+    setInitialWagerId(String(openWagerId))
+    setShowMyWagers(true)
     navigate(location.pathname, { replace: true, state: {} })
-  }, [routeWagerId, location.pathname, navigate])
+  }, [location.state, location.pathname, navigate])
 
   // Shared-phrase deep link (feature 024 / spec 037): a shared QR / link of the form
   // /app?oc=take&code=<four words> now opens the unified phrase lookup, pre-filled and auto-resolved,
