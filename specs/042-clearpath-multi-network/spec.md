@@ -75,6 +75,14 @@ and non-bypassable sanctions screening on any value-moving ClearPath-mediated ac
   → A: **No** — deploying the UUPS registry to expensive L1s is explicitly out of scope
   and MUST NOT be a precondition. The registry-less path is the mechanism on new networks.
 
+### Session 2026-07-06 (clarify)
+
+- Q: Does the first cut ship member-signed **write** actions (vote/queue/execute/propose)
+  on the new ClearPath-only networks, or read-only tracking first? → A: **Read + act** —
+  cut 1 ships read-only tracking AND member-signed governance actions on new networks,
+  each gated by the DAO's own rules and by sanctions screening where a sanctions source is
+  available (per FR-013); ClearPath still holds no custody/authority.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Select a ClearPath-only network (Priority: P1)
