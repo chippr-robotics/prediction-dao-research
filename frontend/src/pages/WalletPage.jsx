@@ -21,6 +21,7 @@ import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import PortalNav from '../components/ui/PortalNav'
+import Footer from '../components/Footer'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
@@ -117,12 +118,11 @@ function WalletPage() {
     const resolved = TAB_ALIASES[requested] || requested
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
-  // On phones the section nav is a slide-over drawer that overlays the content,
-  // so it starts closed; on wider screens it stays docked open like a portal.
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
-  )
-  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile)
+  // The section nav is a left slide-over drawer at every breakpoint so it always
+  // opens and collapses from the left (see WalletPage.css). It starts closed and
+  // is opened from the ☰ control in the topbar; the in-app footer is contained at
+  // the bottom of the drawer.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -220,34 +220,21 @@ function WalletPage() {
     }
   }, [activeTab, isConnected, keyRegistered, handleCheckKeyStatus])
 
-  // Track viewport so the section nav can dock (desktop) or slide over (mobile).
-  // Crossing the breakpoint resets the drawer to its natural state for that size.
+  // Close the slide-over drawer on Escape.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const mq = window.matchMedia('(max-width: 768px)')
-    const handleChange = (event) => {
-      setIsMobile(event.matches)
-      setSidebarOpen(!event.matches)
-    }
-    mq.addEventListener('change', handleChange)
-    return () => mq.removeEventListener('change', handleChange)
-  }, [])
-
-  // Close the slide-over drawer on Escape (mobile only).
-  useEffect(() => {
-    if (!isMobile || !sidebarOpen) return
+    if (!sidebarOpen) return
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setSidebarOpen(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isMobile, sidebarOpen])
+  }, [sidebarOpen])
 
-  // Jumping to a section closes the drawer on mobile so the content is visible.
+  // Jumping to a section closes the drawer so the content is visible.
   const handleSelectTab = useCallback((id) => {
     setActiveTab(id)
-    if (isMobile) setSidebarOpen(false)
-  }, [isMobile])
+    setSidebarOpen(false)
+  }, [])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -360,10 +347,14 @@ function WalletPage() {
                   onSelect={handleSelectTab}
                   ariaLabel="Account sections"
                 />
+                {/* The in-app legal/policy footer is contained at the bottom of the
+                    section drawer on the wallet screen; App.jsx omits the page-level
+                    footer here so it never renders twice. */}
+                <Footer variant="drawer" />
               </aside>
 
-              {/* Mobile only: dim + dismiss the slide-over drawer by tapping outside it. */}
-              {isMobile && sidebarOpen && (
+              {/* Dim + dismiss the slide-over drawer by tapping outside it. */}
+              {sidebarOpen && (
                 <button
                   type="button"
                   className="wallet-portal-backdrop"

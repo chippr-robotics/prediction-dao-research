@@ -1,5 +1,5 @@
 //core
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import './theme.css'
 import './App.css'
 
@@ -38,6 +38,12 @@ import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
 function AppLayout() {
+  // On the wallet screen the legal/policy footer is contained at the bottom of the
+  // section drawer (see WalletPage), so the page-level footer is omitted there to
+  // avoid duplication; every other in-app route keeps it in its usual location.
+  const { pathname } = useLocation()
+  const footerInDrawer = pathname === '/wallet'
+
   return (
     /* Spec 031: platform-wide activity watcher scoped to the app-mode tree — the header bell and the views
        below consume it (wagers + DAO/token/membership sources); landing pages never poll. */
@@ -49,7 +55,7 @@ function AppLayout() {
       <EntryGate />
       <Outlet />
       {/* Spec 010 (US2): condensed legal/policy footer inside the app. */}
-      <Footer variant="condensed" />
+      {!footerInDrawer && <Footer variant="condensed" />}
     </ActivityProvider>
   )
 }

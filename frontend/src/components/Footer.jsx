@@ -8,6 +8,8 @@ import './Footer.css'
  *
  *   variant="full"      → landing-page footer (brand + Oracles/Docs/Legal/Community) + copyright.
  *   variant="condensed" → in-app footer: legal/policy links + copyright only (no marketing columns).
+ *   variant="drawer"    → condensed footer restyled to sit contained at the bottom of the
+ *                         wallet section drawer (same links/copyright, stacked + compact).
  *
  * The copyright year is derived from the current date so it never goes stale (FR-008),
  * and the legal links come from the single LEGAL_LINKS source so the two footers can't
@@ -17,9 +19,10 @@ export default function Footer({ variant = 'full' }) {
   const year = new Date().getFullYear()
   const copyright = `© ${year} ChipprRobotics LLC. Apache License 2.0`
 
-  if (variant === 'condensed') {
+  if (variant === 'condensed' || variant === 'drawer') {
+    const className = variant === 'drawer' ? 'app-footer app-footer--drawer' : 'app-footer'
     return (
-      <footer className="app-footer">
+      <footer className={className}>
         <nav className="app-footer-links" aria-label="Legal">
           {LEGAL_LINKS.map((l) => (
             <a key={l.href} href={l.href}>{l.label}</a>

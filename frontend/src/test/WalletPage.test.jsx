@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WalletPage from '../pages/WalletPage'
 import { WalletContext, UIContext } from '../contexts'
@@ -158,35 +158,10 @@ describe('WalletPage — address QR entry point', () => {
 })
 
 describe('WalletPage — section nav slide-over drawer', () => {
-  // matchMedia defaults to matches:false (desktop) in setup.js. Force a mobile
-  // match so the section nav behaves as an overlay drawer.
-  const setViewport = (isMobile) => {
-    window.matchMedia = vi.fn().mockImplementation((query) => ({
-      matches: isMobile,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-  }
-
-  it('docks the nav open on desktop (no backdrop)', () => {
-    setViewport(false)
-    renderPage(connectedWalletContext)
-
-    expect(
-      screen.getByRole('button', { name: /hide menu/i })
-    ).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      screen.queryByRole('button', { name: /close menu/i })
-    ).not.toBeInTheDocument()
-  })
-
-  it('starts closed on mobile and toggles open with a backdrop', () => {
-    setViewport(true)
+  // The section nav is a left slide-over drawer at every breakpoint: it starts
+  // closed, opens/collapses from the left, and dims the content with a backdrop
+  // while open (WalletPage.css). Behaviour is uniform across viewport widths.
+  it('starts closed and exposes the ☰ open control', () => {
     renderPage(connectedWalletContext)
 
     const toggle = screen.getByRole('button', { name: /show menu/i })
@@ -194,8 +169,12 @@ describe('WalletPage — section nav slide-over drawer', () => {
     expect(
       screen.queryByRole('button', { name: /close menu/i })
     ).not.toBeInTheDocument()
+  })
 
-    fireEvent.click(toggle)
+  it('opens from the ☰ control with a dismiss backdrop', () => {
+    renderPage(connectedWalletContext)
+
+    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
 
     expect(
       screen.getByRole('button', { name: /hide menu/i })
@@ -205,8 +184,7 @@ describe('WalletPage — section nav slide-over drawer', () => {
     ).toBeInTheDocument()
   })
 
-  it('closes the drawer after a section is selected on mobile', () => {
-    setViewport(true)
+  it('closes the drawer after a section is selected', () => {
     renderPage(connectedWalletContext)
 
     fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
@@ -224,8 +202,7 @@ describe('WalletPage — section nav slide-over drawer', () => {
     ).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('dismisses the drawer when the backdrop is tapped on mobile', () => {
-    setViewport(true)
+  it('dismisses the drawer when the backdrop is tapped', () => {
     renderPage(connectedWalletContext)
 
     fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
@@ -234,5 +211,19 @@ describe('WalletPage — section nav slide-over drawer', () => {
     expect(
       screen.getByRole('button', { name: /show menu/i })
     ).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('contains the in-app legal footer at the bottom of the drawer', () => {
+    const { container } = renderPage(connectedWalletContext)
+
+    // The condensed legal footer is rendered inside the section drawer (aside),
+    // not as a separate page-level footer, on the wallet screen.
+    const drawer = container.querySelector('.wallet-portal-sidebar')
+    expect(drawer).toBeTruthy()
+    const footer = drawer.querySelector('.app-footer--drawer')
+    expect(footer).toBeTruthy()
+    expect(
+      within(footer).getByRole('link', { name: /Terms & Conditions/i })
+    ).toHaveAttribute('href', '/terms')
   })
 })
