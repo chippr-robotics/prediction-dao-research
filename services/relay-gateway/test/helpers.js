@@ -36,10 +36,27 @@ const abi = ethers.AbiCoder.defaultAbiCoder()
  * Mock read-provider. `allowed` controls the sanctions answer; `screenError` throws on call
  * (fail-closed path); estimateGas/getFeeData resolve to stable numbers.
  */
-export function mockProvider({ allowed = true, screenError = false, blockNumber = 1, balanceWei = 10n ** 18n } = {}) {
+export function mockProvider({
+  allowed = true,
+  screenError = false,
+  blockNumber = 1,
+  balanceWei = 10n ** 18n,
+  // ERC-1271 fallback behavior (spec 041): map of lowercase address ->
+  // 'magic' | 'wrong' | 'revert' | 'empty'. Calls to isValidSignature
+  // (selector 0x1626ba7e) on those addresses answer accordingly; addresses
+  // not in the map behave like codeless accounts (eth_call returns '0x').
+  erc1271 = {},
+} = {}) {
   return {
-    async call() {
+    async call(tx) {
       if (screenError) throw new Error('rpc unreachable')
+      if (tx?.data?.startsWith('0x1626ba7e')) {
+        const mode = erc1271[tx.to?.toLowerCase()]
+        if (mode === 'magic') return '0x1626ba7e' + '0'.repeat(56)
+        if (mode === 'wrong') return '0xdeadbeef' + '0'.repeat(56)
+        if (mode === 'revert') throw new Error('execution reverted')
+        return '0x' // codeless / empty return
+      }
       return abi.encode(['bool'], [allowed])
     },
     async estimateGas() {
@@ -103,6 +120,8 @@ export async function signedIntent(config, {
   marker = randomMarker(),
   domainChainId, // sign under ANOTHER chain's domain to provoke chain_mismatch
   targetContract,
+  actorAddress, // spec 041: set to a CONTRACT address to exercise the ERC-1271 fallback
+                // (the ECDSA signature then recovers to `signer`, never to the actor)
 } = {}) {
   const def = ACTIONS[action]
   const chain = config.chains[chainId]
@@ -115,9 +134,10 @@ export async function signedIntent(config, {
   }
   const actorField = def.actorField
   const baseParams = params ?? { wagerId: 1 }
+  const actor = actorAddress ?? signer.address
   const message = {
     ...baseParams,
-    [actorField]: signer.address,
+    [actorField]: actor,
     nonce: marker,
     validAfter,
     validBefore,
@@ -128,7 +148,7 @@ export async function signedIntent(config, {
     chainId,
     targetContract: targetContract ?? chain.targetsByKey[def.contract],
     action,
-    params: { ...baseParams, [actorField]: signer.address },
+    params: { ...baseParams, [actorField]: actor },
     signature,
     validAfter,
     validBefore,

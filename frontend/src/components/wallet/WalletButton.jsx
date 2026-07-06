@@ -73,6 +73,15 @@ function WalletButton({ className = '' }) {
           } else if (connector.type === 'walletConnect') {
             // WalletConnect is always available (it uses QR code / deep links)
             status[connector.id] = true
+          } else if (connector.type === 'passkey') {
+            // Passkey option only where genuinely usable (spec 041 FR-004):
+            // WebAuthn support on this device AND passkey config on the
+            // active network (bundler endpoints + synced factory address).
+            const { detectCapability } = await import('../../lib/passkey/credentials')
+            const { getNetwork } = await import('../../config/networks')
+            const capability = await detectCapability()
+            const net = getNetwork(chainId)
+            status[connector.id] = Boolean(capability.available && net?.capabilities?.passkeyAccounts)
           } else {
             // For other connectors, try to get provider
             try {
@@ -93,7 +102,7 @@ function WalletButton({ className = '' }) {
     }
     
     checkConnectors()
-  }, [connectors])
+  }, [connectors, chainId])
 
   // Helper to check if a connector is available
   const isConnectorAvailable = useCallback((connector) => {

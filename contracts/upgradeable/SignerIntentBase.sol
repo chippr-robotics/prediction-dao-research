@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC3009, ERC3009Auth} from "../interfaces/IERC3009.sol";
@@ -21,7 +22,6 @@ import {IERC3009, ERC3009Auth} from "../interfaces/IERC3009.sol";
 ///         verifyingContract give network and contract isolation (FR-005/FR-021): a nonce used on
 ///         one contract can never be replayed on another.
 abstract contract SignerIntentBase is Initializable, EIP712Upgradeable {
-    using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
     bytes32 private constant INVALIDATE_NONCE_TYPEHASH =
@@ -85,12 +85,31 @@ abstract contract SignerIntentBase is Initializable, EIP712Upgradeable {
         if (signer == address(0)) revert IntentSignerZero();
         if (block.timestamp > validBefore) revert IntentExpired();
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(INVALIDATE_NONCE_TYPEHASH, signer, nonce, validBefore)));
-        if (digest.recover(sig) != signer) revert InvalidIntentSignature();
+        if (!_isValidSignerSignature(signer, digest, sig)) revert InvalidIntentSignature();
         _useNonce(signer, nonce);
         emit NonceInvalidated(signer, nonce);
     }
 
     // ---------- Internal intent machinery ----------
+
+    /// @dev Signer-signature check: ECDSA first, then ERC-1271 `isValidSignature` fallback for
+    ///      signers with code — lets contract accounts (spec 041 passkey smart wallets) be intent
+    ///      signers. Byte-for-byte the semantics of OpenZeppelin `SignatureChecker
+    ///      .isValidSignatureNow` (pre-ERC-7913); inlined because OZ 5.4's SignatureChecker
+    ///      imports `utils/Bytes.sol`, which requires the Cancun `mcopy` opcode and cannot
+    ///      compile under this repo's pre-Cancun EVM targets (Mordor-compatible bytecode).
+    function _isValidSignerSignature(address signer, bytes32 digest, bytes calldata sig)
+        private
+        view
+        returns (bool)
+    {
+        (address recovered, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, sig);
+        if (err == ECDSA.RecoverError.NoError && recovered == signer) return true;
+        (bool success, bytes memory result) =
+            signer.staticcall(abi.encodeCall(IERC1271.isValidSignature, (digest, sig)));
+        return success && result.length >= 32
+            && abi.decode(result, (bytes32)) == bytes32(IERC1271.isValidSignature.selector);
+    }
 
     /// @dev Mark `nonce` used for `signer`; revert {IntentReplayed} if already used (single-use).
     function _useNonce(address signer, bytes32 nonce) internal {
@@ -114,7 +133,11 @@ abstract contract SignerIntentBase is Initializable, EIP712Upgradeable {
         if (signer == address(0)) revert IntentSignerZero();
         if (block.timestamp < validAfter) revert IntentNotYetValid();
         if (block.timestamp > validBefore) revert IntentExpired();
-        if (_hashTypedDataV4(structHash).recover(sig) != signer) revert InvalidIntentSignature();
+        // The read-only ERC-1271 fallback is a staticcall into the signer's own
+        // account and happens BEFORE the nonce burn — checks → effects preserved.
+        if (!_isValidSignerSignature(signer, _hashTypedDataV4(structHash), sig)) {
+            revert InvalidIntentSignature();
+        }
         _useNonce(signer, nonce);
         emit IntentNonceUsed(signer, nonce);
     }

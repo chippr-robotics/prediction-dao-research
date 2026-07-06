@@ -243,8 +243,9 @@ export function createApp(config, deps = {}) {
         )
       }
 
-      // Allow-list -> signer recovery -> param binding -> validity window -> calldata.
-      const { signer, calldata } = verifyIntent(intent, chainCfg, config, now())
+      // Allow-list -> signer recovery (ECDSA, then ERC-1271 for contract accounts) ->
+      // param binding -> validity window -> calldata.
+      const { signer, calldata } = await verifyIntent(intent, chainCfg, config, now(), providers[intent.chainId])
 
       // Dedup by uniquenessMarker (FR-008): completed -> 200 original result; in-flight -> 409.
       const existing = dedup.check(intent.chainId, intent.uniquenessMarker)

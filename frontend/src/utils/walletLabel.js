@@ -10,6 +10,8 @@ export function getWalletLabel(connector) {
   const name = connector?.name?.toLowerCase() || ''
   const type = connector?.type?.toLowerCase() || ''
 
+  // Passkey smart accounts (spec 041) — device biometrics, no vendor involved.
+  if (type === 'passkey' || connector?.id === 'fairwinsPasskey') return 'Passkey'
   if (name.includes('walletconnect') || type === 'walletconnect') return 'WalletConnect'
   if (name.includes('coinbase')) return 'Coinbase Wallet'
   if (name.includes('brave')) return 'Brave Wallet'
@@ -36,6 +38,7 @@ export function getWalletLabel(connector) {
 // visually privileged as the default.
 export function getWalletIcon(connector) {
   const label = getWalletLabel(connector)
+  if (label === 'Passkey') return '🔒' // device biometric / passkey
   if (label === 'WalletConnect') return '🔗' // 🔗
   return '👛' // 👛
 }

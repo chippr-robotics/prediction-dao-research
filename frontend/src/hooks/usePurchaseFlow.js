@@ -106,13 +106,23 @@ export function usePurchaseFlow(deps = {}) {
     setStatus('running')
     try {
       if (fromSegment === 'purchase') {
-        // Resolve the exact intent params (price the contract pulls) and route the pay through the
-        // gasless seam; it self-submits (approve+pay) when no relayer is live. Same on-chain result.
-        const ip = await resolveMembershipIntentParams(p.signer, p.roleName, p.tier, p.action, p.termsHash)
-        const tx = p.action === 'upgrade' ? upgradeTx : (p.action === 'extend' ? extendTx : purchaseTx)
-        const result = await tx.run(ip)
-        if (result?.error) throw result.error
-        const receipt = result
+        // Passkey smart accounts (spec 041, FR-016) batch approve+purchase into ONE biometric
+        // confirmation via the 4337 bundler — a single 'pay' step, no approve step. Everyone else
+        // routes the pay through the spec-035/036 gasless seam: relay when a relayer is live, else
+        // self-submit approve+pay (resolveMembershipIntentParams gives the exact price the contract
+        // pulls). Same on-chain result either way.
+        let receipt
+        if (p.batchPurchase) {
+          updateStep('pay', { state: 'active', failureReason: null })
+          receipt = await p.batchPurchase()
+          updateStep('pay', { state: 'completed', txHash: receipt?.txHash })
+        } else {
+          const ip = await resolveMembershipIntentParams(p.signer, p.roleName, p.tier, p.action, p.termsHash)
+          const tx = p.action === 'upgrade' ? upgradeTx : (p.action === 'extend' ? extendTx : purchaseTx)
+          const result = await tx.run(ip)
+          if (result?.error) throw result.error
+          receipt = result
+        }
         receiptRef.current = receipt
         // Defensively ensure approve (if present) + pay show completed.
         setSteps((prev) => prev.map((s) =>
@@ -126,10 +136,25 @@ export function usePurchaseFlow(deps = {}) {
 
       if (fromSegment === 'purchase' || fromSegment === 'sign') {
         updateStep('sign', { state: 'active', failureReason: null })
-        const keys = await p.ensureInitialized()
-        if (!keys?.publicKey) throw new Error('Could not derive encryption keys')
-        publicKeyRef.current = keys.publicKey
-        updateStep('sign', { state: 'completed' })
+        try {
+          const keys = await p.ensureInitialized()
+          if (!keys?.publicKey) throw new Error('Could not derive encryption keys')
+          publicKeyRef.current = keys.publicKey
+          updateStep('sign', { state: 'completed' })
+        } catch (err) {
+          // Device-dependent degradation (spec 041, clarification Q1): a
+          // passkey/authenticator without deterministic key material keeps the
+          // membership fully valid — only encrypted features gate off, and the
+          // UI says so explicitly instead of failing the whole purchase.
+          if (err?.name === 'EncryptionUnavailable') {
+            updateStep('sign', { state: 'skipped', failureReason: err.message })
+            updateStep('register', { state: 'skipped', failureReason: 'Encrypted features unavailable on this device' })
+            setKeyRegOutcome('unavailable')
+            setStatus('succeeded')
+            return
+          }
+          throw err
+        }
       }
 
       // register
@@ -155,9 +180,12 @@ export function usePurchaseFlow(deps = {}) {
     setKeyRegOutcome(null)
     setStatus('running')
 
-    const approvalNeeded = await approvalCheckFn(
-      params.signer, params.roleName, params.priceUSD, params.tier, params.action,
-    )
+    // Passkey batch path never shows a separate approve step (FR-016).
+    const approvalNeeded = params.batchPurchase
+      ? false
+      : await approvalCheckFn(
+          params.signer, params.roleName, params.priceUSD, params.tier, params.action,
+        )
     const ids = approvalNeeded ? ['approve', 'pay', 'sign', 'register'] : ['pay', 'sign', 'register']
     setSteps(ids.map(makeStep))
 

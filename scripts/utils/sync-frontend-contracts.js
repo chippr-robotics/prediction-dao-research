@@ -191,6 +191,9 @@ function main() {
         externalDAORegistry: deployed.externalDAORegistry, // spec 030 — ClearPath external-DAO registry
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
         wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
+        entryPoint: deployed.entryPoint, // spec 041 — ERC-4337 EntryPoint v0.6 (canonical or self-deployed)
+        accountFactory: deployed.accountFactory, // spec 041 — deterministic CoinbaseSmartWalletFactory (same address on every network)
+        p256Verifier: deployed.p256Verifier, // spec 041 — only on networks needing an external P-256 verifier
         polymarketAdapter: deployed.polymarketAdapter,
         chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
         chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,

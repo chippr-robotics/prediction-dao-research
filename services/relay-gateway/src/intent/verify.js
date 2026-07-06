@@ -147,6 +147,31 @@ function tryRecoverTyped(domain, types, message, signature) {
   }
 }
 
+const ERC1271_IFACE = new ethers.Interface([
+  'function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)',
+])
+const ERC1271_MAGIC = '0x1626ba7e'
+
+/**
+ * ERC-1271 fallback for contract-account signers (spec 041: passkey smart accounts).
+ * When ECDSA recovery does not produce the claimed actor, ask the actor itself: if the address
+ * has code on the bound chain, `eth_call isValidSignature(digest, sig)` and accept only the
+ * ERC-1271 magic value. Read-only; mirrors the on-chain SignerIntentBase check exactly, so the
+ * gateway never accepts an intent the contract would reject (and vice versa for this leg).
+ * Fail-closed: no provider, no code, revert, or wrong magic all mean "not valid".
+ */
+async function isValidErc1271Signature(provider, signer, digest, signature) {
+  if (!provider) return false
+  try {
+    const data = ERC1271_IFACE.encodeFunctionData('isValidSignature', [digest, signature])
+    const ret = await provider.call({ to: signer, data })
+    if (!ret || ret === '0x' || ret.length < 10) return false
+    return ret.slice(0, 10).toLowerCase() === ERC1271_MAGIC
+  } catch {
+    return false
+  }
+}
+
 /**
  * Full verification for one intent against the addressed chain's config.
  * Order: allow-list -> signer recovery + binding -> validity window.
@@ -157,9 +182,12 @@ function tryRecoverTyped(domain, types, message, signature) {
  * @param {object} chainCfg      config.chains[intent.chainId]
  * @param {object} config        full gateway config (for cross-chain mismatch detection)
  * @param {number} nowSec        current unix time
- * @returns {{ signer: string, actionDef: object, params: object, calldata: string }}
+ * @param {object|null} provider read provider for this chain — enables the ERC-1271
+ *                               contract-signer fallback (spec 041); omit/null keeps
+ *                               strict ECDSA-only verification.
+ * @returns {Promise<{ signer: string, actionDef: object, params: object, calldata: string }>}
  */
-export function verifyIntent(intent, chainCfg, config, nowSec) {
+export async function verifyIntent(intent, chainCfg, config, nowSec, provider = null) {
   // --- target + action allow-list (version-pinned, FR-025) ---
   const target = chainCfg.targets[intent.targetContract.toLowerCase()]
   if (!target) {
@@ -190,12 +218,16 @@ export function verifyIntent(intent, chainCfg, config, nowSec) {
   } else {
     // Signer-attributed: the actor field of the signed struct IS the signer; the client supplies
     // it in params so the full message is reconstructible, and recovery must match it exactly.
+    // Contract accounts (spec 041 passkey smart wallets) cannot ECDSA-recover to their own
+    // address — on mismatch, fall back to asking the actor contract via ERC-1271.
     const actor = asAddress(`params.${actionDef.actorField}`, intent.params[actionDef.actorField])
     const domain = domainFor(chainCfg, actionDef.contract)
     const message = actionDef.buildMessage(params, actor, intent)
     const recovered = tryRecoverTyped(domain, typesFor(intent.action), message, intent.signature)
     if (!recovered || recovered.toLowerCase() !== actor.toLowerCase()) {
-      throwSignatureError(intent, actionDef, params, actor, config, chainCfg)
+      const digest = ethers.TypedDataEncoder.hash(domain, typesFor(intent.action), message)
+      const okVia1271 = await isValidErc1271Signature(provider, actor, digest, intent.signature)
+      if (!okVia1271) throwSignatureError(intent, actionDef, params, actor, config, chainCfg)
     }
     signer = actor
   }
