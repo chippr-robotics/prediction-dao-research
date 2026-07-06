@@ -61,6 +61,17 @@ describe('payload link fallback', () => {
     )
   })
 
+  it('round-trips across data lengths that exercise base64 padding', () => {
+    // Vary calldata length so the encoded payload lands on each of the 4 base64 padding remainders.
+    for (let n = 0; n < 6; n += 1) {
+      const safeTx = buildSafeTx({ to: TO, value: BigInt(n), data: '0x' + 'ab'.repeat(n), nonce: n })
+      const parsed = parsePayloadLink(encodePayloadLink(SAFE, safeTx, CHAIN))
+      expect(computeSafeTxHash(parsed.safe, parsed.chainId, parsed.safeTx)).toBe(
+        computeSafeTxHash(SAFE, CHAIN, safeTx),
+      )
+    }
+  })
+
   it('rejects an unrecognized payload', () => {
     const bad = Buffer.from(JSON.stringify({ schema: 'nope' }), 'utf8').toString('base64')
     expect(() => parsePayloadLink(bad)).toThrow(/Unrecognized/)

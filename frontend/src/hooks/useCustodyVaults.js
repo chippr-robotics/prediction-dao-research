@@ -28,11 +28,13 @@ export function useCustodyVaults() {
   const supported = isCustodySupported(chainId)
 
   const refresh = useCallback(async () => {
+    // Bump first so any in-flight request is invalidated even on the early-return path.
+    const myReq = ++reqId.current
     if (!address || !chainId || !supported) {
       setVaults([])
+      setLoading(false)
       return
     }
-    const myReq = ++reqId.current
     setLoading(true)
     setError(null)
     try {

@@ -28,21 +28,31 @@ export function useVaultProposals(vault) {
   const hubAddress = getContractAddressForChain('safeProposalHub', chainId)
 
   const refresh = useCallback(async () => {
+    // Bump first so any in-flight request is invalidated even on the early-return path.
+    const myReq = ++reqId.current
     if (!vaultAddress || !hubAddress || !provider) {
       setProposals([])
+      setLoading(false)
       return
     }
-    const myReq = ++reqId.current
     setLoading(true)
     setError(null)
     try {
+      // Never scan from genesis (contracts.js guidance): require a recorded hub deploy block.
+      const fromBlock = getDeploymentBlockForChain('safeProposalHub', chainId)
+      if (!fromBlock) {
+        if (myReq === reqId.current) {
+          setProposals([])
+          setError('Custody proposal history is not configured for this network yet.')
+        }
+        return
+      }
       const safe = new Contract(vaultAddress, SAFE_ABI, provider)
       const [owners, threshold, currentNonce] = await Promise.all([
         safe.getOwners(),
         safe.getThreshold(),
         safe.nonce(),
       ])
-      const fromBlock = getDeploymentBlockForChain('safeProposalHub', chainId) || 0
       const { proposals: verified } = await readVerifiedProposals({
         hubAddress,
         safeAddress: vaultAddress,
@@ -96,6 +106,7 @@ export function useVaultProposals(vault) {
   const propose = useCallback(
     async ({ to, value = 0n, data = '0x', operation = 0 }) => {
       if (!signer) throw new Error('Connect a wallet to propose')
+      if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
       const safe = new Contract(vaultAddress, SAFE_ABI, signer)
       const nonce = await safe.nonce()
       const safeTx = buildSafeTx({ to, value, data, operation, nonce })
@@ -140,6 +151,7 @@ export function useVaultProposals(vault) {
   const cancel = useCallback(
     async (safeTxHash) => {
       if (!signer) throw new Error('Connect a wallet to cancel')
+      if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
       await cancelProposal({ hubAddress, safe: vaultAddress, safeTxHash, signer })
       await refresh()
     },

@@ -130,7 +130,10 @@ function base64UrlEncode(str) {
 }
 
 function base64UrlDecode(s) {
-  return atob(s.replace(/-/g, '+').replace(/_/g, '/'))
+  let b64 = s.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = b64.length % 4
+  if (pad) b64 += '='.repeat(4 - pad) // some atob implementations require '=' padding
+  return atob(b64)
 }
 
 export { hubIface }
