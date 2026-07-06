@@ -2,22 +2,27 @@
    shared fm-* / OpenChallengeModal.css base. Keep additions minimal: the flow reuses
    fm-polymarket-selected, fm-side-picker, oc-deadlines, etc. */
 
-/* Live price chip inside a side button (text + number, not color-only). */
-.ooc-side-price {
-  display: block;
-  font-size: 0.78rem;
-  opacity: 0.75;
-  margin-top: 2px;
-}
-
 /* Refused-market notice sits above the picker so the reason is read before re-picking. */
 .ooc-ineligible {
   margin-bottom: 10px;
 }
 
-/* Derived timeline: visually the same tiles as oc-deadlines, but flagged read-only. */
-.ooc-derived-timeline {
-  cursor: default;
+/* Deep link to the linked market on Polymarket, so takers/makers can review or wager
+   the same event at the source (the challenge here is a peer-to-peer bet, not a
+   Polymarket trade). */
+.ooc-polymarket-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand-primary, #36B37E);
+  text-decoration: none;
+}
+
+.ooc-polymarket-link:hover {
+  text-decoration: underline;
 }
 
 .ooc-timeline-provenance {
