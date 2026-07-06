@@ -11,11 +11,22 @@ const CACHE_VERSION = 'fairwins-shell-v1'
 const OFFLINE_URLS = ['/', '/index.html', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
-  // Take over as soon as the new worker is ready so users aren't stuck on an old one.
-  self.skipWaiting()
+  // NOTE: we deliberately do NOT call skipWaiting() here. On a fresh install there is
+  // no controlling worker, so the new worker activates immediately anyway. On an UPDATE
+  // the old worker keeps controlling open tabs and the new one parks in `waiting` until
+  // the user approves the update (the app posts SKIP_WAITING). This gives a controlled,
+  // user-driven update flow instead of swapping bundles out from under a live session.
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(OFFLINE_URLS).catch(() => undefined))
   )
+})
+
+// The page posts { type: 'SKIP_WAITING' } when the user clicks "Update now"; that
+// promotes this waiting worker to active, which fires `controllerchange` on the client.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 self.addEventListener('activate', (event) => {
