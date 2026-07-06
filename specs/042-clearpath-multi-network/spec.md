@@ -87,6 +87,14 @@ and non-bypassable sanctions screening on any value-moving ClearPath-mediated ac
   wallet + chainId and is NOT synced across devices in this cut; cross-device sync (e.g. via
   spec 032 encrypted data sync) is a deliberate follow-on that would not change the
   connector or UI. A tracked entry is scoped to the origin/device that created it.
+- Q: What is the sanctions posture for signed governance actions on a network with no
+  platform sanctions source (e.g. Ethereum mainnet)? → A: **Screen where available; rely on
+  the external DAO's own rules where not.** ClearPath screens the connected signer against
+  the platform sanctions source on networks where that source is deployed; on a network
+  without one, member-signed **external-DAO governance** actions still proceed because
+  ClearPath is non-custodial and the external DAO's own contracts/rules authorize and route
+  the value. ClearPath's OWN custodial value-moving flows (e.g. native treasury funding —
+  out of scope here) always require the gate and are never offered ungated.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -273,10 +281,13 @@ reason honestly.
   registry) is a no-op with a truthful "already tracked" notice, not a duplicate row.
 - **RPC-limited reads**: On a network whose public RPC caps `eth_getLogs`, the live
   indexer returns a truthful partial/error state, never a fabricated proposal list.
-- **Sanctioned actor**: A value-moving ClearPath-mediated action (or a disbursement
-  recipient) that is sanctioned is blocked fail-closed on networks where the sanctions
-  system is available; where a network has no sanctions source, value-moving actions are
-  gated per policy (see FR-013) rather than silently ungated.
+- **Sanctioned actor**: On a network where the platform sanctions source is deployed, a
+  sanctioned connected signer is blocked fail-closed from ClearPath-mediated governance
+  actions, and any ClearPath-custodial value-moving flow is blocked; a ClearPath-custodial
+  flow is never offered on a network without a sanctions source. On a network with no
+  platform sanctions source, member-signed **external-DAO** governance actions proceed under
+  the external DAO's own rules (see FR-013) — ClearPath adds no gate it cannot honestly
+  enforce and never silently fabricates a "screened" result.
 - **Wrong-network address**: Registering a governance contract that only exists on a
   different network is rejected with a truthful "no contract at this address on this
   network" reason.
@@ -345,11 +356,16 @@ reason honestly.
 **Cross-cutting parity with spec 030 / constitution**
 
 - **FR-013**: The platform's **sanctions screening** MUST be enforced non-bypassably and
-  fail-closed on every ClearPath-mediated **value-moving** action and on disbursement
-  recipients, using the same sanctions system as the rest of the platform; read-only
-  tracking is not gated. On a network where the sanctions source is unavailable, a
-  value-moving ClearPath-mediated action MUST NOT proceed silently ungated — it is gated
-  per the platform's fail-closed policy or the surface is limited to read-only + deep-link.
+  fail-closed on every **ClearPath-custodial** value-moving flow (e.g. native DAO treasury
+  funding — out of scope here) and on its disbursement recipients, using the same sanctions
+  system as the rest of the platform; such a custodial flow MUST NEVER be offered on a
+  network where the sanctions source is unavailable. For **external-DAO governance actions**
+  (vote/propose/queue/execute on a DAO's own contracts, which ClearPath routes but does not
+  custody), the system MUST screen the connected signer against the platform sanctions
+  source **on networks where that source is deployed**; on a network without a platform
+  sanctions source, these member-signed actions proceed under the **external DAO's own
+  rules/compliance** (ClearPath is non-custodial and adds no gate it cannot honestly
+  enforce). Read-only tracking is never gated.
 - **FR-014**: All ClearPath data MUST be **strictly network-scoped** and MUST NOT leak
   across networks (tracked lists, registry entries, treasuries, proposals, membership,
   and reads), verified on every network switch.
@@ -419,8 +435,11 @@ reason honestly.
 - **SC-006**: Adding a **new governance framework** connector requires **no change** to the
   ClearPath discovery, list, detail, or action UI — demonstrated by the OZ and Bravo
   connectors sharing that UI, and documented as the extension path for Morpho/others.
-- **SC-007**: No sanctioned address can take a value-moving ClearPath-mediated action, or
-  be a disbursement recipient, on any network where the action is offered.
+- **SC-007**: On every network where the platform sanctions source is deployed, a sanctioned
+  connected signer is blocked from ClearPath-mediated governance actions and from any
+  ClearPath-custodial value-moving flow; and no ClearPath-custodial value-moving flow is ever
+  offered on a network without a sanctions source — verified for both the screened-network
+  and no-source cases.
 - **SC-008**: Every user-initiated ClearPath action surfaces honest pending/confirmed/
   failed state through the app notification system, and no phantom DAO/proposal/tracked
   entry remains when a transaction does not confirm — verified for success and failure.
@@ -460,7 +479,10 @@ reason honestly.
   enabling wagers, DEX/swaps, or passkey login on ClearPath-only networks; and
   **cross-device sync of the device-local tracked-DAO list** (a deliberate follow-on that
   could layer on spec 032's encrypted data sync without changing the connector or UI).
-- **Sanctions on new networks**: If the platform's sanctions source is not deployed on a
-  new ClearPath-only network, value-moving ClearPath-mediated actions there are gated
-  per the fail-closed policy (or limited to read-only + deep-link); this is confirmed in
-  planning and must never result in a silently ungated value-moving action.
+- **Sanctions on new networks**: The platform sanctions source is not deployed on every new
+  ClearPath-only network (e.g. Ethereum mainnet). Per the clarified posture, ClearPath
+  screens the connected signer where that source exists and otherwise lets member-signed
+  **external-DAO** governance actions proceed under the external DAO's own compliance (it is
+  non-custodial). ClearPath's own custodial value-moving flows are out of scope for new
+  networks in this cut and are never offered without the gate. Planning confirms which
+  networks carry a sanctions source and wires the per-network screening accordingly.
