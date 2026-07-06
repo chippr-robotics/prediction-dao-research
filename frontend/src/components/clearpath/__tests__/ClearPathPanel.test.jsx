@@ -86,7 +86,7 @@ vi.mock('../../../config/networks', () => ({
 // CpAddressField (governor/recipient inputs) pulls in AddressBookButton → useWallet, which throws without a
 // WalletProvider. Stub the wallet-scoped hooks so register + tracking views render the real fields in tests.
 vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
+vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve('clear') }) }))
 
 const OLYMPIA = '0xB85dbc899472756470EF4033b9637ff8fa2FD23D'
 const olympiaRecord = { id: 1, dao: OLYMPIA, framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000 }

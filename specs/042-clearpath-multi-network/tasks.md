@@ -110,7 +110,7 @@ switching networks proves strict scoping.
 - [X] T023 [US2] Edit `frontend/src/components/clearpath/RegisterExternalDao.jsx` to validate + framework-detect client-side and, on a registry-less network, persist via `trackDAO` (device-local) with an honest "tracked on this device" note; keep the on-chain register path where `hasRegistry`.
 - [X] T024 [US2] Edit `frontend/src/components/clearpath/ExternalDaoView.jsx` to resolve the connector via `getConnector`/`detectFramework` and read via `daoDataSource` (per-DAO subgraph-first), rendering the source/status chip; remove direct `governorConnector` coupling.
 - [X] T025 [US2] Edit `frontend/src/components/clearpath/ClearPathPanel.jsx` list rendering to show merged registry+local DAOs with framework badge (`DAO_FRAMEWORK_LABEL`) and network label; wire `untrackDAO` for device-local entries.
-- [ ] T026 [P] [US2] Add the verified **ENS** Governor to `frontend/src/config/clearpath/knownDaos.js` (address + framework 0 + label) and, if available, its governance subgraph to `daoSubgraphs.js` — confirm both on-chain/gateway before committing (research VERIFY).
+- [X] T026 [P] [US2] Add the verified **ENS** Governor to `frontend/src/config/clearpath/knownDaos.js` (address + framework 0 + label) and, if available, its governance subgraph to `daoSubgraphs.js` — confirm both on-chain/gateway before committing (research VERIFY).
 - [X] T027 [P] [US2] Add a `ReadRouteToggle` component `frontend/src/components/clearpath/ReadRouteToggle.jsx` (public-RPC vs wallet-managed; reads only) and its Vitest; wire it to `useClearPath.readRoute`/`setReadRoute` (FR-019).
 - [ ] T028 [US2] Extend `frontend/src/test/clearpath.accessibility.test.jsx` to cover the registry-less register + tracked-list + detail states (axe, zero violations).
 
@@ -132,8 +132,8 @@ unauthorized wallet gets the DAO's rejection reason.
 - [X] T032 [US3] Implement `frontend/src/components/clearpath/connectors/governorBravo.js` (framework 1) against the interface — encapsulating token `getPriorVotes`, `proposals()` tallies, id-based queue/execute, and `signatures` propose (research D5).
 - [X] T033 [US3] Extend `detectFramework` in `frontend/src/components/clearpath/connectors/index.js` with the Bravo probe (order: OZ → Bravo → unknown).
 - [X] T034 [US3] Wire framework-agnostic actions in `frontend/src/components/clearpath/ExternalDaoView.jsx` (vote/queue/execute) through the resolved connector; unknown-framework DAOs render read-only + deep-link (FR-011).
-- [ ] T035 [US3] Enforce the sanctions posture in the action path: screen the signer when `hasSanctionsSource` (block sanctioned, fail-closed); otherwise proceed under the DAO's own rules with no fabricated "screened" claim (research D9 / FR-013); add Vitest for both branches in `frontend/src/test/clearpath.sanctions.test.js`.
-- [ ] T036 [P] [US3] Add the verified **Uniswap** Governor (Bravo), UNI token, and Timelock to `frontend/src/config/clearpath/knownDaos.js` (+ subgraph in `daoSubgraphs.js` if available) — confirm on-chain before committing (research VERIFY).
+- [X] T035 [US3] Enforce the sanctions posture in the action path: screen the signer when `hasSanctionsSource` (block sanctioned, fail-closed); otherwise proceed under the DAO's own rules with no fabricated "screened" claim (research D9 / FR-013); add Vitest for both branches in `frontend/src/test/clearpath.sanctions.test.js`.
+- [X] T036 [P] [US3] Add the verified **Uniswap** Governor (Bravo), UNI token, and Timelock to `frontend/src/config/clearpath/knownDaos.js` (+ subgraph in `daoSubgraphs.js` if available) — confirm on-chain before committing (research VERIFY).
 
 **Checkpoint**: OZ (ENS) and Bravo (Uniswap) DAOs both track + act through one UI, labeled by framework.
 
@@ -148,9 +148,9 @@ network-scoped, including in the notification/activity source.
 its own DAOs (framework + network labeled) with no bleed-through and a truthful disabled state
 where ClearPath isn't configured.
 
-- [ ] T037 [P] [US4] Write Vitest for `daoSource` enumerating BOTH registry (iff deployed) and device-local tracked DAOs via the connector resolver, strictly per chain, in `frontend/src/test/sources/daoSource.test.js` (extend; MUST fail first).
-- [ ] T038 [US4] Edit `frontend/src/data/notifications/sources/daoSource.js` to enumerate registry + `trackedDaoStore` DAOs for the active chain and read each via the connector resolver + `daoDataSource` (replace the direct `externalDAORegistry`-only + `governorConnector` coupling); preserve honest degradation.
-- [ ] T039 [US4] Add a cross-network scoping test (DAO on network A never appears/reads on network B; unified list labels framework + network) in `frontend/src/test/reports/networkScoping.test.js` (extend).
+- [X] T037 [P] [US4] Write Vitest for `daoSource` enumerating BOTH registry (iff deployed) and device-local tracked DAOs via the connector resolver, strictly per chain, in `frontend/src/test/sources/daoSource.test.js` (extend; MUST fail first).
+- [X] T038 [US4] Edit `frontend/src/data/notifications/sources/daoSource.js` to enumerate registry + `trackedDaoStore` DAOs for the active chain and read each via the connector resolver + `daoDataSource` (replace the direct `externalDAORegistry`-only + `governorConnector` coupling); preserve honest degradation.
+- [X] T039 [US4] Add a cross-network scoping test (DAO on network A never appears/reads on network B; unified list labels framework + network) in `frontend/src/test/reports/networkScoping.test.js` (extend).
 
 **Checkpoint**: Unified, network-scoped discovery holds across chains and in notifications.
 
@@ -165,9 +165,9 @@ encoding (OZ vs Bravo) with live preview + validation.
 writing calldata; the encoded call matches each framework's `propose` signature; invalid input
 or an unauthorized wallet surfaces a truthful reason.
 
-- [ ] T040 [P] [US5] Write Vitest for per-framework propose encoding — OZ `(targets,values,calldatas,description)` vs Bravo `(targets,values,signatures,calldatas,description)` — plus field validation + duplicate detection, in `frontend/src/components/clearpath/__tests__/proposalEncoding.test.js` (extend; MUST fail first).
-- [ ] T041 [US5] Extend `frontend/src/components/clearpath/proposalEncoding.js` to emit the framework-correct `propose` arguments (delegating framework specifics to the connector), preserving the OZ correctness invariants (byte-exact description, ERC-20 value=0, equal-length arrays, duplicate id detection).
-- [ ] T042 [US5] Wire the builder's submit path through the resolved connector's `propose` in `frontend/src/components/clearpath/ExternalDaoView.jsx` (and the builder component), surfacing the DAO's own authorization/revert reason via `explainTxError` (no implied success).
+- [X] T040 [P] [US5] Write Vitest for per-framework propose encoding — OZ `(targets,values,calldatas,description)` vs Bravo `(targets,values,signatures,calldatas,description)` — plus field validation + duplicate detection, in `frontend/src/components/clearpath/__tests__/proposalEncoding.test.js` (extend; MUST fail first).
+- [X] T041 [US5] Extend `frontend/src/components/clearpath/proposalEncoding.js` to emit the framework-correct `propose` arguments (delegating framework specifics to the connector), preserving the OZ correctness invariants (byte-exact description, ERC-20 value=0, equal-length arrays, duplicate id detection).
+- [X] T042 [US5] Wire the builder's submit path through the resolved connector's `propose` in `frontend/src/components/clearpath/ExternalDaoView.jsx` (and the builder component), surfacing the DAO's own authorization/revert reason via `explainTxError` (no implied success).
 
 **Checkpoint**: Proposal composition works across both frameworks with honest pre-sign guards.
 
@@ -177,8 +177,8 @@ or an unauthorized wallet surfaces a truthful reason.
 
 **Purpose**: Docs, full validation, and honesty/a11y hardening across stories.
 
-- [ ] T043 [P] Update developer docs for the multi-network ClearPath model, connector-extension path (adding a framework), and the subgraph-first/read-route behavior in `docs/` (and note the ClearPath-only network concept).
-- [ ] T044 [P] Migrate remaining internal imports off the `governorConnector.js` shim to `connectors/`; once no importer remains, remove the shim (or document why it stays).
+- [X] T043 [P] Update developer docs for the multi-network ClearPath model, connector-extension path (adding a framework), and the subgraph-first/read-route behavior in `docs/` (and note the ClearPath-only network concept).
+- [X] T044 [P] Migrate remaining internal imports off the `governorConnector.js` shim to `connectors/`; once no importer remains, remove the shim (or document why it stays).
 - [ ] T045 Run `npm run lint --workspace frontend` and `npm run test:frontend` — resolve all ESLint errors and ensure Vitest + axe are green across the new states (Constitution IV/V; SC-009/SC-010/SC-012).
 - [ ] T046 Execute the `quickstart.md` scenarios A–F against real contracts (ENS + Uniswap on mainnet; Olympia on Mordor) and record results; confirm no fabricated rows, no phantom entries, strict network scoping.
 
