@@ -13,21 +13,26 @@ steps:
       # Gasless relayer (spec 036). The SPA probes this and self-submits if it's down (never-stranded).
       - 'VITE_RELAYER_URL=https://relay.fairwins.app'
       - '--build-arg'
-      - 'VITE_NETWORK_ID=80002'
+      - 'VITE_NETWORK_ID=137'
       - '--build-arg'
-      - 'VITE_RPC_URL=https://rpc-amoy.polygon.technology'
+      - 'VITE_RPC_URL=https://polygon-bor-rpc.publicnode.com'
       - '--build-arg'
       - 'VITE_IPFS_GATEWAY=https://gateway.pinata.cloud'
       # v2 WagerRegistry subgraph (Spec 017 / #707). Build-time only: Vite inlines
       # VITE_* at `npm run build`, so this is baked into the bundle — NOT a Cloud Run
       # runtime var. Public, non-secret URL. Must match VITE_NETWORK_ID above
-      # (80002 = Amoy -> fairwins-amoy). Studio dev query endpoint (rate-limited);
+      # (137 = Polygon -> fairwins-polygon). Studio dev query endpoint (rate-limited);
       # for production traffic, publish to the decentralized net + proxy the keyed
       # gateway URL via nginx (see the VITE_PINATA_JWT pattern).
       - '--build-arg'
-      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-amoy/v0.2.0'
+      - 'VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0'
       - '--build-arg'
       - 'VITE_WAGER_SOURCE=subgraph'
+      # Passkey smart accounts (spec 041): self-hosted alto ERC-4337 bundler, colocated with the
+      # relay gateway (SC-009). Baked in at build; passkeyConfig(137) is null without it, so passkey
+      # accounts stay disabled on Polygon until this is set. EntryPoint v0.6; FairWins sponsors no gas.
+      - '--build-arg'
+      - 'VITE_BUNDLER_URLS_POLYGON=https://fairwins-alto-bundler-266380754692.us-central1.run.app'
       - '-t'
       - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
       - '-t'

@@ -76,5 +76,11 @@
   "timestamp": "2026-07-05T20:05:10.649Z",
   "gaslessIntentsUpgradedAt": "2026-07-05T20:10:24.755Z",
   "wagerPoolsDeployedAt": "2026-07-05T21:15:07.971Z",
-  "erc1271IntentsUpgradedAt": "2026-07-05T23:24:19.415Z"
+  "erc1271IntentsUpgradedAt": "2026-07-05T23:24:19.415Z",
+  "infra": {
+    "altoBundlerUrl": "https://fairwins-alto-bundler-266380754692.us-central1.run.app",
+    "altoExecutor": "0x7C6da19ae005D4F13BB8660Ac989c48aCcFE84F6",
+    "altoImage": "ghcr.io/pimlicolabs/alto:v1.2.7",
+    "altoNote": "EntryPoint v0.6; deploy-simulations-contract=false (v0.6 uses built-in simulateHandleOp). Executor key in Secret Manager alto-executor-key-137."
+  }
 }

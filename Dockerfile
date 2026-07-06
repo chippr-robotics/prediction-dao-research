@@ -25,6 +25,9 @@ ARG VITE_SUBGRAPH_URL
 ARG VITE_WAGER_SOURCE
 # Gasless relayer base URL (spec 036). Unset => gasless disabled, everything self-submits.
 ARG VITE_RELAYER_URL
+# Passkey ERC-4337 bundler URL(s), comma-separated (spec 041). Unset => passkeyConfig(137) is null,
+# so passkey smart accounts stay disabled on Polygon.
+ARG VITE_BUNDLER_URLS_POLYGON
 
 # Set environment variables from build args
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
@@ -35,6 +38,7 @@ ENV VITE_IPFS_GATEWAY=${VITE_IPFS_GATEWAY}
 ENV VITE_SUBGRAPH_URL=${VITE_SUBGRAPH_URL}
 ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
+ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
 
 # Build the application
 RUN npm run build
