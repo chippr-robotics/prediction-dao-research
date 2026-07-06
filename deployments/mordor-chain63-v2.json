@@ -33,7 +33,7 @@
     "zkWagerPoolFactoryImpl": "0xd3e851FDDa9D5796D503daFd34b2403D7336d9fD",
     "poolImpl": "0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277",
     "wagerPoolFactory": "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F",
-    "wagerPoolFactoryImpl": "0xD69a175a0a2CD0564A62384a0687A2908DDf632c",
+    "wagerPoolFactoryImpl": "0xfB6F9F7EfD86a220eE1aD7906278247051B25430",
     "wagerRegistryIntents": "0x81a9c5904A109F0b7bC6329ba6F2be2de5B6abB1"
   },
   "mocks": {
@@ -88,5 +88,6 @@
   "zkWagerPoolsDeployedAt": "2026-07-01T00:06:05.668Z",
   "wagerPoolsDeployedAt": "2026-07-04T15:27:55.875Z",
   "poolTemplateResyncedAt": "2026-07-04T21:47:07.000Z",
-  "gaslessIntentsUpgradedAt": "2026-07-05T17:35:37.300Z"
+  "gaslessIntentsUpgradedAt": "2026-07-05T17:35:37.300Z",
+  "tier2PoolIntentsUpgradedAt": "2026-07-06T04:32:38.208Z"
 }
