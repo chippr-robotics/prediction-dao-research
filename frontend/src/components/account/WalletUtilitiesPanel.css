@@ -6,6 +6,11 @@
   opacity: 0.92;
 }
 
+/* Still used by WordListLanguageSelector.jsx (hardcodes these class names),
+   now mounted from WalletDisplayPreferencesPanel on the Preferences tab. This
+   file stays in the bundle via AccountDashboard -> WalletUtilitiesPanel, so
+   don't delete these even though WalletUtilitiesPanel itself no longer uses
+   them. */
 .account-utilities-row {
   display: flex;
   align-items: center;
@@ -18,21 +23,6 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-muted, var(--text-secondary));
-}
-
-.account-utilities-address {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.account-utilities-link {
-  border: none;
-  background: transparent;
-  color: var(--brand-secondary, #4C9AFF);
-  cursor: pointer;
-  font-size: 0.8rem;
-  padding: 2px 4px;
 }
 
 .account-utilities-actions {

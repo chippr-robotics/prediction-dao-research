@@ -1,7 +1,8 @@
 /**
  * The quick access card catalog (spec 038 US5) — shared by Dashboard.jsx
- * (which renders the cards, filtered by preference) and PreferencesPanel.jsx
- * (which lets the user toggle each card's visibility). Ids must match
+ * (which renders the cards, filtered by preference) and
+ * QuickAccessCardsPanel.jsx (which lets the user toggle each card's
+ * visibility). Ids must match
  * Dashboard.jsx's QuickActionCard action ids exactly. Adding new quick access
  * cards is out of scope for this feature (see spec Assumptions) — if one is
  * ever added, list it here too so it becomes toggleable.

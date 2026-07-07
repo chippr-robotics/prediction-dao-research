@@ -1,25 +1,25 @@
-/* PreferencesPanel — quick access card visibility (spec 038 US5). */
+/* QuickAccessCardsPanel — quick access card visibility (spec 038 US5). */
 
-.preferences-panel {
+.quick-access-cards-panel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.preferences-panel-title {
+.quick-access-cards-panel-title {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.preferences-panel-hint {
+.quick-access-cards-panel-hint {
   margin: 0 0 0.5rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-.preferences-panel-list {
+.quick-access-cards-panel-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -27,7 +27,7 @@
   flex-direction: column;
 }
 
-.preferences-panel-row {
+.quick-access-cards-panel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -36,17 +36,17 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.preferences-panel-row:last-child {
+.quick-access-cards-panel-row:last-child {
   border-bottom: none;
 }
 
-.preferences-panel-label {
+.quick-access-cards-panel-label {
   font-size: 0.9rem;
   color: var(--text-primary);
   cursor: pointer;
 }
 
-.preferences-panel-switch {
+.quick-access-cards-panel-switch {
   position: relative;
   width: 44px;
   height: 24px;
@@ -59,7 +59,7 @@
   transition: background var(--transition-base, 0.2s ease);
 }
 
-.preferences-panel-switch::after {
+.quick-access-cards-panel-switch::after {
   content: '';
   position: absolute;
   top: 2px;
@@ -71,16 +71,16 @@
   transition: transform var(--transition-base, 0.2s ease), background var(--transition-base, 0.2s ease);
 }
 
-.preferences-panel-switch.on {
+.quick-access-cards-panel-switch.on {
   background: var(--brand-primary);
 }
 
-.preferences-panel-switch.on::after {
+.quick-access-cards-panel-switch.on::after {
   transform: translateX(20px);
   background: #fff;
 }
 
-.preferences-panel-switch:focus-visible {
+.quick-access-cards-panel-switch:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
