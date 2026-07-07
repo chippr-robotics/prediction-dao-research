@@ -1,15 +1,23 @@
 // Spec 043 (US3) — expose the active identity and a single submit() that every money-moving surface can call.
 // In personal mode submit sends via the connected signer; in vault mode it creates a threshold-gated proposal.
 
-import { useCallback } from 'react'
+import { useCallback, useContext } from 'react'
 import { useWallet } from '.'
-import { useCustody } from './useCustody'
+import { CustodyContext } from '../contexts/CustodyContext'
 import { getSafeContracts } from '../config/safeContracts'
 import { getContractAddressForChain } from '../config/contracts'
 import { submitAsActiveAccount } from '../lib/custody/submitAsActiveAccount'
 
+const PERSONAL = { mode: 'personal' }
+const NOOP = () => {}
+
 export function useActiveAccount() {
-  const { active, operateAsPersonal } = useCustody()
+  // Read the context directly and degrade to personal mode when no CustodyProvider is mounted. Operate-as is
+  // an optional overlay (the provider is always present at runtime), so broad consumers like useTransfer and
+  // useFriendMarketCreation must not hard-crash when it is absent (e.g. in isolated component tests).
+  const custody = useContext(CustodyContext)
+  const active = custody?.active ?? PERSONAL
+  const operateAsPersonal = custody?.operateAsPersonal ?? NOOP
   const { chainId, signer, provider } = useWallet()
   const isVault = active.mode === 'vault'
 
