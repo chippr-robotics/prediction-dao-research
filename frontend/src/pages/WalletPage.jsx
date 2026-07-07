@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
+import { useClipboard } from '../hooks/useClipboard'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
@@ -15,6 +16,8 @@ import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
+import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
+import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
@@ -97,6 +100,7 @@ function WalletPage() {
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
+  const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
@@ -338,7 +342,15 @@ function WalletPage() {
               >
                 <div className="wallet-portal-identity">
                   <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
-                  <span className="wallet-address-display">{shortenAddress(address)}</span>
+                  <button
+                    type="button"
+                    className="wallet-address-display"
+                    onClick={() => copyAddress(address)}
+                    title={address}
+                    aria-label={addressCopied ? 'Copied!' : 'Copy wallet address'}
+                  >
+                    {addressCopied ? 'Copied!' : shortenAddress(address)}
+                  </button>
                   <span className="status-dot connected" aria-hidden="true"></span>
                 </div>
                 <PortalNav
@@ -381,7 +393,7 @@ function WalletPage() {
                 <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
-                    <AccountDashboard address={address} />
+                    <AccountDashboard />
 
                     {hasRole(ROLES.ADMIN) && (
                       <div className="section admin-section">
@@ -517,10 +529,62 @@ function WalletPage() {
 
                 {activeTab === 'preferences' && (
                   <div className="preferences-section" role="tabpanel">
+                    <h2 className="preferences-group-heading">Display</h2>
+                    <div className="section">
+                      <QuickAccessCardsPanel />
+                    </div>
+
+                    <h2 className="preferences-group-heading">Wallet</h2>
+                    <div className="section">
+                      <WalletDisplayPreferencesPanel address={address} />
+                    </div>
+
+                    <h2 className="preferences-group-heading">Notifications</h2>
                     <div className="section">
                       <NotificationPreferencesPanel />
                     </div>
 
+                    <h2 className="preferences-group-heading">Markets</h2>
+                    <div className="section">
+                      <h3>Polymarket Categories</h3>
+                      <p className="section-description">
+                        Pick the categories you care about. Your dashboard feed will surface markets in these categories first, and the in-wager market browser uses them as the default filter.
+                      </p>
+
+                      {!polymarketSidebetsEnabled && (
+                        <div className="key-error" role="note">
+                          Polymarket integration is only available on Polygon chains. Switch your network to use these preferences.
+                        </div>
+                      )}
+
+                      <div className="polymarket-category-grid">
+                        {POLYMARKET_CATEGORY_OPTIONS.map(({ slug, label }) => {
+                          const checked = selectedPolymarketCategories.includes(slug)
+                          return (
+                            <label key={slug} className={`polymarket-category-option ${checked ? 'checked' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => togglePolymarketCategory(slug)}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+
+                      {selectedPolymarketCategories.length > 0 && (
+                        <button
+                          type="button"
+                          className="key-action-btn secondary"
+                          onClick={() => setPolymarketCategories([])}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    <h2 className="preferences-group-heading">App</h2>
                     <div className="section">
                       <h3>Install App</h3>
                       <p className="section-description">
@@ -599,45 +663,6 @@ function WalletPage() {
                           {pwaChecking ? 'Checking…' : 'Check for updates'}
                         </button>
                       </div>
-                    </div>
-
-                    <div className="section">
-                      <h3>Polymarket Categories</h3>
-                      <p className="section-description">
-                        Pick the categories you care about. Your dashboard feed will surface markets in these categories first, and the in-wager market browser uses them as the default filter.
-                      </p>
-
-                      {!polymarketSidebetsEnabled && (
-                        <div className="key-error" role="note">
-                          Polymarket integration is only available on Polygon chains. Switch your network to use these preferences.
-                        </div>
-                      )}
-
-                      <div className="polymarket-category-grid">
-                        {POLYMARKET_CATEGORY_OPTIONS.map(({ slug, label }) => {
-                          const checked = selectedPolymarketCategories.includes(slug)
-                          return (
-                            <label key={slug} className={`polymarket-category-option ${checked ? 'checked' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => togglePolymarketCategory(slug)}
-                              />
-                              <span>{label}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-
-                      {selectedPolymarketCategories.length > 0 && (
-                        <button
-                          type="button"
-                          className="key-action-btn secondary"
-                          onClick={() => setPolymarketCategories([])}
-                        >
-                          Clear all
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}

@@ -38,6 +38,22 @@
   font-family: monospace;
   font-size: 14px;
   color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.wallet-address-display:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.05));
+}
+
+.wallet-address-display:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 .status-dot {
@@ -391,6 +407,25 @@
   border-bottom: none;
   padding-bottom: 0;
   margin-bottom: 0;
+}
+
+/* Preferences tab — group headings cluster related settings so they're easy
+   to scan (Display / Wallet / Notifications / Markets / App). */
+.preferences-group-heading {
+  margin: 24px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.preferences-group-heading:first-child {
+  margin-top: 0;
+}
+
+.preferences-section .section {
+  margin-bottom: 16px;
 }
 
 .profile-section h3 {

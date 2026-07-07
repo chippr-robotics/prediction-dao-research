@@ -1,0 +1,29 @@
+/* WalletDisplayPreferencesPanel — pool phrase language + QR code, on the
+   Preferences tab. Buttons reuse .account-utilities-btn from
+   WalletUtilitiesPanel.css (still bundled via AccountDashboard) for visual
+   consistency with the Disconnect Wallet button. */
+
+.wallet-display-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wallet-display-prefs-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wallet-display-prefs-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.wallet-display-prefs-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

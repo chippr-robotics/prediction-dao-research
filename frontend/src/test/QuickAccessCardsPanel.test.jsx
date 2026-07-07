@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import userEvent from '@testing-library/user-event'
-import PreferencesPanel from '../components/account/PreferencesPanel'
+import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
 import { QUICK_ACCESS_CARDS } from '../constants/quickAccessCards'
 import { getHiddenCards } from '../utils/quickAccessPreference'
 
-describe('PreferencesPanel (spec 038 US5)', () => {
+describe('QuickAccessCardsPanel (spec 038 US5)', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
   it('lists all 10 quick access cards, each visible by default', () => {
-    render(<PreferencesPanel />)
+    render(<QuickAccessCardsPanel />)
     expect(QUICK_ACCESS_CARDS).toHaveLength(10) // +oracle-open-challenge (spec 041)
     QUICK_ACCESS_CARDS.forEach((card) => {
       const toggle = screen.getByRole('switch', { name: card.label })
@@ -22,7 +22,7 @@ describe('PreferencesPanel (spec 038 US5)', () => {
 
   it('toggling a card off persists the hidden preference and flips the switch', async () => {
     const user = userEvent.setup()
-    render(<PreferencesPanel />)
+    render(<QuickAccessCardsPanel />)
     const toggle = screen.getByRole('switch', { name: 'My Wagers' })
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'false')
@@ -31,7 +31,7 @@ describe('PreferencesPanel (spec 038 US5)', () => {
 
   it('toggling a hidden card back on removes it from the hidden set', async () => {
     const user = userEvent.setup()
-    render(<PreferencesPanel />)
+    render(<QuickAccessCardsPanel />)
     const toggle = screen.getByRole('switch', { name: 'Scan QR Code' })
     await user.click(toggle) // hide
     await user.click(toggle) // restore
@@ -40,7 +40,7 @@ describe('PreferencesPanel (spec 038 US5)', () => {
   })
 
   it('every switch is keyboard-operable with an accessible label', () => {
-    render(<PreferencesPanel />)
+    render(<QuickAccessCardsPanel />)
     const toggle = screen.getByRole('switch', { name: 'My Wagers' })
     toggle.focus()
     expect(toggle).toHaveFocus()
@@ -48,7 +48,7 @@ describe('PreferencesPanel (spec 038 US5)', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<PreferencesPanel />)
+    const { container } = render(<QuickAccessCardsPanel />)
     expect(await axe(container)).toHaveNoViolations()
   })
 })

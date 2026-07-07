@@ -118,8 +118,15 @@ beforeEach(() => {
 })
 
 describe('WalletPage — address QR entry point', () => {
-  it('shows a "Show QR" button in the Account tab when connected (W1)', () => {
+  // Show QR Code (and pool phrase language) moved from the Account tab to the
+  // Preferences tab's "Wallet" section, alongside other settings.
+  function goToPreferences() {
+    fireEvent.click(screen.getByRole('tab', { name: 'Preferences' }))
+  }
+
+  it('shows a "Show QR Code" button on the Preferences tab when connected (W1)', () => {
     renderPage(connectedWalletContext)
+    goToPreferences()
     expect(
       screen.getByRole('button', { name: /show qr/i })
     ).toBeInTheDocument()
@@ -127,6 +134,7 @@ describe('WalletPage — address QR entry point', () => {
 
   it('opens the address QR modal with the connected address — one interaction (W1 / SC-001)', () => {
     const { container } = renderPage(connectedWalletContext)
+    goToPreferences()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
@@ -134,12 +142,12 @@ describe('WalletPage — address QR entry point', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(container.querySelector('.address-qr svg')).toBeInTheDocument()
-    // Address appears in the modal as well as the account details row.
-    expect(screen.getAllByText(ADDRESS).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(ADDRESS)).toBeInTheDocument()
   })
 
   it('closes the modal again via its close button (M3 wiring)', () => {
     renderPage(connectedWalletContext)
+    goToPreferences()
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
@@ -147,13 +155,27 @@ describe('WalletPage — address QR entry point', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('renders the connect prompt with no QR entry point when disconnected (W2 / FR-008)', () => {
+  it('renders the connect prompt with no Preferences tab when disconnected (W2 / FR-008)', () => {
     renderPage(disconnectedWalletContext)
     expect(screen.getByText(/connect your wallet/i)).toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: /show qr/i })
+      screen.queryByRole('tab', { name: 'Preferences' })
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('WalletPage — sidebar identity', () => {
+  // The standalone Copy button moved off the Account tab; the sidebar address
+  // itself is now the copy control (spec: account page reorg).
+  it('copies the full address to the clipboard when the sidebar address is clicked', async () => {
+    renderPage(connectedWalletContext)
+    const addressButton = screen.getByRole('button', { name: /copy wallet address/i })
+
+    fireEvent.click(addressButton)
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(ADDRESS)
+    expect(await screen.findByRole('button', { name: /copied!/i })).toBeInTheDocument()
   })
 })
 
