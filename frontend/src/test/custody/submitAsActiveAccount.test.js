@@ -54,4 +54,14 @@ describe('submitAsActiveAccount (vault mode) guards', () => {
       submitAsActiveAccount({ to: TO }, { mode: 'vault', vaultAddress: TO, chainId: 63, hubAddress: TO, safeContracts: undefined, signer: {} }),
     ).rejects.toThrow(/not available/i)
   })
+
+  it('refuses when the connected provider is on a different chain than the vault', async () => {
+    const provider = { getNetwork: async () => ({ chainId: 137n }) }
+    await expect(
+      submitAsActiveAccount(
+        { to: TO },
+        { mode: 'vault', vaultAddress: TO, chainId: 63, hubAddress: TO, safeContracts: { multiSendCallOnly: TO }, signer: {}, provider },
+      ),
+    ).rejects.toThrow(/not connected to the vault/i)
+  })
 })

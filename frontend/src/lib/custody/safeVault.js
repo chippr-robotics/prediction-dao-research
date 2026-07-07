@@ -62,8 +62,11 @@ export function validateVaultConfig(owners, threshold) {
  */
 export function computeVaultAddress({ proxyFactory, singleton, initializer, saltNonce, creationCode }) {
   const salt = solidityPackedKeccak256(['bytes32', 'uint256'], [keccak256(initializer), BigInt(saltNonce)])
+  // SafeProxyFactory appends the singleton to the proxy creation code as a single 32-byte word
+  // (abi.encodePacked(creationCode, uint256(uint160(singleton)))). Encoding the address here yields the same
+  // 32-byte left-padded word, so the CREATE2 preimage matches the on-chain factory exactly.
   const deploymentData =
-    creationCode + AbiCoder.defaultAbiCoder().encode(['uint256'], [BigInt(singleton)]).slice(2)
+    creationCode + AbiCoder.defaultAbiCoder().encode(['address'], [getAddress(singleton)]).slice(2)
   return getCreate2Address(getAddress(proxyFactory), salt, keccak256(deploymentData))
 }
 

@@ -26,11 +26,14 @@ export function useVaultProposals(vault) {
 
   const vaultAddress = vault?.isSafe ? vault.address : null
   const hubAddress = getContractAddressForChain('safeProposalHub', chainId)
+  // Only read when the connected wallet is on the vault's own network — the connected chainId/provider drive
+  // the reads, so a mismatched chain would query the wrong contracts. The UI gates actions on the same fact.
+  const onVaultChain = vault?.chainId != null && Number(chainId) === Number(vault.chainId)
 
   const refresh = useCallback(async () => {
     // Bump first so any in-flight request is invalidated even on the early-return path.
     const myReq = ++reqId.current
-    if (!vaultAddress || !hubAddress || !provider) {
+    if (!vaultAddress || !hubAddress || !provider || !onVaultChain) {
       setProposals([])
       setLoading(false)
       return
@@ -95,7 +98,7 @@ export function useVaultProposals(vault) {
     } finally {
       if (myReq === reqId.current) setLoading(false)
     }
-  }, [vaultAddress, hubAddress, provider, chainId])
+  }, [vaultAddress, hubAddress, provider, chainId, onVaultChain])
 
   useEffect(() => {
     refresh()

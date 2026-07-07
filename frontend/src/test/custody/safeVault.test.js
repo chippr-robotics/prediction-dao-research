@@ -2,7 +2,9 @@
 // not-a-contract path. The live Safe create+load round-trip is exercised by the fork test (T015).
 
 import { describe, it, expect } from 'vitest'
-import { Interface, getAddress } from 'ethers'
+import { AbiCoder, Interface, getAddress, getCreate2Address, keccak256, solidityPackedKeccak256 } from 'ethers'
+
+const coder = AbiCoder.defaultAbiCoder()
 import {
   buildSetupInitializer,
   validateVaultConfig,
@@ -53,6 +55,17 @@ describe('computeVaultAddress', () => {
     const b = computeVaultAddress({ proxyFactory: safe.proxyFactory, singleton: safe.singletonL2, initializer, saltNonce: 0, creationCode })
     expect(a).toBe(b)
     expect(a).toBe(getAddress(a))
+  })
+
+  it('encodes the singleton as the same 32-byte word whether typed address or uint256 (factory parity)', () => {
+    // The Safe factory appends uint256(uint160(singleton)); abi.encode(address) yields the identical word.
+    const asAddress = computeVaultAddress({ proxyFactory: safe.proxyFactory, singleton: safe.singletonL2, initializer, saltNonce: 0, creationCode })
+    const asUint = getCreate2Address(
+      getAddress(safe.proxyFactory),
+      solidityPackedKeccak256(['bytes32', 'uint256'], [keccak256(initializer), 0n]),
+      keccak256(creationCode + coder.encode(['uint256'], [BigInt(safe.singletonL2)]).slice(2)),
+    )
+    expect(asAddress).toBe(asUint)
   })
 
   it('changes with saltNonce and with owners', () => {

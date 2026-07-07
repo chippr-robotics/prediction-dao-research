@@ -27,9 +27,18 @@ export function buildActiveAccountSafeTx({ to, value = 0n, data = '0x', operatio
  */
 export async function submitAsActiveAccount(payload, ctx) {
   if (ctx.mode === 'vault') {
-    const { vaultAddress, chainId, hubAddress, signer, safeContracts } = ctx
+    const { vaultAddress, chainId, hubAddress, signer, provider, safeContracts } = ctx
     if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
     if (!safeContracts) throw new Error('Custody is not available on this network')
+    // Guard against a wrong-network footgun: the hash is chain-scoped and approveHash lands on whatever chain
+    // the signer is connected to, so refuse unless the signer/provider is actually on the vault's chain.
+    const netSource = provider || signer?.provider
+    if (netSource?.getNetwork) {
+      const net = await netSource.getNetwork()
+      if (Number(net.chainId) !== Number(chainId)) {
+        throw new Error("Wallet is not connected to the vault's network")
+      }
+    }
     const safe = new Contract(vaultAddress, SAFE_ABI, signer)
     const nonce = await safe.nonce()
     const safeTx = buildActiveAccountSafeTx(payload, { nonce, multiSendCallOnly: safeContracts.multiSendCallOnly })
