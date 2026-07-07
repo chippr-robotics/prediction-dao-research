@@ -196,14 +196,14 @@ entry appears; setting Custody to `silent` stops new entries (quickstart Scenari
 
 ### Tests for User Story 6
 
-- [ ] T052 [P] [US6] Write `frontend/src/test/sources/custodySource.test.js` — snapshot-diff emits `approvalNeeded` (actionable), `executed`, `governanceChanged`, `fundsIn/Out`; `currentIds`/`actionNeededById` correct
+- [X] T052 [P] [US6] Write `frontend/src/test/sources/custodySource.test.js` — snapshot-diff emits `approvalNeeded` (actionable), `executed`, `governanceChanged`, `fundsIn/Out`; `currentIds`/`actionNeededById` correct
 
 ### Implementation for User Story 6
 
-- [ ] T053 [US6] Implement `frontend/src/data/notifications/sources/custodySource.js` per `contracts/frontend-integration.md` (reads the member's vaults, diffs nonce/approvedHashes/Safe+hub logs/transfers; entries deep-link to `{ tab: 'custody', vault }`)
-- [ ] T054 [US6] Register `custodySource` in `frontend/src/data/notifications/sources/index.js` and add `{ domain:'custody', label:'Custody', description }` to `NOTIFICATION_CATEGORIES` in `frontend/src/lib/notifications/deliveryPreferences.js` (FR-027, FR-028)
-- [ ] T055 [US6] Confirm the notification tap navigates to the Custody tab via `ActivityNotificationBridge` (link.state), no engine change expected
-- [ ] T056 [US6] Write `frontend/src/test/sources/custodySource.integration.test.js` verifying `silent` suppresses only Custody while other sources still deliver
+- [X] T053 [US6] Implement `frontend/src/data/notifications/sources/custodySource.js` per `contracts/frontend-integration.md` (reads the member's vaults, diffs nonce/approvedHashes/Safe+hub logs/transfers; entries deep-link to `{ tab: 'custody', vault }`)
+- [X] T054 [US6] Register `custodySource` in `frontend/src/data/notifications/sources/index.js` and add `{ domain:'custody', label:'Custody', description }` to `NOTIFICATION_CATEGORIES` in `frontend/src/lib/notifications/deliveryPreferences.js` (FR-027, FR-028)
+- [X] T055 [US6] Confirm the notification tap navigates to the Custody tab via `ActivityNotificationBridge` (link.state), no engine change expected
+- [X] T056 [US6] Write `frontend/src/test/sources/custodySource.integration.test.js` verifying `silent` suppresses only Custody while other sources still deliver
 
 **Checkpoint**: Owners are notified when their approval is needed; controls work.
 
