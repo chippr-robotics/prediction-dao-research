@@ -165,3 +165,21 @@ submit chokepoints reroute through one place.
 | **New contract `SafeProposalHub`** (events-only) | On-chain-only discovery of a pending transaction's preimage without a hosted backend; the chain otherwise reveals only the 32-byte hash before execution | *Pure off-chain payload sharing* (link/QR) alone was de-prioritized by the user as the primary mechanism; it remains the never-stranded fallback. *Reusing the encrypted-sync store* was rejected in clarification (on-chain-only). The hub is the minimal on-chain-native answer; it holds no funds and grants no authority, so its risk is far below routing custody through new stateful code. |
 | **Active-identity ("operate as") seam** touching 7 chokepoints | Spec (US3, FR-020–022c) requires acting as the vault across all money-moving surfaces | No existing delegation/impersonation concept exists; a per-call `modalSigner` swap can't represent a *contract* account that signs via threshold approvals. A single shared `submitAsActiveAccount` seam is the smallest change that covers all chokepoints; wiring is **staged by priority** (P1: Transfer + Wager; P2: Membership, ClearPath, Token Mint, Trade). |
 | **Spec reconciliation — vault-won wager payout claims (FR-022c)** | `WagerRegistry.claimPayout` requires `msg.sender == w.winner` and its gasless twin is EOA-`ecrecover` only (no EIP-1271). A vault that *wins* a wager can only claim by an `execTransaction` **from** the Safe → a threshold-gated action | FR-022c's "inbound needs no approval" holds for plain ERC-20 receipts and for `claimRefund` (caller-agnostic — any owner triggers it, funds route to the vault). It **cannot** hold for wager *payout* claims without a contract change (add EIP-1271 intent support), which is out of scope for v1. Spec FR-022c is reconciled to scope "no-approval inbound" to receipts + refunds, and to note payout-claims for a vault-won wager are a threshold Safe transaction. Recorded here and reflected in the spec. |
+
+## Follow-ups (post-landing)
+
+These are tracked outside this PR and are intended for a separate session/PR:
+
+- **Finish US3 operate-as** — wire the remaining money-moving chokepoints (Membership `usePurchaseFlow`,
+  Token Mint `useTokenFactory`, ClearPath governance connectors, Trade/Swap `DexContext`), the wager **accept**
+  path, and the vault-won-payout **claim routing** (FR-022c), plus the "view/act on the vault's wagers"
+  plumbing those depend on (T035, T039 remainder, T040, T041, T042). The `submitAsActiveAccount` seam and the
+  `OperateAsIndicator` are already in place; each chokepoint reroutes its final `{to,value,data}` through
+  `useActiveAccount().submit` in vault mode.
+- **Ethereum Classic mainnet (61)** — Custody is contract-ready (the canonical Safe v1.4.1 addresses already
+  resolve for 61 in `safeContracts.js` shape), but the app has **no `61` network block** today
+  (`frontend/src/config/contracts.js` / `networks.js`). Adding an ETC network entry (RPC, chain + token config)
+  is a **prerequisite** — after which deploying a `SafeProposalHub` to ETC and syncing lights up Custody there
+  with the same address set. This is config-only and out of scope for this feature.
+- **Live-network tasks** — deploy the hub to Mordor/Polygon (T008/T058) and run the fork tests against the live
+  Safe v1.4.1 deployments (T015/T025/T044); these require funded wallets and a fork RPC.

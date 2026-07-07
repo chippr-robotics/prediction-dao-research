@@ -211,12 +211,12 @@ entry appears; setting Custody to `silent` stops new entries (quickstart Scenari
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T057 [P] Author `docs/developer-guide/safe-custody.md` and `docs/runbooks/safe-proposal-hub-deploy.md` (deploy + sync + network-onboarding, incl. the ETC(61) prerequisite)
+- [X] T057 [P] Author `docs/developer-guide/safe-custody.md` and `docs/runbooks/safe-proposal-hub-deploy.md` (deploy + sync + network-onboarding, incl. the ETC(61) prerequisite)
 - [ ] T058 Deploy `SafeProposalHub` to Polygon (137), record in `deployments/polygon-chain137-v2.json`, and `sync:frontend-contracts -- --network polygon --chainId 137`; add addresses to `POLYGON_CONTRACTS` and `safeContracts.js`
 - [ ] T059 Run the smart-contract security review (`.github/agents/`) and `slither contracts/custody/SafeProposalHub.sol`; document any accepted findings (Constitution I)
-- [ ] T060 [P] Full a11y pass (axe/Lighthouse) across all Custody UI and the OperateAsIndicator (Constitution V)
+- [X] T060 [P] Full a11y pass (axe/Lighthouse) across all Custody UI and the OperateAsIndicator (Constitution V)
 - [ ] T061 Execute all of `quickstart.md` end-to-end on Mordor (and Polygon), including network-gating and the Off chain disabled state
-- [ ] T062 [P] Add the ETC mainnet (61) network-block prerequisite note/issue reference in `specs/043-safe-multisig-custody/plan.md` follow-ups (config-only path to light up Custody on ETC)
+- [X] T062 [P] Add the ETC mainnet (61) network-block prerequisite note/issue reference in `specs/043-safe-multisig-custody/plan.md` follow-ups (config-only path to light up Custody on ETC)
 
 ---
 
