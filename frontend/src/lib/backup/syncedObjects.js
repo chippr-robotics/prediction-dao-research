@@ -4,6 +4,11 @@
 
 import { loadAddressBook, saveAddressBook, mergeBook } from '../addressBook/addressBookStore'
 import { getUserPreference, saveUserPreference } from '../../utils/userStorage'
+import {
+  loadVaultReferences,
+  saveVaultReferences,
+  mergeVaultReferences,
+} from '../custody/vaultReferences'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -51,6 +56,23 @@ export const syncedObjects = [
       return { conflicts: [] }
     },
     merge: (_current, incoming) => ({ value: incoming, conflicts: [] }),
+  },
+  {
+    // Spec 043 — custody vault references + labels. Network-scoped: identity is (chainId, address).
+    key: 'vaultReferences',
+    label: 'Vault references',
+    networkScoped: true,
+    load: (account) => loadVaultReferences(account),
+    apply: (account, value, mode) => {
+      if (mode === 'replace') {
+        saveVaultReferences(account, value)
+        return { conflicts: [] }
+      }
+      const { value: merged, conflicts } = mergeVaultReferences(loadVaultReferences(account), value)
+      saveVaultReferences(account, merged)
+      return { conflicts }
+    },
+    merge: (current, incoming) => mergeVaultReferences(current, incoming),
   },
 ]
 

@@ -9,6 +9,8 @@ export const DOMAIN_META = {
   token: { label: 'Token' },
   membership: { label: 'Membership' },
   pools: { label: 'Pool' },
+  // Spec 043 custody (Safe multisig vault) events.
+  custody: { label: 'Custody' },
   // Spec 035 intent lifecycle entries (emitted via useIntentAction's onActivity callback).
   intents: { label: 'Gasless' },
 }

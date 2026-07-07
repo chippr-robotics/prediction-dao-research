@@ -11,6 +11,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
+import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
@@ -48,6 +49,7 @@ const WALLET_TAB_GROUPS = [
     items: [
       { id: 'trade', label: 'Trade' },
       { id: 'paytransfer', label: 'Pay & Transfer' },
+      { id: 'custody', label: 'Custody' },
     ],
   },
   {
@@ -396,6 +398,12 @@ function WalletPage() {
                 {activeTab === 'paytransfer' && (
                   <div className="paytransfer-section" role="tabpanel">
                     <PayTransferPanel />
+                  </div>
+                )}
+
+                {activeTab === 'custody' && (
+                  <div className="custody-section" role="tabpanel">
+                    <CustodyPanel />
                   </div>
                 )}
 

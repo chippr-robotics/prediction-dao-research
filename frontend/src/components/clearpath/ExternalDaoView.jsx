@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from '../../abis/externalDAORegistry'
 import { getConnector, detectFramework } from './connectors'
 import { fetchDaoProposals } from './daoDataSource'
@@ -107,6 +108,8 @@ function CopyableId({ id }) {
 export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
   const { showNotification } = useNotification()
   const { screenOne } = useAddressScreening()
+  // Spec 043 (US3, FR-022a): acting on a DAO while operating as a vault becomes a threshold-gated vault proposal.
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const net = getNetwork(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
 
@@ -245,6 +248,12 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     try {
       showNotification(`${label}: confirm in your wallet…`, 'info', 0)
       const tx = await makeTx()
+      // Spec 043 (US3): in vault mode makeTx returns a pending proposal (no on-chain tx to await).
+      if (tx?.kind === 'proposed' || tx?.proposed) {
+        showNotification(`${label} proposed to your vault — awaiting co-owner approval.`, 'success')
+        await loadProposals()
+        return true
+      }
       showNotification(`${label} submitted — awaiting confirmation…`, 'info', 0)
       await tx.wait(1, CONFIRM_TIMEOUT_MS)
       showNotification(`${label} confirmed${tx?.hash ? ` · tx ${short(tx.hash)}` : ''}.`, 'success')
@@ -262,6 +271,20 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     } finally {
       setBusy(false)
     }
+  }
+
+  // Spec 043 (US3): build the tx factory for a management action — a normal signer call in personal mode, or
+  // a threshold-gated vault proposal (via the connector's `encode`) when operating as a vault.
+  const managedTx = (action, encodeArgs, personalFn) => async () => {
+    if (operatingAsVault) {
+      if (!canActAsVault) throw new Error("Switch to the vault's network to act as the vault.")
+      if (typeof connector.encode !== 'function') {
+        throw new Error('This DAO framework does not support acting as a vault yet.')
+      }
+      const { to, data } = connector.encode(record.dao, action, encodeArgs)
+      return submitAsActive({ to, value: 0n, data })
+    }
+    return personalFn()
   }
 
   return (
@@ -418,12 +441,12 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
               <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
                 {canVote && (
                   <>
-                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For))}>Vote For</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against))}>Against</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain))}>Abstain</button>
+                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.For }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For)))}>Vote For</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Against }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against)))}>Against</button>
+                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Abstain }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain)))}>Abstain</button>
                   </>
                 )}
-                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', () => connector.queue(signer, record.dao, p))}>Queue</button>}
+                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', managedTx('queue', { p }, () => connector.queue(signer, record.dao, p)))}>Queue</button>}
                 {p.state === 5 && (
                   <button
                     type="button"
@@ -431,7 +454,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
                     disabled={busy || !executeReady}
                     aria-disabled={busy || !executeReady}
                     title={executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
-                    onClick={() => run('Execute', () => connector.execute(signer, record.dao, p))}
+                    onClick={() => run('Execute', managedTx('execute', { p }, () => connector.execute(signer, record.dao, p)))}
                   >
                     Execute
                   </button>

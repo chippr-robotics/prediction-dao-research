@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
@@ -49,6 +50,9 @@ function MyMarketsModal({
 }) {
   const { isConnected, account, chainId } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  // Spec 043 (US3, FR-022c): a vault-won payout claim is a threshold-gated vault transaction (the registry
+  // binds the claimer to the winner). Refunds stay single-owner and need no change.
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
 
   // Wager activity watcher (spec 012). Optional: the modal must keep working
   // when rendered outside WagerActivityProvider (legacy trees, tests).
@@ -785,7 +789,18 @@ function MyMarketsModal({
     setClaimError(null)
 
     try {
-      const result = await claimPayoutTx.run(market.wagerId ?? market.id)
+      const wagerId = market.wagerId ?? market.id
+      // Spec 043 (FR-022c): claiming as a vault → threshold-gated proposal calling claimPayout FROM the Safe.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to claim as the vault.")
+        const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+        const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData('claimPayout', [wagerId])
+        await submitAsActive({ to: registryAddr, value: 0n, data })
+        markWagerRead?.(id)
+        fireToast('Vault claim proposed — awaiting co-owner approval')
+        return
+      }
+      const result = await claimPayoutTx.run(wagerId)
       if (result?.error) throw result.error
       // Pull fresh on-chain data so the claimed wager flips to paid (which
       // hides the Claim affordances) and clear its unread activity.
@@ -811,7 +826,7 @@ function MyMarketsModal({
     } finally {
       setClaimingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx])
+  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx, operatingAsVault, canActAsVault, submitAsActive, chainId])
 
   // Participant reclaims their stake on a wager that ran past its resolution
   // window without a winner being declared (the "refundable" state). Mirrors

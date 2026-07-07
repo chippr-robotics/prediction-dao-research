@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
 import { useEncryption } from '../../hooks/useEncryption'
 import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
@@ -80,6 +81,8 @@ function MarketAcceptanceModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
+  // Spec 043 (US3): accepting a wager while operating as a vault becomes a threshold-gated vault proposal.
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const {
     decryptMetadata,
     canUserDecrypt,
@@ -357,6 +360,25 @@ function MarketAcceptanceModal({
         ],
         signer
       )
+
+      // Spec 043 (US3, FR-021): accepting AS a vault → batch [approve, acceptWager] as a threshold-gated
+      // vault proposal (the Safe is the opponent; stake pulled from the vault). Only in the vault queue until
+      // co-owners approve + execute (FR-022b). Skips the personal balance check — execution enforces it.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to accept as the vault.")
+        const approveData = tokenContract.interface.encodeFunctionData('approve', [contractAddress, stakeAmount])
+        const acceptData = contract.interface.encodeFunctionData('acceptWager', [marketId])
+        const res = await submitAsActive({
+          batch: [
+            { to: stakeTokenAddress, value: 0n, data: approveData },
+            { to: contractAddress, value: 0n, data: acceptData },
+          ],
+        })
+        if (res?.safeTxHash) setTxHash(res.safeTxHash)
+        setStep('success')
+        if (onAccepted) onAccepted(marketId)
+        return
+      }
 
       const balance = await tokenContract.balanceOf(account)
       let tokenSymbol = marketData?.stakeTokenSymbol || 'tokens'

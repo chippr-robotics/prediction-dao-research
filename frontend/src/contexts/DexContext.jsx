@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useChainId } from 'wagmi'
 import { useWallet } from '../hooks/useWalletManagement'
+import { useActiveAccount } from '../hooks/useActiveAccount'
 import { FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/dex'
 import { getNetwork, getCurrentChainId } from '../config/networks'
 import { ERC20_ABI } from '../abis/ERC20'
@@ -23,6 +24,8 @@ const ZERO = '0x0000000000000000000000000000000000000000'
  */
 export function DexProvider({ children }) {
   const { provider, signer, address, isConnected } = useWallet()
+  // Spec 043 (US3): swapping while operating as a vault becomes a threshold-gated vault proposal.
+  const { isVault: operatingAsVault, canActAsVault, identity: activeIdentity, submit: submitAsActive } = useActiveAccount()
   const wagmiChainId = useChainId()
   const chainId = wagmiChainId || getCurrentChainId()
   const network = getNetwork(chainId)
@@ -376,6 +379,31 @@ export function DexProvider({ children }) {
       const amountInWei = ethers.parseUnits(amountIn, decIn)
       const minAmountOutWei = quote.minimumReceivedWei
 
+      // Spec 043 (US3, FR-022a): swap AS a vault → batch [approve, exactInputSingle] with recipient = the
+      // vault, proposed as a threshold-gated vault transaction. Only in the vault queue until executed.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to swap as the vault.")
+        const erc20 = new ethers.Interface(ERC20_ABI)
+        const approveData = erc20.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei])
+        const vaultParams = {
+          tokenIn,
+          tokenOut,
+          fee: quote.feeTier,
+          recipient: activeIdentity.vaultAddress,
+          amountIn: amountInWei,
+          amountOutMinimum: minAmountOutWei,
+          sqrtPriceLimitX96: 0,
+        }
+        const swapData = contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [vaultParams])
+        const res = await submitAsActive({
+          batch: [
+            { to: tokenIn, value: 0n, data: approveData },
+            { to: addresses.SWAP_ROUTER_02, value: 0n, data: swapData },
+          ],
+        })
+        return { proposed: true, safeTxHash: res.safeTxHash }
+      }
+
       const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
       const allowance = await tokenInContract.allowance(address, addresses.SWAP_ROUTER_02)
 
@@ -409,7 +437,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses])
+  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive])
 
   const value = {
     balances,

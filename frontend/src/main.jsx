@@ -12,7 +12,8 @@ import {
   PriceProvider,
   DexProvider,
   UserPreferencesProvider,
-  FriendMarketsProvider
+  FriendMarketsProvider,
+  CustodyProvider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')).render(
           <ThemeProvider>
             {/* WalletProvider is the unified blockchain context - single source of truth */}
             <WalletProvider>
+              <CustodyProvider>
               <UserPreferencesProvider>
                 <FriendMarketsProvider>
                   <DexProvider>
@@ -40,6 +42,7 @@ createRoot(document.getElementById('root')).render(
                   </DexProvider>
                 </FriendMarketsProvider>
               </UserPreferencesProvider>
+              </CustodyProvider>
             </WalletProvider>
           </ThemeProvider>
         </QueryClientProvider>

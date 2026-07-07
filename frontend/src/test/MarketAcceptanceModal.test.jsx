@@ -15,6 +15,10 @@ vi.mock('../hooks', () => ({
     switchNetwork: vi.fn()
   }))
 }))
+// Spec 043: the modal now reads the active identity; default it to personal mode for these tests.
+vi.mock('../hooks/useActiveAccount', () => ({
+  useActiveAccount: () => ({ isVault: false, canActAsVault: false, identity: { mode: 'personal' }, submit: vi.fn(), operateAsPersonal: vi.fn() }),
+}))
 
 vi.mock('../hooks/useEncryption', () => ({
   useEncryption: vi.fn(() => ({

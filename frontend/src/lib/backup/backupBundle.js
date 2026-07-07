@@ -49,6 +49,14 @@ function assertNetworkTagged(key, val) {
       }
     }
   }
+  if (key === 'vaultReferences') {
+    // Spec 043 — each vault reference carries a chainId (identity is (chainId, address)).
+    for (const ref of Array.isArray(val) ? val : []) {
+      if (typeof ref?.chainId !== 'number') {
+        throw new Error(`Network-scoped element missing chainId in ${key}`)
+      }
+    }
+  }
 }
 
 /** Apply a (validated) bundle to local data. mode: 'merge' (additive, default) | 'replace'. */

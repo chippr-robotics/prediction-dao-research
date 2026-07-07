@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from './useWalletManagement'
+import { useActiveAccount } from './useActiveAccount'
 import { useChainTokens } from './useChainTokens'
 import { getNetwork } from '../config/networks'
 import {
@@ -33,6 +34,7 @@ const ERC20_IFACE = new ethers.Interface(TRANSFER_ABI)
 
 export function useTransfer() {
   const { address, chainId, signer, provider, loginMethod, sendCalls } = useWallet()
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const tokens = useChainTokens()
   const isPasskey = loginMethod === 'passkey'
 
@@ -124,6 +126,30 @@ export function useTransfer() {
         throw new Error(`No ${m.symbol || 'stablecoin'} is configured on this network.`)
       }
 
+      // Spec 043 (US3, FR-022): when operating as a vault, a transfer becomes a threshold-gated vault
+      // proposal instead of an immediate send. It surfaces only in the vault queue (FR-022b) until executed.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to send from it.")
+        const payload =
+          kind === TRANSFER_KIND.STABLE
+            ? { to: m.address, value: 0n, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]) }
+            : { to, value, data: '0x' }
+        setError(null)
+        setStatus('submitting')
+        try {
+          const res = await submitAsActive(payload)
+          setStatus('success')
+          const result = { proposed: true, safeTxHash: res.safeTxHash, route: 'vault', id: null }
+          setLastResult(result)
+          return result
+        } catch (err) {
+          const message = err?.shortMessage || err?.message || 'Could not create the vault proposal.'
+          setError(message)
+          setStatus('error')
+          throw err
+        }
+      }
+
       const gasless = quoteGasless(kind)
       const entry = recordTransfer(address, {
         chainId,
@@ -208,7 +234,7 @@ export function useTransfer() {
         throw err
       }
     },
-    [signer, isPasskey, meta, quoteGasless, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances]
+    [signer, isPasskey, meta, quoteGasless, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, submitAsActive]
   )
 
   return useMemo(

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
+import { useActiveAccount } from './useActiveAccount'
 import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 import { getContractAddress, getContractAddressForChain } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
@@ -111,6 +112,8 @@ export const clearPendingTransaction = () => {
  */
 export function useFriendMarketCreation({ onMarketCreated } = {}) {
   const { signer } = useWeb3()
+  // Spec 043 (US3): when operating as a vault, wager creation becomes a threshold-gated vault proposal.
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
 
   // Gasless createWager (spec 035/036): relayed where the relayer serves the chain and the stake token
   // supports EIP-3009 (Polygon USDC); transparent self-submit otherwise (Mordor USC → auto self-submit).
@@ -371,6 +374,24 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         ...(useTerms ? [termsBytes32] : []),
       ]
 
+      // Spec 043 (US3, FR-021): operating as a vault → create the wager AS the vault. Batch
+      // [approve(registry, stake), createWager(...)] into one MultiSend and propose it as a threshold-gated
+      // vault transaction; the Safe becomes the creator and the stake is pulled from the vault. The wager
+      // surfaces only in the vault queue until co-owners approve + execute (FR-022b) — no self-submit/gasless.
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to create a wager as the vault.")
+        const approveData = stakeToken.interface.encodeFunctionData('approve', [wagerRegistryAddress, creatorStakeWei])
+        const createData = registry.interface.encodeFunctionData(createMethod, createArgs)
+        onProgress({ step: 'create', message: 'Creating a vault proposal for co-owner approval…' })
+        const res = await submitAsActive({
+          batch: [
+            { to: stakeTokenAddress, value: 0n, data: approveData },
+            { to: wagerRegistryAddress, value: 0n, data: createData },
+          ],
+        })
+        return { proposed: true, safeTxHash: res.safeTxHash, marketType: data.marketType }
+      }
+
       // Self-submit leg: the existing approve → cleanup → simulate → estimate → send flow verbatim.
       // The gasless path skips ALL of this — EIP-3009 pulls the stake (no approve) and the relayer
       // estimates/pays gas. Captures the mined receipt so the shared code below can read WagerCreated.
@@ -547,7 +568,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       throw error
     }
-  }, [signer, onMarketCreated, createWagerTx])
+  }, [signer, onMarketCreated, createWagerTx, operatingAsVault, canActAsVault, submitAsActive])
 
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
