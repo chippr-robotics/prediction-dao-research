@@ -6,6 +6,7 @@ import { useWallet } from '../../hooks'
 import { useVaultProposals } from '../../hooks/useVaultProposals'
 import ProposeTransactionForm from './ProposeTransactionForm'
 import ProposalQueue from './ProposalQueue'
+import OwnersThresholdPanel from './OwnersThresholdPanel'
 
 export default function VaultProposalsPanel({ vault }) {
   const { address, chainId, switchNetwork } = useWallet()
@@ -56,6 +57,8 @@ export default function VaultProposalsPanel({ vault }) {
       {vault.owner && showPropose && (
         <ProposeTransactionForm onPropose={run(propose)} onDone={() => setShowPropose(false)} />
       )}
+
+      <OwnersThresholdPanel vault={vault} onPropose={run(propose)} busy={busy} />
 
       {loading && <p className="custody-hint">Loading transactions…</p>}
       {(error || actionError) && (

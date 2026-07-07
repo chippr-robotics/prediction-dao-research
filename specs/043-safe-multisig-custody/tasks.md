@@ -158,9 +158,9 @@ confirm new config governs the next transaction (quickstart Scenario 4).
 
 ### Implementation for User Story 4
 
-- [ ] T045 [US4] Build `frontend/src/components/custody/OwnersThresholdPanel.jsx` — add/remove owner, change threshold, using the governance builders from `vaultTransaction.js`; validation that resulting threshold ≤ owner count (FR-018, FR-005)
-- [ ] T046 [US4] Route governance proposals through the US2 proposal queue (they are ordinary vault transactions targeting the Safe) and reflect the updated owners/threshold live after execution (FR-019)
-- [ ] T047 [US4] Write `frontend/src/test/custody/OwnersThresholdPanel.test.jsx` (+ axe), including owner-removed-mid-flight evaluation against current config (edge case)
+- [X] T045 [US4] Build `frontend/src/components/custody/OwnersThresholdPanel.jsx` — add/remove owner, change threshold, using the governance builders from `vaultTransaction.js`; validation that resulting threshold ≤ owner count (FR-018, FR-005)
+- [X] T046 [US4] Route governance proposals through the US2 proposal queue (they are ordinary vault transactions targeting the Safe) and reflect the updated owners/threshold live after execution (FR-019)
+- [X] T047 [US4] Write `frontend/src/test/custody/OwnersThresholdPanel.test.jsx` (+ axe), including owner-removed-mid-flight evaluation against current config (edge case)
 
 **Checkpoint**: Vault governance is self-serve and threshold-gated.
 
