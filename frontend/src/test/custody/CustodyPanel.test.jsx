@@ -7,6 +7,9 @@ import { axe } from 'vitest-axe'
 
 let walletCtx = { chainId: 63 }
 vi.mock('../../hooks', () => ({ useWallet: () => walletCtx }))
+vi.mock('../../hooks/useCustody', () => ({
+  useCustody: () => ({ active: { mode: 'personal' }, operateAsVault: vi.fn(), operateAsPersonal: vi.fn() }),
+}))
 
 import CustodyPanel from '../../components/custody/CustodyPanel'
 

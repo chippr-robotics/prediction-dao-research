@@ -28,3 +28,7 @@ export { FriendMarketsProvider } from './FriendMarketsContext.jsx'
 // Role constants and context (roles are managed in WalletProvider, but RoleContext exported for test compatibility)
 export { RoleContext, ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole, getRoleName } from './RoleContext.js'
 
+// Spec 043: active-identity ("operate as" a vault) context. Provider here; the useCustody hook lives under
+// hooks/ (mirroring DexContext) so this .jsx exports only a component.
+export { CustodyProvider } from './CustodyContext.jsx'
+

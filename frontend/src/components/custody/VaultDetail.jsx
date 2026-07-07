@@ -1,7 +1,7 @@
 // Spec 043 (US1) — a single vault's live on-chain state: address, network, owners, threshold, balance.
 // Honest state: everything shown here is read from chain (owners/threshold/nonce) or is a local label.
 
-export default function VaultDetail({ vault, onForget }) {
+export default function VaultDetail({ vault, onForget, onOperateAs, isActiveIdentity }) {
   if (!vault) return null
   if (vault.isSafe === false) {
     return (
@@ -57,11 +57,18 @@ export default function VaultDetail({ vault, onForget }) {
           </li>
         ))}
       </ul>
-      {onForget && (
-        <button type="button" onClick={() => onForget(vault.address)}>
-          Remove from list
-        </button>
-      )}
+      <div className="custody-actions">
+        {vault.owner && onOperateAs && (
+          <button type="button" onClick={() => onOperateAs(vault)} disabled={isActiveIdentity}>
+            {isActiveIdentity ? 'Operating as this vault' : 'Operate as this vault'}
+          </button>
+        )}
+        {onForget && (
+          <button type="button" className="custody-link" onClick={() => onForget(vault.address)}>
+            Remove from list
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { useWallet } from '../../hooks'
+import { useCustody } from '../../hooks/useCustody'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
 import VaultList from './VaultList'
@@ -15,6 +16,7 @@ import './Custody.css'
 
 function OnChainSection() {
   const { address } = useWallet()
+  const { active, operateAsVault } = useCustody()
   const {
     vaults,
     activeVault,
@@ -61,7 +63,12 @@ function OnChainSection() {
         <VaultList vaults={vaults} activeAddress={activeAddress} onSelect={selectVault} />
         {activeVault && (
           <div className="custody-vault-column">
-            <VaultDetail vault={activeVault} onForget={forget} />
+            <VaultDetail
+              vault={activeVault}
+              onForget={forget}
+              onOperateAs={operateAsVault}
+              isActiveIdentity={active.mode === 'vault' && active.vaultAddress === activeVault.address}
+            />
             <VaultProposalsPanel vault={activeVault} />
           </div>
         )}
