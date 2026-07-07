@@ -2,7 +2,7 @@
 // In personal mode submit sends via the connected signer; in vault mode it creates a threshold-gated proposal.
 
 import { useCallback, useContext } from 'react'
-import { useWallet } from '.'
+import { useWallet } from './useWalletManagement'
 import { CustodyContext } from '../contexts/CustodyContext'
 import { getSafeContracts } from '../config/safeContracts'
 import { getContractAddressForChain } from '../config/contracts'

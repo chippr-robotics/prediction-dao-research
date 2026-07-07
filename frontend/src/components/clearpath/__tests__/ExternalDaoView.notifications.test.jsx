@@ -71,6 +71,10 @@ vi.mock('../../../config/networks', () => ({
 }))
 // ProposalBuilder → CpAddressField → AddressBookButton → useWallet would throw without a provider.
 vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
+// Spec 043: default the active identity to personal mode for these tests.
+vi.mock('../../../hooks/useActiveAccount', () => ({
+  useActiveAccount: () => ({ isVault: false, canActAsVault: false, identity: { mode: 'personal' }, submit: vi.fn(), operateAsPersonal: vi.fn() }),
+}))
 vi.mock('../../../hooks/useAddressScreening', () => ({
   useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve(h.screenStatus) }),
 }))

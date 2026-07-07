@@ -170,12 +170,13 @@ submit chokepoints reroute through one place.
 
 These are tracked outside this PR and are intended for a separate session/PR:
 
-- **Finish US3 operate-as** — wire the remaining money-moving chokepoints (Membership `usePurchaseFlow`,
-  Token Mint `useTokenFactory`, ClearPath governance connectors, Trade/Swap `DexContext`), the wager **accept**
-  path, and the vault-won-payout **claim routing** (FR-022c), plus the "view/act on the vault's wagers"
-  plumbing those depend on (T035, T039 remainder, T040, T041, T042). The `submitAsActiveAccount` seam and the
-  `OperateAsIndicator` are already in place; each chokepoint reroutes its final `{to,value,data}` through
-  `useActiveAccount().submit` in vault mode.
+- **US3 operate-as** — wired surfaces: Pay & Transfer, wager **create** + **accept**, vault-won payout **claim**
+  routing (FR-022c), **Trade/Swap** (`DexContext`), **Token Mint** (`useTokenFactory`), and **ClearPath**
+  governance (castVote/queue/execute via connector `encode`). **Remaining: Membership purchase**
+  (`usePurchaseFlow`) — its stake goes through the deep `purchaseRoleWithStablecoin` service layer and a vault
+  buying its own membership is the most niche operate-as case; deferred as a focused follow-up. The wager
+  claim UI routes correctly but is only reachable once a "view the vault's wagers" list is added (the wager
+  list is keyed to the connected address today).
 - **Ethereum Classic mainnet (61)** — Custody is contract-ready (the canonical Safe v1.4.1 addresses already
   resolve for 61 in `safeContracts.js` shape), but the app has **no `61` network block** today
   (`frontend/src/config/contracts.js` / `networks.js`). Adding an ETC network entry (RPC, chain + token config)

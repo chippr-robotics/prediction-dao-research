@@ -382,6 +382,18 @@ export function proposeAction(signer, governor, { targets, values, calldatas, de
   return writeContract(signer, governor).propose(targets, values, calldatas, description)
 }
 
+// Spec 043 (US3, FR-022a): encode a management action's calldata (to the governor) so it can be proposed as a
+// vault transaction when operating as a Safe. Returns { to, data }.
+export function encodeManagementAction(governor, action, args) {
+  const iface = new ethers.Interface(GOVERNOR_WRITE_ABI)
+  let data
+  if (action === 'castVote') data = iface.encodeFunctionData('castVote', [args.proposalId, args.support])
+  else if (action === 'queue') data = iface.encodeFunctionData('queue', [args.p.targets, args.p.values, args.p.calldatas, args.p.descriptionHash])
+  else if (action === 'execute') data = iface.encodeFunctionData('execute', [args.p.targets, args.p.values, args.p.calldatas, args.p.descriptionHash])
+  else throw new Error(`Unsupported vault governance action: ${action}`)
+  return { to: governor, data }
+}
+
 // --- Spec 042: pluggable connector object (framework 0 = OpenZeppelin Governor) ---
 // One implementation of the shared connector interface (specs/042 contracts/connector-interface.md) so the
 // ClearPath UI, daoDataSource, and daoSource stay framework-agnostic. It wraps the functions above; adding a
@@ -403,5 +415,6 @@ export const ozGovernorConnector = {
   queue: queueProposal,
   execute: executeProposal,
   propose: proposeAction,
+  encode: encodeManagementAction,
   explainTxError,
 }

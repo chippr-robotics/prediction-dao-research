@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { getContractAddressForChain } from '../../config/contracts'
 import {
   TOKEN_FACTORY_ABI,
@@ -35,6 +36,8 @@ export function v1AbiForStandard(standard) {
  */
 export function useTokenFactory() {
   const { account, signer, provider, chainId, isConnected } = useWallet()
+  // Spec 043 (US3): creating a token while operating as a vault becomes a threshold-gated vault proposal.
+  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
 
   const factoryAddress = getContractAddressForChain('tokenFactory', chainId)
   const isSupported = ethers.isAddress(factoryAddress || '')
@@ -235,7 +238,7 @@ export function useTokenFactory() {
 
   // Shared write wrapper: enforces support + signer, tracks honest tx state, returns the created token address.
   const runCreate = useCallback(
-    async (fn) => {
+    async (method, args) => {
       if (!isSupported) throw new Error('Token issuance is not available on this network.')
       if (!signer) throw new Error('Connect a wallet to create a token.')
       setStatus('creating')
@@ -243,7 +246,16 @@ export function useTokenFactory() {
       setLastTxHash(null)
       try {
         const factory = new ethers.Contract(factoryAddress, TOKEN_FACTORY_ABI, signer)
-        const tx = await fn(factory)
+        // Spec 043 (US3, FR-022a): create AS a vault → propose the factory call as a threshold-gated vault
+        // transaction (the Safe becomes the token issuer). Only in the vault queue until executed.
+        if (operatingAsVault) {
+          if (!canActAsVault) throw new Error("Switch to the vault's network to create a token as the vault.")
+          const data = factory.interface.encodeFunctionData(method, args)
+          const res = await submitAsActive({ to: factoryAddress, value: 0n, data })
+          setStatus('success')
+          return { proposed: true, safeTxHash: res.safeTxHash }
+        }
+        const tx = await factory[method](...args)
         setLastTxHash(tx.hash)
         const receipt = await tx.wait()
         // Pull the deployed token address from the TokenCreated event (only finalized after confirmation).
@@ -269,61 +281,57 @@ export function useTokenFactory() {
         throw e
       }
     },
-    [isSupported, factoryAddress, signer]
+    [isSupported, factoryAddress, signer, operatingAsVault, canActAsVault, submitAsActive]
   )
 
   const createOpenERC20 = useCallback(
-    ({ name, symbol, decimals, initialSupply, metadataURI = '', burnable = false, pausable = false }) =>
-      runCreate((factory) => {
-        const supply = ethers.parseUnits(String(initialSupply || '0'), Number(decimals))
-        return factory.createOpenERC20(name, symbol, Number(decimals), supply, metadataURI, burnable, pausable)
-      }),
+    ({ name, symbol, decimals, initialSupply, metadataURI = '', burnable = false, pausable = false }) => {
+      const supply = ethers.parseUnits(String(initialSupply || '0'), Number(decimals))
+      return runCreate('createOpenERC20', [name, symbol, Number(decimals), supply, metadataURI, burnable, pausable])
+    },
     [runCreate]
   )
 
   const createOpenERC721 = useCallback(
     ({ name, symbol, baseURI = '', burnable = false }) =>
-      runCreate((factory) => factory.createOpenERC721(name, symbol, baseURI, burnable)),
+      runCreate('createOpenERC721', [name, symbol, baseURI, burnable]),
     [runCreate]
   )
 
   const createRestrictedERC20 = useCallback(
-    ({ name, symbol, decimals, initialSupply, metadataURI = '', initialEligible = [] }) =>
-      runCreate((factory) => {
-        const supply = ethers.parseUnits(String(initialSupply || '0'), Number(decimals))
-        const eligible = initialEligible.filter((a) => ethers.isAddress(a))
-        return factory.createRestrictedERC20(name, symbol, Number(decimals), supply, metadataURI, eligible)
-      }),
+    ({ name, symbol, decimals, initialSupply, metadataURI = '', initialEligible = [] }) => {
+      const supply = ethers.parseUnits(String(initialSupply || '0'), Number(decimals))
+      const eligible = initialEligible.filter((a) => ethers.isAddress(a))
+      return runCreate('createRestrictedERC20', [name, symbol, Number(decimals), supply, metadataURI, eligible])
+    },
     [runCreate]
   )
 
   // --- v2 create (role-based + optional cap; cap '' or 0 ⇒ uncapped) ---
 
   const createOpenERC20V2 = useCallback(
-    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '' }) =>
-      runCreate((factory) => {
-        const d = Number(decimals)
-        const supply = ethers.parseUnits(String(initialSupply || '0'), d)
-        const capWei = ethers.parseUnits(String(cap || '0'), d) // 0 ⇒ uncapped (contract stores max)
-        return factory.createOpenERC20V2(name, symbol, d, supply, capWei, metadataURI)
-      }),
+    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '' }) => {
+      const d = Number(decimals)
+      const supply = ethers.parseUnits(String(initialSupply || '0'), d)
+      const capWei = ethers.parseUnits(String(cap || '0'), d) // 0 ⇒ uncapped (contract stores max)
+      return runCreate('createOpenERC20V2', [name, symbol, d, supply, capWei, metadataURI])
+    },
     [runCreate]
   )
 
   const createOpenERC721V2 = useCallback(
-    ({ name, symbol, baseURI = '' }) => runCreate((factory) => factory.createOpenERC721V2(name, symbol, baseURI)),
+    ({ name, symbol, baseURI = '' }) => runCreate('createOpenERC721V2', [name, symbol, baseURI]),
     [runCreate]
   )
 
   const createRestrictedERC20V2 = useCallback(
-    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '', initialEligible = [] }) =>
-      runCreate((factory) => {
-        const d = Number(decimals)
-        const supply = ethers.parseUnits(String(initialSupply || '0'), d)
-        const capWei = ethers.parseUnits(String(cap || '0'), d)
-        const eligible = initialEligible.filter((a) => ethers.isAddress(a))
-        return factory.createRestrictedERC20V2(name, symbol, d, supply, capWei, metadataURI, eligible)
-      }),
+    ({ name, symbol, decimals, initialSupply, cap = '0', metadataURI = '', initialEligible = [] }) => {
+      const d = Number(decimals)
+      const supply = ethers.parseUnits(String(initialSupply || '0'), d)
+      const capWei = ethers.parseUnits(String(cap || '0'), d)
+      const eligible = initialEligible.filter((a) => ethers.isAddress(a))
+      return runCreate('createRestrictedERC20V2', [name, symbol, d, supply, capWei, metadataURI, eligible])
+    },
     [runCreate]
   )
 

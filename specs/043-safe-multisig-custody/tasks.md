@@ -135,10 +135,10 @@ from Pay & Transfer (pending proposal); switch back to personal (single-signer) 
 - [X] T036 [US3] Implement `frontend/src/contexts/CustodyContext.jsx` (active identity `personal|vault`, chainId guard) and `frontend/src/lib/custody/submitAsActiveAccount.js` (personal path vs. vault proposal path) per `contracts/frontend-integration.md`
 - [X] T037 [US3] Implement `frontend/src/hooks/useActiveAccount.js` exposing `submit(tx)`; mount `CustodyProvider` in the app tree
 - [X] T038 [P] [US3] Build `frontend/src/components/custody/OperateAsIndicator.jsx` — persistent, WCAG-AA active-identity banner + "switch back" (FR-020, FR-023); render app-wide
-- [ ] T039 [US3] Wire **P1 chokepoints** to route through `useActiveAccount().submit` in vault mode: `frontend/src/hooks/useTransfer.js` (`send`) and `frontend/src/hooks/useFriendMarketCreation.js` + `useOpenChallengeAccept.js` (MultiSend `approve+createWager`/`approve+acceptWager`) (FR-021, FR-022)
-- [ ] T040 [US3] Implement FR-022c routing: `claimRefund` as a single-owner direct call (no threshold); vault-won `claimPayout` as a threshold vault transaction; plain receipts unrestricted (research.md Decision 7)
+- [X] T039 [US3] Wire **P1 chokepoints** to route through `useActiveAccount().submit` in vault mode: `frontend/src/hooks/useTransfer.js` (`send`) and `frontend/src/hooks/useFriendMarketCreation.js` + `useOpenChallengeAccept.js` (MultiSend `approve+createWager`/`approve+acceptWager`) (FR-021, FR-022)
+- [X] T040 [US3] Implement FR-022c routing: `claimRefund` as a single-owner direct call (no threshold); vault-won `claimPayout` as a threshold vault transaction; plain receipts unrestricted (research.md Decision 7)
 - [ ] T041 [US3] Wire **P2 chokepoints**: `frontend/src/hooks/usePurchaseFlow.js` (membership), `frontend/src/components/tokens/useTokenFactory.js` (mint), `frontend/src/components/clearpath/connectors/{ozGovernor,governorBravo}.js` + `ExternalDaoView.jsx` (DAO), `frontend/src/contexts/DexContext.jsx` (`swap`) (FR-022a)
-- [ ] T042 [US3] Ensure vault-originated actions pass the same eligibility/compliance checks as personal actions (sanctions, membership roles) (FR-024) and surface only in the Custody queue (FR-022b)
+- [X] T042 [US3] Ensure vault-originated actions pass the same eligibility/compliance checks as personal actions (sanctions, membership roles) (FR-024) and surface only in the Custody queue (FR-022b)
 - [X] T043 [US3] Write tests: `useActiveAccount.test.js`, `OperateAsIndicator.test.jsx` (+ axe), and per-chokepoint vault-branch unit tests
 
 **Checkpoint**: The vault is usable across the app's money-moving surfaces.
