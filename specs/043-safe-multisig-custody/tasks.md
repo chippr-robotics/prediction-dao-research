@@ -175,7 +175,7 @@ confirm new config governs the next transaction (quickstart Scenario 4).
 
 ### Tests for User Story 5
 
-- [ ] T048 [P] [US5] Write `frontend/src/test/backup/vaultReferences.sync.test.js` — `load/apply/merge` round-trip, network-scoped tag validation, union-by-(chainId,address) with newest label winning
+- [X] T048 [P] [US5] Write `frontend/src/test/backup/vaultReferences.sync.test.js` — `load/apply/merge` round-trip, network-scoped tag validation, union-by-(chainId,address) with newest label winning
 
 ### Implementation for User Story 5
 
