@@ -120,6 +120,6 @@ describe('WalletContext — unified login surface (spec 041 US2)', () => {
     renderProbe()
     await waitFor(() => expect(makeReadProvider).toHaveBeenCalled())
     await waitFor(() => expect(rpcGetBalance).toHaveBeenCalledWith(SMART_ACCOUNT))
-    await waitFor(() => expect(screen.getByTestId('native-balance').textContent).not.toBe('0'))
+    await waitFor(() => expect(screen.getByTestId('native-balance')).toHaveTextContent(/^1(\.0)?$/))
   })
 })

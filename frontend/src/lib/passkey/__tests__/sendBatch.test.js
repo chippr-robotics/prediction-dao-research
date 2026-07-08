@@ -70,4 +70,36 @@ describe('sendPasskeyBatch', () => {
 
     expect(err).toBeInstanceOf(SubmissionUnavailable)
   })
+
+  it('does not use optimistic fallback for intent-capable actions', async () => {
+    const err = await sendPasskeyBatch({
+      chainId: 137,
+      address: ADDRESS,
+      calls: [{ target: ADDRESS, data: '0x', value: 0n }],
+      intent: { intentCapable: true, submitIntent: vi.fn() },
+      deps: {
+        knownCredentials,
+        probeRelayer: async () => ({ healthy: false }),
+        probeBundler: async () => ({ healthy: false }),
+      },
+    }).catch((e) => e)
+
+    expect(err).toBeInstanceOf(SubmissionUnavailable)
+  })
+
+  it('does not use optimistic fallback for account-native actions', async () => {
+    const err = await sendPasskeyBatch({
+      chainId: 137,
+      address: ADDRESS,
+      accountNative: true,
+      calls: [{ target: ADDRESS, data: '0x', value: 0n }],
+      deps: {
+        knownCredentials,
+        probeRelayer: async () => ({ healthy: false }),
+        probeBundler: async () => ({ healthy: false }),
+      },
+    }).catch((e) => e)
+
+    expect(err).toBeInstanceOf(SubmissionUnavailable)
+  })
 })
