@@ -29,7 +29,7 @@ export const OPEN_RESOLUTION_TYPES = { Either: 0, ThirdParty: 3, Polymarket: 4, 
  * is never sent anywhere.
  */
 export function useOpenChallengeCreate() {
-  const { signer } = useWeb3()
+  const { signer, provider, chainId, address, account, sendCalls } = useWeb3()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -37,9 +37,11 @@ export function useOpenChallengeCreate() {
     setError(null)
     setBusy(true)
     try {
-      if (!signer) throw new Error('Connect your wallet to create an open challenge.')
+      const actor = address || account
+      const readProvider = provider || signer?.provider
+      if (!actor || !readProvider) throw new Error('Connect your wallet to create an open challenge.')
 
-      const net = await signer.provider.getNetwork()
+      const net = chainId != null ? { chainId } : await readProvider.getNetwork()
       const execChainId = Number(net.chainId)
       const resolve = (n) => getContractAddressForChain(n, execChainId) || getContractAddress(n)
 
@@ -48,13 +50,12 @@ export function useOpenChallengeCreate() {
       const tokenAddr = (form.token && form.token !== ethers.ZeroAddress) ? form.token : resolve('paymentToken')
       if (!tokenAddr) throw new Error('A stake token (USDC) is required.')
 
-      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
-      const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
+      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, readProvider)
+      const token = new ethers.Contract(tokenAddr, ERC20_ABI, readProvider)
       const decimals = Number(await token.decimals())
-      const userAddress = await signer.getAddress()
       const stakeWei = ethers.parseUnits(String(form.stake || '10'), decimals)
 
-      const balance = await token.balanceOf(userAddress)
+      const balance = await token.balanceOf(actor)
       if (balance < stakeWei) throw new Error('Insufficient token balance for this stake.')
 
       // 1. Generate the claim code + derive the on-chain commitment and the terms key.
@@ -86,11 +87,7 @@ export function useOpenChallengeCreate() {
       const metadataHash = ethers.keccak256(ethers.toUtf8Bytes(metadataReference))
 
       // 3. Approve the stake token (max) if needed.
-      const allowance = await token.allowance(userAddress, registryAddr)
-      if (allowance < stakeWei) {
-        onProgress({ step: 'approve', message: 'Approving token spend…' })
-        await (await token.approve(registryAddr, ethers.MaxUint256)).wait()
-      }
+      const allowance = await token.allowance(actor, registryAddr)
 
       // 4. Deadlines.
       const now = Math.floor(Date.now() / 1000)
@@ -113,14 +110,51 @@ export function useOpenChallengeCreate() {
       // Pre-flight to surface a clear revert (e.g. Silver-tier gate) before the wallet prompt.
       onProgress({ step: 'create', message: 'Validating…' })
       try {
-        await registry.createOpenWager.staticCall(...args)
+        await registry.createOpenWager.staticCall(...args, { from: actor })
       } catch (sim) {
         throw new Error(translateOpenCreateRevert(sim.reason || sim.shortMessage || sim.message || ''))
       }
 
-      onProgress({ step: 'create', message: 'Confirm in your wallet…' })
-      const tx = await registry.createOpenWager(...args)
-      const receipt = await tx.wait()
+      let receipt
+      if (signer) {
+        const writeRegistry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
+        const writeToken = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
+        if (allowance < stakeWei) {
+          onProgress({ step: 'approve', message: 'Approving token spend…' })
+          await (await writeToken.approve(registryAddr, ethers.MaxUint256)).wait()
+        }
+        onProgress({ step: 'create', message: 'Confirm in your wallet…' })
+        const tx = await writeRegistry.createOpenWager(...args)
+        receipt = await tx.wait()
+      } else {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot submit open challenges on the current transaction rail.')
+        }
+        const calls = []
+        if (allowance < stakeWei) {
+          onProgress({ step: 'approve', message: 'Approving token spend…' })
+          calls.push({
+            target: tokenAddr,
+            data: token.interface.encodeFunctionData('approve', [registryAddr, ethers.MaxUint256]),
+            value: 0n,
+          })
+        }
+        onProgress({ step: 'create', message: 'Confirm in your wallet…' })
+        calls.push({
+          target: registryAddr,
+          data: registry.interface.encodeFunctionData('createOpenWager', args),
+          value: 0n,
+        })
+        const sent = await sendCalls(calls)
+        const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
+        if (!txHash) throw new Error('Creation submitted but no transaction hash was returned.')
+        for (let i = 0; i < 20; i += 1) {
+          receipt = await readProvider.getTransactionReceipt(txHash)
+          if (receipt) break
+          await new Promise((res) => setTimeout(res, 1500))
+        }
+        if (!receipt) return { code: normalizeCode(code), wagerId: null, txHash }
+      }
       if (!receipt || receipt.status === 0) throw new Error('Creation reverted on-chain.')
 
       const ev = receipt.logs
@@ -135,7 +169,7 @@ export function useOpenChallengeCreate() {
     } finally {
       setBusy(false)
     }
-  }, [signer])
+  }, [signer, provider, chainId, address, account, sendCalls])
 
   return { createOpenChallenge, busy, error }
 }

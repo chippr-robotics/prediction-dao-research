@@ -22,10 +22,17 @@ import { recordJoinedPool } from '../lib/lookup/myWagersSources'
 import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
 
 /** Fetch a receipt by hash, retrying briefly for relay/RPC lag (self-submit resolves on the first try). */
-async function waitReceipt(signer, txHash, tries = 8, delayMs = 1500) {
+async function waitReceipt(runner, txHash, tries = 8, delayMs = 1500) {
   if (!txHash) return null
+  const receiptReader =
+    runner && typeof runner.getTransactionReceipt === 'function'
+      ? runner
+      : runner?.provider && typeof runner.provider.getTransactionReceipt === 'function'
+        ? runner.provider
+        : null
+  if (!receiptReader) return null
   for (let i = 0; i < tries; i += 1) {
-    const r = await signer.provider.getTransactionReceipt(txHash)
+    const r = await receiptReader.getTransactionReceipt(txHash)
     if (r) return r
     await new Promise((res) => setTimeout(res, delayMs))
   }
@@ -145,16 +152,34 @@ async function summarizePool(poolContract, account) {
 }
 
 export function usePools() {
-  const { signer } = useWeb3()
+  const { signer, provider, address, account, chainId, sendCalls } = useWeb3()
+  const activeAddress = address || account
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
 
-  const requireSigner = useCallback(async () => {
-    if (!signer) throw new Error('Connect your wallet to use group pools.')
-    const net = await signer.provider.getNetwork()
-    const account = await signer.getAddress()
-    return { signer, chainId: Number(net.chainId), account }
-  }, [signer])
+  const requireContext = useCallback(async () => {
+    const runner = signer || provider
+    if (!runner) throw new Error('Connect your wallet to use group pools.')
+    if (!activeAddress) throw new Error('Connect your wallet to use group pools.')
+    const net =
+      chainId != null
+        ? { chainId }
+        : typeof runner.getNetwork === 'function'
+          ? await runner.getNetwork()
+          : runner.provider && typeof runner.provider.getNetwork === 'function'
+            ? await runner.provider.getNetwork()
+            : null
+    const activeChainId = Number(net?.chainId)
+    if (!activeChainId) throw new Error('Could not determine the active network for group pools.')
+    return { runner, signer, chainId: activeChainId, account: activeAddress }
+  }, [signer, provider, activeAddress, chainId])
+
+  const requireSendCalls = useCallback(() => {
+    if (typeof sendCalls !== 'function') {
+      throw new Error('This wallet cannot submit pool transactions on the current transaction rail.')
+    }
+    return sendCalls
+  }, [sendCalls])
 
   // ---- Gasless seams (spec 035/036 Tier 2, factory-forwarder) ----
   // Each pool write routes through the relayer when one is live and transparently self-submits otherwise
@@ -178,7 +203,8 @@ export function usePools() {
     params: (poolAddress) => ({ pool: poolAddress }),
     payment: (poolAddress, summary) => ({ value: summary.buyIn }),
     selfSubmit: async (poolAddress, summary, account) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted join.')
       const token = new ethers.Contract(summary.tokenAddress, ERC20_ABI, s)
       const allowance = await token.allowance(account, poolAddress)
       if (allowance < summary.buyIn) await (await token.approve(poolAddress, summary.buyIn)).wait()
@@ -188,28 +214,32 @@ export function usePools() {
   const closeJoiningTx = useGaslessWrite('poolCloseJoining', {
     params: (poolAddress) => ({ pool: poolAddress }),
     selfSubmit: async (poolAddress) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted close.')
       return (await getPool(poolAddress, s).closeJoining()).wait()
     },
   })
   const cancelTx = useGaslessWrite('poolCancel', {
     params: (poolAddress) => ({ pool: poolAddress }),
     selfSubmit: async (poolAddress) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted cancel.')
       return (await getPool(poolAddress, s).cancel()).wait()
     },
   })
   const proposeTx = useGaslessWrite('poolProposeOutcome', {
     params: (poolAddress, entries) => ({ pool: poolAddress, entries, proposalId: payoutMatrixHash(entries) }),
     selfSubmit: async (poolAddress, entries) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted proposal.')
       return (await getPool(poolAddress, s).proposeOutcome(entries)).wait()
     },
   })
   const approveTx = useGaslessWrite('poolApprove', {
     params: (poolAddress, proposalId) => ({ pool: poolAddress, proposalId }),
     selfSubmit: async (poolAddress, proposalId, step) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted approval.')
       step?.('Confirm the approval in your wallet…')
       const tx = await getPool(poolAddress, s).approve()
       step?.('Submitting your approval on-chain…')
@@ -219,14 +249,16 @@ export function usePools() {
   const claimTx = useGaslessWrite('poolClaim', {
     params: (poolAddress, entries, index, recipient) => ({ pool: poolAddress, entries, index, recipient }),
     selfSubmit: async (poolAddress, entries, index, recipient) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted claim.')
       return (await getPool(poolAddress, s).claim(entries, index, recipient)).wait()
     },
   })
   const refundTx = useGaslessWrite('poolRefund', {
     params: (poolAddress) => ({ pool: poolAddress }),
     selfSubmit: async (poolAddress) => {
-      const { signer: s } = await requireSigner()
+      const { signer: s } = await requireContext()
+      if (!s) throw new Error('No signer available for self-submitted refund.')
       return (await getPool(poolAddress, s).refund()).wait()
     },
   })
@@ -241,11 +273,11 @@ export function usePools() {
     setStatus('creating')
     setError(null)
     try {
-      const { signer: s, chainId, account } = await requireSigner()
-      const factory = getFactory(s, chainId)
-      const tokenAddr = form.token || getContractAddressForChain('paymentToken', chainId)
+      const { runner, signer: writeSigner, chainId: activeChainId, account: activeAccount } = await requireContext()
+      const factory = getFactory(runner, activeChainId)
+      const tokenAddr = form.token || getContractAddressForChain('paymentToken', activeChainId)
       if (!tokenAddr) throw new Error('No buy-in token configured for this network.')
-      const token = new ethers.Contract(tokenAddr, ERC20_ABI, s)
+      const token = new ethers.Contract(tokenAddr, ERC20_ABI, runner)
       let decimals = 6
       try {
         decimals = Number(await token.decimals())
@@ -267,44 +299,55 @@ export function usePools() {
         acceptDeadline,
         resolveDeadline,
       }
-      // Gasless when a relayer is live (createPoolWithSig, attributed to the signer), else self-submit.
-      const result = await poolCreateTx.run(form, { factory, params, account })
-      if (result?.error) throw result.error
+      let txHash
+      if (writeSigner) {
+        // Gasless when a relayer is live (createPoolWithSig, attributed to the signer), else self-submit.
+        const result = await poolCreateTx.run(form, { factory, params, account: activeAccount })
+        if (result?.error) throw result.error
+        txHash = result.txHash
+      } else {
+        const send = requireSendCalls()
+        const factoryAddress = await factory.getAddress()
+        const data = factory.interface.encodeFunctionData('createPool', [params])
+        const submitted = await send([{ target: factoryAddress, data, value: 0n }])
+        txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+        if (!txHash) throw new Error('Pool creation submitted but no transaction hash was returned.')
+      }
       // run() surfaces only a txHash; re-read the receipt to recover the pool address + share phrase
       // (the PoolCreated event) uniformly across the relay and self-submit paths. A relayed tx can lag
       // well behind its ACK, so poll generously (~90s) — losing the receipt means losing the pool's
       // address + share phrase + the device-local record, while the escrow has already succeeded.
-      const receipt = await waitReceipt(s, result.txHash, 45, 2000)
+      const receipt = await waitReceipt(runner, txHash, 45, 2000)
       setStatus('idle')
-      const parsed = parsePoolCreated(receipt, factory, account)
+      const parsed = parsePoolCreated(receipt, factory, activeAccount)
       // Never drop the txHash even if the receipt hasn't landed in time — the UI needs it to show a
       // pending pool the user can recover, not an all-null result that reads as a failure.
-      return { ...parsed, txHash: parsed.txHash ?? result.txHash ?? null }
+      return { ...parsed, txHash: parsed.txHash ?? txHash ?? null }
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner, poolCreateTx])
+  }, [requireContext, poolCreateTx, requireSendCalls])
 
   /** Resolve a four-word phrase to a pool summary, or null if it maps to no pool. */
   const resolvePhrase = useCallback(async (phrase, lang = 'en') => {
     setError(null)
     const indices = phraseToIndices(phrase, lang)
     if (!indices) return { notFound: true, reason: 'invalid' }
-    const { signer: s, chainId, account } = await requireSigner()
-    const factory = getFactory(s, chainId)
+    const { runner, chainId: activeChainId, account: activeAccount } = await requireContext()
+    const factory = getFactory(runner, activeChainId)
     const addr = await resolvePool(factory, indices)
     if (!addr) return { notFound: true, reason: 'unknown' }
-    const summary = await summarizePool(getPool(addr, s), account)
+    const summary = await summarizePool(getPool(addr, runner), activeAccount)
     return { summary }
-  }, [requireSigner])
+  }, [requireContext])
 
   /** Read a pool summary by address. */
   const getPoolSummary = useCallback(async (address) => {
-    const { signer: s, account } = await requireSigner()
-    return summarizePool(getPool(address, s), account)
-  }, [requireSigner])
+    const { runner, account: activeAccount } = await requireContext()
+    return summarizePool(getPool(address, runner), activeAccount)
+  }, [requireContext])
 
   /**
    * Join a pool. Gasless via EIP-3009 (joinWithAuthorization → the factory forwarder) where the chain's
@@ -315,20 +358,41 @@ export function usePools() {
     setStatus('joining')
     setError(null)
     try {
-      const { signer: s, account } = await requireSigner()
-      const summary = await summarizePool(getPool(poolAddress, s), account)
-      const result = await joinTx.run(poolAddress, summary, account)
-      if (result?.error) throw result.error
+      const { runner, signer: writeSigner, account: activeAccount } = await requireContext()
+      const summary = await summarizePool(getPool(poolAddress, runner), activeAccount)
+      let txHash
+      if (writeSigner) {
+        const result = await joinTx.run(poolAddress, summary, activeAccount)
+        if (result?.error) throw result.error
+        txHash = result.txHash
+      } else {
+        const send = requireSendCalls()
+        const token = new ethers.Contract(summary.tokenAddress, ERC20_ABI, runner)
+        const allowance = await token.allowance(activeAccount, poolAddress)
+        const pool = getPool(poolAddress, runner)
+        const calls = []
+        if (allowance < summary.buyIn) {
+          calls.push({
+            target: summary.tokenAddress,
+            data: token.interface.encodeFunctionData('approve', [poolAddress, summary.buyIn]),
+            value: 0n,
+          })
+        }
+        calls.push({ target: poolAddress, data: pool.interface.encodeFunctionData('join', []), value: 0n })
+        const submitted = await send(calls)
+        txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+        if (!txHash) throw new Error('Join submitted but no transaction hash was returned.')
+      }
       // Record the join device-locally so EVERY join path makes the pool findable in My Wagers.
-      recordJoinedPool(account, poolAddress)
+      recordJoinedPool(activeAccount, poolAddress)
       setStatus('idle')
-      return { txHash: result.txHash }
+      return { txHash }
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner, joinTx])
+  }, [requireContext, joinTx, requireSendCalls])
 
   /**
    * The pool roster: member wallet addresses from `Joined(address)` events, each with a deterministic
@@ -336,20 +400,20 @@ export function usePools() {
    * the subgraph (the subgraph is for discovery/listing only).
    */
   const getMembers = useCallback(async (poolAddress) => {
-    const { signer: s } = await requireSigner()
-    const pool = getPool(poolAddress, s)
+    const { runner } = await requireContext()
+    const pool = getPool(poolAddress, runner)
     const events = await pool.queryFilter(pool.filters.Joined())
     return events.map((e) => {
       const address = e.args.member
       return { address, nickname: deriveNickname(address, poolAddress) }
     })
-  }, [requireSigner])
+  }, [requireContext])
 
   /** The connected member's deterministic nickname for a pool (derived from their public address). */
   const getMyNickname = useCallback(async (poolAddress) => {
-    const { account } = await requireSigner()
-    return deriveNickname(account, poolAddress)
-  }, [requireSigner])
+    const { account: activeAccount } = await requireContext()
+    return deriveNickname(activeAccount, poolAddress)
+  }, [requireContext])
 
   /**
    * Read the creator's proposed payout matrix straight from the chain. `proposeOutcome` now commits AND
@@ -360,13 +424,13 @@ export function usePools() {
    */
   const fetchProposedMatrix = useCallback(async (poolAddress) => {
     try {
-      const { signer: s, chainId } = await requireSigner()
-      const pool = getPool(poolAddress, s)
+      const { runner, chainId: activeChainId } = await requireContext()
+      const pool = getPool(poolAddress, runner)
       const onChainId = await pool.currentProposalId()
       const targetId = onChainId && onChainId !== ethers.ZeroHash ? onChainId : null
       // Bound the scan to the factory's deploy block when known (never scan from genesis); a provider that
       // still rejects the range throws below and we return null so the off-chain fallback takes over.
-      const fromBlock = getDeploymentBlockForChain('wagerPoolFactory', chainId) || 0
+      const fromBlock = getDeploymentBlockForChain('wagerPoolFactory', activeChainId) || 0
       const events = await pool.queryFilter(pool.filters.OutcomeProposed(), fromBlock)
       if (!events.length) return null
       // Prefer the event matching the current on-chain proposalId (the latest one if the creator revised);
@@ -382,28 +446,54 @@ export function usePools() {
     } catch {
       return null
     }
-  }, [requireSigner])
+  }, [requireContext])
 
   /** Creator: close joining early (freezes the denominator). Gasless when a relayer is live. */
   const closeJoining = useCallback(async (poolAddress) => {
-    const result = await closeJoiningTx.run(poolAddress)
-    if (result?.error) throw result.error
-    return result.txHash
-  }, [closeJoiningTx])
+    if (signer) {
+      const result = await closeJoiningTx.run(poolAddress)
+      if (result?.error) throw result.error
+      return result.txHash
+    }
+    const { runner } = await requireContext()
+    const send = requireSendCalls()
+    const pool = getPool(poolAddress, runner)
+    const submitted = await send([{ target: poolAddress, data: pool.interface.encodeFunctionData('closeJoining', []), value: 0n }])
+    const txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+    if (!txHash) throw new Error('Close submitted but no transaction hash was returned.')
+    return txHash
+  }, [signer, closeJoiningTx, requireContext, requireSendCalls])
 
   /** Anyone: close joining once the accept deadline has passed (permissionless keeper — self-submit). */
   const pokeDeadline = useCallback(async (poolAddress) => {
-    const { signer: s } = await requireSigner()
-    const tx = await getPool(poolAddress, s).pokeDeadline()
-    return (await tx.wait()).hash
-  }, [requireSigner])
+    const { runner, signer: writeSigner } = await requireContext()
+    if (writeSigner) {
+      const tx = await getPool(poolAddress, writeSigner).pokeDeadline()
+      return (await tx.wait()).hash
+    }
+    const send = requireSendCalls()
+    const pool = getPool(poolAddress, runner)
+    const submitted = await send([{ target: poolAddress, data: pool.interface.encodeFunctionData('pokeDeadline', []), value: 0n }])
+    const txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+    if (!txHash) throw new Error('Deadline poke submitted but no transaction hash was returned.')
+    return txHash
+  }, [requireContext, requireSendCalls])
 
   /** Creator: cancel a pool before it fills (members can then refund). Gasless when a relayer is live. */
   const cancelPool = useCallback(async (poolAddress) => {
-    const result = await cancelTx.run(poolAddress)
-    if (result?.error) throw result.error
-    return result.txHash
-  }, [cancelTx])
+    if (signer) {
+      const result = await cancelTx.run(poolAddress)
+      if (result?.error) throw result.error
+      return result.txHash
+    }
+    const { runner } = await requireContext()
+    const send = requireSendCalls()
+    const pool = getPool(poolAddress, runner)
+    const submitted = await send([{ target: poolAddress, data: pool.interface.encodeFunctionData('cancel', []), value: 0n }])
+    const txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+    if (!txHash) throw new Error('Cancellation submitted but no transaction hash was returned.')
+    return txHash
+  }, [signer, cancelTx, requireContext, requireSendCalls])
 
   /**
    * Creator: propose (or revise) the payout outcome by committing the FULL payout matrix. The contract
@@ -412,10 +502,21 @@ export function usePools() {
    * array; the on-chain `proposalId` = keccak256(abi.encode(entries)). Gasless when a relayer is live.
    */
   const proposeOutcome = useCallback(async (poolAddress, entries) => {
-    const result = await proposeTx.run(poolAddress, entries)
-    if (result?.error) throw result.error
-    return result.txHash
-  }, [proposeTx])
+    if (signer) {
+      const result = await proposeTx.run(poolAddress, entries)
+      if (result?.error) throw result.error
+      return result.txHash
+    }
+    const { runner } = await requireContext()
+    const send = requireSendCalls()
+    const pool = getPool(poolAddress, runner)
+    const submitted = await send([
+      { target: poolAddress, data: pool.interface.encodeFunctionData('proposeOutcome', [entries]), value: 0n },
+    ])
+    const txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+    if (!txHash) throw new Error('Proposal submitted but no transaction hash was returned.')
+    return txHash
+  }, [signer, proposeTx, requireContext, requireSendCalls])
 
   /**
    * Member: approve the current proposal with your wallet (one approval per member per proposal). Plain
@@ -426,23 +527,34 @@ export function usePools() {
     setStatus('voting')
     setError(null)
     try {
-      const { signer: s } = await requireSigner()
+      const { runner, signer: writeSigner } = await requireContext()
       // Pin the CURRENT proposalId the member is approving — approveWithSig binds it so a relayer can
       // never retarget the approval to a matrix the member never saw (anti-rug).
-      const proposalId = await getPool(poolAddress, s).currentProposalId()
+      const pool = getPool(poolAddress, runner)
+      const proposalId = await pool.currentProposalId()
       if (!proposalId || proposalId === ethers.ZeroHash) {
         throw new Error('There is no proposed payout to approve yet.')
       }
-      const result = await approveTx.run(poolAddress, proposalId, step)
-      if (result?.error) throw result.error
+      let txHash
+      if (writeSigner) {
+        const result = await approveTx.run(poolAddress, proposalId, step)
+        if (result?.error) throw result.error
+        txHash = result.txHash
+      } else {
+        const send = requireSendCalls()
+        step('Confirm the approval in your wallet…')
+        const submitted = await send([{ target: poolAddress, data: pool.interface.encodeFunctionData('approve', []), value: 0n }])
+        txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+        if (!txHash) throw new Error('Approval submitted but no transaction hash was returned.')
+      }
       setStatus('idle')
-      return result.txHash
+      return txHash
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [requireSigner, approveTx])
+  }, [requireContext, approveTx, requireSendCalls])
 
   /**
    * Winner: claim a share to `recipient`. `entries` is the payout-matrix preimage (shared by the creator);
@@ -454,32 +566,56 @@ export function usePools() {
     try {
       // Strongest gasless case: a winner holding zero gas. claimWithSig binds (index, recipient) to the
       // signer, so the relayer can never redirect the payout to itself.
-      const result = await claimTx.run(poolAddress, entries, index, recipient)
-      if (result?.error) throw result.error
+      let txHash
+      if (signer) {
+        const result = await claimTx.run(poolAddress, entries, index, recipient)
+        if (result?.error) throw result.error
+        txHash = result.txHash
+      } else {
+        const { runner } = await requireContext()
+        const send = requireSendCalls()
+        const pool = getPool(poolAddress, runner)
+        const submitted = await send([
+          { target: poolAddress, data: pool.interface.encodeFunctionData('claim', [entries, index, recipient]), value: 0n },
+        ])
+        txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+        if (!txHash) throw new Error('Claim submitted but no transaction hash was returned.')
+      }
       setStatus('idle')
-      return result.txHash
+      return txHash
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [claimTx])
+  }, [signer, claimTx, requireContext, requireSendCalls])
 
   /** Member: recover the buy-in after a timeout or cancellation. Gasless (a stranded member has no gas). */
   const refund = useCallback(async (poolAddress) => {
     setStatus('refunding')
     setError(null)
     try {
-      const result = await refundTx.run(poolAddress)
-      if (result?.error) throw result.error
+      let txHash
+      if (signer) {
+        const result = await refundTx.run(poolAddress)
+        if (result?.error) throw result.error
+        txHash = result.txHash
+      } else {
+        const { runner } = await requireContext()
+        const send = requireSendCalls()
+        const pool = getPool(poolAddress, runner)
+        const submitted = await send([{ target: poolAddress, data: pool.interface.encodeFunctionData('refund', []), value: 0n }])
+        txHash = submitted?.txHash ?? submitted?.userOpHash ?? submitted?.intentId
+        if (!txHash) throw new Error('Refund submitted but no transaction hash was returned.')
+      }
       setStatus('idle')
-      return result.txHash
+      return txHash
     } catch (e) {
       setStatus('error')
       setError(e?.shortMessage || e?.message || String(e))
       throw e
     }
-  }, [refundTx])
+  }, [signer, refundTx, requireContext, requireSendCalls])
 
   return {
     status,

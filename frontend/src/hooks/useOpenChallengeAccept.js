@@ -29,7 +29,8 @@ const ERC20_ABI = [
  * plus { busy, error } state. Discovery and the membership check are read-only; only accept signs/sends.
  */
 export function useOpenChallengeAccept() {
-  const { signer, account, chainId, provider } = useWeb3()
+  const { signer, address, account, chainId, provider, sendCalls } = useWeb3()
+  const actor = address || account
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -49,7 +50,7 @@ export function useOpenChallengeAccept() {
 
       // Approve the registry to escrow the stake (skip if already approved). Kept in the self-submit
       // closure because the gasless path never approves — EIP-3009 pulls the stake instead.
-      const allowance = await token.allowance(account, registryAddr)
+      const allowance = await token.allowance(actor, registryAddr)
       if (allowance < stake) {
         onProgress({ step: 'approve', message: `Approve ${symbol} spending in your wallet…` })
         const approveTx = await token.approve(registryAddr, ethers.MaxUint256)
@@ -121,9 +122,9 @@ export function useOpenChallengeAccept() {
       let needsMembership = false
       try {
         const mAddr = chainId != null ? getContractAddressForChain('membershipManager', chainId) : getContractAddress('membershipManager')
-        if (mAddr && account) {
+        if (mAddr && actor) {
           const mm = new ethers.Contract(mAddr, MEMBERSHIP_ABI, readProvider)
-          needsMembership = !(await mm.hasActiveRole(account, WAGER_PARTICIPANT_ROLE))
+          needsMembership = !(await mm.hasActiveRole(actor, WAGER_PARTICIPANT_ROLE))
         }
       } catch {
         needsMembership = false // non-fatal; the contract is the source of truth at accept
@@ -134,7 +135,7 @@ export function useOpenChallengeAccept() {
       // Provider/RPC/contract failure — the caller MUST treat this as "couldn't check", not "no match".
       return { status: 'errored', error }
     }
-  }, [provider, signer, account, chainId, resolveRegistry])
+  }, [provider, signer, actor, chainId, resolveRegistry])
 
   /**
    * Look up an open challenge by its code, read it, and decrypt its terms. Read-only — no wallet signature.
@@ -166,12 +167,13 @@ export function useOpenChallengeAccept() {
     setError(null)
     setBusy(true)
     try {
-      if (!signer || !account) throw new Error('Connect your wallet to accept.')
+      const readProvider = provider || signer?.provider
+      if (!actor || !readProvider) throw new Error('Connect your wallet to accept.')
       if (!isValidCode(code)) throw new Error('Enter the four words exactly as they were shared with you.')
 
       const registryAddr = resolveRegistry()
-      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
-      const net = await signer.provider.getNetwork()
+      const registry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, readProvider)
+      const net = chainId != null ? { chainId: BigInt(chainId) } : await readProvider.getNetwork()
 
       // 1. Read the authoritative stake the contract will pull (opponentStake == creatorStake for open
       //    challenges) and make sure the taker can cover it before any wallet prompt.
@@ -182,13 +184,13 @@ export function useOpenChallengeAccept() {
       if (!tokenAddr || tokenAddr === ethers.ZeroAddress) {
         throw new Error('This challenge has no stake token configured.')
       }
-      const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
+      const token = new ethers.Contract(tokenAddr, ERC20_ABI, readProvider)
       let decimals = 18
       let symbol = 'tokens'
       try { decimals = Number(await token.decimals()) } catch { /* default 18 */ }
       try { symbol = await token.symbol() } catch { /* default tokens */ }
 
-      const balance = await token.balanceOf(account)
+      const balance = await token.balanceOf(actor)
       if (balance < stake) {
         throw new Error(
           `Insufficient ${symbol} balance to take this challenge. ` +
@@ -202,7 +204,7 @@ export function useOpenChallengeAccept() {
       onProgress({ step: 'sign', message: 'Sign to authorize acceptance…' })
       const signature = await signOpenAccept(code, {
         wagerId,
-        taker: account,
+        taker: actor,
         chainId: net.chainId,
         verifyingContract: registryAddr,
       })
@@ -211,16 +213,46 @@ export function useOpenChallengeAccept() {
       //    pulls the stake), transparent self-submit otherwise (approve → pre-flight → send). The
       //    approval, whose absence caused the allowance revert, stays inside the self-submit closure
       //    where a self-submitted accept still needs it.
-      const result = await acceptOpenWagerTx.run(wagerId, signature, stake, tokenAddr, registryAddr, symbol, onProgress)
-      if (result?.error) throw result.error
-      return { txHash: result?.txHash }
+      if (signer) {
+        const result = await acceptOpenWagerTx.run(wagerId, signature, stake, tokenAddr, registryAddr, symbol, onProgress)
+        if (result?.error) throw result.error
+        return { txHash: result?.txHash }
+      }
+      if (typeof sendCalls !== 'function') {
+        throw new Error('This wallet cannot accept challenges on the current transaction rail.')
+      }
+      const calls = []
+      const allowance = await token.allowance(actor, registryAddr)
+      if (allowance < stake) {
+        onProgress({ step: 'approve', message: `Approve ${symbol} spending in your wallet…` })
+        calls.push({
+          target: tokenAddr,
+          data: token.interface.encodeFunctionData('approve', [registryAddr, ethers.MaxUint256]),
+          value: 0n,
+        })
+      }
+      try {
+        await registry.acceptOpenWager.staticCall(wagerId, signature, { from: actor })
+      } catch (sim) {
+        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
+      }
+      onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
+      calls.push({
+        target: registryAddr,
+        data: registry.interface.encodeFunctionData('acceptOpenWager', [wagerId, signature]),
+        value: 0n,
+      })
+      const sent = await sendCalls(calls)
+      const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
+      if (!txHash) throw new Error('Acceptance submitted but no transaction hash was returned.')
+      return { txHash }
     } catch (e) {
       setError(e.message)
       throw e
     } finally {
       setBusy(false)
     }
-  }, [signer, account, resolveRegistry, acceptOpenWagerTx])
+  }, [provider, signer, actor, chainId, resolveRegistry, acceptOpenWagerTx, sendCalls])
 
   return { lookup, discover, accept, busy, error }
 }
