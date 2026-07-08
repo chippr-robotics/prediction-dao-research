@@ -7,6 +7,7 @@
  */
 
 const QUICK_ACCESS_PREF_KEY = 'fairwins_quickaccess_v1'
+// Default-visible cards are: oracle-open-challenge, enter-phrase, my-wagers.
 const DEFAULT_HIDDEN_CARDS = [
   'create-1v1-friends',
   'create-1v1-oracle',

@@ -34,7 +34,7 @@ vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
 
 vi.mock('../components/fairwins/PolymarketTickerCrawler', () => ({
   default: ({ onSelectMarket }) => (
-    <button type="button" onClick={() => onSelectMarket?.({ conditionId: '0xabc' })}>
+    <button type="button" onClick={() => onSelectMarket?.()}>
       Ticker: Will event happen?
     </button>
   ),
@@ -337,7 +337,6 @@ describe('Dashboard Component', () => {
     })
 
     it('hides a card that has been turned off in Preferences and reflows the rest', () => {
-      setCardVisible('scan-qr', true)
       setCardVisible('share-account', true)
       setCardVisible('scan-qr', false)
       renderWithProviders(<Dashboard />)

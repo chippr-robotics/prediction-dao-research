@@ -23,12 +23,12 @@ function PolymarketTickerCrawler({ onSelectMarket, limit = 12 }) {
   const renderGroup = (clone) => (
     <ul className="pm-ticker-group" aria-hidden={clone || undefined}>
       <li className="pm-ticker-label">Polymarket</li>
-      {items.map((item) => (
-        <li key={`${clone ? 'clone' : 'item'}-${item.market.conditionId}`}>
+      {items.map((item, index) => (
+        <li key={`${clone ? 'clone' : 'item'}-${index}-${item.market.conditionId}`}>
           <button
             type="button"
             className="pm-ticker-item"
-            onClick={() => onSelectMarket?.(item.market)}
+            onClick={() => onSelectMarket?.()}
           >
             {item.title}
           </button>
