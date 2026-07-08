@@ -498,9 +498,6 @@ function Dashboard() {
   const [showQrScanner, setShowQrScanner] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  // Pre-fill payload for the create-wager modal when launched from a
-  // Polymarket card. Cleared on modal close so subsequent opens start clean.
-  const [initialPolymarketMarket, setInitialPolymarketMarket] = useState(null)
   // Wager id the My Wagers modal should open directly on (feed navigation).
   const [initialWagerId, setInitialWagerId] = useState(null)
 
@@ -674,7 +671,7 @@ function Dashboard() {
         <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
       </section>
 
-      {/* Polymarket ticker crawler — clicking a title opens Oracle Open Challenge. */}
+      {/* Polymarket ticker crawler — clicking a title opens Open Oracle Challenge. */}
       <section className="dashboard-section">
         <PolymarketTickerCrawler onSelectMarket={handlePolymarketTickerClick} />
       </section>
@@ -686,11 +683,9 @@ function Dashboard() {
           setShowCreateWager(false)
           setCreateWagerType(null)
           setCreateResolutionCategory('all')
-          setInitialPolymarketMarket(null)
         }}
         initialType={createWagerType}
         resolutionCategory={createResolutionCategory}
-        initialPolymarketMarket={initialPolymarketMarket}
       />
 
       {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037). */}

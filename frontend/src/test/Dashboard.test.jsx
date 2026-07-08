@@ -314,7 +314,7 @@ describe('Dashboard Component', () => {
       </MemoryRouter>
     )
 
-    it('the "Enter a Phrase" quick action opens the unified lookup (no auto-resolve)', () => {
+    it('the "Enter Words" quick action opens the unified lookup (no auto-resolve)', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('unified-modal')).not.toBeInTheDocument()
       fireEvent.click(screen.getByText('Enter Words'))

@@ -32,7 +32,7 @@ function notify() {
 
 /**
  * Read the set of hidden quick access card ids for this device.
- * @returns {string[]} hidden card ids (empty array if none hidden, or on missing/corrupt storage)
+ * @returns {string[]} hidden card ids (DEFAULT_HIDDEN_CARDS if none saved, or on missing/corrupt storage)
  */
 export function getHiddenCards() {
   try {

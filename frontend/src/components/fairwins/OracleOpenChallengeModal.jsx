@@ -49,7 +49,7 @@ function OracleOpenChallengeModal({ isOpen, onClose }) {
           <div className="fm-header-content">
             <div className="fm-brand">
               <span className="fm-brand-icon" aria-hidden="true">&#128302;</span>
-              <h2 id="oracle-open-challenge-title">Oracle Open Challenge</h2>
+              <h2 id="oracle-open-challenge-title">Open Oracle Challenge</h2>
             </div>
             <p className="fm-subtitle">
               Bet head-to-head with whoever takes your code — Polymarket only settles the result

@@ -28,7 +28,8 @@ function PolymarketTickerCrawler({ onSelectMarket, limit = 12 }) {
           <button
             type="button"
             className="pm-ticker-item"
-            onClick={() => onSelectMarket?.()}
+            tabIndex={clone ? -1 : undefined}
+            onClick={() => onSelectMarket?.(item.market)}
           >
             {item.title}
           </button>
