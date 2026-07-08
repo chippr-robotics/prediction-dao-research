@@ -14,16 +14,23 @@ const { state, calls } = vi.hoisted(() => ({
   state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '', acceptArgs: null },
   calls: [],
 }))
+const wallet = vi.hoisted(() => ({
+  signer: {
+    getAddress: () => Promise.resolve(ACCOUNT),
+    provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) },
+  },
+  provider: { isFakeProvider: true },
+  sendCalls: vi.fn(async () => ({ txHash: '0xpasskeytx' })),
+}))
 
 vi.mock('../hooks/useWeb3', () => ({
   useWeb3: () => ({
+    address: ACCOUNT,
     account: ACCOUNT,
     chainId: 63,
-    provider: { isFakeProvider: true },
-    signer: {
-      getAddress: () => Promise.resolve(ACCOUNT),
-      provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) },
-    },
+    provider: wallet.provider,
+    signer: wallet.signer,
+    sendCalls: wallet.sendCalls,
   }),
 }))
 
@@ -52,6 +59,7 @@ vi.mock('ethers', async () => {
       }
       acceptOpenWager.staticCall = () => Promise.resolve()
       return {
+        interface: { encodeFunctionData: vi.fn(() => '0xacceptcalldata') },
         openWagerIdForClaim: () => state.throwLookup
           ? Promise.reject(new Error('rpc down'))
           : Promise.resolve(state.wagerId),
@@ -66,6 +74,7 @@ vi.mock('ethers', async () => {
     }
     // token contract
     return {
+      interface: { encodeFunctionData: vi.fn(() => '0xapprovecalldata') },
       decimals: () => Promise.resolve(6),
       symbol: () => Promise.resolve('USDC'),
       balanceOf: () => Promise.resolve(state.balance),
@@ -93,6 +102,12 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     state.allowance = 0n
     state.balance = 100_000_000n
     state.acceptArgs = null
+    wallet.signer = {
+      getAddress: () => Promise.resolve(ACCOUNT),
+      provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) },
+    }
+    wallet.provider = { isFakeProvider: true }
+    wallet.sendCalls.mockReset().mockResolvedValue({ txHash: '0xpasskeytx' })
   })
 
   it('approves the registry BEFORE sending acceptOpenWager when allowance is short', async () => {
@@ -138,6 +153,21 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
       })
     ).rejects.toThrow(/Insufficient USDC balance/i)
     expect(calls).toEqual([])
+  })
+
+  it('supports passkey sessions with no signer by routing writes through sendCalls', async () => {
+    wallet.signer = null
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    const steps = []
+    let res
+    await act(async () => {
+      res = await result.current.accept('river tiger kite zoo', 4n, (p) => steps.push(p.step))
+    })
+    expect(res.txHash).toBe('0xpasskeytx')
+    expect(wallet.sendCalls).toHaveBeenCalledTimes(1)
+    expect(wallet.sendCalls.mock.calls[0][0]).toHaveLength(2) // approve + accept
+    expect(calls).toEqual([]) // no direct signer contract write path used
+    expect(steps).toEqual(expect.arrayContaining(['check', 'approve', 'sign', 'accept']))
   })
 })
 
