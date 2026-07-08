@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 
 const getBalance = vi.fn()
+const rpcGetBalance = vi.fn()
 const tokenBalanceOf = vi.fn()
 const contractCtor = vi.fn(() => ({ balanceOf: tokenBalanceOf }))
+const makeReadProvider = vi.fn()
 
 vi.mock('ethers', () => ({
   ethers: {
@@ -39,7 +41,8 @@ vi.mock('../hooks/useChainTokens', () => ({
     stableAddress: '0xToken000000000000000000000000000000000001',
   }),
 }))
-vi.mock('../config/networks', () => ({ getNetwork: () => ({ stablecoin: { domainVersion: null } }) }))
+vi.mock('../config/networks', () => ({ getNetwork: () => ({ stablecoin: { domainVersion: null }, rpcUrl: 'https://rpc.test' }) }))
+vi.mock('../utils/rpcProvider', () => ({ makeReadProvider: (...args) => makeReadProvider(...args) }))
 vi.mock('../lib/transfer/eip3009Transfer', () => ({
   TRANSFER_ABI: ['function balanceOf(address) view returns (uint256)'],
   signTransferAuthorization: vi.fn(),
@@ -56,10 +59,16 @@ import { useTransfer, TRANSFER_KIND } from '../hooks/useTransfer'
 
 describe('useTransfer balances', () => {
   beforeEach(() => {
+    wallet.loginMethod = 'eoa'
+    wallet.provider = { getBalance }
     getBalance.mockReset()
+    rpcGetBalance.mockReset()
     tokenBalanceOf.mockReset()
+    makeReadProvider.mockReset()
     contractCtor.mockClear()
+    makeReadProvider.mockReturnValue({ getBalance: rpcGetBalance })
     getBalance.mockResolvedValue(2500000000000000000n)
+    rpcGetBalance.mockResolvedValue(3500000000000000000n)
     tokenBalanceOf.mockResolvedValue(123450000n)
   })
 
@@ -81,5 +90,22 @@ describe('useTransfer balances', () => {
     })
     expect(getBalance).toHaveBeenCalledTimes(2)
     expect(tokenBalanceOf).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses the network RPC read provider for passkey sessions', async () => {
+    wallet.loginMethod = 'passkey'
+    wallet.provider = null
+
+    const { result } = renderHook(() => useTransfer())
+
+    await waitFor(() => expect(makeReadProvider).toHaveBeenCalledWith('https://rpc.test', wallet.chainId))
+    await waitFor(() => expect(rpcGetBalance).toHaveBeenCalledWith(wallet.address))
+    await waitFor(() => expect(tokenBalanceOf).toHaveBeenCalledWith(wallet.address))
+    expect(contractCtor).toHaveBeenCalledWith(
+      '0xToken000000000000000000000000000000000001',
+      ['function balanceOf(address) view returns (uint256)'],
+      expect.objectContaining({ getBalance: rpcGetBalance })
+    )
+    expect(result.current.balanceOf(TRANSFER_KIND.NATIVE)).toBe('3.5')
   })
 })

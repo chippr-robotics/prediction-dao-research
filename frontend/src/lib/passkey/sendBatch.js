@@ -17,6 +17,7 @@ import {
   defaultBundlerProbe,
   trackToInclusion,
   LIFECYCLE,
+  SubmissionUnavailable,
 } from './submission'
 import { getNetwork } from '../../config/networks'
 
@@ -51,12 +52,30 @@ export async function sendPasskeyBatch({
   const net = getNetwork(chainId)
   const bundlerUrls = net?.passkey?.bundlerUrls ?? []
 
-  const route = await chooseRoute({
-    intentCapable: Boolean(intent?.intentCapable),
-    accountNative,
-    probeRelayer: deps.probeRelayer ?? defaultRelayerProbe(chainId),
-    probeBundler: deps.probeBundler ?? defaultBundlerProbe(bundlerUrls),
-  })
+  let route
+  try {
+    route = await chooseRoute({
+      intentCapable: Boolean(intent?.intentCapable),
+      accountNative,
+      probeRelayer: deps.probeRelayer ?? defaultRelayerProbe(chainId),
+      probeBundler: deps.probeBundler ?? defaultBundlerProbe(bundlerUrls),
+    })
+  } catch (error) {
+    // Some bundlers block/flake health probes (especially mobile webviews) while
+    // still accepting sendUserOperation. If we have a configured bundler rail and
+    // no intent path to take, optimistically attempt the UserOp rather than fail
+    // before submission.
+    if (
+      error instanceof SubmissionUnavailable &&
+      !intent?.intentCapable &&
+      !accountNative &&
+      bundlerUrls.length > 0
+    ) {
+      route = 'userop'
+    } else {
+      throw error
+    }
+  }
 
   onState?.({ state: LIFECYCLE.DRAFT, route })
 

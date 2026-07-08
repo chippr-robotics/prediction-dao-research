@@ -14,21 +14,27 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { useAccount } from 'wagmi'
 import { WalletProvider } from './WalletContext.jsx'
 import { useWallet } from '../hooks/useWalletManagement'
+import { makeReadProvider } from '../utils/rpcProvider'
 
 vi.mock('../lib/passkey/sendBatch', () => ({
   sendPasskeyBatch: vi.fn(async () => ({ route: 'userop', txHash: '0xbatch' })),
+}))
+const rpcGetBalance = vi.fn(async () => 1000000000000000000n)
+vi.mock('../utils/rpcProvider', () => ({
+  makeReadProvider: vi.fn(() => ({ getBalance: rpcGetBalance })),
 }))
 import { sendPasskeyBatch } from '../lib/passkey/sendBatch'
 
 const SMART_ACCOUNT = '0x00000000000000000000000000000000000A11CE'
 
 function Probe() {
-  const { address, loginMethod, hasRole, sendCalls, disconnectWallet } = useWallet()
+  const { address, loginMethod, hasRole, sendCalls, disconnectWallet, balances } = useWallet()
   return (
     <div>
       <span data-testid="address">{address}</span>
       <span data-testid="login-method">{String(loginMethod)}</span>
       <span data-testid="has-role">{String(hasRole('WAGER_PARTICIPANT'))}</span>
+      <span data-testid="native-balance">{balances.native}</span>
       <button onClick={() => sendCalls([{ target: '0x' + 'a'.repeat(40), data: '0x01' }])}>send</button>
       <button onClick={disconnectWallet}>signout</button>
     </div>
@@ -44,6 +50,7 @@ const renderProbe = () =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  rpcGetBalance.mockClear()
   localStorage.clear()
 })
 
@@ -102,5 +109,17 @@ describe('WalletContext — unified login surface (spec 041 US2)', () => {
       screen.getByText('signout').click()
     })
     expect(localStorage.getItem('fairwins.passkey.session.v1')).toBeNull()
+  })
+
+  it('fetches balances for passkey sessions from chain RPC reads', async () => {
+    useAccount.mockReturnValue({
+      address: SMART_ACCOUNT,
+      isConnected: true,
+      connector: { id: 'fairwinsPasskey', type: 'passkey' },
+    })
+    renderProbe()
+    await waitFor(() => expect(makeReadProvider).toHaveBeenCalled())
+    await waitFor(() => expect(rpcGetBalance).toHaveBeenCalledWith(SMART_ACCOUNT))
+    await waitFor(() => expect(screen.getByTestId('native-balance').textContent).not.toBe('0'))
   })
 })

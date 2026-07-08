@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
 import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID } from '../config/networks'
+import { makeReadProvider } from '../utils/rpcProvider'
 import {
   getUserRoles,
   addUserRole,
@@ -49,6 +50,11 @@ export function WalletProvider({ children }) {
     if (activeConnector.id === 'walletConnect') return 'walletconnect'
     return 'injected'
   }, [isConnected, activeConnector])
+  const readProvider = useMemo(() => {
+    const net = getNetwork(chainId)
+    const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
+    return loginMethod === 'passkey' ? (rpcProvider ?? provider) : (provider ?? rpcProvider)
+  }, [chainId, loginMethod, provider])
 
   // Encryption capability for the FR-012 degradation UI. Classic wallets keep
   // the legacy signature-derived path (always available); passkey sessions
@@ -333,12 +339,12 @@ export function WalletProvider({ children }) {
 
   // Fetch wallet balances
   const fetchBalances = useCallback(async (walletAddress) => {
-    if (!provider || !walletAddress) return
+    if (!readProvider || !walletAddress) return
     
     setBalancesLoading(true)
     try {
       // Get native token balance
-      const nativeBalance = await provider.getBalance(walletAddress)
+      const nativeBalance = await readProvider.getBalance(walletAddress)
 
       setBalances(prev => ({
         ...prev,
@@ -349,7 +355,7 @@ export function WalletProvider({ children }) {
     } finally {
       setBalancesLoading(false)
     }
-  }, [provider])
+  }, [readProvider])
 
   // Load RVAC roles when the wallet connects or the active network changes.
   // Membership (the paid WAGER_PARTICIPANT role) lives in a per-chain
