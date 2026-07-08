@@ -47,7 +47,9 @@
 .input:focus {
   outline: none;
   border-color: var(--color-primary, var(--brand-primary, #6d28d9));
+  /* Fallback for browsers without color-mix() support. */
   box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.14);
+  /* Preferred theme-tinted ring when color-mix() is supported. */
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, var(--brand-primary, #6d28d9)) 14%, transparent);
 }
 
