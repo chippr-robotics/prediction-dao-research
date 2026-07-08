@@ -7,6 +7,15 @@
  */
 
 const QUICK_ACCESS_PREF_KEY = 'fairwins_quickaccess_v1'
+const DEFAULT_HIDDEN_CARDS = [
+  'create-1v1-friends',
+  'create-1v1-oracle',
+  'create-offer',
+  'open-challenge',
+  'create-pool',
+  'scan-qr',
+  'share-account',
+]
 
 const listeners = new Set()
 
@@ -27,12 +36,12 @@ function notify() {
 export function getHiddenCards() {
   try {
     const saved = localStorage.getItem(QUICK_ACCESS_PREF_KEY)
-    if (!saved) return []
+    if (!saved) return DEFAULT_HIDDEN_CARDS
     const parsed = JSON.parse(saved)
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : DEFAULT_HIDDEN_CARDS
   } catch (error) {
     console.warn('Error reading quick access preference:', error)
-    return []
+    return DEFAULT_HIDDEN_CARDS
   }
 }
 

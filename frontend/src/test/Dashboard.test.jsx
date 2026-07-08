@@ -32,6 +32,14 @@ vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
   ) : null,
 }))
 
+vi.mock('../components/fairwins/PolymarketTickerCrawler', () => ({
+  default: ({ onSelectMarket }) => (
+    <button type="button" onClick={() => onSelectMarket?.({ conditionId: '0xabc' })}>
+      Ticker: Will event happen?
+    </button>
+  ),
+}))
+
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
     account: '0x1234567890abcdef1234567890abcdef12345678',
@@ -151,29 +159,31 @@ describe('Dashboard Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.removeItem('fairwins_quickaccess_v1')
   })
 
   describe('QuickActions button flows', () => {
-    const openVia = (cardText) => {
+    const openVia = (cardText, cardId) => {
+      setCardVisible(cardId, true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText(cardText))
       return screen.getByTestId('friend-modal')
     }
 
     it('"Friends Decide (1v1)" opens the participant flow', () => {
-      const modal = openVia('Friends Decide (1v1)')
+      const modal = openVia('Friends Decide (1v1)', 'create-1v1-friends')
       expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
       expect(modal).toHaveAttribute('data-resolution-category', 'participant')
     })
 
     it('"Oracle Settles (1v1)" opens the oracle flow (lands on Polymarket search)', () => {
-      const modal = openVia('Oracle Settles (1v1)')
+      const modal = openVia('Oracle Settles (1v1)', 'create-1v1-oracle')
       expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
       expect(modal).toHaveAttribute('data-resolution-category', 'oracle')
     })
 
     it('"Make an Offer" opens the all-resolution flow', () => {
-      const modal = openVia('Make an Offer')
+      const modal = openVia('Make an Offer', 'create-offer')
       expect(modal).toHaveAttribute('data-initial-type', 'offer')
       expect(modal).toHaveAttribute('data-resolution-category', 'all')
     })
@@ -188,6 +198,7 @@ describe('Dashboard Component', () => {
     // clean, minimally branded QR using the persisted color choice, with no
     // color options and no visible address text.
     it('"Share Account" opens the quick QR view for the connected address', () => {
+      setCardVisible('share-account', true)
       renderWithProviders(<Dashboard />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
@@ -209,6 +220,7 @@ describe('Dashboard Component', () => {
     })
 
     it('"Share Account" QR uses the color preference saved on the Account page', () => {
+      setCardVisible('share-account', true)
       localStorage.setItem('fairwins_qrcolor_v1', 'forest')
       const { container } = renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Share Account'))
@@ -219,6 +231,7 @@ describe('Dashboard Component', () => {
     })
 
     it('"Share Account" modal closes via its close button', () => {
+      setCardVisible('share-account', true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Share Account'))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -233,7 +246,7 @@ describe('Dashboard Component', () => {
   describe('Rendering', () => {
     it('should render dashboard header', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Your Wagers')).toBeInTheDocument()
+      expect(screen.getByText('Quick Actions')).toBeInTheDocument()
     })
 
     it('should not show the demo mode badge by default', () => {
@@ -244,47 +257,32 @@ describe('Dashboard Component', () => {
       expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
     })
 
-    it('should show connected wallet address', () => {
+    it('should not show redundant connected wallet subtitle', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText(/Connected: 0x1234\.\.\.5678/)).toBeInTheDocument()
+      expect(screen.queryByText(/Connected:/)).not.toBeInTheDocument()
     })
   })
 
   describe('Quick Actions', () => {
-    it('should render all quick action cards', () => {
+    it('shows only the default-visible quick action cards', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
-      expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
-      expect(screen.getByText('Make an Offer')).toBeInTheDocument()
-      expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
-      expect(screen.getByText('Share Account')).toBeInTheDocument()
+      expect(screen.getByText('Open Oracle Challenge')).toBeInTheDocument()
+      expect(screen.getByText('Enter Words')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
+      expect(screen.queryByText('Friends Decide (1v1)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Oracle Settles (1v1)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Make an Offer')).not.toBeInTheDocument()
+      expect(screen.queryByText('Open Challenge')).not.toBeInTheDocument()
+      expect(screen.queryByText('Group Pool')).not.toBeInTheDocument()
+      expect(screen.queryByText('Scan QR Code')).not.toBeInTheDocument()
+      expect(screen.queryByText('Share Account')).not.toBeInTheDocument()
     })
 
     it('should have quick action descriptions', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('You and a friend settle the outcome')).toBeInTheDocument()
-      // Default (VITE_ORACLE_MODELS=polymarket-only) hides Chainlink/UMA copy.
-      expect(screen.getByText('Auto-settles from a linked Polymarket market')).toBeInTheDocument()
-      expect(screen.queryByText(/Chainlink or UMA/)).not.toBeInTheDocument()
-      expect(screen.getByText('Offer odds and choose who settles — you or your friend')).toBeInTheDocument()
-    })
-  })
-
-  describe('How It Works', () => {
-    it('should render collapsible how-it-works section', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('How P2P Wagers Work')).toBeInTheDocument()
-    })
-
-    it('should expand how-it-works when clicked', () => {
-      renderWithProviders(<Dashboard />)
-      const toggle = screen.getByText('How P2P Wagers Work')
-      fireEvent.click(toggle)
-      expect(screen.getByText('Create a wager')).toBeInTheDocument()
-      expect(screen.getByText('Share the invite')).toBeInTheDocument()
-      expect(screen.getByText('The designated party proposes the outcome. A 24-hour challenge window ensures fairness.')).toBeInTheDocument()
-      expect(screen.getByText('Claim winnings')).toBeInTheDocument()
+      expect(screen.getByText(/share a code — Polymarket settles it automatically/i)).toBeInTheDocument()
+      expect(screen.getByText('Enter four words to join a pool or take a challenge')).toBeInTheDocument()
+      expect(screen.getByText('View active and past wagers')).toBeInTheDocument()
     })
   })
 
@@ -319,7 +317,7 @@ describe('Dashboard Component', () => {
     it('the "Enter a Phrase" quick action opens the unified lookup (no auto-resolve)', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('unified-modal')).not.toBeInTheDocument()
-      fireEvent.click(screen.getByText('Enter a Phrase'))
+      fireEvent.click(screen.getByText('Enter Words'))
       const modal = screen.getByTestId('unified-modal')
       expect(modal).toHaveAttribute('data-auto', 'false')
       expect(modal).toHaveAttribute('data-phrase', '')
@@ -339,11 +337,12 @@ describe('Dashboard Component', () => {
     })
 
     it('hides a card that has been turned off in Preferences and reflows the rest', () => {
+      setCardVisible('scan-qr', true)
+      setCardVisible('share-account', true)
       setCardVisible('scan-qr', false)
       renderWithProviders(<Dashboard />)
       expect(screen.queryByText('Scan QR Code')).not.toBeInTheDocument()
       // The rest of the grid is unaffected.
-      expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
       expect(screen.getByText('Share Account')).toBeInTheDocument()
     })
 
@@ -370,7 +369,7 @@ describe('Dashboard Component', () => {
     it('should have proper heading hierarchy', () => {
       renderWithProviders(<Dashboard />)
       const h1 = screen.getByRole('heading', { level: 1 })
-      expect(h1).toHaveTextContent('Your Wagers')
+      expect(h1).toHaveTextContent('Quick Actions')
     })
 
     it('should have accessible quick action buttons', () => {
@@ -379,37 +378,43 @@ describe('Dashboard Component', () => {
       expect(buttons.length).toBeGreaterThan(0)
     })
 
-    it('should have aria-expanded on how-it-works toggle', () => {
+    it('should not render the legacy how-it-works section', () => {
       renderWithProviders(<Dashboard />)
-      const toggle = screen.getByRole('button', { name: /How P2P Wagers Work/i })
-        || screen.getByText('How P2P Wagers Work').closest('button')
-      expect(toggle).toHaveAttribute('aria-expanded')
+      expect(screen.queryByText('How P2P Wagers Work')).not.toBeInTheDocument()
     })
   })
 
   describe('Oracle Open Challenge entry (spec 041)', () => {
     it('renders the card with its oracle-settles description', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Oracle Open Challenge')).toBeInTheDocument()
+      expect(screen.getByText('Open Oracle Challenge')).toBeInTheDocument()
       expect(screen.getByText(/share a code — Polymarket settles it automatically/i)).toBeInTheDocument()
     })
 
     it('clicking the card opens the oracle open challenge modal (not the 1v1 flow)', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
-      fireEvent.click(screen.getByText('Oracle Open Challenge'))
+      fireEvent.click(screen.getByText('Open Oracle Challenge'))
       expect(screen.getByTestId('oracle-open-challenge-modal')).toBeInTheDocument()
       expect(screen.queryByTestId('friend-modal')).toBeNull()
+    })
+
+    it('clicking a ticker title opens the oracle open challenge modal', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
+      fireEvent.click(screen.getByText('Ticker: Will event happen?'))
+      expect(screen.getByTestId('oracle-open-challenge-modal')).toBeInTheDocument()
     })
 
     it('the card is toggleable via quick-access preferences like any other (spec 038 US5)', () => {
       setCardVisible('oracle-open-challenge', false)
       renderWithProviders(<Dashboard />)
-      expect(screen.queryByText('Oracle Open Challenge')).toBeNull()
+      expect(screen.queryByText('Open Oracle Challenge')).toBeNull()
       setCardVisible('oracle-open-challenge', true)
     })
 
     it('the user-defined Open Challenge card still opens its own modal unchanged (FR-018)', () => {
+      setCardVisible('open-challenge', true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Open Challenge'))
       // The user-defined modal renders its own dialog header (not the oracle stub);
