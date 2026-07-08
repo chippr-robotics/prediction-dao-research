@@ -95,7 +95,7 @@ export function useAddressScreening() {
     [],
   )
 
-  return { getStatus, screen, anyRestricted }
+  return { screenOne, getStatus, screen, anyRestricted }
 }
 
 export default useAddressScreening

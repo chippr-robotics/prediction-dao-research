@@ -20,12 +20,13 @@ vi.mock('../components/ui/BlockiesAvatar', () => ({ default: () => <span data-te
 
 const send = vi.fn().mockResolvedValue({ txHash: '0xhash', route: 'gasless', id: 't1' })
 const showNotification = vi.fn()
+const screenOne = vi.fn().mockResolvedValue('clear')
 
 vi.mock('../hooks/useWalletManagement', () => ({
   useWallet: () => ({ address: '0xAaAa000000000000000000000000000000000001' }),
 }))
 vi.mock('../hooks/useAddressScreening', () => ({
-  useAddressScreening: () => ({ screenOne: vi.fn().mockResolvedValue('clear') }),
+  useAddressScreening: () => ({ screenOne }),
 }))
 vi.mock('../hooks/useUI', () => ({ useNotification: () => ({ showNotification }) }))
 
@@ -53,7 +54,7 @@ vi.mock('../hooks/useTransfer', async () => {
 import TransferForm from '../components/wallet/TransferForm'
 
 describe('TransferForm', () => {
-  beforeEach(() => { send.mockClear(); showNotification.mockClear(); gasless = true })
+  beforeEach(() => { send.mockClear(); showNotification.mockClear(); screenOne.mockClear(); gasless = true })
 
   it('shows a gasless badge for the stablecoin and previews then sends to the resolved recipient', async () => {
     const user = userEvent.setup()
@@ -63,6 +64,7 @@ describe('TransferForm', () => {
     expect(screen.getByText(/gasless/i)).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('To'), '0xBbBb000000000000000000000000000000000002')
+    await waitFor(() => expect(screenOne).toHaveBeenCalledWith('0xBbBb000000000000000000000000000000000002', 137))
     await user.type(screen.getByLabelText('Amount'), '10')
 
     const preview = screen.getByRole('button', { name: 'Preview' })
