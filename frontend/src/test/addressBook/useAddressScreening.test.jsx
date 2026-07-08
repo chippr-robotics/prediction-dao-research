@@ -85,5 +85,9 @@ describe('useAddressScreening', () => {
     const { result } = renderHook(() => useAddressScreening())
     await expect(result.current.screenOne(ADDR, 137)).resolves.toBe('clear')
     expect(screenAddressMock).toHaveBeenCalledWith(ADDR, walletState.provider)
+
+    screenAddressMock.mockClear()
+    await expect(result.current.screenOne(ADDR, 63)).resolves.toBe('uncertain')
+    expect(screenAddressMock).not.toHaveBeenCalled()
   })
 })
