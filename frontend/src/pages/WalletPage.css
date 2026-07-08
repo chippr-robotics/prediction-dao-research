@@ -375,8 +375,25 @@
     font-size: 14px;
   }
 
+  /* On mobile the drawer must cover the full viewport so it renders above the
+     page footer. Using fixed positioning takes it out of the overflow:hidden
+     clipping context of .wallet-page and anchors it to the viewport instead
+     of the card, ensuring all navigation items are visible and no footer can
+     appear on top of or behind the panel. */
   .wallet-portal-sidebar.portal-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
     width: 85%;
+    z-index: 200;
+  }
+
+  /* Dim overlay must also cover the full viewport on mobile. */
+  .wallet-portal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 190;
   }
 }
 
