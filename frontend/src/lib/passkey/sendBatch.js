@@ -67,6 +67,8 @@ export async function sendPasskeyBatch({
     // before submission.
     if (
       error instanceof SubmissionUnavailable &&
+      // Only force the UserOp route when it's the sole viable route:
+      // no intent leg, non-account-native action, and a configured bundler.
       !intent?.intentCapable &&
       !accountNative &&
       bundlerUrls.length > 0

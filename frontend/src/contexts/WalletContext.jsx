@@ -53,7 +53,7 @@ export function WalletProvider({ children }) {
   const readProvider = useMemo(() => {
     const net = getNetwork(chainId)
     const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
-    return loginMethod === 'passkey' ? (rpcProvider ?? provider) : (provider ?? rpcProvider)
+    return loginMethod === 'passkey' ? (rpcProvider || provider) : (provider || rpcProvider)
   }, [chainId, loginMethod, provider])
 
   // Encryption capability for the FR-012 degradation UI. Classic wallets keep

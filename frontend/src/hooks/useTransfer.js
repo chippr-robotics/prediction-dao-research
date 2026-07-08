@@ -49,7 +49,7 @@ export function useTransfer() {
   const readProvider = useMemo(() => {
     const net = getNetwork(chainId)
     const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
-    return isPasskey ? (rpcProvider ?? provider) : (provider ?? rpcProvider)
+    return isPasskey ? (rpcProvider || provider) : (provider || rpcProvider)
   }, [chainId, isPasskey, provider])
   // A stablecoin transfer is gasless when a passkey smart account sponsors it, or when the token supports
   // EIP-3009 AND a relayer is configured to submit the signed authorization.
