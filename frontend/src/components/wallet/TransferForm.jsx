@@ -51,11 +51,11 @@ export default function TransferForm({ onSent }) {
     let cancelled = false
     if (!toResolved) { setScreening(null); return }
     setScreening(null)
-    Promise.resolve(screenOne(toResolved))
+    Promise.resolve(screenOne(toResolved, tokens.chainId))
       .then((s) => { if (!cancelled) setScreening(s) })
       .catch(() => { if (!cancelled) setScreening('uncertain') })
     return () => { cancelled = true }
-  }, [toResolved, screenOne])
+  }, [toResolved, screenOne, tokens.chainId])
 
   const amountValid = useMemo(() => {
     const n = Number(amount)

@@ -10,7 +10,7 @@
 .label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #e2e8f0;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
 }
 
 .required {
@@ -28,10 +28,10 @@
   width: 100%;
   padding: 0.75rem;
   padding-right: 3rem; /* Space for status indicators */
-  border: 1px solid #2D7A4F;
+  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
   border-radius: 8px;
-  background: #0f1810;
-  color: #f1f5f9;
+  background: var(--color-surface, var(--surface-color, #fff));
+  color: var(--color-text, var(--text-primary, #111827));
   font-size: 1rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -40,24 +40,32 @@
 }
 
 .input::placeholder {
-  color: #94a3b8;
+  color: var(--color-text-tertiary, var(--text-muted, #9ca3af));
   opacity: 1;
 }
 
 .input:focus {
   outline: none;
-  border-color: #34A853;
-  box-shadow: 0 0 0 3px rgba(45, 122, 79, 0.1);
+  border-color: var(--color-primary, var(--brand-primary, #6d28d9));
+  /* Fallback for browsers without color-mix() support. */
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.14);
+}
+
+/* Preferred theme-tinted ring when color-mix() is supported. */
+@supports (color: color-mix(in srgb, red 14%, transparent)) {
+  .input:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, var(--brand-primary, #6d28d9)) 14%, transparent);
+  }
 }
 
 .input:focus-visible {
-  outline: 2px solid #2D7A4F;
+  outline: 2px solid var(--color-primary, var(--brand-primary, #6d28d9));
   outline-offset: 2px;
 }
 
 @supports not selector(:focus-visible) {
   .input:focus {
-    outline: 2px solid #2D7A4F;
+    outline: 2px solid var(--color-primary, var(--brand-primary, #6d28d9));
     outline-offset: 2px;
   }
 }
@@ -65,7 +73,7 @@
 .input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #1a2820;
+  background: var(--color-surface-secondary, #f3f4f6);
 }
 
 /* Error state */

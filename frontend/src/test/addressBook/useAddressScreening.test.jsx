@@ -79,4 +79,15 @@ describe('useAddressScreening', () => {
     expect(initial).toBe('loading')
     await waitFor(() => expect(result.current.getStatus(ADDR, 137)).toBe('restricted'))
   })
+
+  it('exposes screenOne for direct screening callers', async () => {
+    screenAddressMock.mockResolvedValue({ allowed: true, available: true })
+    const { result } = renderHook(() => useAddressScreening())
+    await expect(result.current.screenOne(ADDR, 137)).resolves.toBe('clear')
+    expect(screenAddressMock).toHaveBeenCalledWith(ADDR, walletState.provider)
+
+    screenAddressMock.mockClear()
+    await expect(result.current.screenOne(ADDR, 63)).resolves.toBe('uncertain')
+    expect(screenAddressMock).not.toHaveBeenCalled()
+  })
 })
