@@ -14,14 +14,17 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import { useAccount } from 'wagmi'
 import { WalletProvider } from './WalletContext.jsx'
 import { useWallet } from '../hooks/useWalletManagement'
-import { makeReadProvider } from '../utils/rpcProvider'
 
 vi.mock('../lib/passkey/sendBatch', () => ({
   sendPasskeyBatch: vi.fn(async () => ({ route: 'userop', txHash: '0xbatch' })),
 }))
-const rpcGetBalance = vi.fn(async () => 1000000000000000000n)
+const { makeReadProvider, rpcGetBalance } = vi.hoisted(() => {
+  const rpcGetBalance = vi.fn(async () => 1000000000000000000n)
+  const makeReadProvider = vi.fn(() => ({ getBalance: rpcGetBalance }))
+  return { makeReadProvider, rpcGetBalance }
+})
 vi.mock('../utils/rpcProvider', () => ({
-  makeReadProvider: vi.fn(() => ({ getBalance: rpcGetBalance })),
+  makeReadProvider,
 }))
 import { sendPasskeyBatch } from '../lib/passkey/sendBatch'
 

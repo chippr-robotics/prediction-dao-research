@@ -51,11 +51,12 @@ export async function sendPasskeyBatch({
 
   const net = getNetwork(chainId)
   const bundlerUrls = net?.passkey?.bundlerUrls ?? []
+  const intentCapable = Boolean(intent?.intentCapable)
 
   let route
   try {
     route = await chooseRoute({
-      intentCapable: Boolean(intent?.intentCapable),
+      intentCapable,
       accountNative,
       probeRelayer: deps.probeRelayer ?? defaultRelayerProbe(chainId),
       probeBundler: deps.probeBundler ?? defaultBundlerProbe(bundlerUrls),
@@ -69,7 +70,7 @@ export async function sendPasskeyBatch({
       error instanceof SubmissionUnavailable &&
       // Only force the UserOp route when it's the sole viable route:
       // no intent leg, non-account-native action, and a configured bundler.
-      !intent?.intentCapable &&
+      !intentCapable &&
       !accountNative &&
       bundlerUrls.length > 0
     ) {
