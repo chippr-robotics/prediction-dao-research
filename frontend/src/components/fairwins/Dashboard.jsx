@@ -14,7 +14,7 @@ import GroupPoolModal from './GroupPoolModal'
 import UnifiedLookupModal from './UnifiedLookupModal'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
-import PolymarketBrowser from './PolymarketBrowser'
+import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import QRScanner from '../ui/QRScanner'
 import AddressQRModal from '../ui/AddressQRModal'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
@@ -22,15 +22,6 @@ import Badge from '../ui/Badge'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { NETWORK_CONFIG } from '../../config/contracts'
 import './Dashboard.css'
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-const formatAddress = (addr) => {
-  if (!addr) return ''
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-}
 
 // ============================================================================
 // QUICK ACTION CARDS
@@ -166,7 +157,7 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
           <path d="M19 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
         </svg>
       ),
-      title: 'Oracle Open Challenge',
+      title: 'Open Oracle Challenge',
       description: 'Pick a Polymarket market, share a code — Polymarket settles it automatically'
     },
     {
@@ -197,7 +188,7 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
           <line x1="21" y1="21" x2="16.5" y2="16.5" />
         </svg>
       ),
-      title: 'Enter a Phrase',
+      title: 'Enter Words',
       description: 'Enter four words to join a pool or take a challenge'
     },
     {
@@ -308,65 +299,12 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
               </svg>
               Track &amp; share
             </span>
-            <span className="qa-group-sub">Your wagers and in-person handoffs</span>
+            <span className="qa-group-sub">Track activity and in-person handoffs</span>
           </div>
           {visibleUtilityActions.map(action => (
             <QuickActionCard key={action.id} action={action} onAction={onAction} />
           ))}
         </>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
-// HOW IT WORKS GUIDE
-// ============================================================================
-
-function HowItWorksGuide() {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  return (
-    <div className="how-it-works-card">
-      <button
-        className="how-it-works-toggle"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
-      >
-        <h3>How P2P Wagers Work</h3>
-        <span className="toggle-chevron" aria-hidden="true">{isExpanded ? '\u25B2' : '\u25BC'}</span>
-      </button>
-      {isExpanded && (
-        <div className="how-it-works-steps">
-          <div className="how-step">
-            <div className="how-step-number">1</div>
-            <div className="how-step-content">
-              <strong>Create a wager</strong>
-              <p>Pick your topic, set the stake, and choose a resolution method (either party, initiator, receiver, or third party).</p>
-            </div>
-          </div>
-          <div className="how-step">
-            <div className="how-step-number">2</div>
-            <div className="how-step-content">
-              <strong>Share the invite</strong>
-              <p>Send the QR code or deep link to your friend. They review the terms and stake their side.</p>
-            </div>
-          </div>
-          <div className="how-step">
-            <div className="how-step-number">3</div>
-            <div className="how-step-content">
-              <strong>Resolution</strong>
-              <p>The designated party proposes the outcome. A 24-hour challenge window ensures fairness.</p>
-            </div>
-          </div>
-          <div className="how-step">
-            <div className="how-step-number">4</div>
-            <div className="how-step-content">
-              <strong>Claim winnings</strong>
-              <p>Winner claims the pot from the smart contract. Unclaimed funds return after 90 days.</p>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
@@ -560,9 +498,6 @@ function Dashboard() {
   const [showQrScanner, setShowQrScanner] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  // Pre-fill payload for the create-wager modal when launched from a
-  // Polymarket card. Cleared on modal close so subsequent opens start clean.
-  const [initialPolymarketMarket, setInitialPolymarketMarket] = useState(null)
   // Wager id the My Wagers modal should open directly on (feed navigation).
   const [initialWagerId, setInitialWagerId] = useState(null)
 
@@ -645,13 +580,8 @@ function Dashboard() {
     }
   }, [navigate])
 
-  const handlePolymarketCardClick = useCallback((market) => {
-    setInitialPolymarketMarket(market)
-    setCreateWagerType('oneVsOne')
-    // A Polymarket card pre-selects an oracle (Polymarket) condition, so open
-    // straight into the oracle-resolved flow.
-    setCreateResolutionCategory('oracle')
-    setShowCreateWager(true)
+  const handlePolymarketTickerClick = useCallback(() => {
+    setShowOracleOpenChallenge(true)
   }, [])
 
   const handleQrScanSuccess = useCallback((decodedText) => {
@@ -708,14 +638,9 @@ function Dashboard() {
       <header className="dashboard-header">
         <div className="header-content">
           <div className="header-title-row">
-            <h1>Your Wagers</h1>
+            <h1>Quick Actions</h1>
             {demoMode && <span className="demo-mode-badge">Demo Mode</span>}
           </div>
-          <p className="dashboard-subtitle">
-            {isConnected
-              ? `Connected: ${formatAddress(account)}`
-              : 'Viewing sample data - connect your wallet to create wagers'}
-          </p>
         </div>
       </header>
 
@@ -746,18 +671,9 @@ function Dashboard() {
         <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
       </section>
 
-      {/* Top Polymarket markets — self-gates on chain capability, renders
-          nothing on chains without Polymarket support. */}
+      {/* Polymarket ticker crawler — clicking a title opens Open Oracle Challenge. */}
       <section className="dashboard-section">
-        <PolymarketBrowser
-          variant="feed"
-          onSelectMarket={handlePolymarketCardClick}
-        />
-      </section>
-
-      {/* How It Works (collapsible) */}
-      <section className="dashboard-section">
-        <HowItWorksGuide />
+        <PolymarketTickerCrawler onSelectMarket={handlePolymarketTickerClick} />
       </section>
 
       {/* Create Wager Modal */}
@@ -767,11 +683,9 @@ function Dashboard() {
           setShowCreateWager(false)
           setCreateWagerType(null)
           setCreateResolutionCategory('all')
-          setInitialPolymarketMarket(null)
         }}
         initialType={createWagerType}
         resolutionCategory={createResolutionCategory}
-        initialPolymarketMarket={initialPolymarketMarket}
       />
 
       {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037). */}

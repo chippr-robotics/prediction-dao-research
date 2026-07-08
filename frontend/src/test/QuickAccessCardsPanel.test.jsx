@@ -11,13 +11,19 @@ describe('QuickAccessCardsPanel (spec 038 US5)', () => {
     localStorage.clear()
   })
 
-  it('lists all 10 quick access cards, each visible by default', () => {
+  it('lists all 10 quick access cards with only Open Oracle Challenge, Enter Words, and My Wagers visible by default', () => {
     render(<QuickAccessCardsPanel />)
     expect(QUICK_ACCESS_CARDS).toHaveLength(10) // +oracle-open-challenge (spec 041)
-    QUICK_ACCESS_CARDS.forEach((card) => {
-      const toggle = screen.getByRole('switch', { name: card.label })
-      expect(toggle).toHaveAttribute('aria-checked', 'true')
-    })
+    expect(screen.getByRole('switch', { name: 'Open Oracle Challenge' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Enter Words' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'My Wagers' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Friends Decide (1v1)' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Oracle Settles (1v1)' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Make an Offer' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Open Challenge' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Group Pool' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Scan QR Code' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Share Account' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('toggling a card off persists the hidden preference and flips the switch', async () => {
@@ -29,12 +35,11 @@ describe('QuickAccessCardsPanel (spec 038 US5)', () => {
     expect(getHiddenCards()).toContain('my-wagers')
   })
 
-  it('toggling a hidden card back on removes it from the hidden set', async () => {
+  it('toggling a default-hidden card on removes it from the hidden set', async () => {
     const user = userEvent.setup()
     render(<QuickAccessCardsPanel />)
     const toggle = screen.getByRole('switch', { name: 'Scan QR Code' })
-    await user.click(toggle) // hide
-    await user.click(toggle) // restore
+    await user.click(toggle) // restore (turn visible)
     expect(toggle).toHaveAttribute('aria-checked', 'true')
     expect(getHiddenCards()).not.toContain('scan-qr')
   })
