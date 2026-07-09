@@ -20,7 +20,9 @@ export function WalletProvider({ children }) {
   const { switchChain } = useSwitchChain()
   const { data: walletClient } = useWalletClient()
 
-  // Provider and signer for transactions
+  // Connector-backed write transport for classic wallets only. Passkey sessions never
+  // hydrate an injected BrowserProvider/signer here: reads go through `readProvider`
+  // and writes go through `sendCalls`.
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
   
@@ -607,7 +609,8 @@ export function WalletProvider({ children }) {
     // Available connectors
     connectors,
     
-    // Provider and signer for transactions
+    // Expose the unified read transport here: passkey sessions get direct RPC reads,
+    // while classic wallets keep their connector-backed provider (with RPC fallback).
     provider: readProvider,
     signer,
     
