@@ -4,6 +4,7 @@ import { useWallet } from './useWalletManagement'
 import { useActiveAccount } from './useActiveAccount'
 import { useChainTokens } from './useChainTokens'
 import { getNetwork } from '../config/networks'
+import { makeReadProvider } from '../utils/rpcProvider'
 import {
   TRANSFER_ABI,
   signTransferAuthorization,
@@ -45,6 +46,11 @@ export function useTransfer() {
   const [stableBalance, setStableBalance] = useState(null)
 
   const stableDomainVersion = getNetwork(chainId)?.stablecoin?.domainVersion ?? null
+  const readProvider = useMemo(() => {
+    const net = getNetwork(chainId)
+    const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
+    return isPasskey ? (rpcProvider || provider) : (provider || rpcProvider)
+  }, [chainId, isPasskey, provider])
   // A stablecoin transfer is gasless when a passkey smart account sponsors it, or when the token supports
   // EIP-3009 AND a relayer is configured to submit the signed authorization.
   const hasRelayer = Boolean(getTransferRelayer())
@@ -64,23 +70,23 @@ export function useTransfer() {
     [tokens]
   )
 
-  // Balances for the two supported assets. Native comes from the provider; the stablecoin needs its own
-  // (6-decimal) read since the shared getTokenBalance formats with 18.
+  // Balances for the two supported assets. Reads use the wallet provider when available, but passkey
+  // sessions (and provider-less cases) fall back to direct chain RPC reads.
   const refreshBalances = useCallback(async () => {
-    if (!provider || !address) {
+    if (!readProvider || !address) {
       setNativeBalance(null)
       setStableBalance(null)
       return
     }
     try {
-      const nat = await provider.getBalance(address)
+      const nat = await readProvider.getBalance(address)
       setNativeBalance(ethers.formatUnits(nat, tokens.nativeDecimals))
     } catch {
       setNativeBalance(null)
     }
     if (tokens.stableAddress) {
       try {
-        const erc20 = new ethers.Contract(tokens.stableAddress, TRANSFER_ABI, provider)
+        const erc20 = new ethers.Contract(tokens.stableAddress, TRANSFER_ABI, readProvider)
         const bal = await erc20.balanceOf(address)
         setStableBalance(ethers.formatUnits(bal, tokens.stableDecimals))
       } catch {
@@ -89,7 +95,7 @@ export function useTransfer() {
     } else {
       setStableBalance(null)
     }
-  }, [provider, address, tokens.stableAddress, tokens.stableDecimals, tokens.nativeDecimals])
+  }, [readProvider, address, tokens.stableAddress, tokens.stableDecimals, tokens.nativeDecimals])
 
   useEffect(() => {
     refreshBalances()
