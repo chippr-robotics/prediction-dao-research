@@ -8,7 +8,7 @@
  *    sessions through the sequential signer path;
  *  - disconnectWallet clears the passkey session key atomically (FR-003).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 
 import { useAccount } from 'wagmi'
@@ -58,6 +58,10 @@ beforeEach(() => {
   rpcGetBalance.mockClear()
   localStorage.clear()
   vi.spyOn(console, 'error').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  console.error.mockRestore()
 })
 
 describe('WalletContext — unified login surface (spec 041 US2)', () => {
