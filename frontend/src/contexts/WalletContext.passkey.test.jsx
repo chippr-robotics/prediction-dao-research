@@ -31,13 +31,15 @@ import { sendPasskeyBatch } from '../lib/passkey/sendBatch'
 const SMART_ACCOUNT = '0x00000000000000000000000000000000000A11CE'
 
 function Probe() {
-  const { address, loginMethod, hasRole, sendCalls, disconnectWallet, balances } = useWallet()
+  const { address, loginMethod, hasRole, sendCalls, disconnectWallet, balances, provider, signer } = useWallet()
   return (
     <div>
       <span data-testid="address">{address}</span>
       <span data-testid="login-method">{String(loginMethod)}</span>
       <span data-testid="has-role">{String(hasRole('WAGER_PARTICIPANT'))}</span>
       <span data-testid="native-balance">{balances.native}</span>
+      <span data-testid="has-provider">{String(Boolean(provider))}</span>
+      <span data-testid="has-signer">{String(Boolean(signer))}</span>
       <button onClick={() => sendCalls([{ target: '0x' + 'a'.repeat(40), data: '0x01' }])}>send</button>
       <button onClick={disconnectWallet}>signout</button>
     </div>
@@ -55,6 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   rpcGetBalance.mockClear()
   localStorage.clear()
+  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 describe('WalletContext — unified login surface (spec 041 US2)', () => {
@@ -67,8 +70,11 @@ describe('WalletContext — unified login surface (spec 041 US2)', () => {
     renderProbe()
     await waitFor(() => expect(screen.getByTestId('login-method')).toHaveTextContent('passkey'))
     expect(screen.getByTestId('address')).toHaveTextContent(SMART_ACCOUNT)
+    expect(screen.getByTestId('has-provider')).toHaveTextContent('true')
+    expect(screen.getByTestId('has-signer')).toHaveTextContent('false')
     // Role answer resolves from address-keyed state — never from signer presence.
     expect(['true', 'false']).toContain(screen.getByTestId('has-role').textContent)
+    expect(console.error).not.toHaveBeenCalled()
   })
 
   it('loginMethod=injected for classic connectors (zero behavioral change)', async () => {

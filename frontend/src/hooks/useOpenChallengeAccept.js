@@ -29,8 +29,9 @@ const ERC20_ABI = [
  * plus { busy, error } state. Discovery and the membership check are read-only; only accept signs/sends.
  */
 export function useOpenChallengeAccept() {
-  const { signer, address, account, chainId, provider, sendCalls } = useWeb3()
+  const { signer, address, account, chainId, provider, sendCalls, loginMethod } = useWeb3()
   const actor = address || account
+  const isPasskey = loginMethod === 'passkey'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -213,7 +214,7 @@ export function useOpenChallengeAccept() {
       //    pulls the stake), transparent self-submit otherwise (approve → pre-flight → send). The
       //    approval, whose absence caused the allowance revert, stays inside the self-submit closure
       //    where a self-submitted accept still needs it.
-      if (signer) {
+      if (signer && !isPasskey) {
         const result = await acceptOpenWagerTx.run(wagerId, signature, stake, tokenAddr, registryAddr, symbol, onProgress)
         if (result?.error) throw result.error
         return { txHash: result?.txHash }
@@ -252,7 +253,7 @@ export function useOpenChallengeAccept() {
     } finally {
       setBusy(false)
     }
-  }, [provider, signer, actor, chainId, resolveRegistry, acceptOpenWagerTx, sendCalls])
+  }, [provider, signer, actor, chainId, resolveRegistry, acceptOpenWagerTx, sendCalls, isPasskey])
 
   return { lookup, discover, accept, busy, error }
 }
