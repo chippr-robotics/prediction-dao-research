@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
     getNetwork: () => Promise.resolve({ chainId: 63n }),
     getTransactionReceipt: vi.fn(async () => ({ status: 1, hash: '0xpasskeytx', logs: [] })),
   },
+  loginMethod: 'injected',
 }))
 
 vi.mock('../hooks/useWeb3', () => ({
@@ -25,6 +26,7 @@ vi.mock('../hooks/useWeb3', () => ({
     address: ACCOUNT,
     account: ACCOUNT,
     sendCalls: h.sendCalls,
+    loginMethod: h.loginMethod,
   }),
 }))
 
@@ -95,6 +97,7 @@ describe('useOpenChallengeCreate', () => {
     h.signer = { provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) } }
     h.sendCalls.mockReset().mockResolvedValue({ txHash: '0xpasskeytx' })
     h.provider.getTransactionReceipt.mockReset().mockResolvedValue({ status: 1, hash: '0xpasskeytx', logs: [] })
+    h.loginMethod = 'injected'
   })
 
   it('keeps classic signer behavior for create (approve then create)', async () => {
@@ -108,8 +111,8 @@ describe('useOpenChallengeCreate', () => {
     expect(h.sendCalls).not.toHaveBeenCalled()
   })
 
-  it('supports passkey sessions with no signer via sendCalls routing', async () => {
-    h.signer = null
+  it('isolates passkey sessions onto sendCalls even when a signer object exists', async () => {
+    h.loginMethod = 'passkey'
     const { result } = renderHook(() => useOpenChallengeCreate())
     let out
     await act(async () => {

@@ -29,7 +29,8 @@ export const OPEN_RESOLUTION_TYPES = { Either: 0, ThirdParty: 3, Polymarket: 4, 
  * is never sent anywhere.
  */
 export function useOpenChallengeCreate() {
-  const { signer, provider, chainId, address, account, sendCalls } = useWeb3()
+  const { signer, provider, chainId, address, account, sendCalls, loginMethod } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -116,7 +117,7 @@ export function useOpenChallengeCreate() {
       }
 
       let receipt
-      if (signer) {
+      if (signer && !isPasskey) {
         const writeRegistry = new ethers.Contract(registryAddr, WAGER_REGISTRY_ABI, signer)
         const writeToken = new ethers.Contract(tokenAddr, ERC20_ABI, signer)
         if (allowance < stakeWei) {
@@ -169,7 +170,7 @@ export function useOpenChallengeCreate() {
     } finally {
       setBusy(false)
     }
-  }, [signer, provider, chainId, address, account, sendCalls])
+  }, [signer, provider, chainId, address, account, sendCalls, isPasskey])
 
   return { createOpenChallenge, busy, error }
 }

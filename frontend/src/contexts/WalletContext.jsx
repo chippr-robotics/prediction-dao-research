@@ -20,7 +20,9 @@ export function WalletProvider({ children }) {
   const { switchChain } = useSwitchChain()
   const { data: walletClient } = useWalletClient()
 
-  // Provider and signer for transactions
+  // Connector-backed write transport for classic wallets only. Passkey sessions never
+  // hydrate an injected BrowserProvider/signer here: reads go through `readProvider`
+  // and writes go through `sendCalls`.
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
   
@@ -124,6 +126,12 @@ export function WalletProvider({ children }) {
   useEffect(() => {
     let cancelled = false
     const updateProviderAndSigner = async () => {
+      if (loginMethod === 'passkey') {
+        if (cancelled) return
+        setProvider(null)
+        setSigner(null)
+        return
+      }
       if (isConnected && walletClient) {
         try {
           // Create provider from walletClient's transport for proper authorization
@@ -186,7 +194,7 @@ export function WalletProvider({ children }) {
 
     updateProviderAndSigner()
     return () => { cancelled = true }
-  }, [isConnected, address, walletClient])
+  }, [isConnected, address, walletClient, loginMethod])
 
   // Auto-switch to Polygon (PRIMARY_CHAIN_ID) when the wallet connects on an
   // unsupported chain. If the switch fails, show a network error instead.
@@ -601,8 +609,9 @@ export function WalletProvider({ children }) {
     // Available connectors
     connectors,
     
-    // Provider and signer for transactions
-    provider,
+    // Expose the unified read transport here: passkey sessions get direct RPC reads,
+    // while classic wallets keep their connector-backed provider (with RPC fallback).
+    provider: readProvider,
     signer,
     
     // Network state

@@ -21,6 +21,7 @@ const wallet = vi.hoisted(() => ({
   },
   provider: { isFakeProvider: true },
   sendCalls: vi.fn(async () => ({ txHash: '0xpasskeytx' })),
+  loginMethod: 'injected',
 }))
 
 vi.mock('../hooks/useWeb3', () => ({
@@ -31,6 +32,7 @@ vi.mock('../hooks/useWeb3', () => ({
     provider: wallet.provider,
     signer: wallet.signer,
     sendCalls: wallet.sendCalls,
+    loginMethod: wallet.loginMethod,
   }),
 }))
 
@@ -108,6 +110,7 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     }
     wallet.provider = { isFakeProvider: true }
     wallet.sendCalls.mockReset().mockResolvedValue({ txHash: '0xpasskeytx' })
+    wallet.loginMethod = 'injected'
   })
 
   it('approves the registry BEFORE sending acceptOpenWager when allowance is short', async () => {
@@ -155,8 +158,8 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     expect(calls).toEqual([])
   })
 
-  it('supports passkey sessions with no signer by routing writes through sendCalls', async () => {
-    wallet.signer = null
+  it('isolates passkey sessions onto sendCalls even when a signer object exists', async () => {
+    wallet.loginMethod = 'passkey'
     const { result } = renderHook(() => useOpenChallengeAccept())
     const steps = []
     let res
