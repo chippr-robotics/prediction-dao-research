@@ -19,16 +19,17 @@ import './AdminPanel.css'
 
 // Icons for the mobile bottom quick-nav (SectionIconNav). Desktop uses the
 // text rail; mobile pins these so admins can hop between sections one-handed.
+// Values are NavIcon names (flat line glyphs), not emoji.
 const ADMIN_TAB_ICONS = {
-  overview: '📋',
-  emergency: '🚨',
-  tiers: '🎚️',
-  members: '👥',
-  moderation: '🛑',
-  'admin-roles': '🔑',
-  treasury: '🏦',
-  'oracle-adapters': '🔮',
-  'deny-list': '⛔',
+  overview: 'grid',
+  emergency: 'alert',
+  tiers: 'layers',
+  members: 'users',
+  moderation: 'shieldOff',
+  'admin-roles': 'key',
+  treasury: 'bank',
+  'oracle-adapters': 'broadcast',
+  'deny-list': 'ban',
 }
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }

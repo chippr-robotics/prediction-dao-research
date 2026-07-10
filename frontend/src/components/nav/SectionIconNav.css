@@ -48,8 +48,23 @@
 }
 
 .section-icon-nav-icon {
-  font-size: 18px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 30px;
+  border-radius: 9px;
+  color: inherit;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.section-icon-nav-item.active .section-icon-nav-icon {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  border-color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.32);
 }
 
 .section-icon-nav-label {

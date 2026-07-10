@@ -6,10 +6,12 @@ import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useModal } from '../../hooks/useUI'
+import { useClipboard } from '../../hooks/useClipboard'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
+import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import { getWalletLabel } from '../../utils/walletLabel'
@@ -40,6 +42,7 @@ function WalletButton({ className = '' }) {
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
+  const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { balances, loading: balanceLoading } = useDex()
   const { network } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
@@ -342,7 +345,22 @@ function WalletButton({ className = '' }) {
                 <div className="account-info">
                   <BlockiesAvatar address={address} size={40} />
                   <div className="account-details">
-                    <span className="account-address-full">{shortenAddress(address)}</span>
+                    <button
+                      type="button"
+                      className="account-address-full account-address-copy"
+                      onClick={() => copyAddress(address)}
+                      title={address}
+                      aria-label={addressCopied ? 'Address copied' : 'Copy wallet address'}
+                    >
+                      <span className="account-address-value">
+                        {addressCopied ? 'Copied!' : shortenAddress(address)}
+                      </span>
+                      <NavIcon
+                        name={addressCopied ? 'check' : 'copy'}
+                        size={13}
+                        className="account-address-copy-icon"
+                      />
+                    </button>
                     <span className="usdc-balance">
                       {balanceLoading ? 'Loading...' : `${parseFloat(balances?.stable || 0).toFixed(2)} USDC`}
                     </span>
@@ -376,7 +394,7 @@ function WalletButton({ className = '' }) {
                       className="action-button purchase-access-btn"
                       role="menuitem"
                     >
-                      <span aria-hidden="true">🔓</span>
+                      <span className="action-icon" aria-hidden="true"><NavIcon name="key" size={16} /></span>
                       <span>Get Access - from $2 USDC / month</span>
                     </button>
                     <button
@@ -399,7 +417,7 @@ function WalletButton({ className = '' }) {
                   className="action-button"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">{'\u2699\uFE0F'}</span>
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="user" size={16} /></span>
                   <span>Account</span>
                 </button>
                 <button
@@ -407,7 +425,7 @@ function WalletButton({ className = '' }) {
                   className="action-button"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">{'\uD83C\uDFAB'}</span>
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="ticket" size={16} /></span>
                   <span>Membership</span>
                 </button>
                 <button
@@ -415,7 +433,7 @@ function WalletButton({ className = '' }) {
                   className="action-button"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">{'\uD83C\uDF9B\uFE0F'}</span>
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="sliders" size={16} /></span>
                   <span>Preferences</span>
                 </button>
                 <button
@@ -423,7 +441,7 @@ function WalletButton({ className = '' }) {
                   className="action-button"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">{'\u2B50'}</span>
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="star" size={16} /></span>
                   <span>Purchase Membership</span>
                 </button>
                 {hasRole(ROLES.ADMIN) && (
@@ -432,7 +450,7 @@ function WalletButton({ className = '' }) {
                     className="action-button"
                     role="menuitem"
                   >
-                    <span aria-hidden="true">{'\uD83D\uDC51'}</span>
+                    <span className="action-icon" aria-hidden="true"><NavIcon name="key" size={16} /></span>
                     <span>Role Management</span>
                   </button>
                 )}
@@ -442,7 +460,7 @@ function WalletButton({ className = '' }) {
                   role="menuitem"
                   aria-label="Disconnect wallet"
                 >
-                  <span aria-hidden="true">🔌</span>
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="power" size={16} /></span>
                   <span>Disconnect</span>
                 </button>
               </div>

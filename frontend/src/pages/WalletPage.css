@@ -289,15 +289,7 @@
   overflow-y: auto;
 }
 
-/* My Account portal layout (left sidebar like an admin portal) */
-.wallet-portal-identity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
+/* My Account portal layout */
 .wallet-portal-topbar {
   display: flex;
   align-items: center;

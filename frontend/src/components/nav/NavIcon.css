@@ -1,0 +1,6 @@
+/* Base for the flat nav icon set. Sizing comes from the `size` prop; colour is
+   currentColor so each icon inherits its host's state colour. */
+.nav-icon {
+  display: block;
+  flex: 0 0 auto;
+}

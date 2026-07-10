@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
-import { useClipboard } from '../hooks/useClipboard'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
@@ -28,7 +27,6 @@ import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
-import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import { getWalletLabel, getWalletIcon } from '../utils/walletLabel'
 import './WalletPage.css'
@@ -85,7 +83,6 @@ function WalletPage() {
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
-  const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
@@ -247,11 +244,6 @@ function WalletPage() {
     setPolymarketCategories(next)
   }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
 
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
-  }
-
   const activeTabLabel = (WALLET_TABS.find((t) => t.id === activeTab) || WALLET_TABS[0]).label
 
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
@@ -316,20 +308,9 @@ function WalletPage() {
             </div>
           ) : (
             <div className="wallet-portal wallet-portal--flat">
-              <div className="wallet-portal-identity">
-                <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
-                <button
-                  type="button"
-                  className="wallet-address-display"
-                  onClick={() => copyAddress(address)}
-                  title={address}
-                  aria-label={addressCopied ? 'Copied!' : 'Copy wallet address'}
-                >
-                  {addressCopied ? 'Copied!' : shortenAddress(address)}
-                </button>
-                <span className="status-dot connected" aria-hidden="true"></span>
-              </div>
-
+              {/* The wallet identity + copy-address affordance now lives on the
+                  account button (top right); the section panels below no longer
+                  duplicate it. */}
               <div className="wallet-portal-main">
                 <div className="wallet-portal-topbar">
                   <span className="wallet-portal-current">{activeTabLabel}</span>
