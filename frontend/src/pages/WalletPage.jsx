@@ -12,6 +12,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
+import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
@@ -50,6 +51,7 @@ const WALLET_TAB_GROUPS = [
   {
     label: 'Finance',
     items: [
+      { id: 'portfolio', label: 'Portfolio' },
       { id: 'trade', label: 'Trade' },
       { id: 'paytransfer', label: 'Pay & Transfer' },
       { id: 'custody', label: 'Custody' },
@@ -404,6 +406,12 @@ function WalletPage() {
                         <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === 'portfolio' && (
+                  <div className="portfolio-section" role="tabpanel">
+                    <PortfolioPanel />
                   </div>
                 )}
 
