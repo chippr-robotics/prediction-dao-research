@@ -1,0 +1,93 @@
+name: "✨ Feature Request"
+description: Propose a new capability or enhancement for FairWins.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo builds features through [Spec Kit](https://github.com/github/spec-kit)
+        (`/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`). For
+        anything beyond a trivial change, the fields below are written to map directly onto
+        `spec-template.md` so the team can turn this issue into `specs/<feature>/spec.md` with
+        minimal back-and-forth.
+
+  - type: input
+    id: problem
+    attributes:
+      label: Problem / user need
+      description: What pain point or gap does this address? Plain language, no tech choices yet.
+      placeholder: "Members can't tell which of their open wagers are about to expire"
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      description: "As a [role], I want [capability], so that [benefit]."
+      placeholder: "As a wager participant, I want an expiry warning badge, so that I don't miss the accept/resolve deadline."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance scenarios
+      description: Given/When/Then bullets describing observable, testable outcomes.
+      placeholder: |
+        1. Given a wager with acceptDeadline < 24h away, When I open My Wagers, Then it shows an "expiring soon" badge.
+        2. Given a wager past its deadline, When the page loads, Then the badge is not shown.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P1 — critical path / blocking
+        - P2 — important, not blocking
+        - P3 — nice to have
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary affected area
+      options:
+        - Contracts (contracts/)
+        - Frontend (frontend/)
+        - Subgraph (subgraph/)
+        - Scripts / deployment
+        - Documentation
+        - Other / cross-cutting
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / approach (optional)
+      description: Sketch an approach if you have one. Tech-stack decisions belong in plan.md, not here — keep this conceptual.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links to related issues/specs, constraints, out-of-scope notes.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues/specs and this isn't a duplicate
+          required: true
