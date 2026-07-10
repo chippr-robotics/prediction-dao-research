@@ -46,8 +46,9 @@ export async function readVaultGuard(vaultAddress, chainId, provider) {
  */
 export async function getPolicyStatus(vaultAddress, chainId, provider) {
   const engine = getPolicyEngineAddresses(chainId)
+  // FR-013: networks without the engine surface "policy unsupported" — no guard-slot read needed.
+  if (!engine) return 'unsupported'
   const guardSet = await readVaultGuard(vaultAddress, chainId, provider).catch(() => ZeroAddress)
-  if (!engine) return guardSet !== ZeroAddress ? 'foreign' : 'unsupported'
   if (guardSet === ZeroAddress) return 'none'
   return guardSet === engine.guard ? 'managed' : 'foreign'
 }

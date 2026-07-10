@@ -9,7 +9,8 @@ policies (spec 049). One deployment per chain, resolved via
 - **Restriction-only**: can block a Safe transaction; can never initiate, approve, or execute one,
   and holds no funds.
 - **Authority = the vault itself**: every mutating function requires `msg.sender` to be the Safe
-  whose policy is touched (`NotVault()` otherwise). Threshold approval is therefore inherited from
+  whose policy is touched (config is keyed by `msg.sender`, so an address can only ever write
+  its own policy). Threshold approval is therefore inherited from
   the Safe; the guard has no owner, admin, or upgrade key.
 - **EthTrust-SL target**: L2 (comprehensive tests, documented risks). Accepted risks: 24 h window
   is fixed-reset (≤ 2× limit across a straddling span, disclosed in UI); unrecognized calldata is
@@ -95,7 +96,7 @@ pre-flight (FR-012) and post-hoc failure explanation (FR-011).
 
 ## Custom errors
 
-`NotVault()`, `DelegatecallBlocked()`, `GasRefundBlocked()`, `RecipientNotAllowed(address)`,
+`DelegatecallBlocked()`, `GasRefundBlocked()`, `RecipientNotAllowed(address)`,
 `CooldownActive(uint64 nextAllowedAt)`, `PerTxLimitExceeded(address asset, uint256 amount,
 uint256 limit)`, `WindowLimitExceeded(address asset, uint256 attempted, uint256 remaining)`,
 `EmptyAllowlist()`, `CooldownTooLong()`, `TooManyAssets()`, `ValueToGuardBlocked()`.

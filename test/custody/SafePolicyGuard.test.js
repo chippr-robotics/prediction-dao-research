@@ -183,6 +183,18 @@ describe("SafePolicyGuard", function () {
       ).to.not.be.reverted;
     });
 
+    it("classifies token calldata with extra trailing bytes exactly as the token would execute it", async () => {
+      // Solidity functions ignore extra trailing calldata for static args; the guard slices the
+      // canonical words so padded calldata neither bypasses classification nor spuriously blocks.
+      const padded = erc20.encodeFunctionData("transfer", [recipient.address, 101n]) + "ab".repeat(13);
+      await expect(guard.connect(safe).checkTransaction(...checkArgs({ to: token, data: padded })))
+        .to.not.be.reverted; // token unconfigured for limits here — but classification must not revert
+      await guard.connect(safe).configureRules(...cfg({ limits: [{ asset: token, perTxLimit: 50n, windowLimit: 0n }] }));
+      await expect(guard.connect(safe).checkTransaction(...checkArgs({ to: token, data: padded })))
+        .to.be.revertedWithCustomError(guard, "PerTxLimitExceeded")
+        .withArgs(token, 101n, 50n);
+    });
+
     it("leaves unconfigured assets unvalued (disclosed passthrough)", async () => {
       const otherToken = ethers.getAddress("0x00000000000000000000000000000000000dead1");
       const data = erc20.encodeFunctionData("transfer", [recipient.address, ethers.MaxUint256]);

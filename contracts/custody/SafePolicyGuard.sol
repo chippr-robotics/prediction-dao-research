@@ -364,6 +364,10 @@ contract SafePolicyGuard is ISafeGuard {
     }
 
     /// @dev Decode the ERC-20 actions the guard values. Anything else is a generic call.
+    ///      Slices the exact canonical argument length: Solidity functions ignore extra trailing
+    ///      calldata for static args, so decoding only the canonical words classifies the call
+    ///      exactly as the token itself would execute it — padded calldata can neither bypass
+    ///      classification nor spuriously revert it.
     function _classify(address to, bytes calldata data)
         internal
         pure
@@ -372,15 +376,15 @@ contract SafePolicyGuard is ISafeGuard {
         if (data.length < 4) return (address(0), 0, address(0), false);
         bytes4 selector = bytes4(data[0:4]);
         if (selector == _SEL_TRANSFER && data.length >= 68) {
-            (address recipient, uint256 amount) = abi.decode(data[4:], (address, uint256));
+            (address recipient, uint256 amount) = abi.decode(data[4:68], (address, uint256));
             return (to, amount, recipient, true);
         }
         if (selector == _SEL_APPROVE && data.length >= 68) {
-            (address spender, uint256 amount) = abi.decode(data[4:], (address, uint256));
+            (address spender, uint256 amount) = abi.decode(data[4:68], (address, uint256));
             return (to, amount, spender, true);
         }
         if (selector == _SEL_TRANSFER_FROM && data.length >= 100) {
-            (, address recipient, uint256 amount) = abi.decode(data[4:], (address, address, uint256));
+            (, address recipient, uint256 amount) = abi.decode(data[4:100], (address, address, uint256));
             return (to, amount, recipient, true);
         }
         return (address(0), 0, address(0), false);

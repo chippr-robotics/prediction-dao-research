@@ -84,6 +84,7 @@ Blocked executions revert (no event); the client reports them from decoded custo
 
 - Allowlist cannot be enabled with zero entries; removing the last entry auto-disables (explicit).
 - `cooldown ≤ 365 days`; limits are `uint128`-bounded and must be non-zero to enable.
-- Config functions revert for `msg.sender` ≠ the Safe being configured (`NotVault()`).
+- Config functions are scoped to `msg.sender` — an address can only ever write its own
+  policy, so no cross-vault writes exist (no separate error needed).
 - UI warns when a configuration is unusually strict (per-tx limit of 0-after-decimals, cooldown
   > 30 days) before letting the member proceed.

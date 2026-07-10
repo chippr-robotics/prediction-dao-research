@@ -42,7 +42,8 @@ because every story enforces or reads it.
       (SC-002), per-asset limits incl. unconfigured-asset passthrough, window open/accumulate/
       reset boundaries, cooldown, allowlist recipient resolution (native / transfer /
       transferFrom / approve / generic call target), exemptions under max-strict policy (SC-003),
-      delegatecall + gas-refund + value-to-guard denials, `NotVault` on config, FR-015 config
+      delegatecall + gas-refund + value-to-guard denials, msg.sender-scoped config (each
+      address can only configure its own policy), FR-015 config
       validation, error argument payloads, `previewTransaction` parity with enforcement,
       view outputs. Written against MockSafe; must fail before T002 lands, pass after.
 - [X] T006 [P] Unit tests `test/custody/PolicyGuardSetup.test.js`: slot write via delegatecall,

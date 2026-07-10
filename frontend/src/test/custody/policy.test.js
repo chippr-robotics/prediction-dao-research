@@ -229,7 +229,9 @@ describe('getPolicyStatus (US2 / edge cases)', () => {
   it("'foreign' when another guard is set (unrecognized rules)", async () => {
     expect(await getPolicyStatus(VAULT, CHAIN, providerWith(RECIPIENT))).toBe('foreign')
   })
-  it("'unsupported' on networks without the engine", async () => {
-    expect(await getPolicyStatus(VAULT, 80002, providerWith(ZeroAddress))).toBe('unsupported')
+  it("'unsupported' on networks without the engine — regardless of guard slot, with no RPC (FR-013)", async () => {
+    const provider = providerWith(RECIPIENT) // even a set guard reports unsupported here
+    expect(await getPolicyStatus(VAULT, 80002, provider)).toBe('unsupported')
+    expect(provider.getStorage).not.toHaveBeenCalled()
   })
 })
