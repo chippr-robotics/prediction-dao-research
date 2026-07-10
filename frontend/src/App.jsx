@@ -1,5 +1,5 @@
 //core
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import './theme.css'
 import './App.css'
 
@@ -41,6 +41,12 @@ import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
 function AppLayout() {
+  // The global nav drawer ("us") already carries the legal/policy footer, and the
+  // My Account screen is a dense tab host, so it omits the redundant page-level
+  // footer; every other in-app route keeps it.
+  const { pathname } = useLocation()
+  const showPageFooter = pathname !== '/wallet'
+
   return (
     /* Spec 031: platform-wide activity watcher scoped to the app-mode tree — the header bell and the views
        below consume it (wagers + DAO/token/membership sources); landing pages never poll. */
@@ -58,8 +64,8 @@ function AppLayout() {
         <EntryGate />
         <Outlet />
         {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
-            drawer carries its own copy for when it is open. */}
-        <Footer variant="condensed" />
+            drawer carries its own copy; /wallet relies on that to avoid duplication. */}
+        {showPageFooter && <Footer variant="condensed" />}
       </NavDrawerProvider>
     </ActivityProvider>
   )
