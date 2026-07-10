@@ -30,13 +30,18 @@
   border-right: 1px solid var(--border-color, var(--color-border, #e5e7eb));
   box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
   transform: translateX(-100%);
-  transition: transform 0.22s ease;
+  /* Hidden (and so not tabbable) while off-screen; visibility flips after the
+     slide-out finishes. */
+  visibility: hidden;
+  transition: transform 0.22s ease, visibility 0s linear 0.22s;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .app-nav-drawer.open {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.22s ease, visibility 0s;
 }
 
 .app-nav-drawer-header {
@@ -97,8 +102,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-nav-drawer {
-    transition: none;
+  .app-nav-drawer,
+  .app-nav-drawer.open {
+    transition: visibility 0s;
   }
   .app-nav-backdrop {
     animation: none;

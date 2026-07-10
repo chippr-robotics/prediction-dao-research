@@ -205,12 +205,12 @@ function WalletPage() {
 
   // Keep the active panel in sync with `?tab=` so navigating from the global
   // nav drawer / account button (which change the URL) switches sections here.
+  // Always derive from the URL — a missing or unknown tab falls back to Account
+  // so the panel never drifts out of sync with the address bar.
   useEffect(() => {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
-    if (resolved && WALLET_TABS.some((t) => t.id === resolved)) {
-      setActiveTab(resolved)
-    }
+    setActiveTab(WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account')
   }, [searchParams])
 
   const handleCheckForUpdate = useCallback(async () => {

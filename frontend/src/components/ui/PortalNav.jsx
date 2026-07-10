@@ -1,26 +1,33 @@
 /**
- * PortalNav — a vertical, admin-portal-style tab rail. Renders the sections
- * down the left side as an accessible vertical tablist. Shared by My Account
- * (WalletPage) and the Admin Panel so both read like a portal.
+ * PortalNav — a vertical, admin-portal-style section rail. Shared by the Admin
+ * Panel, the global nav drawer, and other portal-style surfaces.
  *
- * Flat form: pass `items` = [{ id, label }].
- * Grouped form: pass `groups` = [{ label, items: [{ id, label }] }] to break the
- * rail into labelled sections (e.g. Admin / Finance / Tools / Apps). The group
- * labels are presentational headers; every entry stays a tab in the one tablist
- * so keyboard/tablist semantics are unchanged. The active item is reflected with
- * aria-selected and an accent border. Pair with role="tabpanel" content keyed
- * off the same id.
+ * Flat form: pass `items` = [{ id, label, icon? }].
+ * Grouped form: pass `groups` = [{ label, items: [...] }] to break the rail into
+ * labelled sections (e.g. Finance / Tools / Apps). The group labels are
+ * presentational headers.
+ *
+ * `variant` picks the semantics of the entries:
+ *   - 'tabs' (default): a `role="tablist"` of `role="tab"` buttons that switch
+ *     panels within the SAME page (active reflected via aria-selected). Pair with
+ *     role="tabpanel" content keyed off the same id.
+ *   - 'nav': a navigation landmark of plain buttons that route ELSEWHERE (active
+ *     reflected via aria-current="page"). Use this when selecting an entry
+ *     navigates between routes rather than swapping an in-page panel.
  */
 import { Fragment } from 'react'
 import './PortalNav.css'
 
-export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel }) {
+export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel, variant = 'tabs' }) {
+  const isTabs = variant === 'tabs'
+
   const renderItem = (item) => (
     <button
       key={item.id}
       type="button"
-      role="tab"
-      aria-selected={item.id === activeId}
+      role={isTabs ? 'tab' : undefined}
+      aria-selected={isTabs ? item.id === activeId : undefined}
+      aria-current={!isTabs && item.id === activeId ? 'page' : undefined}
       className={`portal-nav-item ${item.id === activeId ? 'active' : ''}`}
       onClick={() => onSelect(item.id)}
     >
@@ -34,8 +41,8 @@ export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel
   return (
     <nav
       className="portal-nav"
-      role="tablist"
-      aria-orientation="vertical"
+      role={isTabs ? 'tablist' : undefined}
+      aria-orientation={isTabs ? 'vertical' : undefined}
       aria-label={ariaLabel}
     >
       {groups

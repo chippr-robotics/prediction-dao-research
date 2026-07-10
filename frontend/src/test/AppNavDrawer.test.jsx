@@ -41,37 +41,41 @@ describe('AppNavDrawer (global nav drawer)', () => {
   it('lists Home plus the Finance / Tools / Apps sections', () => {
     renderDrawer()
 
-    expect(screen.getByRole('tab', { name: /home/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Trade' })).toBeInTheDocument()
+    // Drawer entries navigate between routes, so they use navigation (button)
+    // semantics with aria-current — not tablist/tab.
+    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Trade' })).toBeInTheDocument()
     // Custody is surfaced as "Protect"; Security relocated into Tools.
-    expect(screen.getByRole('tab', { name: 'Protect' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Security' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Protect' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Security' })).toBeInTheDocument()
+    // Not a tablist.
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
 
     expect(screen.getByText('Finance')).toBeInTheDocument()
     expect(screen.getByText('Tools')).toBeInTheDocument()
     expect(screen.getByText('Apps')).toBeInTheDocument()
 
     // Removed Admin group / personal-account entries are absent from the menu.
-    expect(screen.queryByRole('tab', { name: 'Preferences' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Account' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Preferences' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
   })
 
   it('routes Home to the dashboard', () => {
     renderDrawer('/wallet?tab=trade')
-    fireEvent.click(screen.getByRole('tab', { name: /home/i }))
+    fireEvent.click(screen.getByRole('button', { name: /home/i }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/app')
   })
 
   it('routes a section item to its wallet tab (Protect → custody)', () => {
     renderDrawer()
-    fireEvent.click(screen.getByRole('tab', { name: 'Protect' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Protect' }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=custody')
   })
 
-  it('highlights the active section from the URL', () => {
+  it('highlights the active section from the URL with aria-current', () => {
     renderDrawer('/wallet?tab=security')
-    expect(screen.getByRole('tab', { name: 'Security' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Trade' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('button', { name: 'Security' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Trade' })).not.toHaveAttribute('aria-current')
   })
 
   it('contains the in-app legal footer', () => {

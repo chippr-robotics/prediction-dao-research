@@ -84,6 +84,7 @@ export default function AppNavDrawer() {
         </div>
 
         <PortalNav
+          variant="nav"
           groups={DRAWER_GROUPS}
           activeId={activeId}
           onSelect={handleSelect}

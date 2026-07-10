@@ -10,7 +10,7 @@ import './Header.css'
 function Header({ hideWalletButton = false, appMode = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { open: openNavDrawer, available: navDrawerAvailable } = useNavDrawer()
+  const { open: openNavDrawer, isOpen: navDrawerOpen, available: navDrawerAvailable } = useNavDrawer()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
 
@@ -59,8 +59,8 @@ function Header({ hideWalletButton = false, appMode = false }) {
           className="header-logo"
           onClick={handleLogoClick}
           aria-label={appMode && navDrawerAvailable ? 'Open menu' : 'FairWins home'}
-          aria-haspopup={appMode && navDrawerAvailable ? 'menu' : undefined}
           aria-controls={appMode && navDrawerAvailable ? 'app-nav-drawer' : undefined}
+          aria-expanded={appMode && navDrawerAvailable ? navDrawerOpen : undefined}
         >
           {!logoError ? (
             <img
