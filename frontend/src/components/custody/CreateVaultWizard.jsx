@@ -1,14 +1,20 @@
 // Spec 043 (US1) — create a new Safe vault: choose owners + threshold, preview the deterministic address, and
 // deploy. Validation mirrors validateVaultConfig (FR-005). Presentational; all chain work is delegated to the
 // injected callbacks so the component is unit-testable.
+// Spec 049 (US1) — an optional Policy step sits between configuration and review: when rules are configured
+// they become a `policySetup` ({setupTo, setupData}) threaded into vault creation; when skipped the payload
+// carries no policySetup, keeping the initializer byte-identical to spec 043 (FR-010).
 
 import { useState, useMemo, useEffect } from 'react'
 import { validateVaultConfig } from '../../lib/custody/safeVault'
+import { buildEnablePolicySetup } from '../../lib/custody/policy'
+import PolicyStep from './PolicyStep'
 
-export default function CreateVaultWizard({ connectedAddress, onCreate, onPreview, onDone }) {
+export default function CreateVaultWizard({ connectedAddress, chainId, onCreate, onPreview, onDone }) {
   const [owners, setOwners] = useState([connectedAddress || ''])
   const [threshold, setThreshold] = useState(1)
   const [label, setLabel] = useState('')
+  const [policy, setPolicy] = useState(null)
   const [predicted, setPredicted] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -23,14 +29,19 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
     }
   }, [owners, threshold])
 
-  // A previewed address is only valid for the exact owners+threshold it was computed from; clear it whenever
-  // the config changes so the user never sees a stale address that won't match what "Create vault" deploys.
+  // A previewed address is only valid for the exact owners+threshold+policy it was computed from (the policy
+  // setup is part of the initializer, which is hashed into the CREATE2 salt); clear it whenever the config
+  // changes so the user never sees a stale address that won't match what "Create vault" deploys.
   useEffect(() => {
     setPredicted(null)
-  }, [owners, threshold])
+  }, [owners, threshold, policy])
 
   const cleanedOwners = () => owners.map((o) => o.trim()).filter(Boolean)
   const nextSaltNonce = () => Date.now()
+
+  // Spec 049: a policy still being edited (invalid) blocks create; a skipped policy is null.
+  const policyBlocked = Boolean(policy?.invalid)
+  const buildPolicySetup = () => (policy && !policy.invalid ? buildEnablePolicySetup(chainId, policy) : undefined)
 
   const updateOwner = (i, val) => setOwners((prev) => prev.map((o, idx) => (idx === i ? val : o)))
   const addOwner = () => setOwners((prev) => [...prev, ''])
@@ -40,7 +51,12 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
     setError(null)
     setBusy(true)
     try {
-      const addr = await onPreview({ owners: cleanedOwners(), threshold, saltNonce: previewNonce })
+      const addr = await onPreview({
+        owners: cleanedOwners(),
+        threshold,
+        saltNonce: previewNonce,
+        policySetup: buildPolicySetup(),
+      })
       setPredicted(addr)
     } catch (e) {
       setError(e?.message || 'Could not preview the vault address')
@@ -56,7 +72,13 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
     setError(null)
     setBusy(true)
     try {
-      await onCreate({ owners: cleanedOwners(), threshold, saltNonce: previewNonce, label })
+      await onCreate({
+        owners: cleanedOwners(),
+        threshold,
+        saltNonce: previewNonce,
+        label,
+        policySetup: buildPolicySetup(),
+      })
       onDone?.()
     } catch (e) {
       setError(e?.message || 'Vault creation failed')
@@ -109,6 +131,8 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
         <input id="vault-label" type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
       </div>
 
+      <PolicyStep chainId={chainId} value={policy} onChange={setPolicy} />
+
       {validationError && (
         <p className="custody-error" role="alert">
           {validationError}
@@ -125,11 +149,17 @@ export default function CreateVaultWizard({ connectedAddress, onCreate, onPrevie
         </p>
       )}
 
+      <p className="custody-policy-review">
+        {policy && !policy.invalid
+          ? `Policy: ${(policy.summary || []).join('; ')}`
+          : 'No policy — the vault will have no spending rules.'}
+      </p>
+
       <div className="custody-actions">
-        <button type="button" onClick={handlePreview} disabled={!!validationError || busy}>
+        <button type="button" onClick={handlePreview} disabled={!!validationError || policyBlocked || busy}>
           Preview address
         </button>
-        <button type="button" onClick={handleCreate} disabled={!!validationError || busy}>
+        <button type="button" onClick={handleCreate} disabled={!!validationError || policyBlocked || busy}>
           {busy ? 'Working…' : 'Create vault'}
         </button>
       </div>

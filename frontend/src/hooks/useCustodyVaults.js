@@ -16,6 +16,23 @@ import {
   upsertVaultReference,
   removeVaultReference,
 } from '../lib/custody/vaultReferences'
+import { getPolicyStatus, readPolicy, summarizeRules, isPolicySupported } from '../lib/custody/policy'
+
+/**
+ * Spec 049 (US2/FR-006) — per-vault policy badge data for the list. Resilient by design: any
+ * failure yields `{}` so the row simply renders without a badge; custody itself is unaffected.
+ */
+async function readPolicyBadge(vaultAddress, chainId, provider) {
+  try {
+    if (!isPolicySupported(chainId)) return { policyStatus: 'unsupported' }
+    const policyStatus = await getPolicyStatus(vaultAddress, chainId, provider)
+    if (policyStatus !== 'managed') return { policyStatus }
+    const policy = await readPolicy(vaultAddress, chainId, provider)
+    return { policyStatus, policySummary: summarizeRules(policy) }
+  } catch {
+    return {}
+  }
+}
 
 export function useCustodyVaults() {
   const { address, chainId, signer, provider } = useWallet()
@@ -43,7 +60,8 @@ export function useCustodyVaults() {
         refs.map(async (ref) => {
           try {
             const state = await loadVault(ref.address, chainId, provider)
-            return { ...ref, ...state, owner: isVaultOwner(state, address) }
+            const badge = state.isSafe ? await readPolicyBadge(ref.address, chainId, provider) : {}
+            return { ...ref, ...state, owner: isVaultOwner(state, address), ...badge }
           } catch (e) {
             return { ...ref, isSafe: undefined, loadError: e?.message || 'load failed' }
           }
@@ -85,9 +103,10 @@ export function useCustodyVaults() {
     [address, chainId, provider, refresh],
   )
 
-  /** Create a new vault and persist its reference (owner role). */
+  /** Create a new vault and persist its reference (owner role). `policySetup` (spec 049, optional)
+   * attaches a policy guard atomically at creation. */
   const createVault = useCallback(
-    async ({ owners, threshold, saltNonce, label = '' }, nowMs = 0) => {
+    async ({ owners, threshold, saltNonce, label = '', policySetup }, nowMs = 0) => {
       if (!signer) throw new Error('Connect a wallet to create a vault')
       setError(null)
       const { address: vaultAddress, txHash } = await createVaultTx({
@@ -96,6 +115,7 @@ export function useCustodyVaults() {
         owners,
         threshold,
         saltNonce,
+        policySetup,
       })
       upsertVaultReference(
         address,
@@ -111,12 +131,13 @@ export function useCustodyVaults() {
 
   /** Preview the deterministic address a new vault would deploy to (before signing, FR US1). */
   const previewVaultAddress = useCallback(
-    async ({ owners, threshold, saltNonce }) => {
+    async ({ owners, threshold, saltNonce, policySetup }) => {
       const { predictedAddress } = await buildCreateVaultTx({
         chainId,
         owners,
         threshold,
         saltNonce,
+        policySetup,
         provider,
       })
       return predictedAddress

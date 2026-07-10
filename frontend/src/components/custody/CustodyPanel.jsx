@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useWallet } from '../../hooks'
 import { useCustody } from '../../hooks/useCustody'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
+import { useVaultProposals } from '../../hooks/useVaultProposals'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
 import VaultList from './VaultList'
 import VaultDetail from './VaultDetail'
@@ -15,7 +16,7 @@ import LoadVaultForm from './LoadVaultForm'
 import './Custody.css'
 
 function OnChainSection() {
-  const { address } = useWallet()
+  const { address, chainId } = useWallet()
   const { active, operateAsVault } = useCustody()
   const {
     vaults,
@@ -30,6 +31,10 @@ function OnChainSection() {
     forget,
   } = useCustodyVaults()
   const [mode, setMode] = useState(null) // null | 'create' | 'load'
+  // Spec 049 — one shared proposal-queue instance for the active vault, so policy-change proposals
+  // (VaultDetail → PolicyPanel) land in the same queue the VaultProposalsPanel renders.
+  const proposals = useVaultProposals(activeVault)
+  const onVaultChain = activeVault && Number(chainId) === Number(activeVault.chainId)
 
   return (
     <div className="custody-onchain" role="region" aria-label="On-chain vaults">
@@ -45,6 +50,7 @@ function OnChainSection() {
       {mode === 'create' && (
         <CreateVaultWizard
           connectedAddress={address}
+          chainId={chainId}
           onCreate={createVault}
           onPreview={previewVaultAddress}
           onDone={() => setMode(null)}
@@ -68,8 +74,9 @@ function OnChainSection() {
               onForget={forget}
               onOperateAs={operateAsVault}
               isActiveIdentity={active.mode === 'vault' && active.vaultAddress === activeVault.address}
+              onProposePolicy={activeVault.owner && onVaultChain ? proposals.propose : undefined}
             />
-            <VaultProposalsPanel vault={activeVault} />
+            <VaultProposalsPanel vault={activeVault} proposals={proposals} />
           </div>
         )}
       </div>

@@ -20,14 +20,20 @@ import { getProvider } from '../../utils/blockchainService'
 const setupIface = new Interface(SAFE_SETUP_ABI)
 const factoryIface = new Interface(SAFE_PROXY_FACTORY_ABI)
 
-/** Encode the Safe.setup initializer for a plain multisig (no setup delegatecall, no gas refunds). */
-export function buildSetupInitializer(owners, threshold, fallbackHandler) {
+/**
+ * Encode the Safe.setup initializer (no gas refunds). By default there is no setup delegatecall —
+ * the encoding is byte-identical to the original policy-less initializer (spec 049 FR-010/SC-007).
+ * Pass `policySetup` (`{setupTo, setupData}` from spec 049's `buildEnablePolicySetup`) to attach a
+ * policy guard atomically at creation.
+ */
+export function buildSetupInitializer(owners, threshold, fallbackHandler, policySetup = {}) {
+  const { setupTo = ZeroAddress, setupData = '0x' } = policySetup || {}
   const cleanOwners = owners.map((o) => getAddress(o))
   return setupIface.encodeFunctionData('setup', [
     cleanOwners,
     BigInt(threshold),
-    ZeroAddress, // to
-    '0x', // data
+    getAddress(setupTo), // to (setup delegatecall target; ZeroAddress = none)
+    setupData, // data (setup delegatecall payload; '0x' = none)
     getAddress(fallbackHandler),
     ZeroAddress, // paymentToken
     0n, // payment
@@ -91,13 +97,14 @@ export async function predictVaultAddress({ chainId, initializer, saltNonce, pro
 
 /**
  * Pure: build the createProxyWithNonce calldata for a new vault (no provider, no predicted address).
+ * `policySetup` ({setupTo, setupData}, optional) attaches a policy guard at creation (spec 049 US1).
  * @returns {{ to:string, data:string, value:bigint, initializer:string }}
  */
-export function buildCreateVaultCalldata({ chainId, owners, threshold, saltNonce }) {
+export function buildCreateVaultCalldata({ chainId, owners, threshold, saltNonce, policySetup }) {
   validateVaultConfig(owners, threshold)
   const safe = getSafeContracts(chainId)
   if (!safe) throw new Error(`Custody is not available on chain ${chainId}`)
-  const initializer = buildSetupInitializer(owners, threshold, safe.fallbackHandler)
+  const initializer = buildSetupInitializer(owners, threshold, safe.fallbackHandler, policySetup)
   const data = factoryIface.encodeFunctionData('createProxyWithNonce', [
     getAddress(safe.singletonL2),
     initializer,
@@ -111,8 +118,8 @@ export function buildCreateVaultCalldata({ chainId, owners, threshold, saltNonce
  * proxyCreationCode on-chain via `provider`).
  * @returns {{ to:string, data:string, value:bigint, predictedAddress:string }}
  */
-export async function buildCreateVaultTx({ chainId, owners, threshold, saltNonce, provider }) {
-  const { to, data, value, initializer } = buildCreateVaultCalldata({ chainId, owners, threshold, saltNonce })
+export async function buildCreateVaultTx({ chainId, owners, threshold, saltNonce, policySetup, provider }) {
+  const { to, data, value, initializer } = buildCreateVaultCalldata({ chainId, owners, threshold, saltNonce, policySetup })
   const predictedAddress = await predictVaultAddress({ chainId, initializer, saltNonce, provider })
   return { to, data, value, predictedAddress }
 }
@@ -121,8 +128,8 @@ export async function buildCreateVaultTx({ chainId, owners, threshold, saltNonce
  * Deploy a new vault. Sends createProxyWithNonce with `signer` and returns the deployed proxy address parsed
  * from the ProxyCreation event (falling back to the predicted address).
  */
-export async function createVault({ signer, chainId, owners, threshold, saltNonce }) {
-  const tx = await buildCreateVaultTx({ chainId, owners, threshold, saltNonce, provider: signer.provider })
+export async function createVault({ signer, chainId, owners, threshold, saltNonce, policySetup }) {
+  const tx = await buildCreateVaultTx({ chainId, owners, threshold, saltNonce, policySetup, provider: signer.provider })
   const sent = await signer.sendTransaction({ to: tx.to, data: tx.data, value: tx.value })
   const receipt = await sent.wait()
   let deployed = tx.predictedAddress
