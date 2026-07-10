@@ -21,6 +21,7 @@ export function UserPreferencesProvider({ children }) {
     defaultSlippage: 0.5,
     polymarketCategories: [],
     showTestnetAssets: false,
+    showZeroBalances: false,
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -36,6 +37,7 @@ export function UserPreferencesProvider({ children }) {
         defaultSlippage: 0.5,
         polymarketCategories: [],
         showTestnetAssets: false,
+        showZeroBalances: false,
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,6 +51,7 @@ export function UserPreferencesProvider({ children }) {
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
       const polymarketCategories = getUserPreference(walletAddress, 'polymarket_categories', [], true)
       const showTestnetAssets = getUserPreference(walletAddress, 'show_testnet_assets', false, true)
+      const showZeroBalances = getUserPreference(walletAddress, 'show_zero_balances', false, true)
 
       setPreferences({
         recentSearches,
@@ -56,6 +59,7 @@ export function UserPreferencesProvider({ children }) {
         defaultSlippage,
         polymarketCategories,
         showTestnetAssets,
+        showZeroBalances,
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -135,6 +139,14 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, showTestnetAssets: next }))
   }, [account])
 
+  const setShowZeroBalances = useCallback((show) => {
+    if (!account) return
+
+    const next = Boolean(show)
+    saveUserPreference(account, 'show_zero_balances', next, true)
+    setPreferences(prev => ({ ...prev, showZeroBalances: next }))
+  }, [account])
+
   const clearAllPreferences = useCallback(() => {
     if (!account) return
 
@@ -145,6 +157,7 @@ export function UserPreferencesProvider({ children }) {
       defaultSlippage: 0.5,
       polymarketCategories: [],
       showTestnetAssets: false,
+      showZeroBalances: false,
     })
   }, [account])
 
@@ -157,6 +170,7 @@ export function UserPreferencesProvider({ children }) {
     setDefaultSlippage,
     setPolymarketCategories,
     setShowTestnetAssets,
+    setShowZeroBalances,
     savePreference,
     clearAllPreferences,
   }

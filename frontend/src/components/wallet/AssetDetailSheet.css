@@ -1,0 +1,211 @@
+/* AssetDetailSheet (spec 044 v1.2) — bottom sheet at the modal overlay tier. */
+
+.asset-sheet-backdrop {
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 2000; /* modal tier — above header (1000) and nav drawer (1401) */
+  animation: assetSheetFade 0.15s ease;
+}
+.asset-sheet-scrim {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+}
+.asset-sheet {
+  animation: assetSheetRise 0.2s ease;
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  color: var(--text-primary, #111827);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-height: 85vh;
+  max-width: 40rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.6rem 1rem 1.2rem;
+  position: relative;
+  width: 100%;
+}
+.asset-sheet:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: -2px;
+}
+.asset-sheet-grabber {
+  background: var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  height: 4px;
+  margin: 0 auto 0.2rem;
+  width: 42px;
+}
+
+/* Header */
+.asset-sheet-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+}
+.asset-sheet-heading {
+  flex: 1;
+  min-width: 0;
+}
+.asset-sheet-heading h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.asset-sheet-position {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0.15rem 0 0;
+}
+.asset-sheet-usd {
+  color: var(--brand-primary, #36B37E);
+}
+.asset-sheet-price {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0.15rem 0 0;
+}
+.asset-sheet-price-source {
+  color: var(--text-muted, #9ca3af);
+}
+.asset-sheet-close {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+}
+.asset-sheet-close:focus-visible,
+.asset-sheet-action:focus-visible,
+.asset-sheet-instance input:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 2px;
+}
+
+/* Instance selection */
+.asset-sheet-instances {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0.25rem 0.6rem 0.6rem;
+}
+.asset-sheet-instances legend {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+.asset-sheet-instance {
+  align-items: center;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.45rem 0.4rem;
+}
+.asset-sheet-instance.selected {
+  background: var(--bg-primary, rgba(54, 179, 126, 0.08));
+}
+.asset-sheet-instance-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.asset-sheet-instance-form {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.asset-sheet-instance-meta {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+}
+.asset-sheet-instance-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  gap: 0.1rem;
+}
+.asset-sheet-instance-balance {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.asset-sheet-instance-usd {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+}
+
+/* Actions */
+.asset-sheet-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.asset-sheet-action {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.55rem 0;
+}
+.asset-sheet-action.primary {
+  background: var(--primary-button, var(--brand-primary, #36B37E));
+  border-color: var(--primary-button, var(--brand-primary, #36B37E));
+  color: var(--primary-button-text, #fff);
+}
+.asset-sheet-action:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.asset-sheet-actions-note {
+  color: var(--text-muted, #9ca3af);
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+@keyframes assetSheetRise {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes assetSheetFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .asset-sheet-backdrop,
+  .asset-sheet {
+    animation: none;
+  }
+}

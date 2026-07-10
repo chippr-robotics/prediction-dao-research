@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { formatUnits } from 'ethers'
 import usePortfolio from '../../hooks/usePortfolio'
 import InfoTip from '../ui/InfoTip'
+import AssetLogo from './AssetLogo'
+import AssetDetailSheet from './AssetDetailSheet'
+import { formatAssetAmount } from '../../lib/portfolio/aggregate'
 import './Portfolio.css'
 
 // Full-precision USD for a compliance-flavored view — deliberately not the
@@ -13,66 +15,51 @@ function formatUsdFull(n) {
   })}`
 }
 
-// Max fraction digits shown for a fungible balance.
-const FRACTION_DIGITS = 6
-
-function formatBalance(holding) {
-  const { asset, balance, balanceRaw } = holding
-  if (asset.kind === 'nft') {
-    return `${balance} ${balance === 1 ? 'item' : 'items'}`
-  }
-  // Format from the raw units string so a nonzero dust holding can never
-  // round to a misleading "0" (honest state). Falls back to the numeric
-  // balance only when raw units aren't available.
-  if (typeof balanceRaw === 'bigint' && Number.isInteger(asset.decimals)) {
-    const [int, frac = ''] = formatUnits(balanceRaw, asset.decimals).split('.')
-    const intFmt = BigInt(int).toLocaleString('en-US')
-    const fracShown = frac.slice(0, FRACTION_DIGITS).replace(/0+$/, '')
-    if (int === '0' && fracShown === '' && balanceRaw > 0n) {
-      return `< 0.${'0'.repeat(FRACTION_DIGITS - 1)}1 ${asset.symbol}`
-    }
-    return `${intFmt}${fracShown ? `.${fracShown}` : ''} ${asset.symbol}`
-  }
-  const digits = balance !== 0 && Math.abs(balance) < 1 ? 6 : 4
-  return `${Number(balance).toLocaleString('en-US', { maximumFractionDigits: digits })} ${asset.symbol}`
+function formatAggregateBalance(aggregate) {
+  return formatAssetAmount(aggregate.balance, aggregate.underlying, aggregate.kind)
 }
 
-// Member-facing names for the classification provenance (FR-006).
-const SOURCE_LABELS = {
-  'sec-baseline': 'SEC baseline',
-  'curated-registry': 'Curated registry',
-  'app-config': 'App configuration',
-}
-
-function AssetRow({ holding }) {
-  const { asset, usd, network } = holding
+function AggregateRow({ aggregate, onOpen }) {
+  const networks = new Set(aggregate.instances.map((h) => h.asset.chainId))
+  const singleInstance = aggregate.instances.length === 1 ? aggregate.instances[0] : null
   return (
     <li className="portfolio-row">
-      <div className="portfolio-row-asset">
-        <span className="portfolio-row-name">{asset.name}</span>
-        <span className="portfolio-row-meta">
-          {asset.symbol}
-          <span className="portfolio-row-network">{network}</span>
-          <span className="portfolio-row-source">{SOURCE_LABELS[asset.source] || asset.source}</span>
-        </span>
-      </div>
-      <div className="portfolio-row-values">
-        <span className="portfolio-row-balance">{formatBalance(holding)}</span>
-        {usd == null ? (
-          <span className="portfolio-row-usd portfolio-row-usd-unavailable">
-            <span aria-hidden="true">—</span>
-            <span className="portfolio-visually-hidden">price unavailable</span>
+      <button
+        type="button"
+        className="portfolio-row-button"
+        onClick={() => onOpen(aggregate)}
+        aria-haspopup="dialog"
+      >
+        <AssetLogo symbol={aggregate.underlying} size={32} />
+        <span className="portfolio-row-asset">
+          <span className="portfolio-row-name">{aggregate.name}</span>
+          <span className="portfolio-row-meta">
+            {aggregate.underlying}
+            <span className="portfolio-row-network">
+              {singleInstance
+                ? singleInstance.network
+                : `${aggregate.instances.length} instances · ${networks.size} network${networks.size === 1 ? '' : 's'}`}
+            </span>
           </span>
-        ) : (
-          <span className="portfolio-row-usd">{formatUsdFull(usd)}</span>
-        )}
-      </div>
+        </span>
+        <span className="portfolio-row-values">
+          <span className="portfolio-row-balance">{formatAggregateBalance(aggregate)}</span>
+          {aggregate.usd == null ? (
+            <span className="portfolio-row-usd portfolio-row-usd-unavailable">
+              <span aria-hidden="true">—</span>
+              <span className="portfolio-visually-hidden">price unavailable</span>
+            </span>
+          ) : (
+            <span className="portfolio-row-usd">{formatUsdFull(aggregate.usd)}</span>
+          )}
+        </span>
+      </button>
     </li>
   )
 }
 
-function CategorySection({ group, collapsed, onToggle }) {
-  const { category, holdings, subtotalUsd } = group
+function CategorySection({ group, collapsed, onToggle, onOpen }) {
+  const { category, aggregates, subtotalUsd } = group
   const regionId = `portfolio-category-${category.id}`
   const expanded = !collapsed
   return (
@@ -98,12 +85,12 @@ function CategorySection({ group, collapsed, onToggle }) {
         </InfoTip>
       </div>
       <div id={regionId} role="region" aria-label={category.label} hidden={!expanded}>
-        {holdings.length === 0 ? (
+        {aggregates.length === 0 ? (
           <p className="portfolio-category-empty">No assets in this category.</p>
         ) : (
           <ul className="portfolio-rows">
-            {holdings.map((h) => (
-              <AssetRow key={`${h.asset.chainId}:${h.asset.id}`} holding={h} />
+            {aggregates.map((aggregate) => (
+              <AggregateRow key={aggregate.id} aggregate={aggregate} onOpen={onOpen} />
             ))}
           </ul>
         )}
@@ -113,14 +100,20 @@ function CategorySection({ group, collapsed, onToggle }) {
 }
 
 /**
- * Connected Account Portfolio (spec 044 + follow-up) — the member's holdings
- * across every supported network, grouped by the SEC/CFTC asset taxonomy.
- * Read-only; category explainers live in InfoTip bubbles; testnet networks
- * are included per the "show testnet tokens" preference.
+ * Connected Account Portfolio (spec 044 v1.2) — the member's holdings across
+ * every supported network, grouped by the SEC/CFTC asset taxonomy with
+ * wrapped forms combined into their underlying asset. Tapping a row opens
+ * the asset detail sheet (instances + actions). Category explainers live in
+ * InfoTip bubbles; testnet and zero-balance visibility follow the
+ * Preferences → Portfolio settings.
  */
 export default function PortfolioPanel() {
   const portfolio = usePortfolio()
   const [collapsedIds, setCollapsedIds] = useState(() => new Set())
+  const [openAggregateId, setOpenAggregateId] = useState(null)
+
+  // Resolve from the live snapshot so a refresh keeps the sheet current.
+  const openAggregate = portfolio.aggregates.find((a) => a.id === openAggregateId) || null
 
   const toggleCategory = (id) => {
     setCollapsedIds((prev) => {
@@ -187,6 +180,7 @@ export default function PortfolioPanel() {
           group={group}
           collapsed={collapsedIds.has(group.category.id)}
           onToggle={toggleCategory}
+          onOpen={(aggregate) => setOpenAggregateId(aggregate.id)}
         />
       ))}
 
@@ -194,12 +188,19 @@ export default function PortfolioPanel() {
         {!portfolio.showTestnetAssets && (
           <p>Testnet tokens are hidden — enable them under Preferences → Portfolio.</p>
         )}
+        {!portfolio.showZeroBalances && (
+          <p>Zero-balance assets are hidden — enable them under Preferences → Portfolio.</p>
+        )}
         <p>
           Classifications are informational, not legal or investment advice. Only assets in the
-          app&apos;s curated registry are scanned, and USD totals include only assets with an
-          available price.
+          app&apos;s curated registry are scanned; prices come from on-chain sources (oracle
+          feeds, DEX pools) and USD totals include only priced assets.
         </p>
       </footer>
+
+      {openAggregate && (
+        <AssetDetailSheet aggregate={openAggregate} onClose={() => setOpenAggregateId(null)} />
+      )}
     </div>
   )
 }

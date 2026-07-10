@@ -120,3 +120,15 @@ US3 → US4 → Polish, validating each checkpoint's tests before moving on.
 - [X] T022 Rework `frontend/src/components/wallet/PortfolioPanel.jsx`: category descriptions in shared `InfoTip` bubbles, per-row network badges, no partial labels, compact single-line disclosure, testnet-hidden note
 - [X] T023 Add `showTestnetAssets` preference (default false, persisted per wallet) to `frontend/src/contexts/UserPreferencesContext.jsx` and a Preferences → Portfolio group (`frontend/src/components/account/PortfolioPreferencesPanel.jsx`) wired into WalletPage
 - [X] T024 Update/extend tests: cross-chain hook suite, InfoTip/network/no-partial panel suite, `getPortfolioChainIds` + Sepolia registry tests, PortfolioPreferencesPanel suite, refreshed axe audits
+
+## Phase 9: Follow-up v1.2 (on-chain prices, asset detail sheet, aggregation)
+
+- [X] T025 Add Chainlink AggregatorV3 + Uniswap V3 factory/pool read ABIs (`frontend/src/abis/AggregatorV3.js`, `frontend/src/abis/UniswapV3PoolReader.js`) and the per-chain feed map `frontend/src/config/priceFeeds.js` (canonical Polygon */USD feeds, staleness bound, DEX fee tiers)
+- [X] T026 Implement the verifiable price ladder `frontend/src/lib/portfolio/prices.js` (Chainlink first — stale/non-positive answers rejected; then DEX pool spot vs the network stablecoin from slot0 with token0/token1 decimal handling; stablecoins par; else unpriced) + `priceSourceLabel` provenance
+- [X] T027 Implement wrapped-asset aggregation `frontend/src/lib/portfolio/aggregate.js` (per-(category, underlying) aggregates; zero-balance instances neutral; any unpriced nonzero instance → aggregate unpriced; home-instance + form-label helpers; dust-safe shared amount formatter) and `UNDERLYING_META` in assetTaxonomy.js
+- [X] T028 Rework `frontend/src/hooks/usePortfolio.js`: concurrent balance + price loading, holdings for every readable instance (zeros included), aggregate rows filtered by the new zero-balance preference (default hide)
+- [X] T029 Add `frontend/src/components/wallet/AssetLogo.jsx` (+css): bundled inline SVG asset glyphs with network sub-badges (home natives badge-free, testnets dash-ringed)
+- [X] T030 Add `frontend/src/components/wallet/AssetDetailSheet.jsx` (+css): bottom sheet (modal tier, Escape/backdrop/focus handling) with aggregate position, unit price + on-chain source provenance, per-instance radio selection, and Trade/Transfer/Stake actions gated by real eligibility (deep links carry chain+token)
+- [X] T031 Panel rework `PortfolioPanel.jsx`: tappable aggregate rows (logo, combined balance, instance/network summary), zero-hidden note, price-source disclosure line
+- [X] T032 Preferences: `showZeroBalances` (default false) in UserPreferencesContext + second switch in PortfolioPreferencesPanel
+- [X] T033 Tests: prices ladder suite (feed decode/staleness/negative, pool math both token orders), aggregation suite (combination, no-partial-sums rule, dust), rewritten hook suite, panel aggregate-row suite, AssetDetailSheet suite (selection, eligibility, deep links, dismissal), refreshed axe audits incl. open sheet

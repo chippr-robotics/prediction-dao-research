@@ -98,6 +98,33 @@ export const SEC_COMMODITY_BASELINE = ['BTC', 'ETH', 'SOL', 'XRP', 'MATIC', 'POL
 
 const BASELINE_SET = new Set(SEC_COMMODITY_BASELINE)
 
+/**
+ * Display metadata per underlying asset symbol (spec 044 v1.2). `homeChainId`
+ * is the canonical mainnet whose NATIVE coin the symbol is — a native
+ * instance on that chain renders its logo without a network badge (FR-026);
+ * every other instance (wrapped, bridged, testnet) carries the hosting
+ * network's badge.
+ */
+export const UNDERLYING_META = {
+  ETH: { name: 'Ethereum', homeChainId: 1 },
+  BTC: { name: 'Bitcoin', homeChainId: null },
+  MATIC: { name: 'Polygon', homeChainId: 137 },
+  POL: { name: 'Polygon', homeChainId: 137 },
+  ETC: { name: 'Ethereum Classic', homeChainId: 61 },
+  SOL: { name: 'Solana', homeChainId: null },
+  XRP: { name: 'XRP', homeChainId: null },
+  LINK: { name: 'Chainlink', homeChainId: null },
+  USDC: { name: 'USD Coin', homeChainId: null },
+  USDT: { name: 'Tether USD', homeChainId: null },
+  USC: { name: 'Classic USD', homeChainId: null },
+  FWMV: { name: 'FairWins Membership Voucher', homeChainId: null },
+}
+
+export function getUnderlyingMeta(symbol) {
+  const key = (symbol || '').toUpperCase()
+  return UNDERLYING_META[key] || { name: key, homeChainId: null }
+}
+
 // Curated per-network token entries. Canonical, well-known deployments only —
 // the same convention as the canonical Uniswap addresses in networks.js.
 // `baselineSymbol` marks a token as the wrapped form of an SEC-baseline

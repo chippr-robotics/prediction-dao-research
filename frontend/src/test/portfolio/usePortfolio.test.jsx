@@ -1,25 +1,27 @@
 /**
- * usePortfolio (spec 044 + follow-up) — cross-chain balance hook tests.
+ * usePortfolio (spec 044 v1.2) — cross-chain aggregated portfolio tests.
  *
- * Wallet + price state are mocked at the context level per repo convention —
- * never raw wagmi hooks. Per-chain read providers (utils/rpcProvider) and
- * ethers' Contract are stubbed with chain-scoped fixture maps.
+ * Wallet state is mocked at the context level per repo convention — never
+ * raw wagmi hooks. Per-chain read providers (utils/rpcProvider), ethers'
+ * Contract, and the on-chain price ladder (lib/portfolio/prices) are stubbed
+ * with fixture maps.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, waitFor, act } from '@testing-library/react'
 import { WalletContext } from '../../contexts'
-import PriceContext from '../../contexts/PriceContext'
 import usePortfolio from '../../hooks/usePortfolio'
 import { getPortfolioRegistry, getPortfolioChainIds } from '../../config/assetTaxonomy'
-import { NETWORKS } from '../../config/networks'
 
-// Chain-scoped fixtures. Values may be bigints or functions (to simulate
-// rejections). Unlisted assets read as 0n.
+// Chain-scoped fixtures. Balance values may be bigints or functions (to
+// simulate rejections); unlisted assets read as 0n. Semicolon required:
+// vitest's hoisting transform concatenates this with the vi.mock calls.
 const fixtures = vi.hoisted(() => ({
   nativeBalances: new Map(), // chainId -> bigint | fn
   tokenBalances: new Map(), // `${chainId}:${addressLower}` -> bigint | fn
-  prefs: { showTestnetAssets: false },
-}))
+  prefs: { showTestnetAssets: false, showZeroBalances: false },
+  prices: new Map(), // underlying -> {usd, source, chainId}
+  pricesFail: false,
+}));
 
 function resolveFixture(value) {
   if (typeof value === 'function') return value()
@@ -49,10 +51,22 @@ vi.mock('ethers', async (importOriginal) => {
   }
 })
 
+vi.mock('../../lib/portfolio/prices', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    fetchPortfolioPrices: () =>
+      fixtures.pricesFail
+        ? Promise.reject(new Error('pricing down'))
+        : Promise.resolve(new Map(fixtures.prices)),
+  }
+})
+
 vi.mock('../../hooks/useUserPreferences', () => ({
   useUserPreferences: () => ({
     preferences: { ...fixtures.prefs },
     setShowTestnetAssets: vi.fn(),
+    setShowZeroBalances: vi.fn(),
   }),
 }))
 
@@ -65,20 +79,16 @@ function makeWallet(overrides = {}) {
   return { address: ADDRESS, isConnected: true, chainId: 137, ...overrides }
 }
 
-const PRICE_OK = { nativeUsdRate: 0.5, error: null }
-
 let latest
 function Probe() {
   latest = usePortfolio()
   return null
 }
 
-function Harness({ wallet, price = PRICE_OK }) {
+function Harness({ wallet }) {
   return (
     <WalletContext.Provider value={wallet}>
-      <PriceContext.Provider value={price}>
-        <Probe />
-      </PriceContext.Provider>
+      <Probe />
     </WalletContext.Provider>
   )
 }
@@ -86,95 +96,115 @@ function Harness({ wallet, price = PRICE_OK }) {
 async function renderPortfolio(props = {}) {
   let view
   await act(async () => {
-    view = render(<Harness wallet={props.wallet || makeWallet()} price={props.price || PRICE_OK} />)
+    view = render(<Harness wallet={props.wallet || makeWallet()} />)
   })
   return view
 }
 
+const aggFor = (underlying, categoryId = null) =>
+  latest.aggregates.find(
+    (a) => a.underlying === underlying && (categoryId == null || a.categoryId === categoryId),
+  )
+
 beforeEach(() => {
   fixtures.nativeBalances.clear()
   fixtures.tokenBalances.clear()
+  fixtures.prices.clear()
+  fixtures.pricesFail = false
   fixtures.prefs.showTestnetAssets = false
+  fixtures.prefs.showZeroBalances = false
   latest = undefined
 })
 
-describe('usePortfolio (cross-chain)', () => {
+describe('usePortfolio (aggregated, on-chain priced)', () => {
   it('is disconnected without a connected account', async () => {
     await renderPortfolio({ wallet: makeWallet({ address: undefined, isConnected: false }) })
     expect(latest.status).toBe('disconnected')
-    expect(latest.holdings).toEqual([])
+    expect(latest.aggregates).toEqual([])
   })
 
-  it('scans mainnets only by default and never lists testnet assets', async () => {
+  it('values holdings from the on-chain price map and hides zero aggregates by default (FR-022/023)', async () => {
     fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
     fixtures.tokenBalances.set(addr(137, 'USDC'), 100_000_000n)
-    fixtures.tokenBalances.set(addr(63, 'USC'), 40_000_000n) // Mordor — must stay hidden
+    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
 
-    const mainnets = new Set(getPortfolioChainIds())
-    expect(mainnets.has(63)).toBe(false)
-    for (const h of latest.holdings) {
-      expect(mainnets.has(h.asset.chainId)).toBe(true)
-    }
-    expect(latest.holdings.some((h) => h.asset.symbol === 'USC')).toBe(false)
-    expect(latest.totalUsd).toBeCloseTo(101) // 2 MATIC × $0.50 + 100 USDC
+    const matic = aggFor('MATIC')
+    expect(matic.usd).toBeCloseTo(1)
+    expect(matic.unitPriceUsd).toBe(0.5)
+    expect(matic.priceEntry.source).toBe('chainlink')
+    expect(aggFor('USDC').usd).toBeCloseTo(100)
+    expect(latest.totalUsd).toBeCloseTo(101)
+    // Zero-balance aggregates (ETH, BTC, LINK, …) are hidden by default.
+    expect(aggFor('ETH')).toBeUndefined()
+    expect(latest.aggregates.every((a) => a.balance > 0)).toBe(true)
   })
 
-  it('lists every digital commodity across scanned chains, zero balances included', async () => {
+  it('lists zero-balance aggregates when the preference is on, worth an honest $0.00', async () => {
+    fixtures.prefs.showZeroBalances = true
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
 
-    const commodities = latest.categories.find((g) => g.category.id === 'digital-commodities')
-    const expected = getPortfolioChainIds()
-      .flatMap((id) => getPortfolioRegistry(id))
-      .filter((e) => e.categoryId === 'digital-commodities')
-    expect(commodities.holdings).toHaveLength(expected.length)
-    // Zero of anything is honestly worth $0.00 — no dash, no fabricated price.
-    const zeroEth = commodities.holdings.find((h) => h.asset.chainId === 1 && h.asset.kind === 'native')
-    expect(zeroEth.balance).toBe(0)
-    expect(zeroEth.usd).toBe(0)
-    expect(zeroEth.network).toBe('Ethereum')
-    // Other categories stay holdings-only: no zero-balance stablecoin rows.
-    const stables = latest.categories.find((g) => g.category.id === 'payment-stablecoins')
-    expect(stables.holdings).toEqual([])
+    const eth = aggFor('ETH', 'digital-commodities')
+    expect(eth.balance).toBe(0)
+    expect(eth.usd).toBe(0)
+    expect(latest.totalUsd).toBe(0)
   })
 
-  it('includes testnet chains when the preference is on', async () => {
-    fixtures.prefs.showTestnetAssets = true
-    fixtures.nativeBalances.set(63, 10n ** 18n) // 1 ETC on Mordor
+  it('combines native and wrapped forms into one underlying aggregate (FR-025)', async () => {
+    fixtures.nativeBalances.set(1, 10n ** 18n) // 1 ETH on Ethereum
+    fixtures.tokenBalances.set(addr(1, 'WETH'), 5n * 10n ** 17n) // 0.5 WETH on Ethereum
+    fixtures.tokenBalances.set(addr(137, 'WETH'), 25n * 10n ** 16n) // 0.25 WETH on Polygon
+    fixtures.prices.set('ETH', { usd: 2000, source: 'chainlink', chainId: 137 })
+    await renderPortfolio()
+    await waitFor(() => expect(latest.status).toBe('ready'))
+
+    const eth = aggFor('ETH')
+    expect(eth.instances).toHaveLength(3)
+    expect(eth.balance).toBeCloseTo(1.75)
+    expect(eth.usd).toBeCloseTo(3500)
+    // Home native first, wrapped and cross-chain instances after.
+    expect(eth.instances[0].asset.kind).toBe('native')
+    expect(eth.instances.map((h) => h.asset.chainId)).toEqual([1, 1, 137])
+    // The main list shows ONE ETH row — instances live in the sheet.
+    expect(latest.aggregates.filter((a) => a.underlying === 'ETH')).toHaveLength(1)
+  })
+
+  it('scans testnets only when enabled and never prices them with foreign rates', async () => {
     fixtures.tokenBalances.set(addr(63, 'USC'), 40_000_000n)
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
+    expect(aggFor('USC')).toBeUndefined()
 
-    const usc = latest.holdings.find((h) => h.asset.symbol === 'USC')
-    expect(usc.usd).toBeCloseTo(40)
-    expect(usc.network).toBe('Ethereum Classic Mordor')
-    // A nonzero ETC native must NOT be priced with the MATIC feed rate.
-    const mordorNative = latest.holdings.find(
-      (h) => h.asset.chainId === 63 && h.asset.kind === 'native',
-    )
-    expect(mordorNative.balance).toBe(1)
-    expect(mordorNative.usd).toBeNull()
-    // Sepolia joins the scan set alongside Amoy and Mordor.
+    fixtures.prefs.showTestnetAssets = true
+    fixtures.nativeBalances.set(63, 10n ** 18n) // 1 ETC on Mordor — no price entry
+    await renderPortfolio()
+    await waitFor(() => expect(aggFor('USC')).toBeTruthy())
+
+    expect(aggFor('USC').usd).toBeCloseTo(40)
     expect(getPortfolioChainIds({ includeTestnets: true })).toContain(11155111)
-    expect(latest.holdings.some((h) => h.asset.chainId === 11155111)).toBe(true)
+    const etc = aggFor('ETC')
+    expect(etc.balance).toBe(1)
+    expect(etc.usd).toBeNull() // unpriced, never borrowed from another asset
   })
 
-  it('treats an errored price feed as no price rather than using the fallback rate', async () => {
+  it('keeps the portfolio ready when pricing fails entirely — assets just go unpriced', async () => {
+    fixtures.pricesFail = true
     fixtures.nativeBalances.set(137, 10n ** 18n)
-    await renderPortfolio({ price: { nativeUsdRate: 0.5, error: 'feed down' } })
+    await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
-    const matic = latest.holdings.find((h) => h.asset.chainId === 137 && h.asset.kind === 'native')
+    const matic = aggFor('MATIC')
     expect(matic.usd).toBeNull()
     expect(latest.totalUsd).toBe(0)
   })
 
-  it('renders NFT holdings as item counts', async () => {
+  it('renders NFT holdings as item-count aggregates', async () => {
     fixtures.tokenBalances.set(addr(137, 'FWMV'), 2n)
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('ready'))
-    const voucher = latest.holdings.find((h) => h.asset.symbol === 'FWMV')
+    const voucher = aggFor('FWMV')
+    expect(voucher.kind).toBe('nft')
     expect(voucher.balance).toBe(2)
     expect(voucher.usd).toBeNull()
   })
@@ -186,7 +216,7 @@ describe('usePortfolio (cross-chain)', () => {
     await waitFor(() => expect(latest.status).toBe('ready'))
 
     expect(latest.failedAssets).toContain('LINK')
-    expect(latest.holdings.some((h) => h.asset.symbol === 'LINK')).toBe(false)
+    expect(aggFor('LINK')).toBeUndefined()
     expect(latest.totalUsd).toBeCloseTo(25)
   })
 
@@ -200,7 +230,7 @@ describe('usePortfolio (cross-chain)', () => {
     }
     await renderPortfolio()
     await waitFor(() => expect(latest.status).toBe('error'))
-    expect(latest.holdings).toEqual([])
+    expect(latest.aggregates).toEqual([])
 
     // Retry leaves the error state immediately (loading, not retry spam)...
     let resolveNative
