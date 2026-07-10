@@ -11,6 +11,7 @@ const VAULT = '0x1111111111111111111111111111111111111111'
 
 const readState = vi.fn()
 const refs = vi.fn()
+const policyCount = vi.fn()
 
 vi.mock('../../utils/blockchainService', () => ({ getProvider: () => ({}) }))
 vi.mock('../../config/safeContracts', () => ({ getSafeContracts: () => ({ multiSendCallOnly: VAULT }) }))
@@ -20,6 +21,7 @@ vi.mock('../../config/contracts', () => ({
 }))
 vi.mock('../../lib/custody/vaultReferences', () => ({ loadVaultReferences: (...a) => refs(...a) }))
 vi.mock('../../lib/custody/vaultProposalReads', () => ({ readVaultProposalState: (...a) => readState(...a) }))
+vi.mock('../../lib/custody/policyEvents', () => ({ readPolicyEventCount: (...a) => policyCount(...a) }))
 
 import { custodySource } from '../../data/notifications/sources/custodySource'
 
@@ -33,6 +35,8 @@ const pendingNeedingMe = {
 beforeEach(() => {
   refs.mockReturnValue([{ chainId: 63, address: VAULT, label: 'Coop', role: 'owner' }])
   readState.mockReset()
+  policyCount.mockReset()
+  policyCount.mockResolvedValue(0)
 })
 
 const sid = `custody:${VAULT}`
@@ -79,5 +83,35 @@ describe('custodySource', () => {
     readState.mockRejectedValue(new Error('rpc down'))
     const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior: {} })
     expect(out.ok).toBe(false)
+  })
+
+  // Spec 049 (FR-016) — guard rule events join the same snapshot-diff.
+  it('baselines the policy event count on first sight without emitting', async () => {
+    readState.mockResolvedValue(base)
+    policyCount.mockResolvedValue(3)
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior: {} })
+    expect(out.entries).toEqual([])
+    expect(out.nextSnapshots[sid].policyEventCount).toBe(3)
+  })
+
+  it('emits policy-changed when new guard events appear for a member vault', async () => {
+    readState.mockResolvedValue(base)
+    policyCount.mockResolvedValue(4)
+    const prior = { snapshots: { [sid]: { needMe: [], executedCount: 0, govKey: '1:1', policyEventCount: 2 } } }
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
+    const e = out.entries.find((x) => x.type === 'policy-changed')
+    expect(e).toBeTruthy()
+    expect(e.domain).toBe('custody')
+    expect(e.message).toMatch(/policy rules on “Coop” changed/i)
+    expect(out.nextSnapshots[sid].policyEventCount).toBe(4)
+  })
+
+  it('keeps the prior policy baseline when the guard read fails (no false diff later)', async () => {
+    readState.mockResolvedValue(base)
+    policyCount.mockRejectedValue(new Error('rpc down'))
+    const prior = { snapshots: { [sid]: { needMe: [], executedCount: 0, govKey: '1:1', policyEventCount: 2 } } }
+    const out = await custodySource.detect({ account: OWNER, chainId: 63, nowMs: NOW, prior })
+    expect(out.entries.find((x) => x.type === 'policy-changed')).toBeFalsy()
+    expect(out.nextSnapshots[sid].policyEventCount).toBe(2)
   })
 })

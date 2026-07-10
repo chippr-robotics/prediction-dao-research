@@ -1,8 +1,22 @@
 // Spec 043 (US1) — vault detail renders live on-chain facts and the unreadable-vault state.
+// Spec 049 — VaultDetail hosts the Policy section (PolicyPanel); the policy lib is mocked here
+// (tests run on a network without the engine) — PolicyPanel behavior has its own suites.
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
+
+vi.mock('../../lib/custody/policy', () => ({
+  getPolicyStatus: vi.fn(async () => 'unsupported'),
+  readPolicy: vi.fn(async () => null),
+  describeRules: () => [],
+  validatePolicyConfig: () => {},
+  buildPolicyChangeTx: vi.fn(),
+  buildSetGuardTx: vi.fn(),
+  NATIVE_ASSET: '0x0000000000000000000000000000000000000000',
+  shortAddress: (a) => String(a),
+}))
+
 import VaultDetail from '../../components/custody/VaultDetail'
 import VaultList from '../../components/custody/VaultList'
 
@@ -15,6 +29,9 @@ describe('VaultDetail', () => {
     const { container } = render(<VaultDetail vault={vault} />)
     expect(screen.getByText(/2 of 2 owners/i)).toBeInTheDocument()
     expect(screen.getByText(/can propose & approve/i)).toBeInTheDocument()
+    // Spec 049 — the Policy section is mounted (here in its unsupported-network state).
+    expect(screen.getByRole('heading', { name: /^policy$/i })).toBeInTheDocument()
+    expect(await screen.findByText(/aren.t supported on this network/i)).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
 

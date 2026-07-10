@@ -1,15 +1,107 @@
 // Spec 043 (US2) — the vault's pending queue + history with approve/execute actions. Non-owners see state
 // but no action buttons (FR-016). Blocked states are surfaced honestly (approvals remaining; not-ready).
+// Spec 049 (US3) — proposals targeting the chain's SafePolicyGuard that decode as configureRules render as a
+// distinct "Policy change" entry with the decoded rule diff; a self-tx setting that guard renders as
+// "Activate policy engine". Anything that fails to decode renders exactly as before.
 
+import { Interface, formatUnits } from 'ethers'
 import { STATUS } from '../../lib/custody/proposalStatus'
 import { approvalsRemaining } from '../../lib/custody/proposalStatus'
+import { getContractAddressForChain } from '../../config/contracts'
+import { guardIface, NATIVE_ASSET, shortAddress, formatDuration } from '../../lib/custody/policy'
+import './Policy.css'
+
+const SAFE_GUARD_IFACE = new Interface(['function setGuard(address guard)'])
 
 function shortHash(h) {
   return h ? `${h.slice(0, 10)}…${h.slice(-6)}` : ''
 }
 
-function ProposalRow({ p, isOwner, hasApproved, onApprove, onExecute, onCancel, busy }) {
+function assetName(asset) {
+  return asset === NATIVE_ASSET ? 'native coin' : `token ${shortAddress(asset)}`
+}
+
+function assetAmount(asset, amount) {
+  return asset === NATIVE_ASSET ? formatUnits(amount, 18) : `${amount} base units`
+}
+
+/**
+ * Classify a queued proposal against the chain's policy engine (spec 049). Returns
+ * `{ kind: 'configure', changes: string[] }`, `{ kind: 'set-guard' }`, `{ kind: 'remove-guard' }`,
+ * or null for an ordinary proposal. Never throws — unknown data renders as today.
+ */
+function classifyPolicyProposal(p, chainId, vaultAddress) {
+  try {
+    const guard = getContractAddressForChain('safePolicyGuard', chainId)
+    if (!guard || !p?.to || !p?.data || p.data === '0x') return null
+    const to = String(p.to).toLowerCase()
+    const guardLc = guard.toLowerCase()
+
+    if (to === guardLc) {
+      const parsed = guardIface.parseTransaction({ data: p.data })
+      if (!parsed || parsed.name !== 'configureRules') return null
+      const [limits, cooldown, allowlistEnabled, adds, removes] = parsed.args
+      const changes = []
+      for (const l of limits) {
+        const per = BigInt(l.perTxLimit)
+        const win = BigInt(l.windowLimit)
+        changes.push(
+          `${assetName(l.asset)}: per-transaction limit ${per > 0n ? assetAmount(l.asset, per) : 'off'}, ` +
+            `24-hour window limit ${win > 0n ? assetAmount(l.asset, win) : 'off'}`,
+        )
+      }
+      const cd = Number(cooldown)
+      changes.push(cd > 0 ? `Transaction delay: ${formatDuration(cd)}` : 'Transaction delay: off')
+      changes.push(`Recipient allowlist: ${allowlistEnabled ? 'enabled' : 'disabled'}`)
+      for (const a of adds) changes.push(`Add recipient ${shortAddress(a)}`)
+      for (const a of removes) changes.push(`Remove recipient ${shortAddress(a)}`)
+      return { kind: 'configure', changes }
+    }
+
+    if (vaultAddress && to === String(vaultAddress).toLowerCase()) {
+      const parsed = SAFE_GUARD_IFACE.parseTransaction({ data: p.data })
+      if (!parsed || parsed.name !== 'setGuard') return null
+      const target = String(parsed.args[0]).toLowerCase()
+      if (target === guardLc) return { kind: 'set-guard' }
+      if (/^0x0{40}$/.test(target)) return { kind: 'remove-guard' }
+      return null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function PolicyProposalFacts({ policyInfo }) {
+  if (policyInfo.kind === 'configure') {
+    return (
+      <div className="custody-proposal-facts custody-proposal-facts--policy">
+        <span className="custody-policy-tag">Policy change</span>
+        <ul className="custody-policy-diff" aria-label="Proposed rule changes">
+          {policyInfo.changes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+  return (
+    <div className="custody-proposal-facts custody-proposal-facts--policy">
+      <span className="custody-policy-tag">
+        {policyInfo.kind === 'set-guard' ? 'Activate policy engine' : 'Detach policy engine'}
+      </span>
+      <span>
+        {policyInfo.kind === 'set-guard'
+          ? 'Attaches the policy engine to this vault — the configured rules take effect when this executes.'
+          : 'Removes the policy engine from this vault — rules stop applying when this executes.'}
+      </span>
+    </div>
+  )
+}
+
+function ProposalRow({ p, isOwner, hasApproved, onApprove, onExecute, onCancel, busy, chainId, vaultAddress }) {
   const remaining = approvalsRemaining(p.approvals, p.threshold)
+  const policyInfo = classifyPolicyProposal(p, chainId, vaultAddress)
   return (
     <li className="custody-proposal-row">
       <div className="custody-proposal-main">
@@ -20,6 +112,7 @@ function ProposalRow({ p, isOwner, hasApproved, onApprove, onExecute, onCancel, 
         </span>
         <code className="custody-proposal-hash">{shortHash(p.safeTxHash)}</code>
       </div>
+      {policyInfo && <PolicyProposalFacts policyInfo={policyInfo} />}
       <div className="custody-proposal-facts">
         <span>to <code>{p.to}</code></span>
         <span>nonce {String(p.nonce)}</span>
@@ -47,7 +140,7 @@ function ProposalRow({ p, isOwner, hasApproved, onApprove, onExecute, onCancel, 
   )
 }
 
-export default function ProposalQueue({ queue, history, isOwner, connectedAddress, onApprove, onExecute, onCancel, busy }) {
+export default function ProposalQueue({ queue, history, isOwner, connectedAddress, onApprove, onExecute, onCancel, busy, chainId, vaultAddress }) {
   const approvedByMe = (p) =>
     !!connectedAddress && (p.approvers || []).some((a) => a.toLowerCase() === connectedAddress.toLowerCase())
 
@@ -70,6 +163,8 @@ export default function ProposalQueue({ queue, history, isOwner, connectedAddres
               onExecute={onExecute}
               onCancel={onCancel}
               busy={busy}
+              chainId={chainId}
+              vaultAddress={vaultAddress}
             />
           ))}
         </ul>

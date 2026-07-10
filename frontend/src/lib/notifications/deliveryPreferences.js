@@ -40,7 +40,7 @@ export const NOTIFICATION_CATEGORIES = [
   { domain: 'membership', label: 'Membership', description: 'Renewals, upgrades, and redeemable vouchers' },
   { domain: 'dao', label: 'Governance', description: 'Proposals to vote on, queue, or execute' },
   { domain: 'token', label: 'Token admin', description: 'Role changes and pause/unpause events' },
-  { domain: 'custody', label: 'Custody', description: 'Vault approvals needed, executions, and owner/threshold changes' },
+  { domain: 'custody', label: 'Custody', description: 'Vault approvals needed, executions, owner/threshold changes, and policy rule changes' },
 ]
 
 const KNOWN_DOMAINS = NOTIFICATION_CATEGORIES.map((c) => c.domain)

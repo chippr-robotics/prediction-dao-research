@@ -8,9 +8,12 @@ import ProposeTransactionForm from './ProposeTransactionForm'
 import ProposalQueue from './ProposalQueue'
 import OwnersThresholdPanel from './OwnersThresholdPanel'
 
-export default function VaultProposalsPanel({ vault }) {
+export default function VaultProposalsPanel({ vault, proposals }) {
   const { address, chainId, switchNetwork } = useWallet()
-  const { queue, history, loading, error, propose, approve, execute, cancel } = useVaultProposals(vault)
+  // Spec 049 — the queue instance may be lifted (shared with the Policy section); the internal
+  // hook is only live when no instance is passed, so nothing is fetched twice.
+  const internal = useVaultProposals(proposals ? null : vault)
+  const { queue, history, loading, error, propose, approve, execute, cancel } = proposals || internal
   const [showPropose, setShowPropose] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
@@ -55,7 +58,7 @@ export default function VaultProposalsPanel({ vault }) {
         </div>
       )}
       {vault.owner && showPropose && (
-        <ProposeTransactionForm onPropose={run(propose)} onDone={() => setShowPropose(false)} />
+        <ProposeTransactionForm vault={vault} onPropose={run(propose)} onDone={() => setShowPropose(false)} />
       )}
 
       <OwnersThresholdPanel vault={vault} onPropose={run(propose)} busy={busy} />
@@ -71,6 +74,8 @@ export default function VaultProposalsPanel({ vault }) {
         queue={queue}
         history={history}
         isOwner={!!vault.owner}
+        chainId={vault.chainId}
+        vaultAddress={vault.address}
         connectedAddress={address}
         onApprove={run(approve)}
         onExecute={run(execute)}

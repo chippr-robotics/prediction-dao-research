@@ -1,4 +1,8 @@
 // Spec 043 (US1) — the member's vaults on the active network, with selection (FR-007).
+// Spec 049 (US2) — each row carries a PolicyBadge when the vault is policy-governed (or has a
+// foreign guard); the status/summary are enriched by useCustodyVaults and absent on failure.
+
+import PolicyBadge from './PolicyBadge'
 
 export default function VaultList({ vaults, activeAddress, onSelect }) {
   if (!vaults?.length) {
@@ -30,6 +34,7 @@ export default function VaultList({ vaults, activeAddress, onSelect }) {
                 </span>
               )}
               {v.isSafe === false && <span className="custody-vault-meta custody-error">unreadable</span>}
+              <PolicyBadge status={v.policyStatus} summary={v.policySummary} />
             </button>
           </li>
         )

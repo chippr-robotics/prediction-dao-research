@@ -1,7 +1,12 @@
 // Spec 043 (US1) — a single vault's live on-chain state: address, network, owners, threshold, balance.
 // Honest state: everything shown here is read from chain (owners/threshold/nonce) or is a local label.
+// Spec 049 (US2/US3) — carries the Policy section (PolicyPanel). `onProposePolicy` is the spec 043
+// proposal-queue submit (useVaultProposals.propose); when absent (view-only member, wrong network)
+// the section is read-only.
 
-export default function VaultDetail({ vault, onForget, onOperateAs, isActiveIdentity }) {
+import PolicyPanel from './PolicyPanel'
+
+export default function VaultDetail({ vault, onForget, onOperateAs, isActiveIdentity, onProposePolicy }) {
   if (!vault) return null
   if (vault.isSafe === false) {
     return (
@@ -57,6 +62,7 @@ export default function VaultDetail({ vault, onForget, onOperateAs, isActiveIden
           </li>
         ))}
       </ul>
+      <PolicyPanel vault={vault} onPropose={onProposePolicy} />
       <div className="custody-actions">
         {vault.owner && onOperateAs && (
           <button type="button" onClick={() => onOperateAs(vault)} disabled={isActiveIdentity}>
