@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-10
 
-**Status**: Draft
+**Status**: Implemented (v1.0 merged in PR #836); v1.1 follow-up in progress
 
 **Input**: User description: "Connected Account Portfolio in the Finance section. Add a new 'Portfolio' section under My Wallet → Finance that shows the connected account's assets grouped by SEC/CFTC regulatory taxonomy categories, matching the provided mobile mockup (total portfolio balance at top, collapsible category sections each with a category subtotal and per-asset rows showing balance and USD value). Categories: Digital Securities, Digital Commodities, Digital Collectibles, Digital Tools, Payment Stablecoins. Classification uses the official SEC commodity list as a hardcoded baseline plus curated open-source registry lists mapped to the regulatory definitions. Assets shown must be the real on-chain holdings of the connected account, scoped to the active network. Unclassified tokens must be handled honestly."
 
@@ -256,3 +256,26 @@ rows, subtotals, and totals now reflect only the new network and its registry.
 - The mobile mockup is a visual reference for structure (header total, collapsible
   category sections, asset rows); exact visual styling follows the app's existing
   design system rather than the mockup's.
+
+## Follow-up Amendments (v1.1, 2026-07-10)
+
+Owner-requested refinements after v1.0 shipped ("the page is too information dense"):
+
+- **FR-017**: Category regulatory descriptions move out of the inline layout into the
+  app's shared info bubbles (spec 039 `InfoTip`) on each category header.
+- **FR-018**: The Digital Commodities category lists ALL registry commodity assets in
+  scope, including zero balances (a zero balance renders as a true 0 worth $0.00);
+  other categories remain holdings-only.
+- **FR-019**: Partial-balance labeling is removed. Unpriced assets still show their
+  balance with USD as "—" and are excluded from USD sums; a single compact disclosure
+  line states that totals include only priced assets. (Supersedes the FR-010 labeling
+  requirement; the no-fabricated-USD rule stands.)
+- **FR-020**: The portfolio is cross-chain: it scans every supported network
+  (Ethereum, Ethereum Classic, Polygon, and — when enabled — Sepolia, Amoy, Mordor)
+  over per-network read providers, independent of the wallet's active chain. Each row
+  is labeled with its network. (Supersedes FR-003's single-active-network scoping;
+  the never-mix-networks rule now applies per row.) Sepolia is added to the network
+  config as a portfolio-scan-only testnet.
+- **FR-021**: A "Portfolio" settings group in Preferences holds a "Show testnet
+  tokens" switch (default off, persisted per wallet). When off, testnet networks are
+  not scanned and a compact note in the portfolio says testnet tokens are hidden.

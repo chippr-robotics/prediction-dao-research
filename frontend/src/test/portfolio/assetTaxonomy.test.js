@@ -8,6 +8,7 @@ import {
   CLASSIFICATION_SOURCES,
   SEC_COMMODITY_BASELINE,
   getPortfolioRegistry,
+  getPortfolioChainIds,
   getTaxonomyCategory,
 } from '../../config/assetTaxonomy'
 import { listSupportedChainIds, NETWORKS } from '../../config/networks'
@@ -39,6 +40,25 @@ describe('TAXONOMY_CATEGORIES', () => {
     expect(getTaxonomyCategory('digital-tools').id).toBe('digital-tools')
     expect(getTaxonomyCategory('nonsense').id).toBe('unclassified')
     expect(getTaxonomyCategory(undefined).id).toBe('unclassified')
+  })
+})
+
+describe('getPortfolioChainIds', () => {
+  it('scans mainnets only by default (Ethereum, Ethereum Classic, Polygon)', () => {
+    expect(new Set(getPortfolioChainIds())).toEqual(new Set([1, 61, 137]))
+  })
+
+  it('adds Sepolia, Amoy, and Mordor when testnets are enabled', () => {
+    expect(new Set(getPortfolioChainIds({ includeTestnets: true }))).toEqual(
+      new Set([1, 61, 137, 11155111, 80002, 63]),
+    )
+  })
+
+  it('orders mainnets before testnets and never includes local sandboxes', () => {
+    const ids = getPortfolioChainIds({ includeTestnets: true })
+    expect(ids).not.toContain(1337)
+    const testnetFlags = ids.map((id) => Boolean(NETWORKS[id].isTestnet))
+    expect(testnetFlags.indexOf(true)).toBeGreaterThanOrEqual(testnetFlags.lastIndexOf(false))
   })
 })
 
@@ -119,6 +139,17 @@ describe('getPortfolioRegistry', () => {
     expect(bySymbol.LINK.source).toBe('curated-registry')
     expect(bySymbol.USDT.categoryId).toBe('payment-stablecoins')
     expect(bySymbol.USDT.source).toBe('curated-registry')
+  })
+
+  it('covers Sepolia: baseline-commodity native ETH plus Circle USDC', () => {
+    const registry = getPortfolioRegistry(11155111)
+    const native = registry.find((e) => e.kind === 'native')
+    expect(native.symbol).toBe('ETH')
+    expect(native.categoryId).toBe('digital-commodities')
+    expect(native.source).toBe('sec-baseline')
+    const usdc = registry.find((e) => e.symbol === 'USDC')
+    expect(usdc.categoryId).toBe('payment-stablecoins')
+    expect(usdc.source).toBe('app-config')
   })
 
   it('scans canonical WETH on Ethereum mainnet despite no dex/wmatic config', () => {
