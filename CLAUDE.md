@@ -104,5 +104,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/043-safe-multisig-custody/plan.md
+at specs/044-connected-account-portfolio/plan.md
 <!-- SPECKIT END -->

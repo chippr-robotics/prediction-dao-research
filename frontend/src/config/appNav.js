@@ -21,6 +21,7 @@ export const NAV_GROUPS = [
   {
     label: 'Finance',
     items: [
+      { id: 'portfolio', label: 'Portfolio', icon: '📈' },
       { id: 'trade', label: 'Trade', icon: '🔄' },
       { id: 'paytransfer', label: 'Pay & Transfer', icon: '💸' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
