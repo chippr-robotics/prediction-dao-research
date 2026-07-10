@@ -17,6 +17,15 @@
 
 // chainId → underlying symbol → AggregatorV3 address (all */USD, 8 decimals).
 export const CHAINLINK_FEEDS = {
+  1: {
+    // Canonical Ethereum mainnet feeds (spec 048). Ethereum mainnet has no in-app
+    // `dex` config, so the DEX-spot fallback cannot run there — these feeds are the
+    // required price source for native ETH and WETH (WETH resolves via the ETH
+    // underlying). Stablecoins (USDC/USDT/DAI) value at par $1 and are not listed.
+    ETH: import.meta.env?.VITE_FEED_MAINNET_ETH_USD || '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
+    BTC: import.meta.env?.VITE_FEED_MAINNET_BTC_USD || '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c',
+    LINK: import.meta.env?.VITE_FEED_MAINNET_LINK_USD || '0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c',
+  },
   137: {
     MATIC: import.meta.env?.VITE_FEED_POLYGON_MATIC_USD || '0xAB594600376Ec9fD91F8e885dADF0CE036862dE0',
     ETH: import.meta.env?.VITE_FEED_POLYGON_ETH_USD || '0xF9680D99D6C9589e2a93a78A04A279e509205945',

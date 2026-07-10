@@ -1,12 +1,16 @@
 /**
- * Blockscout Block Explorer Configuration
+ * Block Explorer Configuration
  *
- * Centralized configuration for Blockscout URLs across the application.
+ * Centralized helpers for per-chain explorer URLs across the application.
  * All explorer links should use these utilities to ensure consistency.
  */
 
-// Block explorer base URLs by chain ID
-// Note: Polygon networks use PolygonScan (Etherscan-style), ETC networks use Blockscout
+import { NETWORKS } from './networks'
+
+// Legacy per-chain base map, kept ONLY as a fallback for any chain not carrying an
+// `explorer.baseUrl` in networks.js. networks.js is the single source of truth
+// (constitution V) — new chains (e.g. the Ethereum family, spec 048) resolve from there.
+// Note: Polygon networks use PolygonScan (Etherscan-style), ETC networks use Blockscout.
 export const BLOCKSCOUT_URLS = {
   61: 'https://etc.blockscout.com',         // ETC Mainnet
   63: 'https://etc-mordor.blockscout.com',  // Mordor Testnet
@@ -15,12 +19,19 @@ export const BLOCKSCOUT_URLS = {
 }
 
 /**
- * Get the block explorer base URL for a given chain ID
+ * Get the block explorer base URL for a given chain ID.
+ *
+ * Resolves strictly per-chain from `NETWORKS[chainId].explorer.baseUrl` (single source
+ * of truth), falling back to the legacy map only for chains still listed there. An
+ * unknown chain yields '' — NO cross-network default — so a caller renders no link
+ * rather than a link pointing at the wrong network (FR-016, honest-state).
+ *
  * @param {number} chainId - The chain ID
- * @returns {string} The block explorer base URL
+ * @returns {string} The block explorer base URL, or '' when the chain is unknown
  */
 export const getBlockscoutBaseUrl = (chainId) => {
-  return BLOCKSCOUT_URLS[chainId] || BLOCKSCOUT_URLS[80002] // Default to Amoy
+  const fromConfig = NETWORKS[chainId]?.explorer?.baseUrl
+  return fromConfig || BLOCKSCOUT_URLS[chainId] || ''
 }
 
 /**
@@ -32,6 +43,7 @@ export const getBlockscoutBaseUrl = (chainId) => {
  */
 export const getBlockscoutUrl = (chainId, hash, type = 'address') => {
   const baseUrl = getBlockscoutBaseUrl(chainId)
+  if (!baseUrl) return ''
   return `${baseUrl}/${type}/${hash}`
 }
 
@@ -44,6 +56,7 @@ export const getBlockscoutUrl = (chainId, hash, type = 'address') => {
  */
 export const getAddressUrl = (chainId, address, tab = null) => {
   const baseUrl = getBlockscoutBaseUrl(chainId)
+  if (!baseUrl) return ''
   const url = `${baseUrl}/address/${address}`
   return tab ? `${url}?tab=${tab}` : url
 }
@@ -56,6 +69,7 @@ export const getAddressUrl = (chainId, address, tab = null) => {
  */
 export const getTransactionUrl = (chainId, txHash) => {
   const baseUrl = getBlockscoutBaseUrl(chainId)
+  if (!baseUrl) return ''
   return `${baseUrl}/tx/${txHash}`
 }
 
@@ -67,6 +81,7 @@ export const getTransactionUrl = (chainId, txHash) => {
  */
 export const getBlockUrl = (chainId, blockNumber) => {
   const baseUrl = getBlockscoutBaseUrl(chainId)
+  if (!baseUrl) return ''
   return `${baseUrl}/block/${blockNumber}`
 }
 
@@ -78,6 +93,7 @@ export const getBlockUrl = (chainId, blockNumber) => {
  */
 export const getTokenUrl = (chainId, tokenAddress) => {
   const baseUrl = getBlockscoutBaseUrl(chainId)
+  if (!baseUrl) return ''
   return `${baseUrl}/token/${tokenAddress}`
 }
 

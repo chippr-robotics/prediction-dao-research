@@ -5,6 +5,10 @@ import {
   getSelectableNetworks,
   isDexAvailable,
   isSupportedChainId,
+  PRIMARY_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  TESTNET_CHAIN_ID,
+  TESTNET_MAINNET_PAIR,
 } from '../config/networks'
 
 // Spec 033 — network-aware swap provider. The DEX provider is declared per
@@ -72,5 +76,28 @@ describe('Ethereum Classic mainnet (chainId 61) (Spec 033 FR-011)', () => {
 
   it('uses the Ethereum Classic Blockscout explorer', () => {
     expect(getNetwork(61).explorer.baseUrl).toBe('https://etc.blockscout.com')
+  })
+})
+
+// Spec 048 — the selectable-network set grows to include the Ethereum family without
+// disturbing the app's default/home network or the Testnet/Mainnet toggle (FR-015 / SC-006).
+describe('selectable-network set + defaults after adding the Ethereum family (spec 048)', () => {
+  it('includes the Ethereum family alongside every prior selectable network', () => {
+    const ids = getSelectableNetworks().map((n) => n.chainId)
+    for (const id of [137, 80002, 61, 63, 1, 11155111, 560048]) {
+      expect(ids).toContain(id)
+    }
+  })
+
+  it('offers only networks flagged selectable (never the local sandbox)', () => {
+    expect(getSelectableNetworks().every((n) => n.selectable === true)).toBe(true)
+    expect(getSelectableNetworks().some((n) => n.chainId === 1337)).toBe(false)
+  })
+
+  it('leaves the default/home network and the Testnet/Mainnet pair unchanged', () => {
+    expect(PRIMARY_CHAIN_ID).toBe(137)
+    expect(MAINNET_CHAIN_ID).toBe(137)
+    expect(TESTNET_CHAIN_ID).toBe(80002)
+    expect(TESTNET_MAINNET_PAIR).toEqual({ testnet: 80002, mainnet: 137 })
   })
 })
