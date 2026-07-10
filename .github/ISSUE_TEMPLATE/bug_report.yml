@@ -10,7 +10,7 @@ body:
         **Security vulnerabilities**: do not file a public issue for anything that could put user
         funds or PII at risk (reentrancy, access-control bypass, oracle manipulation, key leakage,
         etc.). Instead follow the process in `docs/developer-guide/contributing.md` (email
-        security@example.com). This template is for functional bugs only.
+        security@chipprbots.com). This template is for functional bugs only.
 
         Fields below are intentionally structured — the team feeds well-formed bug reports
         straight into the Spec Kit workflow (`/speckit-specify`) when a fix needs a spec.

@@ -12,12 +12,13 @@ body:
         (logo, name/symbol, network badge, and its entry in the asset taxonomy — see
         `frontend/src/config/assetTaxonomy.js` and `frontend/src/schemas/token-metadata-v1.json`).
 
-        **This is a request, not a guarantee.** The FairWins team independently reviews every
-        submission for accuracy, contract safety, and regulatory classification before anything
-        is added — your self-reported classification below is a starting point, not the final
-        word (see constitution principle I, Security-First; and `specs/007-compliance-gating`).
-        Submitting this form does not constitute investment or legal advice, and is not an
-        endorsement of the asset.
+        **This is a request, not a guarantee.** FairWins is the platform; listings are reviewed
+        and managed by **Chippr Robotics LLC**, the company that operates FairWins. Chippr
+        Robotics independently reviews every submission for accuracy, contract safety, and
+        regulatory classification before anything is added — your self-reported classification
+        below is a starting point, not the final word (see constitution principle I,
+        Security-First; and `specs/007-compliance-gating`). Submitting this form does not
+        constitute investment or legal advice, and is not an endorsement of the asset.
 
   - type: input
     id: project_name
@@ -145,15 +146,15 @@ body:
       label: Requested asset classification
       description: |
         FairWins' asset taxonomy (see `assetTaxonomy.js`) is SEC/CFTC-aligned. Pick the closest
-        fit — the FairWins compliance review determines the final category, and may override
-        this selection, regardless of what you select here.
+        fit — the Chippr Robotics compliance review determines the final category, and may
+        override this selection, regardless of what you select here.
       options:
         - Digital Commodity (e.g. functional L1/L2 network asset)
         - Digital Security (represents equity, debt, or an investment contract)
         - Payment Stablecoin (approved-issuer, transactional)
         - Digital Tool / Utility (no yield or capital-raising function)
         - Digital Collectible (NFT-style, no profit-sharing)
-        - Unsure — let the FairWins team classify
+        - Unsure — let the Chippr Robotics team classify
     validations:
       required: true
 
@@ -195,11 +196,11 @@ body:
       options:
         - label: To my knowledge, this asset and project are not associated with a sanctioned entity, individual, or jurisdiction
           required: true
-        - label: I understand FairWins may decline, delay, or reclassify this listing for security, legal, or compliance reasons, and that no fee or submission guarantees inclusion
+        - label: I understand Chippr Robotics may decline, delay, or reclassify this listing for security, legal, or compliance reasons, and that no fee or submission guarantees inclusion
           required: true
 
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Anything else the review team should know (tokenomics, upcoming network deployments, prior listing history elsewhere, etc.).
+      description: Anything else the Chippr Robotics review team should know (tokenomics, upcoming network deployments, prior listing history elsewhere, etc.).
