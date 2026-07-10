@@ -17,14 +17,9 @@ import './SensitiveValue.css'
  */
 const PLACEHOLDER = '••••'
 
-function SensitiveValue({
-  as: Tag = 'span',
-  className,
-  children,
-  hiddenLabel = 'hidden',
-  ...rest
-}) {
+function SensitiveValue({ as = 'span', className, children, hiddenLabel = 'hidden', ...rest }) {
   const { hidden } = usePrivacy()
+  const Tag = as
 
   if (hidden) {
     const maskedClass = ['sensitive-value', 'sensitive-value--masked', className]

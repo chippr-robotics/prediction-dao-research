@@ -22,6 +22,7 @@ import NotificationPreferencesPanel from '../components/account/NotificationPref
 import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
+import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
@@ -416,6 +417,11 @@ function WalletPage() {
                     <h2 className="preferences-group-heading">Portfolio</h2>
                     <div className="section">
                       <PortfolioPreferencesPanel />
+                    </div>
+
+                    <h2 className="preferences-group-heading">Privacy</h2>
+                    <div className="section">
+                      <PrivacyPreferencesPanel />
                     </div>
 
                     <h2 className="preferences-group-heading">Notifications</h2>

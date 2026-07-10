@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { sortParticipants } from '../../lib/pools/participantOrder'
+import SensitiveValue from '../common/SensitiveValue'
 
 /**
  * PoolParticipants — the pool's single combined roster (spec 034, address-based).
@@ -121,7 +122,11 @@ export default function PoolParticipants({
               </span>
               {hasPayout && (
                 <span className="pool-participant-payout" data-testid="participant-payout">
-                  {inMoney ? `${ethers.formatUnits(amount, tokenDecimals)} ${tokenSymbol}` : 'No payout'}
+                  {inMoney ? (
+                    <SensitiveValue>{`${ethers.formatUnits(amount, tokenDecimals)} ${tokenSymbol}`}</SensitiveValue>
+                  ) : (
+                    'No payout'
+                  )}
                 </span>
               )}
               {canReorder && (

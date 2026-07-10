@@ -4,6 +4,7 @@ import { SLIPPAGE_OPTIONS, getExplorerUrl } from '../../constants/dex'
 import { feeTierLabel } from '../../lib/uniswap/trade'
 import { useWallet } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import SensitiveValue from '../common/SensitiveValue'
 import './TradePanel.css'
 
 const FROM_NATIVE = 'NATIVE'
@@ -290,7 +291,7 @@ function TradePanel() {
           <div className="trade-leg-top">
             <label htmlFor="trade-amount">You pay</label>
             <span className="trade-balance">
-              Balance: {Number(balanceFor(fromToken)).toLocaleString(undefined, { maximumSignificantDigits: 8 })}
+              Balance: <SensitiveValue>{Number(balanceFor(fromToken)).toLocaleString(undefined, { maximumSignificantDigits: 8 })}</SensitiveValue>
             </span>
           </div>
           <div className="trade-leg-body">
@@ -344,12 +345,12 @@ function TradePanel() {
           <div className="trade-leg-top">
             <label>You receive</label>
             <span className="trade-balance">
-              Balance: {Number(balanceFor(toToken)).toLocaleString(undefined, { maximumSignificantDigits: 8 })}
+              Balance: <SensitiveValue>{Number(balanceFor(toToken)).toLocaleString(undefined, { maximumSignificantDigits: 8 })}</SensitiveValue>
             </span>
           </div>
           <div className="trade-leg-body">
             <div className="trade-receive-value" aria-live="polite">
-              {receiveValue}
+              <SensitiveValue>{receiveValue}</SensitiveValue>
             </div>
             {isTrade ? (
               <select
@@ -396,7 +397,7 @@ function TradePanel() {
               <span className="trade-summary-note"> after {(slippage / 100).toFixed(2)}% slippage</span>
             </span>
             <span className="trade-summary-val">
-              {Number(quote.minimumReceived).toLocaleString(undefined, { maximumSignificantDigits: 8 })}{' '}
+              <SensitiveValue>{Number(quote.minimumReceived).toLocaleString(undefined, { maximumSignificantDigits: 8 })}</SensitiveValue>{' '}
               {quote.tokenOutSymbol}
             </span>
           </div>

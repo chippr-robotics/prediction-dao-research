@@ -4,6 +4,7 @@ import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
 import AssetDetailSheet from './AssetDetailSheet'
 import { formatAssetAmount } from '../../lib/portfolio/aggregate'
+import SensitiveValue from '../common/SensitiveValue'
 import './Portfolio.css'
 
 // Full-precision USD for a compliance-flavored view — deliberately not the
@@ -43,14 +44,14 @@ function AggregateRow({ aggregate, onOpen }) {
           </span>
         </span>
         <span className="portfolio-row-values">
-          <span className="portfolio-row-balance">{formatAggregateBalance(aggregate)}</span>
+          <SensitiveValue className="portfolio-row-balance">{formatAggregateBalance(aggregate)}</SensitiveValue>
           {aggregate.usd == null ? (
             <span className="portfolio-row-usd portfolio-row-usd-unavailable">
               <span aria-hidden="true">—</span>
               <span className="portfolio-visually-hidden">price unavailable</span>
             </span>
           ) : (
-            <span className="portfolio-row-usd">{formatUsdFull(aggregate.usd)}</span>
+            <SensitiveValue className="portfolio-row-usd">{formatUsdFull(aggregate.usd)}</SensitiveValue>
           )}
         </span>
       </button>
@@ -77,7 +78,7 @@ function CategorySection({ group, collapsed, onToggle, onOpen }) {
               {expanded ? '▾' : '▸'}
             </span>
             <span className="portfolio-category-label">{category.label}</span>
-            <span className="portfolio-category-subtotal">{formatUsdFull(subtotalUsd)}</span>
+            <SensitiveValue className="portfolio-category-subtotal">{formatUsdFull(subtotalUsd)}</SensitiveValue>
           </button>
         </h3>
         <InfoTip label={`About ${category.label}`} className="portfolio-category-info">
@@ -162,7 +163,7 @@ export default function PortfolioPanel() {
           Total portfolio balance
         </p>
         <p className="portfolio-total" aria-labelledby="portfolio-total-label">
-          {formatUsdFull(portfolio.totalUsd)}
+          <SensitiveValue>{formatUsdFull(portfolio.totalUsd)}</SensitiveValue>
         </p>
         <button
           type="button"
