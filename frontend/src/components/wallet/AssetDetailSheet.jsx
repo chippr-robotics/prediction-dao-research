@@ -4,6 +4,7 @@ import AssetLogo from './AssetLogo'
 import { NETWORKS } from '../../config/networks'
 import { priceSourceLabel } from '../../lib/portfolio/prices'
 import { isHomeInstance, instanceFormLabel, formatAssetAmount } from '../../lib/portfolio/aggregate'
+import SensitiveValue from '../common/SensitiveValue'
 import './AssetDetailSheet.css'
 
 // Member-facing names for the classification provenance (FR-006).
@@ -122,8 +123,8 @@ export default function AssetDetailSheet({ aggregate, onClose }) {
           <div className="asset-sheet-heading">
             <h3 id={titleId}>{aggregate.name} details</h3>
             <p className="asset-sheet-position">
-              {formatAssetAmount(aggregate.balance, aggregate.underlying, aggregate.kind)}
-              {aggregate.usd != null && <span className="asset-sheet-usd"> · {formatUsdFull(aggregate.usd)}</span>}
+              <SensitiveValue>{formatAssetAmount(aggregate.balance, aggregate.underlying, aggregate.kind)}</SensitiveValue>
+              {aggregate.usd != null && <span className="asset-sheet-usd"> · <SensitiveValue>{formatUsdFull(aggregate.usd)}</SensitiveValue></span>}
             </p>
             {aggregate.unitPriceUsd != null && (
               <p className="asset-sheet-price">
@@ -167,14 +168,14 @@ export default function AssetDetailSheet({ aggregate, onClose }) {
                   </span>
                 </span>
                 <span className="asset-sheet-instance-values">
-                  <span className="asset-sheet-instance-balance">{formatAmount(holding)}</span>
+                  <SensitiveValue className="asset-sheet-instance-balance">{formatAmount(holding)}</SensitiveValue>
                   {holding.usd == null ? (
                     <span className="asset-sheet-instance-usd">
                       <span aria-hidden="true">—</span>
                       <span className="portfolio-visually-hidden">price unavailable</span>
                     </span>
                   ) : (
-                    <span className="asset-sheet-instance-usd">{formatUsdFull(holding.usd)}</span>
+                    <SensitiveValue className="asset-sheet-instance-usd">{formatUsdFull(holding.usd)}</SensitiveValue>
                   )}
                 </span>
               </label>

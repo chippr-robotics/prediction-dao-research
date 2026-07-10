@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSiteStats } from '../../hooks/useSiteStats'
 import { STAT_CARDS } from '../../constants/siteStats'
+import SensitiveValue from '../common/SensitiveValue'
 
 /** Compact number formatting: 1500 → "1.5K", 1_200_000 → "1.2M". */
 function formatCompact(n) {
@@ -47,7 +48,12 @@ function StatValue({ value, format, animatable, visible }) {
 
   // Render the final value directly unless we're mid count-up animation.
   const display = animatable && visible ? animated : value
-  return <span className="livestat-number">{formatStat(display, format)}</span>
+  const formatted = formatStat(display, format)
+  // Only the USD-denominated stat (Value Wagered) is a monetary figure that
+  // tilt-to-hide should mask; counts stay visible.
+  return format === 'usd'
+    ? <SensitiveValue className="livestat-number">{formatted}</SensitiveValue>
+    : <span className="livestat-number">{formatted}</span>
 }
 
 /**

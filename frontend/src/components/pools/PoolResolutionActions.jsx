@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import Button from '../ui/Button'
+import SensitiveValue from '../common/SensitiveValue'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { payoutMatrixHash, payoutMatrixSum, serializeMatrix, parseMatrix } from '../../lib/pools/payout'
 import { saveProposedMatrix } from '../../lib/pools/proposalStore'
@@ -224,7 +225,7 @@ export default function PoolResolutionActions({
           <h2>{isRevision ? 'Update the proposed payout' : 'Propose the payout'}</h2>
           <p>
             One row per member, in your rank order. Enter each member&apos;s amount; the total must equal the
-            escrow ({ethers.formatUnits(escrow, decimals)} {summary.tokenSymbol}). Leave a member blank to
+            escrow (<SensitiveValue>{`${ethers.formatUnits(escrow, decimals)} ${summary.tokenSymbol}`}</SensitiveValue>). Leave a member blank to
             give them no payout — their wallet address is their claim.
           </p>
           {rows.length === 0 && <p className="pool-hint">Waiting for members to join…</p>}
@@ -242,7 +243,7 @@ export default function PoolResolutionActions({
           <div className="pool-propose-controls">
             {anyFilled && !sumOk && (
               <span className="form-error" role="alert">
-                Total {ethers.formatUnits(sum, decimals)} ≠ escrow {ethers.formatUnits(escrow, decimals)}
+                Total <SensitiveValue>{ethers.formatUnits(sum, decimals)}</SensitiveValue> ≠ escrow <SensitiveValue>{ethers.formatUnits(escrow, decimals)}</SensitiveValue>
               </span>
             )}
             <Button data-testid="propose-outcome" onClick={propose} disabled={!sumOk || busy}>
@@ -257,7 +258,7 @@ export default function PoolResolutionActions({
         <div className="pool-claim" data-testid="claim-form">
           <h2>Claim your winnings</h2>
           {myAmount != null && myAmount > 0n && (
-            <p data-testid="claim-amount">Your share: <strong>{ethers.formatUnits(myAmount, decimals)} {summary.tokenSymbol}</strong></p>
+            <p data-testid="claim-amount">Your share: <SensitiveValue as="strong">{`${ethers.formatUnits(myAmount, decimals)} ${summary.tokenSymbol}`}</SensitiveValue></p>
           )}
           <Button data-testid="claim" onClick={claim} disabled={busy || status === 'claiming'}>
             {busy || status === 'claiming' ? 'Claiming…' : 'Claim to my wallet'}
