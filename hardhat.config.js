@@ -241,6 +241,11 @@ const etherscanConfig = BLOCKSCOUT_VERIFY_NETWORKS.has(verifyTargetNetwork())
       apiKey: process.env.ETHERSCAN_API_KEY || "",
     };
 
+// Coverage mode: solidity-coverage runs the hardhat `coverage` task. Detect it so
+// coverage-only network settings (block-gas headroom for instrumented bytecode —
+// spec 046) never leak into `npm test` / gas-report, which must stay realistic.
+const COVERAGE = process.env.COVERAGE === "true" || process.argv.includes("coverage");
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -299,6 +304,15 @@ module.exports = {
     hardhat: {
       chainId: 1337,
       allowUnlimitedContractSize: true,
+      // Coverage instrumentation balloons the WagerRegistry deploy far past 2**24 gas.
+      // Hardhat's default hardfork (osaka) enables EIP-7825, which CAPS per-tx gas at
+      // 2**24 (~16.7M) — so instrumented deploys "run out of gas" (spec 046 root cause).
+      // solidity-coverage keys its per-tx gas limit off networks.hardhat.hardfork: any
+      // hardfork < osaka disables the cap and it uses 0xffffffffff (~1.1T) instead.
+      // Pin the highest pre-osaka fork (prague) ONLY under coverage; non-coverage runs
+      // (npm test / gas report) keep the realistic default. The account WebAuthn path
+      // falls back to the FreshCryptoLib verifier when the osaka P256 precompile is absent.
+      ...(COVERAGE ? { hardfork: "prague" } : {}),
       accounts: {
         count: 20, // More accounts for integration tests
         accountsBalance: "100000000000000000000000", // 100,000 ETH each - increased to handle bond-heavy tests

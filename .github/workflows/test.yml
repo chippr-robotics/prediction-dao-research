@@ -70,12 +70,11 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      # Coverage report generation can fail due to environment issues without indicating
-      # actual test failures. We allow this to fail gracefully while still uploading
-      # whatever coverage data was generated.
+      # Contract coverage is a first-class gate (spec 046): it MUST fail the pipeline
+      # loudly (Constitution IV) — no continue-on-error. The run emits
+      # coverage/coverage-summary.json (istanbul json-summary via .solcover.js).
       - name: Generate coverage report
         run: npm run test:coverage
-        continue-on-error: true
 
       - name: Summarize coverage
         if: always()
@@ -95,6 +94,12 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
+
+      # Blocking gate: fail the PR if any security-critical contract falls below its
+      # tier in coverage-threshold-policy.json (spec 046, FR-011). Report-only
+      # contracts never fail the gate.
+      - name: Enforce coverage thresholds (security-critical gate)
+        run: node scripts/coverage/check-thresholds.js --summary coverage/coverage-summary.json --policy coverage-threshold-policy.json --scope gated
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

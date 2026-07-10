@@ -23,6 +23,13 @@ coverage
 coverage.json
 *.lcov
 
+# spec 046: the coverage GATE source lives under *coverage* dirs — keep it tracked
+# (the bare `coverage` rule above would otherwise ignore these first-party sources).
+!scripts/coverage/
+!scripts/coverage/**
+!test/coverage/
+!test/coverage/**
+
 # nyc test coverage
 .nyc_output
 
