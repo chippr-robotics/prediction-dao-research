@@ -76,6 +76,10 @@ export function usePortfolio() {
     if (!isConnected || !address || !provider || registry.length === 0) return
     const reqId = ++reqIdRef.current
     setIsLoading(true)
+    // A retry after a failed load must leave the error state immediately so
+    // the panel shows loading (and its Retry button goes away) instead of
+    // inviting overlapping retries against a stale error.
+    setReads((prev) => (prev.error ? { balances: null, failedAssets: [], error: null } : prev))
     try {
       const settled = await Promise.allSettled(
         registry.map((asset) => readAssetBalance(asset, { provider, address })),

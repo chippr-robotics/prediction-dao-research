@@ -168,6 +168,27 @@ describe('PortfolioPanel portfolio view', () => {
     expect(screen.getAllByText('$0.00').length).toBeGreaterThanOrEqual(6) // total + 5 subtotals
   })
 
+  it('never renders a nonzero dust balance as zero (honest state)', () => {
+    const dust = {
+      asset: { id: '0xweth', chainId: 137, kind: 'erc20', address: '0xweth', symbol: 'WETH', name: 'Wrapped Ether', categoryId: 'digital-commodities', source: 'sec-baseline', decimals: 18 },
+      balance: 1e-18,
+      balanceRaw: 1n, // 1 wei of WETH
+      usd: null,
+    }
+    const usdc = {
+      asset: { id: '0xusdc2', chainId: 137, kind: 'erc20', address: '0xusdc2', symbol: 'USDC', name: 'USD Coin', categoryId: 'payment-stablecoins', source: 'app-config', decimals: 6 },
+      balance: 1234.5,
+      balanceRaw: 1_234_500_000n,
+      usd: 1234.5,
+    }
+    mockUsePortfolio.mockReturnValue(makeSnapshot({ holdings: [dust, usdc] }))
+    render(<PortfolioPanel />)
+    // Raw-units formatting: dust floors at "< 0.000001", never "0 WETH".
+    expect(screen.getByText('< 0.000001 WETH')).toBeInTheDocument()
+    expect(screen.queryByText(/^0 WETH$/)).not.toBeInTheDocument()
+    expect(screen.getByText('1,234.5 USDC')).toBeInTheDocument()
+  })
+
   it('refresh button triggers a reload (FR-015)', () => {
     const snapshot = makeSnapshot({ holdings: POPULATED })
     mockUsePortfolio.mockReturnValue(snapshot)

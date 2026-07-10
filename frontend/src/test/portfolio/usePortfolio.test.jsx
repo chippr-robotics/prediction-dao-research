@@ -178,11 +178,20 @@ describe('usePortfolio', () => {
     expect(latest.error).toBeTruthy()
     expect(latest.holdings).toEqual([])
 
-    // Recovery: the network comes back, refresh reloads to ready.
-    provider.getBalance.mockResolvedValue(10n ** 18n)
+    // Retry must leave the error state immediately (loading, not a stale
+    // error inviting retry spam) while the new request is in flight.
+    let resolveNative
+    provider.getBalance.mockImplementation(() => new Promise((res) => { resolveNative = res }))
     tokenBalances.clear()
+    act(() => {
+      latest.refresh()
+    })
+    await waitFor(() => expect(latest.status).toBe('loading'))
+    expect(latest.error).toBeNull()
+
+    // Recovery: the network comes back and the reload lands on ready.
     await act(async () => {
-      await latest.refresh()
+      resolveNative(10n ** 18n)
     })
     await waitFor(() => expect(latest.status).toBe('ready'))
     expect(latest.holdings.some((h) => h.asset.kind === 'native')).toBe(true)

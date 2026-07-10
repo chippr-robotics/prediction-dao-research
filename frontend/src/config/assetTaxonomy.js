@@ -103,6 +103,19 @@ const BASELINE_SET = new Set(SEC_COMMODITY_BASELINE)
 // `baselineSymbol` marks a token as the wrapped form of an SEC-baseline
 // commodity (upgrades its source to sec-baseline).
 const CURATED_REGISTRY = {
+  1: [
+    {
+      // Canonical WETH9 on Ethereum mainnet. Chain 1 has no dex config or
+      // wmatic deployment record, so without this curated entry the wrapped
+      // form of the chain's own baseline commodity would never be scanned.
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
+      decimals: 18,
+      categoryId: 'digital-commodities',
+      baselineSymbol: 'ETH',
+    },
+  ],
   137: [
     {
       // Canonical Wrapped Ether on Polygon PoS (Polygon canonical bridge).

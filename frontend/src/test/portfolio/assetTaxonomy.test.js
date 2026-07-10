@@ -121,6 +121,15 @@ describe('getPortfolioRegistry', () => {
     expect(bySymbol.USDT.source).toBe('curated-registry')
   })
 
+  it('scans canonical WETH on Ethereum mainnet despite no dex/wmatic config', () => {
+    // Chain 1 has dex: null and no wmatic deployment record — the curated
+    // layer must still surface the wrapped form of its baseline commodity.
+    const weth = getPortfolioRegistry(1).find((e) => e.symbol === 'WETH')
+    expect(weth).toBeTruthy()
+    expect(weth.categoryId).toBe('digital-commodities')
+    expect(weth.source).toBe('sec-baseline')
+  })
+
   it('applies source precedence: SEC baseline outranks curated data (FR-006)', () => {
     // WETH/WBTC ship in the curated layer but wrap baseline commodities —
     // the baseline classification and source must win.

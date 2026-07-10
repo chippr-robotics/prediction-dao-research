@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatUnits } from 'ethers'
 import usePortfolio from '../../hooks/usePortfolio'
 import './Portfolio.css'
 
@@ -11,10 +12,25 @@ function formatUsdFull(n) {
   })}`
 }
 
+// Max fraction digits shown for a fungible balance.
+const FRACTION_DIGITS = 6
+
 function formatBalance(holding) {
-  const { asset, balance } = holding
+  const { asset, balance, balanceRaw } = holding
   if (asset.kind === 'nft') {
     return `${balance} ${balance === 1 ? 'item' : 'items'}`
+  }
+  // Format from the raw units string so a nonzero dust holding can never
+  // round to a misleading "0" (honest state). Falls back to the numeric
+  // balance only when raw units aren't available.
+  if (typeof balanceRaw === 'bigint' && Number.isInteger(asset.decimals)) {
+    const [int, frac = ''] = formatUnits(balanceRaw, asset.decimals).split('.')
+    const intFmt = BigInt(int).toLocaleString('en-US')
+    const fracShown = frac.slice(0, FRACTION_DIGITS).replace(/0+$/, '')
+    if (int === '0' && fracShown === '' && balanceRaw > 0n) {
+      return `< 0.${'0'.repeat(FRACTION_DIGITS - 1)}1 ${asset.symbol}`
+    }
+    return `${intFmt}${fracShown ? `.${fracShown}` : ''} ${asset.symbol}`
   }
   const digits = balance !== 0 && Math.abs(balance) < 1 ? 6 : 4
   return `${Number(balance).toLocaleString('en-US', { maximumFractionDigits: digits })} ${asset.symbol}`
