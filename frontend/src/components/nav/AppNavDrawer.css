@@ -1,0 +1,112 @@
+/* Global navigation drawer ("us") — a left slide-over opened by the clover logo
+   on every in-app route. Sits above the sticky header. */
+
+.app-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  animation: app-nav-backdrop-fade 0.2s ease;
+}
+
+@keyframes app-nav-backdrop-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.app-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1401;
+  width: min(84vw, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary, var(--color-surface, #fff));
+  border-right: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(-100%);
+  /* Hidden (and so not tabbable) while off-screen; visibility flips after the
+     slide-out finishes. */
+  visibility: hidden;
+  transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-nav-drawer.open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.22s ease, visibility 0s;
+}
+
+.app-nav-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+}
+
+.app-nav-drawer-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-primary, var(--color-text, #1F2933));
+}
+
+.app-nav-drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-nav-drawer-close:hover {
+  background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.05)));
+  color: var(--text-primary, var(--color-text, #1F2933));
+}
+
+.app-nav-drawer-close:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
+  outline-offset: 2px;
+}
+
+/* The section list grows to fill so the footer sits at the bottom. */
+.app-nav-drawer .portal-nav {
+  flex: 1 1 auto;
+}
+
+.app-nav-drawer .app-footer--drawer {
+  margin-top: auto;
+}
+
+/* Icon + label alignment inside the drawer entries. */
+.portal-nav-item-icon {
+  display: inline-flex;
+  width: 1.25rem;
+  justify-content: center;
+  font-size: 15px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-nav-drawer,
+  .app-nav-drawer.open {
+    transition: visibility 0s;
+  }
+  .app-nav-backdrop {
+    animation: none;
+  }
+}

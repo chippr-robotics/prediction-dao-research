@@ -25,55 +25,36 @@ import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
-import PortalNav from '../components/ui/PortalNav'
-import Footer from '../components/Footer'
+import SectionIconNav from '../components/nav/SectionIconNav'
+import { groupForTab } from '../config/appNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import { getWalletLabel, getWalletIcon } from '../utils/walletLabel'
 import './WalletPage.css'
 
-// My Account sections, grouped by function so the section rail stays legible as
-// the number of tabs grows. Each group renders a heading in PortalNav; the tabs
-// themselves stay a single tablist. WALLET_TABS is the flat projection used for
-// deep-link/alias resolution and for looking up the active tab's label.
-const WALLET_TAB_GROUPS = [
-  {
-    label: 'Admin',
-    items: [
-      { id: 'account', label: 'Account' },
-      { id: 'membership', label: 'Membership' },
-      { id: 'network', label: 'Network' },
-      { id: 'preferences', label: 'Preferences' },
-      { id: 'security', label: 'Security' },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      { id: 'portfolio', label: 'Portfolio' },
-      { id: 'trade', label: 'Trade' },
-      { id: 'paytransfer', label: 'Pay & Transfer' },
-      { id: 'custody', label: 'Custody' },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [
-      { id: 'addressbook', label: 'Address Book' },
-      { id: 'backup', label: 'Backup' },
-      { id: 'reports', label: 'Reporting' },
-    ],
-  },
-  {
-    label: 'Apps',
-    items: [
-      { id: 'clearpath', label: 'ClearPath' },
-      { id: 'tokens', label: 'Token Mint' },
-    ],
-  },
+// My Account section panels, keyed by tab id. The section MENU now lives in the
+// global nav drawer + account button (see config/appNav.js) — this page just
+// hosts the panels and reads `?tab=` to pick one. WALLET_TABS is the flat list
+// used for deep-link/alias resolution and for the active tab's heading label.
+// (Account / Membership / Preferences are reached from the account button;
+// 'custody' is surfaced to users as "Protect".)
+const WALLET_TABS = [
+  { id: 'account', label: 'Account' },
+  { id: 'membership', label: 'Membership' },
+  { id: 'network', label: 'Network' },
+  { id: 'preferences', label: 'Preferences' },
+  { id: 'security', label: 'Security' },
+  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'trade', label: 'Trade' },
+  { id: 'paytransfer', label: 'Pay & Transfer' },
+  { id: 'custody', label: 'Protect' },
+  { id: 'addressbook', label: 'Address Book' },
+  { id: 'backup', label: 'Backup' },
+  { id: 'reports', label: 'Reporting' },
+  { id: 'clearpath', label: 'ClearPath' },
+  { id: 'tokens', label: 'Token Mint' },
 ]
-const WALLET_TABS = WALLET_TAB_GROUPS.flatMap((group) => group.items)
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade").
 const TAB_ALIASES = { swap: 'trade' }
@@ -120,17 +101,13 @@ function WalletPage() {
   const [pwaChecking, setPwaChecking] = useState(false)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  // Allow deep-linking straight to a section (e.g. the update toast → ?tab=preferences).
+  // The section is driven by `?tab=` so the global nav drawer and the account
+  // button can route straight to a panel (e.g. the update toast → ?tab=preferences).
   const [activeTab, setActiveTab] = useState(() => {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
-  // The section nav is a left slide-over drawer at every breakpoint so it always
-  // opens and collapses from the left (see WalletPage.css). It starts closed and
-  // is opened from the ☰ control in the topbar; the in-app footer is contained at
-  // the bottom of the drawer.
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -228,21 +205,15 @@ function WalletPage() {
     }
   }, [activeTab, isConnected, keyRegistered, handleCheckKeyStatus])
 
-  // Close the slide-over drawer on Escape.
+  // Keep the active panel in sync with `?tab=` so navigating from the global
+  // nav drawer / account button (which change the URL) switches sections here.
+  // Always derive from the URL — a missing or unknown tab falls back to Account
+  // so the panel never drifts out of sync with the address bar.
   useEffect(() => {
-    if (!sidebarOpen) return
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setSidebarOpen(false)
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [sidebarOpen])
-
-  // Jumping to a section closes the drawer so the content is visible.
-  const handleSelectTab = useCallback((id) => {
-    setActiveTab(id)
-    setSidebarOpen(false)
-  }, [])
+    const requested = searchParams.get('tab')
+    const resolved = TAB_ALIASES[requested] || requested
+    setActiveTab(WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account')
+  }, [searchParams])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -282,6 +253,11 @@ function WalletPage() {
   }
 
   const activeTabLabel = (WALLET_TABS.find((t) => t.id === activeTab) || WALLET_TABS[0]).label
+
+  // Sibling sub-items for the mobile bottom icon nav — the group the active tab
+  // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
+  const currentSectionGroup = groupForTab(activeTab)
+  const sectionNavItems = currentSectionGroup?.items || []
 
   return (
     <div className="wallet-page-wrapper">
@@ -339,58 +315,23 @@ function WalletPage() {
               </div>
             </div>
           ) : (
-            <div className={`wallet-portal portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
-              <aside
-                id="wallet-portal-nav"
-                className="portal-sidebar wallet-portal-sidebar"
-              >
-                <div className="wallet-portal-identity">
-                  <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
-                  <button
-                    type="button"
-                    className="wallet-address-display"
-                    onClick={() => copyAddress(address)}
-                    title={address}
-                    aria-label={addressCopied ? 'Copied!' : 'Copy wallet address'}
-                  >
-                    {addressCopied ? 'Copied!' : shortenAddress(address)}
-                  </button>
-                  <span className="status-dot connected" aria-hidden="true"></span>
-                </div>
-                <PortalNav
-                  groups={WALLET_TAB_GROUPS}
-                  activeId={activeTab}
-                  onSelect={handleSelectTab}
-                  ariaLabel="Account sections"
-                />
-                {/* The in-app legal/policy footer is contained at the bottom of the
-                    section drawer on the wallet screen; App.jsx omits the page-level
-                    footer here so it never renders twice. */}
-                <Footer variant="drawer" />
-              </aside>
-
-              {/* Dim + dismiss the slide-over drawer by tapping outside it. */}
-              {sidebarOpen && (
+            <div className="wallet-portal wallet-portal--flat">
+              <div className="wallet-portal-identity">
+                <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
                 <button
                   type="button"
-                  className="wallet-portal-backdrop"
-                  aria-label="Close menu"
-                  onClick={() => setSidebarOpen(false)}
-                />
-              )}
+                  className="wallet-address-display"
+                  onClick={() => copyAddress(address)}
+                  title={address}
+                  aria-label={addressCopied ? 'Copied!' : 'Copy wallet address'}
+                >
+                  {addressCopied ? 'Copied!' : shortenAddress(address)}
+                </button>
+                <span className="status-dot connected" aria-hidden="true"></span>
+              </div>
 
-              <div className="portal-main wallet-portal-main">
+              <div className="wallet-portal-main">
                 <div className="wallet-portal-topbar">
-                  <button
-                    type="button"
-                    className="portal-sidebar-toggle"
-                    aria-expanded={sidebarOpen}
-                    aria-controls="wallet-portal-nav"
-                    aria-label={sidebarOpen ? 'Hide menu' : 'Show menu'}
-                    onClick={() => setSidebarOpen((o) => !o)}
-                  >
-                    <span aria-hidden="true">{'☰'}</span>
-                  </button>
                   <span className="wallet-portal-current">{activeTabLabel}</span>
                 </div>
 
@@ -705,6 +646,15 @@ function WalletPage() {
                   </div>
                 )}
                 </div>
+
+                {/* Mobile-only quick switching between the current section's
+                    sibling views (Finance / Tools / Apps), pinned to the bottom. */}
+                <SectionIconNav
+                  items={sectionNavItems}
+                  activeId={activeTab}
+                  onSelect={(id) => navigate(`/wallet?tab=${id}`)}
+                  ariaLabel={currentSectionGroup ? `${currentSectionGroup.label} sections` : 'Section navigation'}
+                />
               </div>
             </div>
           )}

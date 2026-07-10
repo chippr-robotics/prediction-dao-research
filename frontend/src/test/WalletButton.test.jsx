@@ -237,7 +237,7 @@ describe('WalletButton Component - Wagers', () => {
       expect(screen.queryByText('My Wagers')).not.toBeInTheDocument()
     })
 
-    it('exposes the Membership Vouchers entry so the voucher view is reachable', async () => {
+    it('exposes a Purchase Membership entry that opens the purchase modal', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
         roles: [],
@@ -249,11 +249,33 @@ describe('WalletButton Component - Wagers', () => {
       const button = screen.getByRole('button', { name: /wallet account/i })
       await user.click(button)
 
+      // The former "Membership Vouchers" action is now "Purchase Membership".
       await waitFor(() => {
-        expect(screen.getByText('Membership Vouchers')).toBeInTheDocument()
+        expect(screen.getByText('Purchase Membership')).toBeInTheDocument()
       })
-      // Non-members also get a direct redeem entry point.
+      expect(screen.queryByText('Membership Vouchers')).not.toBeInTheDocument()
+
+      // Non-members also get a direct redeem entry point in the upsell (assert
+      // before clicking Purchase, which closes the dropdown).
       expect(screen.getByText(/Have a voucher\? Redeem it/)).toBeInTheDocument()
+
+      // Clicking Purchase Membership opens the purchase modal (mocked here).
+      await user.click(screen.getByText('Purchase Membership'))
+      expect(mockShowModal).toHaveBeenCalled()
+    })
+
+    it('no longer shows the Get USDC action in the dropdown', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<WalletButton />)
+
+      const button = screen.getByRole('button', { name: /wallet account/i })
+      await user.click(button)
+
+      await screen.findByRole('menu')
+      expect(screen.queryByText('Get USDC')).not.toBeInTheDocument()
+      // Personal-account entries moved onto the account button.
+      expect(screen.getByText('Account')).toBeInTheDocument()
+      expect(screen.getByText('Preferences')).toBeInTheDocument()
     })
 
     it('hides Create Prediction Market button (removed feature)', async () => {

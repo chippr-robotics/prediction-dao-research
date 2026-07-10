@@ -41,7 +41,7 @@ function WalletButton({ className = '' }) {
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useDex()
-  const { isTestnet, network } = useNetworkMode()
+  const { network } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
@@ -390,23 +390,41 @@ function WalletButton({ className = '' }) {
                 </div>
               )}
 
-              {/* Navigation Actions */}
+              {/* Account Actions \u2014 personal account entries live here (moved off
+                  the section menu): Account, Membership, Preferences, plus the
+                  membership purchase flow and Disconnect. */}
               <div className="dropdown-actions">
                 <button
-                  onClick={() => { setIsOpen(false); navigate('/wallet') }}
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=account') }}
                   className="action-button"
                   role="menuitem"
                 >
                   <span aria-hidden="true">{'\u2699\uFE0F'}</span>
-                  <span>My Account</span>
+                  <span>Account</span>
                 </button>
                 <button
-                  onClick={() => { setIsOpen(false); navigate('/vouchers') }}
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=membership') }}
                   className="action-button"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">{'\uD83C\uDF9F\uFE0F'}</span>
-                  <span>Membership Vouchers</span>
+                  <span aria-hidden="true">{'\uD83C\uDFAB'}</span>
+                  <span>Membership</span>
+                </button>
+                <button
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=preferences') }}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">{'\uD83C\uDF9B\uFE0F'}</span>
+                  <span>Preferences</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPurchaseModal()}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">{'\u2B50'}</span>
+                  <span>Purchase Membership</span>
                 </button>
                 {hasRole(ROLES.ADMIN) && (
                   <button
@@ -418,16 +436,6 @@ function WalletButton({ className = '' }) {
                     <span>Role Management</span>
                   </button>
                 )}
-                <a
-                  href={isTestnet ? "https://faucet.circle.com/" : "https://app.uniswap.org/swap?chain=polygon"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="action-button get-usdc-btn"
-                  role="menuitem"
-                >
-                  <span aria-hidden="true">💰</span>
-                  <span>Get USDC</span>
-                </a>
                 <button
                   onClick={handleDisconnect}
                   className="action-button disconnect-button"
