@@ -24,7 +24,10 @@ export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel
       className={`portal-nav-item ${item.id === activeId ? 'active' : ''}`}
       onClick={() => onSelect(item.id)}
     >
-      {item.label}
+      {item.icon && (
+        <span className="portal-nav-item-icon" aria-hidden="true">{item.icon}</span>
+      )}
+      <span className="portal-nav-item-label">{item.label}</span>
     </button>
   )
 

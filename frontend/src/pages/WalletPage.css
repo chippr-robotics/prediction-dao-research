@@ -312,62 +312,18 @@
   color: var(--color-text);
 }
 
-/* The section nav is a left slide-over drawer at EVERY breakpoint so it always
-   opens and collapses from the left, overlaying the content instead of docking as
-   a column. It is anchored to the wallet card and animates in/out from the left
-   edge, with the in-app footer pinned to its bottom. These overrides are scoped to
-   .wallet-portal* so the shared Admin portal keeps its docked column. */
-.wallet-portal.portal-shell {
+/* Flat My Account layout. The section MENU now lives in the global nav drawer
+   ("us") + the account button, so this page simply stacks an identity row over
+   the active panel — no in-page sidebar or slide-over here anymore. */
+.wallet-portal--flat {
+  display: flex;
+  flex-direction: column;
   min-height: 320px;
-  position: relative;
 }
 
-.wallet-portal-sidebar.portal-sidebar {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  display: flex;
-  width: 80%;
-  max-width: 300px;
-  flex-basis: auto;
-  overflow-y: auto;
-  border-right: 1px solid var(--color-border);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
-  transform: translateX(-100%);
-  visibility: hidden;
-  transition: transform 0.25s ease, visibility 0s linear 0.25s;
-}
-
-/* The section list keeps its natural height so the footer's margin-top:auto can
-   pin it to the bottom of the drawer regardless of how many sections there are. */
-.wallet-portal-sidebar .portal-nav {
-  flex: 0 0 auto;
-}
-
-/* Open state: slide in and become focusable. */
-.wallet-portal.portal-shell:not(.portal-collapsed) .wallet-portal-sidebar.portal-sidebar {
-  transform: translateX(0);
-  visibility: visible;
-  transition: transform 0.25s ease, visibility 0s;
-}
-
-/* Closed state: keep it rendered (override the shared display:none) so it can
-   animate back out rather than vanish. */
-.wallet-portal.portal-shell.portal-collapsed .wallet-portal-sidebar.portal-sidebar {
-  display: flex;
-}
-
-.wallet-portal-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  background: rgba(0, 0, 0, 0.4);
-  animation: wallet-portal-backdrop-fade 0.2s ease;
+.wallet-portal--flat .wallet-portal-main {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -375,41 +331,10 @@
     font-size: 14px;
   }
 
-  /* On mobile the drawer must cover the full viewport so it renders above the
-     page footer. Using fixed positioning takes it out of the overflow:hidden
-     clipping context of .wallet-page and anchors it to the viewport instead
-     of the card, ensuring all navigation items are visible and no footer can
-     appear on top of or behind the panel. */
-  .wallet-portal-sidebar.portal-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 85%;
-    z-index: 200;
-  }
-
-  /* Dim overlay must also cover the full viewport on mobile. */
-  .wallet-portal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 190;
-  }
-}
-
-@keyframes wallet-portal-backdrop-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wallet-portal-sidebar.portal-sidebar,
-  .wallet-portal.portal-shell:not(.portal-collapsed) .wallet-portal-sidebar.portal-sidebar {
-    transition: visibility 0s;
-  }
-
-  .wallet-portal-backdrop {
-    animation: none;
+  /* Leave room for the fixed mobile SectionIconNav so it never covers the last
+     row of the active panel. */
+  .wallet-portal--flat .tab-content {
+    padding-bottom: 84px;
   }
 }
 

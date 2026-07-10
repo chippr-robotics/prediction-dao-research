@@ -4,13 +4,26 @@ import WalletButton from './wallet/WalletButton'
 import ThemeToggle from './ui/ThemeToggle'
 import NotificationBell from './notifications/NotificationBell'
 import NetworkCrawler from './fairwins/NetworkCrawler'
+import { useNavDrawer } from '../contexts/NavDrawerContext.js'
 import './Header.css'
 
 function Header({ hideWalletButton = false, appMode = false }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { open: openNavDrawer, available: navDrawerAvailable } = useNavDrawer()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+
+  // In app mode the clover logo is the site menu button — it opens the global
+  // navigation drawer ("us"). On the landing pages (no drawer provider) it keeps
+  // its classic "return home" behaviour.
+  const handleLogoClick = () => {
+    if (appMode && navDrawerAvailable) {
+      openNavDrawer()
+    } else {
+      navigate(appMode ? '/app' : '/')
+    }
+  }
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -40,8 +53,15 @@ function Header({ hideWalletButton = false, appMode = false }) {
   return (
     <header className="site-header" role="banner">
       <div className="header-container">
-        {/* Logo Section */}
-        <div className="header-logo" onClick={() => navigate(appMode ? '/app' : '/')}>
+        {/* Logo Section — in app mode this is the site menu button. */}
+        <button
+          type="button"
+          className="header-logo"
+          onClick={handleLogoClick}
+          aria-label={appMode && navDrawerAvailable ? 'Open menu' : 'FairWins home'}
+          aria-haspopup={appMode && navDrawerAvailable ? 'menu' : undefined}
+          aria-controls={appMode && navDrawerAvailable ? 'app-nav-drawer' : undefined}
+        >
           {!logoError ? (
             <img
               src="/assets/fairwins_no-text_logo.svg"
@@ -54,7 +74,7 @@ function Header({ hideWalletButton = false, appMode = false }) {
           ) : (
             <span className="header-logo-text">FairWins</span>
           )}
-        </div>
+        </button>
 
         {/* Desktop Navigation */}
         <nav className="header-nav desktop-nav" aria-label="Main navigation">

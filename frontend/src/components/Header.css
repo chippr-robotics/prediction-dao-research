@@ -31,16 +31,28 @@
   gap: 2rem;
 }
 
-/* Logo Section */
+/* Logo Section — rendered as a <button> (the site menu trigger in app mode). */
 .header-logo {
   display: flex;
   align-items: center;
   cursor: pointer;
   transition: opacity 0.2s;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
 }
 
 .header-logo:hover {
   opacity: 0.8;
+}
+
+.header-logo:focus-visible {
+  outline: 2px solid var(--color-primary, #36B37E);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .header-logo-image {
