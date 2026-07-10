@@ -1,0 +1,113 @@
+name: "🐛 Bug Report"
+description: Report a defect in a FairWins contract, the frontend, the subgraph, or tooling.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security vulnerabilities**: do not file a public issue for anything that could put user
+        funds or PII at risk (reentrancy, access-control bypass, oracle manipulation, key leakage,
+        etc.). Instead follow the process in `docs/developer-guide/contributing.md` (email
+        security@example.com). This template is for functional bugs only.
+
+        Fields below are intentionally structured — the team feeds well-formed bug reports
+        straight into the Spec Kit workflow (`/speckit-specify`) when a fix needs a spec.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the repo does this bug live in?
+      options:
+        - Contracts (contracts/)
+        - Frontend (frontend/)
+        - Subgraph (subgraph/)
+        - Scripts / deployment (scripts/, deployments/)
+        - Documentation
+        - CI / infrastructure
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network / environment
+      description: Where did you observe the bug?
+      options:
+        - Local Hardhat node
+        - Ethereum Classic Mordor (testnet)
+        - Polygon Amoy (testnet)
+        - Ethereum Classic (mainnet)
+        - Polygon (mainnet)
+        - Ethereum (mainnet)
+        - Sepolia (testnet)
+        - Not applicable / N/A
+    validations:
+      required: true
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence describing the bug.
+      placeholder: "Claiming a payout on an open-challenge wager reverts for the second acceptor"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps, inputs, wallet/role, and (for contract bugs) tx hashes or contract addresses.
+      placeholder: |
+        1. Deploy/connect to ...
+        2. Call/click ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages, revert reasons, stack traces, or screenshots.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical — funds/keys at risk or contract stuck
+        - High — core functionality broken
+        - Medium — degraded UX, workaround exists
+        - Low — cosmetic / minor
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, related issues/PRs, browser/OS, Node version, etc.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this isn't a duplicate
+          required: true
+        - label: This is a regression (it used to work)
+          required: false
