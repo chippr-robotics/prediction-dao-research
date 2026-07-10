@@ -109,6 +109,7 @@ nav:
     - Agent Examples: developer-guide/ethereum-security-agent-examples.md
     - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Testing: developer-guide/testing.md
+    - Coverage & Audit Gates: developer-guide/coverage-and-audit-gates.md
     - Contributing: developer-guide/contributing.md
   - Security Testing:
     - Overview: security/index.md

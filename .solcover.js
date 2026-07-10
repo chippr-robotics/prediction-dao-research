@@ -11,6 +11,14 @@ module.exports = {
   mocha: {
     timeout: 180000, // 3 minutes for coverage (instrumented code is slower)
   },
+  // Emit a machine-readable summary (spec 046). Both CI workflows read
+  // coverage/coverage-summary.json; without this reporter it was never produced, so
+  // every coverage summary/gate fell through to "not available". First-party-only
+  // accounting is done in post-processing (scripts/coverage/lib/first-party.js) rather
+  // than via skipFiles, because skipping vendored account/lib/** (which the first-party
+  // wallet contracts import) would corrupt their source-map attribution — same hazard
+  // the skipFiles note above describes for contracts/test/*.
+  istanbulReporter: ['json-summary', 'lcov', 'text'],
   providerOptions: {
     default_balance_ether: 10000,
     total_accounts: 20,
