@@ -48,9 +48,10 @@ describe('getPortfolioChainIds', () => {
     expect(new Set(getPortfolioChainIds())).toEqual(new Set([1, 61, 137]))
   })
 
-  it('adds Sepolia, Amoy, and Mordor when testnets are enabled', () => {
+  it('adds Sepolia, Hoodi, Amoy, and Mordor when testnets are enabled', () => {
+    // Hoodi (560048) joins the Ethereum family testnets (spec 048).
     expect(new Set(getPortfolioChainIds({ includeTestnets: true }))).toEqual(
-      new Set([1, 61, 137, 11155111, 80002, 63]),
+      new Set([1, 61, 137, 11155111, 560048, 80002, 63]),
     )
   })
 

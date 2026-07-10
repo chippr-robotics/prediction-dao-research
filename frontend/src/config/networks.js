@@ -12,10 +12,17 @@
  *   - Polygon Amoy (80002) — testnet. Co-locates with Polymarket's CTF for
  *     settle-by-reference; community Uniswap V3 contracts may be plugged in via
  *     VITE_AMOY_UNISWAP_* env vars.
+ *   - Ethereum Classic (61) + Mordor (63) — ETCswap V3 swap surface + ClearPath
+ *     (specs 033 / 042).
+ *   - Ethereum family (spec 048) — value networks for select + portfolio +
+ *     send/receive: Ethereum Mainnet (1, also ClearPath), Hoodi (560048) and
+ *     Sepolia (11155111) testnets. No wager/DEX/passkey infra is deployed here;
+ *     those capabilities self-disclose as unavailable (honest-state).
  *   - Hardhat (1337) — local dev.
  *
  * The user-facing Testnet/Mainnet toggle switches between 80002 (testnet) and
- * 137 (mainnet) via wagmi.switchChain.
+ * 137 (mainnet) via wagmi.switchChain; every network with `selectable: true`
+ * is also individually switchable from the My Account → Network tab.
  */
 
 // Note: We intentionally do NOT import from ./contracts here — contracts.js
@@ -339,16 +346,21 @@ const NETWORKS = {
     // Surfaced in the My Account → Network tab as a user-switchable network.
     selectable: true,
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
-    // Ethereum mainnet is a ClearPath-ONLY network (spec 042): DAO governance (ENS/Uniswap/…) is
-    // the only enabled capability. No wager/DEX/passkey infra is deployed here, and each of those
-    // features self-discloses as unavailable rather than pretending to work (FR-002/FR-003).
+    // Ethereum mainnet is a first-class VALUE network (spec 048): members can select it, view
+    // their ETH + curated-token holdings in the portfolio, and send/receive on it — alongside the
+    // ClearPath DAO governance (ENS/Uniswap/…) enabled since spec 042. No wager/DEX/passkey infra
+    // is deployed here, and each of those features self-discloses as unavailable rather than
+    // pretending to work (honest-state; FR-005/FR-015). Passkey (smart-account) submission is not
+    // enabled on the Ethereum family in this cut — a passkey member transacts via a linked wallet
+    // and may still select the network for view-only use (FR-003a).
     rpcUrl: import.meta.env?.VITE_RPC_URL_MAINNET || 'https://ethereum-rpc.publicnode.com',
     explorer: { name: 'Etherscan', baseUrl: 'https://etherscan.io' },
     // No wager subgraph for this network. ClearPath reads a DAO's own data subgraph-first (per-DAO,
     // see config/clearpath/daoSubgraphs.js) then falls back to a bounded on-chain scan.
     subgraphUrl: null,
-    // Native Circle USDC on Ethereum mainnet — read for tracked-DAO treasury USDC balances only
-    // (ClearPath is non-custodial; no wager escrow uses it here). Override via VITE_MAINNET_USDC.
+    // Native Circle USDC on Ethereum mainnet — the network stablecoin for send/receive and a
+    // portfolio holding (valued at par $1); also read for tracked-DAO treasury balances. The app
+    // is non-custodial — no wager escrow uses it here. Override via VITE_MAINNET_USDC.
     stablecoin: {
       address: import.meta.env?.VITE_MAINNET_USDC || '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       symbol: 'USDC',
@@ -378,10 +390,11 @@ const NETWORKS = {
     name: 'Sepolia',
     isTestnet: true,
     isPrimary: false,
-    // Portfolio-scan only (spec 044 follow-up): balances are read over RPC for
-    // the cross-chain portfolio. Not offered in the network switcher and no
-    // app feature is deployed here, so every capability self-discloses off.
-    selectable: false,
+    // User-selectable Ethereum testnet (spec 048): offered in the network switcher for
+    // select + send/receive, and scanned for the cross-chain portfolio (testnet holdings
+    // gated behind the "show testnet assets" preference). No app feature (wager/DEX/passkey)
+    // is deployed here, so every such capability self-discloses off (honest-state).
+    selectable: true,
     nativeCurrency: { decimals: 18, name: 'Sepolia Ether', symbol: 'ETH' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_SEPOLIA || 'https://ethereum-sepolia-rpc.publicnode.com',
     explorer: { name: 'Etherscan', baseUrl: 'https://sepolia.etherscan.io' },
@@ -394,6 +407,42 @@ const NETWORKS = {
       decimals: 6,
       domainVersion: '2',
     },
+    dex: null,
+    contracts: {},
+    polymarket: null,
+    passkey: null,
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: false,
+        friendMarkets: false,
+        passkeyAccounts: false,
+        clearpath: false,
+      }
+    },
+  },
+  560048: {
+    chainId: 560048,
+    name: 'Hoodi',
+    isTestnet: true,
+    isPrimary: false,
+    // User-selectable Ethereum testnet (spec 048) — Ethereum's long-lived proof-of-stake
+    // testnet. Offered in the network switcher for select + send/receive and scanned for the
+    // portfolio (testnet holdings gated behind the "show testnet assets" preference). No app
+    // feature (wager/DEX/passkey) is deployed here, so every such capability self-discloses off.
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Hoodi Ether', symbol: 'ETH' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_HOODI || 'https://ethereum-hoodi-rpc.publicnode.com',
+    explorer: { name: 'Etherscan', baseUrl: 'https://hoodi.etherscan.io' },
+    subgraphUrl: null,
+    // No canonical Hoodi faucet stablecoin is verified yet, so the stablecoin stays null unless
+    // VITE_HOODI_USDC is supplied — no invented address (honest-state). With no stablecoin, Hoodi
+    // send offers native ETH only and the portfolio shows native (+ any real curated token).
+    stablecoin: (() => {
+      const address = import.meta.env?.VITE_HOODI_USDC
+      if (!address) return null
+      return { address, symbol: 'USDC', name: 'USD Coin', decimals: 6, domainVersion: '2' }
+    })(),
     dex: null,
     contracts: {},
     polymarket: null,

@@ -116,6 +116,7 @@ export const UNDERLYING_META = {
   LINK: { name: 'Chainlink', homeChainId: null },
   USDC: { name: 'USD Coin', homeChainId: null },
   USDT: { name: 'Tether USD', homeChainId: null },
+  DAI: { name: 'Dai Stablecoin', homeChainId: null },
   USC: { name: 'Classic USD', homeChainId: null },
   FWMV: { name: 'FairWins Membership Voucher', homeChainId: null },
 }
@@ -141,6 +142,23 @@ const CURATED_REGISTRY = {
       decimals: 18,
       categoryId: 'digital-commodities',
       baselineSymbol: 'ETH',
+    },
+    {
+      // Tether USD on Ethereum mainnet — transactional stablecoin by known issuer
+      // (spec 048). Valued at par $1. USDC arrives via the network `stablecoin`.
+      address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      symbol: 'USDT',
+      name: 'Tether USD',
+      decimals: 6,
+      categoryId: 'payment-stablecoins',
+    },
+    {
+      // Dai on Ethereum mainnet — decentralized stablecoin, valued at par $1 (spec 048).
+      address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+      symbol: 'DAI',
+      name: 'Dai Stablecoin',
+      decimals: 18,
+      categoryId: 'payment-stablecoins',
     },
   ],
   137: [

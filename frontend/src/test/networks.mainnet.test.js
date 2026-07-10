@@ -3,14 +3,21 @@ import { getNetwork, getSelectableNetworks, isSupportedChainId } from '../config
 import { getContractAddressForChain } from '../config/contracts'
 import { getNetworkFeatures } from '../config/networkCapabilities'
 import { knownDaosForChain } from '../config/clearpath/knownDaos'
+import { getPortfolioChainIds } from '../config/assetTaxonomy'
 
-// Spec 042 US1 — Ethereum mainnet (1) is a ClearPath-ONLY network: DAO governance is the only enabled
-// capability, and every other feature honestly self-discloses as unavailable (no fabricated infra).
+// Ethereum mainnet (1) is a first-class VALUE network (spec 048): selectable, portfolio-eligible,
+// send/receive-capable — plus the ClearPath DAO governance enabled since spec 042. Every app feature
+// NOT deployed here (wager/DEX/passkey) still honestly self-discloses as unavailable (no fabricated
+// infra); this is the invariant the tests below pin.
 
-describe('Ethereum mainnet ClearPath-only network (spec 042 US1)', () => {
+describe('Ethereum mainnet value network (spec 048; ClearPath since spec 042)', () => {
   it('is a supported, selectable network', () => {
     expect(isSupportedChainId(1)).toBe(true)
     expect(getSelectableNetworks().some((n) => n.chainId === 1)).toBe(true)
+  })
+
+  it('is portfolio-eligible without opting into testnets (spec 048 FR-006)', () => {
+    expect(getPortfolioChainIds({ includeTestnets: false })).toContain(1)
   })
 
   it('enables ONLY clearpath among capabilities', () => {

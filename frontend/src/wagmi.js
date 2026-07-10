@@ -1,6 +1,28 @@
 import { http, createConfig } from 'wagmi'
+import { mainnet, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { passkeyConnector } from './connectors/passkey'
+
+// Define Hoodi — Ethereum's long-lived proof-of-stake testnet (spec 048). Not a
+// wagmi/chains built-in, so declared inline like the ETC-family chains. RPC/explorer
+// defaults mirror config/networks.js (single-source consistency).
+const hoodi = {
+  id: 560048,
+  name: 'Hoodi',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Hoodi Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: { http: ['https://ethereum-hoodi-rpc.publicnode.com'] },
+    public: { http: ['https://ethereum-hoodi-rpc.publicnode.com'] },
+  },
+  blockExplorers: {
+    default: { name: 'Etherscan', url: 'https://hoodi.etherscan.io' },
+  },
+  testnet: true,
+}
 
 // Define Ethereum Classic mainnet
 const ethereumClassic = {
@@ -144,7 +166,10 @@ const appUrl = resolveAppUrl()
 // Define supported chains. Polygon mainnet is first so it is wagmi's default
 // chain (used by useChainId when no wallet is connected), matching the primary
 // network. The Testnet/Mainnet toggle still switches to Amoy on demand.
-const chains = [polygon, amoy, ethereumClassic, mordor, hardhat]
+// Exported so config-parity tests can assert every selectable network (config/networks.js)
+// is registered here — otherwise switchChain cannot reach it. Polygon stays first (wagmi
+// default chain — FR-015).
+export const chains = [polygon, amoy, ethereumClassic, mordor, mainnet, sepolia, hoodi, hardhat]
 
 // Create wagmi config
 export const config = createConfig({
@@ -174,6 +199,10 @@ export const config = createConfig({
     [polygon.id]: http(networkId === 137 ? rpcUrl : 'https://polygon-bor-rpc.publicnode.com'),
     [ethereumClassic.id]: http(),
     [mordor.id]: http(networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org'),
+    // Ethereum family (spec 048) — defaults mirror config/networks.js.
+    [mainnet.id]: http(networkId === 1 ? rpcUrl : 'https://ethereum-rpc.publicnode.com'),
+    [sepolia.id]: http(networkId === 11155111 ? rpcUrl : 'https://ethereum-sepolia-rpc.publicnode.com'),
+    [hoodi.id]: http(networkId === 560048 ? rpcUrl : 'https://ethereum-hoodi-rpc.publicnode.com'),
     [hardhat.id]: http('http://localhost:8545'),
   },
 })
@@ -189,6 +218,12 @@ export const getExpectedChain = () => {
       return ethereumClassic
     case 63:
       return mordor
+    case 1:
+      return mainnet
+    case 11155111:
+      return sepolia
+    case 560048:
+      return hoodi
     case 1337:
       return hardhat
     default:
