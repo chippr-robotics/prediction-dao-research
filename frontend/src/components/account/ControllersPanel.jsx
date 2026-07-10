@@ -22,13 +22,32 @@ import {
 } from '../../lib/passkey/smartAccount'
 import { unwrapMasterSeed, wrapForController, revokeController } from '../../lib/passkey/prfKeys'
 import { screenController } from '../../utils/sanctionsScreen'
+import AddressInput from '../ui/AddressInput'
+import AddressBookButton from '../ui/AddressBookButton'
+import QRScanner from '../ui/QRScanner'
+import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
 function ControllersPanel({ deps = {} }) {
-  const { address, sendCalls, provider } = useWallet()
+  const { address, sendCalls, provider, chainId } = useWallet()
   const account = usePasskeyAccount(deps)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [linkAddress, setLinkAddress] = useState('')
+  const [linkAddressResolved, setLinkAddressResolved] = useState('')
+  const [scanOpen, setScanOpen] = useState(false)
+
+  const applyLinkAddress = useCallback((addr) => {
+    setLinkAddress(addr)
+    setLinkAddressResolved(addr)
+  }, [])
+
+  const handleScan = useCallback((decodedText) => {
+    const addr = extractAddressFromScan(decodedText)
+    if (addr) applyLinkAddress(addr)
+    setScanOpen(false)
+  }, [applyLinkAddress])
 
   const run = useCallback(
     async (fn) => {
@@ -78,7 +97,7 @@ function ControllersPanel({ deps = {} }) {
   const linkWallet = useCallback(
     () =>
       run(async () => {
-        const target = linkAddress.trim()
+        const target = (linkAddressResolved || linkAddress).trim()
         // Idempotent refusal (spec 045 edge case) — the contract would revert
         // AlreadyOwner anyway; refusing here saves the ceremony and the fee.
         const already = account.controllers.some(
@@ -95,8 +114,9 @@ function ControllersPanel({ deps = {} }) {
         }
         await sendCalls([{ target: address, data: encodeAddWalletOwner(target) }])
         setLinkAddress('')
+        setLinkAddressResolved('')
       }),
-    [run, deps, linkAddress, provider, sendCalls, address, account.controllers]
+    [run, deps, linkAddress, linkAddressResolved, provider, sendCalls, address, account.controllers]
   )
 
   /** Remove a controller: on-chain removal + wrapped-seed revocation (FR-020). */
@@ -165,17 +185,43 @@ function ControllersPanel({ deps = {} }) {
             A linked wallet becomes a full controller: it can move funds, manage controllers, and
             recover this account if you lose your passkeys. Link only a wallet you exclusively control.
           </p>
-          <input
-            type="text"
-            placeholder="0x… wallet to link"
-            value={linkAddress}
-            onChange={(e) => setLinkAddress(e.target.value)}
-            aria-label="Wallet address to link"
-          />
+          {/* Standard address entry (ENS resolution + address book + QR scan) used across the app */}
+          <div className="controllers-panel__link-row">
+            <div className="controllers-panel__address-wrap">
+              <AddressInput
+                id="controllers-link-address"
+                value={linkAddress}
+                onChange={(e) => setLinkAddress(e.target.value)}
+                onResolvedChange={(addr) => setLinkAddressResolved(addr || '')}
+                chainId={chainId}
+                placeholder="0x… wallet to link"
+                disabled={busy || !account.deployed}
+                aria-label="Wallet address to link"
+              />
+            </div>
+            <AddressBookButton
+              chainId={chainId}
+              disabled={busy || !account.deployed}
+              onSelect={(entry) => applyLinkAddress(entry.address)}
+            />
+            <button
+              type="button"
+              className="controllers-panel__scan-btn"
+              onClick={() => setScanOpen(true)}
+              disabled={busy || !account.deployed}
+              title="Scan QR code"
+              aria-label="Scan QR code"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+              </svg>
+            </button>
+          </div>
+          <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
           <button
             type="button"
             className="btn"
-            disabled={busy || !account.deployed || !/^0x[0-9a-fA-F]{40}$/.test(linkAddress.trim())}
+            disabled={busy || !account.deployed || !ADDRESS_RE.test((linkAddressResolved || linkAddress).trim())}
             onClick={linkWallet}
           >
             Link wallet
