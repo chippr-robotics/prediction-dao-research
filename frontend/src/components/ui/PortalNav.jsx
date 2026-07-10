@@ -16,6 +16,7 @@
  *     navigates between routes rather than swapping an in-page panel.
  */
 import { Fragment } from 'react'
+import NavIcon from '../nav/NavIcon'
 import './PortalNav.css'
 
 export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel, variant = 'tabs' }) {
@@ -32,7 +33,9 @@ export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel
       onClick={() => onSelect(item.id)}
     >
       {item.icon && (
-        <span className="portal-nav-item-icon" aria-hidden="true">{item.icon}</span>
+        <span className="portal-nav-item-icon" aria-hidden="true">
+          <NavIcon name={item.icon} />
+        </span>
       )}
       <span className="portal-nav-item-label">{item.label}</span>
     </button>

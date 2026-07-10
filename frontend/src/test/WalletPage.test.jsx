@@ -161,17 +161,15 @@ describe('WalletPage — address QR entry point', () => {
   })
 })
 
-describe('WalletPage — sidebar identity', () => {
-  // The standalone Copy button moved off the Account tab; the sidebar address
-  // itself is now the copy control (spec: account page reorg).
-  it('copies the full address to the clipboard when the sidebar address is clicked', async () => {
+describe('WalletPage — identity moved to the wallet button', () => {
+  // The wallet identity + copy-address affordance was removed from the section
+  // panels and now lives on the account button (top right). WalletPage no longer
+  // renders a copy-address control.
+  it('does not render a copy-address control in the panels', () => {
     renderPage(connectedWalletContext)
-    const addressButton = screen.getByRole('button', { name: /copy wallet address/i })
-
-    fireEvent.click(addressButton)
-
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(ADDRESS)
-    expect(await screen.findByRole('button', { name: /copied!/i })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /copy wallet address/i })
+    ).not.toBeInTheDocument()
   })
 })
 

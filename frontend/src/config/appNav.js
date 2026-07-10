@@ -12,8 +12,9 @@
  * from the groups below.
  */
 
-// Quick-access entry pinned to the top of the drawer list.
-export const HOME_ITEM = { id: 'home', label: 'Home', icon: '🏠', to: '/app' }
+// Quick-access entry pinned to the top of the drawer list. `icon` is a NavIcon
+// name (see components/nav/NavIcon.jsx) — flat line glyphs, not emoji.
+export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 
 // Grouped section rail. `id` matches the WalletPage tab id; `icon` drives both
 // the drawer and the mobile bottom nav.
@@ -21,29 +22,29 @@ export const NAV_GROUPS = [
   {
     label: 'Finance',
     items: [
-      { id: 'portfolio', label: 'Portfolio', icon: '📈' },
-      { id: 'trade', label: 'Trade', icon: '🔄' },
-      { id: 'paytransfer', label: 'Pay & Transfer', icon: '💸' },
+      { id: 'portfolio', label: 'Portfolio', icon: 'trending' },
+      { id: 'trade', label: 'Trade', icon: 'trade' },
+      { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
-      { id: 'custody', label: 'Protect', icon: '🛡️' },
+      { id: 'custody', label: 'Protect', icon: 'shield' },
     ],
   },
   {
     label: 'Tools',
     items: [
-      { id: 'addressbook', label: 'Address Book', icon: '📇' },
-      { id: 'backup', label: 'Backup', icon: '💾' },
-      { id: 'reports', label: 'Reporting', icon: '📊' },
+      { id: 'addressbook', label: 'Address Book', icon: 'addressbook' },
+      { id: 'backup', label: 'Backup', icon: 'backup' },
+      { id: 'reports', label: 'Reporting', icon: 'reports' },
       // Security relocated here from the former Admin group.
-      { id: 'security', label: 'Security', icon: '🔐' },
-      { id: 'network', label: 'Network', icon: '🌐' },
+      { id: 'security', label: 'Security', icon: 'lock' },
+      { id: 'network', label: 'Network', icon: 'globe' },
     ],
   },
   {
     label: 'Apps',
     items: [
-      { id: 'clearpath', label: 'ClearPath', icon: '🧭' },
-      { id: 'tokens', label: 'Token Mint', icon: '🪙' },
+      { id: 'clearpath', label: 'ClearPath', icon: 'compass' },
+      { id: 'tokens', label: 'Token Mint', icon: 'coin' },
     ],
   },
 ]
