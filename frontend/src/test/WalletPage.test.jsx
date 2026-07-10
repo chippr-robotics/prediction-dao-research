@@ -175,26 +175,25 @@ describe('WalletPage — identity moved to the wallet button', () => {
 
 describe('WalletPage — section routing', () => {
   // The in-page section rail/drawer was lifted into the global nav drawer. The
-  // page is now a flat host: it reads `?tab=` to pick a panel and shows the
-  // active section's heading. No in-page ☰ toggle, backdrop, or footer here.
+  // page is now a flat host: it reads `?tab=` to pick a panel. Each panel renders
+  // its own heading, so there is no duplicate in-page section title, ☰ toggle,
+  // backdrop, or footer here.
   it('defaults to the Account section with no ?tab', () => {
-    renderPage(connectedWalletContext, '/wallet')
-    expect(screen.getByText('Account')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /show menu/i })
-    ).not.toBeInTheDocument()
+    const { container } = renderPage(connectedWalletContext, '/wallet')
+    expect(container.querySelector('.profile-section')).toBeTruthy()
+    expect(container.querySelector('.membership-section')).toBeFalsy()
   })
 
   it('deep-links to the Membership section via ?tab=membership', () => {
-    renderPage(connectedWalletContext, '/wallet?tab=membership')
-    // The Membership panel renders its "Your Roles" / "Membership" headings.
-    expect(screen.getByRole('heading', { name: /membership/i })).toBeInTheDocument()
+    const { container } = renderPage(connectedWalletContext, '/wallet?tab=membership')
+    expect(container.querySelector('.membership-section')).toBeTruthy()
+    // The Membership panel renders its own "Your Roles" / "Membership" headings.
     expect(screen.getByRole('heading', { name: /your roles/i })).toBeInTheDocument()
   })
 
-  it('shows the active section label in the topbar', () => {
+  it('does not render a duplicate in-page section title', () => {
     const { container } = renderPage(connectedWalletContext, '/wallet?tab=membership')
-    const current = container.querySelector('.wallet-portal-current')
-    expect(current).toHaveTextContent('Membership')
+    expect(container.querySelector('.wallet-portal-current')).toBeFalsy()
+    expect(container.querySelector('.wallet-portal-topbar')).toBeFalsy()
   })
 })
