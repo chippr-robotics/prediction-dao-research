@@ -37,8 +37,8 @@ top of it.
 
 **Purpose**: Test harness and deployment prerequisites for device orientation.
 
-- [ ] T001 [P] Add a `DeviceOrientationEvent` / `'deviceorientation'` mock to `frontend/src/test/setup.js` (none exists today; follow the existing `window.matchMedia` mock as the template — allow tests to dispatch synthetic events with `beta`/`gamma` and to stub `DeviceOrientationEvent.requestPermission`).
-- [ ] T002 [P] Fix `Permissions-Policy` in `frontend/nginx.conf` and `frontend/nginx.conf.template`: change `accelerometer=()` → `accelerometer=(self)` and `gyroscope=()` → `gyroscope=(self)`, leaving the other directives unchanged (per research R3 — otherwise orientation events never fire in production).
+- [x] T001 [P] Add a `DeviceOrientationEvent` / `'deviceorientation'` mock to `frontend/src/test/setup.js` (none exists today; follow the existing `window.matchMedia` mock as the template — allow tests to dispatch synthetic events with `beta`/`gamma` and to stub `DeviceOrientationEvent.requestPermission`).
+- [x] T002 [P] Fix `Permissions-Policy` in `frontend/nginx.conf` and `frontend/nginx.conf.template`: change `accelerometer=()` → `accelerometer=(self)` and `gyroscope=()` → `gyroscope=(self)`, leaving the other directives unchanged (per research R3 — otherwise orientation events never fire in production).
 
 ---
 
@@ -52,19 +52,19 @@ masking primitive.
 
 ### Tests (write first, must fail)
 
-- [ ] T003 [P] Classifier unit test in `frontend/src/test/privacy/tilt.test.js`: face-up→`hidden`, face-down (|beta|→180)→`hidden`, portrait-viewing→`viewing`, landscape-viewing (large |gamma|)→`viewing`, dead-band holds previous state, null/NaN reading holds previous state.
-- [ ] T004 [P] `SensitiveValue` component test in `frontend/src/test/privacy/SensitiveValue.test.jsx`: when hidden → placeholder shown, real string absent from DOM text (not copyable), accessible name is "hidden", box width stable and independent of digit count; when shown → exact children rendered.
-- [ ] T005 [P] Preference test in `frontend/src/test/privacy/userPreferences.tiltToHide.test.jsx`: `tiltToHide` defaults to `true`, `setTiltToHide(false)` persists via `saveUserPreference(account,'tilt_to_hide',false,true)`, value reloads per account.
-- [ ] T006 [P] `PrivacyProvider` / `usePrivacy` test in `frontend/src/test/privacy/PrivacyContext.test.jsx`: supported path sets `hidden` on synthetic flat event and clears it on viewing event; permission-denied and unsupported paths keep `hidden===false`; preference off keeps `hidden===false` and attaches no listener; listener removed on unmount.
+- [x] T003 [P] Classifier unit test in `frontend/src/test/privacy/tilt.test.js`: face-up→`hidden`, face-down (|beta|→180)→`hidden`, portrait-viewing→`viewing`, landscape-viewing (large |gamma|)→`viewing`, dead-band holds previous state, null/NaN reading holds previous state.
+- [x] T004 [P] `SensitiveValue` component test in `frontend/src/test/privacy/SensitiveValue.test.jsx`: when hidden → placeholder shown, real string absent from DOM text (not copyable), accessible name is "hidden", box width stable and independent of digit count; when shown → exact children rendered.
+- [x] T005 [P] Preference test in `frontend/src/test/privacy/userPreferences.tiltToHide.test.jsx`: `tiltToHide` defaults to `true`, `setTiltToHide(false)` persists via `saveUserPreference(account,'tilt_to_hide',false,true)`, value reloads per account.
+- [x] T006 [P] `PrivacyProvider` / `usePrivacy` test in `frontend/src/test/privacy/PrivacyContext.test.jsx`: supported path sets `hidden` on synthetic flat event and clears it on viewing event; permission-denied and unsupported paths keep `hidden===false`; preference off keeps `hidden===false` and attaches no listener; listener removed on unmount.
 
 ### Implementation
 
-- [ ] T007 [P] Create pure classifier `frontend/src/lib/privacy/tilt.js`: export `TILT_DEFAULTS` (`enterFlatDeg`, `exitFlatDeg`, `settleMs`) and `classifyOrientation(reading, prevState, options)` per `contracts/tilt-to-hide.md` §1 (screen-normal-near-vertical rule + hysteresis; no DOM).
-- [ ] T008 [P] Extend `frontend/src/contexts/UserPreferencesContext.jsx`: add `tiltToHide: true` to both default-state objects, load `getUserPreference(account,'tilt_to_hide',true,true)` in `loadPreferences`, add `setTiltToHide` setter (mirror `setShowZeroBalances`), expose both in context value.
-- [ ] T009 [P] Create `frontend/src/components/common/SensitiveValue.jsx` (+ `SensitiveValue.css`) per `contracts/tilt-to-hide.md` §3: content-swap masking (placeholder replaces DOM text, accessible name `hiddenLabel` default "hidden", fixed non-digit-encoding width, layout-stable); reads `usePrivacy().hidden`.
-- [ ] T010 Create `frontend/src/contexts/PrivacyContext.js` (`createContext`) + `frontend/src/contexts/PrivacyContext.jsx` (`PrivacyProvider`) + `frontend/src/hooks/usePrivacy.js`: subscribe to throttled `deviceorientation`, feed `classifyOrientation`, derive effective `hidden` (per data-model rule), detect `support`, handle iOS `requestMotionPermission()`; reads `tiltToHide` from `useUserPreferences()`. (depends on T007, T008)
-- [ ] T011 Wire exports in `frontend/src/contexts/index.js` and `frontend/src/hooks/index.js` for `PrivacyProvider` / `usePrivacy`. (depends on T010)
-- [ ] T012 Mount `<PrivacyProvider>` in `frontend/src/main.jsx` just inside `UserPreferencesProvider` so it wraps the remaining providers and `<App/>`. (depends on T010, T011)
+- [x] T007 [P] Create pure classifier `frontend/src/lib/privacy/tilt.js`: export `TILT_DEFAULTS` (`enterFlatDeg`, `exitFlatDeg`, `settleMs`) and `classifyOrientation(reading, prevState, options)` per `contracts/tilt-to-hide.md` §1 (screen-normal-near-vertical rule + hysteresis; no DOM).
+- [x] T008 [P] Extend `frontend/src/contexts/UserPreferencesContext.jsx`: add `tiltToHide: true` to both default-state objects, load `getUserPreference(account,'tilt_to_hide',true,true)` in `loadPreferences`, add `setTiltToHide` setter (mirror `setShowZeroBalances`), expose both in context value.
+- [x] T009 [P] Create `frontend/src/components/common/SensitiveValue.jsx` (+ `SensitiveValue.css`) per `contracts/tilt-to-hide.md` §3: content-swap masking (placeholder replaces DOM text, accessible name `hiddenLabel` default "hidden", fixed non-digit-encoding width, layout-stable); reads `usePrivacy().hidden`.
+- [x] T010 Create `frontend/src/contexts/PrivacyContext.js` (`createContext`) + `frontend/src/contexts/PrivacyContext.jsx` (`PrivacyProvider`) + `frontend/src/hooks/usePrivacy.js`: subscribe to throttled `deviceorientation`, feed `classifyOrientation`, derive effective `hidden` (per data-model rule), detect `support`, handle iOS `requestMotionPermission()`; reads `tiltToHide` from `useUserPreferences()`. (depends on T007, T008)
+- [x] T011 Wire exports in `frontend/src/contexts/index.js` and `frontend/src/hooks/index.js` for `PrivacyProvider` / `usePrivacy`. (depends on T010)
+- [x] T012 Mount `<PrivacyProvider>` in `frontend/src/main.jsx` just inside `UserPreferencesProvider` so it wraps the remaining providers and `<App/>`. (depends on T010, T011)
 
 **Checkpoint**: Engine ready — classifier, preference, provider, and
 `<SensitiveValue>` exist and are unit-tested. No values are wrapped yet.
@@ -82,18 +82,18 @@ flat → new values render masked; hard-reload while flat → no flash of real d
 
 ### Tests (write first, must fail)
 
-- [ ] T013 [P] [US1] Integration test in `frontend/src/test/privacy/tiltHide.integration.test.jsx`: render a sample money screen inside `PrivacyProvider`, dispatch a flat event → all wrapped values masked; dispatch viewing event → revealed; initial render while already flat → masked with no real-digit frame; values mounted after going flat → masked.
+- [x] T013 [P] [US1] Integration test in `frontend/src/test/privacy/tiltHide.integration.test.jsx`: render a sample money screen inside `PrivacyProvider`, dispatch a flat event → all wrapped values masked; dispatch viewing event → revealed; initial render while already flat → masked with no real-digit frame; values mounted after going flat → masked.
 
 ### Implementation — wrap monetary render sites in `<SensitiveValue>`
 
-- [ ] T014 [P] [US1] Wrap account-dashboard tiles in `frontend/src/components/account/SummaryTiles.jsx` (`.account-tile-value` — Net P&L, Total Wagered, Wallet Balance); coordinate with `frontend/src/components/account/useCountUp.js` so masking shows the placeholder and does not run/reveal the count-up. Update colocated test.
-- [ ] T015 [P] [US1] Wrap activity amounts in `frontend/src/components/account/RecentActivityFeed.jsx` (`formatUsd(e.usdValue)`, `.account-feed-amount`) and `frontend/src/components/account/ActivityBreakdowns.jsx`. Update colocated tests.
-- [ ] T016 [P] [US1] Wrap P&L figures in `frontend/src/components/account/PnlChart.jsx` and `frontend/src/components/account/PnlChartCanvas.jsx` (monetary axis/summary labels; leave non-monetary axis ticks unmasked).
-- [ ] T017 [P] [US1] Wrap portfolio figures in `frontend/src/components/wallet/PortfolioPanel.jsx` (portfolio total via local `formatUsdFull`, `.portfolio-row-usd`, `.portfolio-row-balance`) and `frontend/src/components/wallet/AssetDetailSheet.jsx`.
-- [ ] T018 [P] [US1] Wrap wager stake/payout amounts where rendered in `frontend/src/components/fairwins/WagerCard.jsx` and `frontend/src/components/fairwins/WagerTable.jsx` (render the strings from `wagerCardHelpers.js` / `wagerVm.js` through `<SensitiveValue>`; keep those helpers pure).
-- [ ] T019 [P] [US1] Wrap stake/amount displays in `frontend/src/components/fairwins/TakeChallengePanel.jsx`, `frontend/src/components/fairwins/TradePanel.jsx`, and `frontend/src/components/fairwins/LiveStats.jsx`.
-- [ ] T020 [P] [US1] Wrap pool stake/payout amounts in the `frontend/src/components/pools/` displays (pool total, per-member stake, payout figures).
-- [ ] T021 [US1] Completeness sweep: grep for remaining monetary renders (Dashboard tiles, `frontend/src/pages/` money views, vouchers, custody/treasury amounts), wrap any found, and record the finalized render-site inventory as a comment/checklist in this file. Confirm non-monetary numbers (counts, timers, dates, IDs) are NOT wrapped. (depends on T014–T020)
+- [x] T014 [P] [US1] Wrap account-dashboard tiles in `frontend/src/components/account/SummaryTiles.jsx` (`.account-tile-value` — Net P&L, Total Wagered, Wallet Balance); coordinate with `frontend/src/components/account/useCountUp.js` so masking shows the placeholder and does not run/reveal the count-up. Update colocated test.
+- [x] T015 [P] [US1] Wrap activity amounts in `frontend/src/components/account/RecentActivityFeed.jsx` (`formatUsd(e.usdValue)`, `.account-feed-amount`) and `frontend/src/components/account/ActivityBreakdowns.jsx`. Update colocated tests.
+- [x] T016 [P] [US1] Wrap P&L figures in `frontend/src/components/account/PnlChart.jsx` and `frontend/src/components/account/PnlChartCanvas.jsx` (monetary axis/summary labels; leave non-monetary axis ticks unmasked).
+- [x] T017 [P] [US1] Wrap portfolio figures in `frontend/src/components/wallet/PortfolioPanel.jsx` (portfolio total via local `formatUsdFull`, `.portfolio-row-usd`, `.portfolio-row-balance`) and `frontend/src/components/wallet/AssetDetailSheet.jsx`.
+- [x] T018 [P] [US1] Wrap wager stake/payout amounts where rendered in `frontend/src/components/fairwins/WagerCard.jsx` and `frontend/src/components/fairwins/WagerTable.jsx` (render the strings from `wagerCardHelpers.js` / `wagerVm.js` through `<SensitiveValue>`; keep those helpers pure).
+- [x] T019 [P] [US1] Wrap stake/amount displays in `frontend/src/components/fairwins/TakeChallengePanel.jsx`, `frontend/src/components/fairwins/TradePanel.jsx`, and `frontend/src/components/fairwins/LiveStats.jsx`.
+- [x] T020 [P] [US1] Wrap pool stake/payout amounts in the `frontend/src/components/pools/` displays (pool total, per-member stake, payout figures).
+- [x] T021 [US1] Completeness sweep: grep for remaining monetary renders (Dashboard tiles, `frontend/src/pages/` money views, vouchers, custody/treasury amounts), wrap any found, and record the finalized render-site inventory as a comment/checklist in this file. Confirm non-monetary numbers (counts, timers, dates, IDs) are NOT wrapped. (depends on T014–T020)
 
 **Checkpoint**: Tilt-to-hide is fully functional end-to-end on mobile (default on).
 MVP deliverable.
@@ -111,12 +111,12 @@ setting persists.
 
 ### Tests (write first, must fail)
 
-- [ ] T022 [P] [US2] Panel test in `frontend/src/test/privacy/PrivacyPreferencesPanel.test.jsx`: renders a `role="switch"` toggle defaulting on, bound to `tiltToHide`; toggling calls `setTiltToHide` and persists; with the pref off, `usePrivacy().hidden` stays false under a flat event (app-wide off).
+- [x] T022 [P] [US2] Panel test in `frontend/src/test/privacy/PrivacyPreferencesPanel.test.jsx`: renders a `role="switch"` toggle defaulting on, bound to `tiltToHide`; toggling calls `setTiltToHide` and persists; with the pref off, `usePrivacy().hidden` stays false under a flat event (app-wide off).
 
 ### Implementation
 
-- [ ] T023 [US2] Create `frontend/src/components/account/PrivacyPreferencesPanel.jsx` (+ `PrivacyPreferencesPanel.css`) using the `PrefSwitch` (`role="switch"` / `aria-checked`) pattern from `PortfolioPreferencesPanel.jsx`, bound to `useUserPreferences().tiltToHide` / `setTiltToHide`, with descriptive sub-text ("Balances hide when you lay your phone flat and show when you hold it up").
-- [ ] T024 [US2] Render the panel under a new "Privacy" `preferences-group-heading` in the Preferences tab of `frontend/src/pages/WalletPage.jsx` (~line 404, alongside Display/Wallet/Portfolio/Notifications) and add any needed heading styles in `frontend/src/pages/WalletPage.css`.
+- [x] T023 [US2] Create `frontend/src/components/account/PrivacyPreferencesPanel.jsx` (+ `PrivacyPreferencesPanel.css`) using the `PrefSwitch` (`role="switch"` / `aria-checked`) pattern from `PortfolioPreferencesPanel.jsx`, bound to `useUserPreferences().tiltToHide` / `setTiltToHide`, with descriptive sub-text ("Balances hide when you lay your phone flat and show when you hold it up").
+- [x] T024 [US2] Render the panel under a new "Privacy" `preferences-group-heading` in the Preferences tab of `frontend/src/pages/WalletPage.jsx` (~line 404, alongside Display/Wallet/Portfolio/Notifications) and add any needed heading styles in `frontend/src/pages/WalletPage.css`.
 
 **Checkpoint**: Members can enable/disable tilt-to-hide app-wide; choice persists.
 
@@ -133,11 +133,11 @@ motion permission is surfaced.
 
 ### Tests (write first, must fail)
 
-- [ ] T025 [P] [US3] Extend `frontend/src/test/privacy/PrivacyPreferencesPanel.test.jsx` (or add a sibling spec): when `usePrivacy().support === 'unsupported'` the panel shows a mobile-only/inactive message; when `permission === 'denied'` the panel surfaces it; enabling on iOS triggers `requestMotionPermission()` from the tap gesture.
+- [x] T025 [P] [US3] Extend `frontend/src/test/privacy/PrivacyPreferencesPanel.test.jsx` (or add a sibling spec): when `usePrivacy().support === 'unsupported'` the panel shows a mobile-only/inactive message; when `permission === 'denied'` the panel surfaces it; enabling on iOS triggers `requestMotionPermission()` from the tap gesture.
 
 ### Implementation
 
-- [ ] T026 [US3] Enhance `frontend/src/components/account/PrivacyPreferencesPanel.jsx` to consume `usePrivacy()` `support` / `permission`: render mobile-only/inactive state on unsupported devices, surface a denied-permission state, and call `requestMotionPermission()` on the enable gesture (per contracts §5). (depends on T023)
+- [x] T026 [US3] Enhance `frontend/src/components/account/PrivacyPreferencesPanel.jsx` to consume `usePrivacy()` `support` / `permission`: render mobile-only/inactive state on unsupported devices, surface a denied-permission state, and call `requestMotionPermission()` on the enable gesture (per contracts §5). (depends on T023)
 
 **Checkpoint**: All three stories independently functional.
 
@@ -145,10 +145,10 @@ motion permission is surfaced.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T027 [P] Write `docs/developer-guide/tilt-to-hide.md`: how the mechanism works, thresholds/hysteresis, iOS permission flow, the `Permissions-Policy` requirement, and how to wrap a new monetary value in `<SensitiveValue>`.
-- [ ] T028 [P] Accessibility pass (axe/Lighthouse in the frontend CI job): confirm masked values are not announced, the placeholder is not read as a value, and the Privacy toggle is keyboard-operable and labeled (WCAG 2.1 AA, constitution V).
-- [ ] T029 Run `quickstart.md` validation: `npm run test:frontend` (all `src/test/privacy/*` pass) and the manual mobile/desktop checklist; verify no monetary site is missed and no non-monetary value is masked.
-- [ ] T030 Final gate: `npm run test:frontend` and frontend ESLint clean (no new warnings); confirm no `continue-on-error` added (constitution IV).
+- [x] T027 [P] Write `docs/developer-guide/tilt-to-hide.md`: how the mechanism works, thresholds/hysteresis, iOS permission flow, the `Permissions-Policy` requirement, and how to wrap a new monetary value in `<SensitiveValue>`.
+- [x] T028 [P] Accessibility pass (axe/Lighthouse in the frontend CI job): confirm masked values are not announced, the placeholder is not read as a value, and the Privacy toggle is keyboard-operable and labeled (WCAG 2.1 AA, constitution V).
+- [x] T029 Run `quickstart.md` validation: `npm run test:frontend` (all `src/test/privacy/*` pass) and the manual mobile/desktop checklist; verify no monetary site is missed and no non-monetary value is masked.
+- [x] T030 Final gate: `npm run test:frontend` and frontend ESLint clean (no new warnings); confirm no `continue-on-error` added (constitution IV).
 
 ---
 
@@ -219,3 +219,37 @@ This is a shippable MVP.
 - Wrap values in the JSX render site, never in pure string helpers.
 - Verify each test fails before implementing (constitution II).
 - Commit after each task or logical group; keep ESLint clean.
+
+---
+
+## Implementation notes (completeness sweep — T021)
+
+Finalized monetary render-site inventory wrapped in `<SensitiveValue>`:
+
+- **Account dashboard**: `SummaryTiles` (Net P&L, Total Wagered, Wallet Balance,
+  "at stake" sub), `RecentActivityFeed` (USD amounts), `ActivityBreakdowns`
+  (per-token stake USD), `PnlChart` (sr summary + data table), `PnlChartCanvas`
+  (tooltip + Y-axis ticks).
+- **Wallet / portfolio**: `PortfolioPanel` (total, category subtotals, per-asset
+  balance + USD), `AssetDetailSheet` (position, per-instance balance + USD),
+  `WalletButton` (header USDC balance), `TransferForm` (stable/native/asset
+  balances).
+- **Wagers**: `WagerCard`, `WagerTable` (stakes), `TakeChallengePanel` (stake /
+  winner-takes), `TradePanel` (pay/receive balances, receive value, minimum
+  received), `LiveStats` (Value Wagered).
+- **Pools**: `PoolParticipants` (payout), `PoolResolutionActions` (escrow target,
+  validation totals, claim share).
+
+Deliberately **not** masked (non-monetary or not the user's holdings): participant
+/ vote / member counts, dates, deadlines, timers, wager/pool IDs & codes,
+addresses, nicknames, win-rate %, price-impact/slippage %, public market
+prices/odds (Polymarket cents, DEX exchange rates), and editable amount `<input>`
+fields.
+
+## Test status
+
+- All 6 tilt-to-hide test files pass (36 tests). Full frontend suite: the only
+  regression from wrapping (`TradePanel.test.jsx` cross-element matcher) was fixed.
+- Pre-existing, unrelated failures remain on this branch and are **out of scope**
+  for spec 046 (verified failing with the original `test/setup.js` too):
+  `clearpath/ClearPathPanel`, `clearpath/ProposalBuilder`, `quickAccessPreference`.
