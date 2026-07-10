@@ -244,8 +244,6 @@ function WalletPage() {
     setPolymarketCategories(next)
   }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
 
-  const activeTabLabel = (WALLET_TABS.find((t) => t.id === activeTab) || WALLET_TABS[0]).label
-
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
   // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
   const currentSectionGroup = groupForTab(activeTab)
@@ -312,10 +310,8 @@ function WalletPage() {
                   account button (top right); the section panels below no longer
                   duplicate it. */}
               <div className="wallet-portal-main">
-                <div className="wallet-portal-topbar">
-                  <span className="wallet-portal-current">{activeTabLabel}</span>
-                </div>
-
+                {/* No in-page section title — every panel renders its own
+                    heading, and the section name is shown in the nav. */}
                 <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
