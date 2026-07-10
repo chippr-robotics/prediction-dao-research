@@ -1,0 +1,206 @@
+name: "💰 Digital Asset Listing Request"
+description: Request that a token or digital asset be added to the FairWins platform (as wager collateral, an oracle-tracked market category, or a recognized portfolio asset).
+title: "[Asset Listing]: "
+labels:
+  - asset-listing
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to request that your project's token/asset be recognized by FairWins. The
+        fields below map directly to what the FairWins UI needs to render an asset correctly
+        (logo, name/symbol, network badge, and its entry in the asset taxonomy — see
+        `frontend/src/config/assetTaxonomy.js` and `frontend/src/schemas/token-metadata-v1.json`).
+
+        **This is a request, not a guarantee.** FairWins is the platform; listings are reviewed
+        and managed by **Chippr Robotics LLC**, the company that operates FairWins. Chippr
+        Robotics independently reviews every submission for accuracy, contract safety, and
+        regulatory classification before anything is added — your self-reported classification
+        below is a starting point, not the final word (see constitution principle I,
+        Security-First; and `specs/007-compliance-gating`). Submitting this form does not
+        constitute investment or legal advice, and is not an endorsement of the asset.
+
+  - type: input
+    id: project_name
+    attributes:
+      label: Project name
+    validations:
+      required: true
+
+  - type: input
+    id: contact_name
+    attributes:
+      label: Point of contact (name and role)
+      placeholder: "Jane Doe, Head of Partnerships"
+    validations:
+      required: true
+
+  - type: input
+    id: contact_email
+    attributes:
+      label: Contact email
+    validations:
+      required: true
+
+  - type: input
+    id: project_website
+    attributes:
+      label: Official project website
+      placeholder: "https://example.org"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: authority
+    attributes:
+      label: Authorization
+      options:
+        - label: I am an authorized representative of this project and am submitting this request on its behalf
+          required: true
+
+  - type: input
+    id: asset_name
+    attributes:
+      label: Asset / token name
+      description: Full display name, as it should appear in the UI (matches `name` in the token metadata schema).
+      placeholder: "Example Token"
+    validations:
+      required: true
+
+  - type: input
+    id: asset_symbol
+    attributes:
+      label: Token symbol / ticker
+      placeholder: "EXT"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: token_standard
+    attributes:
+      label: Token standard
+      options:
+        - ERC-20
+        - ERC-721
+        - ERC-1155
+        - Native coin
+        - Other (describe in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: networks
+    attributes:
+      label: Network(s) this asset is deployed on
+      multiple: true
+      options:
+        - Ethereum (mainnet)
+        - Polygon (mainnet)
+        - Ethereum Classic (mainnet)
+        - Sepolia (testnet)
+        - Polygon Amoy (testnet)
+        - Ethereum Classic Mordor (testnet)
+        - Other network (not yet supported by FairWins — describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract_addresses
+    attributes:
+      label: Contract address(es) by network
+      description: 'One per line, in the form `network: 0x...`. For a native coin, write "native" instead of an address.'
+      placeholder: |
+        Polygon (mainnet): 0x1234...
+        Ethereum Classic (mainnet): 0xabcd...
+    validations:
+      required: true
+
+  - type: input
+    id: decimals
+    attributes:
+      label: Decimals
+      placeholder: "18"
+    validations:
+      required: true
+
+  - type: input
+    id: logo_url
+    attributes:
+      label: Logo / image URL
+      description: Square, transparent background preferred. `ipfs://` preferred, `https://` accepted (matches the `image` field pattern in the token metadata schema).
+      placeholder: "ipfs://Qm... or https://example.org/logo.png"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Short description
+      description: 1-3 sentences, plain language, suitable for display as-is in the UI (10-200 characters).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: classification
+    attributes:
+      label: Requested asset classification
+      description: |
+        FairWins' asset taxonomy (see `assetTaxonomy.js`) is SEC/CFTC-aligned. Pick the closest
+        fit — the Chippr Robotics compliance review determines the final category, and may
+        override this selection, regardless of what you select here.
+      options:
+        - Digital Commodity (e.g. functional L1/L2 network asset)
+        - Digital Security (represents equity, debt, or an investment contract)
+        - Payment Stablecoin (approved-issuer, transactional)
+        - Digital Tool / Utility (no yield or capital-raising function)
+        - Digital Collectible (NFT-style, no profit-sharing)
+        - Unsure — let the Chippr Robotics team classify
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: token_facts
+    attributes:
+      label: Token facts
+      options:
+        - label: Contract source is verified on a public block explorer
+        - label: Token is listed on at least one DEX
+        - label: Token has a public third-party security audit
+
+  - type: input
+    id: explorer_link
+    attributes:
+      label: Block explorer link (verified contract)
+      placeholder: "https://polygonscan.com/address/0x..."
+
+  - type: input
+    id: dex_link
+    attributes:
+      label: DEX / liquidity pool link (if applicable)
+
+  - type: input
+    id: audit_link
+    attributes:
+      label: Audit report link (if applicable)
+
+  - type: textarea
+    id: additional_links
+    attributes:
+      label: Additional links
+      description: Docs, GitHub, whitepaper, and official social accounts (one per line).
+
+  - type: checkboxes
+    id: compliance
+    attributes:
+      label: Compliance acknowledgment
+      options:
+        - label: To my knowledge, this asset and project are not associated with a sanctioned entity, individual, or jurisdiction
+          required: true
+        - label: I understand Chippr Robotics may decline, delay, or reclassify this listing for security, legal, or compliance reasons, and that no fee or submission guarantees inclusion
+          required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else the Chippr Robotics review team should know (tokenomics, upcoming network deployments, prior listing history elsewhere, etc.).

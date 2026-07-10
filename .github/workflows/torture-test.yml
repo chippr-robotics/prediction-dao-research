@@ -79,27 +79,18 @@ jobs:
       - name: Generate coverage report
         run: npm run test:coverage
 
-      - name: Summarize coverage
-        if: always()
+      # First-party coverage summary + blocking gate (spec 046). Prints the FIRST-PARTY
+      # total (vendored account/lib/**, test harnesses, and interfaces excluded — not the
+      # istanbul blended total) and fails loudly if any gated contract is below tier.
+      # `--scope all` also lists report-only contracts. rc is captured so the tee'd
+      # summary is always written while the gate's non-zero exit still fails the job.
+      - name: Enforce coverage thresholds + first-party summary
         run: |
-          echo "### Contract Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f "coverage/coverage-summary.json" ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            node -e "
-              const c = require('./coverage/coverage-summary.json').total;
-              console.log('Statements: ' + c.statements.pct + '% (' + c.statements.covered + '/' + c.statements.total + ')');
-              console.log('Branches:   ' + c.branches.pct + '% (' + c.branches.covered + '/' + c.branches.total + ')');
-              console.log('Functions:  ' + c.functions.pct + '% (' + c.functions.covered + '/' + c.functions.total + ')');
-              console.log('Lines:      ' + c.lines.pct + '% (' + c.lines.covered + '/' + c.lines.total + ')');
-            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          elif [ -d "coverage" ]; then
-            echo "Coverage artifacts generated (see uploaded report)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Coverage generation failed" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Contract Coverage (first-party)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          node scripts/coverage/check-thresholds.js --summary coverage/coverage-summary.json --policy coverage-threshold-policy.json --scope all | tee -a "$GITHUB_STEP_SUMMARY"; rc=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
