@@ -124,17 +124,36 @@
   padding: 0.35rem 0 0.35rem;
 }
 .portfolio-row {
-  align-items: center;
   display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  padding: 0.55rem 0.9rem;
 }
 .portfolio-row + .portfolio-row {
   border-top: 1px solid var(--color-border, var(--border-color, #e5e7eb));
 }
+/* The whole row is a button that opens the asset detail sheet (FR-024). */
+.portfolio-row-button {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  text-align: left;
+  width: 100%;
+}
+.portfolio-row-button:hover {
+  background: var(--bg-primary, rgba(54, 179, 126, 0.06));
+}
+.portfolio-row-button:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: -2px;
+}
 .portfolio-row-asset {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;

@@ -1,7 +1,7 @@
 /**
- * usePortfolio (spec 044 + follow-up) — the connected account's holdings
- * across every network the app supports, grouped by the SEC/CFTC asset
- * taxonomy.
+ * usePortfolio (spec 044 v1.2) — the connected account's holdings across
+ * every supported network, grouped by the SEC/CFTC asset taxonomy and
+ * aggregated per underlying asset (native + wrapped forms combined, FR-025).
  *
  * Cross-chain: balances are read over each network's own read provider
  * (makeReadProvider), independent of the wallet's active chain. Testnet
@@ -9,21 +9,20 @@
  * assets" preference. Discovery stays registry-driven (the panel discloses
  * this, FR-013).
  *
- * Honest-state rules (constitution III):
- *   - a failed read never renders as a zero balance — the asset is skipped
+ * Pricing (FR-022): USD values come from verifiable on-chain sources —
+ * Chainlink feeds first, then DEX pool spot vs the network stablecoin
+ * (lib/portfolio/prices.js); stablecoins at par $1. Honest-state rules
+ * (constitution III):
+ *   - a failed balance read never renders as zero — the asset is skipped
  *     and reported in `failedAssets`;
- *   - an asset with no trustworthy USD price gets `usd: null` and is simply
- *     excluded from USD sums (the feed's hardcoded fallback rate counts as
- *     unavailable, and the MATIC/USD feed never prices another chain's
- *     native coin);
- *   - Digital Commodities are always listed in full — a zero balance renders
- *     as a true 0 (worth $0.00), other categories list only nonzero holdings.
+ *   - an asset with no resolvable on-chain price gets `usd: null` and is
+ *     excluded from USD sums;
+ *   - zero of anything is worth exactly $0.00 (no price feed required).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Contract, formatUnits } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import { useUserPreferences } from './useUserPreferences'
-import { usePrice } from '../contexts/PriceContext'
 import { makeReadProvider } from '../utils/rpcProvider'
 import { NETWORKS } from '../config/networks'
 import {
@@ -32,16 +31,13 @@ import {
   getTaxonomyCategory,
   TAXONOMY_CATEGORIES,
 } from '../config/assetTaxonomy'
+import { fetchPortfolioPrices, underlyingSymbolOf } from '../lib/portfolio/prices'
+import { aggregateHoldings } from '../lib/portfolio/aggregate'
 
 const POLL_MS = 60_000
 
 // Works for ERC-20 balances and ERC-721 item counts alike.
 const BALANCE_OF_ABI = ['function balanceOf(address) view returns (uint256)']
-
-// The app's only price feed quotes MATIC/USD (usePriceConversion), so the
-// native/wrapped-native rate applies solely on MATIC-native chains. Applying
-// it elsewhere (e.g. pricing ETH or ETC with a MATIC rate) would fabricate value.
-const PRICE_FEED_NATIVE_SYMBOLS = new Set(['MATIC', 'POL'])
 
 async function readAssetBalance(asset, { provider, address }) {
   if (asset.kind === 'native') {
@@ -51,7 +47,7 @@ async function readAssetBalance(asset, { provider, address }) {
   return token.balanceOf(address)
 }
 
-function toHolding(asset, balanceRaw, { nativeUsdRate }) {
+function toHolding(asset, balanceRaw, priceMap) {
   const balance =
     asset.kind === 'nft' ? Number(balanceRaw) : Number(formatUnits(balanceRaw, asset.decimals))
 
@@ -62,13 +58,9 @@ function toHolding(asset, balanceRaw, { nativeUsdRate }) {
   } else if (asset.categoryId === 'payment-stablecoins') {
     // Par $1 — the app-wide stablecoin convention (see useAccountStats).
     usd = balance
-  } else if (
-    asset.kind !== 'nft' &&
-    nativeUsdRate != null &&
-    asset.baselineSymbol &&
-    PRICE_FEED_NATIVE_SYMBOLS.has(asset.baselineSymbol.toUpperCase())
-  ) {
-    usd = balance * nativeUsdRate
+  } else if (asset.kind !== 'nft') {
+    const price = priceMap.get(underlyingSymbolOf(asset))
+    if (price) usd = balance * price.usd
   }
   return { asset, balance, balanceRaw, usd, network: NETWORKS[asset.chainId]?.name || String(asset.chainId) }
 }
@@ -78,10 +70,7 @@ export function usePortfolio() {
   const { address, isConnected } = wallet
   const { preferences } = useUserPreferences() || {}
   const showTestnetAssets = Boolean(preferences?.showTestnetAssets)
-  const price = usePrice()
-  // A feed error means the exported rate is the hardcoded fallback — honest
-  // portfolios treat that as "no price" rather than presenting it as real.
-  const nativeUsdRate = price?.error ? null : price?.nativeUsdRate ?? null
+  const showZeroBalances = Boolean(preferences?.showZeroBalances)
 
   const chainIds = useMemo(
     () => getPortfolioChainIds({ includeTestnets: showTestnetAssets }),
@@ -96,6 +85,7 @@ export function usePortfolio() {
   )
 
   const [reads, setReads] = useState({ balances: null, failedAssets: [], error: null })
+  const [priceMap, setPriceMap] = useState(() => new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
   const reqIdRef = useRef(0)
@@ -109,11 +99,16 @@ export function usePortfolio() {
     // inviting overlapping retries against a stale error.
     setReads((prev) => (prev.error ? { balances: null, failedAssets: [], error: null } : prev))
     try {
-      const settled = await Promise.allSettled(
-        registry.map((asset) =>
-          readAssetBalance(asset, { provider: providers.get(asset.chainId), address }),
+      // Prices resolve concurrently with balances; a total pricing failure
+      // leaves assets honestly unpriced without failing the portfolio.
+      const [settled, priced] = await Promise.all([
+        Promise.allSettled(
+          registry.map((asset) =>
+            readAssetBalance(asset, { provider: providers.get(asset.chainId), address }),
+          ),
         ),
-      )
+        fetchPortfolioPrices(providers, registry).catch(() => new Map()),
+      ])
       if (reqId !== reqIdRef.current) return
 
       const balances = new Map()
@@ -133,6 +128,7 @@ export function usePortfolio() {
         setReads({ balances: null, failedAssets, error: 'Unable to read balances from the supported networks.' })
       } else {
         setReads({ balances, failedAssets, error: null })
+        setPriceMap(priced)
         setLastUpdated(Date.now())
       }
     } catch (err) {
@@ -148,6 +144,7 @@ export function usePortfolio() {
   useEffect(() => {
     reqIdRef.current++
     setReads({ balances: null, failedAssets: [], error: null })
+    setPriceMap(new Map())
     setLastUpdated(null)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,34 +162,39 @@ export function usePortfolio() {
     else if (reads.error) status = 'error'
     else if (!reads.balances) status = 'loading'
 
+    // Every readable registry instance becomes a holding — zero balances
+    // included, so aggregates can list all their instances in the sheet.
+    // Zero-balance AGGREGATES are hidden from the main view unless the
+    // member enables the zero-balance preference (FR-023).
     const holdings = []
     if (reads.balances) {
       for (const asset of registry) {
         const raw = reads.balances.get(`${asset.chainId}:${asset.id}`)
         if (raw == null) continue
-        // Digital Commodities always render in full (zero balances included);
-        // every other category lists only what the account actually holds.
-        if (raw <= 0n && asset.categoryId !== 'digital-commodities') continue
-        holdings.push(toHolding(asset, raw, { nativeUsdRate }))
+        holdings.push(toHolding(asset, raw, priceMap))
       }
     }
 
+    const aggregates = aggregateHoldings(holdings, priceMap).filter(
+      (agg) => showZeroBalances || agg.balance > 0,
+    )
+
     const byCategory = new Map()
-    for (const h of holdings) {
-      const list = byCategory.get(h.asset.categoryId) || []
-      list.push(h)
-      byCategory.set(h.asset.categoryId, list)
+    for (const agg of aggregates) {
+      const list = byCategory.get(agg.categoryId) || []
+      list.push(agg)
+      byCategory.set(agg.categoryId, list)
     }
     const categories = TAXONOMY_CATEGORIES
       // The regulatory categories always render; Unclassified only when it
       // actually holds something (FR-012).
       .filter((cat) => cat.id !== 'unclassified' || (byCategory.get(cat.id) || []).length > 0)
       .map((cat) => {
-        const catHoldings = byCategory.get(cat.id) || []
+        const catAggregates = byCategory.get(cat.id) || []
         return {
           category: getTaxonomyCategory(cat.id),
-          holdings: catHoldings,
-          subtotalUsd: catHoldings.reduce((sum, h) => sum + (h.usd ?? 0), 0),
+          aggregates: catAggregates,
+          subtotalUsd: catAggregates.reduce((sum, a) => sum + (a.usd ?? 0), 0),
         }
       })
 
@@ -201,14 +203,17 @@ export function usePortfolio() {
       isLoading,
       error: reads.error,
       holdings,
+      aggregates,
       categories,
-      totalUsd: holdings.reduce((sum, h) => sum + (h.usd ?? 0), 0),
+      totalUsd: aggregates.reduce((sum, a) => sum + (a.usd ?? 0), 0),
       failedAssets: reads.failedAssets,
+      priceMap,
       showTestnetAssets,
+      showZeroBalances,
       lastUpdated,
       refresh: load,
     }
-  }, [registry, isConnected, address, reads, nativeUsdRate, isLoading, lastUpdated, load, showTestnetAssets])
+  }, [registry, isConnected, address, reads, priceMap, isLoading, lastUpdated, load, showTestnetAssets, showZeroBalances])
 }
 
 export default usePortfolio

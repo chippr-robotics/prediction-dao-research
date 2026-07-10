@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-10
 
-**Status**: Implemented (v1.0 merged in PR #836); v1.1 follow-up in progress
+**Status**: Implemented (v1.0 merged in PR #836, v1.1 merged in PR #838); v1.2 follow-up in progress
 
 **Input**: User description: "Connected Account Portfolio in the Finance section. Add a new 'Portfolio' section under My Wallet → Finance that shows the connected account's assets grouped by SEC/CFTC regulatory taxonomy categories, matching the provided mobile mockup (total portfolio balance at top, collapsible category sections each with a category subtotal and per-asset rows showing balance and USD value). Categories: Digital Securities, Digital Commodities, Digital Collectibles, Digital Tools, Payment Stablecoins. Classification uses the official SEC commodity list as a hardcoded baseline plus curated open-source registry lists mapped to the regulatory definitions. Assets shown must be the real on-chain holdings of the connected account, scoped to the active network. Unclassified tokens must be handled honestly."
 
@@ -279,3 +279,36 @@ Owner-requested refinements after v1.0 shipped ("the page is too information den
 - **FR-021**: A "Portfolio" settings group in Preferences holds a "Show testnet
   tokens" switch (default off, persisted per wallet). When off, testnet networks are
   not scanned and a compact note in the portfolio says testnet tokens are hidden.
+
+## Follow-up Amendments (v1.2, 2026-07-10)
+
+Owner-requested next iteration (asset detail + verifiable pricing):
+
+- **FR-022 (verifiable prices)**: USD prices come from verifiable on-chain sources
+  where available — decentralized oracle price feeds (Chainlink aggregators) first,
+  then DEX pool spot prices (Uniswap V3 `slot0` vs the network stablecoin) — read
+  live over RPC. Stablecoins stay at par $1. Assets with no on-chain source remain
+  honestly unpriced. (Replaces the CoinGecko rate for the portfolio; subgraph-backed
+  pricing is a documented future performance option.)
+- **FR-023 (zero-balance visibility)**: a Preferences → Portfolio setting shows/hides
+  zero-balance assets, default **hide**. (Supersedes v1.1 FR-018 "always list all
+  commodities": commodity instances are still always scanned, but zero-balance
+  aggregate rows are hidden unless the setting is on.)
+- **FR-024 (asset detail sheet)**: tapping an asset row opens a bottom sheet with
+  the aggregate position (logo, combined balance, USD, unit price), the list of
+  underlying instances, and actions — Trade, Transfer, and (when the app gains a
+  staking surface) Stake; actions unavailable in the app render disabled/hidden,
+  never as dead buttons.
+- **FR-025 (wrapped-asset aggregation)**: for Digital Commodities, wrapped forms are
+  combined with their underlying asset into one row (e.g. ETH = native ETH + WETH on
+  every scanned chain, valued together); the bottom sheet lists each instance's
+  balance separately.
+- **FR-026 (logos + network badges)**: every asset renders a primary asset logo with
+  a small network sub-badge. A native coin on its home network shows the logo only;
+  a wrapped or bridged form shows the underlying asset's logo with the hosting
+  network's badge (e.g. WETH on Polygon = ETH logo + Polygon badge). Logos are
+  bundled with the app (no external image CDNs).
+- **FR-027 (instance selection)**: within the bottom sheet the member selects a
+  specific instance (chain + form) before invoking Trade/Transfer/other eligible
+  operations; the action deep-links to the target surface for that instance's
+  network and token.
