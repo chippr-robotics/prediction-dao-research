@@ -9,8 +9,8 @@
  * user never sees a separate "deploy" step.
  */
 
-import { knownCredentials } from './credentials'
-import { buildAccount, buildAction } from './smartAccount'
+import { knownCredentials, isTransactComplete } from './credentials'
+import { buildAccount, buildAction, resolveOwnerIndex, CredentialRecordIncomplete } from './smartAccount'
 import {
   chooseRoute,
   defaultRelayerProbe,
@@ -37,17 +37,25 @@ export async function sendPasskeyBatch({
   chainId,
   address,
   calls,
+  credentialId = null,
   intent = null,
   accountNative = false,
   onState,
   deps = {},
 }) {
-  const credential = (deps.knownCredentials ?? knownCredentials)().find(
-    (c) => c.address?.toLowerCase() === address?.toLowerCase()
-  )
+  // Pin to the SESSION's credential when the caller knows it (spec 045 US3 —
+  // multiple passkeys may map to the same address book entry set); fall back
+  // to the address match for older callers.
+  const book = (deps.knownCredentials ?? knownCredentials)(deps.storage)
+  const credential =
+    (credentialId && book.find((c) => c.credentialId === credentialId)) ||
+    book.find((c) => c.address?.toLowerCase() === address?.toLowerCase())
   if (!credential) {
     throw new Error('No passkey credential is linked to this account on this browser — sign in again.')
   }
+  // Refuse incomplete records with an actionable message BEFORE any ceremony
+  // (spec 045 FR-006 — previously crashed as "reading 'id'" inside the signer).
+  if (!isTransactComplete(credential)) throw new CredentialRecordIncomplete()
 
   const net = getNetwork(chainId)
   const bundlerUrls = net?.passkey?.bundlerUrls ?? []
@@ -92,10 +100,19 @@ export async function sendPasskeyBatch({
 
   // Row 2/3: UserOperation. buildAccount wires the WebAuthn owner — the
   // sendUserOperation call below triggers exactly ONE assertion ceremony
-  // covering the whole batch (FR-008/FR-016).
+  // covering the whole batch (FR-008/FR-016). The credential's real owner
+  // slot is resolved from the chain (FR-009) — accounts that added
+  // controllers sign with the correct index, not a hardcoded 0.
+  const ownerIndex = await (deps.resolveOwnerIndex ?? resolveOwnerIndex)({
+    chainId,
+    accountAddress: address,
+    credential,
+    deps,
+  })
   const { bundlerClient } = await (deps.buildAccount ?? buildAccount)({
     chainId,
     credential,
+    ownerIndex,
     deps,
   })
   const { calls: shaped } = buildAction(calls)

@@ -33,12 +33,16 @@ import {
   publicKeyToOwnerBytes,
   addressToOwnerBytes,
   buildAction,
+  buildAccount,
+  resolveOwnerIndex,
   encodeRemoveOwner,
   encodeAddWalletOwner,
   requirePasskeySupport,
   deriveAddress,
   ChainNotSupportedError,
   LastControllerError,
+  CredentialRecordIncomplete,
+  CredentialNotControllerError,
 } from '../smartAccount'
 
 const X = '0x' + '11'.repeat(32)
@@ -112,5 +116,64 @@ describe('action composition + guards', () => {
     const add = encodeAddWalletOwner('0x' + 'd'.repeat(40))
     expect(add.startsWith('0x')).toBe(true)
     expect(add.toLowerCase()).toContain('d'.repeat(40))
+  })
+})
+
+describe('buildAccount credential validation (spec 045 FR-006)', () => {
+  it('refuses an incomplete record before any ceremony — the old "reading id" crash', async () => {
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+    await expect(
+      buildAccount({ chainId: 80002, credential: { address: '0xA11CE' }, deps: { publicClient } })
+    ).rejects.toBeInstanceOf(CredentialRecordIncomplete)
+    await expect(
+      buildAccount({ chainId: 80002, credential: { credentialId: 'c1' }, deps: { publicClient } })
+    ).rejects.toBeInstanceOf(CredentialRecordIncomplete)
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+  })
+})
+
+describe('resolveOwnerIndex (spec 045 FR-009)', () => {
+  const credential = { credentialId: 'c1', publicKey: { x: X, y: Y } }
+  const myOwnerBytes = publicKeyToOwnerBytes({ x: X, y: Y })
+
+  it('returns the credential’s REAL slot on a deployed multi-controller account', async () => {
+    const readControllers = vi.fn().mockResolvedValue({
+      deployed: true,
+      controllers: [
+        { index: 0n, kind: 'wallet', ownerBytes: addressToOwnerBytes('0x' + 'e'.repeat(40)) },
+        { index: 2n, kind: 'passkey', ownerBytes: myOwnerBytes },
+      ],
+    })
+    const out = await resolveOwnerIndex({
+      chainId: 80002,
+      accountAddress: '0xACC',
+      credential,
+      deps: { readControllers },
+    })
+    expect(out).toBe(2)
+  })
+
+  it('falls back to slot 0 for counterfactual (undeployed) accounts', async () => {
+    const readControllers = vi.fn().mockResolvedValue({ deployed: false, controllers: [] })
+    expect(
+      await resolveOwnerIndex({ chainId: 80002, accountAddress: '0xACC', credential, deps: { readControllers } })
+    ).toBe(0)
+  })
+
+  it('falls back to slot 0 when controllers cannot be read (RPC failure)', async () => {
+    const readControllers = vi.fn().mockRejectedValue(new Error('rpc down'))
+    expect(
+      await resolveOwnerIndex({ chainId: 80002, accountAddress: '0xACC', credential, deps: { readControllers } })
+    ).toBe(0)
+  })
+
+  it('throws (never guesses) when the deployed account no longer lists the credential', async () => {
+    const readControllers = vi.fn().mockResolvedValue({
+      deployed: true,
+      controllers: [{ index: 0n, kind: 'wallet', ownerBytes: addressToOwnerBytes('0x' + 'e'.repeat(40)) }],
+    })
+    await expect(
+      resolveOwnerIndex({ chainId: 80002, accountAddress: '0xACC', credential, deps: { readControllers } })
+    ).rejects.toBeInstanceOf(CredentialNotControllerError)
   })
 })

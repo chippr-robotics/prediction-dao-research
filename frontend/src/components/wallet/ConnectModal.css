@@ -1,0 +1,242 @@
+/* Unified connect surface (spec 045). Uses the shared theme variables so it
+   renders correctly in both themes; bottom-sheet on mobile like the old
+   wallet dropdown did. */
+
+.connect-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.connect-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--surface-color, #1a1a1a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 0 0 0.75rem;
+  outline: none;
+}
+
+.connect-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.connect-modal__header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-primary, #fff);
+}
+
+.connect-modal__close {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+}
+
+.connect-modal__close:hover,
+.connect-modal__close:focus-visible {
+  color: var(--text-primary, #fff);
+  background: var(--surface-hover, #262626);
+}
+
+.connect-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.connect-modal__option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: none;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  color: var(--text-primary, #fff);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.connect-modal__option:hover:not(:disabled),
+.connect-modal__option:focus-visible {
+  background: var(--surface-hover, #262626);
+  border-color: var(--border-hover, #4a4a4a);
+}
+
+.connect-modal__option:disabled {
+  cursor: not-allowed;
+}
+
+.connect-modal__option.unavailable {
+  opacity: 0.55;
+}
+
+.connect-modal__option--secondary {
+  border-style: dashed;
+  color: var(--text-secondary, #aaa);
+}
+
+.connect-modal__option-name {
+  flex: 1;
+}
+
+.connect-modal__status {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.connect-modal__status.connecting {
+  color: var(--primary-color, #3b82f6);
+}
+
+.connect-modal__badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--success-color, #22c55e);
+  background: color-mix(in srgb, var(--success-color, #22c55e) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.connect-modal__divider {
+  margin: 0.5rem 0 0.125rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #aaa);
+}
+
+.connect-modal__loading,
+.connect-modal__hint {
+  padding: 0.5rem 0.25rem;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.85rem;
+}
+
+.connect-modal__error {
+  margin: 0.75rem 1rem 0;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--danger-color, #ef4444);
+  border-radius: 10px;
+  color: var(--danger-color, #ef4444);
+  font-size: 0.85rem;
+}
+
+.connect-modal__footer {
+  padding: 0.625rem 1.25rem 0.25rem;
+  border-top: 1px solid var(--border-color, #333);
+  margin-top: 0.5rem;
+}
+
+.connect-modal__footer p {
+  margin: 0.25rem 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.connect-modal__footer a {
+  color: var(--primary-color, #3b82f6);
+}
+
+.connect-modal__account-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.375rem;
+}
+
+.connect-modal__account-row .connect-modal__option {
+  flex: 1;
+}
+
+.connect-modal__address {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.connect-modal__forget,
+.connect-modal__back {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  align-self: center;
+}
+
+.connect-modal__forget:hover,
+.connect-modal__back:hover {
+  color: var(--text-primary, #fff);
+  background: var(--surface-hover, #262626);
+}
+
+/* Explainer step */
+.passkey-explainer {
+  padding: 1rem 1.25rem 0.5rem;
+  color: var(--text-primary, #fff);
+}
+
+.passkey-explainer h4 {
+  margin: 0 0 0.5rem;
+}
+
+.passkey-explainer p,
+.passkey-explainer li {
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.passkey-explainer__points {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.1rem;
+}
+
+.passkey-explainer__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Bottom sheet on mobile, like the previous wallet dropdown */
+@media (max-width: 640px) {
+  .connect-modal__backdrop {
+    align-items: flex-end;
+  }
+
+  .connect-modal {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connect-modal__option {
+    transition: none;
+  }
+}

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
+import ConnectModal from '../components/wallet/ConnectModal'
 import { ethers } from 'ethers'
 import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID } from '../config/networks'
 import { makeReadProvider } from '../utils/rpcProvider'
@@ -13,8 +14,8 @@ import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
   // Wagmi hooks for wallet connection
-  const { address, isConnected, connector: activeConnector } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { address, isConnected, connector: activeConnector, status: accountStatus } = useAccount()
+  const { connect, connectAsync, connectors } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
@@ -41,6 +42,15 @@ export function WalletProvider({ children }) {
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
+
+  // ---- Spec 045: single connect surface (FR-001) ----
+  // Every "Connect" control in the app opens THIS modal; no surface renders
+  // its own connector list. `connectInFlightRef` serializes attempts (FR-004):
+  // at most one user-initiated connect flow at a time.
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
+  const connectInFlightRef = useRef(null)
+  const openConnectModal = useCallback(() => setIsConnectModalOpen(true), [])
+  const closeConnectModal = useCallback(() => setIsConnectModalOpen(false), [])
 
   // ---- Spec 041: unified login-method + capability surface (FR-002) ----
   // `loginMethod` is INFORMATIONAL ONLY (signing ceremony differs); identity,
@@ -107,8 +117,14 @@ export function WalletProvider({ children }) {
     async (calls) => {
       if (!calls?.length) throw new Error('sendCalls: empty batch')
       if (loginMethod === 'passkey') {
-        const { sendPasskeyBatch } = await import('../lib/passkey/sendBatch')
-        return sendPasskeyBatch({ chainId, address, calls })
+        const [{ sendPasskeyBatch }, { readSession }] = await Promise.all([
+          import('../lib/passkey/sendBatch'),
+          import('../connectors/passkey'),
+        ])
+        // Pin the ceremony to the credential this session signed in with —
+        // never a different passkey that happens to share the address book
+        // (spec 045 US3/FR-008).
+        return sendPasskeyBatch({ chainId, address, calls, credentialId: readSession()?.credentialId })
       }
       if (!signer) throw new Error('No signer available')
       const receipts = []
@@ -221,11 +237,17 @@ export function WalletProvider({ children }) {
     )
   }, [chainId, isConnected, switchChain])
 
-  // Clear stale WalletConnect data on mount if not connected
-  // This prevents "failed to process inbound message" errors from stale sessions
+  // Clear stale WalletConnect data once reconnect has SETTLED and nothing is
+  // connected. This prevents "failed to process inbound message" errors from
+  // stale sessions. It must not run at mount: wagmi's eager reconnect may
+  // still be restoring a WalletConnect session, and deleting relay data mid-
+  // restore breaks it (spec 045 FR-004 — background restore is never raced).
+  const wcCleanupDoneRef = useRef(false)
   useEffect(() => {
-    // Only run once on mount, and only if not already connected
-    if (!isConnected) {
+    if (wcCleanupDoneRef.current) return
+    if (accountStatus === 'connecting' || accountStatus === 'reconnecting') return
+    wcCleanupDoneRef.current = true
+    if (accountStatus === 'disconnected') {
       try {
         const keysToRemove = []
         for (let i = 0; i < localStorage.length; i++) {
@@ -244,8 +266,7 @@ export function WalletProvider({ children }) {
         // Silently ignore cleanup errors
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [accountStatus])
 
   /**
    * Sync local roles with blockchain state
@@ -419,37 +440,47 @@ export function WalletProvider({ children }) {
     }
   }, [provider, address])
 
-  // Connect wallet
-  const connectWallet = useCallback(async (connectorId) => {
+  // Connect wallet (spec 045 FR-001/FR-004).
+  // - No connectorId: open the unified connect modal so the USER chooses —
+  //   the old behavior silently defaulted to the injected wallet, which made
+  //   passkey unreachable from those call sites.
+  // - With connectorId: serialized — a second attempt while one is pending is
+  //   refused with visible feedback instead of racing it.
+  // - `opts` (e.g. { credentialId, mode } for the passkey account picker) is
+  //   forwarded to the connector.
+  const connectWallet = useCallback(async (connectorId, opts) => {
+    if (!connectorId) {
+      openConnectModal()
+      return true
+    }
+    if (connectInFlightRef.current) {
+      throw new Error('A connection attempt is already in progress — finish or cancel it first.')
+    }
+    connectInFlightRef.current = connectorId
     try {
-      // If no specific connector is requested, try injected first, then WalletConnect
-      let connector
-      
-      if (connectorId) {
-        // Use specific connector if requested
-        connector = connectors.find(c => c.id === connectorId)
-      } else {
-        // Try injected first if available, otherwise use WalletConnect
-        connector = connectors.find(c => c.id === 'injected') || 
-                   connectors.find(c => c.id === 'walletConnect')
-      }
-      
+      const connector = connectors.find(c => c.id === connectorId)
       if (!connector) {
         throw new Error('No wallet connector available')
       }
 
-      await connect({ connector })
+      // connectAsync resolves/rejects with the real outcome (plain `connect`
+      // is fire-and-forget), which the in-flight guard and the connect
+      // modal's error display both depend on. Fallback keeps older test
+      // doubles that only stub `connect` working.
+      await (connectAsync ?? connect)({ connector, ...(opts || {}) })
       return true
     } catch (error) {
       console.error('Error connecting wallet:', error)
-      
+
       // Check for user rejection
       if (error.code === 4001 || error.name === 'UserRejectedRequestError') {
         throw new Error('Please approve the connection request')
       }
       throw error
+    } finally {
+      connectInFlightRef.current = null
     }
-  }, [connect, connectors])
+  }, [connect, connectAsync, connectors, openConnectModal])
 
   // Disconnect wallet
   const disconnectWallet = useCallback(() => {
@@ -632,6 +663,11 @@ export function WalletProvider({ children }) {
     connectWallet,
     disconnectWallet,
     switchNetwork,
+
+    // Spec 045: unified connect surface
+    isConnectModalOpen,
+    openConnectModal,
+    closeConnectModal,
     
     // Transaction methods
     sendTransaction,
@@ -657,6 +693,8 @@ export function WalletProvider({ children }) {
   return (
     <WalletContext.Provider value={value}>
       {children}
+      {/* Spec 045: the ONE connect surface, mounted once for the whole app. */}
+      <ConnectModal />
     </WalletContext.Provider>
   )
 }

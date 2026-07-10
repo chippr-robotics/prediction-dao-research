@@ -30,18 +30,21 @@ vi.mock('../../config/contracts', () => ({
 
 import { passkeyConnector, readSession, writeSession, PASSKEY_CONNECTOR_ID } from '../passkey'
 import { ChainNotSupportedError } from '../../lib/passkey/smartAccount'
+import { rememberCredential, knownCredentials } from '../../lib/passkey/credentials'
 
 const ACCOUNT = '0x00000000000000000000000000000000000a11CE'
+const PUBLIC_KEY = { x: '0x' + '1'.repeat(64), y: '0x' + '2'.repeat(64) }
 
 function makeConnector(overrides = {}) {
   const deps = {
     detectCapability: vi.fn().mockResolvedValue({ available: true, platformAuthenticator: true }),
     createCredential: vi
       .fn()
-      .mockResolvedValue({ credentialId: 'cred-1', publicKey: { x: '0x' + '1'.repeat(64), y: '0x' + '2'.repeat(64) }, prfCapable: true }),
+      .mockResolvedValue({ credentialId: 'cred-1', publicKey: PUBLIC_KEY, prfCapable: true }),
     getAssertion: vi.fn().mockResolvedValue({ credentialId: 'cred-1' }),
     deriveAddress: vi.fn().mockResolvedValue(ACCOUNT),
     resolveAddress: vi.fn().mockResolvedValue(ACCOUNT),
+    readControllers: vi.fn().mockResolvedValue({ deployed: false, controllers: [] }),
     ...overrides,
   }
   const config = {
@@ -50,6 +53,11 @@ function makeConnector(overrides = {}) {
   }
   const connector = passkeyConnector({ deps, ...overrides.options })(config)
   return { connector, deps, config }
+}
+
+/** A transact-complete book record, as sign-up would have written it. */
+function rememberCompleteRecord(credentialId = 'cred-1') {
+  rememberCredential({ credentialId, publicKey: PUBLIC_KEY, prfCapable: true, address: ACCOUNT })
 }
 
 beforeEach(() => localStorage.clear())
@@ -74,12 +82,51 @@ describe('connect', () => {
     expect(out.accounts[0].toLowerCase()).toBe(ACCOUNT.toLowerCase())
   })
 
+  it('sign-in refreshes the credential book so the session can transact (spec 045 FR-005)', async () => {
+    // The old sign-in branch never wrote the book — the transaction path then
+    // resolved an undefined credential and crashed with "reading 'id'".
+    rememberCompleteRecord()
+    const { connector } = makeConnector({ options: { mode: 'sign-in' } })
+    await connector.connect({ chainId: 80002 })
+    const [rec] = knownCredentials()
+    expect(rec.credentialId).toBe('cred-1')
+    expect(rec.address).toBe(ACCOUNT)
+    expect(rec.publicKey).toEqual(PUBLIC_KEY) // merge never drops the key
+  })
+
+  it('sign-in repairs a missing public key from the chain when unambiguous', async () => {
+    rememberCredential({ credentialId: 'cred-1', address: ACCOUNT }) // legacy partial record
+    const ownerBytes = `0x${'1'.repeat(64)}${'2'.repeat(64)}`
+    const { connector } = makeConnector({
+      options: { mode: 'sign-in' },
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [{ index: 0n, kind: 'passkey', ownerBytes }],
+      }),
+    })
+    await connector.connect({ chainId: 80002 })
+    const [rec] = knownCredentials()
+    expect(rec.publicKey).toEqual(PUBLIC_KEY)
+  })
+
+  it('sign-in pinned to a chosen credential passes it to the assertion (spec 045 US3)', async () => {
+    const { connector, deps } = makeConnector({
+      options: { mode: 'sign-in' },
+      getAssertion: vi.fn().mockResolvedValue({ credentialId: 'cred-2' }),
+      resolveAddress: vi.fn().mockResolvedValue(ACCOUNT),
+    })
+    await connector.connect({ chainId: 80002, credentialId: 'cred-2' })
+    expect(deps.getAssertion).toHaveBeenCalledWith(expect.objectContaining({ credentialId: 'cred-2' }))
+    expect(readSession().credentialId).toBe('cred-2') // session pins what was ASSERTED
+  })
+
   it('refuses unsupported networks with ChainNotSupportedError (FR-022)', async () => {
     const { connector } = makeConnector()
     await expect(connector.connect({ chainId: 63 })).rejects.toBeInstanceOf(ChainNotSupportedError)
   })
 
   it('silent reconnect restores the session without any ceremony (FR-003)', async () => {
+    rememberCompleteRecord()
     writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
     const { connector, deps } = makeConnector()
     const out = await connector.connect({ chainId: 80002, isReconnecting: true })
@@ -91,6 +138,17 @@ describe('connect', () => {
   it('reconnect with no stored session fails (no silent account invention)', async () => {
     const { connector } = makeConnector()
     await expect(connector.connect({ chainId: 80002, isReconnecting: true })).rejects.toThrow(/No passkey session/)
+  })
+
+  it('reconnect refuses + clears a session whose credential record cannot transact (spec 045 FR-005)', async () => {
+    // Session exists but the book record is incomplete (legacy partial write):
+    // restoring it would strand the user with a session that crashes on first
+    // action — refuse it honestly instead.
+    rememberCredential({ credentialId: 'cred-1', address: ACCOUNT }) // no publicKey
+    writeSession({ address: ACCOUNT, chainId: 80002, credentialId: 'cred-1', loginMethod: 'passkey' })
+    const { connector } = makeConnector()
+    await expect(connector.connect({ chainId: 80002, isReconnecting: true })).rejects.toThrow(/sign in again/)
+    expect(readSession()).toBeNull()
   })
 })
 

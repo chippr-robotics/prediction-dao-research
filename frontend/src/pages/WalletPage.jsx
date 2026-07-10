@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
+import { useWallet, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
 import { useClipboard } from '../hooks/useClipboard'
 import { useUserPreferences } from '../hooks/useUserPreferences'
@@ -17,6 +17,8 @@ import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
+import ControllersPanel from '../components/account/ControllersPanel'
+import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
 import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
 import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
@@ -29,8 +31,6 @@ import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
-import LoadingScreen from '../components/ui/LoadingScreen'
-import { getWalletLabel, getWalletIcon } from '../utils/walletLabel'
 import './WalletPage.css'
 
 // My Account section panels, keyed by tab id. The section MENU now lives in the
@@ -59,13 +59,6 @@ const WALLET_TABS = [
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade").
 const TAB_ALIASES = { swap: 'trade' }
 
-// Connector labels are resolved through the shared, vendor-neutral helper so
-// the generic injected option reads "Browser Wallet" rather than assuming a
-// specific vendor like MetaMask.
-const getConnectorInfo = (connector) => {
-  return `${getWalletIcon(connector)} ${getWalletLabel(connector)}`
-}
-
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
 const POLYMARKET_CATEGORY_OPTIONS = [
@@ -80,8 +73,7 @@ const POLYMARKET_CATEGORY_OPTIONS = [
 ]
 
 function WalletPage() {
-  const { address, isConnected, connectors, provider, signer } = useWallet()
-  const { connectWallet } = useWalletConnection()
+  const { address, isConnected, provider, signer, openConnectModal } = useWallet()
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
@@ -108,36 +100,11 @@ function WalletPage() {
     const resolved = TAB_ALIASES[requested] || requested
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
-  const [connectingConnectorId, setConnectingConnectorId] = useState(null)
-  const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
   const [keyCheckLoading, setKeyCheckLoading] = useState(false)
   const [keyRegisterLoading, setKeyRegisterLoading] = useState(false)
   const [keyError, setKeyError] = useState(null)
 
-  const handleConnect = async (connectorId) => {
-    setConnectingConnectorId(connectorId)
-    setConnectionError(null)
-
-    try {
-      const success = await connectWallet(connectorId)
-      if (!success) {
-        setConnectionError('Failed to connect wallet. Please try again.')
-      }
-    } catch (error) {
-      console.error('Wallet connection error:', error)
-
-      if (error.message.includes('rejected') || error.message.includes('approve')) {
-        setConnectionError('Connection request was rejected. Please try again.')
-      } else if (error.message.includes('connector')) {
-        setConnectionError('No wallet connector available. Please install a Web3 wallet.')
-      } else {
-        setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
-      }
-    } finally {
-      setConnectingConnectorId(null)
-    }
-  }
 
   const handleOpenPurchaseModal = () => {
     showModal(<PremiumPurchaseModal onClose={hideModal} />, {
@@ -268,49 +235,14 @@ function WalletPage() {
               <div className="connect-prompt">
                 <div className="connect-icon" aria-hidden="true">{'\uD83D\uDD17'}</div>
                 <h3>Connect Your Wallet</h3>
-                <p>Connect your Web3 wallet to access all features, manage your membership, and create wagers.</p>
+                <p>Sign in with a passkey or connect your Web3 wallet to access all features, manage your membership, and create wagers.</p>
 
-                {connectionError && (
-                  <div className="connection-error" role="alert" aria-live="assertive">
-                    <span className="error-icon" aria-hidden="true">{'\u26A0\uFE0F'}</span>
-                    <span className="error-message">{connectionError}</span>
-                  </div>
-                )}
-
+                {/* Spec 045 FR-001: no inline connector list \u2014 every entry
+                    point opens the ONE shared connect surface. */}
                 <div className="connector-options">
-                  {connectors.map((connector) => {
-                    const isThisConnecting = connectingConnectorId === connector.id
-                    return (
-                      <button
-                        key={connector.id}
-                        onClick={() => handleConnect(connector.id)}
-                        className="connector-btn"
-                        disabled={connectingConnectorId !== null}
-                        aria-busy={isThisConnecting}
-                      >
-                        {isThisConnecting ? (
-                          <>
-                            <LoadingScreen visible={true} inline size="small" text="" />
-                            <span style={{ marginLeft: '8px' }}>Connecting...</span>
-                          </>
-                        ) : (
-                          getConnectorInfo(connector)
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="wallet-help" role="note">
-                  <p>New to Web3 wallets?</p>
-                  <a
-                    href="https://ethereum.org/en/wallets/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="install-wallet-link"
-                  >
-                    Learn about Web3 wallets
-                  </a>
+                  <button onClick={openConnectModal} className="connector-btn">
+                    Connect
+                  </button>
                 </div>
               </div>
             </div>
@@ -432,6 +364,13 @@ function WalletPage() {
 
                 {activeTab === 'security' && (
                   <div className="security-section" role="tabpanel">
+                    {/* Spec 045 US5/US6 — account controllers & recovery.
+                        ControllersPanel renders for passkey sessions (add a
+                        passkey / link a wallet as recovery); the recovery
+                        panel renders for wallet sessions (regain passkey
+                        access using a linked wallet). Each self-gates. */}
+                    <ControllersPanel />
+                    <RecoverAccountPanel />
                     <div className="section">
                       <h3>Encryption Key</h3>
                       <p className="section-description">

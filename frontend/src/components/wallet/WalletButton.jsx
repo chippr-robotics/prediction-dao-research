@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
+import { useState, useEffect, useRef } from 'react'
+import { useAccount, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useDex } from '../../hooks/useDex'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles } from '../../hooks'
+import { useWallet } from '../../hooks/useWalletManagement'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
@@ -12,22 +13,17 @@ import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
-import { getWalletLabel } from '../../utils/walletLabel'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
 
 /**
  * WalletButton Component
- * 
- * A neutral, non-third-party wallet connection button that uses wagmi hooks directly.
- * Provides a clean, professional interface similar to RainbowKit's design philosophy.
- * 
- * Features:
- * - Uses assets/wallet_no_text.svg icon for wallet access
- * - Displays account info when connected
- * - Shows connector options when disconnected
- * - Integrates with existing modal system for user management
+ *
+ * Header wallet control. Disconnected it is a single button that opens the
+ * app's unified connect surface (spec 045 — ConnectModal via WalletContext,
+ * the ONLY place connector choices render). Connected it shows the account
+ * dropdown (roles, navigation, disconnect).
  */
 
 // Pending-tx tracking lives in useFriendMarketCreation now.
@@ -35,8 +31,7 @@ import './RoleDetailsCard.css'
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const { address, isConnected } = useAccount()
-  const { connect, connectors, isPending: isConnecting } = useConnect()
-  const { disconnect } = useDisconnect()
+  const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
@@ -50,97 +45,6 @@ function WalletButton({ className = '' }) {
   } = useRoleDetails()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
-  const [connectorStatus, setConnectorStatus] = useState({})
-  const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
-  const [pendingConnector, setPendingConnector] = useState(null)
-
-  // Check connector availability on mount and when connectors change
-  useEffect(() => {
-    const checkConnectors = async () => {
-      setIsCheckingConnectors(true)
-      const status = {}
-      
-      for (const connector of connectors) {
-        try {
-          // For injected connectors, check if provider is available
-          if (connector.type === 'injected') {
-            // Check if there's an injected provider available
-            const hasProvider = typeof window !== 'undefined' && (
-              window.ethereum !== undefined ||
-              window.web3 !== undefined
-            )
-            status[connector.id] = hasProvider
-          } else if (connector.type === 'walletConnect') {
-            // WalletConnect is always available (it uses QR code / deep links)
-            status[connector.id] = true
-          } else if (connector.type === 'passkey') {
-            // Passkey option only where genuinely usable (spec 041 FR-004):
-            // WebAuthn support on this device AND passkey config on the
-            // active network (bundler endpoints + synced factory address).
-            const { detectCapability } = await import('../../lib/passkey/credentials')
-            const { getNetwork } = await import('../../config/networks')
-            const capability = await detectCapability()
-            const net = getNetwork(chainId)
-            status[connector.id] = Boolean(capability.available && net?.capabilities?.passkeyAccounts)
-          } else {
-            // For other connectors, try to get provider
-            try {
-              const provider = await connector.getProvider()
-              status[connector.id] = !!provider
-            } catch {
-              status[connector.id] = true // Assume available if we can't check
-            }
-          }
-        } catch (error) {
-          console.warn(`Error checking connector ${connector.name}:`, error)
-          status[connector.id] = false
-        }
-      }
-      
-      setConnectorStatus(status)
-      setIsCheckingConnectors(false)
-    }
-    
-    checkConnectors()
-  }, [connectors, chainId])
-
-  // Helper to check if a connector is available
-  const isConnectorAvailable = useCallback((connector) => {
-    // WalletConnect is always available
-    if (connector.type === 'walletConnect') return true
-    // Check our cached status
-    return connectorStatus[connector.id] !== false
-  }, [connectorStatus])
-
-  // Track previous connection state to detect connection success
-  const wasConnected = useRef(isConnected)
-
-  // Close dropdown when connection state changes from disconnected to connected
-  // This handles both immediate connections and delayed confirmations
-  useEffect(() => {
-    // Detect transition from disconnected to connected
-    if (!wasConnected.current && isConnected) {
-      // Successfully connected - close dropdown and clear pending state
-      if (isOpen) {
-        setIsOpen(false)
-      }
-      setPendingConnector(null)
-    }
-    // Update the ref for next comparison
-    wasConnected.current = isConnected
-  }, [isConnected, isOpen])
-
-  // Reset pending connector when connection attempt fails
-  // Uses a short delay to handle wagmi's async state updates where isConnecting
-  // may become false briefly before isConnected becomes true on success
-  useEffect(() => {
-    if (!isConnecting && pendingConnector && !isConnected) {
-      const timeout = setTimeout(() => {
-        setPendingConnector(null)
-      }, 500)
-      return () => clearTimeout(timeout)
-    }
-  }, [isConnecting, pendingConnector, isConnected])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -180,22 +84,10 @@ function WalletButton({ className = '' }) {
     setIsOpen(!isOpen)
   }
 
-  const handleConnect = (connector) => {
-    // Track which connector we're trying to connect
-    setPendingConnector(connector.id)
-    
-    // Initiate connection - don't await, don't close dropdown
-    // The useEffect watching isConnected will close the dropdown when connected
-    connect({ connector }, {
-      onError: (error) => {
-        console.error('Error connecting wallet with', connector.name, ':', error)
-        setPendingConnector(null)
-      }
-    })
-  }
-
   const handleDisconnect = () => {
-    disconnect()
+    // Context disconnect: clears wagmi/WalletConnect persistence AND the
+    // passkey session atomically — the raw wagmi disconnect() skipped that.
+    disconnectWallet()
     setIsOpen(false)
   }
 
@@ -237,88 +129,24 @@ function WalletButton({ className = '' }) {
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`
   }
 
-  // Vendor-neutral connector label — the generic injected connector resolves to
-  // "Browser Wallet" unless a specific provider can be positively detected.
-  const getConnectorName = (connector) => getWalletLabel(connector)
-
   return (
     <div className={`wallet-button-container ${className}`}>
       {!isConnected ? (
-        <>
-          <button
-            ref={buttonRef}
-            onClick={toggleDropdown}
-            className="wallet-connect-button"
-            aria-label="Connect Wallet"
-            aria-expanded={isOpen}
-            aria-haspopup="true"
-          >
-            <img 
-              src={walletIcon} 
-              alt="Wallet" 
-              className="wallet-icon"
-              width="24"
-              height="24"
-            />
-            <span className="connect-text">Connect Wallet</span>
-          </button>
-
-          {isOpen && (
-            <div 
-              ref={dropdownRef}
-              className="wallet-dropdown"
-              role="menu"
-            >
-              <div className="dropdown-header">
-                <h3>Connect a Wallet</h3>
-              </div>
-              <div className="connector-list">
-                {isCheckingConnectors ? (
-                  <div className="connector-loading">Detecting wallets...</div>
-                ) : (
-                  connectors.map((connector) => {
-                    const available = isConnectorAvailable(connector)
-                    const isThisConnecting = pendingConnector === connector.id && isConnecting
-                    return (
-                      <button
-                        key={connector.id}
-                        onClick={() => handleConnect(connector)}
-                        className={`connector-option ${!available ? 'unavailable' : ''} ${isThisConnecting ? 'connecting' : ''}`}
-                        role="menuitem"
-                        disabled={isConnecting}
-                      >
-                        <span className="connector-name">
-                          {getConnectorName(connector)}
-                        </span>
-                        {isThisConnecting && (
-                          <span className="connector-status connecting">Connecting...</span>
-                        )}
-                        {!isThisConnecting && !available && connector.type === 'injected' && (
-                          <span className="connector-status">Not Detected</span>
-                        )}
-                        {!isThisConnecting && connector.type === 'walletConnect' && (
-                          <span className="connector-badge">QR Code</span>
-                        )}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-              <div className="dropdown-footer">
-                <p className="help-text">
-                  New to Web3 wallets?{' '}
-                  <a 
-                    href="https://ethereum.org/en/wallets/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    Learn more
-                  </a>
-                </p>
-              </div>
-            </div>
-          )}
-        </>
+        <button
+          ref={buttonRef}
+          onClick={openConnectModal}
+          className="wallet-connect-button"
+          aria-label="Connect Wallet"
+        >
+          <img
+            src={walletIcon}
+            alt="Wallet"
+            className="wallet-icon"
+            width="24"
+            height="24"
+          />
+          <span className="connect-text">Connect Wallet</span>
+        </button>
       ) : (
         <>
           <button

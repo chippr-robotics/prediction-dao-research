@@ -88,6 +88,20 @@ describe('ControllersPanel', () => {
     expect(walletState.sendCalls).not.toHaveBeenCalled()
   })
 
+  it('REFUSES re-linking a wallet that is already a controller (spec 045, idempotent)', async () => {
+    const screenController = vi.fn(async () => ({ clear: true, available: true }))
+    accountState = {
+      ...accountState,
+      controllers: [passkeyRow(0), { index: 1n, ownerBytes: '0x' + '0'.repeat(24) + 'c'.repeat(40), kind: 'wallet', address: WALLET, label: 'Wallet', credentialId: null, isThisDevice: false }],
+    }
+    render(<ControllersPanel deps={{ screenController }} />)
+    fireEvent.change(screen.getByLabelText(/wallet address to link/i), { target: { value: WALLET } })
+    fireEvent.click(screen.getByRole('button', { name: /link wallet/i }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/already a controller/i))
+    expect(screenController).not.toHaveBeenCalled()
+    expect(walletState.sendCalls).not.toHaveBeenCalled()
+  })
+
   it('REFUSES when screening is unavailable — fail-closed', async () => {
     const screenController = vi.fn(async () => ({ clear: false, available: false }))
     render(<ControllersPanel deps={{ screenController }} />)
