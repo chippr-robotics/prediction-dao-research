@@ -77,18 +77,18 @@ because every story enforces or reads it.
 **Independent Test**: quickstart §5.1 — create vault with per-tx limit + allowlist, rules render
 on detail, violating approved tx blocked, compliant tx executes.
 
-- [ ] T012 [US1] Extend `buildSetupInitializer` in `frontend/src/lib/custody/safeVault.js` with
+- [X] T012 [US1] Extend `buildSetupInitializer` in `frontend/src/lib/custody/safeVault.js` with
       optional `{ setupTo, setupData }` (defaults byte-identical; update its unit tests in
       `frontend/src/test/custody/` to pin both paths).
-- [ ] T013 [US1] Implement `frontend/src/components/custody/PolicyStep.jsx` (+ styles in
+- [X] T013 [US1] Implement `frontend/src/components/custody/PolicyStep.jsx` (+ styles in
       `Custody.css`): enable/configure the four rules, plain-language summary, skip path,
       network gating, FR-015 warnings.
-- [ ] T014 [US1] Wire PolicyStep into `frontend/src/components/custody/CreateVaultWizard.jsx`
+- [X] T014 [US1] Wire PolicyStep into `frontend/src/components/custody/CreateVaultWizard.jsx`
       (initializer switches to `buildEnablePolicySetup` output when configured; address preview
       still matches deployment).
-- [ ] T015 [P] [US1] Vitest `frontend/src/test/custody/PolicyStep.test.jsx`: skip ⇒ unchanged
+- [X] T015 [P] [US1] Vitest `frontend/src/test/custody/PolicyStep.test.jsx`: skip ⇒ unchanged
       initializer, configured ⇒ setup wiring, summary text, unsupported-network state, axe pass.
-- [ ] T016 [US1] Vitest update `frontend/src/test/custody/CreateVaultWizard.test.jsx`: wizard
+- [X] T016 [US1] Vitest update `frontend/src/test/custody/CreateVaultWizard.test.jsx`: wizard
       end-to-end with and without policy (US1 acceptance scenarios 1–3).
 
 **Checkpoint**: MVP — policy-governed vaults can be created and are enforced on-chain.
@@ -102,13 +102,13 @@ on detail, violating approved tx blocked, compliant tx executes.
 **Independent Test**: quickstart §5.2 — badge on policy vault only; detail shows rules + live
 window/cooldown state matching chain; foreign-guard vault shows "unrecognized" notice.
 
-- [ ] T017 [US2] Implement `frontend/src/components/custody/PolicyBadge.jsx` and render it in
+- [X] T017 [US2] Implement `frontend/src/components/custody/PolicyBadge.jsx` and render it in
       `frontend/src/components/custody/VaultList.jsx` (managed summary line; foreign marker).
-- [ ] T018 [US2] Implement `frontend/src/components/custody/PolicyPanel.jsx` (read-only half):
+- [X] T018 [US2] Implement `frontend/src/components/custody/PolicyPanel.jsx` (read-only half):
       plain-language rules, live `remainingInWindow`/`nextAllowedAt`, window-semantics
       disclosure, foreign-guard and unsupported-network states; mount in
       `frontend/src/components/custody/VaultDetail.jsx`.
-- [ ] T019 [P] [US2] Vitest `frontend/src/test/custody/PolicyBadge.test.jsx` +
+- [X] T019 [P] [US2] Vitest `frontend/src/test/custody/PolicyBadge.test.jsx` +
       `PolicyPanel.test.jsx` (read-only): all four status states, live-state rendering from
       mocked reads, axe pass (US2 acceptance scenarios 1–4).
 
@@ -123,16 +123,16 @@ window/cooldown state matching chain; foreign-guard vault shows "unrecognized" n
 **Independent Test**: quickstart §5.4 — propose limit raise on 2-of-3 vault: inert at 1 approval,
 live at 2; attach flow on a policy-less vault; loosening executes under max-strict policy.
 
-- [ ] T020 [US3] Extend `PolicyPanel.jsx` with the owner-only change flow: edit form reusing
+- [X] T020 [US3] Extend `PolicyPanel.jsx` with the owner-only change flow: edit form reusing
       PolicyStep's rule inputs, current-vs-proposed diff, submit via `buildPolicyChangeTx`
       through the existing spec 043 proposal queue (`vaultTransaction.js`/`proposalHub.js`).
-- [ ] T021 [US3] Attach-first-policy flow in `PolicyPanel.jsx` for `none` vaults: queue
+- [X] T021 [US3] Attach-first-policy flow in `PolicyPanel.jsx` for `none` vaults: queue
       `configureRules` self-tx then `setGuard` self-tx in that order (no unguarded half-set gap
       — `contracts/frontend-integration.md`).
-- [ ] T022 [US3] Render pending policy-change proposals distinctly in
+- [X] T022 [US3] Render pending policy-change proposals distinctly in
       `frontend/src/components/custody/ProposalQueue.jsx` (decode guard-targeted calldata to a
       human diff; approvals bind to exact calldata — FR-009 inherited, show it).
-- [ ] T023 [P] [US3] Vitest `frontend/src/test/custody/PolicyPanel.change.test.jsx`: diff
+- [X] T023 [P] [US3] Vitest `frontend/src/test/custody/PolicyPanel.change.test.jsx`: diff
       rendering, queue submission payloads, attach ordering, non-owner sees no management
       actions, axe pass (US3 acceptance scenarios 1–5).
 
@@ -147,18 +147,18 @@ live at 2; attach flow on a policy-less vault; loosening executes under max-stri
 **Independent Test**: quickstart §5.3 — draft transfer to non-allowlisted address ⇒ named rule
 warning pre-submit; fix recipient ⇒ warning clears.
 
-- [ ] T024 [US4] Integrate `previewPolicy` into
+- [X] T024 [US4] Integrate `previewPolicy` into
       `frontend/src/components/custody/ProposeTransactionForm.jsx`: debounce-evaluated warning
       naming rule + values (via `decodePolicyError`), non-blocking submit, none for compliant or
       policy-less vaults; surface the same decoder on failed execution paths (FR-011).
-- [ ] T025 [P] [US4] Vitest update `frontend/src/test/custody/ProposeTransactionForm.test.jsx`:
+- [X] T025 [P] [US4] Vitest update `frontend/src/test/custody/ProposeTransactionForm.test.jsx`:
       violation warning content per rule, clear-on-fix, no-policy silence, axe pass.
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T026 [P] Wire guard events (`RulesConfigured`, `AllowlistChanged`, `AllowlistEnabled`) into
+- [X] T026 [P] Wire guard events (`RulesConfigured`, `AllowlistChanged`, `AllowlistEnabled`) into
       the existing `custody` notification domain watcher path (FR-016) and cover with a Vitest
       case alongside the existing custody notification tests.
 - [X] T027 [P] Run Slither over `contracts/custody/SafePolicyGuard.sol` +
@@ -166,7 +166,7 @@ warning pre-submit; fix recipient ⇒ warning clears.
 - [X] T028 [P] Developer doc `docs/developer-guide/multisig-policy-engine.md`: architecture,
       trust model, accepted risks (window straddle, unvalued calldata, no-delegatecall
       limitation), deployment/rollout runbook note (Mordor → Polygon).
-- [ ] T029 Full verification: `npm run compile`, `npm test`, `npm run test:frontend`, frontend
+- [X] T029 Full verification: `npm run compile`, `npm test`, `npm run test:frontend`, frontend
       lint — quickstart.md §1–§4 outcomes; confirm spec 043 custody suites untouched (SC-007).
 
 ---

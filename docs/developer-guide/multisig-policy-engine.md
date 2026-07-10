@@ -87,7 +87,13 @@ npm run sync:frontend-contracts -- --network <net> --chainId <id>
 Deterministic CREATE2 via the Safe singleton factory (same salt prefix as the v2 suite), recorded
 in `deployments/<net>-chain<id>-v2.json` under `safePolicyGuard` / `policyGuardSetup`. Rollout
 follows custody support: **Mordor (63) → Polygon (137)**; both contracts are admin-free so the
-deploy key holds no ongoing power. Upgrades ship as a NEW guard deployment that vaults adopt via
+deploy key holds no ongoing power.
+
+> **Deploy-owner checklist per network**: after running the script + sync, also add a
+> `safePolicyGuard` entry to `DEPLOYMENT_BLOCKS_BY_CHAIN` in `frontend/src/config/contracts.js`
+> (the deploy block is printed by the script and recorded in `deployments/`). The policy-event
+> notification source (FR-016) deliberately no-ops until that bounded scan-start block exists —
+> the never-scan-from-genesis rule (issue #703/#704) gates it, same as the proposal hub. Upgrades ship as a NEW guard deployment that vaults adopt via
 threshold-approved `setGuard` — never an in-place upgrade (`check:storage-layout` is not
 applicable; there is no proxy).
 
