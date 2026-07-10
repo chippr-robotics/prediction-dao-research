@@ -17,6 +17,10 @@ export { DexProvider } from './DexContext.jsx'
 export { UserPreferencesContext } from './UserPreferencesContext.js'
 export { UserPreferencesProvider } from './UserPreferencesContext.jsx'
 
+// Privacy (tilt-to-hide) context — live viewing state for value masking (spec 046)
+export { PrivacyContext } from './PrivacyContext.js'
+export { PrivacyProvider } from './PrivacyContext.jsx'
+
 // Unified Wallet context (single source of truth for blockchain interactions)
 export { WalletContext } from './WalletContext.js'
 export { WalletProvider } from './WalletContext.jsx'

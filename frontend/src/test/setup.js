@@ -301,6 +301,31 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// Mock DeviceOrientationEvent for tilt-to-hide tests (spec 046). jsdom has no
+// orientation sensor; tests dispatch a plain Event with beta/gamma attached, or
+// use dispatchOrientation() below. requestPermission is left UNDEFINED by default
+// so the non-iOS path is exercised; tests that need the iOS gesture flow set
+// window.DeviceOrientationEvent.requestPermission themselves.
+if (typeof window.DeviceOrientationEvent === 'undefined') {
+  window.DeviceOrientationEvent = class DeviceOrientationEvent extends Event {
+    constructor(type, init = {}) {
+      super(type)
+      this.beta = init.beta ?? null
+      this.gamma = init.gamma ?? null
+      this.alpha = init.alpha ?? null
+    }
+  }
+}
+
+// Helper: dispatch a synthetic 'deviceorientation' event with the given angles.
+global.dispatchOrientation = ({ beta, gamma = 0, alpha = 0 } = {}) => {
+  const event = new Event('deviceorientation')
+  event.beta = beta
+  event.gamma = gamma
+  event.alpha = alpha
+  window.dispatchEvent(event)
+}
+
 // Create clipboard mock
 const writeTextMock = vi.fn(() => Promise.resolve())
 const readTextMock = vi.fn(() => Promise.resolve(''))

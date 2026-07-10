@@ -13,7 +13,8 @@ import {
   DexProvider,
   UserPreferencesProvider,
   FriendMarketsProvider,
-  CustodyProvider
+  CustodyProvider,
+  PrivacyProvider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
@@ -32,15 +33,20 @@ createRoot(document.getElementById('root')).render(
             <WalletProvider>
               <CustodyProvider>
               <UserPreferencesProvider>
-                <FriendMarketsProvider>
-                  <DexProvider>
-                    <UIProvider>
-                      <PriceProvider>
-                        <App />
-                      </PriceProvider>
-                    </UIProvider>
-                  </DexProvider>
-                </FriendMarketsProvider>
+                {/* PrivacyProvider reads the tiltToHide preference and owns the
+                    live tilt-to-hide viewing state; must wrap App so every
+                    monetary render site can mask (spec 046). */}
+                <PrivacyProvider>
+                  <FriendMarketsProvider>
+                    <DexProvider>
+                      <UIProvider>
+                        <PriceProvider>
+                          <App />
+                        </PriceProvider>
+                      </UIProvider>
+                    </DexProvider>
+                  </FriendMarketsProvider>
+                </PrivacyProvider>
               </UserPreferencesProvider>
               </CustodyProvider>
             </WalletProvider>
