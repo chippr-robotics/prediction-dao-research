@@ -80,6 +80,20 @@ describe('ConnectModal — single surface ordering (US2)', () => {
     expect(row).toBeDisabled()
   })
 
+  it('traps Tab focus inside the dialog (aria-modal keyboard navigation)', async () => {
+    const user = userEvent.setup()
+    render(<ConnectModal />)
+    const dialog = screen.getByRole('dialog')
+    const focusables = dialog.querySelectorAll('button:not([disabled]), [href]')
+    const last = focusables[focusables.length - 1]
+    last.focus()
+    await user.tab() // Tab from the last element wraps to the first
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).toBe(focusables[0])
+    await user.tab({ shift: true }) // Shift+Tab from the first wraps to the last
+    expect(document.activeElement).toBe(last)
+  })
+
   it('renders nothing when closed and closes itself once connected', async () => {
     mockWallet.isConnectModalOpen = false
     const { rerender, container } = render(<ConnectModal />)

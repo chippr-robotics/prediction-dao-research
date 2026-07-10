@@ -111,7 +111,7 @@ export function passkeyConnector(options = {}) {
         // Keep the book transact-complete (spec 045 FR-005): refresh the
         // record for the asserted credential, repairing a missing public key
         // from the chain when it can be identified unambiguously.
-        upsertCredential(
+        const record = upsertCredential(
           {
             credentialId: assertion.credentialId,
             address,
@@ -119,6 +119,16 @@ export function passkeyConnector(options = {}) {
           },
           deps.storage
         )
+        // FR-005: sign-in must leave the session able to transact. If the
+        // record still lacks its key (and the chain couldn't disambiguate),
+        // refuse honestly now instead of minting a session that fails on its
+        // first action.
+        if (!isTransactComplete(record)) {
+          throw new Error(
+            'This browser cannot sign for that account yet — its passkey record is incomplete. ' +
+              'Use a linked wallet to recover access, or sign in on the browser where this passkey was created.'
+          )
+        }
       }
 
       const session = {
@@ -197,6 +207,9 @@ async function repairPublicKey({ credentialId, address, chainId, deps }) {
     const passkeyOwners = controllers.filter((c) => c.kind === 'passkey')
     if (passkeyOwners.length !== 1) return undefined
     const bytes = passkeyOwners[0].ownerBytes
+    // Only the exact 64-byte x||y encoding is a P-256 key — persisting a
+    // malformed slice would pass isTransactComplete yet break signing later.
+    if (typeof bytes !== 'string' || !/^0x[0-9a-fA-F]{128}$/.test(bytes)) return undefined
     return { x: `0x${bytes.slice(2, 66)}`, y: `0x${bytes.slice(66, 130)}` }
   } catch {
     return undefined

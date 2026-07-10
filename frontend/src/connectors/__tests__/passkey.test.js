@@ -75,6 +75,7 @@ describe('connect', () => {
   })
 
   it('sign-in: unpinned assertion (platform picker) resolves the existing account', async () => {
+    rememberCompleteRecord()
     const { connector, deps } = makeConnector({ options: { mode: 'sign-in' } })
     const out = await connector.connect({ chainId: 80002 })
     expect(deps.getAssertion).toHaveBeenCalled()
@@ -110,6 +111,7 @@ describe('connect', () => {
   })
 
   it('sign-in pinned to a chosen credential passes it to the assertion (spec 045 US3)', async () => {
+    rememberCredential({ credentialId: 'cred-2', publicKey: PUBLIC_KEY, address: ACCOUNT })
     const { connector, deps } = makeConnector({
       options: { mode: 'sign-in' },
       getAssertion: vi.fn().mockResolvedValue({ credentialId: 'cred-2' }),
@@ -118,6 +120,39 @@ describe('connect', () => {
     await connector.connect({ chainId: 80002, credentialId: 'cred-2' })
     expect(deps.getAssertion).toHaveBeenCalledWith(expect.objectContaining({ credentialId: 'cred-2' }))
     expect(readSession().credentialId).toBe('cred-2') // session pins what was ASSERTED
+  })
+
+  it('sign-in REFUSES (no session) when the record still cannot transact after repair (FR-005)', async () => {
+    // Partial record + ambiguous chain state (two passkey owners): the key
+    // cannot be reconstructed, so minting a session would just crash later.
+    rememberCredential({ credentialId: 'cred-1', address: ACCOUNT }) // no publicKey
+    const ownerBytes = `0x${'1'.repeat(64)}${'2'.repeat(64)}`
+    const { connector } = makeConnector({
+      options: { mode: 'sign-in' },
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [
+          { index: 0n, kind: 'passkey', ownerBytes },
+          { index: 1n, kind: 'passkey', ownerBytes: `0x${'3'.repeat(64)}${'4'.repeat(64)}` },
+        ],
+      }),
+    })
+    await expect(connector.connect({ chainId: 80002 })).rejects.toThrow(/recover access/i)
+    expect(readSession()).toBeNull()
+  })
+
+  it('does not repair from malformed on-chain owner bytes (refuses instead of persisting junk)', async () => {
+    rememberCredential({ credentialId: 'cred-1', address: ACCOUNT }) // no publicKey
+    const { connector } = makeConnector({
+      options: { mode: 'sign-in' },
+      readControllers: vi.fn().mockResolvedValue({
+        deployed: true,
+        controllers: [{ index: 0n, kind: 'passkey', ownerBytes: '0x1234' }], // not 64 bytes
+      }),
+    })
+    await expect(connector.connect({ chainId: 80002 })).rejects.toThrow(/recover access/i)
+    const [rec] = knownCredentials()
+    expect(rec.publicKey).toBeUndefined() // junk was never persisted
   })
 
   it('refuses unsupported networks with ChainNotSupportedError (FR-022)', async () => {

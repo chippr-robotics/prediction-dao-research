@@ -16,7 +16,7 @@ Existing entity, hardened. One entry per passkey known to this browser.
 | `address` | 0x-address | Smart-account address. Set at sign-up, refreshed at sign-in and after recovery. |
 | `prfCapable` | boolean | From creation/assertion PRF result. |
 | `label` | string | Client-side only, never on-chain. |
-| `updatedAt` | ISO string | Refreshed on every upsert. |
+| `updatedAt` | number (epoch ms) | Refreshed on every upsert (`Date.now()`). |
 
 **Validation**: `isTransactComplete(record)` ⇔ `credentialId` && `publicKey.x`
 && `publicKey.y`. `sendBatch`/`buildAccount` reject records failing this with

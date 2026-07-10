@@ -59,11 +59,32 @@ function ConnectModalDialog() {
     if (isConnected && isConnectModalOpen) close()
   }, [isConnected, isConnectModalOpen, close])
 
-  // Esc closes; focus moves into the dialog on open.
+  // Esc closes; focus moves into the dialog on open; Tab/Shift+Tab cycle
+  // within the dialog's focusable elements (aria-modal focus trap).
   useEffect(() => {
     if (!isConnectModalOpen) return
     const handleKey = (e) => {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape') {
+        close()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusables = dialog.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const outside = !dialog.contains(document.activeElement)
+      if (e.shiftKey && (document.activeElement === first || outside)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (document.activeElement === last || outside)) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', handleKey)
     dialogRef.current?.focus()
