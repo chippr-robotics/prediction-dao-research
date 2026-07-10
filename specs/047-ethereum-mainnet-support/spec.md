@@ -52,6 +52,20 @@ on the Ethereum family, and the networks become selectable so a member can reach
   (already modelled but not selectable) and Hoodi (not yet modelled) are the two
   testnets in scope. Both are surfaced as selectable testnet networks alongside
   Ethereum mainnet.
+- Q: What token coverage should the Ethereum networks get in the portfolio and send
+  surfaces? → A: A **curated multi-token list per network**, at parity with the existing
+  Polygon portfolio: Ethereum mainnet gets native ETH plus a curated set of major assets
+  (e.g. WETH, USDC, USDT, DAI); each Ethereum testnet gets native test ETH plus its
+  faucet stablecoin where one exists. Every listed token must have a verifiable value
+  source or its value discloses as unavailable (honest-state). (See FR-006a and FR-009.)
+- Q: When a passkey (smart-account) user with **no linked external wallet** selects an
+  Ethereum network that has no passkey/account-abstraction support, what happens? → A:
+  **Allow view-only selection.** The passkey user can select the Ethereum network to view
+  their portfolio and receive (read-only); transactional actions (send) disclose that a
+  connected wallet is required on this network rather than presenting a dead action
+  (honest-state, never-stranded). This satisfies acceptance scenario 1 (a passkey user
+  can select the network) and scenario 2 (view holdings) without any passkey
+  infrastructure on Ethereum. (See FR-003a and FR-010.)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -186,6 +200,11 @@ Ethereum address is shown with a scannable form.
   networks on the networks surface, visually distinguishable as testnets.
 - **FR-003**: When a member selects an Ethereum network, the system MUST set it as the
   active network and update every active-network indicator accordingly.
+- **FR-003a**: A passkey (smart-account) member with no linked external wallet MUST be
+  able to select an Ethereum network for **view-only** use (portfolio and receive);
+  transactional actions that require a wallet the network does not support (e.g. send via
+  passkey) MUST disclose that a connected wallet is required rather than presenting a dead
+  action. Network selection MUST NOT be hidden or blocked for passkey-only members.
 - **FR-004**: The system MUST persist the selected Ethereum network as the active
   network across sessions on the same basis as any other selectable network.
 - **FR-005**: The networks surface MUST display each Ethereum network's real
@@ -194,14 +213,20 @@ Ethereum address is shown with a scannable form.
 - **FR-006**: The portfolio view MUST include a connected account's Ethereum mainnet
   holdings (native coin and supported tokens) alongside holdings from other networks,
   labelled with the network they belong to.
+- **FR-006a**: Each Ethereum network MUST expose a **curated multi-token set** at parity
+  with the existing first-class networks: Ethereum mainnet MUST cover native ETH plus a
+  curated set of major assets (e.g. WETH, USDC, USDT, DAI), and each Ethereum testnet MUST
+  cover native test ETH plus its faucet stablecoin where one exists. Every token in the
+  set MUST have a verifiable value source or disclose its value as unavailable
+  (never fabricated, never shown as zero-value).
 - **FR-007**: The portfolio MUST include Hoodi and Sepolia holdings only when the member
   has enabled showing testnet assets, and exclude them otherwise.
 - **FR-008**: Ethereum holdings MUST contribute to portfolio value totals on the same
   basis as other networks, and any holding whose value cannot be resolved MUST be
   disclosed as unavailable (never rendered as zero) and excluded from value sums.
 - **FR-009**: While an Ethereum network is active, a member MUST be able to send that
-  network's native coin, and any supported token that is configured on that network, to
-  a valid recipient address or resolvable name.
+  network's native coin, and any token in that network's curated supported-token set
+  (FR-006a), to a valid recipient address or resolvable name.
 - **FR-010**: Sending on an Ethereum network MUST provide a working path for a
   wallet/EOA-connected member: gasless where the network's stablecoin and relay
   infrastructure support it, otherwise a self-submitted transfer paying the network's
@@ -282,9 +307,12 @@ Ethereum address is shown with a scannable form.
   send/receive (transfer) surfaces already exist and operate against the active or
   scanned networks; this feature extends the set of networks they cover rather than
   building new surfaces.
-- **Supported tokens on Ethereum**: The initial supported tokens are the network's native
-  coin and its canonical stablecoin(s); a broader curated token list is a follow-on and
-  not required for this feature.
+- **Supported tokens on Ethereum**: Each Ethereum network ships a curated multi-token set
+  at parity with the existing first-class networks (see FR-006a) — Ethereum mainnet covers
+  native ETH plus major curated assets (e.g. WETH, USDC, USDT, DAI); testnets cover native
+  test ETH plus a faucet stablecoin where one exists. The specific curated address list per
+  network is a configuration value resolved during planning; a token is included only when
+  it has a verifiable value source.
 - **Default network unchanged**: The app's default/home network is unchanged by this
   feature.
 
