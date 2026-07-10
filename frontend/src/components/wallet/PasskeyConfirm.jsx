@@ -11,6 +11,7 @@
  */
 
 import PropTypes from 'prop-types'
+import './PasskeyConfirm.css'
 
 function formatFeeLine({ feeQuote }) {
   if (!feeQuote) return 'Network fee: none (relayed intent)'

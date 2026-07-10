@@ -3,7 +3,7 @@
  * MultiOwnable ABI exactly — parity vectors from test/account/factory.test.js),
  * batch composition, guard refusals, capability gating per network.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../../config/networks', () => ({
   getNetwork: vi.fn((chainId) => {
@@ -15,13 +15,24 @@ vi.mock('../../../config/networks', () => ({
         passkey: { bundlerUrls: ['https://bundler.example'], erc20PaymasterUrl: null },
       }
     }
+    if (chainId === 137) {
+      return {
+        chainId: 137,
+        rpcUrl: 'https://rpc.example',
+        capabilities: { passkeyAccounts: true },
+        passkey: {
+          bundlerUrls: ['https://bundler.example/polygon'],
+          erc20PaymasterUrl: 'https://paymaster.example/polygon',
+        },
+      }
+    }
     return { chainId, capabilities: { passkeyAccounts: false }, passkey: null }
   }),
 }))
 
 vi.mock('../../../config/contracts', () => ({
   getContractAddressForChain: vi.fn((key, chainId) => {
-    if (chainId !== 80002) return null
+    if (chainId !== 80002 && chainId !== 137) return null
     return {
       accountFactory: '0xFAC70000000000000000000000000000000000001'.slice(0, 42),
       entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
@@ -29,6 +40,18 @@ vi.mock('../../../config/contracts', () => ({
   }),
 }))
 
+vi.mock('viem/account-abstraction', async () => {
+  const actual = await vi.importActual('viem/account-abstraction')
+  return {
+    ...actual,
+    toWebAuthnAccount: vi.fn(() => ({ type: 'webAuthnAccount' })),
+    toCoinbaseSmartAccount: vi.fn(async () => ({ address: '0xACC0000000000000000000000000000000000001' })),
+    createBundlerClient: vi.fn((opts) => opts),
+    createPaymasterClient: vi.fn((opts) => ({ __isPaymasterClient: true, ...opts })),
+  }
+})
+
+import { createBundlerClient, createPaymasterClient } from 'viem/account-abstraction'
 import {
   publicKeyToOwnerBytes,
   addressToOwnerBytes,
@@ -129,6 +152,43 @@ describe('buildAccount credential validation (spec 045 FR-006)', () => {
       buildAccount({ chainId: 80002, credential: { credentialId: 'c1' }, deps: { publicClient } })
     ).rejects.toBeInstanceOf(CredentialRecordIncomplete)
     expect(publicClient.readContract).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildAccount ERC-20 paymaster wiring (issue #854)', () => {
+  const credential = { credentialId: 'c1', publicKey: { x: X, y: Y } }
+  const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+
+  beforeEach(() => {
+    createBundlerClient.mockClear()
+    createPaymasterClient.mockClear()
+  })
+
+  it('builds a paymaster client from the network config and passes it to the bundler client', async () => {
+    await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
+
+    expect(createPaymasterClient).toHaveBeenCalledTimes(1)
+    const bundlerOpts = createBundlerClient.mock.calls[0][0]
+    expect(bundlerOpts.paymaster).toEqual(
+      expect.objectContaining({ __isPaymasterClient: true })
+    )
+  })
+
+  it('omits the paymaster (native-token fallback) when no ERC-20 paymaster is configured', async () => {
+    await buildAccount({ chainId: 80002, credential, ownerIndex: 0, deps: { publicClient } })
+
+    expect(createPaymasterClient).not.toHaveBeenCalled()
+    const bundlerOpts = createBundlerClient.mock.calls[0][0]
+    expect(bundlerOpts.paymaster).toBeUndefined()
+  })
+
+  it('a test-injected deps.paymaster still overrides the configured URL', async () => {
+    const injected = { __testPaymaster: true }
+    await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient, paymaster: injected } })
+
+    expect(createPaymasterClient).not.toHaveBeenCalled()
+    const bundlerOpts = createBundlerClient.mock.calls[0][0]
+    expect(bundlerOpts.paymaster).toBe(injected)
   })
 })
 
