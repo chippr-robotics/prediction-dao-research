@@ -225,6 +225,46 @@ export function deriveKeyPairFromSignature(signature) {
   }
 }
 
+// ==================== Passkey seed-based derivation ====================
+// Passkey accounts have no EOA signature to derive from; instead a per-account
+// 32-byte master seed is recovered from the WebAuthn PRF extension (lib/passkey/
+// prfKeys.js). These helpers turn that seed into the SAME kind of X25519 / X-Wing
+// keypairs the signature path produces, so the on-chain KeyRegistry entry and the
+// envelope interop are identical regardless of login method. The seed is expanded
+// through HKDF with distinct info labels so the two keypairs are domain-separated
+// from each other and can never collide with signature-derived material.
+const PASSKEY_X25519_INFO = utf8ToBytes('fairwins-passkey-x25519-v1')
+const PASSKEY_XWING_INFO = utf8ToBytes('fairwins-passkey-xwing-v1')
+const PASSKEY_DERIVE_SALT = new Uint8Array(32)
+
+/**
+ * Derive the X25519 keypair for a passkey account from its master seed.
+ * Deterministic: same seed ⇒ same keypair on every device/controller.
+ *
+ * @param {Uint8Array} seed - 32-byte PRF-derived master seed
+ * @returns {{publicKey: Uint8Array, privateKey: Uint8Array}}
+ */
+export function deriveKeyPairFromSeed(seed) {
+  if (!seed || seed.length !== 32) throw new Error('deriveKeyPairFromSeed: seed must be 32 bytes')
+  const privateKey = hkdf(sha256, seed, PASSKEY_DERIVE_SALT, PASSKEY_X25519_INFO, 32)
+  const publicKey = x25519.getPublicKey(privateKey)
+  return { publicKey, privateKey }
+}
+
+/**
+ * Derive the X-Wing (post-quantum) keypair for a passkey account from its master
+ * seed. Deterministic: same seed ⇒ same keypair.
+ *
+ * @param {Uint8Array} seed - 32-byte PRF-derived master seed
+ * @returns {{publicKey: Uint8Array, secretKey: Uint8Array}}
+ */
+export function deriveXWingKeyPairFromSeed(seed) {
+  if (!seed || seed.length !== 32) throw new Error('deriveXWingKeyPairFromSeed: seed must be 32 bytes')
+  const xwingSeed = hkdf(sha256, seed, PASSKEY_DERIVE_SALT, PASSKEY_XWING_INFO, 32)
+  const { publicKey, secretKey } = xwingKeygen(xwingSeed)
+  return { publicKey, secretKey }
+}
+
 // ==================== X-Wing Post-Quantum Functions ====================
 
 /**

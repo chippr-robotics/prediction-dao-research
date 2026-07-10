@@ -7,7 +7,9 @@ import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { getUserTierOnChain, buildMembershipPurchaseCalls } from '../../utils/blockchainService'
-import { EncryptionUnavailable } from '../../lib/passkey/prfKeys'
+import { ensurePasskeyEncryptionKeys } from '../../lib/passkey/encryption'
+import { buildRegisterKeyCalls, hasRegisteredKey } from '../../utils/keyRegistryService'
+import { readSession } from '../../connectors/passkey'
 import { getCurrentDocument } from '../../utils/legalDocs'
 import { getContractAddressForChain } from '../../config/contracts'
 import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
@@ -93,7 +95,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { grantRole, loadRoles } = useRoles()
   const {
     account, isConnected, isCorrectNetwork, switchNetwork, chainId,
-    loginMethod, sendCalls, provider, accountCapabilities,
+    loginMethod, sendCalls, provider,
   } = useWeb3()
   const { showNotification } = useNotification()
   const { getPrice, getLimits, usingFallbackPrices } = useTierPrices()
@@ -249,14 +251,21 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
           return { hash: res?.txHash, txHash: res?.txHash, route: res?.route }
         }
 
-        // Private-wager encryption is signature-derived and not yet wired to the passkey
-        // PRF pipeline, so gate it off honestly (clarification Q1): the membership stays
-        // fully active, only encrypted features are unavailable on this account for now.
-        const ensureInitializedPasskey = async () => {
-          throw new EncryptionUnavailable(
-            accountCapabilities?.encryptionReason ||
-            'Private-wager encryption is not yet available for passkey accounts. Your membership is fully active.',
-          )
+        // Encryption keys are derived from the WebAuthn PRF master seed (one ceremony),
+        // not an EOA signature — same X25519 key the KeyRegistry publishes so envelope
+        // interop is identical to the EOA path. A non-PRF authenticator raises
+        // EncryptionUnavailable inside, so the flow degrades honestly (clarification Q1):
+        // the membership stays fully active, only encrypted features gate off.
+        const credentialId = readSession()?.credentialId
+        const ensureInitialized = () => ensurePasskeyEncryptionKeys({ account, credentialId })
+
+        // Publish the X25519 key on-chain through sendCalls (one ceremony) — a passkey
+        // session has no ethers signer for the KeyRegistry write.
+        const registerKey = async (publicKey) => {
+          if (await hasRegisteredKey(account, provider)) return false
+          const calls = buildRegisterKeyCalls(publicKey, chainId, acceptedTermsHash)
+          await sendCalls(calls)
+          return true
         }
 
         await flow.start({
@@ -268,7 +277,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
           action,
           termsHash: acceptedTermsHash,
           batchPurchase,
-          ensureInitialized: ensureInitializedPasskey,
+          ensureInitialized,
+          registerKey,
           onPaid,
         })
         return

@@ -125,4 +125,37 @@ describe('usePurchaseFlow — passkey batch path (spec 041)', () => {
     expect(result.current.status).toBe('failed')
     expect(result.current.steps.find((s) => s.id === 'sign').state).toBe('failed')
   })
+
+  it('registers the derived key through the passkey registerKey closure (not the signer service)', async () => {
+    const registerKey = vi.fn(async () => true)
+    const params = passkeyParams({ registerKey })
+    const { result } = renderHook(() => usePurchaseFlow())
+    await act(async () => {
+      await result.current.start(params)
+    })
+
+    expect(result.current.status).toBe('succeeded')
+    expect(result.current.steps.find((s) => s.id === 'register').state).toBe('completed')
+    // The publicKey derived in the sign step is what gets published on-chain.
+    expect(registerKey).toHaveBeenCalledTimes(1)
+    expect(registerKey.mock.calls[0][0]).toBeInstanceOf(Uint8Array)
+    expect(ensureKeyRegistered).not.toHaveBeenCalled() // signer path is bypassed for passkey
+    expect(result.current.keyRegOutcome).toBe('success')
+  })
+
+  it('a failed passkey registerKey surfaces as a non-blocking register failure (membership stays active)', async () => {
+    const registerKey = vi.fn(async () => { throw new Error('user cancelled the key ceremony') })
+    const params = passkeyParams({ registerKey })
+    const { result } = renderHook(() => usePurchaseFlow())
+    await act(async () => {
+      await result.current.start(params)
+    })
+
+    expect(result.current.status).toBe('failed')
+    const register = result.current.steps.find((s) => s.id === 'register')
+    expect(register.state).toBe('failed')
+    expect(register.blocking).toBe(false) // Continue anyway is offered — the membership is real
+    expect(result.current.canContinueAnyway).toBe(true)
+    expect(params.onPaid).toHaveBeenCalledTimes(1) // payment already succeeded
+  })
 })
