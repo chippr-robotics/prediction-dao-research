@@ -16,9 +16,17 @@ import {
   createCredential,
   getAssertion,
   rememberCredential,
+  upsertCredential,
+  knownCredentials,
+  isTransactComplete,
   hasExistingCredential,
 } from '../lib/passkey/credentials'
-import { requirePasskeySupport, deriveAddress, publicKeyToOwnerBytes } from '../lib/passkey/smartAccount'
+import {
+  requirePasskeySupport,
+  deriveAddress,
+  publicKeyToOwnerBytes,
+  readControllers,
+} from '../lib/passkey/smartAccount'
 
 export const PASSKEY_CONNECTOR_ID = 'fairwinsPasskey'
 const SESSION_KEY = 'fairwins.passkey.session.v1'
@@ -54,21 +62,30 @@ export function passkeyConnector(options = {}) {
       this.capability = await (deps.detectCapability ?? detectCapability)()
     },
 
-    async connect({ chainId, isReconnecting } = {}) {
+    async connect({ chainId, isReconnecting, credentialId, mode: requestedMode } = {}) {
       const targetChain = chainId ?? config.chains[0]?.id
       requirePasskeySupport(targetChain) // throws ChainNotSupportedError (FR-022)
 
       // Silent restore: no ceremony on reload (FR-003). Transactions still
       // require a fresh ceremony each (FR-008) — the session is read-state only.
+      // Spec 045 FR-005: only restore sessions the browser can actually sign
+      // for — a session whose credential record is missing or incomplete is
+      // cleared (honest sign-out) instead of crashing on the first action.
       if (isReconnecting) {
         const session = readSession(deps.storage)
         if (!session) throw new Error('No passkey session to restore')
+        const record = knownCredentials(deps.storage).find((c) => c.credentialId === session.credentialId)
+        if (!isTransactComplete(record)) {
+          writeSession(null, deps.storage)
+          throw new Error('Passkey session is unusable on this browser — sign in again.')
+        }
         return { accounts: [getAddress(session.address)], chainId: session.chainId ?? targetChain }
       }
 
       let credential
       let address
-      const mode = options.mode ?? (hasExistingCredential(deps.storage) ? 'sign-in' : 'sign-up')
+      const mode =
+        requestedMode ?? options.mode ?? (hasExistingCredential(deps.storage) ? 'sign-in' : 'sign-up')
 
       if (mode === 'sign-up') {
         credential = await (deps.createCredential ?? createCredential)({ label: options.label, deps })
@@ -76,10 +93,13 @@ export function passkeyConnector(options = {}) {
         address = await (deps.deriveAddress ?? deriveAddress)({ chainId: targetChain, ownersBytes, deps })
         rememberCredential({ ...credential, address }, deps.storage)
       } else {
-        // Sign-in: platform picker chooses among discoverable credentials —
-        // the app never guesses (edge case "multiple accounts").
+        // Sign-in: pinned to the account the user picked in the in-app chooser
+        // when `credentialId` is set; otherwise getAssertion offers the whole
+        // local book via allowCredentials so the platform must show a chooser
+        // (spec 045 US3 — the app never guesses, and neither may the browser).
         const assertion = await (deps.getAssertion ?? getAssertion)({
           challenge: crypto.getRandomValues(new Uint8Array(32)),
+          credentialId,
           deps,
         })
         credential = { credentialId: assertion.credentialId }
@@ -88,6 +108,27 @@ export function passkeyConnector(options = {}) {
           chainId: targetChain,
           deps,
         })
+        // Keep the book transact-complete (spec 045 FR-005): refresh the
+        // record for the asserted credential, repairing a missing public key
+        // from the chain when it can be identified unambiguously.
+        const record = upsertCredential(
+          {
+            credentialId: assertion.credentialId,
+            address,
+            publicKey: await repairPublicKey({ credentialId: assertion.credentialId, address, chainId: targetChain, deps }),
+          },
+          deps.storage
+        )
+        // FR-005: sign-in must leave the session able to transact. If the
+        // record still lacks its key (and the chain couldn't disambiguate),
+        // refuse honestly now instead of minting a session that fails on its
+        // first action.
+        if (!isTransactComplete(record)) {
+          throw new Error(
+            'This browser cannot sign for that account yet — its passkey record is incomplete. ' +
+              'Use a linked wallet to recover access, or sign in on the browser where this passkey was created.'
+          )
+        }
       }
 
       const session = {
@@ -143,6 +184,36 @@ export function passkeyConnector(options = {}) {
       writeSession(null, deps.storage)
     },
   }))
+}
+
+/**
+ * Best-effort public-key repair for a sign-in whose local record lost its
+ * P-256 key (legacy/partial writes). The chain stores every passkey owner's
+ * key as its owner bytes — when the account has exactly ONE passkey
+ * controller the mapping is unambiguous and the record can be healed, making
+ * "sign out and sign back in" an actual fix for CredentialRecordIncomplete.
+ * Ambiguous (multi-passkey) or unreachable accounts return undefined: the
+ * upsert then simply keeps whatever the record already had.
+ */
+async function repairPublicKey({ credentialId, address, chainId, deps }) {
+  try {
+    const existing = knownCredentials(deps.storage).find((c) => c.credentialId === credentialId)
+    if (existing?.publicKey?.x && existing?.publicKey?.y) return undefined // nothing to repair
+    const { controllers } = await (deps.readControllers ?? readControllers)({
+      chainId,
+      accountAddress: address,
+      deps,
+    })
+    const passkeyOwners = controllers.filter((c) => c.kind === 'passkey')
+    if (passkeyOwners.length !== 1) return undefined
+    const bytes = passkeyOwners[0].ownerBytes
+    // Only the exact 64-byte x||y encoding is a P-256 key — persisting a
+    // malformed slice would pass isTransactComplete yet break signing later.
+    if (typeof bytes !== 'string' || !/^0x[0-9a-fA-F]{128}$/.test(bytes)) return undefined
+    return { x: `0x${bytes.slice(2, 66)}`, y: `0x${bytes.slice(66, 130)}` }
+  } catch {
+    return undefined
+  }
 }
 
 /**

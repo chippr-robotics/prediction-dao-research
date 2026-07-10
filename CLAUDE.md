@@ -104,5 +104,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/044-connected-account-portfolio/plan.md
+at specs/045-unified-connect-recovery/plan.md
 <!-- SPECKIT END -->

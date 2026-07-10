@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { sendPasskeyBatch } from '../sendBatch'
 import { SubmissionUnavailable, LIFECYCLE } from '../submission'
+import { CredentialRecordIncomplete } from '../smartAccount'
 
 let network = { passkey: { bundlerUrls: ['https://bundler.test'] } }
 
@@ -85,6 +86,70 @@ describe('sendPasskeyBatch', () => {
     }).catch((e) => e)
 
     expect(err).toBeInstanceOf(SubmissionUnavailable)
+  })
+
+  it('refuses an incomplete credential record with an actionable error (spec 045 FR-006)', async () => {
+    // A record with an address but no key/id used to slip past the address
+    // match and crash inside the signer with "reading 'id'".
+    const err = await sendPasskeyBatch({
+      chainId: 137,
+      address: ADDRESS,
+      calls: [{ target: ADDRESS, data: '0x', value: 0n }],
+      deps: { knownCredentials: () => [{ address: ADDRESS }] },
+    }).catch((e) => e)
+    expect(err).toBeInstanceOf(CredentialRecordIncomplete)
+    expect(err.message).toMatch(/sign back in/i)
+  })
+
+  it('pins the session credential by id over the address match (spec 045 US3)', async () => {
+    const buildAccount = vi.fn().mockResolvedValue({
+      bundlerClient: {
+        sendUserOperation: vi.fn().mockResolvedValue('0xuserop'),
+        getUserOperationReceipt: vi.fn().mockResolvedValue({ success: true, receipt: { transactionHash: '0xtx' } }),
+      },
+    })
+    const book = () => [
+      { address: ADDRESS, credentialId: 'cred-first', publicKey: { x: `0x${'3'.repeat(64)}`, y: `0x${'4'.repeat(64)}` } },
+      { address: ADDRESS, credentialId: 'cred-session', publicKey: { x: `0x${'1'.repeat(64)}`, y: `0x${'2'.repeat(64)}` } },
+    ]
+    await sendPasskeyBatch({
+      chainId: 137,
+      address: ADDRESS,
+      credentialId: 'cred-session',
+      calls: [{ target: ADDRESS, data: '0x', value: 0n }],
+      deps: {
+        knownCredentials: book,
+        probeRelayer: async () => ({ healthy: true }),
+        probeBundler: async () => ({ healthy: true }),
+        resolveOwnerIndex: vi.fn().mockResolvedValue(0),
+        buildAccount,
+      },
+    })
+    expect(buildAccount.mock.calls[0][0].credential.credentialId).toBe('cred-session')
+  })
+
+  it('resolves and forwards the credential’s real owner index (spec 045 FR-009)', async () => {
+    const buildAccount = vi.fn().mockResolvedValue({
+      bundlerClient: {
+        sendUserOperation: vi.fn().mockResolvedValue('0xuserop'),
+        getUserOperationReceipt: vi.fn().mockResolvedValue({ success: true, receipt: { transactionHash: '0xtx' } }),
+      },
+    })
+    const resolveOwnerIndex = vi.fn().mockResolvedValue(3)
+    await sendPasskeyBatch({
+      chainId: 137,
+      address: ADDRESS,
+      calls: [{ target: ADDRESS, data: '0x', value: 0n }],
+      deps: {
+        knownCredentials,
+        probeRelayer: async () => ({ healthy: true }),
+        probeBundler: async () => ({ healthy: true }),
+        resolveOwnerIndex,
+        buildAccount,
+      },
+    })
+    expect(resolveOwnerIndex).toHaveBeenCalledWith(expect.objectContaining({ accountAddress: ADDRESS }))
+    expect(buildAccount.mock.calls[0][0].ownerIndex).toBe(3)
   })
 
   it('does not use optimistic fallback for account-native actions', async () => {

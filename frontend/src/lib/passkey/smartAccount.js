@@ -15,6 +15,7 @@ import { http, createPublicClient, encodeFunctionData, parseAbi } from 'viem'
 import { toWebAuthnAccount, toCoinbaseSmartAccount, createBundlerClient } from 'viem/account-abstraction'
 import { getNetwork } from '../../config/networks'
 import { getContractAddressForChain } from '../../config/contracts'
+import { CeremonyCancelled, isTransactComplete } from './credentials'
 
 export class ChainNotSupportedError extends Error {
   constructor(chainId) {
@@ -28,6 +29,33 @@ export class LastControllerError extends Error {
   constructor() {
     super('An account must always keep at least one controller.')
     this.name = 'LastControllerError'
+  }
+}
+
+/**
+ * Typed error: the local record for this passkey is missing the fields the
+ * signer needs (spec 045, FR-006). Historically this surfaced as an internal
+ * "Cannot read properties of undefined (reading 'id')" from inside the
+ * WebAuthn signer — now it's an actionable message before any ceremony.
+ */
+export class CredentialRecordIncomplete extends Error {
+  constructor() {
+    super(
+      'This browser’s record of your passkey is incomplete, so it can’t sign transactions. ' +
+        'Sign out and sign back in with your passkey; if that doesn’t help, use a linked wallet to recover access.'
+    )
+    this.name = 'CredentialRecordIncomplete'
+  }
+}
+
+/** Typed error: the passkey no longer controls the account (removed on-chain). */
+export class CredentialNotControllerError extends Error {
+  constructor() {
+    super(
+      'This passkey is no longer a controller of the account. Sign in with another controller ' +
+        '(a different passkey or a linked wallet) to manage it.'
+    )
+    this.name = 'CredentialNotControllerError'
   }
 }
 
@@ -101,29 +129,70 @@ export function defaultPublicClient(chainId) {
 }
 
 /**
+ * Resolve which owner slot a credential occupies on a deployed account, so
+ * signatures carry the credential's REAL index — hardcoding 0 breaks every
+ * account that gained controllers (spec 045, FR-009). Counterfactual (not yet
+ * deployed) or unreadable accounts fall back to 0, the initial owner's slot.
+ * A deployed account that no longer lists the credential throws — signing
+ * would be guessing.
+ */
+export async function resolveOwnerIndex({ chainId, accountAddress, credential, deps = {} }) {
+  let result
+  try {
+    result = await (deps.readControllers ?? readControllers)({ chainId, accountAddress, deps })
+  } catch {
+    return 0
+  }
+  if (!result.deployed) return 0
+  const ownerBytes = publicKeyToOwnerBytes(credential.publicKey).toLowerCase()
+  const match = result.controllers.find((c) => c.ownerBytes?.toLowerCase() === ownerBytes)
+  if (!match) throw new CredentialNotControllerError()
+  return Number(match.index)
+}
+
+/**
  * Build the viem smart-account + bundler client pair for a credential.
  * `credential` = { credentialId, publicKey: {x, y} } from credentials.js.
  * `signPayload` lets the connector own the ceremony UX (deps-injectable).
  */
-export async function buildAccount({ chainId, credential, ownersBytes, nonce = 0n, deps = {} }) {
+export async function buildAccount({ chainId, credential, ownersBytes, ownerIndex, nonce = 0n, deps = {} }) {
   const { entryPoint, bundlerUrls } = requirePasskeySupport(chainId)
   const client = deps.publicClient ?? defaultPublicClient(chainId)
+
+  // Refuse incomplete records BEFORE any ceremony — an undefined id/key here
+  // used to surface as "Cannot read properties of undefined (reading 'id')"
+  // from inside the WebAuthn signer (spec 045, FR-006).
+  if (!isTransactComplete(credential)) throw new CredentialRecordIncomplete()
+
+  // Own the WebAuthn get() call: viem's default dereferences the result
+  // without a null guard, and some browsers (Brave) resolve null on cancel
+  // instead of rejecting. The request options viem passes already pin
+  // allowCredentials to this credential.
+  const getFn =
+    deps.getFn ??
+    (async (options) => {
+      const credentials = deps.credentials ?? globalThis.navigator?.credentials
+      const result = await credentials.get(options)
+      if (!result) throw new CeremonyCancelled()
+      return result
+    })
 
   const owner = toWebAuthnAccount({
     credential: {
       id: credential.credentialId,
       publicKey: publicKeyToOwnerBytes(credential.publicKey),
     },
-    ...(deps.getFn ? { getFn: deps.getFn } : {}),
+    getFn,
     rpId: deps.rpId,
   })
 
   const account = await toCoinbaseSmartAccount({
     client,
     owners: [owner],
-    // ownerIndex of THIS owner inside the account's owner list; the initial
-    // credential is index 0. Controller additions never reindex (append-only).
-    ownerIndex: deps.ownerIndex ?? 0,
+    // ownerIndex of THIS owner inside the account's owner list. Resolved from
+    // the chain by callers (resolveOwnerIndex); 0 is the initial credential's
+    // slot. Controller additions never reindex (append-only).
+    ownerIndex: ownerIndex ?? deps.ownerIndex ?? 0,
     nonce,
     ...(ownersBytes ? {} : {}),
   })

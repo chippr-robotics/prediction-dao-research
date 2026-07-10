@@ -78,6 +78,38 @@ export function rememberCredential(entry, storage = globalThis.localStorage) {
   storage.setItem(CREDENTIALS_KEY, JSON.stringify(list))
 }
 
+/**
+ * Merge-update a credential record by credentialId (spec 045, FR-005).
+ * Unlike rememberCredential (which replaces the whole entry), this never
+ * drops fields the partial update doesn't carry — in particular `publicKey`,
+ * which cannot be recovered from an assertion ceremony. Sign-in uses this to
+ * keep the book transact-complete without needing the key again.
+ */
+export function upsertCredential(partial, storage = globalThis.localStorage) {
+  if (!partial?.credentialId) return
+  const list = knownCredentials(storage)
+  const existing = list.find((c) => c.credentialId === partial.credentialId)
+  const merged = { ...existing, ...stripUndefined(partial), updatedAt: Date.now() }
+  const rest = list.filter((c) => c.credentialId !== partial.credentialId)
+  rest.push(merged)
+  storage.setItem(CREDENTIALS_KEY, JSON.stringify(rest))
+  return merged
+}
+
+function stripUndefined(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null))
+}
+
+/**
+ * A record can back transactions only when the ceremony can be pinned to a
+ * credential AND the P-256 key is known (the WebAuthn owner needs both).
+ * Records failing this are legacy/partial writes; the signing layer refuses
+ * them with a plain-language error instead of crashing inside the signer.
+ */
+export function isTransactComplete(record) {
+  return Boolean(record?.credentialId && record?.publicKey?.x && record?.publicKey?.y)
+}
+
 export function forgetCredential(credentialId, storage = globalThis.localStorage) {
   const list = knownCredentials(storage).filter((c) => c.credentialId !== credentialId)
   storage.setItem(CREDENTIALS_KEY, JSON.stringify(list))
@@ -151,9 +183,12 @@ export async function createCredential({ label, userName = 'FairWins account', d
 
 /**
  * Run an assertion (WebAuthn "get") ceremony over a 32-byte challenge.
- * When `credentialId` is set the request pins that credential; otherwise the
- * platform picker offers every discoverable FairWins credential (the app never
- * guesses which account the user meant — edge case "multiple accounts").
+ * When `credentialId` is set the request pins that credential. When unpinned,
+ * every credential in the local book is offered via `allowCredentials` so the
+ * platform MUST present a chooser — Brave/Chromium silently assert the first
+ * discoverable credential on a bare request, which locked users out of all
+ * but their first account (spec 045, US3). Only a browser with no local book
+ * (fresh device) falls back to the bare discoverable-credential request.
  *
  * `prfSalt` (optional Uint8Array(32)) also evaluates the PRF extension.
  * Returns the raw fields the signing layer needs:
@@ -163,12 +198,22 @@ export async function getAssertion({ challenge, credentialId, prfSalt, deps = {}
   const credentials = deps.credentials ?? globalThis.navigator?.credentials
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
+  const pinnedIds = credentialId
+    ? [credentialId]
+    : (deps.knownCredentials ?? knownCredentials)(deps.storage).map((c) => c.credentialId)
+  const allowCredentials = []
+  for (const id of pinnedIds) {
+    try {
+      if (id) allowCredentials.push({ type: 'public-key', id: base64urlToBytes(id) })
+    } catch {
+      // Malformed stored id — skip rather than abort the whole ceremony.
+    }
+  }
+
   const publicKey = {
     challenge,
     userVerification: 'required',
-    ...(credentialId
-      ? { allowCredentials: [{ type: 'public-key', id: base64urlToBytes(credentialId) }] }
-      : {}),
+    ...(allowCredentials.length ? { allowCredentials } : {}),
     ...(prfSalt ? { extensions: { prf: { eval: { first: prfSalt } } } } : {}),
   }
 

@@ -9,6 +9,8 @@ import {
   detectCapability,
   hasExistingCredential,
   rememberCredential,
+  upsertCredential,
+  isTransactComplete,
   forgetCredential,
   knownCredentials,
   CeremonyCancelled,
@@ -93,10 +95,33 @@ describe('getAssertion', () => {
     expect(arg.userVerification).toBe('required')
   })
 
-  it('leaves credential selection to the platform picker when unpinned (never guesses)', async () => {
+  it('offers the whole local book via allowCredentials when unpinned (forces a chooser — spec 045 US3)', async () => {
+    // Brave/Chromium silently assert the FIRST discoverable credential on a
+    // bare get(); listing every known credential makes the platform show its
+    // account chooser instead of guessing.
     const credentials = { get: vi.fn().mockResolvedValue(fakeAssertion) }
-    await getAssertion({ challenge: new Uint8Array(32), deps: { credentials } })
+    const book = () => [
+      { credentialId: 'Y3JlZC1hYmM' }, // "cred-abc"
+      { credentialId: 'Y3JlZC1kZWY' }, // "cred-def"
+      { credentialId: null }, // legacy junk entry — skipped, never aborts
+    ]
+    await getAssertion({ challenge: new Uint8Array(32), deps: { credentials, knownCredentials: book } })
+    const arg = credentials.get.mock.calls[0][0].publicKey
+    expect(arg.allowCredentials).toHaveLength(2)
+    expect(arg.allowCredentials.every((c) => c.type === 'public-key')).toBe(true)
+  })
+
+  it('falls back to the bare discoverable flow when the local book is empty (fresh browser)', async () => {
+    const credentials = { get: vi.fn().mockResolvedValue(fakeAssertion) }
+    await getAssertion({ challenge: new Uint8Array(32), deps: { credentials, knownCredentials: () => [] } })
     expect(credentials.get.mock.calls[0][0].publicKey.allowCredentials).toBeUndefined()
+  })
+
+  it('throws CeremonyCancelled when the browser resolves a null assertion (Brave cancel path)', async () => {
+    const credentials = { get: vi.fn().mockResolvedValue(null) }
+    await expect(
+      getAssertion({ challenge: new Uint8Array(32), deps: { credentials, knownCredentials: () => [] } })
+    ).rejects.toBeInstanceOf(CeremonyCancelled)
   })
 
   it('maps cancellation to CeremonyCancelled', async () => {
@@ -149,5 +174,33 @@ describe('duplicate-signup steering + local credential book-keeping', () => {
     rememberCredential({ credentialId: 'c2' })
     forgetCredential('c1')
     expect(knownCredentials().map((c) => c.credentialId)).toEqual(['c2'])
+  })
+})
+
+describe('upsertCredential + isTransactComplete (spec 045 FR-005/FR-006)', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('merges by credentialId and never drops the public key (sign-in refresh)', () => {
+    rememberCredential({ credentialId: 'c1', publicKey: { x: '0x1', y: '0x2' }, prfCapable: true })
+    upsertCredential({ credentialId: 'c1', address: '0xA11CE', publicKey: undefined })
+    const [rec] = knownCredentials()
+    expect(rec.address).toBe('0xA11CE')
+    expect(rec.publicKey).toEqual({ x: '0x1', y: '0x2' })
+    expect(rec.prfCapable).toBe(true)
+  })
+
+  it('creates a record when none exists and ignores entries without a credentialId', () => {
+    upsertCredential({ address: '0xA11CE' }) // no credentialId — no-op
+    expect(knownCredentials()).toHaveLength(0)
+    upsertCredential({ credentialId: 'c9', address: '0xA11CE' })
+    expect(knownCredentials()).toHaveLength(1)
+  })
+
+  it('isTransactComplete requires credentialId and both P-256 coordinates', () => {
+    expect(isTransactComplete({ credentialId: 'c1', publicKey: { x: '0x1', y: '0x2' } })).toBe(true)
+    expect(isTransactComplete({ credentialId: 'c1' })).toBe(false)
+    expect(isTransactComplete({ credentialId: 'c1', publicKey: { x: '0x1' } })).toBe(false)
+    expect(isTransactComplete({ publicKey: { x: '0x1', y: '0x2' } })).toBe(false)
+    expect(isTransactComplete(undefined)).toBe(false)
   })
 })

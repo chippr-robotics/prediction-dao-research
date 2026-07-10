@@ -79,6 +79,12 @@ function ControllersPanel({ deps = {} }) {
     () =>
       run(async () => {
         const target = linkAddress.trim()
+        // Idempotent refusal (spec 045 edge case) — the contract would revert
+        // AlreadyOwner anyway; refusing here saves the ceremony and the fee.
+        const already = account.controllers.some(
+          (c) => c.kind === 'wallet' && c.address?.toLowerCase() === target.toLowerCase()
+        )
+        if (already) throw new Error('That wallet is already a controller of this account.')
         const verdict = await (deps.screenController ?? screenController)(target, provider)
         if (!verdict.clear) {
           throw new Error(
@@ -90,7 +96,7 @@ function ControllersPanel({ deps = {} }) {
         await sendCalls([{ target: address, data: encodeAddWalletOwner(target) }])
         setLinkAddress('')
       }),
-    [run, deps, linkAddress, provider, sendCalls, address]
+    [run, deps, linkAddress, provider, sendCalls, address, account.controllers]
   )
 
   /** Remove a controller: on-chain removal + wrapped-seed revocation (FR-020). */
@@ -154,6 +160,11 @@ function ControllersPanel({ deps = {} }) {
           Add a passkey
         </button>
         <div className="controllers-panel__link">
+          {/* FR-011: linking is granting FULL control — say so before the act. */}
+          <p className="controllers-panel__link-warning">
+            A linked wallet becomes a full controller: it can move funds, manage controllers, and
+            recover this account if you lose your passkeys. Link only a wallet you exclusively control.
+          </p>
           <input
             type="text"
             placeholder="0x… wallet to link"
