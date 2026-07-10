@@ -77,6 +77,7 @@
     "@openzeppelin/contracts-upgradeable": "5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@pinata/sdk": "^2.1.0",
+    "@safe-global/safe-contracts": "1.4.1",
     "@safe-global/safe-singleton-factory": "^2.0.0",
     "@semaphore-protocol/group": "^4.14.2",
     "@semaphore-protocol/identity": "^4.14.2",
@@ -100,5 +101,10 @@
   },
   "dependencies": {
     "@semaphore-protocol/contracts": "^4.14.2"
+  },
+  "overrides": {
+    "@safe-global/safe-contracts": {
+      "ethers": "$ethers"
+    }
   }
 }
