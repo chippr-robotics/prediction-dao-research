@@ -23,13 +23,13 @@
   font-weight: 600;
 }
 .portfolio-prefs-sub {
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  color: var(--text-secondary, #6b7280);
   font-size: 0.85rem;
 }
 .portfolio-prefs-switch {
   appearance: none;
-  background: var(--color-surface-2, var(--surface-secondary, #e5e7eb));
-  border: 1px solid var(--color-border, var(--border-color, #d1d5db));
+  background: var(--surface-color, var(--bg-secondary, #e5e7eb));
+  border: 1px solid var(--border-color, #d1d5db);
   border-radius: 999px;
   cursor: pointer;
   flex: none;
@@ -52,13 +52,13 @@
   width: 18px;
 }
 .portfolio-prefs-switch.on {
-  background: var(--color-primary, var(--brand-primary, #6d28d9));
-  border-color: var(--color-primary, var(--brand-primary, #6d28d9));
+  background: var(--brand-primary, #36B37E);
+  border-color: var(--brand-primary, #36B37E);
 }
 .portfolio-prefs-switch.on::after {
   transform: translateX(20px);
 }
 .portfolio-prefs-switch:focus-visible {
-  outline: 2px solid var(--color-primary, #6d28d9);
+  outline: 2px solid var(--brand-primary, #36B37E);
   outline-offset: 2px;
 }
