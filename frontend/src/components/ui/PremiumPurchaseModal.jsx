@@ -6,7 +6,8 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { getUserTierOnChain } from '../../utils/blockchainService'
+import { getUserTierOnChain, buildMembershipPurchaseCalls } from '../../utils/blockchainService'
+import { EncryptionUnavailable } from '../../lib/passkey/prfKeys'
 import { getCurrentDocument } from '../../utils/legalDocs'
 import { getContractAddressForChain } from '../../config/contracts'
 import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
@@ -90,7 +91,10 @@ function TierLimits({ tierName, chainLimits }) {
  */
 function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { grantRole, loadRoles } = useRoles()
-  const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
+  const {
+    account, isConnected, isCorrectNetwork, switchNetwork, chainId,
+    loginMethod, sendCalls, provider, accountCapabilities,
+  } = useWeb3()
   const { showNotification } = useNotification()
   const { getPrice, getLimits, usingFallbackPrices } = useTierPrices()
   const { ensureInitialized } = useEncryption()
@@ -200,21 +204,83 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
 
     const tierValue = selectedTierInfo.id
     const tierName = selectedTierInfo.name
-    showNotification(`Confirm the wallet prompts to complete your ${tierName} membership (${selectedPrice} USDC)`, 'info', 10000)
+    const isPasskey = loginMethod === 'passkey'
+    showNotification(
+      isPasskey
+        ? `Confirm with your passkey to complete your ${tierName} membership (${selectedPrice} USDC)`
+        : `Confirm the wallet prompts to complete your ${tierName} membership (${selectedPrice} USDC)`,
+      'info',
+      10000,
+    )
 
     // Switch to the dedicated Processing view (spec 022) — the step indicator
     // surfaces each wallet interaction in turn.
     setShowProcessing(true)
     try {
-      // Get a fresh signer
+      // Spec 007 (FR-039): record the accepted in-force Terms version hash on-chain.
+      const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
+
+      // Membership is active the moment payment confirms — run side effects then,
+      // before the (non-blocking) key steps.
+      const onPaid = async (receipt) => {
+        grantRole(ROLE_KEY)
+        recordRolePurchase(account, ROLE_KEY, {
+          price: selectedPrice,
+          currency: 'USDC',
+          tier: selectedTier,
+          tierValue,
+          txHash: receipt?.hash,
+          purchasedBy: account,
+        }, chainId)
+        try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
+        showNotification(`${tierName} membership activated.`, 'success', 7000)
+      }
+
+      if (isPasskey) {
+        // Passkey smart account (spec 041, FR-016): approve + purchase are batched into
+        // ONE WebAuthn ceremony via the ERC-4337 bundler/relayer (WalletContext.sendCalls) —
+        // no browser-wallet prompt and no separate on-chain approval. Reads use the session's
+        // RPC provider; the batch carries the exact price the contract pulls.
+        const batchPurchase = async () => {
+          const { calls } = await buildMembershipPurchaseCalls(
+            provider, account, ROLE_KEY, tierValue, action, acceptedTermsHash,
+          )
+          const res = await sendCalls(calls)
+          return { hash: res?.txHash, txHash: res?.txHash, route: res?.route }
+        }
+
+        // Private-wager encryption is signature-derived and not yet wired to the passkey
+        // PRF pipeline, so gate it off honestly (clarification Q1): the membership stays
+        // fully active, only encrypted features are unavailable on this account for now.
+        const ensureInitializedPasskey = async () => {
+          throw new EncryptionUnavailable(
+            accountCapabilities?.encryptionReason ||
+            'Private-wager encryption is not yet available for passkey accounts. Your membership is fully active.',
+          )
+        }
+
+        await flow.start({
+          signer: null,
+          account,
+          roleName: ROLE_KEY,
+          priceUSD: selectedPrice,
+          tier: tierValue,
+          action,
+          termsHash: acceptedTermsHash,
+          batchPurchase,
+          ensureInitialized: ensureInitializedPasskey,
+          onPaid,
+        })
+        return
+      }
+
+      // Classic wallet path (EOA connectors): acquire the injected signer and route the
+      // purchase through the gasless-or-self-submit seam inside usePurchaseFlow.
       const { ethers } = await import('ethers')
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
       if (!accounts || accounts.length === 0) throw new Error('No wallet account authorised')
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-
-      // Spec 007 (FR-039): record the accepted in-force Terms version hash on-chain.
-      const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
+      const browserProvider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await browserProvider.getSigner()
 
       await flow.start({
         signer,
@@ -225,21 +291,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         action,
         termsHash: acceptedTermsHash,
         ensureInitialized,
-        // Membership is active the moment payment confirms — run side effects then,
-        // before the (non-blocking) key steps.
-        onPaid: async (receipt) => {
-          grantRole(ROLE_KEY)
-          recordRolePurchase(account, ROLE_KEY, {
-            price: selectedPrice,
-            currency: 'USDC',
-            tier: selectedTier,
-            tierValue,
-            txHash: receipt.hash,
-            purchasedBy: account,
-          }, chainId)
-          try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
-          showNotification(`${tierName} membership activated.`, 'success', 7000)
-        },
+        onPaid,
       })
     } catch (err) {
       // Failure to even acquire a signer (before the flow starts). In-flow failures
