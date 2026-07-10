@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WalletPage from '../pages/WalletPage'
 import { WalletContext, UIContext } from '../contexts'
@@ -101,9 +101,9 @@ const uiContext = {
   clearError: vi.fn(),
 }
 
-function renderPage(walletContext) {
+function renderPage(walletContext, route = '/wallet') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[route]}>
       <UIContext.Provider value={uiContext}>
         <WalletContext.Provider value={walletContext}>
           <WalletPage />
@@ -118,23 +118,20 @@ beforeEach(() => {
 })
 
 describe('WalletPage — address QR entry point', () => {
-  // Show QR Code (and pool phrase language) moved from the Account tab to the
-  // Preferences tab's "Wallet" section, alongside other settings.
-  function goToPreferences() {
-    fireEvent.click(screen.getByRole('tab', { name: 'Preferences' }))
-  }
+  // Show QR Code (and pool phrase language) live in the Preferences panel's
+  // "Wallet" section. Preferences is now reached from the account button, so the
+  // panel is deep-linked here via ?tab=preferences rather than an in-page tab.
+  const PREFERENCES_ROUTE = '/wallet?tab=preferences'
 
-  it('shows a "Show QR Code" button on the Preferences tab when connected (W1)', () => {
-    renderPage(connectedWalletContext)
-    goToPreferences()
+  it('shows a "Show QR Code" button on the Preferences panel when connected (W1)', () => {
+    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
     expect(
       screen.getByRole('button', { name: /show qr/i })
     ).toBeInTheDocument()
   })
 
   it('opens the address QR modal with the connected address — one interaction (W1 / SC-001)', () => {
-    const { container } = renderPage(connectedWalletContext)
-    goToPreferences()
+    const { container } = renderPage(connectedWalletContext, PREFERENCES_ROUTE)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
@@ -146,8 +143,7 @@ describe('WalletPage — address QR entry point', () => {
   })
 
   it('closes the modal again via its close button (M3 wiring)', () => {
-    renderPage(connectedWalletContext)
-    goToPreferences()
+    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
     fireEvent.click(screen.getByRole('button', { name: /show qr/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
@@ -155,11 +151,11 @@ describe('WalletPage — address QR entry point', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('renders the connect prompt with no Preferences tab when disconnected (W2 / FR-008)', () => {
-    renderPage(disconnectedWalletContext)
+  it('renders the connect prompt with no section content when disconnected (W2 / FR-008)', () => {
+    renderPage(disconnectedWalletContext, PREFERENCES_ROUTE)
     expect(screen.getByText(/connect your wallet/i)).toBeInTheDocument()
     expect(
-      screen.queryByRole('tab', { name: 'Preferences' })
+      screen.queryByRole('button', { name: /show qr/i })
     ).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -179,73 +175,28 @@ describe('WalletPage — sidebar identity', () => {
   })
 })
 
-describe('WalletPage — section nav slide-over drawer', () => {
-  // The section nav is a left slide-over drawer at every breakpoint: it starts
-  // closed, opens/collapses from the left, and dims the content with a backdrop
-  // while open (WalletPage.css). Behaviour is uniform across viewport widths.
-  it('starts closed and exposes the ☰ open control', () => {
-    renderPage(connectedWalletContext)
-
-    const toggle = screen.getByRole('button', { name: /show menu/i })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+describe('WalletPage — section routing', () => {
+  // The in-page section rail/drawer was lifted into the global nav drawer. The
+  // page is now a flat host: it reads `?tab=` to pick a panel and shows the
+  // active section's heading. No in-page ☰ toggle, backdrop, or footer here.
+  it('defaults to the Account section with no ?tab', () => {
+    renderPage(connectedWalletContext, '/wallet')
+    expect(screen.getByText('Account')).toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: /close menu/i })
+      screen.queryByRole('button', { name: /show menu/i })
     ).not.toBeInTheDocument()
   })
 
-  it('opens from the ☰ control with a dismiss backdrop', () => {
-    renderPage(connectedWalletContext)
-
-    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
-
-    expect(
-      screen.getByRole('button', { name: /hide menu/i })
-    ).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      screen.getByRole('button', { name: /close menu/i })
-    ).toBeInTheDocument()
+  it('deep-links to the Membership section via ?tab=membership', () => {
+    renderPage(connectedWalletContext, '/wallet?tab=membership')
+    // The Membership panel renders its "Your Roles" / "Membership" headings.
+    expect(screen.getByRole('heading', { name: /membership/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /your roles/i })).toBeInTheDocument()
   })
 
-  it('closes the drawer after a section is selected', () => {
-    renderPage(connectedWalletContext)
-
-    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
-    expect(
-      screen.getByRole('button', { name: /close menu/i })
-    ).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Membership' }))
-
-    expect(
-      screen.queryByRole('button', { name: /close menu/i })
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /show menu/i })
-    ).toHaveAttribute('aria-expanded', 'false')
-  })
-
-  it('dismisses the drawer when the backdrop is tapped', () => {
-    renderPage(connectedWalletContext)
-
-    fireEvent.click(screen.getByRole('button', { name: /show menu/i }))
-    fireEvent.click(screen.getByRole('button', { name: /close menu/i }))
-
-    expect(
-      screen.getByRole('button', { name: /show menu/i })
-    ).toHaveAttribute('aria-expanded', 'false')
-  })
-
-  it('contains the in-app legal footer at the bottom of the drawer', () => {
-    const { container } = renderPage(connectedWalletContext)
-
-    // The condensed legal footer is rendered inside the section drawer (aside),
-    // not as a separate page-level footer, on the wallet screen.
-    const drawer = container.querySelector('.wallet-portal-sidebar')
-    expect(drawer).toBeTruthy()
-    const footer = drawer.querySelector('.app-footer--drawer')
-    expect(footer).toBeTruthy()
-    expect(
-      within(footer).getByRole('link', { name: /Terms & Conditions/i })
-    ).toHaveAttribute('href', '/terms')
+  it('shows the active section label in the topbar', () => {
+    const { container } = renderPage(connectedWalletContext, '/wallet?tab=membership')
+    const current = container.querySelector('.wallet-portal-current')
+    expect(current).toHaveTextContent('Membership')
   })
 })

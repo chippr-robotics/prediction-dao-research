@@ -14,7 +14,22 @@ import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
 import PortalNav from './ui/PortalNav'
+import SectionIconNav from './nav/SectionIconNav'
 import './AdminPanel.css'
+
+// Icons for the mobile bottom quick-nav (SectionIconNav). Desktop uses the
+// text rail; mobile pins these so admins can hop between sections one-handed.
+const ADMIN_TAB_ICONS = {
+  overview: '📋',
+  emergency: '🚨',
+  tiers: '🎚️',
+  members: '👥',
+  moderation: '🛑',
+  'admin-roles': '🔑',
+  treasury: '🏦',
+  'oracle-adapters': '🔮',
+  'deny-list': '⛔',
+}
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
 const USDC_DECIMALS = 6
@@ -696,6 +711,14 @@ function AdminPanel() {
           />
         )}
           </main>
+
+          {/* Mobile-only bottom quick-nav between admin sections. */}
+          <SectionIconNav
+            items={adminTabs.map((tab) => ({ ...tab, icon: ADMIN_TAB_ICONS[tab.id] || '•' }))}
+            activeId={activeTab}
+            onSelect={setActiveTab}
+            ariaLabel="Admin sections"
+          />
         </div>
       </div>
     </div>
