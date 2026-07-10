@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatUnits } from 'ethers'
 import usePortfolio from '../../hooks/usePortfolio'
+import InfoTip from '../ui/InfoTip'
 import './Portfolio.css'
 
 // Full-precision USD for a compliance-flavored view — deliberately not the
@@ -44,13 +45,14 @@ const SOURCE_LABELS = {
 }
 
 function AssetRow({ holding }) {
-  const { asset, usd } = holding
+  const { asset, usd, network } = holding
   return (
     <li className="portfolio-row">
       <div className="portfolio-row-asset">
         <span className="portfolio-row-name">{asset.name}</span>
         <span className="portfolio-row-meta">
           {asset.symbol}
+          <span className="portfolio-row-network">{network}</span>
           <span className="portfolio-row-source">{SOURCE_LABELS[asset.source] || asset.source}</span>
         </span>
       </div>
@@ -70,42 +72,38 @@ function AssetRow({ holding }) {
 }
 
 function CategorySection({ group, collapsed, onToggle }) {
-  const { category, holdings, subtotalUsd, isPartial } = group
+  const { category, holdings, subtotalUsd } = group
   const regionId = `portfolio-category-${category.id}`
   const expanded = !collapsed
   return (
     <section className="portfolio-category">
-      <h3 className="portfolio-category-heading">
-        <button
-          type="button"
-          className="portfolio-category-toggle"
-          aria-expanded={expanded}
-          aria-controls={regionId}
-          onClick={() => onToggle(category.id)}
-        >
-          <span className="portfolio-category-chevron" aria-hidden="true">
-            {expanded ? '▾' : '▸'}
-          </span>
-          <span className="portfolio-category-label">{category.label}</span>
-          <span className="portfolio-category-subtotal">
-            {formatUsdFull(subtotalUsd)}
-            {isPartial && (
-              <span className="portfolio-partial-flag" title="Some assets in this category have no available price">
-                {' '}
-                (partial)
-              </span>
-            )}
-          </span>
-        </button>
-      </h3>
+      <div className="portfolio-category-heading-row">
+        <h3 className="portfolio-category-heading">
+          <button
+            type="button"
+            className="portfolio-category-toggle"
+            aria-expanded={expanded}
+            aria-controls={regionId}
+            onClick={() => onToggle(category.id)}
+          >
+            <span className="portfolio-category-chevron" aria-hidden="true">
+              {expanded ? '▾' : '▸'}
+            </span>
+            <span className="portfolio-category-label">{category.label}</span>
+            <span className="portfolio-category-subtotal">{formatUsdFull(subtotalUsd)}</span>
+          </button>
+        </h3>
+        <InfoTip label={`About ${category.label}`} className="portfolio-category-info">
+          {category.description}
+        </InfoTip>
+      </div>
       <div id={regionId} role="region" aria-label={category.label} hidden={!expanded}>
-        <p className="portfolio-category-description">{category.description}</p>
         {holdings.length === 0 ? (
           <p className="portfolio-category-empty">No assets in this category.</p>
         ) : (
           <ul className="portfolio-rows">
             {holdings.map((h) => (
-              <AssetRow key={h.asset.id} holding={h} />
+              <AssetRow key={`${h.asset.chainId}:${h.asset.id}`} holding={h} />
             ))}
           </ul>
         )}
@@ -115,10 +113,10 @@ function CategorySection({ group, collapsed, onToggle }) {
 }
 
 /**
- * Connected Account Portfolio (spec 044) — the member's live holdings on the
- * active network, grouped by the SEC/CFTC asset taxonomy. Read-only; honest
- * states for disconnected / unsupported network / loading / error / partial
- * pricing (FR-010/012/013/014).
+ * Connected Account Portfolio (spec 044 + follow-up) — the member's holdings
+ * across every supported network, grouped by the SEC/CFTC asset taxonomy.
+ * Read-only; category explainers live in InfoTip bubbles; testnet networks
+ * are included per the "show testnet tokens" preference.
  */
 export default function PortfolioPanel() {
   const portfolio = usePortfolio()
@@ -137,14 +135,6 @@ export default function PortfolioPanel() {
     return (
       <div className="portfolio-root">
         <p className="portfolio-state">Connect a wallet to see your portfolio.</p>
-      </div>
-    )
-  }
-
-  if (!portfolio.isSupportedNetwork) {
-    return (
-      <div className="portfolio-root">
-        <p className="portfolio-state">Portfolio isn&apos;t available on this network.</p>
       </div>
     )
   }
@@ -180,17 +170,7 @@ export default function PortfolioPanel() {
         </p>
         <p className="portfolio-total" aria-labelledby="portfolio-total-label">
           {formatUsdFull(portfolio.totalUsd)}
-          {portfolio.isPartial && (
-            <span className="portfolio-partial-flag portfolio-partial-total"> (partial)</span>
-          )}
         </p>
-        {portfolio.isPartial && (
-          <p className="portfolio-partial-note">
-            Some assets have no available price or could not be read
-            {portfolio.failedAssets.length > 0 && <> (unreadable: {portfolio.failedAssets.join(', ')})</>}
-            ; they are excluded from USD totals.
-          </p>
-        )}
         <button
           type="button"
           className="portfolio-refresh"
@@ -211,13 +191,13 @@ export default function PortfolioPanel() {
       ))}
 
       <footer className="portfolio-disclosures">
+        {!portfolio.showTestnetAssets && (
+          <p>Testnet tokens are hidden — enable them under Preferences → Portfolio.</p>
+        )}
         <p>
-          Classifications follow the app&apos;s SEC/CFTC-aligned taxonomy and are informational
-          only — not legal or investment advice.
-        </p>
-        <p>
-          Only assets in the app&apos;s curated registry are scanned, so other holdings may exist
-          on-chain that are not listed here.
+          Classifications are informational, not legal or investment advice. Only assets in the
+          app&apos;s curated registry are scanned, and USD totals include only assets with an
+          available price.
         </p>
       </footer>
     </div>

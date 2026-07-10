@@ -111,3 +111,12 @@ Ship US1 as the MVP (registry + hook + panel + nav). US2/US3 are small panel/con
 increments on top; US4 hardens scoping/freshness; polish gates close with axe + ESLint +
 full suite. Since all stories land in one PR here, implement sequentially US1 → US2 →
 US3 → US4 → Polish, validating each checkpoint's tests before moving on.
+
+## Phase 8: Follow-up v1.1 (density, cross-chain, testnet preference)
+
+- [X] T019 Add Sepolia (11155111) to `frontend/src/config/networks.js` as a portfolio-scan-only testnet (publicnode RPC, Circle Sepolia USDC, all capabilities off, not selectable)
+- [X] T020 Add `getPortfolioChainIds({ includeTestnets })` to `frontend/src/config/assetTaxonomy.js` (all networks except local sandboxes, mainnets first, testnets opt-in)
+- [X] T021 Rewrite `frontend/src/hooks/usePortfolio.js` for cross-chain reads via `makeReadProvider` per network; always-list digital commodities (zero balances render as 0 / $0.00); drop partial-total labeling; scope reset on preference change
+- [X] T022 Rework `frontend/src/components/wallet/PortfolioPanel.jsx`: category descriptions in shared `InfoTip` bubbles, per-row network badges, no partial labels, compact single-line disclosure, testnet-hidden note
+- [X] T023 Add `showTestnetAssets` preference (default false, persisted per wallet) to `frontend/src/contexts/UserPreferencesContext.jsx` and a Preferences → Portfolio group (`frontend/src/components/account/PortfolioPreferencesPanel.jsx`) wired into WalletPage
+- [X] T024 Update/extend tests: cross-chain hook suite, InfoTip/network/no-partial panel suite, `getPortfolioChainIds` + Sepolia registry tests, PortfolioPreferencesPanel suite, refreshed axe audits
