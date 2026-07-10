@@ -1,8 +1,8 @@
 # Implementation Plan: Ethereum Mainnet & Testnet Support
 
-**Branch**: `047-ethereum-mainnet-support` (working branch `claude/issue-847-speckit-specify-e4ekhw`) | **Date**: 2026-07-10 | **Spec**: [spec.md](./spec.md)
+**Branch**: `048-ethereum-mainnet-support` (working branch `claude/issue-847-speckit-specify-e4ekhw`) | **Date**: 2026-07-10 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/047-ethereum-mainnet-support/spec.md`
+**Input**: Feature specification from `specs/048-ethereum-mainnet-support/spec.md`
 
 ## Summary
 
@@ -67,7 +67,7 @@ those capabilities keep disclosing as unavailable.
 ### Documentation (this feature)
 
 ```text
-specs/047-ethereum-mainnet-support/
+specs/048-ethereum-mainnet-support/
 ├── plan.md              # This file (/speckit-plan output)
 ├── research.md          # Phase 0 output — decisions & rationale
 ├── data-model.md        # Phase 1 output — config entities & shapes

@@ -1,6 +1,6 @@
 # Quickstart: Ethereum Mainnet & Testnet Support
 
-End-to-end validation for spec 047. Proves a member can select the Ethereum networks, see
+End-to-end validation for spec 048. Proves a member can select the Ethereum networks, see
 Ethereum holdings in the portfolio, and send/receive on an active Ethereum network — with
 unavailable capabilities disclosed honestly. All work is in `frontend/`.
 

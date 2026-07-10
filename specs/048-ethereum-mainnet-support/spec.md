@@ -1,6 +1,6 @@
 # Feature Specification: Ethereum Mainnet & Testnet Support
 
-**Feature Branch**: `047-ethereum-mainnet-support`
+**Feature Branch**: `048-ethereum-mainnet-support`
 
 **Created**: 2026-07-10
 

@@ -1,10 +1,10 @@
 ---
-description: "Task list for Ethereum Mainnet & Testnet Support (spec 047)"
+description: "Task list for Ethereum Mainnet & Testnet Support (spec 048)"
 ---
 
 # Tasks: Ethereum Mainnet & Testnet Support
 
-**Input**: Design documents from `specs/047-ethereum-mainnet-support/`
+**Input**: Design documents from `specs/048-ethereum-mainnet-support/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
