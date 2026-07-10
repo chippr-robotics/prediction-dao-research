@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { classifyOrientation, inclinationFromFlat, TILT_DEFAULTS } from '../../lib/privacy/tilt'
 
-describe('tilt classifier (spec 046)', () => {
+describe('tilt classifier (spec 047)', () => {
   describe('inclinationFromFlat', () => {
     it('is ~0deg when the phone lies flat, face up', () => {
       expect(inclinationFromFlat(0, 0)).toBeLessThan(2)

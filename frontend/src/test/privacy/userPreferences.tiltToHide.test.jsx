@@ -17,7 +17,7 @@ function wrapper({ children }) {
   return <UserPreferencesProvider>{children}</UserPreferencesProvider>
 }
 
-describe('UserPreferencesContext — tiltToHide (spec 046)', () => {
+describe('UserPreferencesContext — tiltToHide (spec 047)', () => {
   beforeEach(() => {
     localStorage.clear()
     state.account = ACCOUNT_A

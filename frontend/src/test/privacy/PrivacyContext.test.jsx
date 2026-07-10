@@ -28,7 +28,7 @@ function renderProvider() {
   )
 }
 
-describe('PrivacyProvider (spec 046)', () => {
+describe('PrivacyProvider (spec 047)', () => {
   beforeEach(() => {
     prefs.tiltToHide = true
     delete window.DeviceOrientationEvent.requestPermission

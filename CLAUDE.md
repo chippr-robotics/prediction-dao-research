@@ -104,5 +104,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/046-mask-sensitive-values/plan.md
+at specs/047-mask-sensitive-values/plan.md
 <!-- SPECKIT END -->

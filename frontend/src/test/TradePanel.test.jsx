@@ -156,7 +156,7 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     expect(screen.getByText(/1 WPOL = 1.23 USDC/)).toBeInTheDocument()
     expect(screen.getByText('0.42%')).toBeInTheDocument()
     // The minimum-received amount is wrapped in <SensitiveValue> for tilt-to-hide
-    // (spec 046), so assert against the row that holds both amount and symbol.
+    // (spec 047), so assert against the row that holds both amount and symbol.
     expect(screen.getByText('1.22385').closest('.trade-summary-val')).toHaveTextContent(/1.22385\s*USDC/)
     expect(screen.getByText('0.3% pool')).toBeInTheDocument()
   })

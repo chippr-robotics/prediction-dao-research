@@ -35,7 +35,7 @@ createRoot(document.getElementById('root')).render(
               <UserPreferencesProvider>
                 {/* PrivacyProvider reads the tiltToHide preference and owns the
                     live tilt-to-hide viewing state; must wrap App so every
-                    monetary render site can mask (spec 046). */}
+                    monetary render site can mask (spec 047). */}
                 <PrivacyProvider>
                   <FriendMarketsProvider>
                     <DexProvider>

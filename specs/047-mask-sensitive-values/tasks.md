@@ -4,7 +4,7 @@ description: "Task list for Mask Sensitive Values (Tilt-to-Hide)"
 
 # Tasks: Mask Sensitive Values (Tilt-to-Hide)
 
-**Input**: Design documents from `/specs/046-mask-sensitive-values/`
+**Input**: Design documents from `/specs/047-mask-sensitive-values/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/tilt-to-hide.md, quickstart.md
 
@@ -251,5 +251,5 @@ fields.
 - All 6 tilt-to-hide test files pass (36 tests). Full frontend suite: the only
   regression from wrapping (`TradePanel.test.jsx` cross-element matcher) was fixed.
 - Pre-existing, unrelated failures remain on this branch and are **out of scope**
-  for spec 046 (verified failing with the original `test/setup.js` too):
+  for spec 047 (verified failing with the original `test/setup.js` too):
   `clearpath/ClearPathPanel`, `clearpath/ProposalBuilder`, `quickAccessPreference`.

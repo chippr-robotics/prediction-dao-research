@@ -1,6 +1,6 @@
 # Tilt-to-Hide (Mask Sensitive Values)
 
-Spec: [`specs/046-mask-sensitive-values/`](../../specs/046-mask-sensitive-values/spec.md)
+Spec: [`specs/047-mask-sensitive-values/`](../../specs/047-mask-sensitive-values/spec.md)
 
 Tilt-to-hide masks on-screen monetary figures automatically: on a mobile device,
 balances show while the phone is held at a viewing tilt and hide the moment it is

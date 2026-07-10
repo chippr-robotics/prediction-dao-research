@@ -2,7 +2,7 @@ import { usePrivacy } from '../../hooks/usePrivacy'
 import './SensitiveValue.css'
 
 /**
- * SensitiveValue — masks a monetary figure when tilt-to-hide is active (spec 046).
+ * SensitiveValue — masks a monetary figure when tilt-to-hide is active (spec 047).
  *
  * When `usePrivacy().hidden` is true it renders a fixed neutral placeholder in
  * place of the value. Critically, the real value string is NOT rendered into the

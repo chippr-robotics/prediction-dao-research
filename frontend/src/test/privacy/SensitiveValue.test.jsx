@@ -14,7 +14,7 @@ function renderWith(hidden, ui) {
   return render(<PrivacyContext.Provider value={value}>{ui}</PrivacyContext.Provider>)
 }
 
-describe('SensitiveValue (spec 046)', () => {
+describe('SensitiveValue (spec 047)', () => {
   it('renders the exact value when not hidden', () => {
     renderWith(false, <SensitiveValue className="amt">$1,234.56</SensitiveValue>)
     expect(screen.getByText('$1,234.56')).toBeInTheDocument()

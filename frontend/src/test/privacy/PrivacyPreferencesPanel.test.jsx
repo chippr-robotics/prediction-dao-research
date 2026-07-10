@@ -30,7 +30,7 @@ beforeEach(() => {
   mockPrivacy.requestMotionPermission = vi.fn(async () => 'granted')
 })
 
-describe('PrivacyPreferencesPanel (spec 046)', () => {
+describe('PrivacyPreferencesPanel (spec 047)', () => {
   it('renders an accessible switch that is on by default', () => {
     render(<PrivacyPreferencesPanel />)
     const toggle = screen.getByRole('switch', { name: /hide balances when phone is flat/i })

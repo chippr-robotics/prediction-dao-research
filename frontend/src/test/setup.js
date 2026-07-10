@@ -301,7 +301,7 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
-// Mock DeviceOrientationEvent for tilt-to-hide tests (spec 046). jsdom has no
+// Mock DeviceOrientationEvent for tilt-to-hide tests (spec 047). jsdom has no
 // orientation sensor; tests dispatch a plain Event with beta/gamma attached, or
 // use dispatchOrientation() below. requestPermission is left UNDEFINED by default
 // so the non-iOS path is exercised; tests that need the iOS gesture flow set

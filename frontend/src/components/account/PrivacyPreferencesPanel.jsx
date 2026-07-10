@@ -3,7 +3,7 @@ import { usePrivacy } from '../../hooks/usePrivacy'
 import './PrivacyPreferencesPanel.css'
 
 /**
- * PrivacyPreferencesPanel — the "Privacy" area of the Preferences tab (spec 046).
+ * PrivacyPreferencesPanel — the "Privacy" area of the Preferences tab (spec 047).
  *
  * A single app-wide tilt-to-hide switch (default on). On devices without motion
  * sensing (desktop / sensor-less) or where motion access is denied, the panel

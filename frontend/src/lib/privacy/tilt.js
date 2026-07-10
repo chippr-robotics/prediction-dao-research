@@ -1,5 +1,5 @@
 /**
- * Pure device-orientation classifier for tilt-to-hide (spec 046).
+ * Pure device-orientation classifier for tilt-to-hide (spec 047).
  *
  * Turns a DeviceOrientationEvent reading ({ beta, gamma }) into a coarse
  * 'viewing' | 'hidden' state. No DOM, no side effects, fully deterministic — all

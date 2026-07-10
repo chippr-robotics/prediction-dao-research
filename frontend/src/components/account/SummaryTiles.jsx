@@ -6,7 +6,7 @@ import './SummaryTiles.css'
 /**
  * A single animated numeric value. Monetary tiles pass `sensitive` so the value
  * is masked (placeholder, no animation shown) when tilt-to-hide is active
- * (spec 046); non-monetary tiles (win rate, active count) are never masked.
+ * (spec 047); non-monetary tiles (win rate, active count) are never masked.
  */
 function AnimatedValue({ value, format, sensitive = false }) {
   const n = useCountUp(Number(value) || 0)

@@ -2,7 +2,7 @@ import { useContext } from 'react'
 import { PrivacyContext } from '../contexts/PrivacyContext'
 
 /**
- * Access the tilt-to-hide privacy state (spec 046).
+ * Access the tilt-to-hide privacy state (spec 047).
  *
  * Unlike most context hooks this does NOT throw when used outside its provider:
  * it returns a safe "values shown" default so any component that wraps a value in

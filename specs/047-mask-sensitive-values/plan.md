@@ -2,7 +2,7 @@
 
 **Branch**: `claude/mask-sensitive-values-e6o6a6` | **Date**: 2026-07-10 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/046-mask-sensitive-values/spec.md`
+**Input**: Feature specification from `/specs/047-mask-sensitive-values/spec.md`
 
 ## Summary
 
@@ -106,7 +106,7 @@ existing Preferences-panel pattern rather than introducing parallel machinery.
 ### Documentation (this feature)
 
 ```text
-specs/046-mask-sensitive-values/
+specs/047-mask-sensitive-values/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

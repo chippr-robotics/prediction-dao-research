@@ -4,7 +4,7 @@ import { classifyOrientation } from '../lib/privacy/tilt'
 import { PrivacyContext } from './PrivacyContext.js'
 
 /**
- * PrivacyProvider — owns the live tilt-to-hide "viewing state" (spec 046).
+ * PrivacyProvider — owns the live tilt-to-hide "viewing state" (spec 047).
  *
  * Reads the per-account `tiltToHide` preference, subscribes to
  * `deviceorientation` while enabled, and derives `hidden` (mask now?) from the

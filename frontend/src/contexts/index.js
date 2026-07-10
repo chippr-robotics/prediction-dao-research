@@ -17,7 +17,7 @@ export { DexProvider } from './DexContext.jsx'
 export { UserPreferencesContext } from './UserPreferencesContext.js'
 export { UserPreferencesProvider } from './UserPreferencesContext.jsx'
 
-// Privacy (tilt-to-hide) context — live viewing state for value masking (spec 046)
+// Privacy (tilt-to-hide) context — live viewing state for value masking (spec 047)
 export { PrivacyContext } from './PrivacyContext.js'
 export { PrivacyProvider } from './PrivacyContext.jsx'
 

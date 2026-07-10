@@ -25,7 +25,7 @@ function renderScreen(ui = <MoneyScreen />) {
   return render(<PrivacyProvider>{ui}</PrivacyProvider>)
 }
 
-describe('tilt-to-hide end-to-end (spec 046, US1)', () => {
+describe('tilt-to-hide end-to-end (spec 047, US1)', () => {
   beforeEach(() => {
     prefs.tiltToHide = true
     delete window.DeviceOrientationEvent.requestPermission
