@@ -19,7 +19,12 @@ import { CHAINLINK_FEEDS, FEED_MAX_AGE_SECONDS, DEX_SPOT_FEE_TIERS } from '../..
 import { NETWORKS } from '../../config/networks'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-const Q96 = 2 ** 96
+// sqrtPriceX96 is a uint160 — far beyond Number.MAX_SAFE_INTEGER — so the
+// squaring happens in BigInt and only the final scaled ratio is converted.
+// RATIO_SCALE keeps 27 significant decimal digits through the conversion;
+// raw ratios below 1e-27 (no real pool) round to 0 and are rejected.
+const Q192 = 1n << 192n
+const RATIO_SCALE = 10n ** 27n
 
 export function underlyingSymbolOf(asset) {
   return (asset.baselineSymbol || asset.symbol || '').toUpperCase()
@@ -58,12 +63,13 @@ async function readDexSpotUsd(provider, dex, token, stable) {
         pool.liquidity(),
       ])
       if (liquidity === 0n) continue
-      const sqrtPriceX96 = Number(slot0[0])
-      if (!sqrtPriceX96) continue
-      // rawRatio = raw token1 per raw token0. Human price of our token in
-      // the stablecoin: token0 → rawRatio·10^(dTok−dStable);
-      // token1 → (1/rawRatio)·10^(dTok−dStable).
-      const rawRatio = (sqrtPriceX96 / Q96) ** 2
+      const sqrtPriceX96 = BigInt(slot0[0])
+      if (sqrtPriceX96 === 0n) continue
+      // rawRatio = raw token1 per raw token0 = sqrtPriceX96² / 2¹⁹². Human
+      // price of our token in the stablecoin:
+      // token0 → rawRatio·10^(dTok−dStable); token1 → (1/rawRatio)·10^(dTok−dStable).
+      const rawRatio = Number((sqrtPriceX96 * sqrtPriceX96 * RATIO_SCALE) / Q192) / 1e27
+      if (rawRatio === 0) continue
       const tokenIsToken0 = token0.toLowerCase() === token.address.toLowerCase()
       const price =
         (tokenIsToken0 ? rawRatio : 1 / rawRatio) * 10 ** (token.decimals - stable.decimals)

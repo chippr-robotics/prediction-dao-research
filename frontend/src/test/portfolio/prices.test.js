@@ -140,6 +140,15 @@ describe('fetchPortfolioPrices', () => {
     expect(prices.get('ETC').usd).toBeCloseTo(15, 1)
   })
 
+  it('keeps precision for full-magnitude sqrtPriceX96 values (uint160 ≫ 2^53)', async () => {
+    // USC as token0 with a high WETC price ⇒ sqrtPriceX96 ≈ 1.8e33, far
+    // beyond Number.MAX_SAFE_INTEGER — the BigInt path must stay accurate.
+    setEtcPool(2000, { wetcIsToken0: false })
+    const prices = await fetchPortfolioPrices(providers, registry, NOW)
+    const usd = prices.get('ETC').usd
+    expect(Math.abs(usd - 2000) / 2000).toBeLessThan(1e-6)
+  })
+
   it('leaves assets unpriced when neither source resolves', async () => {
     const prices = await fetchPortfolioPrices(providers, registry, NOW)
     expect(prices.size).toBe(0)
