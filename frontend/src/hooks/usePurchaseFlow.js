@@ -157,9 +157,13 @@ export function usePurchaseFlow(deps = {}) {
         }
       }
 
-      // register
+      // register — passkey sessions have no ethers signer, so they supply a
+      // `registerKey(publicKey)` closure that publishes the key through sendCalls
+      // (one WebAuthn ceremony); EOA wallets keep the signer-based service call.
       updateStep('register', { state: 'active', failureReason: null })
-      const wasNew = await registerKeyFn(p.signer, p.account, publicKeyRef.current)
+      const wasNew = typeof p.registerKey === 'function'
+        ? await p.registerKey(publicKeyRef.current)
+        : await registerKeyFn(p.signer, p.account, publicKeyRef.current)
       updateStep('register', { state: 'completed' })
       setKeyRegOutcome(wasNew ? 'success' : 'skipped')
       setStatus('succeeded')

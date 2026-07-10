@@ -1456,6 +1456,109 @@ export async function resolveMembershipIntentParams(signer, roleName, tier = Mem
 }
 
 /**
+ * Passkey smart accounts (spec 041, FR-016): build the [approve, purchase] call
+ * batch a passkey session submits through {@link WalletContext.sendCalls} — ONE
+ * WebAuthn ceremony authorizes the whole batch via the ERC-4337 bundler (gasless
+ * where a paymaster serves the chain), so there is no separate on-chain approval
+ * and no browser-wallet prompt.
+ *
+ * Read-only: `provider` is a plain RPC provider (no signer). Price + terms + method
+ * selection mirror {@link purchaseRoleWithStablecoin} exactly, so the batched
+ * `approve(price)` matches the amount the contract pulls and the purchase method
+ * matches the self-submit path byte-for-byte.
+ *
+ * @param {ethers.Provider} provider - RPC read provider for the connected chain
+ * @param {string} account - the passkey smart-account address (the member)
+ * @param {string} roleName - role being purchased/upgraded/extended
+ * @param {number} tier - target tier (1=Bronze..4=Platinum), clamped to [1,4]
+ * @param {string} [action='purchase'] - 'purchase' (default), 'upgrade', or 'extend'
+ * @param {string|null} [termsHash=null] - accepted T&C version hash (bare 64-hex or 0x-prefixed)
+ * @returns {Promise<{calls: Array<{target: string, data: string, value: bigint}>, price: bigint,
+ *   membershipManager: string, paymentToken: string, roleHash: string, validTier: number}>}
+ */
+export async function buildMembershipPurchaseCalls(provider, account, roleName, tier = MembershipTier.BRONZE, action = 'purchase', termsHash = null) {
+  if (!provider) throw new Error('No read provider available')
+  if (!account) throw new Error('No account address available')
+  const roleHash = getRoleHash(roleName)
+  if (!roleHash) throw new Error(`Unknown role: ${roleName}`)
+  const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+
+  let walletChainId = null
+  try {
+    walletChainId = Number((await provider.getNetwork()).chainId)
+  } catch { /* provider without a network; fall back to build-time chain */ }
+  const mmAddress = getContractAddressForChain('membershipManager', walletChainId)
+  if (!mmAddress) {
+    throw new Error(`No membership contract is configured on the connected network (chain ${walletChainId ?? 'unknown'}).`)
+  }
+  const code = await provider.getCode(mmAddress)
+  if (!code || code === '0x') {
+    throw new Error(
+      `No membership contract is deployed at ${mmAddress} on the connected network (chain ${walletChainId ?? 'unknown'}). ` +
+        `Please switch to Polygon and try again.`
+    )
+  }
+
+  const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
+  const paymentTokenAddr = await mm.paymentToken()
+  if (!paymentTokenAddr || paymentTokenAddr === ethers.ZeroAddress) {
+    throw new Error('MembershipManager has no payment token configured. Contact the DAO administrator.')
+  }
+  const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, provider)
+
+  // Exact price the contract will charge (this becomes the batched approve amount).
+  let price
+  if (action === 'upgrade') {
+    const membership = await mm.getMembership(account, roleHash)
+    const currentCfg = await mm.getTierConfig(roleHash, membership.tier)
+    const newCfg = await mm.getTierConfig(roleHash, validTier)
+    price = newCfg.priceUSDC - currentCfg.priceUSDC
+  } else {
+    const tierCfg = await mm.getTierConfig(roleHash, validTier)
+    price = tierCfg.priceUSDC
+  }
+
+  const balance = await paymentToken.balanceOf(account)
+  if (balance < price) {
+    throw new Error(
+      `Insufficient USDC balance. Have ${ethers.formatUnits(balance, 6)}, need ${ethers.formatUnits(price, 6)}.`
+    )
+  }
+
+  // Spec 007 (FR-039): record the accepted T&C version on-chain via the *WithTerms overloads.
+  const normTerms = typeof termsHash === 'string'
+    ? (termsHash.startsWith('0x') ? termsHash : '0x' + termsHash)
+    : null
+  const hasTerms = normTerms !== null && /^0x[0-9a-fA-F]{64}$/.test(normTerms)
+
+  let purchaseData
+  if (action === 'upgrade') {
+    purchaseData = hasTerms
+      ? mm.interface.encodeFunctionData('upgradeTierWithTerms', [roleHash, validTier, normTerms])
+      : mm.interface.encodeFunctionData('upgradeTier', [roleHash, validTier])
+  } else if (action === 'extend') {
+    purchaseData = mm.interface.encodeFunctionData('extendMembership', [roleHash])
+  } else {
+    purchaseData = hasTerms
+      ? mm.interface.encodeFunctionData('purchaseTierWithTerms', [roleHash, validTier, normTerms])
+      : mm.interface.encodeFunctionData('purchaseTier', [roleHash, validTier])
+  }
+  const approveData = paymentToken.interface.encodeFunctionData('approve', [mmAddress, price])
+
+  return {
+    calls: [
+      { target: paymentTokenAddr, data: approveData, value: 0n },
+      { target: mmAddress, data: purchaseData, value: 0n },
+    ],
+    price,
+    membershipManager: mmAddress,
+    paymentToken: paymentTokenAddr,
+    roleHash,
+    validTier,
+  }
+}
+
+/**
  * Spec 022: read-only pre-flight to decide whether the membership purchase will
  * require a separate ERC-20 approval prompt. Lets the progress indicator build the
  * exact step list up front and OMIT the approval step entirely when the member

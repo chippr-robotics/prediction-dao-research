@@ -183,6 +183,43 @@ export async function registerEncryptionKey(signer, publicKeyBytes) {
 }
 
 /**
+ * Build the KeyRegistry `registerKey` call batch for a passkey smart account
+ * (spec 041) — submitted through WalletContext.sendCalls as a single WebAuthn
+ * ceremony, since a passkey session has no ethers signer.
+ *
+ * Mirrors {@link registerEncryptionKey}: prefers `registerKeyWithEligibility`
+ * (Spec 007 FR-043 — records the in-force Terms version hash on-chain) when a
+ * terms hash is supplied and the ABI exposes it, else plain `registerKey`.
+ *
+ * @param {Uint8Array} publicKeyBytes - X25519 public key (32 bytes)
+ * @param {number} chainId - chain the passkey account is on
+ * @param {string|null} [termsHash] - in-force Terms version hash (bare 64-hex or 0x-prefixed)
+ * @returns {Array<{target: string, data: string, value: bigint}>} single-call batch
+ */
+export function buildRegisterKeyCalls(publicKeyBytes, chainId, termsHash = null) {
+  if (!publicKeyBytes || publicKeyBytes.length !== 32) {
+    throw new Error('Invalid public key: must be 32 bytes')
+  }
+  const address = getContractAddressForChain('keyRegistry', chainId) || getContractAddressForChain('zkKeyManager', chainId)
+  if (!address) throw new Error('KeyRegistry contract not configured')
+
+  const iface = new ethers.Interface(KEY_REGISTRY_ABI)
+  const publicKeyHex = '0x' + bytesToHex(publicKeyBytes)
+  const normTerms = typeof termsHash === 'string'
+    ? (termsHash.startsWith('0x') ? termsHash : '0x' + termsHash)
+    : null
+  const hasEligibility = iface.fragments.some(
+    (f) => f.type === 'function' && f.name === 'registerKeyWithEligibility'
+  )
+
+  const data = (normTerms && hasEligibility)
+    ? iface.encodeFunctionData('registerKeyWithEligibility', [publicKeyHex, normTerms])
+    : iface.encodeFunctionData('registerKey', [publicKeyHex])
+
+  return [{ target: address, data, value: 0n }]
+}
+
+/**
  * Ensure a user's key is registered on-chain. If already registered, no-op.
  *
  * @param {ethers.Signer} signer - Connected wallet signer
