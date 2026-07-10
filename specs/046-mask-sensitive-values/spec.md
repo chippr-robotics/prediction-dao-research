@@ -26,6 +26,14 @@ choice is remembered so the app stays in their preferred state the next time
 they open it. Nothing about balances, holdings, or on-chain state changes — this
 is purely a display-level mask over values that are already the member's own.
 
+## Clarifications
+
+### Session 2026-07-10
+
+- Q: What should the privacy preference be keyed to (per-device vs per-account)? → A: Per connected account — each wallet address remembers its own masked/revealed state on the local device; before any account is connected the default (revealed) applies.
+- Q: Where should the always-available privacy toggle live? → A: A persistent global control in the app header/navigation, visible on every screen.
+- Q: Which additional monetary figures should v1 mask beyond the core set? → A: All on-screen monetary figures — including activity/transaction-history amounts and pending payout/winnings amounts, not just balances, totals, subtotals, per-asset values, and stakes.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Instantly hide my balances in a public space (Priority: P1)
@@ -136,6 +144,10 @@ without turning the global toggle off.
   visual glyphs.
 - **Screenshots and screen-share**: a screenshot or shared screen taken while
   masked shows the placeholders, since masking operates on what is rendered.
+- **Switching accounts**: because the preference is keyed to the connected
+  account, switching to a different account applies that account's own remembered
+  state (revealed if it has never been set); the switch must not flash the new
+  account's real values if that account's saved state is masked.
 - **Layout under different value widths**: masking a long value and a short
   value should not cause the row to resize in a way that reveals the original
   magnitude (the placeholder should not encode digit count).
@@ -144,27 +156,30 @@ without turning the global toggle off.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST provide a single privacy toggle that is reachable
-  from every screen that can display sensitive monetary values, without deep
-  navigation.
+- **FR-001**: The system MUST provide a single privacy toggle as a persistent
+  control in the app header/navigation, visible and operable from every screen
+  that can display sensitive monetary values, without deep navigation.
 - **FR-002**: Activating the toggle MUST immediately replace every sensitive
   monetary value currently on screen with a neutral masked placeholder, and
   deactivating it MUST immediately restore the exact real values.
-- **FR-003**: The system MUST define an explicit set of "sensitive" values that
-  are masked — at minimum: wallet/account balances, the portfolio total,
-  category subtotals, per-asset amounts and USD values, and wager stake amounts
-  — and MUST NOT mask non-sensitive numbers such as participant counts,
-  timers, dates, or identifiers.
+- **FR-003**: The system MUST mask every on-screen monetary figure. This
+  explicitly includes: wallet/account balances, the portfolio total, category
+  subtotals, per-asset amounts and USD values, wager stake amounts,
+  activity/transaction-history amounts, and pending payout/winnings amounts. The
+  system MUST NOT mask non-sensitive numbers such as participant counts, timers,
+  dates, or identifiers.
 - **FR-004**: The masked state MUST apply globally across the app: while active,
   every sensitive value on the current and any subsequently visited screen is
   masked, including values that load or update asynchronously after activation.
-- **FR-005**: The system MUST persist the member's toggle choice so that it is
-  retained across app reloads and new sessions on the same device.
+- **FR-005**: The system MUST persist the member's toggle choice keyed to the
+  connected account, so that each account's masked/revealed state is retained
+  across app reloads and new sessions on the same device, and switching accounts
+  restores that account's own remembered state.
 - **FR-006**: When the persisted state is "masked," the app MUST render
   sensitive values masked from the initial display, with no visible flash of
   real values before the mask applies.
-- **FR-007**: The default state for a member who has never set the toggle MUST
-  be "revealed" (values shown).
+- **FR-007**: The default state MUST be "revealed" (values shown) for any
+  account that has not yet set the toggle, and while no account is connected.
 - **FR-008**: Masking MUST NOT alter, recompute, or lose the underlying values;
   toggling off MUST reproduce the identical figures (including honest
   "unavailable" / non-zero states) that would have been shown without the
@@ -184,20 +199,23 @@ without turning the global toggle off.
 - **FR-013**: The system SHOULD allow a member to briefly reveal a single masked
   value (a "peek") without turning off the global toggle, after which that value
   re-masks. *(Supports User Story 3; optional for MVP.)*
-- **FR-014**: The privacy preference MUST be treated as a local device
-  presentation setting and MUST NOT depend on network/on-chain state or leak
-  across the testnet/mainnet network boundary in a way that changes displayed
-  balances.
+- **FR-014**: The privacy preference MUST be treated as a local, per-account
+  presentation setting stored on the device and MUST NOT depend on network/on-chain
+  state or leak across the testnet/mainnet network boundary in a way that changes
+  displayed balances.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Privacy Preference**: A per-device, per-member presentation setting with two
-  states — masked or revealed — that persists across sessions and defaults to
-  revealed. It governs display only and holds no financial data.
-- **Sensitive Value Field**: A category of on-screen figure classified as
-  financially sensitive (balance, portfolio total, subtotal, per-asset value,
-  stake amount) and therefore subject to masking. Non-sensitive figures are
-  explicitly excluded.
+- **Privacy Preference**: A presentation setting with two states — masked or
+  revealed — stored locally on the device and keyed to the connected account, so
+  each account remembers its own state across sessions. Defaults to revealed for
+  a not-yet-set account and while no account is connected. It governs display
+  only and holds no financial data.
+- **Sensitive Value Field**: Any on-screen monetary figure subject to masking —
+  balances, portfolio total, subtotals, per-asset values, stake amounts,
+  activity/transaction-history amounts, and pending payout/winnings amounts.
+  Non-monetary figures (counts, timers, dates, identifiers) are explicitly
+  excluded.
 
 ## Success Criteria *(mandatory)*
 
@@ -225,11 +243,13 @@ without turning the global toggle off.
 - The scope is the FairWins frontend/web experience; masking is a client-side
   presentation concern and does not require any smart-contract or subgraph
   change.
-- "Sensitive values" are financial figures (balances, totals, subtotals,
-  per-asset values, stake amounts). Identifiers, counts, dates, and timers are
-  out of scope for masking unless later specified.
-- The preference is stored per device (local to the browser/app instance);
-  syncing the preference across a member's devices is out of scope for v1.
+- "Sensitive values" are all on-screen monetary figures (balances, totals,
+  subtotals, per-asset values, stake amounts, activity/transaction-history
+  amounts, pending payout/winnings amounts). Identifiers, counts, dates, and
+  timers are out of scope for masking unless later specified.
+- The preference is stored locally on the device and keyed to the connected
+  account; syncing the preference across a member's devices is out of scope for
+  v1.
 - The default is revealed, matching current behavior, so existing members see no
   change until they opt in.
 - Masking protects against casual over-the-shoulder / shared-screen viewing; it
