@@ -5,6 +5,7 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { ResolutionType } from '../../constants/wagerDefaults'
 import { UIContext } from '../../contexts/UIContext'
 import InfoTip from '../ui/InfoTip'
+import SensitiveValue from '../common/SensitiveValue'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
 import './TakeChallengePanel.css'
@@ -174,7 +175,7 @@ function ChallengeStake({ wager }) {
   return (
     <div className="tc-stake" aria-label="Stake and payout">
       <span className="tc-stake-line">
-        You stake <strong>{amount} {stable}</strong> — winner takes <strong>{payout} {stable}</strong>
+        You stake <SensitiveValue as="strong">{amount} {stable}</SensitiveValue> — winner takes <SensitiveValue as="strong">{payout} {stable}</SensitiveValue>
       </span>
     </div>
   )

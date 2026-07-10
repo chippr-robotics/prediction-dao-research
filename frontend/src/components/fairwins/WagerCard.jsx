@@ -1,6 +1,7 @@
 import Badge from '../ui/Badge'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import OpponentName from './OpponentName'
+import SensitiveValue from '../common/SensitiveValue'
 
 // spec 012 FR-007 action-needed labels, reused on the card's status row.
 const ACTION_NEEDED_LABELS = {
@@ -67,7 +68,7 @@ export default function WagerCard({
       >
         <div className="wc-header-main">
           <div className="wc-amount-row">
-            <span className="wc-stake">{vm.stake}</span>
+            <SensitiveValue className="wc-stake">{vm.stake}</SensitiveValue>
             <span className="wc-token">{vm.tokenSymbol}</span>
             {vm.outcome && (
               <span className={`wc-outcome ${vm.outcome.tone}`}>

@@ -1,5 +1,8 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { formatSignedUsd } from '../../lib/account/format'
+import { usePrivacy } from '../../hooks/usePrivacy'
+
+const MASK = '••'
 
 /**
  * PnlChartCanvas — the Recharts internals, isolated so it can be lazy-loaded
@@ -13,18 +16,22 @@ function readVar(name, fallback) {
 }
 
 function ChartTooltip({ active, payload }) {
+  const { hidden } = usePrivacy()
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   const date = new Date(p.timestamp)
   return (
     <div className="account-chart-tooltip" role="status">
       <div className="account-chart-tooltip-date">{date.toLocaleDateString()}</div>
-      <div className="account-chart-tooltip-value">{formatSignedUsd(p.cumulativeUsd)}</div>
+      <div className="account-chart-tooltip-value">
+        {hidden ? MASK : formatSignedUsd(p.cumulativeUsd)}
+      </div>
     </div>
   )
 }
 
 function PnlChartCanvas({ points }) {
+  const { hidden } = usePrivacy()
   const end = points.length ? points[points.length - 1].cumulativeUsd : 0
   const positive = end >= 0
   const stroke = positive
@@ -50,7 +57,7 @@ function PnlChartCanvas({ points }) {
           minTickGap={32}
         />
         <YAxis
-          tickFormatter={(v) => formatSignedUsd(v)}
+          tickFormatter={(v) => (hidden ? MASK : formatSignedUsd(v))}
           tick={{ fontSize: 11, fill: readVar('--text-muted', '#8A959E') }}
           width={56}
         />

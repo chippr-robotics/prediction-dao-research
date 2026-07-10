@@ -1,6 +1,8 @@
 import { Suspense, lazy } from 'react'
 import { RANGES } from '../../lib/account/computePnlSeries'
 import { formatSignedUsd } from '../../lib/account/format'
+import { usePrivacy } from '../../hooks/usePrivacy'
+import SensitiveValue from '../common/SensitiveValue'
 import EmptyState from './EmptyState'
 import './PnlChart.css'
 
@@ -16,11 +18,14 @@ const RANGE_LABEL = { '7D': '7D', '30D': '30D', '90D': '90D', ALL: 'All' }
  */
 function PnlChart({ series, onRangeChange, onCreateWager }) {
   const { range, points, isEmpty, isLowData, endValueUsd } = series
+  const { hidden } = usePrivacy()
 
   const rangeLabel = RANGE_LABEL[range] || range
   const srSummary = isEmpty
     ? 'Net profit and loss over time: no activity yet.'
-    : `Net profit and loss over the ${rangeLabel} range: ${formatSignedUsd(endValueUsd)}.`
+    : hidden
+      ? `Net profit and loss over the ${rangeLabel} range: hidden.`
+      : `Net profit and loss over the ${rangeLabel} range: ${formatSignedUsd(endValueUsd)}.`
 
   return (
     <section className="account-chart" aria-label="Performance over time">
@@ -68,7 +73,7 @@ function PnlChart({ series, onRangeChange, onCreateWager }) {
               {points.map((p) => (
                 <tr key={p.timestamp}>
                   <td>{new Date(p.timestamp).toLocaleDateString()}</td>
-                  <td>{formatSignedUsd(p.cumulativeUsd)}</td>
+                  <td><SensitiveValue>{formatSignedUsd(p.cumulativeUsd)}</SensitiveValue></td>
                 </tr>
               ))}
             </tbody>

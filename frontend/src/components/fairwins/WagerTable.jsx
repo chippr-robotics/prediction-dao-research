@@ -4,6 +4,7 @@ import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { buildWagerVm } from './wagerVm'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import OpponentName from './OpponentName'
+import SensitiveValue from '../common/SensitiveValue'
 
 const VARIANT_CLASS = {
   primary: 'wc-action-primary',
@@ -112,7 +113,7 @@ export default function WagerTable({
                 )}
               </td>
               <td className="wc-table-amount">
-                <strong>{vm.stake}</strong> {vm.tokenSymbol}
+                <SensitiveValue as="strong">{vm.stake}</SensitiveValue> {vm.tokenSymbol}
                 {vm.outcome && (
                   <span className={`wc-outcome ${vm.outcome.tone}`} style={{ marginLeft: 6 }}>
                     {vm.outcome.address

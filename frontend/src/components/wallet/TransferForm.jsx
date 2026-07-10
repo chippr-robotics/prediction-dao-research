@@ -3,6 +3,7 @@ import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
+import SensitiveValue from '../common/SensitiveValue'
 import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
@@ -119,7 +120,9 @@ export default function TransferForm({ onSent }) {
           >
             <span className="pt-asset-sym">{tokens.stable}</span>
             <span className="pt-asset-bal">
-              {stableUnavailable ? 'Not on this network' : `Balance: ${balanceOf(TRANSFER_KIND.STABLE) ?? '…'}`}
+              {stableUnavailable
+                ? 'Not on this network'
+                : <>Balance: <SensitiveValue>{balanceOf(TRANSFER_KIND.STABLE) ?? '…'}</SensitiveValue></>}
             </span>
           </button>
           <button
@@ -131,7 +134,7 @@ export default function TransferForm({ onSent }) {
             disabled={busy}
           >
             <span className="pt-asset-sym">{tokens.native}</span>
-            <span className="pt-asset-bal">Balance: {balanceOf(TRANSFER_KIND.NATIVE) ?? '…'}</span>
+            <span className="pt-asset-bal">Balance: <SensitiveValue>{balanceOf(TRANSFER_KIND.NATIVE) ?? '…'}</SensitiveValue></span>
           </button>
         </div>
         {gasless ? (
@@ -211,7 +214,9 @@ export default function TransferForm({ onSent }) {
               <span className="pt-amount-sym">{m.symbol}</span>
             </div>
             <span className="pt-hint" id="pt-amount-hint">
-              {bal != null ? `Balance: ${bal} ${m.symbol}` : 'Loading balance…'}
+              {bal != null
+                ? <>Balance: <SensitiveValue>{bal}</SensitiveValue> {m.symbol}</>
+                : 'Loading balance…'}
               {overBalance && ' · exceeds balance'}
             </span>
           </div>

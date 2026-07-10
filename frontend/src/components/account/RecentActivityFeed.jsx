@@ -1,5 +1,6 @@
 import { getNetwork } from '../../config/networks'
 import { formatUsd, formatRelativeTime } from '../../lib/account/format'
+import SensitiveValue from '../common/SensitiveValue'
 import EmptyState from './EmptyState'
 import './RecentActivityFeed.css'
 
@@ -43,7 +44,7 @@ function RecentActivityFeed({ activity = [], chainId }) {
               <span className={`account-feed-icon tone-${meta.tone}`} aria-hidden="true">{meta.icon}</span>
               <span className="account-feed-main">
                 <span className="account-feed-label">{meta.label}</span>
-                <span className="account-feed-amount">{formatUsd(e.usdValue)} <span className="account-feed-token">{e.symbol}</span></span>
+                <span className="account-feed-amount"><SensitiveValue>{formatUsd(e.usdValue)}</SensitiveValue> <span className="account-feed-token">{e.symbol}</span></span>
               </span>
               <span className="account-feed-meta">
                 <time>{formatRelativeTime(e.timestamp)}</time>

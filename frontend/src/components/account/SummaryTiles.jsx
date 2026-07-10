@@ -1,10 +1,18 @@
 import { formatSignedUsd, formatUsd, formatPercent, formatCompact, signGlyph } from '../../lib/account/format'
 import { useCountUp } from './useCountUp'
+import SensitiveValue from '../common/SensitiveValue'
 import './SummaryTiles.css'
 
-/** A single animated numeric value. */
-function AnimatedValue({ value, format }) {
+/**
+ * A single animated numeric value. Monetary tiles pass `sensitive` so the value
+ * is masked (placeholder, no animation shown) when tilt-to-hide is active
+ * (spec 047); non-monetary tiles (win rate, active count) are never masked.
+ */
+function AnimatedValue({ value, format, sensitive = false }) {
   const n = useCountUp(Number(value) || 0)
+  if (sensitive) {
+    return <SensitiveValue className="account-tile-value">{format(n)}</SensitiveValue>
+  }
   return <span className="account-tile-value">{format(n)}</span>
 }
 
@@ -25,10 +33,14 @@ function SummaryTiles({ summary, isEmpty }) {
       render: () => (
         <span className={`account-tile-value tone-${pnlTone}`}>
           <span className="account-tile-cue" aria-hidden="true">{isEmpty ? '' : signGlyph(pnl)} </span>
-          {isEmpty ? formatUsd(0) : <AnimatedValueText value={pnl} format={formatSignedUsd} />}
+          {isEmpty
+            ? <SensitiveValue>{formatUsd(0)}</SensitiveValue>
+            : <AnimatedValueText value={pnl} format={formatSignedUsd} />}
         </span>
       ),
-      sub: isEmpty ? 'no activity yet' : `${formatUsd(s.atStakeUsd || 0)} at stake`,
+      sub: isEmpty
+        ? 'no activity yet'
+        : <><SensitiveValue>{formatUsd(s.atStakeUsd || 0)}</SensitiveValue> at stake</>,
     },
     {
       key: 'winrate',
@@ -39,7 +51,7 @@ function SummaryTiles({ summary, isEmpty }) {
     {
       key: 'wagered',
       label: 'Total Wagered',
-      render: () => <AnimatedValue value={s.totalWageredUsd} format={formatUsd} />,
+      render: () => <AnimatedValue value={s.totalWageredUsd} format={formatUsd} sensitive />,
       sub: 'your stake',
     },
     {
@@ -51,7 +63,7 @@ function SummaryTiles({ summary, isEmpty }) {
     {
       key: 'balance',
       label: 'Wallet Balance',
-      render: () => <AnimatedValue value={s.walletBalanceUsd} format={formatUsd} />,
+      render: () => <AnimatedValue value={s.walletBalanceUsd} format={formatUsd} sensitive />,
       sub: 'available',
     },
   ]
@@ -69,10 +81,10 @@ function SummaryTiles({ summary, isEmpty }) {
   )
 }
 
-/** Animated value that formats with a signed formatter. */
+/** Animated value that formats with a signed formatter (Net P&L — always monetary). */
 function AnimatedValueText({ value, format }) {
   const n = useCountUp(Number(value) || 0)
-  return <span>{format(n)}</span>
+  return <SensitiveValue>{format(n)}</SensitiveValue>
 }
 
 export default SummaryTiles

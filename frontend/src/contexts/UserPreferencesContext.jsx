@@ -22,6 +22,7 @@ export function UserPreferencesProvider({ children }) {
     polymarketCategories: [],
     showTestnetAssets: false,
     showZeroBalances: false,
+    tiltToHide: true,
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -38,6 +39,7 @@ export function UserPreferencesProvider({ children }) {
         polymarketCategories: [],
         showTestnetAssets: false,
         showZeroBalances: false,
+        tiltToHide: true,
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,6 +54,7 @@ export function UserPreferencesProvider({ children }) {
       const polymarketCategories = getUserPreference(walletAddress, 'polymarket_categories', [], true)
       const showTestnetAssets = getUserPreference(walletAddress, 'show_testnet_assets', false, true)
       const showZeroBalances = getUserPreference(walletAddress, 'show_zero_balances', false, true)
+      const tiltToHide = getUserPreference(walletAddress, 'tilt_to_hide', true, true)
 
       setPreferences({
         recentSearches,
@@ -60,6 +63,7 @@ export function UserPreferencesProvider({ children }) {
         polymarketCategories,
         showTestnetAssets,
         showZeroBalances,
+        tiltToHide,
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -147,6 +151,14 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, showZeroBalances: next }))
   }, [account])
 
+  const setTiltToHide = useCallback((enabled) => {
+    if (!account) return
+
+    const next = Boolean(enabled)
+    saveUserPreference(account, 'tilt_to_hide', next, true)
+    setPreferences(prev => ({ ...prev, tiltToHide: next }))
+  }, [account])
+
   const clearAllPreferences = useCallback(() => {
     if (!account) return
 
@@ -158,6 +170,7 @@ export function UserPreferencesProvider({ children }) {
       polymarketCategories: [],
       showTestnetAssets: false,
       showZeroBalances: false,
+      tiltToHide: true,
     })
   }, [account])
 
@@ -171,6 +184,7 @@ export function UserPreferencesProvider({ children }) {
     setPolymarketCategories,
     setShowTestnetAssets,
     setShowZeroBalances,
+    setTiltToHide,
     savePreference,
     clearAllPreferences,
   }

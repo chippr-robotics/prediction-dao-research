@@ -10,6 +10,7 @@ import { useModal } from '../../hooks/useUI'
 import { useClipboard } from '../../hooks/useClipboard'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
+import SensitiveValue from '../common/SensitiveValue'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import NavIcon from '../nav/NavIcon'
@@ -190,7 +191,9 @@ function WalletButton({ className = '' }) {
                       />
                     </button>
                     <span className="usdc-balance">
-                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.stable || 0).toFixed(2)} USDC`}
+                      {balanceLoading
+                        ? 'Loading...'
+                        : <><SensitiveValue>{parseFloat(balances?.stable || 0).toFixed(2)}</SensitiveValue> USDC</>}
                     </span>
                     <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>

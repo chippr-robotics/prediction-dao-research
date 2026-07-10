@@ -1,4 +1,5 @@
 import { formatUsd, formatCompact } from '../../lib/account/format'
+import SensitiveValue from '../common/SensitiveValue'
 import './ActivityBreakdowns.css'
 
 const STATUS_LABEL = {
@@ -48,7 +49,7 @@ function ActivityBreakdowns({ breakdowns }) {
           {b.byToken.map((t) => (
             <li key={t.tokenAddress}>
               <span>{t.symbol || 'Token'}</span>
-              <span className="account-breakdown-count">{formatUsd(t.ownStakeUsd)}</span>
+              <SensitiveValue className="account-breakdown-count">{formatUsd(t.ownStakeUsd)}</SensitiveValue>
             </li>
           ))}
         </ul>
