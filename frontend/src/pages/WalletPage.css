@@ -282,55 +282,33 @@
   outline-offset: -2px;
 }
 
-/* Tab Content */
+/* Tab Content — grows with the panel so each section fills the available space;
+   the page scrolls rather than boxing the content into a short inner scroller. */
 .tab-content {
   padding: 24px;
-  max-height: 500px;
-  overflow-y: auto;
 }
 
-/* My Account portal layout (left sidebar like an admin portal) */
-.wallet-portal-identity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.wallet-portal-topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.wallet-portal-current {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-/* Flat My Account layout. The section MENU now lives in the global nav drawer
-   ("us") + the account button, so this page simply stacks an identity row over
-   the active panel — no in-page sidebar or slide-over here anymore. */
+/* Flat My Account layout. The section MENU lives in the global nav drawer ("us")
+   + the account button, so this page is just a full-height host for the active
+   panel — no in-page sidebar, slide-over, or duplicate section title. */
 .wallet-portal--flat {
   display: flex;
   flex-direction: column;
-  min-height: 320px;
+  min-height: 60vh;
 }
 
 .wallet-portal--flat .wallet-portal-main {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wallet-portal--flat .tab-content {
+  flex: 1 1 auto;
 }
 
 @media (max-width: 768px) {
-  .wallet-portal-current {
-    font-size: 14px;
-  }
-
   /* Leave room for the fixed mobile SectionIconNav so it never covers the last
      row of the active panel. */
   .wallet-portal--flat .tab-content {
@@ -887,7 +865,6 @@
 
   .tab-content {
     padding: 16px;
-    max-height: 400px;
   }
 
   .key-actions {

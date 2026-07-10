@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWallet, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
-import { useClipboard } from '../hooks/useClipboard'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
@@ -22,6 +21,7 @@ import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
 import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
 import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
+import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
@@ -30,7 +30,6 @@ import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
-import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import './WalletPage.css'
 
 // My Account section panels, keyed by tab id. The section MENU now lives in the
@@ -77,7 +76,6 @@ function WalletPage() {
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
-  const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
@@ -214,13 +212,6 @@ function WalletPage() {
     setPolymarketCategories(next)
   }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
 
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
-  }
-
-  const activeTabLabel = (WALLET_TABS.find((t) => t.id === activeTab) || WALLET_TABS[0]).label
-
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
   // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
   const currentSectionGroup = groupForTab(activeTab)
@@ -248,25 +239,12 @@ function WalletPage() {
             </div>
           ) : (
             <div className="wallet-portal wallet-portal--flat">
-              <div className="wallet-portal-identity">
-                <BlockiesAvatar address={address} size={36} className="wallet-avatar" />
-                <button
-                  type="button"
-                  className="wallet-address-display"
-                  onClick={() => copyAddress(address)}
-                  title={address}
-                  aria-label={addressCopied ? 'Copied!' : 'Copy wallet address'}
-                >
-                  {addressCopied ? 'Copied!' : shortenAddress(address)}
-                </button>
-                <span className="status-dot connected" aria-hidden="true"></span>
-              </div>
-
+              {/* The wallet identity + copy-address affordance now lives on the
+                  account button (top right); the section panels below no longer
+                  duplicate it. */}
               <div className="wallet-portal-main">
-                <div className="wallet-portal-topbar">
-                  <span className="wallet-portal-current">{activeTabLabel}</span>
-                </div>
-
+                {/* No in-page section title — every panel renders its own
+                    heading, and the section name is shown in the nav. */}
                 <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
@@ -433,6 +411,11 @@ function WalletPage() {
                     <h2 className="preferences-group-heading">Wallet</h2>
                     <div className="section">
                       <WalletDisplayPreferencesPanel address={address} />
+                    </div>
+
+                    <h2 className="preferences-group-heading">Portfolio</h2>
+                    <div className="section">
+                      <PortfolioPreferencesPanel />
                     </div>
 
                     <h2 className="preferences-group-heading">Notifications</h2>

@@ -1,4 +1,5 @@
 import { useIsMobile } from '../../hooks/useMediaQuery'
+import NavIcon from './NavIcon'
 import './SectionIconNav.css'
 
 /**
@@ -26,7 +27,9 @@ export default function SectionIconNav({ items = [], activeId, onSelect, ariaLab
           aria-current={item.id === activeId ? 'page' : undefined}
           onClick={() => onSelect(item.id)}
         >
-          <span className="section-icon-nav-icon" aria-hidden="true">{item.icon}</span>
+          <span className="section-icon-nav-icon" aria-hidden="true">
+            <NavIcon name={item.icon} size={20} />
+          </span>
           <span className="section-icon-nav-label">{item.label}</span>
         </button>
       ))}

@@ -139,6 +139,50 @@
   font-weight: 500;
 }
 
+/* The account address doubles as the copy-to-clipboard control (the address
+   affordance moved off the My Account tabs onto the wallet button). */
+.account-address-full.account-address-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.account-address-copy:hover {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+}
+
+.account-address-copy:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 1px;
+}
+
+.account-address-copy-icon {
+  color: var(--brand-primary, #36B37E);
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.account-address-copy:hover .account-address-copy-icon {
+  opacity: 1;
+}
+
+/* Flat glyphs for the dropdown action rows — inherit each row's colour so the
+   Disconnect action stays red, etc. */
+.action-button .action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: inherit;
+}
+
 .usdc-balance {
   font-size: 0.875rem;
   color: var(--success-color, #4caf50);

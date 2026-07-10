@@ -159,6 +159,23 @@ function normalizeAddress(address) {
   return typeof address === 'string' ? address.toLowerCase() : address
 }
 
+// Local-only sandboxes are never part of the portfolio scan.
+const LOCAL_CHAIN_IDS = new Set([1337])
+
+/**
+ * The chains the cross-chain portfolio scans (spec 044 follow-up): every
+ * configured network except local sandboxes, mainnets first. Testnets are
+ * included only when the member has opted in via the "show testnet assets"
+ * preference.
+ */
+export function getPortfolioChainIds({ includeTestnets = false } = {}) {
+  return Object.values(NETWORKS)
+    .filter((net) => !LOCAL_CHAIN_IDS.has(net.chainId))
+    .filter((net) => includeTestnets || !net.isTestnet)
+    .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
+    .map((net) => net.chainId)
+}
+
 /**
  * The taxonomy category for `categoryId`, falling back to the `unclassified`
  * category (never undefined) so display code can always render a group.

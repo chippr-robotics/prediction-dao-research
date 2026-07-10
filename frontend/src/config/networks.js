@@ -373,6 +373,41 @@ const NETWORKS = {
       }
     },
   },
+  11155111: {
+    chainId: 11155111,
+    name: 'Sepolia',
+    isTestnet: true,
+    isPrimary: false,
+    // Portfolio-scan only (spec 044 follow-up): balances are read over RPC for
+    // the cross-chain portfolio. Not offered in the network switcher and no
+    // app feature is deployed here, so every capability self-discloses off.
+    selectable: false,
+    nativeCurrency: { decimals: 18, name: 'Sepolia Ether', symbol: 'ETH' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_SEPOLIA || 'https://ethereum-sepolia-rpc.publicnode.com',
+    explorer: { name: 'Etherscan', baseUrl: 'https://sepolia.etherscan.io' },
+    subgraphUrl: null,
+    // Circle's canonical faucet USDC on Sepolia. Override via VITE_SEPOLIA_USDC.
+    stablecoin: {
+      address: import.meta.env?.VITE_SEPOLIA_USDC || '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      domainVersion: '2',
+    },
+    dex: null,
+    contracts: {},
+    polymarket: null,
+    passkey: null,
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: false,
+        friendMarkets: false,
+        passkeyAccounts: false,
+        clearpath: false,
+      }
+    },
+  },
   1337: {
     chainId: 1337,
     name: 'Hardhat',

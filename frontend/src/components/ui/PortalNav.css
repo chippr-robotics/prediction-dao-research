@@ -79,6 +79,36 @@
   background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
 }
 
+/* Flat "glass" icon tile — a translucent, brand-tinted chip behind each nav
+   glyph for a modern, capital-markets feel. The glyph inherits the item's
+   state colour via currentColor. */
+.portal-nav-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--text-secondary, var(--color-text-secondary, #5A6772));
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.portal-nav-item:hover .portal-nav-item-icon {
+  color: var(--text-primary, var(--color-text, #1F2933));
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.13);
+}
+
+.portal-nav-item.active .portal-nav-item-icon {
+  color: var(--brand-primary, var(--color-primary, #36B37E));
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  border-color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.32);
+}
+
 .portal-nav-item.active {
   color: var(--brand-primary, var(--color-primary, #36B37E));
   border-left-color: var(--brand-primary, var(--color-primary, #36B37E));

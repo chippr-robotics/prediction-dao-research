@@ -278,6 +278,23 @@ describe('WalletButton Component - Wagers', () => {
       expect(screen.getByText('Preferences')).toBeInTheDocument()
     })
 
+    it('copies the wallet address from the account dropdown header', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<WalletButton />)
+
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+
+      const copyButton = await screen.findByRole('button', { name: /copy wallet address/i })
+      await user.click(copyButton)
+
+      // Visible confirmation, and the full address landed on the clipboard
+      // (userEvent installs its own functional clipboard stub).
+      expect(await screen.findByText('Copied!')).toBeInTheDocument()
+      expect(await navigator.clipboard.readText()).toBe(
+        '0x1234567890123456789012345678901234567890'
+      )
+    })
+
     it('hides Create Prediction Market button (removed feature)', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({

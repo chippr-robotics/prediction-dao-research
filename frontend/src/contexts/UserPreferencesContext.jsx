@@ -20,6 +20,7 @@ export function UserPreferencesProvider({ children }) {
     favoriteMarkets: [],
     defaultSlippage: 0.5,
     polymarketCategories: [],
+    showTestnetAssets: false,
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -34,6 +35,7 @@ export function UserPreferencesProvider({ children }) {
         favoriteMarkets: [],
         defaultSlippage: 0.5,
         polymarketCategories: [],
+        showTestnetAssets: false,
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,12 +48,14 @@ export function UserPreferencesProvider({ children }) {
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
       const polymarketCategories = getUserPreference(walletAddress, 'polymarket_categories', [], true)
+      const showTestnetAssets = getUserPreference(walletAddress, 'show_testnet_assets', false, true)
 
       setPreferences({
         recentSearches,
         favoriteMarkets,
         defaultSlippage,
         polymarketCategories,
+        showTestnetAssets,
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -123,6 +127,14 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, polymarketCategories: next }))
   }, [account])
 
+  const setShowTestnetAssets = useCallback((show) => {
+    if (!account) return
+
+    const next = Boolean(show)
+    saveUserPreference(account, 'show_testnet_assets', next, true)
+    setPreferences(prev => ({ ...prev, showTestnetAssets: next }))
+  }, [account])
+
   const clearAllPreferences = useCallback(() => {
     if (!account) return
 
@@ -132,6 +144,7 @@ export function UserPreferencesProvider({ children }) {
       favoriteMarkets: [],
       defaultSlippage: 0.5,
       polymarketCategories: [],
+      showTestnetAssets: false,
     })
   }, [account])
 
@@ -143,6 +156,7 @@ export function UserPreferencesProvider({ children }) {
     toggleFavoriteMarket,
     setDefaultSlippage,
     setPolymarketCategories,
+    setShowTestnetAssets,
     savePreference,
     clearAllPreferences,
   }

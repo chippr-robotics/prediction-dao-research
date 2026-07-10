@@ -9,9 +9,9 @@ vi.mock('../hooks/useMediaQuery', () => ({
 import SectionIconNav from '../components/nav/SectionIconNav'
 
 const ITEMS = [
-  { id: 'trade', label: 'Trade', icon: '🔄' },
-  { id: 'paytransfer', label: 'Pay & Transfer', icon: '💸' },
-  { id: 'custody', label: 'Protect', icon: '🛡️' },
+  { id: 'trade', label: 'Trade', icon: 'trade' },
+  { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
+  { id: 'custody', label: 'Protect', icon: 'shield' },
 ]
 
 describe('SectionIconNav (mobile bottom quick-nav)', () => {
