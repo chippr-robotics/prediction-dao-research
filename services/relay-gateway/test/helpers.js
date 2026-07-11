@@ -64,10 +64,14 @@ export function mockProvider({
   // malformed/empty node response). Overrides `poolId` — used to assert the decode-failure path
   // maps to a retryable 503 (never-stranded), not a hard 400.
   poolIdRaw = null,
+  // Sponsored-paymaster (spec 050): EntryPoint.balanceOf(paymaster) answer for the /status deposit
+  // runway. Selector 0x70a08231.
+  depositWei = 0n,
 } = {}) {
   return {
     async call(tx) {
       if (screenError) throw new Error('rpc unreachable')
+      if (tx?.data?.startsWith('0x70a08231')) return abi.encode(['uint256'], [depositWei])
       if (tx?.data?.startsWith(POOL_ID_SELECTOR)) {
         if (poolIdRaw != null) return poolIdRaw
         return abi.encode(['uint256'], [poolId])

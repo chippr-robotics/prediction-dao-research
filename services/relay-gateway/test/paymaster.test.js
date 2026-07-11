@@ -137,4 +137,15 @@ describe('POST /v1/paymaster (spec 050)', () => {
       .send({ jsonrpc: '2.0', id: 1, method: 'pm_getPaymasterStubData', params: [userOp(), ENTRYPOINT, '0x89'] })
     expect(res.status).to.equal(403)
   })
+
+  // US4 — sponsorship deposit runway on /status (operator-only).
+  it('reports paymasterDepositRunwayHrs on /status for a chain with a paymaster', async () => {
+    const app = build({ providers: mockProviders(pmConfig(), { depositWei: 5_000_000_000_000_000_000n }) }) // 5 native
+    const res = await request(app).get('/status').set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(res.status).to.equal(200)
+    // 5e18 deposit / 5e16 peak-burn-per-hr default = 100 hrs
+    expect(res.body.chains['137'].paymasterDepositRunwayHrs).to.equal(100)
+    // a chain WITHOUT a configured paymaster reports null
+    expect(res.body.chains['80002'].paymasterDepositRunwayHrs).to.equal(null)
+  })
 })

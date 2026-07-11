@@ -205,7 +205,22 @@ export function createApp(config, deps = {}) {
             gasWalletRunwayHrs = null
           }
         }
-        chains[chainId] = { rpc, gasWalletRunwayHrs }
+        // Sponsored-paymaster deposit runway (spec 050 / FR-019, US4): the EntryPoint deposit funds
+        // every sponsored UserOp — a drained deposit silently fails sponsorship (falls open to
+        // self-submit, but the "free" promise stops). Surfaced beside the gas-wallet runway so
+        // operators top up before it empties. balanceOf(paymaster) on the EntryPoint (selector
+        // 0x70a08231), reusing the chain's peak-burn divisor.
+        let paymasterDepositRunwayHrs = null
+        if (chainCfg.paymaster && rpc === 'up') {
+          try {
+            const data = '0x70a08231' + chainCfg.paymaster.address.slice(2).toLowerCase().padStart(64, '0')
+            const deposit = BigInt(await provider.call({ to: chainCfg.paymaster.entryPoint, data }))
+            paymasterDepositRunwayHrs = Number(deposit / chainCfg.peakBurnWeiPerHour)
+          } catch {
+            paymasterDepositRunwayHrs = null
+          }
+        }
+        chains[chainId] = { rpc, gasWalletRunwayHrs, paymasterDepositRunwayHrs }
       })
     )
     return chains

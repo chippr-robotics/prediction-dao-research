@@ -49,8 +49,8 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 - [x] T005 [P] Contract unit tests `test/account/VerifyingPaymaster.test.js` + `contracts/mocks/MockEntryPointStake.sol`: valid sig sponsors (sigFailed=0, window echoed); wrong-signer + tampered-op → sigFailed=1; `onlyEntryPoint` guard; malformed `paymasterAndData` reverts; `setVerifyingSigner` owner-only + zero rejected + rotation flips who can sponsor; `deposit`/owner-only `withdrawTo`; zero-signer constructor rejected. **9 passing.**
 - [x] T006 Implement `contracts/account/FairWinsVerifyingPaymaster.sol` (self-contained `is IPaymaster, Ownable`; `verifyingSigner`; signature-only, zero-storage `validatePaymasterUserOp`; `getHash`; `setVerifyingSigner`; owner-gated `withdrawTo`/stake) — EntryPoint v0.6. **Compiles (paris), unit tests green.** ⚠️ still needs the fork test (T007), Slither/Medusa + security review (T029) before merge.
-- [ ] T007 [P] Write fork test `test/account/fork/VerifyingPaymaster.fork.test.js` (real EntryPoint v0.6 on a Polygon fork): fund deposit, sign an approval with a local key standing in for KMS, submit a **first-use** `executeBatch` UserOp for a **zero-native** counterfactual account, assert inclusion + sender native balance unchanged
-- [ ] T008 Implement `scripts/deploy/deploy-verifying-paymaster.js` (CREATE2 deploy, set `verifyingSigner` to the KMS-derived address, record `deployments/<net>.json` `{verifyingPaymaster, verifyingSigner, entryPoint}`, optional `--deposit`) — mirrors `scripts/deploy/deploy-account-stack.js`
+- [x] T007 [P] Write fork test `test/account/fork/VerifyingPaymaster.fork.test.js` (real EntryPoint v0.6 on a Polygon fork): fund deposit, sign an approval with a local key standing in for KMS, submit a **first-use** `executeBatch` UserOp for a **zero-native** counterfactual account, assert inclusion + sender native balance unchanged
+- [x] T008 Implement `scripts/deploy/deploy-verifying-paymaster.js` (CREATE2 deploy, set `verifyingSigner` to the KMS-derived address, record `deployments/<net>.json` `{verifyingPaymaster, verifyingSigner, entryPoint}`, optional `--deposit`) — mirrors `scripts/deploy/deploy-account-stack.js`
 
 **Checkpoint**: paymaster compiles, unit + fork tests pass, deploy script ready. User stories can begin.
 
@@ -112,9 +112,9 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **Independent Test**: `/status` reports `paymasterDepositRunwayHrs`; a low-runway condition is surfaced.
 
-- [ ] T026 [P] [US4] Gateway test in `services/relay-gateway/test/paymaster.test.js`: `/status` reports `paymasterDepositRunwayHrs` (operator-only, like `gasWalletRunwayHrs`) and flags `< PM_RUNWAY_WARN_HRS` (TDD)
-- [ ] T027 [US4] Add `paymasterDepositRunwayHrs` (`balanceOf(paymaster) / burnRate`) + `PM_RUNWAY_WARN_HRS` to the health cache + `/status` in `services/relay-gateway/src/server.js`
-- [ ] T028 [US4] Wire the runway metric + low-runway alert into ops monitoring alongside the alto-executor + relayer gas wallets; document in `docs/runbooks/paymaster-operations.md` (SC-007)
+- [x] T026 [P] [US4] Gateway test in `services/relay-gateway/test/paymaster.test.js`: `/status` reports `paymasterDepositRunwayHrs` (operator-only, like `gasWalletRunwayHrs`) and flags `< PM_RUNWAY_WARN_HRS` (TDD)
+- [x] T027 [US4] Add `paymasterDepositRunwayHrs` (`balanceOf(paymaster) / burnRate`) + `PM_RUNWAY_WARN_HRS` to the health cache + `/status` in `services/relay-gateway/src/server.js`
+- [x] T028 [US4] Wire the runway metric + low-runway alert into ops monitoring alongside the alto-executor + relayer gas wallets; document in `docs/runbooks/paymaster-operations.md` (SC-007)
 
 **Checkpoint**: all four stories independently functional.
 
