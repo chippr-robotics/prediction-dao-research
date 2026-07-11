@@ -11,17 +11,19 @@ import {
   MorphoApiError,
 } from '../../lib/earn/morphoApi'
 
+// Mirrors the LIVE api.morpho.org schema (verified 2026-07-11): curation is the
+// `listed` flag (`whitelisted` was removed from the schema — querying it 400s),
+// and curators come as named entities under state.curators.
 const VAULT_ITEM = {
   address: '0xVault1',
   symbol: 'mUSDC',
   name: 'Prime USDC Vault',
   listed: true,
-  whitelisted: true,
   state: {
     totalAssetsUsd: 12_345_678,
     apy: 0.031,
     netApy: 0.043,
-    curator: 'Prime Curation',
+    curators: [{ name: 'Prime Curation' }],
     allRewards: [{ asset: { address: '0xMorpho', symbol: 'MORPHO' }, supplyApr: 0.012 }],
   },
   asset: { name: 'USD Coin', address: '0xUSDC', decimals: 6, symbol: 'USDC' },
@@ -46,10 +48,30 @@ describe('normalizeVault', () => {
     expect(vault.rewards).toEqual([{ assetSymbol: 'MORPHO', supplyApr: 0.012 }])
   })
 
-  it('drops non-listed, non-whitelisted, and foreign-chain items', () => {
+  it('drops non-listed and foreign-chain items', () => {
     expect(normalizeVault({ ...VAULT_ITEM, listed: false }, 137)).toBeNull()
-    expect(normalizeVault({ ...VAULT_ITEM, whitelisted: false }, 137)).toBeNull()
     expect(normalizeVault({ ...VAULT_ITEM, chain: { id: 1 } }, 137)).toBeNull()
+  })
+
+  it('joins multiple curator names and yields null when none are named', () => {
+    const multi = normalizeVault(
+      { ...VAULT_ITEM, state: { ...VAULT_ITEM.state, curators: [{ name: 'Gauntlet' }, { name: 'Steakhouse' }] } },
+      137,
+    )
+    expect(multi.curator).toBe('Gauntlet & Steakhouse')
+    const anon = normalizeVault({ ...VAULT_ITEM, state: { ...VAULT_ITEM.state, curators: [] } }, 137)
+    expect(anon.curator).toBeNull()
+  })
+
+  it('never sends the removed `whitelisted` field (live schema 400s on it)', async () => {
+    let sentBody
+    const fetchImpl = async (_url, init) => {
+      sentBody = init.body
+      return { ok: true, json: async () => ({ data: { vaults: { items: [] } } }) }
+    }
+    await fetchVaults(137, { fetchImpl })
+    expect(sentBody).not.toContain('whitelisted')
+    expect(sentBody).toContain('listed: true')
   })
 
   it('keeps missing APY/TVL as null — never zero (honest-state)', () => {

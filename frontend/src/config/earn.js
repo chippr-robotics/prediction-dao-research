@@ -18,8 +18,8 @@ export const MORPHO_API_URL = 'https://api.morpho.org/graphql'
 // MIP-111 — the legacy rewards.morpho.org/URD flow is deprecated).
 export const MERKL_API_URL = 'https://api.merkl.xyz/v4'
 
-// Cap on curated vaults surfaced per chain (TVL-ordered, whitelisted+listed
-// only). Keeps the list scannable for non-technical members.
+// Cap on curated vaults surfaced per chain (TVL-ordered, Morpho-listed only).
+// Keeps the list scannable for non-technical members.
 export const VAULT_LIST_LIMIT = 20
 
 // Position refresh cadence — aligned with usePortfolio's 60s poll.
