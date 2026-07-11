@@ -62,6 +62,7 @@ import {
   encodeAddWalletOwner,
   requirePasskeySupport,
   deriveAddress,
+  defaultPublicClient,
   ChainNotSupportedError,
   LastControllerError,
   CredentialRecordIncomplete,
@@ -95,6 +96,23 @@ describe('capability gating (FR-022)', () => {
 
   it('throws ChainNotSupportedError on ETC/Mordor-class networks', () => {
     expect(() => requirePasskeySupport(63)).toThrow(ChainNotSupportedError)
+  })
+})
+
+describe('defaultPublicClient (issue #854 — client.chain.id crash)', () => {
+  it('sets a chain with the network id, not just a bare transport', () => {
+    // viem's toCoinbaseSmartAccount reads `client.chain.id` unconditionally inside
+    // sign/signMessage/signTypedData/signUserOperation. A publicClient built without
+    // a `chain` leaves that undefined, so every passkey ceremony crashed with
+    // "Cannot read properties of undefined (reading 'id')" the moment it tried to sign.
+    const client = defaultPublicClient(80002)
+    expect(client.chain).toBeDefined()
+    expect(client.chain.id).toBe(80002)
+  })
+
+  it('is reused as-is by buildAccount/deriveAddress/readControllers (no separate bare client)', () => {
+    const client = defaultPublicClient(137)
+    expect(client.chain.id).toBe(137)
   })
 })
 
