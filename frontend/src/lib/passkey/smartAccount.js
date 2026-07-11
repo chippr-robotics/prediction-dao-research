@@ -12,7 +12,12 @@
  */
 
 import { http, createPublicClient, encodeFunctionData, parseAbi } from 'viem'
-import { toWebAuthnAccount, toCoinbaseSmartAccount, createBundlerClient } from 'viem/account-abstraction'
+import {
+  toWebAuthnAccount,
+  toCoinbaseSmartAccount,
+  createBundlerClient,
+  createPaymasterClient,
+} from 'viem/account-abstraction'
 import { getNetwork } from '../../config/networks'
 import { getContractAddressForChain } from '../../config/contracts'
 import { CeremonyCancelled, isTransactComplete } from './credentials'
@@ -85,7 +90,13 @@ export function requirePasskeySupport(chainId) {
   if (!net?.capabilities?.passkeyAccounts || !factory || !entryPoint) {
     throw new ChainNotSupportedError(chainId)
   }
-  return { network: net, factory, entryPoint, bundlerUrls: net.passkey.bundlerUrls }
+  return {
+    network: net,
+    factory,
+    entryPoint,
+    bundlerUrls: net.passkey.bundlerUrls,
+    erc20PaymasterUrl: net.passkey.erc20PaymasterUrl ?? null,
+  }
 }
 
 function safeAddress(key, chainId) {
@@ -156,7 +167,7 @@ export async function resolveOwnerIndex({ chainId, accountAddress, credential, d
  * `signPayload` lets the connector own the ceremony UX (deps-injectable).
  */
 export async function buildAccount({ chainId, credential, ownersBytes, ownerIndex, nonce = 0n, deps = {} }) {
-  const { entryPoint, bundlerUrls } = requirePasskeySupport(chainId)
+  const { entryPoint, bundlerUrls, erc20PaymasterUrl } = requirePasskeySupport(chainId)
   const client = deps.publicClient ?? defaultPublicClient(chainId)
 
   // Refuse incomplete records BEFORE any ceremony — an undefined id/key here
@@ -197,11 +208,19 @@ export async function buildAccount({ chainId, credential, ownersBytes, ownerInde
     ...(ownersBytes ? {} : {}),
   })
 
+  // Fee-in-USDC path (spec 041 §4/FR-014): when a third-party ERC-20 paymaster is configured
+  // for this network, the bundler client fetches paymaster data automatically so the account
+  // never needs a native-token balance to pay gas — the config was previously parsed but never
+  // reached the bundler client, so every UserOp silently required native token (issue #854).
+  // Falls back to native-token fee payment when unconfigured (clarification Q3).
+  const paymaster =
+    deps.paymaster ?? (erc20PaymasterUrl ? createPaymasterClient({ transport: http(erc20PaymasterUrl) }) : undefined)
+
   const bundlerClient = createBundlerClient({
     account,
     client,
     transport: http(bundlerUrls[0]),
-    ...(deps.paymaster ? { paymaster: deps.paymaster } : {}),
+    ...(paymaster ? { paymaster } : {}),
   })
 
   return { account, bundlerClient, entryPoint, bundlerUrls, publicClient: client }

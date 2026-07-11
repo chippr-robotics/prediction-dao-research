@@ -1,0 +1,54 @@
+/* Single-credential risk warning (spec 041 T051) — theme-aware, mirrors the
+   shared app CSS variables (theme.css) and the Pay & Transfer notice/button
+   conventions (PayTransfer.css). Scoped under .device-loss-warning so its
+   .btn primitives never leak into unrelated buttons elsewhere in the app. */
+
+.device-loss-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  color: var(--color-text, var(--text-primary, #111827));
+}
+
+.device-loss-warning strong {
+  color: #b45309;
+  font-size: 0.95rem;
+}
+
+.device-loss-warning p {
+  margin: 0;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  font-size: 0.9rem;
+}
+
+.device-loss-warning__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.device-loss-warning .btn {
+  appearance: none;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  background: var(--color-surface, var(--surface-color, #fff));
+  color: var(--color-text, var(--text-primary, #111827));
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  transition: border-color var(--transition-fast, 0.15s ease), background-color var(--transition-fast, 0.15s ease);
+}
+.device-loss-warning .btn-primary {
+  border-color: transparent;
+  background: var(--primary-button, var(--brand-primary, #36B37E));
+  color: var(--primary-button-text, #fff);
+}
+.device-loss-warning .btn-primary:hover {
+  background: var(--primary-button-hover, #2F9E6E);
+}

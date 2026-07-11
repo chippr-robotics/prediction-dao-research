@@ -12,6 +12,7 @@ import { useState, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import { usePasskeyAccount } from '../../hooks/usePasskeyAccount'
 import { WARNING_MOMENTS, dismissedAt, recordDismissal } from '../../lib/passkey/accountProfile'
+import './DeviceLossWarning.css'
 
 function DeviceLossWarning({ moment, onAddController, deps = {} }) {
   const account = usePasskeyAccount(deps)
