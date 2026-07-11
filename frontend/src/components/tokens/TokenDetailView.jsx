@@ -28,7 +28,10 @@ const ROLE_LABELS = [
 ]
 
 export default function TokenDetailView({ token, onBack }) {
-  const { signer } = useWallet()
+  const { signer, sendCalls, loginMethod } = useWallet()
+  // Passkey smart-account sessions (spec 041/050) have NO ethers signer; their writes go through
+  // sendCalls (one sponsored ERC-4337 UserOp) instead of a signer-bound contract call.
+  const isPasskey = loginMethod === 'passkey'
   const { detectCapabilities, readTokenLive, reader, chainId } = useTokenFactory()
   const { showNotification } = useNotification()
 
@@ -76,9 +79,28 @@ export default function TokenDetailView({ token, onBack }) {
 
   const run = useCallback(
     async (label, fn) => {
-      if (!signer) return showNotification('Connect a wallet to administer this token.', 'warning')
+      if (!isPasskey && !signer) return showNotification('Connect a wallet to administer this token.', 'warning')
       setStatus('working')
       try {
+        // Passkey smart-account (no ethers signer): reuse the SAME `fn(c) => c.method(...)` closure the
+        // classic path uses, but hand it a populating contract so it yields the {to,data} calldata instead
+        // of sending, then route that as one sponsored ERC-4337 UserOp via sendCalls.
+        if (isPasskey) {
+          if (typeof sendCalls !== 'function') {
+            throw new Error('This wallet cannot administer tokens on the current transaction rail.')
+          }
+          const populated = await fn(populatingContract(contractFor(false)))
+          showNotification(`${label} submitted — awaiting confirmation…`, 'info')
+          await sendCalls([{
+            target: populated?.to ?? token.tokenAddress,
+            data: populated.data,
+            value: populated?.value ?? 0n,
+          }])
+          setStatus('idle')
+          showNotification(`${label} confirmed.`, 'success')
+          setRefresh((n) => n + 1)
+          return
+        }
         const tx = await fn(contractFor(true))
         showNotification(`${label} submitted — awaiting confirmation…`, 'info')
         await tx.wait()
@@ -90,7 +112,7 @@ export default function TokenDetailView({ token, onBack }) {
         showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
       }
     },
-    [signer, contractFor, showNotification]
+    [isPasskey, signer, sendCalls, contractFor, token, showNotification]
   )
 
   const tabs = useMemo(() => {
@@ -211,6 +233,22 @@ export default function TokenDetailView({ token, onBack }) {
 }
 
 // ---- helpers ----
+// Wrap a read-only (signer-less) contract so that calling a write method returns its populated
+// { to, data, value } transaction request (ethers populateTransaction) instead of trying to send it.
+// This lets the passkey rail reuse the EXACT SAME `fn(c) => c.method(...)` closures the classic signer
+// path uses, turning them into ERC-4337 batch calls without ever needing a signer to encode.
+function populatingContract(contract) {
+  return new Proxy(contract, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value === 'function' && typeof value.populateTransaction === 'function') {
+        return (...args) => value.populateTransaction(...args)
+      }
+      return value
+    },
+  })
+}
+
 function short(a) { return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '' }
 function badgeClass(std) {
   if (std === TOKEN_STANDARD.OPEN_ERC721) return 'tm-badge-erc721'
