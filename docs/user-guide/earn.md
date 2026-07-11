@@ -30,9 +30,10 @@ plain-language explanation.
     - who manages the vault.
 3. Pick a vault and enter an amount (or tap **Max**). The app checks your amount before your
    wallet is ever involved and explains any problem in plain language.
-4. Confirm in your wallet. **Your first deposit takes two quick confirmations**: the first gives
-   the vault permission to take exactly the amount you typed, the second makes the deposit. This
-   is standard for on-chain tokens — you never approve more than you typed.
+4. Confirm the deposit. **With a browser wallet, a first deposit takes two quick
+   confirmations**: the first gives the vault permission to take exactly the amount you typed,
+   the second makes the deposit — you never approve more than you typed. **With a passkey
+   account, one passkey confirmation covers both steps.**
 5. Your position appears under **Your positions** with its current value, which includes the
    return earned so far.
 
