@@ -175,7 +175,7 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       // Durable audit entry in the unified activity ledger (spec 051).
       captureEarnAction(address, chainId, {
         type: mode === 'deposit' ? 'earn-deposit' : 'earn-withdraw',
-        txHash: receipt.hash,
+        txHash,
         at: Date.now(),
         vaultAddress: vault.address,
         amountRaw: amount?.toString?.() ?? String(amount),

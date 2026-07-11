@@ -115,7 +115,7 @@ export function useEarnRewards() {
       // Durable audit entry in the unified activity ledger (spec 051).
       captureEarnAction(address, chainId, {
         type: 'earn-rewards-claimed',
-        txHash: receipt.hash,
+        txHash,
         at: Date.now(),
         tokenAddress: args.tokens[0] ?? null,
         description: `Claimed earn rewards: ${summary}`,
