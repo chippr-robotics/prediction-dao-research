@@ -45,13 +45,18 @@ vi.mock('viem/account-abstraction', async () => {
   return {
     ...actual,
     toWebAuthnAccount: vi.fn(() => ({ type: 'webAuthnAccount' })),
-    toCoinbaseSmartAccount: vi.fn(async () => ({ address: '0xACC0000000000000000000000000000000000001' })),
+    // Echo the pinned `address` param (the factory-mismatch fix pins the sender) and expose an
+    // isDeployed the getFactoryArgs override consults; default counterfactual.
+    toCoinbaseSmartAccount: vi.fn(async (params) => ({
+      address: params?.address ?? '0xACC0000000000000000000000000000000000001',
+      isDeployed: vi.fn().mockResolvedValue(false),
+    })),
     createBundlerClient: vi.fn((opts) => opts),
     createPaymasterClient: vi.fn((opts) => ({ __isPaymasterClient: true, ...opts })),
   }
 })
 
-import { createBundlerClient, createPaymasterClient } from 'viem/account-abstraction'
+import { createBundlerClient, createPaymasterClient, toCoinbaseSmartAccount } from 'viem/account-abstraction'
 import {
   publicKeyToOwnerBytes,
   addressToOwnerBytes,
@@ -217,6 +222,74 @@ describe('buildAccount sponsoring-paymaster wiring (spec 050)', () => {
     const bundlerOpts = createBundlerClient.mock.calls[0][0]
     expect(bundlerOpts.paymaster).toBe(injected)
     expect(out.sponsored).toBe(true)
+  })
+})
+
+describe('buildAccount FairWins-factory address pinning (factory-mismatch fix)', () => {
+  const credential = { credentialId: 'c1', publicKey: { x: X, y: Y } }
+  const ownerBytes = publicKeyToOwnerBytes({ x: X, y: Y })
+  const FUNDED = '0xF1F269F7ABF9C94963692D53A0D9386DB36EA4C0'
+
+  beforeEach(() => {
+    toCoinbaseSmartAccount.mockClear()
+  })
+
+  it('pins the viem sender to the caller-supplied account address (never viem’s Coinbase-factory address)', async () => {
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+    const out = await buildAccount({
+      chainId: 137,
+      credential,
+      accountAddress: FUNDED,
+      ownerIndex: 0,
+      deps: { publicClient },
+    })
+    // viem is told the address explicitly — it must NOT query its own (wrong) factory to derive it.
+    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(FUNDED)
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+    expect(out.account.address).toBe(FUNDED)
+  })
+
+  it('derives the sender from the FairWins factory (getAddress) when the caller omits it', async () => {
+    const publicClient = { readContract: vi.fn().mockResolvedValue(FUNDED), getCode: vi.fn() }
+    await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
+    // deriveAddress → getAddress on the FairWins-deployed factory (0xFAC7…), with the credential’s owner bytes.
+    const call = publicClient.readContract.mock.calls[0][0]
+    expect(call.functionName).toBe('getAddress')
+    expect(call.address).toMatch(/^0xFAC7/i)
+    expect(call.args).toEqual([[ownerBytes], 0n])
+    // …and that derived address is what viem is pinned to.
+    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(FUNDED)
+  })
+
+  it('overrides getFactoryArgs to deploy via the FairWins factory while counterfactual', async () => {
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+    const out = await buildAccount({
+      chainId: 137,
+      credential,
+      accountAddress: FUNDED,
+      ownerIndex: 0,
+      deps: { publicClient },
+    })
+    const args = await out.account.getFactoryArgs()
+    // The FairWins factory (0xFAC7…), NOT viem’s hardwired Coinbase factory (0x0ba5ed0c…).
+    expect(args.factory).toMatch(/^0xFAC7/i)
+    expect(args.factory.toLowerCase()).not.toBe('0x0ba5ed0c6aa8c49038f819e587e2633c4a9f428a')
+    // createAccount([ownerBytes], 0) calldata carries the initial owner bytes.
+    expect(args.factoryData.toLowerCase()).toContain('11'.repeat(32) + '22'.repeat(32))
+  })
+
+  it('emits NO initCode once the account is deployed (preserves viem’s isDeployed guard)', async () => {
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
+    const out = await buildAccount({
+      chainId: 137,
+      credential,
+      accountAddress: FUNDED,
+      ownerIndex: 0,
+      deps: { publicClient },
+    })
+    out.account.isDeployed.mockResolvedValue(true)
+    const args = await out.account.getFactoryArgs()
+    expect(args).toEqual({ factory: undefined, factoryData: undefined })
   })
 })
 

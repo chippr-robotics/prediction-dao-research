@@ -57,6 +57,10 @@ describe('sendPasskeyBatch never-stranded fallback (spec 050)', () => {
     // second build forced self-funding
     expect(buildAccount).toHaveBeenCalledTimes(2)
     expect(buildAccount.mock.calls[1][0].deps.noPaymaster).toBe(true)
+    // both builds pin the sender to the SESSION address (the FairWins-factory address the user funded),
+    // never viem's empty Coinbase-factory address (the factory-mismatch fix).
+    expect(buildAccount.mock.calls[0][0].accountAddress).toBe(ADDRESS)
+    expect(buildAccount.mock.calls[1][0].accountAddress).toBe(ADDRESS)
     expect(onState).toHaveBeenCalledWith(expect.objectContaining({ state: LIFECYCLE.DRAFT, sponsored: false }))
   })
 
@@ -82,5 +86,11 @@ describe('sendPasskeyBatch never-stranded fallback (spec 050)', () => {
     expect(isSponsorshipUnavailable(new Error('AA23 reverted: account validation'))).toBe(false)
     expect(isSponsorshipUnavailable(new Error('execution reverted'))).toBe(false)
     expect(isSponsorshipUnavailable(new Error('AA21 didn\'t pay prefund'))).toBe(false)
+    // The insufficient-balance revert (empty sender) is an OP problem — surface it, don't mask it as
+    // a self-funded AA21 (the confusing symptom the factory-mismatch fix resolves).
+    expect(
+      isSponsorshipUnavailable(new Error('UserOperation reverted during simulation with reason: transfer amount exceeds balance'))
+    ).toBe(false)
+    expect(isSponsorshipUnavailable(new Error('ERC20: transfer amount exceeds balance'))).toBe(false)
   })
 })
