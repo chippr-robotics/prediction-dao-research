@@ -4,6 +4,26 @@ FairWins users can authorize every core action with **one off-chain signature** 
 ERC-20 approval, no native gas token. A relayer (spec 036) submits the signed intent; the on-chain
 effect is always attributed to the **signer**, never the submitter.
 
+## Two gasless rails
+
+FairWins has **two** distinct gasless mechanisms. They serve different account types and actions;
+both keep a self-submit fallback (never-stranded).
+
+| Rail | For | How it's gasless | Docs |
+|------|-----|------------------|------|
+| **Relayed intents** (specs 035 + 036) | EOAs **and** contract accounts (ERC-1271), for *contract* actions (create/accept/claim/membership/…) and EIP-3009 stablecoin transfers | The **relayer's gas wallet** submits a `…WithSig`/`…WithAuthorization` meta-tx and pays gas | *this document* |
+| **Sponsored UserOps** (spec 050) | **Passkey smart accounts** (spec 041), for *account-native* UserOperations — native + USDC transfers, controller changes, first-use deploy | A FairWins-operated **verifying paymaster** reimburses the bundler from a FairWins-funded deposit; the user needs **zero** native token | [passkey-accounts.md](./passkey-accounts.md) + [runbooks/paymaster-operations.md](../runbooks/paymaster-operations.md) |
+
+Why both: the relayer can't move a smart account's **native** token — only the EntryPoint can
+execute the account — and passkey **account-native** operations (native transfer, controller
+add/remove, first-use deploy) have no `…WithSig` meta-tx equivalent, so they can only travel the
+ERC-4337 (paymaster + bundler) rail. (Native USDC *does* accept a contract-account ERC-7598
+authorization — proven by `test/fork/usdc-erc1271-authorization.test.js` — but the ERC-7598 bytes
+leg isn't yet plumbed through the relayer twins, so passkey USDC moves currently ride UserOps too;
+see the passkey-accounts scope note.) The sponsored-paymaster rail is specified in
+`specs/050-sponsored-paymaster/` and reuses the same relay-gateway policy engine (screening, quotas,
+killswitch) to authorize each sponsorship.
+
 ## How it works
 
 ```
@@ -84,6 +104,12 @@ See `services/relay-gateway/README.md` (policy gateway: signer recovery, fail-cl
 re-screen, dedup, quotas, kill switch, audit) and `services/oz-relayer/README.md` (submission
 engine: nonce lanes, gas pricing — legacy type-0 on ETC/Mordor — inclusion tracking, KMS-held hot
 key). Runbook: `docs/runbooks/relayer-operations.md`.
+
+Spec 050 adds a second responsibility to this same gateway: a `POST /v1/paymaster` ERC-7677
+endpoint that runs the identical policy pipeline (killswitch → chain → sanctions → quotas, plus a
+per-op cost ceiling) and, on grant, **signs a sponsorship** for the verifying paymaster with a
+KMS-held signer key (returns `paymasterAndData` rather than submitting a tx). The bundler (alto)
+still submits. See [runbooks/paymaster-operations.md](../runbooks/paymaster-operations.md).
 
 ## Upgrade & rollout
 

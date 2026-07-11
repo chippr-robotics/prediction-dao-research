@@ -82,6 +82,39 @@ accepts the contract-account authorization.
 gating ALWAYS key off `address`), `accountCapabilities.encryption`, and
 `sendCalls`. Classic-wallet paths are untouched (SC-004).
 
+## Fees & sponsorship (spec 050)
+
+Spec 041 shipped with **users paying their own UserOp gas** from the account's
+native balance (FR-015: no FairWins paymaster). That strands stablecoin-only
+users and fails during gas spikes, so **spec 050 supersedes FR-015 for the
+UserOp path**: FairWins sponsors account-native UserOps (native + USDC
+transfers, controller changes, first-use deploy) via a **self-hosted verifying
+paymaster** — the user needs **zero** native token.
+
+- **On-chain**: `FairWinsVerifyingPaymaster` (EntryPoint v0.6) sponsors an op iff
+  its `paymasterAndData` carries a valid signature from the FairWins sponsorship
+  signer over the op + a short validity window. FairWins funds the EntryPoint
+  **deposit** (the hard exposure cap); validation is signature-only (no external
+  storage). `owner` (floppy keystore) withdraws; `verifyingSigner` (KMS) is
+  rotatable.
+- **Off-chain**: the **relay-gateway** gains `POST /v1/paymaster` (ERC-7677
+  `pm_getPaymaster{Stub,}Data`) — the SAME policy engine (killswitch, sanctions
+  screen on the account, per-account + global quotas) plus a per-operation cost
+  ceiling; on grant it KMS-signs the sponsorship. The **alto bundler** still
+  submits. No new service.
+- **Frontend**: `buildAccount` wires a viem paymaster client at
+  `VITE_SPONSOR_PAYMASTER_<net>` → the gateway endpoint. `sendBatch` **falls back
+  to a self-funded UserOp** if sponsorship is unavailable (never-stranded), and
+  the confirm UI discloses the **truthful** fee — "Sponsored — no network fee"
+  ONLY when a sponsorship was actually obtained, else "you pay the network fee"
+  (fixing the previously-unconditional badge).
+
+Eligibility is **identity-open** (any screened, in-quota FairWins passkey
+account — not membership-gated). Networks: Polygon 137 first, Amoy 80002 for
+validation; ETC/Mordor degrade to honest self-submit. Design +
+run/rollback: `specs/050-sponsored-paymaster/` and
+`docs/runbooks/paymaster-operations.md`.
+
 ## Compliance
 
 Screening keys off the **account address** everywhere. Additionally
