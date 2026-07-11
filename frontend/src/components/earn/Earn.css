@@ -238,11 +238,35 @@
 .earn-reward-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
   border-radius: 10px;
+}
+
+.earn-reward-row .earn-reward-values {
+  margin-left: auto;
+}
+
+/* Per-network reward groups (network-transparent rewards). */
+.earn-rewards-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.earn-rewards-network {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Position rows: network context under the vault name. */
+.earn-position-network {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 400;
 }
 
 .earn-reward-token {

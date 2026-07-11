@@ -36,12 +36,6 @@ export const EARN_DISCLOSURE = {
   risk: 'Lending happens through Morpho, a third-party on-chain lending protocol, from your own wallet. Returns are variable and not guaranteed, and smart contracts carry risk. FairWins never holds your deposit and charges no fee on Earn.',
 }
 
-/** Honest unavailable-state copy for networks without earn support (FR-008). */
-export function earnUnavailableCopy(networkName, earnNetworkNames) {
-  const names = (earnNetworkNames || []).join(' and ')
-  return `Earning is not available on ${networkName || 'this network'} yet. Lending is available on ${names || 'supported networks'} — switch networks to use it.`
-}
-
 /** Honest "not yet" copy for future earning areas (FR-002). */
 export const EARN_AREAS_FUTURE = {
   staking: 'Staking is not available in the app yet.',

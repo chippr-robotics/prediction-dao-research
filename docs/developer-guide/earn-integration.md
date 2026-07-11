@@ -14,11 +14,20 @@ lib/earn/morphoApi.js          Morpho GraphQL: vault discovery + position enrich
 lib/earn/merkl.js              Merkl REST: reward balances + claim-arg builder
 lib/earn/vaultActions.js       ethers v6 ERC-4626 reads/validators/deposit/withdraw
 lib/earn/earnActivityBuffer.js queues user actions for the activity source
-hooks/useEarnVaults|Positions|Rewards.js
+hooks/useEarnVaults|Positions|Rewards.js   multi-network (all earn chains at once)
+hooks/useEarnSend.js           network-transparent sending: auto-switches to the
+                               target chain on submit, then routes via sendCalls
 components/earn/*              EarnPanel (hub) / EarnLendView / VaultSheet /
                                EarnRewardsView / EarnPositionsList
 data/notifications/sources/earnSource.js   spec-031 activity source
 ```
+
+Network selection is TRANSPARENT, like the portfolio: vaults, positions, and rewards from
+every earn-enabled network render together with network badges (shared `AssetLogo` artwork),
+independent of the wallet's active chain. Submitting a transaction on another chain switches
+automatically as part of the confirmation (`useEarnSend`) — there is no in-app "switch
+network" step. Passkey sessions are gated honestly to chains with an ERC-4337 rail
+(`NETWORKS[chainId].passkey`).
 
 Data flow is honest-state throughout (constitution III): vault lists and APY come live from
 Morpho's API (explicit `unavailable` on failure — deposits disabled, never stale numbers);
@@ -42,9 +51,10 @@ claims are safe no-ops.
 
 ## Vault curation
 
-No hand-maintained vault lists. The client queries `vaults(where: { chainId_in, whitelisted:
-true })`, requires `listed: true` (vaults shown on the Morpho app itself), keeps API TVL
-ordering, and caps at `VAULT_LIST_LIMIT`. Only Morpho **Vault V1 (MetaMorpho)** is surfaced in
+No hand-maintained vault lists. The client queries `vaults(where: { chainId_in, listed: true })`
+— `listed` = vaults shown on the Morpho app itself; the docs' `whitelisted` field was removed
+from the live schema — in ONE query across every earn-enabled chain, keeps API TVL ordering,
+and caps at `VAULT_LIST_LIMIT`. Only Morpho **Vault V1 (MetaMorpho)** is surfaced in
 this cut: V1 implements the full ERC-4626 surface including honest `maxDeposit`/`maxWithdraw`
 (Vault V2 returns 0 from `max*` by design, which breaks honest limit display).
 

@@ -1,45 +1,60 @@
 /**
- * useEarnPositions (spec 050) — the member's lending positions on the active
- * network. Authoritative state is on-chain (share balance + convertToAssets +
- * maxWithdraw over the chain's read provider); USD value and earned-so-far are
- * best-effort enrichment from the Morpho API that degrades honestly to "—"
- * when the API is down (position still shown — constitution III).
+ * useEarnPositions (spec 050) — the member's lending positions across every
+ * earn-enabled network. Like the portfolio, each vault is read over ITS OWN
+ * chain's read provider (independent of the wallet's active network), so the
+ * member sees all their positions at once with network badges. Authoritative
+ * state is on-chain (share balance + convertToAssets + maxWithdraw); USD
+ * value and earned-so-far are best-effort Morpho API enrichment that
+ * degrades honestly to "—" (position still shown — constitution III).
  *
  * Polls every POSITIONS_POLL_MS (60s, aligned with usePortfolio), scoped to
- * (account, chain) — a scope change resets synchronously so nothing leaks.
+ * the connected account — an account change resets synchronously.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWallet } from './useWalletManagement'
-import { NETWORKS, isEarnAvailable } from '../config/networks'
+import { NETWORKS, getEarnNetworks } from '../config/networks'
 import { makeReadProvider } from '../utils/rpcProvider'
 import { POSITIONS_POLL_MS } from '../config/earn'
 import { readVaultUserState } from '../lib/earn/vaultActions'
 import { fetchPositionsEnrichment } from '../lib/earn/morphoApi'
 
-export function useEarnPositions(vaults) {
-  const { address, isConnected, chainId } = useWallet() || {}
-  const supported = isEarnAvailable(chainId)
+/** Cross-chain key for one vault position. */
+export function positionKey(chainId, vaultAddress) {
+  return `${chainId}:${String(vaultAddress).toLowerCase()}`
+}
 
-  const [userStates, setUserStates] = useState(null) // Map vaultAddrLc -> chain reads
+export function useEarnPositions(vaults) {
+  const { address, isConnected } = useWallet() || {}
+  const earnChainIds = useMemo(() => getEarnNetworks().map((net) => net.chainId), [])
+
+  const [userStates, setUserStates] = useState(null) // Map positionKey -> chain reads
   const [enrichment, setEnrichment] = useState({})
   const [status, setStatus] = useState('loading')
   const reqIdRef = useRef(0)
 
-  const provider = useMemo(
-    () => (supported ? makeReadProvider(NETWORKS[chainId].rpcUrl, chainId) : null),
-    [supported, chainId],
+  const providers = useMemo(
+    () => new Map(earnChainIds.map((id) => [id, makeReadProvider(NETWORKS[id].rpcUrl, id)])),
+    [earnChainIds],
   )
 
   const load = useCallback(async () => {
-    if (!supported || !isConnected || !address || !provider || !vaults?.length) return
+    if (!isConnected || !address || !vaults?.length) return
     const reqId = ++reqIdRef.current
     try {
-      const [settled, enriched] = await Promise.all([
+      const [settled, enrichedPerChain] = await Promise.all([
         Promise.allSettled(
-          vaults.map((vault) => readVaultUserState({ vault, account: address, provider })),
+          vaults.map((vault) =>
+            readVaultUserState({ vault, account: address, provider: providers.get(vault.chainId) }),
+          ),
         ),
         // Enrichment failure degrades to on-chain values only — never blocks.
-        fetchPositionsEnrichment(address, chainId).catch(() => ({})),
+        Promise.all(
+          earnChainIds.map((chainId) =>
+            fetchPositionsEnrichment(address, chainId)
+              .then((byVault) => ({ chainId, byVault }))
+              .catch(() => ({ chainId, byVault: {} })),
+          ),
+        ),
       ])
       if (reqId !== reqIdRef.current) return
       const next = new Map()
@@ -47,13 +62,19 @@ export function useEarnPositions(vaults) {
       settled.forEach((res, i) => {
         if (res.status === 'fulfilled') {
           anyOk = true
-          next.set(vaults[i].address.toLowerCase(), res.value)
+          next.set(positionKey(vaults[i].chainId, vaults[i].address), res.value)
         }
       })
       if (!anyOk) {
         setUserStates(null)
         setStatus('unavailable')
         return
+      }
+      const enriched = {}
+      for (const { chainId, byVault } of enrichedPerChain) {
+        for (const [vaultAddress, extra] of Object.entries(byVault)) {
+          enriched[positionKey(chainId, vaultAddress)] = extra
+        }
       }
       setUserStates(next)
       setEnrichment(enriched)
@@ -63,31 +84,31 @@ export function useEarnPositions(vaults) {
       setUserStates(null)
       setStatus('unavailable')
     }
-  }, [supported, isConnected, address, provider, chainId, vaults])
+  }, [isConnected, address, providers, earnChainIds, vaults])
 
-  // Scope change: hard reset so another account/chain's positions never render.
+  // Account change: hard reset so another account's positions never render.
   useEffect(() => {
     reqIdRef.current++
     setUserStates(null)
     setEnrichment({})
-    setStatus(supported && isConnected ? 'loading' : 'idle')
+    setStatus(isConnected ? 'loading' : 'idle')
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, chainId, vaults])
+  }, [address, vaults])
 
   useEffect(() => {
-    if (!supported || !isConnected || !address) return undefined
+    if (!isConnected || !address) return undefined
     const id = setInterval(() => load(), POSITIONS_POLL_MS)
     return () => clearInterval(id)
-  }, [supported, isConnected, address, load])
+  }, [isConnected, address, load])
 
   return useMemo(() => {
     const positions = []
     if (userStates && vaults?.length) {
       for (const vault of vaults) {
-        const state = userStates.get(vault.address.toLowerCase())
+        const state = userStates.get(positionKey(vault.chainId, vault.address))
         if (!state || state.shares === 0n) continue
-        const extra = enrichment[vault.address.toLowerCase()] || {}
+        const extra = enrichment[positionKey(vault.chainId, vault.address)] || {}
         positions.push({
           vault,
           shares: state.shares,

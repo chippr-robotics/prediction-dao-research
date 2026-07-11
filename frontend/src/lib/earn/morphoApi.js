@@ -86,12 +86,17 @@ function numOrNull(v) {
 
 /**
  * Normalize one API vault item; returns null for items that fail curation or
- * consistency guards (non-listed, foreign chain, missing coordinates).
+ * consistency guards (non-listed, chain outside the allowlist, missing
+ * coordinates). `chainIds` is the earn-enabled allowlist — vaults are tagged
+ * with their own chainId so the multi-network list stays unambiguous
+ * (network transparency, like the portfolio).
  */
-export function normalizeVault(item, chainId) {
+export function normalizeVault(item, chainIds) {
+  const allowed = Array.isArray(chainIds) ? chainIds.map(Number) : [Number(chainIds)]
   if (!item?.address || !item?.asset?.address) return null
   if (item.listed !== true) return null
-  if (Number(item.chain?.id) !== Number(chainId)) return null
+  const itemChainId = Number(item.chain?.id)
+  if (!allowed.includes(itemChainId)) return null
   const decimals = Number(item.asset.decimals)
   if (!Number.isInteger(decimals) || decimals < 0) return null
   // Human curator names ("Gauntlet", "Steakhouse Financial"); the schema's
@@ -101,7 +106,7 @@ export function normalizeVault(item, chainId) {
     .filter(Boolean)
   return {
     address: item.address,
-    chainId: Number(chainId),
+    chainId: itemChainId,
     name: item.name || item.symbol || 'Vault',
     symbol: item.symbol || '',
     asset: {
@@ -121,19 +126,22 @@ export function normalizeVault(item, chainId) {
 }
 
 /**
- * Curated vault list for one chain — TVL-ordered (API order preserved),
- * capped at VAULT_LIST_LIMIT. Throws MorphoApiError on failure.
+ * Curated vault list across the earn-enabled chains — one query, TVL-ordered
+ * (API order preserved), capped at VAULT_LIST_LIMIT. Each vault carries its
+ * own chainId so the UI can badge networks like the portfolio does.
+ * Throws MorphoApiError on failure.
  */
-export async function fetchVaults(chainId, { fetchImpl } = {}) {
+export async function fetchVaults(chainIds, { fetchImpl } = {}) {
+  const allowed = (Array.isArray(chainIds) ? chainIds : [chainIds]).map(Number)
   const data = await graphql(
     VAULTS_QUERY,
     // first is generous: curation drops non-listed items after the fetch.
-    { chainIds: [Number(chainId)], first: 100 },
+    { chainIds: allowed, first: 100 },
     { fetchImpl },
   )
   const items = data?.vaults?.items || []
   return items
-    .map((item) => normalizeVault(item, chainId))
+    .map((item) => normalizeVault(item, allowed))
     .filter(Boolean)
     .slice(0, VAULT_LIST_LIMIT)
 }

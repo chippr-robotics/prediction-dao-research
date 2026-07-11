@@ -2,8 +2,10 @@
  * VaultSheet tests (spec 050 US1) — pre-wallet amount validation with
  * member-facing reasons, Max shortcut, session-aware confirmation copy,
  * honest withdraw liquidity bound, withdraw disabled without a position,
- * and the sendCalls write rail (passkey batch + honest no-rail error —
- * the tap must NEVER be a silent no-op).
+ * and the network-transparent write rail (useEarnSend): the vault's network
+ * is displayed, submission targets the VAULT's chain (switching handled
+ * inside the hook), sessions that can't transact on that chain see the
+ * reason, and a tap is NEVER a silent no-op.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -11,6 +13,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 const mockWallet = vi.hoisted(() => ({ current: {} }))
 vi.mock('../../hooks/useWalletManagement', () => ({
   useWallet: () => mockWallet.current,
+}))
+
+const mockSend = vi.hoisted(() => ({ current: {} }))
+vi.mock('../../hooks/useEarnSend', () => ({
+  useEarnSend: () => mockSend.current,
+  default: () => mockSend.current,
 }))
 
 // Batch builders are unit-tested in vaultActions.test.js; here they are mocked
@@ -37,6 +45,13 @@ const VAULT = {
   curator: 'Prime Curation',
 }
 
+const ETH_VAULT = {
+  ...VAULT,
+  address: '0x00000000000000000000000000000000000000a2',
+  chainId: 1,
+  name: 'Blue ETH Vault',
+}
+
 // 25 USDC wallet, 10 USDC position, 8 USDC withdrawable right now.
 const USER_STATE = {
   shares: 10_000_000n,
@@ -52,13 +67,19 @@ const DEPOSIT_CALLS = [
 ]
 
 beforeEach(() => {
-  mockWallet.current = { address: '0xac', chainId: 137, sendCalls: vi.fn(), loginMethod: 'wallet' }
+  mockWallet.current = { address: '0xac', chainId: 137 }
+  mockSend.current = {
+    sendOnChain: vi.fn().mockResolvedValue({ route: 'direct', txHash: '0xtx1' }),
+    canTransactOn: () => true,
+    cannotTransactReason: (chainId) => `Passkey accounts can't send transactions on chain ${chainId} yet`,
+    isPasskey: false,
+  }
   mockBuilders.deposit.mockReset().mockResolvedValue({ calls: DEPOSIT_CALLS, requiresApproval: true })
   mockBuilders.withdraw.mockReset().mockResolvedValue({ calls: [DEPOSIT_CALLS[1]] })
 })
 
-function renderSheet(userState = USER_STATE) {
-  return render(<VaultSheet vault={VAULT} userState={userState} onClose={vi.fn()} onActionComplete={vi.fn()} />)
+function renderSheet(userState = USER_STATE, vault = VAULT) {
+  return render(<VaultSheet vault={vault} userState={userState} onClose={vi.fn()} onActionComplete={vi.fn()} />)
 }
 
 describe('VaultSheet deposit validation (pre-wallet)', () => {
@@ -87,10 +108,11 @@ describe('VaultSheet deposit validation (pre-wallet)', () => {
     expect(screen.getByText(/two quick wallet confirmations/i)).toBeInTheDocument()
   })
 
-  it('shows wallet and existing-position balances', () => {
+  it('shows wallet and existing-position balances, and names the vault network', () => {
     renderSheet()
     expect(screen.getByText(/in your wallet/i)).toBeInTheDocument()
     expect(screen.getByText(/already in this vault/i)).toBeInTheDocument()
+    expect(screen.getByText(/on Polygon/i)).toBeInTheDocument()
   })
 })
 
@@ -121,49 +143,50 @@ describe('VaultSheet withdraw (honest liquidity bound)', () => {
   })
 })
 
-describe('VaultSheet write rail (sendCalls — passkey + classic)', () => {
-  it('passkey deposit sends ONE sendCalls batch (approve + deposit) and shows the success state', async () => {
-    const sendCalls = vi.fn().mockResolvedValue({ route: 'userop', state: 'included', txHash: '0xtx1' })
-    mockWallet.current = { address: '0xac', chainId: 137, sendCalls, loginMethod: 'passkey' }
+describe('VaultSheet network-transparent write rail (useEarnSend)', () => {
+  it('submits to the VAULT chain — the network switch is managed for the member', async () => {
+    // Wallet is on Polygon; the vault lives on Ethereum. No banner, no
+    // pre-confirmation: the hook switches as part of the submission.
+    mockWallet.current = { address: '0xac', chainId: 137 }
+    renderSheet(USER_STATE, ETH_VAULT)
+    expect(screen.getByText(/on Ethereum/i)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
+    await waitFor(() => expect(screen.getByText(/deposit complete/i)).toBeInTheDocument())
+    expect(mockSend.current.sendOnChain).toHaveBeenCalledTimes(1)
+    expect(mockSend.current.sendOnChain).toHaveBeenCalledWith(1, DEPOSIT_CALLS, expect.anything())
+  })
+
+  it('passkey deposit sends ONE batch (approve + deposit) with one-ceremony copy', async () => {
+    mockSend.current = {
+      ...mockSend.current,
+      isPasskey: true,
+      sendOnChain: vi.fn().mockResolvedValue({ route: 'userop', state: 'included', txHash: '0xtx1' }),
+    }
     renderSheet()
-    // Passkey copy: one ceremony, not "two confirmations".
     expect(screen.getByText(/one passkey confirmation/i)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
     await waitFor(() => expect(screen.getByText(/deposit complete/i)).toBeInTheDocument())
-    expect(sendCalls).toHaveBeenCalledTimes(1)
-    expect(sendCalls).toHaveBeenCalledWith(DEPOSIT_CALLS)
-    expect(mockBuilders.deposit).toHaveBeenCalledWith(
-      expect.objectContaining({ account: '0xac', amount: 5_000_000n }),
-    )
+    expect(mockSend.current.sendOnChain).toHaveBeenCalledWith(137, DEPOSIT_CALLS, expect.anything())
     expect(screen.getByRole('link', { name: /view transaction/i })).toHaveAttribute(
       'href',
       expect.stringContaining('0xtx1'),
     )
   })
 
-  it('classic wallet withdraw routes through sendCalls too', async () => {
-    const sendCalls = vi.fn().mockResolvedValue({ route: 'direct', txHash: '0xtx2' })
-    mockWallet.current = { address: '0xac', chainId: 137, sendCalls, loginMethod: 'wallet' }
-    renderSheet()
-    fireEvent.click(screen.getByRole('tab', { name: /withdraw/i }))
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: /withdraw usdc/i }))
-    await waitFor(() => expect(screen.getByText(/withdrawal complete/i)).toBeInTheDocument())
-    expect(sendCalls).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows an honest error when the session has no write rail — never a silent no-op', async () => {
-    mockWallet.current = { address: '0xac', chainId: 137, sendCalls: undefined, loginMethod: 'passkey' }
-    renderSheet()
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
-    fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot send transactions/i)
+  it('discloses up front when this session cannot transact on the vault network', () => {
+    mockSend.current = { ...mockSend.current, isPasskey: true, canTransactOn: () => false }
+    renderSheet(USER_STATE, ETH_VAULT)
+    const submit = screen.getByRole('button', { name: /deposit usdc/i })
+    expect(submit).toBeDisabled()
+    expect(screen.getByRole('note')).toHaveTextContent(/passkey accounts can't send transactions/i)
   })
 
   it('surfaces a failed submission outcome instead of pretending success', async () => {
-    const sendCalls = vi.fn().mockResolvedValue({ route: 'userop', state: 'failed', reason: 'user operation reverted' })
-    mockWallet.current = { address: '0xac', chainId: 137, sendCalls, loginMethod: 'passkey' }
+    mockSend.current.sendOnChain = vi
+      .fn()
+      .mockResolvedValue({ route: 'userop', state: 'failed', reason: 'user operation reverted' })
     renderSheet()
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: /deposit usdc/i }))

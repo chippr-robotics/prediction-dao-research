@@ -1,8 +1,9 @@
 /**
- * useEarnRewards claim tests (spec 050 US2) — the claim goes through
- * sendCalls (so passkey sessions work), encodes the distributor call with
- * CUMULATIVE amounts, reports honestly on failure, and never silently
- * no-ops when the session has no write rail.
+ * useEarnRewards claim tests (spec 050 US2) — rewards fetched across every
+ * earn network and tagged with their chainId; claims go through
+ * useEarnSend.sendOnChain (network switch managed for the member, passkey
+ * sessions supported), encode the distributor call with CUMULATIVE amounts,
+ * and report honestly on failure.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
@@ -17,10 +18,23 @@ vi.mock('../../hooks/useActivity', () => ({
   useActivityOptional: () => null,
 }))
 
-const mockMerkl = vi.hoisted(() => ({ rewards: [] }))
+const mockSend = vi.hoisted(() => ({ current: {} }))
+vi.mock('../../hooks/useEarnSend', () => ({
+  useEarnSend: () => mockSend.current,
+  default: () => mockSend.current,
+}))
+
+const mockMerkl = vi.hoisted(() => ({ byChain: {} }))
 vi.mock('../../lib/earn/merkl', async (importOriginal) => {
   const actual = await importOriginal()
-  return { ...actual, fetchRewards: vi.fn(async () => mockMerkl.rewards) }
+  return {
+    ...actual,
+    fetchRewards: vi.fn(async (_address, chainId) => {
+      const entry = mockMerkl.byChain[chainId]
+      if (entry instanceof Error) throw entry
+      return entry || []
+    }),
+  }
 })
 
 import { useEarnRewards } from '../../hooks/useEarnRewards'
@@ -40,50 +54,63 @@ const REWARD = {
 }
 
 beforeEach(() => {
-  mockMerkl.rewards = [REWARD]
-  mockWallet.current = {
-    address: ACCOUNT,
-    isConnected: true,
-    chainId: 137,
-    sendCalls: vi.fn().mockResolvedValue({ route: 'userop', state: 'included', txHash: '0xtx' }),
+  mockMerkl.byChain = { 137: [REWARD], 1: [] }
+  mockWallet.current = { address: ACCOUNT, isConnected: true, chainId: 63 }
+  mockSend.current = {
+    sendOnChain: vi.fn().mockResolvedValue({ route: 'userop', state: 'included', txHash: '0xtx' }),
+    canTransactOn: () => true,
+    cannotTransactReason: () => 'not available',
+    isPasskey: false,
   }
   localStorage.clear()
 })
 
-describe('useEarnRewards claim (sendCalls rail)', () => {
-  it('claims via one distributor call with the CUMULATIVE amount', async () => {
+describe('useEarnRewards (network-transparent claim rail)', () => {
+  it('fetches every earn network and tags rewards with their chainId', async () => {
     const { result } = renderHook(() => useEarnRewards())
     await waitFor(() => expect(result.current.status).toBe('ready'))
-    await act(() => result.current.claim())
+    expect(result.current.rewards).toHaveLength(1)
+    expect(result.current.rewards[0].chainId).toBe(137)
+    expect(result.current.failedNetworks).toEqual([])
+  })
 
-    const sendCalls = mockWallet.current.sendCalls
-    expect(sendCalls).toHaveBeenCalledTimes(1)
-    const [calls] = sendCalls.mock.calls[0]
+  it('claims via sendOnChain for the reward network with the CUMULATIVE amount', async () => {
+    const { result } = renderHook(() => useEarnRewards())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(() => result.current.claim(137))
+
+    const { sendOnChain } = mockSend.current
+    expect(sendOnChain).toHaveBeenCalledTimes(1)
+    const [chainId, calls] = sendOnChain.mock.calls[0]
+    expect(chainId).toBe(137)
     expect(calls).toHaveLength(1)
     const decoded = DISTRIBUTOR_IFACE.decodeFunctionData('claim', calls[0].data)
     expect(decoded[0][0].toLowerCase()).toBe(ACCOUNT) // users
     expect(decoded[1][0].toLowerCase()).toBe(REWARD.token.address) // tokens
     expect(decoded[2][0]).toBe(REWARD.amount) // cumulative, NOT the difference
-    expect(result.current.claimState.status).toBe('confirmed')
+    expect(result.current.claimState).toMatchObject({ status: 'confirmed', chainId: 137 })
     expect(result.current.claimState.txUrl).toContain('0xtx')
   })
 
-  it('reports an honest error when the session has no write rail', async () => {
-    mockWallet.current = { ...mockWallet.current, sendCalls: undefined }
+  it('is unavailable only when EVERY network fails; partial failures are named', async () => {
+    mockMerkl.byChain = { 137: [REWARD], 1: new Error('merkl down') }
     const { result } = renderHook(() => useEarnRewards())
     await waitFor(() => expect(result.current.status).toBe('ready'))
-    await act(() => result.current.claim())
-    expect(result.current.claimState.status).toBe('error')
-    expect(result.current.claimState.error).toMatch(/cannot send transactions/i)
+    expect(result.current.failedNetworks).toEqual(['Ethereum'])
+    expect(result.current.rewards).toHaveLength(1)
+
+    mockMerkl.byChain = { 137: new Error('down'), 1: new Error('down') }
+    const { result: allFail } = renderHook(() => useEarnRewards())
+    await waitFor(() => expect(allFail.current.status).toBe('unavailable'))
   })
 
   it('surfaces a failed submission outcome', async () => {
-    mockWallet.current.sendCalls = vi
+    mockSend.current.sendOnChain = vi
       .fn()
       .mockResolvedValue({ route: 'userop', state: 'failed', reason: 'reverted' })
     const { result } = renderHook(() => useEarnRewards())
     await waitFor(() => expect(result.current.status).toBe('ready'))
-    await act(() => result.current.claim())
+    await act(() => result.current.claim(137))
     expect(result.current.claimState.status).toBe('error')
   })
 })
