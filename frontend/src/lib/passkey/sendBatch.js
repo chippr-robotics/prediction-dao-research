@@ -110,7 +110,9 @@ export async function sendPasskeyBatch({
     deps,
   })
   const build = deps.buildAccount ?? buildAccount
-  let acct = await build({ chainId, credential, ownerIndex, deps })
+  // Pass the SESSION address (the FairWins-factory address the user funded) so buildAccount pins the
+  // UserOp sender to it — never viem's hardwired Coinbase-factory address, which is empty.
+  let acct = await build({ chainId, credential, accountAddress: address, ownerIndex, deps })
   const { calls: shaped } = buildAction(calls)
 
   // Sponsored attempt with a never-stranded self-funded fallback (spec 050 / FR-007): if a paymaster
@@ -125,7 +127,7 @@ export async function sendPasskeyBatch({
   } catch (err) {
     if (sponsored && isSponsorshipUnavailable(err)) {
       onState?.({ state: LIFECYCLE.DRAFT, route, sponsored: false })
-      acct = await build({ chainId, credential, ownerIndex, deps: { ...deps, noPaymaster: true } })
+      acct = await build({ chainId, credential, accountAddress: address, ownerIndex, deps: { ...deps, noPaymaster: true } })
       sponsored = false
       bundlerClient = acct.bundlerClient
       hash = await bundlerClient.sendUserOperation({ calls: shaped })
@@ -155,7 +157,15 @@ export async function sendPasskeyBatch({
  */
 export function isSponsorshipUnavailable(err) {
   const msg = String(err?.details || err?.shortMessage || err?.message || err || '').toLowerCase()
-  if (/aa1[0-9]|aa2[0-9]|execution reverted|reverted with|account validation|out of gas|invalid userop/.test(msg)) {
+  // An op that reverts in bundler simulation (e.g. "reverted during simulation ... transfer amount
+  // exceeds balance") is a USER-OP problem: a self-funded retry reverts identically and only masks the
+  // real reason behind a confusing AA21. Surface it. Only genuine sponsorship/transport failures below
+  // fall through to the self-funded retry.
+  if (
+    /aa1[0-9]|aa2[0-9]|execution reverted|reverted with|reverted during simulation|exceeds balance|transfer amount|account validation|out of gas|invalid userop/.test(
+      msg
+    )
+  ) {
     return false
   }
   // Paymaster AA3x, our endpoint's refusals, and HTTP/RPC/transport failures all mean sponsorship

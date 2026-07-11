@@ -182,8 +182,8 @@ export async function resolveOwnerIndex({ chainId, accountAddress, credential, d
  * `credential` = { credentialId, publicKey: {x, y} } from credentials.js.
  * `signPayload` lets the connector own the ceremony UX (deps-injectable).
  */
-export async function buildAccount({ chainId, credential, ownersBytes, ownerIndex, nonce = 0n, deps = {} }) {
-  const { entryPoint, bundlerUrls, sponsorPaymasterUrl } = requirePasskeySupport(chainId)
+export async function buildAccount({ chainId, credential, accountAddress, ownerIndex, nonce = 0n, deps = {} }) {
+  const { entryPoint, bundlerUrls, sponsorPaymasterUrl, factory } = requirePasskeySupport(chainId)
   const client = deps.publicClient ?? defaultPublicClient(chainId)
 
   // Refuse incomplete records BEFORE any ceremony — an undefined id/key here
@@ -204,14 +204,27 @@ export async function buildAccount({ chainId, credential, ownersBytes, ownerInde
       return result
     })
 
+  const initialOwnerBytes = publicKeyToOwnerBytes(credential.publicKey)
+
   const owner = toWebAuthnAccount({
     credential: {
       id: credential.credentialId,
-      publicKey: publicKeyToOwnerBytes(credential.publicKey),
+      publicKey: initialOwnerBytes,
     },
     getFn,
     rpId: deps.rpId,
   })
+
+  // The account address is a pure function of (initial owners, nonce) and the FairWins-DEPLOYED
+  // factory — the one the connector's `deriveAddress` uses and the address the user funds (their
+  // displayed balance). viem's `toCoinbaseSmartAccount` instead hardwires the canonical Coinbase
+  // factory (0x0ba5ed0c), which derives a DIFFERENT counterfactual address. Left unpinned, every
+  // UserOp was built for that empty Coinbase-factory address — the transfer reverted "exceeds
+  // balance" (sponsored) or the sender couldn't prefund gas → AA21 (self-funded). Pin viem to the
+  // FairWins address so the sender is the account that actually holds the funds.
+  const address =
+    accountAddress ??
+    (await deriveAddress({ chainId, ownersBytes: [initialOwnerBytes], nonce, deps: { publicClient: client } }))
 
   const account = await toCoinbaseSmartAccount({
     client,
@@ -221,8 +234,28 @@ export async function buildAccount({ chainId, credential, ownersBytes, ownerInde
     // slot. Controller additions never reindex (append-only).
     ownerIndex: ownerIndex ?? deps.ownerIndex ?? 0,
     nonce,
-    ...(ownersBytes ? {} : {}),
+    // Pin the sender: viem returns this verbatim from getAddress() instead of querying its
+    // own (wrong) factory. Signing (replaySafeHash/ERC-1271) binds this same address + chainId.
+    address,
   })
+
+  // First-use deployment must land the account code at `address`, so the initCode MUST call the
+  // FairWins factory's createAccount — not viem's hardwired Coinbase factory (which would deploy a
+  // different address and revert AA14). Override viem's getFactoryArgs, preserving its isDeployed
+  // guard so a deployed account emits no initCode. Owners here mirror `deriveAddress` exactly, so
+  // the deployed address equals `address`. (For counterfactual accounts the connecting credential
+  // is always the sole initial owner — controllers can only be added post-deployment.)
+  account.getFactoryArgs = async () => {
+    if (await account.isDeployed()) return { factory: undefined, factoryData: undefined }
+    return {
+      factory,
+      factoryData: encodeFunctionData({
+        abi: FACTORY_ABI,
+        functionName: 'createAccount',
+        args: [[initialOwnerBytes], nonce],
+      }),
+    }
+  }
 
   // FairWins-sponsored paymaster (spec 050): when a sponsor endpoint is configured for this network,
   // the bundler client fetches a signed sponsorship automatically so the account never needs a
