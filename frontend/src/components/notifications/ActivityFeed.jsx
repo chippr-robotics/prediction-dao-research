@@ -138,6 +138,13 @@ function ActivityFeed({ onClose }) {
                 </span>
                 <span className="entry-time">{relativeTime(entry.createdAt, now)}</span>
               </button>
+              {/* Entries stamped with a txUrl (e.g. earn actions, spec 050) get a
+                  direct explorer link alongside the in-app deep link. */}
+              {entry.txUrl && (
+                <a className="entry-tx-link" href={entry.txUrl} target="_blank" rel="noopener noreferrer">
+                  View transaction ↗
+                </a>
+              )}
             </li>
           ))}
         </ul>

@@ -13,6 +13,8 @@ export const DOMAIN_META = {
   custody: { label: 'Custody' },
   // Spec 035 intent lifecycle entries (emitted via useIntentAction's onActivity callback).
   intents: { label: 'Gasless' },
+  // Spec 050 earn (lending & rewards) events.
+  earn: { label: 'Earn' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */

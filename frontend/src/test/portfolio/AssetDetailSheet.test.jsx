@@ -128,6 +128,25 @@ describe('AssetDetailSheet actions', () => {
     expect(screen.getByRole('button', { name: 'Transfer' })).toBeDisabled()
   })
 
+  it('deep-links Earn to the lend view scoped to the instance (spec 050, US3)', () => {
+    const onClose = renderSheet(ETH_AGG)
+    // WETH on Polygon — an earn-enabled network (chain 137).
+    fireEvent.click(screen.getAllByRole('radio')[2])
+    const earn = screen.getByRole('button', { name: 'Earn' })
+    expect(earn).toBeEnabled()
+    fireEvent.click(earn)
+    expect(mockNavigate).toHaveBeenCalledWith('/wallet?tab=earn&view=lend&chain=137&token=WETH')
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('disables Earn with a reason on non-earn networks and for collectibles (spec 050)', () => {
+    // Mordor voucher NFT: wrong kind AND (were it fungible) non-earn network.
+    renderSheet(VOUCHER_AGG)
+    const earn = screen.getByRole('button', { name: 'Earn' })
+    expect(earn).toBeDisabled()
+    expect(screen.getByText(/collectibles cannot be lent/i)).toBeInTheDocument()
+  })
+
   it('always shows Stake as honestly unavailable (no staking surface yet)', () => {
     renderSheet(ETH_AGG)
     const stake = screen.getByRole('button', { name: 'Stake' })

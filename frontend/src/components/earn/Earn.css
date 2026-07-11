@@ -1,0 +1,435 @@
+/* Earn section styles (spec 050). Reuses the asset-sheet modal shell from
+   AssetDetailSheet.css for VaultSheet; everything earn-specific lives here. */
+
+.earn-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.earn-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.earn-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+}
+
+.earn-switch-note,
+.earn-unavailable {
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.earn-switch-note p,
+.earn-unavailable p {
+  margin: 0;
+}
+
+/* Area cards (hub) */
+.earn-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+
+.earn-area-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  text-align: left;
+  padding: 1rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 12px;
+  background: var(--bg-secondary, transparent);
+  color: var(--text-primary, inherit);
+  cursor: pointer;
+}
+
+.earn-area-card:hover:not(:disabled),
+.earn-area-card:focus-visible:not(:disabled) {
+  border-color: var(--brand-primary);
+}
+
+.earn-area-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.earn-area-name {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.earn-area-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.earn-area-flag {
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+.earn-back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--brand-primary);
+  cursor: pointer;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+/* Lend view */
+.earn-lend,
+.earn-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.earn-lend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.earn-lend-header h3,
+.earn-positions h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.earn-filter-chip {
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-primary);
+  background: none;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.earn-state {
+  color: var(--text-secondary);
+  margin: 0.25rem 0;
+}
+
+.earn-vault-list,
+.earn-positions-list,
+.earn-rewards-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.earn-vault-row,
+.earn-position-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+  background: var(--bg-secondary, transparent);
+  color: var(--text-primary, inherit);
+  cursor: pointer;
+  text-align: left;
+}
+
+.earn-vault-row:hover,
+.earn-vault-row:focus-visible,
+.earn-position-row:hover,
+.earn-position-row:focus-visible {
+  border-color: var(--brand-primary);
+}
+
+.earn-vault-main,
+.earn-position-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.earn-vault-name {
+  font-weight: 600;
+}
+
+.earn-vault-asset,
+.earn-vault-curator {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.earn-vault-numbers,
+.earn-position-values,
+.earn-reward-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  white-space: nowrap;
+}
+
+.earn-vault-apy {
+  font-weight: 600;
+  color: var(--brand-primary);
+}
+
+.earn-vault-tvl,
+.earn-position-usd,
+.earn-reward-pending {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.earn-position-pnl.up {
+  color: var(--brand-primary);
+  font-size: 0.8rem;
+}
+
+.earn-position-pnl.down {
+  color: var(--danger-color, #c0392b);
+  font-size: 0.8rem;
+}
+
+.earn-legend {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Rewards */
+.earn-freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.earn-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+}
+
+.earn-reward-token {
+  font-weight: 600;
+}
+
+.earn-legacy-note {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Buttons */
+.earn-btn {
+  border-radius: 8px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  background: var(--bg-secondary, transparent);
+  color: var(--text-primary, inherit);
+}
+
+.earn-btn.primary {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #fff;
+}
+
+.earn-btn.secondary {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: none;
+  align-self: flex-start;
+}
+
+.earn-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Vault sheet (modal internals) */
+.earn-vault-sheet-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+}
+
+.earn-mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.earn-mode-tab {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary, inherit);
+  cursor: pointer;
+}
+
+.earn-mode-tab.active {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.earn-mode-tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.earn-vault-sheet-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+}
+
+.earn-vault-sheet-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.earn-vault-sheet-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.earn-vault-sheet-facts dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.earn-amount-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.earn-amount-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.earn-amount-input input {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 8px;
+  background: var(--bg-secondary, transparent);
+  color: var(--text-primary, inherit);
+  font-size: 1rem;
+}
+
+.earn-input-error {
+  color: var(--danger-color, #c0392b);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.earn-summary {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.earn-submit {
+  width: 100%;
+}
+
+.earn-tx-done {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 0;
+}
+
+.earn-tx-done p {
+  margin: 0;
+}
+
+.earn-tx-done a,
+.earn-docs-link,
+.earn-attribution {
+  color: var(--brand-primary);
+  text-decoration: none;
+}
+
+.earn-tx-done a:hover,
+.earn-docs-link:hover,
+.earn-attribution:hover {
+  text-decoration: underline;
+}
+
+/* Footer: attribution + risk disclosure */
+.earn-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.earn-attribution {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.earn-risk {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.earn-docs-link {
+  font-size: 0.85rem;
+}

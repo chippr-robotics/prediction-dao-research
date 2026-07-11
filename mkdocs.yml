@@ -91,6 +91,7 @@ nav:
     - Accepting a Wager: user-guide/accept-wager.md
     - Open Challenges: user-guide/open-challenges.md
     - Membership Vouchers: user-guide/membership-vouchers.md
+    - Earn (Lending & Rewards): user-guide/earn.md
     - Resolving a Wager: user-guide/resolve-wager.md
     - Private Wager Encryption: user-guide/private-market-encryption.md
     - Address Book & Screening: user-guide/address-book.md
@@ -101,6 +102,7 @@ nav:
     - Smart Contracts: developer-guide/smart-contracts.md
     - Frontend Development: developer-guide/frontend.md
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
+    - Earn Integration: developer-guide/earn-integration.md
     - Encryption Architecture: developer-guide/encryption-architecture.md
     - Envelope Encryption Spec: developer-guide/envelope-encryption-spec.md
     - Ethereum Security Agent: developer-guide/ethereum-security-agent.md

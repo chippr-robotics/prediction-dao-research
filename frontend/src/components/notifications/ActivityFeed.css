@@ -180,6 +180,20 @@
   white-space: nowrap;
 }
 
+/* External explorer link for entries stamped with a txUrl (spec 050 earn). */
+.entry-tx-link {
+  display: block;
+  padding: 0 0.75rem 0.5rem 2.4rem;
+  font-size: 0.75rem;
+  color: var(--brand-primary);
+  text-decoration: none;
+}
+
+.entry-tx-link:hover,
+.entry-tx-link:focus-visible {
+  text-decoration: underline;
+}
+
 @media (max-width: 480px) {
   .activity-feed {
     position: fixed;
