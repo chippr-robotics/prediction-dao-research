@@ -59,14 +59,27 @@
 .portfolio-category {
   border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
   border-radius: 10px;
-  overflow: hidden;
+  /* No overflow:hidden here — the InfoTip bubble in the heading row must be
+     able to escape this box (spec 039 FR-008); it was getting clipped to
+     the collapsed section's short height (issue #858). Rounding is instead
+     applied to the heading row and the rows region individually below. */
 }
 .portfolio-category-heading-row {
   align-items: center;
   background: var(--surface-color, var(--bg-secondary, #f9fafb));
+  border-radius: 9px 9px 0 0;
   display: flex;
   gap: 0.25rem;
   padding-right: 0.6rem;
+}
+/* When the category is collapsed, the heading row is the section's only
+   visible child and needs its bottom corners rounded too. */
+.portfolio-category-heading-row:has(+ [hidden]) {
+  border-radius: 9px;
+}
+.portfolio-category > [role='region'] {
+  border-radius: 0 0 9px 9px;
+  overflow: hidden;
 }
 .portfolio-category-heading {
   flex: 1;
