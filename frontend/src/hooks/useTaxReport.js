@@ -41,9 +41,11 @@ export function useTaxReport(options = {}) {
   // Spec 051: the report reads the SAME activity ledger the Account tab
   // renders, so line items and totals can never disagree (FR-014/FR-015).
   // Injectable for tests; `ledger: null` forces the legacy wager-only path.
+  const hasLedgerOption = 'ledger' in options
+  const ledgerOption = options.ledger
   const ledger = useMemo(
-    () => ('ledger' in options ? options.ledger : getDefaultLedgerRepository()),
-    [options.ledger],
+    () => (hasLedgerOption ? ledgerOption : getDefaultLedgerRepository()),
+    [hasLedgerOption, ledgerOption],
   )
   const networkOf = useMemo(() => options.getNetwork || getNetwork, [options.getNetwork])
   const escrowOf = useMemo(
