@@ -17,6 +17,7 @@
     "lint": "echo 'no standalone linter wired; relies on repo-level review' && exit 0"
   },
   "dependencies": {
+    "@google-cloud/kms": "^5.5.1",
     "ethers": "^6.16.0",
     "express": "^4.21.2",
     "helmet": "^8.0.0"
