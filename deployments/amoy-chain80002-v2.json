@@ -18,7 +18,10 @@
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
     "chainlinkFunctionsAdapter": "0x074fC18C1E322a7537b53B8B2Bf0762629E3b532",
     "umaAdapter": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88",
-    "voucherBatchMinter": "0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1"
+    "voucherBatchMinter": "0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1",
+    "verifyingPaymaster": "0xA00A06ae44FA2bd40Ec10D9613c96afD779b6898",
+    "verifyingPaymasterSigner": "0x9Ec0d8fF320c3590b47Da5B06ae0253Ab1Ca22CD",
+    "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
   },
   "mocks": {
     "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",

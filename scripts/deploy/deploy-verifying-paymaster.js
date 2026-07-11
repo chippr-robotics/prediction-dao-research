@@ -75,7 +75,7 @@ async function main() {
   }
 
   // Record into the network's v2 deployment file (append-only; never clobber sibling contracts).
-  const filename = getDeploymentFilename(network, "v2");
+  const filename = getDeploymentFilename({ chainId }, "v2");
   const filepath = path.join(process.cwd(), "deployments", filename);
   const record = fs.existsSync(filepath)
     ? JSON.parse(fs.readFileSync(filepath, "utf8"))
