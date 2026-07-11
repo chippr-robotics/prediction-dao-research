@@ -62,7 +62,7 @@ export function passkeyConnector(options = {}) {
       this.capability = await (deps.detectCapability ?? detectCapability)()
     },
 
-    async connect({ chainId, isReconnecting, credentialId, mode: requestedMode } = {}) {
+    async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
       const targetChain = chainId ?? config.chains[0]?.id
       requirePasskeySupport(targetChain) // throws ChainNotSupportedError (FR-022)
 
@@ -97,9 +97,13 @@ export function passkeyConnector(options = {}) {
         // when `credentialId` is set; otherwise getAssertion offers the whole
         // local book via allowCredentials so the platform must show a chooser
         // (spec 045 US3 — the app never guesses, and neither may the browser).
+        // `discoverable` (issue #849) widens that to a bare discoverable request
+        // so passkeys this browser never recorded — but that live on the device
+        // — become reachable from "Use a different passkey…".
         const assertion = await (deps.getAssertion ?? getAssertion)({
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           credentialId,
+          discoverable,
           deps,
         })
         credential = { credentialId: assertion.credentialId }

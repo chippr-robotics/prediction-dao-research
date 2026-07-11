@@ -161,11 +161,20 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     markExplainerSeen()
   })
 
-  it('pins a single known passkey without a picker (one-tap return, SC-004)', async () => {
-    rememberCredential({ credentialId: 'c-only', publicKey: PK(1), address: '0x' + 'a'.repeat(40) })
+  it('offers the chooser for a single known passkey — never silently pins index 0 (issue #849)', async () => {
+    rememberCredential({ credentialId: 'c-only', publicKey: PK(1), address: '0x' + 'a'.repeat(40), label: 'Phone' })
     const user = userEvent.setup()
     render(<ConnectModal />)
     await user.click(screen.getByText('Passkey').closest('button'))
+
+    // A member with one recorded passkey is still presented with a choice
+    // (acceptance #1) rather than being locked to the first credential.
+    expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
+    expect(mockWallet.connectWallet).not.toHaveBeenCalled()
+    expect(screen.getByText('Use a different passkey…')).toBeInTheDocument()
+    expect(screen.getByText('Create a new account')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Phone').closest('button'))
     expect(mockWallet.connectWallet).toHaveBeenCalledWith('fairwinsPasskey', {
       credentialId: 'c-only',
       mode: 'sign-in',
@@ -195,7 +204,12 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     const user = userEvent.setup()
     render(<ConnectModal />)
     await user.click(screen.getByText('Passkey').closest('button'))
-    // Only one usable record -> pinned directly, no picker.
+    // The picker lists only the usable record; the broken one never appears.
+    expect(screen.getByTestId('passkey-picker')).toBeInTheDocument()
+    expect(screen.getByText('Phone')).toBeInTheDocument()
+    expect(screen.queryByText('Broken')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Phone').closest('button'))
     expect(mockWallet.connectWallet).toHaveBeenCalledWith('fairwinsPasskey', {
       credentialId: 'c1',
       mode: 'sign-in',
@@ -210,7 +224,12 @@ describe('ConnectModal — multi-passkey account picker (US3)', () => {
     await user.click(screen.getByText('Passkey').closest('button'))
 
     await user.click(screen.getByText('Use a different passkey…'))
-    expect(mockWallet.connectWallet).toHaveBeenLastCalledWith('fairwinsPasskey', { mode: 'sign-in' })
+    // Discoverable request (no allowCredentials) so passkeys this browser has
+    // never recorded — but that live on the device — are reachable (issue #849).
+    expect(mockWallet.connectWallet).toHaveBeenLastCalledWith('fairwinsPasskey', {
+      mode: 'sign-in',
+      discoverable: true,
+    })
 
     await user.click(screen.getByText('Create a new account'))
     expect(mockWallet.connectWallet).toHaveBeenLastCalledWith('fairwinsPasskey', { mode: 'sign-up' })
