@@ -71,8 +71,10 @@ export function deriveTransfersFromWagers({ wagers = [], address } = {}) {
     // time for the opponent, so we attribute their deposit to createdAt too.
     // Settlement uses resolvedAt when present, else createdAt (refund/cancel/
     // decline events don't set resolvedAt in the index).
-    const createdAt = Number(w.createdAt) || 0
-    const settledAt = Number(w.resolvedAt) || createdAt
+    // A missing time is NULL, never 0 — epoch-0 rendered as "20645d ago"
+    // (spec 051 FR-006); consumers show an explicit "date unavailable" state.
+    const createdAt = Number(w.createdAt) > 0 ? Number(w.createdAt) : null
+    const settledAt = Number(w.resolvedAt) > 0 ? Number(w.resolvedAt) : createdAt
 
     const push = (direction, amount, timestamp) => {
       if (amount <= 0n) return

@@ -117,11 +117,11 @@ independently testable increment.
 
 **Independent Test**: quickstart.md §3 — RPC-only network shows explorer-matching dates; "20645d" is unfindable (SC-004)
 
-- [ ] T034 [P] [US4] Write Vitest specs for `formatRelativeTime` null-guard (`0`, negative, null, undefined ⇒ `null`) and callers rendering the explicit "date unavailable" state in `frontend/src/lib/account/format.test.js`
-- [ ] T035 [US4] Update `frontend/src/lib/account/format.js` + all call sites (`RecentActivityFeed`, `TransferActivityList`, `FreshnessIndicator` unaffected-but-verified) to pass T034
-- [ ] T036 [P] [US4] Write Vitest specs for timestamp hydration (bounded scan + `getBlock` → ms; budget exhaustion ⇒ `null` + `unavailable`; cache hit skips RPC; cache loss harmless) in `frontend/src/data/ledger/timestamps.test.js`
-- [ ] T037 [US4] Implement `frontend/src/data/ledger/timestamps.js` reusing the `reportDataSource` bounded event-window scanner, and wire it into `wagerLedgerSource`'s derived fallback path (replacing the `createdAt: 0` coercion in `deriveTransfersFromWagers` usage) to pass T036
-- [ ] T038 [US4] Update `frontend/src/lib/account/deriveTransfers.js` (+ its test) to emit `timestamp: null` instead of `0`/createdAt-fallback when no real time exists
+- [X] T034 [P] [US4] Write Vitest specs for `formatRelativeTime` null-guard (`0`, negative, null, undefined ⇒ `null`) and callers rendering the explicit "date unavailable" state in `frontend/src/lib/account/format.test.js`
+- [X] T035 [US4] Update `frontend/src/lib/account/format.js` + all call sites (`RecentActivityFeed`, `TransferActivityList`, `FreshnessIndicator` unaffected-but-verified) to pass T034
+- [X] T036 [P] [US4] Write Vitest specs for timestamp hydration (bounded scan + `getBlock` → ms; budget exhaustion ⇒ `null` + `unavailable`; cache hit skips RPC; cache loss harmless) in `frontend/src/data/ledger/timestamps.test.js`
+- [X] T037 [US4] Implement `frontend/src/data/ledger/timestamps.js` reusing the `reportDataSource` bounded event-window scanner, and wire it into `wagerLedgerSource`'s derived fallback path (replacing the `createdAt: 0` coercion in `deriveTransfersFromWagers` usage) to pass T036
+- [X] T038 [US4] Update `frontend/src/lib/account/deriveTransfers.js` (+ its test) to emit `timestamp: null` instead of `0`/createdAt-fallback when no real time exists
 
 **Checkpoint**: FR-005/006 satisfied on every network
 

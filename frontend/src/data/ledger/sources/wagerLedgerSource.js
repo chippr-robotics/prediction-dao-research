@@ -15,6 +15,7 @@
 import { createReportDataSource } from '../../reports/reportDataSource'
 import { getDefaultWagerRepository } from '../../wagers/WagerRepository'
 import { deriveTransfersFromWagers } from '../../../lib/account/deriveTransfers'
+import { hydrateWagerTimestamps } from '../timestamps'
 import { subgraphEntryId, derivedWagerEntryId, wagerDedupKey } from '../identity'
 import { LEDGER_CLASS, LEDGER_STATUS, PROVENANCE, TS_PROVENANCE } from '../constants'
 
@@ -109,9 +110,10 @@ export function createWagerLedgerSource(deps = {}) {
         deps.listWagers ||
         (async (q) => loadAllWagers(getDefaultWagerRepository(q.chainId), q.account))
       let wagers = await listWagers({ account, chainId })
-      if (typeof deps.hydrateWagerTimestamps === 'function') {
-        wagers = await deps.hydrateWagerTimestamps(wagers, chainId)
-      }
+      // Real block times for the derived rows (US4/FR-005): bounded chain
+      // scan + cache; anything unhydrated stays null → "date unavailable".
+      const hydrate = deps.hydrateWagerTimestamps || ((ws, cid) => hydrateWagerTimestamps(ws, cid, { provider }))
+      wagers = await hydrate(wagers, chainId)
       const derived = deriveTransfersFromWagers({ wagers, address: account })
       return derived.map((row) => derivedTransferToEntry(row, { chainId, account }))
     },

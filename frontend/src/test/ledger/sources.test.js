@@ -43,6 +43,7 @@ describe('wagerLedgerSource', () => {
   it('falls back to derived entries on subgraph-less networks — null timestamps, never 0', async () => {
     const src = createWagerLedgerSource({
       listTransfers: async () => null, // no subgraph
+      hydrateWagerTimestamps: async (ws) => ws, // hydration exhausted — nothing recovered
       listWagers: async () => [
         {
           id: '9',
