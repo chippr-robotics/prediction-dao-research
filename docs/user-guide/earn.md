@@ -6,9 +6,11 @@ time. You stay in control the whole time: deposits go straight from your own wal
 never holds your money, and you can withdraw whenever you like.
 
 !!! note "Where Earn works"
-    Lending is available on **Ethereum** and **Polygon**. On other networks the Earn section
-    stays visible and tells you where earning is available — switch networks from
-    My Account → Network to use it.
+    Lending is available on **Ethereum** and **Polygon**, and the Earn section shows vaults
+    from both together — each row carries a small network badge, just like your portfolio.
+    You never manage networks yourself: when you confirm a deposit, withdrawal, or claim,
+    the app moves to the right network automatically (a browser wallet may ask you to
+    approve the network change in the wallet itself).
 
 ## What lending is (in plain terms)
 
@@ -23,7 +25,8 @@ plain-language explanation.
 ## Lending step by step
 
 1. Open the menu and choose **Earn** in the Finance group, then open **Lend**.
-2. Browse the vault list. For each vault you can see:
+2. Browse the vault list — vaults from every supported network appear together, each with
+   its network badge. For each vault you can see:
     - the asset it accepts (for example USDC),
     - the estimated **yearly rate (APY)** — an estimate, not a promise; rates change constantly,
     - how much everyone has deposited in total,

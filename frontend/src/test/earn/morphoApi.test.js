@@ -48,9 +48,16 @@ describe('normalizeVault', () => {
     expect(vault.rewards).toEqual([{ assetSymbol: 'MORPHO', supplyApr: 0.012 }])
   })
 
-  it('drops non-listed and foreign-chain items', () => {
+  it('drops non-listed items and chains outside the earn allowlist', () => {
     expect(normalizeVault({ ...VAULT_ITEM, listed: false }, 137)).toBeNull()
-    expect(normalizeVault({ ...VAULT_ITEM, chain: { id: 1 } }, 137)).toBeNull()
+    expect(normalizeVault({ ...VAULT_ITEM, chain: { id: 8453 } }, [1, 137])).toBeNull()
+  })
+
+  it('tags each vault with its OWN chainId across a multi-network allowlist', () => {
+    const onPolygon = normalizeVault(VAULT_ITEM, [1, 137])
+    expect(onPolygon.chainId).toBe(137)
+    const onEthereum = normalizeVault({ ...VAULT_ITEM, chain: { id: 1 } }, [1, 137])
+    expect(onEthereum.chainId).toBe(1)
   })
 
   it('joins multiple curator names and yields null when none are named', () => {

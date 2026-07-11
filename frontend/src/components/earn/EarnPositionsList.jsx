@@ -6,7 +6,9 @@
  */
 import { formatUnits } from 'ethers'
 import InfoTip from '../ui/InfoTip'
+import AssetLogo from '../wallet/AssetLogo'
 import SensitiveValue from '../common/SensitiveValue'
+import { NETWORKS } from '../../config/networks'
 import { EARN_TIPS } from '../../lib/earn/earnCopy'
 
 function formatUsd(n) {
@@ -31,13 +33,24 @@ export default function EarnPositionsList({ positions, status, onSelect }) {
       </h3>
       <ul className="earn-positions-list">
         {positions.map((position) => (
-          <li key={position.vault.address}>
+          <li key={`${position.vault.chainId}:${position.vault.address}`}>
             <button
               type="button"
               className="earn-position-row"
               onClick={() => onSelect?.(position)}
             >
-              <span className="earn-position-name">{position.vault.name}</span>
+              <AssetLogo
+                symbol={position.vault.asset.symbol}
+                chainId={position.vault.chainId}
+                showBadge
+                size={28}
+              />
+              <span className="earn-position-name">
+                {position.vault.name}
+                <span className="earn-position-network">
+                  on {NETWORKS[position.vault.chainId]?.name || 'unknown network'}
+                </span>
+              </span>
               <span className="earn-position-values">
                 <SensitiveValue className="earn-position-assets">
                   {formatAssets(position)}

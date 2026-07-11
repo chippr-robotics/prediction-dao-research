@@ -1,6 +1,7 @@
 /**
- * Earn section WCAG 2.1 AA audits (spec 050, FR-015 / SC-007) — hub, lend
- * view with vaults + positions, vault sheet, and rewards view.
+ * Earn section WCAG 2.1 AA audits (spec 050, FR-015 / SC-007) — hub,
+ * network-transparent lend view (multi-network vaults + positions), vault
+ * sheet, and per-network rewards view.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent, screen } from '@testing-library/react'
@@ -12,6 +13,12 @@ vi.mock('../../hooks/useWalletManagement', () => ({
   useWallet: () => mockWallet.current,
 }))
 
+const mockSend = vi.hoisted(() => ({ current: {} }))
+vi.mock('../../hooks/useEarnSend', () => ({
+  useEarnSend: () => mockSend.current,
+  default: () => mockSend.current,
+}))
+
 const mockVaults = vi.hoisted(() => ({ current: {} }))
 vi.mock('../../hooks/useEarnVaults', () => ({
   useEarnVaults: () => mockVaults.current,
@@ -19,10 +26,14 @@ vi.mock('../../hooks/useEarnVaults', () => ({
 }))
 
 const mockPositions = vi.hoisted(() => ({ current: {} }))
-vi.mock('../../hooks/useEarnPositions', () => ({
-  useEarnPositions: () => mockPositions.current,
-  default: () => mockPositions.current,
-}))
+vi.mock('../../hooks/useEarnPositions', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    positionKey: actual.positionKey,
+    useEarnPositions: () => mockPositions.current,
+    default: () => mockPositions.current,
+  }
+})
 
 const mockRewards = vi.hoisted(() => ({ current: {} }))
 vi.mock('../../hooks/useEarnRewards', () => ({
@@ -45,6 +56,13 @@ const VAULT = {
   totalAssetsUsd: 12_000_000,
   curator: 'Prime Curation',
 }
+const ETH_VAULT = {
+  ...VAULT,
+  address: '0x00000000000000000000000000000000000000a2',
+  chainId: 1,
+  name: 'Blue ETH Vault',
+  asset: { address: '0xweth', symbol: 'WETH', name: 'Wrapped Ether', decimals: 18 },
+}
 
 const USER_STATE = {
   shares: 10_000_000n,
@@ -55,17 +73,26 @@ const USER_STATE = {
 }
 
 beforeEach(() => {
-  mockWallet.current = { chainId: 137, address: '0xac', isConnected: true, signer: null, switchNetwork: vi.fn() }
-  mockVaults.current = { vaults: [VAULT], status: 'ready', isSupported: true, refresh: vi.fn() }
+  mockWallet.current = { chainId: 63, address: '0xac', isConnected: true }
+  mockSend.current = {
+    sendOnChain: vi.fn(),
+    canTransactOn: () => true,
+    cannotTransactReason: () => 'not available',
+    isPasskey: false,
+  }
+  mockVaults.current = { vaults: [VAULT, ETH_VAULT], status: 'ready', refresh: vi.fn() }
   mockPositions.current = {
-    positions: [{ vault: VAULT, shares: 10_000_000n, assets: 10_000_000n, maxWithdrawAssets: 8_000_000n, assetsUsd: 10.0, pnlUsd: 0.12 }],
-    userStates: new Map([[VAULT.address.toLowerCase(), USER_STATE]]),
+    positions: [
+      { vault: VAULT, shares: 10_000_000n, assets: 10_000_000n, maxWithdrawAssets: 8_000_000n, assetsUsd: 10.0, pnlUsd: 0.12 },
+    ],
+    userStates: new Map(),
     status: 'ready',
     refresh: vi.fn(),
   }
   mockRewards.current = {
     rewards: [
       {
+        chainId: 137,
         token: { address: '0xmorpho', symbol: 'MORPHO', decimals: 18 },
         amount: 2n,
         claimed: 1n,
@@ -75,11 +102,14 @@ beforeEach(() => {
         fetchedAt: 1,
       },
     ],
+    failedNetworks: [],
     status: 'ready',
     fetchedAt: 1,
     totalClaimable: 1,
     claim: vi.fn(),
-    claimState: { status: 'idle', txUrl: null, error: null },
+    claimState: { status: 'idle', chainId: null, txUrl: null, error: null },
+    canTransactOn: () => true,
+    cannotTransactReason: () => 'not available',
     legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
     refresh: vi.fn(),
   }
@@ -98,12 +128,12 @@ describe('Earn section accessibility (FR-015)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('lend view (vaults + positions) has no axe violations', async () => {
+  it('multi-network lend view (vaults + positions) has no axe violations', async () => {
     const { container } = renderAt('/wallet?tab=earn&view=lend')
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('rewards view has no axe violations', async () => {
+  it('per-network rewards view has no axe violations', async () => {
     const { container } = renderAt('/wallet?tab=earn&view=rewards')
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -117,10 +147,11 @@ describe('Earn section accessibility (FR-015)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('unavailable-network state has no axe violations', async () => {
-    mockWallet.current = { ...mockWallet.current, chainId: 63 }
-    mockVaults.current = { vaults: [], status: 'unsupported', isSupported: false, refresh: vi.fn() }
-    const { container } = renderAt('/wallet?tab=earn')
+  it('cannot-transact disclosure state has no axe violations', async () => {
+    mockSend.current = { ...mockSend.current, isPasskey: true, canTransactOn: () => false }
+    const { container } = render(
+      <VaultSheet vault={ETH_VAULT} userState={USER_STATE} onClose={vi.fn()} onActionComplete={vi.fn()} />,
+    )
     expect(await axe(container)).toHaveNoViolations()
   })
 })

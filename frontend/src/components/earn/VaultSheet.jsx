@@ -3,11 +3,14 @@
  * vault. Bottom-sheet modal per repo convention (Escape + backdrop close,
  * focus managed).
  *
- * Writes go through WalletContext.sendCalls — the unified spec-041 rail — so
- * BOTH session kinds work: a passkey session authorizes the whole
- * approve+deposit batch with one WebAuthn ceremony (it has no ethers signer),
- * a classic wallet signs each step. Reads (allowance, dry-runs) use the
- * chain's read provider, never the signer.
+ * Writes go through useEarnSend → WalletContext.sendCalls — the unified
+ * spec-041 rail — so BOTH session kinds work: a passkey session authorizes
+ * the whole approve+deposit batch with one WebAuthn ceremony (it has no
+ * ethers signer), a classic wallet signs each step. Network selection is
+ * transparent (like the portfolio): the sheet names the vault's network, and
+ * submitting on a different active network switches automatically as part of
+ * the confirmation — no separate switch step. Reads (allowance, dry-runs)
+ * use the VAULT's chain read provider, never the signer.
  *
  * Non-intimidating by design: amounts are validated with member-facing
  * reasons BEFORE any wallet prompt; a first deposit explains up front how
@@ -19,6 +22,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
+import { useEarnSend } from '../../hooks/useEarnSend'
 import { useActivityOptional } from '../../hooks/useActivity'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
 import { NETWORKS } from '../../config/networks'
@@ -42,11 +46,13 @@ function fmt(amountBig, decimals, symbol) {
 }
 
 export default function VaultSheet({ vault, userState, onClose, onActionComplete }) {
-  const { address, chainId, sendCalls, loginMethod } = useWallet() || {}
-  const isPasskey = loginMethod === 'passkey'
+  const { address } = useWallet() || {}
+  const { sendOnChain, canTransactOn, cannotTransactReason, isPasskey } = useEarnSend()
   const activity = useActivityOptional()
   const sheetRef = useRef(null)
   const restoreFocusRef = useRef(null)
+  const vaultNetwork = NETWORKS[vault.chainId]
+  const canTransact = canTransactOn(vault.chainId)
 
   const [mode, setMode] = useState('deposit')
   const [amountText, setAmountText] = useState('')
@@ -114,27 +120,30 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       return
     }
     setInputError(null)
-    // Never a silent no-op (constitution III): if this session has no write
-    // rail at all, say so instead of swallowing the tap.
-    if (!address || typeof sendCalls !== 'function') {
+    // Never a silent no-op (constitution III): sessions that can't transact
+    // on this vault's network see the reason instead of a dead tap.
+    if (!address || !canTransact) {
       setTxState({
         step: 'error',
         txUrl: null,
-        error: 'This session cannot send transactions right now — please reconnect and try again.',
+        error: !address
+          ? 'This session cannot send transactions right now — please reconnect and try again.'
+          : cannotTransactReason(vault.chainId),
       })
       return
     }
 
     try {
-      // Reads (allowance check, dry-runs) go over the chain's read provider —
-      // passkey sessions have no signer/provider of their own.
-      const provider = makeReadProvider(NETWORKS[chainId].rpcUrl, chainId)
+      // Reads (allowance check, dry-runs) go over the VAULT's chain read
+      // provider — independent of the wallet's active network.
+      const provider = makeReadProvider(vaultNetwork.rpcUrl, vault.chainId)
       let calls
       let message
+      let busyStep
       if (mode === 'deposit') {
         const built = await buildDepositCalls({ vault, account: address, amount, provider })
         calls = built.calls
-        setTxState({ step: built.requiresApproval ? 'approving' : 'confirming', txUrl: null, error: null })
+        busyStep = built.requiresApproval ? 'approving' : 'confirming'
         message = `Deposited ${fmt(amount, decimals, symbol)} into ${vault.name}`
       } else {
         // A full withdrawal redeems all shares so no dust strands.
@@ -149,13 +158,21 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
           provider,
         })
         calls = built.calls
-        setTxState({ step: 'confirming', txUrl: null, error: null })
+        busyStep = 'confirming'
         message = `Withdrew ${fmt(amount, decimals, symbol)} from ${vault.name}`
       }
 
-      // One passkey ceremony covers the whole batch; classic wallets prompt
-      // per call (approve, then the action) — the copy above sets expectations.
-      const sent = await sendCalls(calls)
+      // Network selection is managed for the member: if the wallet is on a
+      // different network, sendOnChain switches to the vault's network first
+      // (no separate in-app confirmation step), then submits. One passkey
+      // ceremony covers the whole batch; classic wallets prompt per call.
+      setTxState({ step: busyStep, txUrl: null, error: null })
+      const sent = await sendOnChain(vault.chainId, calls, {
+        onState: ({ step }) => {
+          if (step === 'switching') setTxState({ step: 'switching', txUrl: null, error: null })
+          if (step === 'sending') setTxState({ step: busyStep, txUrl: null, error: null })
+        },
+      })
       if (sent?.state === 'failed') {
         throw new Error(sent.reason || 'transaction failed')
       }
@@ -163,8 +180,8 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       if (!txHash) throw new Error('Submitted, but no transaction reference was returned.')
       // Explorer links only for real tx hashes — a UserOp hash is not a page
       // on the block explorer.
-      const txUrl = sent?.txHash ? getBlockscoutUrl(chainId, sent.txHash, 'tx') : null
-      queueEarnAction(address, chainId, {
+      const txUrl = sent?.txHash ? getBlockscoutUrl(vault.chainId, sent.txHash, 'tx') : null
+      queueEarnAction(address, vault.chainId, {
         type: mode === 'deposit' ? 'earn-deposit' : 'earn-withdraw',
         refId: vault.address,
         message,
@@ -172,8 +189,9 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
         txUrl,
         at: Date.now(),
       })
-      // Durable audit entry in the unified activity ledger (spec 051).
-      captureEarnAction(address, chainId, {
+      // Durable audit entry in the unified activity ledger (spec 051),
+      // scoped to the VAULT's chain (network-transparent flows).
+      captureEarnAction(address, vault.chainId, {
         type: mode === 'deposit' ? 'earn-deposit' : 'earn-withdraw',
         txHash,
         at: Date.now(),
@@ -194,12 +212,14 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
         txUrl: null,
         error: rejected
           ? 'The confirmation was cancelled. Nothing was moved.'
-          : 'The transaction could not be completed. Nothing was moved — you can try again.',
+          : err?.message && /switch|network/i.test(err.message)
+            ? err.message
+            : 'The transaction could not be completed. Nothing was moved — you can try again.',
       })
     }
   }
 
-  const busy = txState.step === 'approving' || txState.step === 'confirming'
+  const busy = txState.step === 'approving' || txState.step === 'confirming' || txState.step === 'switching'
   const titleId = 'earn-vault-sheet-title'
 
   return (
@@ -223,7 +243,10 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
                 {EARN_TIPS.apy}
               </InfoTip>
             </p>
-            {vault.curator && <p className="earn-vault-sheet-meta">Managed by {vault.curator}</p>}
+            <p className="earn-vault-sheet-meta">
+              On {vaultNetwork?.name || 'its network'}
+              {vault.curator ? ` · Managed by ${vault.curator}` : ''}
+            </p>
           </div>
           <button type="button" className="asset-sheet-close" onClick={onClose}>
             Close
@@ -365,18 +388,33 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
               </p>
             )}
 
-            <button type="button" className="earn-btn primary earn-submit" onClick={submit} disabled={busy}>
-              {txState.step === 'approving'
-                ? isPasskey
-                  ? 'Confirm with your passkey…'
-                  : 'Approve, then confirm the deposit…'
-                : txState.step === 'confirming'
+            {/* Sessions that can't transact on this vault's network get the
+                reason up front instead of a doomed submit (constitution III). */}
+            {!canTransact && (
+              <p className="earn-summary" role="note">
+                {cannotTransactReason(vault.chainId)}
+              </p>
+            )}
+            <button
+              type="button"
+              className="earn-btn primary earn-submit"
+              onClick={submit}
+              disabled={busy || !canTransact}
+              title={canTransact ? undefined : cannotTransactReason(vault.chainId)}
+            >
+              {txState.step === 'switching'
+                ? `Switching to ${vaultNetwork?.name || 'the vault network'}…`
+                : txState.step === 'approving'
                   ? isPasskey
                     ? 'Confirm with your passkey…'
-                    : 'Waiting for confirmation…'
-                  : mode === 'deposit'
-                    ? `Deposit ${symbol}`
-                    : `Withdraw ${symbol}`}
+                    : 'Approve, then confirm the deposit…'
+                  : txState.step === 'confirming'
+                    ? isPasskey
+                      ? 'Confirm with your passkey…'
+                      : 'Waiting for confirmation…'
+                    : mode === 'deposit'
+                      ? `Deposit ${symbol}`
+                      : `Withdraw ${symbol}`}
             </button>
           </>
         )}

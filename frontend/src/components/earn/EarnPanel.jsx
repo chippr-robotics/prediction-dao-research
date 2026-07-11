@@ -1,39 +1,40 @@
 /**
  * EarnPanel (spec 050, issue #861) — the Finance → Earn section hub.
  *
- * A member-friendly gateway to passive earning: live area (Lend via Morpho
- * vaults) plus honest "not yet available" areas (Staking, Bridges), the
- * member's rewards, protocol attribution + risk disclosure, and a link to the
- * user guide. Every DeFi term carries an InfoTip (FR-011). On networks
- * without earn support the panel explains where earning IS available instead
- * of dead-ending (FR-008).
+ * A member-friendly gateway to passive earning: live areas (Lend via Morpho
+ * vaults, Rewards via Merkl) plus honest "not yet available" areas (Staking,
+ * Bridges), protocol attribution + risk disclosure, and a link to the user
+ * guide. Every DeFi term carries an InfoTip (FR-011).
  *
- * Deep links: /wallet?tab=earn[&view=lend|rewards][&chain=<id>][&token=<sym>]
- * — `chain` is a hint (prompts a switch when it differs from the active
- * network), `token` prefilters the vault list (used by the portfolio's Earn
- * action).
+ * Network selection is TRANSPARENT, like the portfolio: vaults, positions,
+ * and rewards from every earn-enabled network render together with network
+ * badges, regardless of the wallet's active network — and submitting a
+ * transaction switches networks automatically when needed (useEarnSend).
+ * There is no "switch network" banner and no per-network gating here.
+ *
+ * Deep links: /wallet?tab=earn[&view=lend|rewards][&token=<sym>] — `token`
+ * prefilters the vault list (used by the portfolio's Earn action). A legacy
+ * `chain` param is accepted and ignored: the list already spans all earn
+ * networks.
  */
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useWallet } from '../../hooks/useWalletManagement'
-import { getNetwork, isEarnAvailable, getEarnConfig, getEarnNetworks, NETWORKS } from '../../config/networks'
+import { getEarnNetworks } from '../../config/networks'
 import InfoTip from '../ui/InfoTip'
 import EarnLendView from './EarnLendView'
 import EarnRewardsView from './EarnRewardsView'
-import { EARN_TIPS, EARN_DISCLOSURE, EARN_AREAS_FUTURE, earnUnavailableCopy } from '../../lib/earn/earnCopy'
+import { EARN_TIPS, EARN_DISCLOSURE, EARN_AREAS_FUTURE } from '../../lib/earn/earnCopy'
 import './Earn.css'
 
 const EARN_DOCS_URL = 'https://docs.FairWins.app/user-guide/earn/'
 const VIEWS = ['home', 'lend', 'rewards']
 
 export default function EarnPanel() {
-  const { chainId, switchNetwork } = useWallet() || {}
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const supported = isEarnAvailable(chainId)
-  const network = getNetwork(chainId)
-  const earnConfig = getEarnConfig(chainId)
-  const earnNetworkNames = useMemo(() => getEarnNetworks().map((n) => n.name), [])
+  // Provider identity + legacy link are the same on every earn network —
+  // resolve from the canonical earn config, independent of the active chain.
+  const earnConfig = useMemo(() => getEarnNetworks()[0]?.earn ?? null, [])
 
   // View selection is derived from ?view= so nav/portfolio deep links land
   // directly and back/forward keep working — no duplicated state.
@@ -47,10 +48,6 @@ export default function EarnPanel() {
     setSearchParams(params, { replace: true })
   }
 
-  // ?chain= hint from deep links: when it names a different earn-enabled
-  // network, offer the switch honestly instead of silently ignoring it.
-  const chainHint = Number(searchParams.get('chain')) || null
-  const hintNetwork = chainHint && chainHint !== chainId ? NETWORKS[chainHint] : null
   const tokenFilter = searchParams.get('token') || null
 
   return (
@@ -68,58 +65,20 @@ export default function EarnPanel() {
         </p>
       </div>
 
-      {hintNetwork && (
-        <div className="earn-switch-note" role="note">
-          <p>
-            You followed a link for {hintNetwork.name}, but your wallet is on{' '}
-            {network?.name || 'another network'}.
-          </p>
-          {typeof switchNetwork === 'function' && (
-            <button
-              type="button"
-              className="earn-btn secondary"
-              onClick={() => switchNetwork(chainHint)}
-            >
-              Switch to {hintNetwork.name}
-            </button>
-          )}
-        </div>
-      )}
-
-      {!supported && (
-        <div className="earn-unavailable" role="note">
-          <p>{earnUnavailableCopy(network?.name, earnNetworkNames)}</p>
-        </div>
-      )}
-
       {view === 'home' && (
         <div className="earn-areas" aria-label="Earning opportunities">
-          <button
-            type="button"
-            className="earn-area-card"
-            disabled={!supported}
-            title={supported ? undefined : earnUnavailableCopy(network?.name, earnNetworkNames)}
-            onClick={() => openView('lend')}
-          >
+          <button type="button" className="earn-area-card" onClick={() => openView('lend')}>
             <span className="earn-area-name">Lend</span>
             <span className="earn-area-desc">
               Deposit into a managed lending vault and earn interest. Withdraw any time.
             </span>
-            {!supported && <span className="earn-area-flag">Not on this network</span>}
           </button>
 
-          <button
-            type="button"
-            className="earn-area-card"
-            disabled={!supported}
-            title={supported ? undefined : earnUnavailableCopy(network?.name, earnNetworkNames)}
-            onClick={() => openView('rewards')}
-          >
+          <button type="button" className="earn-area-card" onClick={() => openView('rewards')}>
             <span className="earn-area-name">Rewards</span>
             <span className="earn-area-desc">
               See bonus tokens your deposits have earned and claim them to your wallet.
             </span>
-            {!supported && <span className="earn-area-flag">Not on this network</span>}
           </button>
 
           {/* Future areas render honestly disabled — same pattern as the
@@ -154,10 +113,8 @@ export default function EarnPanel() {
         </button>
       )}
 
-      {/* The not-supported explanation renders once above (FR-008), so the
-          sub-views simply stay absent on non-earn networks. */}
-      {view === 'lend' && supported && <EarnLendView tokenFilter={tokenFilter} />}
-      {view === 'rewards' && supported && <EarnRewardsView />}
+      {view === 'lend' && <EarnLendView tokenFilter={tokenFilter} />}
+      {view === 'rewards' && <EarnRewardsView />}
 
       <footer className="earn-footer">
         {earnConfig?.provider && (
