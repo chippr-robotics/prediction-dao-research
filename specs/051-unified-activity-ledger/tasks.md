@@ -131,7 +131,7 @@ independently testable increment.
 
 - [X] T039 [P] Consistency test: every financial event surfaced by the spec-031 notification sources resolves to a ledger entry (FR-002) in `frontend/src/data/notifications/ledgerConsistency.test.js`
 - [X] T040 [P] Update docs: `docs/developer-guide/` page for the activity ledger (architecture, identity/merge, backup object) and cross-link from gasless-intents + upgradeable docs where activity is mentioned
-- [ ] T041 Run full gates locally: `npm run test:frontend`, frontend lint/build, axe/Lighthouse on the Account tab; fix regressions
+- [X] T041 Run full gates locally: `npm run test:frontend`, frontend lint/build, axe/Lighthouse on the Account tab; fix regressions
 - [ ] T042 Execute quickstart.md §2–§6 manual validation on one subgraph network and one RPC-only network; record results in the PR
 
 > **Phase 7 notes:** the T039 consistency test lives at
