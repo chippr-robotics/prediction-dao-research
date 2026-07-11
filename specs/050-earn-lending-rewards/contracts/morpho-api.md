@@ -6,18 +6,24 @@ per session). All queries filter by the active `chainId`; responses are normaliz
 
 ## Vault list (curated)
 
+> **Schema drift note (verified against the live API 2026-07-11):** the docs' example
+> `whitelisted` field was REMOVED from the production schema — any query naming it fails
+> GraphQL validation with HTTP 400. Curation is the `listed` flag. Likewise the scalar
+> `state.curator` is a raw address; human curator names come from `state.curators { name }`.
+
 ```graphql
 query EarnVaults($chainIds: [Int!]!, $first: Int!) {
   vaults(
     first: $first
     orderBy: TotalAssetsUsd
     orderDirection: Desc
-    where: { chainId_in: $chainIds, whitelisted: true }
+    where: { chainId_in: $chainIds, listed: true }
   ) {
     items {
-      address symbol name listed whitelisted
+      address symbol name listed
       state {
-        totalAssetsUsd apy netApy curator
+        totalAssetsUsd apy netApy
+        curators { name }
         allRewards { asset { address symbol } supplyApr }
       }
       asset { name address decimals symbol }
@@ -30,6 +36,8 @@ query EarnVaults($chainIds: [Int!]!, $first: Int!) {
 Normalizer rules:
 - Drop items with `listed !== true` or `chain.id !== chainId` (defense against API drift).
 - `netApy`/`apy`/`totalAssetsUsd` may be null → keep null (render "—"), never 0.
+- `curator` = joined `state.curators[].name` ("Gauntlet & Steakhouse"), null when unnamed —
+  never a raw address in member-facing UI.
 - Order preserved (TVL desc), capped at `VAULT_LIST_LIMIT`.
 
 ## Position enrichment (USD value + earnings)

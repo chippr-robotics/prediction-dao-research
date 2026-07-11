@@ -7,8 +7,9 @@
  * PositionEnrichment models (specs/050-earn-lending-rewards/data-model.md).
  *
  * Honest-state rules (constitution III):
- *   - curation is the API's own flags: `whitelisted: true` filter + `listed`
- *     requirement (vaults shown on the Morpho app) — never a hand-kept list;
+ *   - curation is the API's own `listed` flag (vaults shown on the Morpho app)
+ *     — never a hand-kept list. The docs' `whitelisted` field was removed from
+ *     the live schema (queries using it 400); `listed` is its successor;
  *   - null APY/TVL stays null (rendered "—"), never coerced to 0;
  *   - any transport/GraphQL failure throws MorphoApiError so hooks can map it
  *     to an explicit `unavailable` state — stale numbers are never truth.
@@ -29,12 +30,13 @@ query EarnVaults($chainIds: [Int!]!, $first: Int!) {
     first: $first
     orderBy: TotalAssetsUsd
     orderDirection: Desc
-    where: { chainId_in: $chainIds, whitelisted: true }
+    where: { chainId_in: $chainIds, listed: true }
   ) {
     items {
-      address symbol name listed whitelisted
+      address symbol name listed
       state {
-        totalAssetsUsd apy netApy curator
+        totalAssetsUsd apy netApy
+        curators { name }
         allRewards { asset { address symbol } supplyApr }
       }
       asset { name address decimals symbol }
@@ -88,10 +90,15 @@ function numOrNull(v) {
  */
 export function normalizeVault(item, chainId) {
   if (!item?.address || !item?.asset?.address) return null
-  if (item.listed !== true || item.whitelisted !== true) return null
+  if (item.listed !== true) return null
   if (Number(item.chain?.id) !== Number(chainId)) return null
   const decimals = Number(item.asset.decimals)
   if (!Number.isInteger(decimals) || decimals < 0) return null
+  // Human curator names ("Gauntlet", "Steakhouse Financial"); the schema's
+  // scalar `state.curator` is a raw address — never shown to members.
+  const curatorNames = (item.state?.curators || [])
+    .map((c) => c?.name)
+    .filter(Boolean)
   return {
     address: item.address,
     chainId: Number(chainId),
@@ -109,7 +116,7 @@ export function normalizeVault(item, chainId) {
       .filter((r) => r?.asset?.symbol != null)
       .map((r) => ({ assetSymbol: r.asset.symbol, supplyApr: numOrNull(r.supplyApr) })),
     totalAssetsUsd: numOrNull(item.state?.totalAssetsUsd),
-    curator: item.state?.curator || null,
+    curator: curatorNames.length > 0 ? curatorNames.join(' & ') : null,
   }
 }
 

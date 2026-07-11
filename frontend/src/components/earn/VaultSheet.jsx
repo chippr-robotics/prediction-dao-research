@@ -3,27 +3,33 @@
  * vault. Bottom-sheet modal per repo convention (Escape + backdrop close,
  * focus managed).
  *
+ * Writes go through WalletContext.sendCalls — the unified spec-041 rail — so
+ * BOTH session kinds work: a passkey session authorizes the whole
+ * approve+deposit batch with one WebAuthn ceremony (it has no ethers signer),
+ * a classic wallet signs each step. Reads (allowance, dry-runs) use the
+ * chain's read provider, never the signer.
+ *
  * Non-intimidating by design: amounts are validated with member-facing
- * reasons BEFORE any wallet prompt; a first deposit explains the two wallet
- * confirmations (approval + deposit) up front; a plain-English summary states
- * exactly what will happen; withdrawal honors the vault's honest liquidity
- * bound (maxWithdraw). Every completed action is queued for the activity
- * feed with its transaction link (FR-010).
+ * reasons BEFORE any wallet prompt; a first deposit explains up front how
+ * many confirmations to expect for the session kind; a plain-English summary
+ * states exactly what will happen; withdrawal honors the vault's honest
+ * liquidity bound (maxWithdraw). Every completed action is queued for the
+ * activity feed with its transaction link (FR-010).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useActivityOptional } from '../../hooks/useActivity'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
+import { NETWORKS } from '../../config/networks'
+import { makeReadProvider } from '../../utils/rpcProvider'
 import InfoTip from '../ui/InfoTip'
 import { EARN_TIPS } from '../../lib/earn/earnCopy'
 import {
   validateDepositAmount,
   validateWithdrawAmount,
-  needsApproval,
-  approveDeposit,
-  depositToVault,
-  withdrawFromVault,
+  buildDepositCalls,
+  buildWithdrawCalls,
 } from '../../lib/earn/vaultActions'
 import { queueEarnAction } from '../../lib/earn/earnActivityBuffer'
 import { captureEarnAction } from '../../data/ledger'
@@ -36,7 +42,8 @@ function fmt(amountBig, decimals, symbol) {
 }
 
 export default function VaultSheet({ vault, userState, onClose, onActionComplete }) {
-  const { address, chainId, signer } = useWallet() || {}
+  const { address, chainId, sendCalls, loginMethod } = useWallet() || {}
+  const isPasskey = loginMethod === 'passkey'
   const activity = useActivityOptional()
   const sheetRef = useRef(null)
   const restoreFocusRef = useRef(null)
@@ -107,43 +114,61 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       return
     }
     setInputError(null)
-    if (!signer || !address) return
+    // Never a silent no-op (constitution III): if this session has no write
+    // rail at all, say so instead of swallowing the tap.
+    if (!address || typeof sendCalls !== 'function') {
+      setTxState({
+        step: 'error',
+        txUrl: null,
+        error: 'This session cannot send transactions right now — please reconnect and try again.',
+      })
+      return
+    }
 
     try {
-      let receipt
+      // Reads (allowance check, dry-runs) go over the chain's read provider —
+      // passkey sessions have no signer/provider of their own.
+      const provider = makeReadProvider(NETWORKS[chainId].rpcUrl, chainId)
+      let calls
       let message
       if (mode === 'deposit') {
-        const provider = signer.provider
-        const requiresApproval = await needsApproval({ vault, account: address, amount, provider })
-        if (requiresApproval) {
-          setTxState({ step: 'approving', txUrl: null, error: null })
-          await approveDeposit({ vault, amount, signer })
-        }
-        setTxState({ step: 'confirming', txUrl: null, error: null })
-        ;({ receipt } = await depositToVault({ vault, account: address, amount, signer }))
+        const built = await buildDepositCalls({ vault, account: address, amount, provider })
+        calls = built.calls
+        setTxState({ step: built.requiresApproval ? 'approving' : 'confirming', txUrl: null, error: null })
         message = `Deposited ${fmt(amount, decimals, symbol)} into ${vault.name}`
       } else {
-        setTxState({ step: 'confirming', txUrl: null, error: null })
         // A full withdrawal redeems all shares so no dust strands.
         const isFullExit =
           userState?.maxWithdrawAssets != null && amount === userState.maxWithdrawAssets &&
           userState?.shares != null
-        ;({ receipt } = await withdrawFromVault({
+        const built = await buildWithdrawCalls({
           vault,
           account: address,
           amount,
           redeemAllShares: isFullExit ? userState.shares : null,
-          signer,
-        }))
+          provider,
+        })
+        calls = built.calls
+        setTxState({ step: 'confirming', txUrl: null, error: null })
         message = `Withdrew ${fmt(amount, decimals, symbol)} from ${vault.name}`
       }
 
-      const txUrl = getBlockscoutUrl(chainId, receipt.hash, 'tx')
+      // One passkey ceremony covers the whole batch; classic wallets prompt
+      // per call (approve, then the action) — the copy above sets expectations.
+      const sent = await sendCalls(calls)
+      if (sent?.state === 'failed') {
+        throw new Error(sent.reason || 'transaction failed')
+      }
+      const txHash = sent?.txHash ?? sent?.userOpHash ?? null
+      if (!txHash) throw new Error('Submitted, but no transaction reference was returned.')
+      // Explorer links only for real tx hashes — a UserOp hash is not a page
+      // on the block explorer.
+      const txUrl = sent?.txHash ? getBlockscoutUrl(chainId, sent.txHash, 'tx') : null
       queueEarnAction(address, chainId, {
         type: mode === 'deposit' ? 'earn-deposit' : 'earn-withdraw',
         refId: vault.address,
         message,
-        txHash: receipt.hash,
+        txHash,
         txUrl,
         at: Date.now(),
       })
@@ -163,12 +188,12 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
       setTxState({ step: 'done', txUrl, error: null })
       onActionComplete?.()
     } catch (err) {
-      const rejected = /rejected|denied/i.test(err?.message || '')
+      const rejected = /rejected|denied|cancelled|not allowed|abort/i.test(err?.message || '')
       setTxState({
         step: 'error',
         txUrl: null,
         error: rejected
-          ? 'Transaction was cancelled in your wallet. Nothing was moved.'
+          ? 'The confirmation was cancelled. Nothing was moved.'
           : 'The transaction could not be completed. Nothing was moved — you can try again.',
       })
     }
@@ -318,9 +343,11 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
             {mode === 'deposit' && (
               <p className="earn-summary">
                 Your {symbol} moves from your wallet into this vault and starts earning. You can
-                withdraw it whenever you like. A first deposit asks for two quick wallet
-                confirmations.
-                <InfoTip label="Why two confirmations?" className="earn-info">
+                withdraw it whenever you like.{' '}
+                {isPasskey
+                  ? 'One passkey confirmation covers the whole deposit — including the spending permission on a first deposit.'
+                  : 'A first deposit asks for two quick wallet confirmations.'}
+                <InfoTip label="About the spending permission" className="earn-info">
                   {EARN_TIPS.approval}
                 </InfoTip>
               </p>
@@ -340,9 +367,13 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
 
             <button type="button" className="earn-btn primary earn-submit" onClick={submit} disabled={busy}>
               {txState.step === 'approving'
-                ? 'Waiting for approval…'
+                ? isPasskey
+                  ? 'Confirm with your passkey…'
+                  : 'Approve, then confirm the deposit…'
                 : txState.step === 'confirming'
-                  ? 'Waiting for confirmation…'
+                  ? isPasskey
+                    ? 'Confirm with your passkey…'
+                    : 'Waiting for confirmation…'
                   : mode === 'deposit'
                     ? `Deposit ${symbol}`
                     : `Withdraw ${symbol}`}

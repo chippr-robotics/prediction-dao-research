@@ -10,7 +10,7 @@
  * carries the explorer link (FR-010).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Contract, formatUnits } from 'ethers'
+import { Interface, formatUnits } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import { isEarnAvailable, getEarnConfig } from '../config/networks'
 import { getBlockscoutUrl } from '../config/blockExplorer'
@@ -20,8 +20,12 @@ import { queueEarnAction } from '../lib/earn/earnActivityBuffer'
 import { captureEarnAction } from '../data/ledger'
 import { useActivityOptional } from './useActivity'
 
+const DISTRIBUTOR_IFACE = new Interface(MERKL_DISTRIBUTOR_ABI)
+
 export function useEarnRewards() {
-  const { address, isConnected, chainId, signer } = useWallet() || {}
+  // Writes go through sendCalls (spec 041's unified rail) so passkey sessions
+  // — which have no ethers signer — can claim too.
+  const { address, isConnected, chainId, sendCalls } = useWallet() || {}
   const activity = useActivityOptional()
   const supported = isEarnAvailable(chainId)
   const earnConfig = getEarnConfig(chainId)
@@ -66,15 +70,37 @@ export function useEarnRewards() {
 
   /** Claim every claimable reward in one distributor transaction. */
   const claim = useCallback(async () => {
-    if (!signer || !address || !earnConfig?.merklDistributor) return
+    if (!address || !earnConfig?.merklDistributor) return
     const args = buildClaimArgs(address, rewards)
     if (!args) return // nothing claimable — never prompt the wallet for a no-op
+    if (typeof sendCalls !== 'function') {
+      // Never a silent no-op (constitution III).
+      setClaimState({
+        status: 'error',
+        txUrl: null,
+        error: 'This session cannot send transactions right now — please reconnect and try again.',
+      })
+      return
+    }
     setClaimState({ status: 'pending', txUrl: null, error: null })
     try {
-      const distributor = new Contract(earnConfig.merklDistributor, MERKL_DISTRIBUTOR_ABI, signer)
-      const tx = await distributor.claim(args.users, args.tokens, args.amounts, args.proofs)
-      const receipt = await tx.wait()
-      const txUrl = getBlockscoutUrl(chainId, receipt.hash, 'tx')
+      const sent = await sendCalls([
+        {
+          target: earnConfig.merklDistributor,
+          data: DISTRIBUTOR_IFACE.encodeFunctionData('claim', [
+            args.users,
+            args.tokens,
+            args.amounts,
+            args.proofs,
+          ]),
+          value: 0n,
+        },
+      ])
+      if (sent?.state === 'failed') throw new Error(sent.reason || 'claim failed')
+      const txHash = sent?.txHash ?? sent?.userOpHash ?? null
+      if (!txHash) throw new Error('Submitted, but no transaction reference was returned.')
+      // Explorer links only for real tx hashes (a UserOp hash has no page).
+      const txUrl = sent?.txHash ? getBlockscoutUrl(chainId, sent.txHash, 'tx') : null
       const summary = args.rewards
         .map((r) => `${formatUnits(r.claimable, r.token.decimals)} ${r.token.symbol}`.trim())
         .join(', ')
@@ -82,7 +108,7 @@ export function useEarnRewards() {
         type: 'earn-rewards-claimed',
         refId: args.tokens[0],
         message: `Claimed earn rewards: ${summary}`,
-        txHash: receipt.hash,
+        txHash,
         txUrl,
         at: Date.now(),
       })
@@ -98,14 +124,14 @@ export function useEarnRewards() {
       setClaimState({ status: 'confirmed', txUrl, error: null })
       load()
     } catch (err) {
-      const rejected = /rejected|denied/i.test(err?.message || '')
+      const rejected = /rejected|denied|cancelled|not allowed|abort/i.test(err?.message || '')
       setClaimState({
         status: 'error',
         txUrl: null,
-        error: rejected ? 'Transaction was cancelled in your wallet.' : 'Claim failed. Please try again.',
+        error: rejected ? 'The confirmation was cancelled.' : 'Claim failed. Please try again.',
       })
     }
-  }, [signer, address, chainId, rewards, earnConfig, activity, load])
+  }, [sendCalls, address, chainId, rewards, earnConfig, activity, load])
 
   return useMemo(
     () => ({

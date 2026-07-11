@@ -28,6 +28,9 @@ ARG VITE_RELAYER_URL
 # Passkey ERC-4337 bundler URL(s), comma-separated (spec 041). Unset => passkeyConfig(137) is null,
 # so passkey smart accounts stay disabled on Polygon.
 ARG VITE_BUNDLER_URLS_POLYGON
+# Sponsored-paymaster endpoint (spec 050): the relay-gateway's /v1/paymaster. Set => passkey UserOps
+# are gasless (FairWins sponsors gas); unset => the account self-funds and the UI discloses honestly.
+ARG VITE_SPONSOR_PAYMASTER_POLYGON
 
 # Set environment variables from build args
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
@@ -39,6 +42,7 @@ ENV VITE_SUBGRAPH_URL=${VITE_SUBGRAPH_URL}
 ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
+ENV VITE_SPONSOR_PAYMASTER_POLYGON=${VITE_SPONSOR_PAYMASTER_POLYGON}
 
 # Build the application
 RUN npm run build

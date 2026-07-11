@@ -67,8 +67,13 @@ constitution III.
 
 - Pure validators (`validateDepositAmount`/`validateWithdrawAmount`) reject zero/junk/over-limit
   amounts with member-facing reasons **before** any wallet prompt.
-- Deposits: exact-amount `approve` (no unlimited allowances) → `previewDeposit` quote →
-  `deposit.staticCall` dry-run → transaction.
+- Writes are `{ target, data, value }` batches submitted through
+  **`WalletContext.sendCalls`** (spec 041's unified rail) — never a raw ethers signer. Passkey
+  sessions (which have no signer) authorize the whole approve+deposit batch with ONE WebAuthn
+  ceremony via UserOp; classic wallets sign sequentially. Reads (allowance, dry-runs) use the
+  chain's read provider.
+- Deposits: exact-amount `approve` leg when the allowance is short (no unlimited allowances);
+  spendable deposits are dry-run with `staticCall` from the member's address before signing.
 - Withdrawals: bounded by `maxWithdraw` (vault liquidity, surfaced in the UI); full exits use
   `redeem(shares)` so share dust never strands.
 
