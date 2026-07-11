@@ -28,8 +28,15 @@ const stats = {
     byOracle: [{ resolutionType: 1, label: 'Polymarket', count: 10 }],
   },
   activity: [
-    { id: 'a', direction: 'payout', amount: 190, symbol: 'USDC', usdValue: 190, timestamp: 2_000_000, txHash: '0xabc', wagerId: '1' },
+    {
+      entryId: 'oc:80002:wt:0xabc-1-payout', chainId: 80002, class: 'wager', kind: 'payout',
+      direction: 'in', status: 'settled', tokenSymbol: 'USDC', amount: 190, valueUsd: 190,
+      valuationStatus: 'valued', timestamp: Date.now() - 60_000, timestampProvenance: 'chain',
+      txHash: '0x' + 'ab'.repeat(32), refs: { wagerId: '1' },
+    },
   ],
+  staleClasses: [],
+  prunedBefore: null,
   isConnected: true, isSupportedNetwork: true, chainId: 80002,
   isLoading: false, isEmpty: false, error: null,
   freshness: { summary: { lastUpdated: Date.now(), status: 'fresh' } },

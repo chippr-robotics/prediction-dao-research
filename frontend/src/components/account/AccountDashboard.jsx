@@ -21,7 +21,7 @@ function AccountDashboard() {
   const { disconnectWallet } = useWalletConnection()
   const stats = useAccountStats()
   const {
-    summary, series, setRange, breakdowns, activity,
+    summary, series, setRange, breakdowns, activity, staleClasses, prunedBefore,
     isSupportedNetwork, chainId, isLoading, isEmpty, freshness, refresh,
   } = stats
 
@@ -57,7 +57,12 @@ function AccountDashboard() {
           <SummaryTiles summary={summary} isEmpty={isLoading && !summary} />
           <PnlChart series={series} onRangeChange={setRange} onCreateWager={goCreate} />
           <ActivityBreakdowns breakdowns={breakdowns} />
-          <RecentActivityFeed activity={activity} chainId={chainId} />
+          <RecentActivityFeed
+            entries={activity}
+            chainId={chainId}
+            staleClasses={staleClasses}
+            prunedBefore={prunedBefore}
+          />
         </>
       )}
 

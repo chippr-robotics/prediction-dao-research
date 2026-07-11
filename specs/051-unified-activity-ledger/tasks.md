@@ -20,8 +20,8 @@ independently testable increment.
 
 **Purpose**: Skeleton for the new ledger module — no behavior yet
 
-- [ ] T001 Create `frontend/src/data/ledger/` module skeleton (`ledgerRepository.js`, `ledgerClientStore.js`, `identity.js`, `timestamps.js`, `migrate.js`, `sources/` with five empty source files exporting the LedgerSource shape from `contracts/ledger-source.md`)
-- [ ] T002 [P] Add shared ledger constants/enums (`class`, `kind`, `status`, provenance namespaces `oc:`/`dv:`/`cl:`) in `frontend/src/data/ledger/constants.js` mirroring `data-model.md`
+- [X] T001 Create `frontend/src/data/ledger/` module skeleton (`ledgerRepository.js`, `ledgerClientStore.js`, `identity.js`, `timestamps.js`, `migrate.js`, `sources/` with five empty source files exporting the LedgerSource shape from `contracts/ledger-source.md`)
+- [X] T002 [P] Add shared ledger constants/enums (`class`, `kind`, `status`, provenance namespaces `oc:`/`dv:`/`cl:`) in `frontend/src/data/ledger/constants.js` mirroring `data-model.md`
 
 ---
 
@@ -29,12 +29,12 @@ independently testable increment.
 
 **Purpose**: Identity, normalization, and assembly core every story depends on
 
-- [ ] T003 [P] Write Vitest specs for entryId builders and merge precedence (`oc:` > `dv:` same-event drop; `cl:`→`oc:` txHash linking; idempotent re-derivation) in `frontend/src/data/ledger/identity.test.js`
-- [ ] T004 Implement `frontend/src/data/ledger/identity.js` (builders + `mergeEntries(entries)` precedence per data-model.md) to pass T003
-- [ ] T005 [P] Write Vitest specs for entry normalization invariants (reject `timestamp: 0`, `failed ⇒ direction none excluded from totals flag`, `onchain ⇒ txHash`, chainId scoping) in `frontend/src/data/ledger/normalize.test.js`
-- [ ] T006 Implement `frontend/src/data/ledger/normalize.js` (pre-item → LedgerEntry validation/enrichment seam) to pass T005
-- [ ] T007 [P] Write Vitest specs for repository assembly (multi-source aggregation, dedup, sort by `timestamp ?? recordedAt` desc, per-source failure → `staleClasses`, class/status/period filters) in `frontend/src/data/ledger/ledgerRepository.test.js`
-- [ ] T008 Implement `frontend/src/data/ledger/ledgerRepository.js` (`listEntries({account, chainId, filter, period, signal})` per `contracts/ledger-source.md`, wiring `identity.js` + `normalize.js` + the shared `enrichTransfers` token/USD pipeline with `valuationStatus` flagging) to pass T007
+- [X] T003 [P] Write Vitest specs for entryId builders and merge precedence (`oc:` > `dv:` same-event drop; `cl:`→`oc:` txHash linking; idempotent re-derivation) in `frontend/src/data/ledger/identity.test.js`
+- [X] T004 Implement `frontend/src/data/ledger/identity.js` (builders + `mergeEntries(entries)` precedence per data-model.md) to pass T003
+- [X] T005 [P] Write Vitest specs for entry normalization invariants (reject `timestamp: 0`, `failed ⇒ direction none excluded from totals flag`, `onchain ⇒ txHash`, chainId scoping) in `frontend/src/data/ledger/normalize.test.js`
+- [X] T006 Implement `frontend/src/data/ledger/normalize.js` (pre-item → LedgerEntry validation/enrichment seam) to pass T005
+- [X] T007 [P] Write Vitest specs for repository assembly (multi-source aggregation, dedup, sort by `timestamp ?? recordedAt` desc, per-source failure → `staleClasses`, class/status/period filters) in `frontend/src/data/ledger/ledgerRepository.test.js`
+- [X] T008 Implement `frontend/src/data/ledger/ledgerRepository.js` (`listEntries({account, chainId, filter, period, signal})` per `contracts/ledger-source.md`, wiring `identity.js` + `normalize.js` + the shared `enrichTransfers` token/USD pipeline with `valuationStatus` flagging) to pass T007
 
 **Checkpoint**: Core assembly proven against fixture sources — story phases can start (US phases are independent of each other after this point)
 
@@ -46,21 +46,34 @@ independently testable increment.
 
 **Independent Test**: quickstart.md §2 — seed one activity per class, verify each appears once with class/amount/token/status/timestamp/explorer link; totals unchanged by a failed gasless transfer; strict per-network scoping
 
-- [ ] T009 [P] [US1] Write Vitest specs for the wager source (subgraph `WagerTransfer` primary mapping; derived fallback flagged `dv:`; both yield stable ids) in `frontend/src/data/ledger/sources/wagerLedgerSource.test.js`
-- [ ] T010 [P] [US1] Implement `frontend/src/data/ledger/sources/wagerLedgerSource.js` reusing `reportDataSource` transfer enumeration (subgraph path) and `deriveTransfersFromWagers` (fallback path, timestamps deferred to US4 hydration — emit `null`, never 0)
-- [ ] T011 [P] [US1] Write Vitest specs for the transfer source (maps `transferStore`/client records incl. `route: 'gasless'`, failed status + verbatim `failureReason`) in `frontend/src/data/ledger/sources/transferLedgerSource.test.js`
-- [ ] T012 [P] [US1] Implement `frontend/src/data/ledger/sources/transferLedgerSource.js` reading `ledgerClientStore` (fed by T024 mirror; pre-mirror fallback reads `transferStore` directly)
-- [ ] T013 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/poolLedgerSource.js` (subgraph `PoolMember`/`PoolClaim`/`PoolRefund` → join/claim/refund entries) with `poolLedgerSource.test.js`
-- [ ] T014 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/membershipLedgerSource.js` (voucher/membership purchases via the existing membership queries) with `membershipLedgerSource.test.js`
-- [ ] T015 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/earnLedgerSource.js` (user-scoped ERC-4626 `Deposit`/`Withdraw` events via bounded window scan; reward claims recorded at claim time) with `earnLedgerSource.test.js`
-- [ ] T016 [US1] Write Vitest specs + implement `frontend/src/hooks/useActivityLedger.js` (account/chainId scoping, 60s polling model, filters, `staleClasses` surfaced) in `useActivityLedger.test.js`
-- [ ] T017 [US1] Rework `frontend/src/components/account/RecentActivityFeed.jsx` (+ its test) to render ledger entries: all classes, class/status filters, failed badge + reason, explorer link only for real ≥66-char txHash, "date unavailable" state on null timestamp
-- [ ] T018 [US1] Update `frontend/src/hooks/useAccountStats.js` (+ test) to source activity from `useActivityLedger`/`ledgerRepository` instead of `deriveTransfersFromWagers`, keeping the wager-list consistency guarantees
-- [ ] T019 [US1] Update `frontend/src/lib/account/{computeSummary,computePnlSeries,breakdowns}.js` (+ tests) to be pure functions of LedgerEntry arrays that exclude `failed` from all totals (SC-006)
-- [ ] T020 [US1] Update `frontend/src/components/wallet/TransferActivityList.jsx` (+ test) to read the ledger filtered to `class: 'transfer'` so the Pay & Transfer tab and Account tab can never diverge (FR-002)
-- [ ] T021 [US1] Accessibility pass on changed Account-tab UI (labels for filters/status badges, axe clean) in the affected component tests
+- [X] T009 [P] [US1] Write Vitest specs for the wager source (subgraph `WagerTransfer` primary mapping; derived fallback flagged `dv:`; both yield stable ids) in `frontend/src/data/ledger/sources/wagerLedgerSource.test.js`
+- [X] T010 [P] [US1] Implement `frontend/src/data/ledger/sources/wagerLedgerSource.js` reusing `reportDataSource` transfer enumeration (subgraph path) and `deriveTransfersFromWagers` (fallback path, timestamps deferred to US4 hydration — emit `null`, never 0)
+- [X] T011 [P] [US1] Write Vitest specs for the transfer source (maps `transferStore`/client records incl. `route: 'gasless'`, failed status + verbatim `failureReason`) in `frontend/src/data/ledger/sources/transferLedgerSource.test.js`
+- [X] T012 [P] [US1] Implement `frontend/src/data/ledger/sources/transferLedgerSource.js` reading `ledgerClientStore` (fed by T024 mirror; pre-mirror fallback reads `transferStore` directly)
+- [X] T013 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/poolLedgerSource.js` (subgraph `PoolMember`/`PoolClaim`/`PoolRefund` → join/claim/refund entries) with `poolLedgerSource.test.js`
+- [X] T014 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/membershipLedgerSource.js` (voucher/membership purchases via the existing membership queries) with `membershipLedgerSource.test.js`
+- [X] T015 [P] [US1] Write Vitest specs + implement `frontend/src/data/ledger/sources/earnLedgerSource.js` (user-scoped ERC-4626 `Deposit`/`Withdraw` events via bounded window scan; reward claims recorded at claim time) with `earnLedgerSource.test.js`
+- [X] T016 [US1] Write Vitest specs + implement `frontend/src/hooks/useActivityLedger.js` (account/chainId scoping, 60s polling model, filters, `staleClasses` surfaced) in `useActivityLedger.test.js`
+- [X] T017 [US1] Rework `frontend/src/components/account/RecentActivityFeed.jsx` (+ its test) to render ledger entries: all classes, class/status filters, failed badge + reason, explorer link only for real ≥66-char txHash, "date unavailable" state on null timestamp
+- [X] T018 [US1] Update `frontend/src/hooks/useAccountStats.js` (+ test) to source activity from `useActivityLedger`/`ledgerRepository` instead of `deriveTransfersFromWagers`, keeping the wager-list consistency guarantees
+- [X] T019 [US1] Update `frontend/src/lib/account/{computeSummary,computePnlSeries,breakdowns}.js` (+ tests) to be pure functions of LedgerEntry arrays that exclude `failed` from all totals (SC-006)
+- [X] T020 [US1] Update `frontend/src/components/wallet/TransferActivityList.jsx` (+ test) to read the ledger filtered to `class: 'transfer'` so the Pay & Transfer tab and Account tab can never diverge (FR-002)
+- [X] T021 [US1] Accessibility pass on changed Account-tab UI (labels for filters/status badges, axe clean) in the affected component tests
 
 **Checkpoint**: US1 fully functional — MVP deliverable
+
+> **Implementation notes (deviations, recorded per plan §Complexity):**
+> - T015: earn activity is captured at action time into the client ledger
+>   (`captureEarnAction` beside the existing `queueEarnAction` call sites)
+>   instead of an ERC-4626 event scan — earn vaults are Morpho-discovered with
+>   no fixed registry, so an event sweep is not viable on public RPCs. The gap
+>   (externally-made earn actions) is disclosed in the source header.
+> - T019: the summary/P&L/breakdown helpers keep their proven spec-020 math;
+>   they now consume the ledger through `lib/account/ledgerAdapters.js`, which
+>   maps wager-class entries and excludes `failed` (FR-003/FR-015 hold via the
+>   single read path).
+> - Ledger tests live under `frontend/src/test/ledger/` (repo convention)
+>   rather than colocated next to sources.
 
 ---
 
@@ -85,9 +98,9 @@ independently testable increment.
 
 **Independent Test**: quickstart.md §5–6 — backup → wipe → restore returns the full record incl. failed gasless entries with no duplicates; no-backup restore rebuilds on-chain history and says client-only history wasn't recovered; `fairwins.transfers.v1` migrates once
 
-- [ ] T026 [P] [US3] Write Vitest specs for `ledgerClientStore` (append-only, `supersedes` chain resolution, per-account + chainId scoping via `userStorage`, FR-013 pruning guard + `prunedBefore` disclosure, storage failure never throws into caller) in `frontend/src/data/ledger/ledgerClientStore.test.js`
-- [ ] T027 [US3] Implement `frontend/src/data/ledger/ledgerClientStore.js` to pass T026
-- [ ] T028 [US3] Write Vitest specs + update `frontend/src/hooks/useTransfer.js` to mirror record/updateTransfer calls into `ledgerClientStore` as append+supersede records (transfer flow must never fail on ledger write) in `useTransfer.test.js`
+- [X] T026 [P] [US3] Write Vitest specs for `ledgerClientStore` (append-only, `supersedes` chain resolution, per-account + chainId scoping via `userStorage`, FR-013 pruning guard + `prunedBefore` disclosure, storage failure never throws into caller) in `frontend/src/data/ledger/ledgerClientStore.test.js`
+- [X] T027 [US3] Implement `frontend/src/data/ledger/ledgerClientStore.js` to pass T026
+- [X] T028 [US3] Write Vitest specs + update `frontend/src/hooks/useTransfer.js` to mirror record/updateTransfer calls into `ledgerClientStore` as append+supersede records (transfer flow must never fail on ledger write) in `useTransfer.test.js`
 - [ ] T029 [P] [US3] Write Vitest specs for one-time idempotent migration of `fairwins.transfers.v1` (statuses/errors/txHash/createdAt preserved, marker prevents re-import) in `frontend/src/data/ledger/migrate.test.js`
 - [ ] T030 [US3] Implement `frontend/src/data/ledger/migrate.js` + invoke on app bootstrap to pass T029 (FR-017, SC-007)
 - [ ] T031 [P] [US3] Write backup round-trip Vitest spec (load → union merge by entryId, replace mode also unions, restore dedups against re-derived entries) in `frontend/src/lib/backup/activityLedgerObject.test.js`
