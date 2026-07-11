@@ -12,6 +12,33 @@ import {
   relayGaslessTransfer,
 } from '../lib/transfer/eip3009Transfer'
 import { recordTransfer, updateTransfer, TRANSFER_STATUS } from '../lib/transfer/transferStore'
+import { appendClientRecord } from '../data/ledger'
+import { transferRecordToEntry } from '../data/ledger/sources/transferLedgerSource'
+
+/**
+ * Mirror a transfer record (or a status transition) into the append-only
+ * client ledger (spec 051 FR-008/FR-010): the initial record keeps its
+ * `cl:<id>` identity; each transition appends a superseding record instead
+ * of mutating. Deterministic suffixes make re-mirroring a no-op. Best-effort:
+ * the ledger must never break a transfer.
+ */
+function mirrorToLedger(account, record, patch = null, suffix = null) {
+  try {
+    const entry = transferRecordToEntry({ ...record, ...(patch || {}) }, { account })
+    if (!suffix) {
+      appendClientRecord(account, entry)
+      return
+    }
+    appendClientRecord(account, {
+      ...entry,
+      entryId: `${entry.entryId}:${suffix}`,
+      recordedAt: Date.now(),
+      refs: { ...entry.refs, supersedes: entry.entryId },
+    })
+  } catch {
+    /* capture is best-effort */
+  }
+}
 
 /**
  * useTransfer — the send engine behind the Pay & Transfer wallet section.
@@ -171,6 +198,7 @@ export function useTransfer() {
         to,
         route: gasless ? 'gasless' : kind === TRANSFER_KIND.STABLE ? 'self' : 'direct',
       })
+      mirrorToLedger(address, entry)
 
       setError(null)
       setStatus('signing')
@@ -234,6 +262,7 @@ export function useTransfer() {
         }
 
         updateTransfer(address, entry.id, { status: TRANSFER_STATUS.COMPLETE, txHash, route })
+        mirrorToLedger(address, entry, { status: TRANSFER_STATUS.COMPLETE, txHash, route }, 'done')
         setStatus('success')
         const result = { txHash, route, id: entry.id }
         setLastResult(result)
@@ -242,6 +271,7 @@ export function useTransfer() {
       } catch (err) {
         const message = err?.shortMessage || err?.message || 'Transfer failed.'
         updateTransfer(address, entry.id, { status: TRANSFER_STATUS.FAILED, error: message })
+        mirrorToLedger(address, entry, { status: TRANSFER_STATUS.FAILED, error: message }, 'fail')
         setError(message)
         setStatus('error')
         throw err

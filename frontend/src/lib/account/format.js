@@ -39,9 +39,16 @@ export function formatPercent(rate) {
   return `${Math.round(Number(rate) * 100)}%`
 }
 
-/** Relative "Ns/Nm/Nh/Nd ago" from an epoch-ms timestamp. */
+/**
+ * Relative "Ns/Nm/Nh/Nd ago" from an epoch-ms timestamp — or `null` when no
+ * real timestamp exists. A missing/zero/negative input MUST NOT render as
+ * time-since-epoch (the "20645d ago" defect, spec 051 FR-006): callers render
+ * an explicit "date unavailable" state on `null`.
+ */
 export function formatRelativeTime(ts, now = Date.now()) {
-  const diff = Math.max(0, now - Number(ts || 0))
+  const t = Number(ts)
+  if (!Number.isFinite(t) || t <= 0) return null
+  const diff = Math.max(0, now - t)
   const s = Math.floor(diff / 1000)
   if (s < 60) return `${s}s ago`
   const m = Math.floor(s / 60)

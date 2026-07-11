@@ -17,6 +17,7 @@ import { getBlockscoutUrl } from '../config/blockExplorer'
 import { fetchRewards, buildClaimArgs } from '../lib/earn/merkl'
 import { MERKL_DISTRIBUTOR_ABI } from '../abis/MerklDistributor'
 import { queueEarnAction } from '../lib/earn/earnActivityBuffer'
+import { captureEarnAction } from '../data/ledger'
 import { useActivityOptional } from './useActivity'
 
 const DISTRIBUTOR_IFACE = new Interface(MERKL_DISTRIBUTOR_ABI)
@@ -110,6 +111,14 @@ export function useEarnRewards() {
         txHash,
         txUrl,
         at: Date.now(),
+      })
+      // Durable audit entry in the unified activity ledger (spec 051).
+      captureEarnAction(address, chainId, {
+        type: 'earn-rewards-claimed',
+        txHash,
+        at: Date.now(),
+        tokenAddress: args.tokens[0] ?? null,
+        description: `Claimed earn rewards: ${summary}`,
       })
       activity?.refresh?.()
       setClaimState({ status: 'confirmed', txUrl, error: null })

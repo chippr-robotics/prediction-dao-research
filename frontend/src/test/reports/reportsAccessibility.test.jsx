@@ -12,6 +12,8 @@ const hookOptions = (saveAs = vi.fn()) => ({
   account: USER,
   chainId: CHAIN_ID,
   createDataSource: () => makeFixtureDataSource(),
+  // Legacy wager-only pipeline against the wager fixtures (see reportParity.test.js).
+  ledger: null,
   getNetwork: () => ({ name: 'Polygon', isTestnet: false, nativeCurrency: { symbol: 'MATIC' } }),
   getEscrow: () => REGISTRY,
   saveAs,

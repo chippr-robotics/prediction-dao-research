@@ -32,6 +32,7 @@ import {
   buildWithdrawCalls,
 } from '../../lib/earn/vaultActions'
 import { queueEarnAction } from '../../lib/earn/earnActivityBuffer'
+import { captureEarnAction } from '../../data/ledger'
 import { formatApy } from '../../lib/earn/format'
 
 function fmt(amountBig, decimals, symbol) {
@@ -170,6 +171,18 @@ export default function VaultSheet({ vault, userState, onClose, onActionComplete
         txHash,
         txUrl,
         at: Date.now(),
+      })
+      // Durable audit entry in the unified activity ledger (spec 051).
+      captureEarnAction(address, chainId, {
+        type: mode === 'deposit' ? 'earn-deposit' : 'earn-withdraw',
+        txHash,
+        at: Date.now(),
+        vaultAddress: vault.address,
+        amountRaw: amount?.toString?.() ?? String(amount),
+        tokenAddress: vault.asset?.address ?? null,
+        tokenSymbol: symbol,
+        tokenDecimals: decimals,
+        description: message,
       })
       activity?.refresh?.()
       setTxState({ step: 'done', txUrl, error: null })

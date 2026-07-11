@@ -10,7 +10,7 @@
 
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { REPORT_COLUMNS, lineItemToRow } from './csvReport'
+import { reportColumns, lineItemToRow } from './csvReport'
 
 /**
  * @param {object} report - ActivityReport from buildReport
@@ -32,14 +32,24 @@ export function render(report) {
     `Period: ${report.period.label}`,
     `Generated: ${new Date(report.generatedAt).toISOString()}`,
   ]
+  // Spec 051 disclosures mirror the CSV preamble.
+  if (report.staleClasses?.length) {
+    headerLines.push(`Coverage note: could not refresh ${report.staleClasses.join(', ')} — entries may be missing.`)
+  }
+  if (report.prunedBefore != null) {
+    headerLines.push(`Retention note: device-local entries before ${new Date(report.prunedBefore).toISOString()} were pruned.`)
+  }
+  if (report.totals?.overall?.failedCount > 0) {
+    headerLines.push(`${report.totals.overall.failedCount} failed operation(s) listed but excluded from all totals.`)
+  }
   for (const line of headerLines) {
     doc.text(line, marginX, y)
     y += 13
   }
 
   autoTable(doc, {
-    head: [REPORT_COLUMNS],
-    body: report.lineItems.map(lineItemToRow),
+    head: [reportColumns(report)],
+    body: report.lineItems.map((it) => lineItemToRow(it, report)),
     startY: y + 6,
     styles: { fontSize: 6, font: 'courier', cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fontSize: 6, fillColor: [40, 40, 40] },

@@ -1,9 +1,13 @@
 /**
- * useAccountStats — the Account dashboard's single data seam (spec 020).
+ * useAccountStats — the Account dashboard's single data seam (spec 020,
+ * re-pointed at the unified activity ledger by spec 051).
  *
  * Composes existing feeds into the derived view models in data-model.md:
  *  - member wagers (WagerRepository.listMyWagers, all pages)
- *  - valued WagerTransfers (report data source `listTransfers` + enrichment)
+ *  - the unified activity ledger (spec 051) — ALL activity classes; the
+ *    wager-class entries feed the P&L/summary/breakdown math via
+ *    lib/account/ledgerAdapters so dashboard figures and the tax report read
+ *    the same ledger and can never disagree (FR-014/015)
  *  - wallet balances + native→USD (wallet context + usePriceConversion)
  *
  * Pure aggregation lives in lib/account/*; this hook only wires feeds, manages
@@ -18,16 +22,16 @@ import { useWallet } from './useWalletManagement'
 import usePriceConversion from './usePriceConversion'
 import { useChainTokens } from './useChainTokens'
 import { getDefaultWagerRepository } from '../data/wagers/WagerRepository'
+import { getDefaultLedgerRepository } from '../data/ledger'
 import { getContractAddressForChain } from '../config/contracts'
 import {
   computeSummary,
   computePnlSeries,
   computeBreakdowns,
-  enrichTransfers,
-  deriveTransfersFromWagers,
   isSettledStatus,
   DEFAULT_RANGE,
 } from '../lib/account'
+import { wagerTransfersFromLedger, tokenMetaFromLedger } from '../lib/account/ledgerAdapters'
 
 const POLL_MS = 60_000
 
@@ -80,8 +84,9 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
   const [range, setRange] = useState(initialRange)
   const [wagers, setWagers] = useState([])
   const [stableBalance, setStableBalance] = useState(null)
-  const [valuedTransfers, setValuedTransfers] = useState([])
-  const [tokenMetaByAddress, setTokenMetaByAddress] = useState({})
+  const [ledgerEntries, setLedgerEntries] = useState([])
+  const [staleClasses, setStaleClasses] = useState([])
+  const [prunedBefore, setPrunedBefore] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isSupportedNetwork, setIsSupportedNetwork] = useState(true)
@@ -94,10 +99,13 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
 
   const reqIdRef = useRef(0)
 
+  const ledgerRepository = useMemo(() => getDefaultLedgerRepository(), [])
+
   const load = useCallback(async () => {
     if (!isConnected || !address) {
       setWagers([])
-      setValuedTransfers([])
+      setLedgerEntries([])
+      setStaleClasses([])
       setStableBalance(null)
       setIsLoading(false)
       return
@@ -113,8 +121,8 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     if (!escrowConfigured) {
       setIsSupportedNetwork(false)
       setWagers([])
-      setValuedTransfers([])
-      setTokenMetaByAddress({})
+      setLedgerEntries([])
+      setStaleClasses([])
       setIsLoading(false)
       const settled = { lastUpdated: Date.now(), status: 'fresh' }
       setFreshness({ summary: settled, series: settled, balances: settled, activity: settled })
@@ -132,7 +140,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     }))
     try {
       const repository = getDefaultWagerRepository(chainId)
-      const [loadedWagers, stable] = await Promise.all([
+      const [loadedWagers, stable, ledger] = await Promise.all([
         loadAllWagers(repository, address),
         fetchStableBalance({
           provider,
@@ -140,20 +148,17 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
           stableAddress: tokens.stableAddress,
           stableDecimals: tokens.stableDecimals,
         }),
+        // The unified activity ledger (spec 051): all classes, one read path
+        // shared with the tax report so the two can never disagree.
+        ledgerRepository.listEntries({ account: address, chainId, provider }),
       ])
-      if (reqId !== reqIdRef.current) return
-
-      // Derive the member's value movements from the SAME authoritative wagers
-      // that power My Wagers — not the separate WagerTransfer entity — so totals,
-      // P&L, breakdowns, and activity are always consistent with the wager list.
-      const rawTransfers = deriveTransfersFromWagers({ wagers: loadedWagers, address })
-      const { transfers, tokenMetaByAddress: meta } = await enrichTransfers(rawTransfers, { chainId })
       if (reqId !== reqIdRef.current) return
 
       setWagers(loadedWagers)
       if (stable != null) setStableBalance(stable)
-      setValuedTransfers(transfers)
-      setTokenMetaByAddress(meta)
+      setLedgerEntries(ledger.entries)
+      setStaleClasses(ledger.staleClasses)
+      setPrunedBefore(ledger.prunedBefore)
       setIsSupportedNetwork(true)
       const now = Date.now()
       const fresh = { lastUpdated: now, status: 'fresh' }
@@ -175,7 +180,7 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     } finally {
       if (reqId === reqIdRef.current) setIsLoading(false)
     }
-  }, [isConnected, address, chainId, provider, tokens.stableAddress, tokens.stableDecimals])
+  }, [isConnected, address, chainId, provider, tokens.stableAddress, tokens.stableDecimals, ledgerRepository])
 
   // Reload on connect / account / network change.
   useEffect(() => {
@@ -225,6 +230,11 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     return m
   }, [wagers])
 
+  // Wager money flows come from the ledger (single read path, FR-015); failed
+  // entries are excluded by the adapter so they never touch a total (FR-003).
+  const valuedTransfers = useMemo(() => wagerTransfersFromLedger(ledgerEntries), [ledgerEntries])
+  const tokenMetaByAddress = useMemo(() => tokenMetaFromLedger(ledgerEntries), [ledgerEntries])
+
   const summary = useMemo(
     () => computeSummary({ wagers, transfers: valuedTransfers, address, walletBalanceUsd, walletBalances }),
     [wagers, valuedTransfers, address, walletBalanceUsd, walletBalances],
@@ -245,23 +255,11 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     [wagers, valuedTransfers, tokenMetaByAddress],
   )
 
-  const activity = useMemo(() => {
-    return [...valuedTransfers]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 25)
-      .map((t) => ({
-        id: `${t.txHash}-${t.wagerId}-${t.direction}`,
-        direction: t.direction,
-        amount: t.amount,
-        symbol: t.ticker,
-        usdValue: t.usdValue,
-        timestamp: t.timestamp,
-        txHash: t.txHash,
-        wagerId: t.wagerId,
-      }))
-  }, [valuedTransfers])
+  // The Account tab's canonical activity record: ALL classes, newest first,
+  // failed entries included and labeled (they are excluded from totals above).
+  const activity = useMemo(() => ledgerEntries.slice(0, 50), [ledgerEntries])
 
-  const isEmpty = isConnected && !isLoading && wagers.length === 0 && valuedTransfers.length === 0
+  const isEmpty = isConnected && !isLoading && wagers.length === 0 && ledgerEntries.length === 0
 
   return {
     summary,
@@ -269,6 +267,8 @@ export function useAccountStats({ range: initialRange = DEFAULT_RANGE } = {}) {
     setRange,
     breakdowns,
     activity,
+    staleClasses,
+    prunedBefore,
     isConnected: Boolean(isConnected),
     isSupportedNetwork,
     chainId,

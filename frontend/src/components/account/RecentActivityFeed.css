@@ -92,3 +92,64 @@
 .account-feed-link:hover {
   text-decoration: underline;
 }
+
+/* --- spec 051: unified ledger feed --- */
+
+.account-feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.account-feed-filter {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-full, 9999px);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.account-feed-filter.active {
+  background: var(--brand-secondary, #4C9AFF);
+  border-color: var(--brand-secondary, #4C9AFF);
+  color: #fff;
+}
+
+.account-feed-icon.tone-failed {
+  background: rgba(229, 83, 61, 0.18);
+  color: var(--semantic-loss, #E5533D);
+}
+
+.account-feed-badge-failed {
+  color: var(--semantic-loss, #E5533D);
+  font-weight: 700;
+}
+
+.account-feed-badge-unvalued {
+  color: var(--text-muted, var(--text-secondary));
+  font-weight: 400;
+}
+
+.account-feed-reason {
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+  overflow-wrap: anywhere;
+}
+
+.account-feed-nodate {
+  font-style: italic;
+}
+
+.account-feed-stale,
+.account-feed-pruned {
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary));
+  margin: 0 0 8px;
+}
+
+.account-feed-pruned {
+  margin: 8px 0 0;
+}

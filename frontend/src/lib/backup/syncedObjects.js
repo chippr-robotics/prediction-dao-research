@@ -9,6 +9,10 @@ import {
   saveVaultReferences,
   mergeVaultReferences,
 } from '../custody/vaultReferences'
+import {
+  listClientRecordsAllChains,
+  mergeClientRecordsAllChains,
+} from '../../data/ledger/ledgerClientStore'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -73,6 +77,28 @@ export const syncedObjects = [
       return { conflicts }
     },
     merge: (current, incoming) => mergeVaultReferences(current, incoming),
+  },
+  {
+    // Spec 051 — client-only activity ledger records (failed gasless ops,
+    // transfer history, earn action captures): the part of the audit trail
+    // that cannot be re-derived from public chain data (FR-010). On-chain
+    // entries are deliberately NOT in the bundle — they re-derive (FR-009).
+    key: 'activityLedger',
+    label: 'Activity history',
+    networkScoped: true, // every record carries chainId
+    load: (account) => listClientRecordsAllChains(account),
+    // Records are append-only value objects, so BOTH modes union by entryId:
+    // a "replace" that deleted history would violate the append-only audit
+    // guarantee (FR-008). Identical ids are identical records — conflict-free.
+    apply: (account, value, _mode) => {
+      mergeClientRecordsAllChains(account, value)
+      return { conflicts: [] }
+    },
+    merge: (current, incoming) => {
+      const have = new Set((current || []).map((r) => r.entryId))
+      const fresh = (incoming || []).filter((r) => r?.entryId && !have.has(r.entryId))
+      return { value: [...(current || []), ...fresh], conflicts: [] }
+    },
   },
 ]
 
