@@ -81,6 +81,16 @@ artifacts live under `specs/<feature>/`.
   `services/relay-gateway` policy gateway + `services/oz-relayer` engine config) is optional
   infrastructure — every gasless flow keeps a self-submit fallback (never-stranded rule).
   See `docs/developer-guide/gasless-intents.md` + `docs/runbooks/relayer-operations.md`.
+- **Two gasless rails.** (1) *Relayed intents* (035 + 036, above) for contract actions + EIP-3009.
+  (2) *Sponsored UserOps* (**spec 050**) for passkey account-native ops (native/USDC transfers,
+  controller changes, first-use deploy): a self-hosted **verifying paymaster** (EntryPoint v0.6,
+  `contracts/account/FairWinsVerifyingPaymaster.sol`) reimburses the alto bundler from a
+  FairWins-funded deposit, authorized per-op by a KMS-signed ERC-7677 endpoint on the **same
+  relay-gateway** (`POST /v1/paymaster`, reuses screening/quotas/killswitch). This **supersedes spec
+  041 FR-015** for the UserOp path (041 shipped user-paid gas). The passkey path still falls back to
+  self-funded UserOps when sponsorship is unavailable; the confirm UI must disclose the fee honestly
+  (sponsored vs. user-pays). See `specs/050-sponsored-paymaster/` +
+  `docs/runbooks/paymaster-operations.md`.
 - **Wager Pools (spec 034) are a documented exception to the "route escrow
   through `wagerRegistry`" rule.** Group wager pools are a **parallel system**: the
   `WagerPoolFactory` (UUPS proxy, deployment keys `wagerPoolFactory` /
@@ -104,5 +114,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/050-earn-lending-rewards/plan.md
+at specs/050-sponsored-paymaster/plan.md
 <!-- SPECKIT END -->

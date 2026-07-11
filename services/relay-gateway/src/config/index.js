@@ -189,6 +189,18 @@ export function loadConfig(env = process.env, opts = {}) {
       peakBurnWeiPerHour: bigInt(env, `PEAK_BURN_WEI_PER_HR_${chainId}`, 50_000_000_000_000_000n), // 0.05 native/hr
       engineRelayerId: opt(env, `ENGINE_RELAYER_ID_${chainId}`, `${def.name}-${chainId}`),
       deploymentFile: deployment.file,
+      // Sponsored-paymaster (spec 050): set PER CHAIN, so sponsorship is enabled ONLY where a
+      // paymaster is deployed (e.g. Polygon-only = set PAYMASTER_ADDRESS_137 alone). null => the
+      // /v1/paymaster endpoint refuses this chain and the SPA self-funds (never-stranded).
+      paymaster: (() => {
+        const addr = opt(env, `PAYMASTER_ADDRESS_${chainId}`, null)
+        if (!addr) return null
+        if (!ADDRESS_RE.test(addr)) throw new Error(`[relay-gateway] PAYMASTER_ADDRESS_${chainId} is not an address`)
+        return {
+          address: addr,
+          entryPoint: opt(env, `ENTRYPOINT_V06_${chainId}`, '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'),
+        }
+      })(),
     }
   }
 
@@ -216,6 +228,20 @@ export function loadConfig(env = process.env, opts = {}) {
       signerPerWindow: int(env, 'SIGNER_QUOTA_PER_MIN', 12),
       globalPerWindow: int(env, 'GLOBAL_QUOTA_PER_MIN', 120),
       windowMs: int(env, 'QUOTA_WINDOW_MS', 60_000),
+    },
+    // Sponsored-paymaster (spec 050): sponsorship signer + per-op ceilings + burst quotas. The
+    // killswitch and sanctions screen are shared with the intent path; these are the paymaster-only
+    // knobs. Signer: dev/CI uses PM_SIGNER_PRIVATE_KEY (never a prod secret); prod uses the KMS key.
+    paymaster: {
+      signerPrivateKey: opt(env, 'PM_SIGNER_PRIVATE_KEY', null),
+      kmsKeyName: opt(env, 'PM_SIGNER_KMS_KEY', null),
+      maxCostWei: bigInt(env, 'PM_MAX_COST_WEI', 2_000_000_000_000_000_000n), // 2 native / op ceiling
+      maxGas: BigInt(int(env, 'PM_MAX_GAS', 3_000_000)),
+      approvalTtlSec: int(env, 'PM_APPROVAL_TTL_SEC', 180),
+      accountPerWindow: int(env, 'PM_ACCOUNT_QUOTA_PER_MIN', 6),
+      globalPerWindow: int(env, 'PM_GLOBAL_QUOTA_PER_MIN', 60),
+      windowMs: int(env, 'PM_QUOTA_WINDOW_MS', 60_000),
+      runwayWarnHrs: int(env, 'PM_RUNWAY_WARN_HRS', 48),
     },
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),

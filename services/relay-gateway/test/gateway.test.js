@@ -556,7 +556,7 @@ describe('GET /healthz + /status (cached, gated telemetry)', () => {
     // Edge/operator caller (valid X-Origin-Auth) — runway disclosed.
     const auth = await request(app).get('/status').set('X-Origin-Auth', ORIGIN_SECRET)
     expect(auth.body.chains['137'].gasWalletRunwayHrs).toBeGreaterThan(0)
-    expect(auth.body.chains['80002']).toEqual({ rpc: 'up', gasWalletRunwayHrs: null })
+    expect(auth.body.chains['80002']).toEqual({ rpc: 'up', gasWalletRunwayHrs: null, paymasterDepositRunwayHrs: null })
   })
 
   it('caches the RPC fan-out so a request loop cannot amplify upstream load', async () => {

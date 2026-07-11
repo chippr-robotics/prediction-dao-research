@@ -12,7 +12,7 @@ vi.mock('../../../config/networks', () => ({
         chainId: 80002,
         rpcUrl: 'https://rpc.example',
         capabilities: { passkeyAccounts: true },
-        passkey: { bundlerUrls: ['https://bundler.example'], erc20PaymasterUrl: null },
+        passkey: { bundlerUrls: ['https://bundler.example'], sponsorPaymasterUrl: null },
       }
     }
     if (chainId === 137) {
@@ -22,7 +22,7 @@ vi.mock('../../../config/networks', () => ({
         capabilities: { passkeyAccounts: true },
         passkey: {
           bundlerUrls: ['https://bundler.example/polygon'],
-          erc20PaymasterUrl: 'https://paymaster.example/polygon',
+          sponsorPaymasterUrl: 'https://paymaster.example/polygon',
         },
       }
     }
@@ -173,7 +173,7 @@ describe('buildAccount credential validation (spec 045 FR-006)', () => {
   })
 })
 
-describe('buildAccount ERC-20 paymaster wiring (issue #854)', () => {
+describe('buildAccount sponsoring-paymaster wiring (spec 050)', () => {
   const credential = { credentialId: 'c1', publicKey: { x: X, y: Y } }
   const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
 
@@ -182,31 +182,41 @@ describe('buildAccount ERC-20 paymaster wiring (issue #854)', () => {
     createPaymasterClient.mockClear()
   })
 
-  it('builds a paymaster client from the network config and passes it to the bundler client', async () => {
-    await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
+  it('builds a paymaster client from the network config, passes it to the bundler client, and reports sponsored:true', async () => {
+    const out = await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
 
     expect(createPaymasterClient).toHaveBeenCalledTimes(1)
     const bundlerOpts = createBundlerClient.mock.calls[0][0]
-    expect(bundlerOpts.paymaster).toEqual(
-      expect.objectContaining({ __isPaymasterClient: true })
-    )
+    expect(bundlerOpts.paymaster).toEqual(expect.objectContaining({ __isPaymasterClient: true }))
+    expect(out.sponsored).toBe(true)
   })
 
-  it('omits the paymaster (native-token fallback) when no ERC-20 paymaster is configured', async () => {
-    await buildAccount({ chainId: 80002, credential, ownerIndex: 0, deps: { publicClient } })
+  it('omits the paymaster (native-token fallback, sponsored:false) when no sponsor endpoint is configured', async () => {
+    const out = await buildAccount({ chainId: 80002, credential, ownerIndex: 0, deps: { publicClient } })
 
     expect(createPaymasterClient).not.toHaveBeenCalled()
     const bundlerOpts = createBundlerClient.mock.calls[0][0]
     expect(bundlerOpts.paymaster).toBeUndefined()
+    expect(out.sponsored).toBe(false)
+  })
+
+  it('deps.noPaymaster forces self-funding even when a sponsor endpoint is configured (never-stranded retry)', async () => {
+    const out = await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient, noPaymaster: true } })
+
+    expect(createPaymasterClient).not.toHaveBeenCalled()
+    const bundlerOpts = createBundlerClient.mock.calls[0][0]
+    expect(bundlerOpts.paymaster).toBeUndefined()
+    expect(out.sponsored).toBe(false)
   })
 
   it('a test-injected deps.paymaster still overrides the configured URL', async () => {
     const injected = { __testPaymaster: true }
-    await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient, paymaster: injected } })
+    const out = await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient, paymaster: injected } })
 
     expect(createPaymasterClient).not.toHaveBeenCalled()
     const bundlerOpts = createBundlerClient.mock.calls[0][0]
     expect(bundlerOpts.paymaster).toBe(injected)
+    expect(out.sponsored).toBe(true)
   })
 })
 

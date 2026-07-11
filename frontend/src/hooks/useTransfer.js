@@ -51,15 +51,19 @@ export function useTransfer() {
     const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
     return isPasskey ? (rpcProvider || provider) : (provider || rpcProvider)
   }, [chainId, isPasskey, provider])
-  // A stablecoin transfer is gasless when a passkey smart account sponsors it, or when the token supports
-  // EIP-3009 AND a relayer is configured to submit the signed authorization.
+  // A transfer is gasless when a passkey smart account's UserOp is FairWins-sponsored (spec 050: a
+  // sponsor paymaster is configured for this chain), or — for classic wallets — when the token
+  // supports EIP-3009 AND a relayer is configured. Without a sponsor paymaster a passkey UserOp
+  // self-funds native gas (NOT gasless), so the badge must not claim "sponsored" (honest-state,
+  // Constitution III; this is the fix for the previously-unconditional passkey badge).
   const hasRelayer = Boolean(getTransferRelayer())
-  const stableGasless = isPasskey || (stableDomainVersion != null && hasRelayer)
+  const passkeySponsored = isPasskey && Boolean(getNetwork(chainId)?.passkey?.sponsorPaymasterUrl)
+  const stableGasless = passkeySponsored || (!isPasskey && stableDomainVersion != null && hasRelayer)
 
   /** Whether a given kind will be gasless for the current session (drives the UI badge, honestly). */
   const quoteGasless = useCallback(
-    (kind) => (kind === TRANSFER_KIND.STABLE ? stableGasless : isPasskey),
-    [stableGasless, isPasskey]
+    (kind) => (kind === TRANSFER_KIND.STABLE ? stableGasless : passkeySponsored),
+    [stableGasless, passkeySponsored]
   )
 
   const meta = useCallback(
@@ -175,7 +179,7 @@ export function useTransfer() {
         let route = entry.route
 
         if (isPasskey) {
-          // One ceremony, sponsored by the smart account. Native = value move; stable = ERC-20 transfer call.
+          // One ceremony via the smart-account batch. Native = value move; stable = ERC-20 transfer call.
           const calls =
             kind === TRANSFER_KIND.STABLE
               ? [{ target: m.address, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]), value: 0n }]
@@ -183,7 +187,10 @@ export function useTransfer() {
           setStatus('submitting')
           const res = await sendCalls(calls)
           txHash = res?.txHash ?? res?.userOpHash ?? res?.intentId ?? null
-          route = 'gasless' // smart-account batch is sponsored (bundler/relay) regardless of inner route
+          // Honest route: reflect whether the batch was ACTUALLY sponsored. sendCalls falls back to a
+          // self-funded UserOp when sponsorship is unavailable (spec 050), so trust its `sponsored`
+          // flag rather than assuming gasless.
+          route = res?.sponsored === false ? 'self' : res?.sponsored === true || passkeySponsored ? 'gasless' : 'self'
         } else if (kind === TRANSFER_KIND.STABLE && stableDomainVersion != null && hasRelayer) {
           // Classic EOA, gasless: sign an EIP-3009 authorization; a relayer submits + pays gas.
           const auth = await signTransferAuthorization({
