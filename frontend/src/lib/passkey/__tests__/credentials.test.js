@@ -117,6 +117,31 @@ describe('getAssertion', () => {
     expect(credentials.get.mock.calls[0][0].publicKey.allowCredentials).toBeUndefined()
   })
 
+  it('discoverable:true skips the local book so any device passkey is reachable (issue #849)', async () => {
+    // "Use a different passkey…" must reach passkeys this browser never recorded.
+    // A non-empty book would otherwise constrain allowCredentials to itself and
+    // hide every other FairWins passkey on the device.
+    const credentials = { get: vi.fn().mockResolvedValue(fakeAssertion) }
+    const book = () => [{ credentialId: 'Y3JlZC1hYmM' }, { credentialId: 'Y3JlZC1kZWY' }]
+    await getAssertion({
+      challenge: new Uint8Array(32),
+      discoverable: true,
+      deps: { credentials, knownCredentials: book },
+    })
+    expect(credentials.get.mock.calls[0][0].publicKey.allowCredentials).toBeUndefined()
+  })
+
+  it('an explicit credentialId still pins even when discoverable is set', async () => {
+    const credentials = { get: vi.fn().mockResolvedValue(fakeAssertion) }
+    await getAssertion({
+      challenge: new Uint8Array(32),
+      credentialId: 'Y3JlZC1hYmM',
+      discoverable: true,
+      deps: { credentials, knownCredentials: () => [] },
+    })
+    expect(credentials.get.mock.calls[0][0].publicKey.allowCredentials).toHaveLength(1)
+  })
+
   it('throws CeremonyCancelled when the browser resolves a null assertion (Brave cancel path)', async () => {
     const credentials = { get: vi.fn().mockResolvedValue(null) }
     await expect(

@@ -5,9 +5,11 @@
  * choices. Passkey and WalletConnect are featured ahead of browser wallets
  * (all three stay fully supported).
  *
- * Passkey path: first-time explainer (US4) → in-app account picker when this
- * browser knows several passkeys (US3 — Brave/Chromium won't reliably offer
- * the choice, so the app does) → ceremony pinned to the chosen credential.
+ * Passkey path: first-time explainer (US4) → in-app account picker whenever
+ * this browser knows at least one passkey (US3 + issue #849 — Brave/Chromium
+ * won't reliably offer the choice, and even a lone recorded passkey must not
+ * silently pin the member to index 0) → ceremony pinned to the chosen
+ * credential, or a discoverable request for a passkey not yet in the book.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -113,16 +115,18 @@ function ConnectModalDialog() {
 
   const startPasskey = useCallback(() => {
     const known = knownCredentials().filter(isTransactComplete)
-    if (known.length >= 2) {
+    // Issue #849: whenever this browser knows at least one passkey, present the
+    // chooser instead of silently pinning to the first (index 0). The picker
+    // lets the member select any known passkey, reach a different one on the
+    // device via "Use a different passkey…", or create another account — the
+    // three acceptance scenarios. Only a browser with an empty book skips
+    // straight to sign-up (there is nothing yet to choose between).
+    if (known.length >= 1) {
       setPickerAccounts(known)
       setStep('picker')
       return
     }
-    // 0 known → connector runs sign-up; 1 known → sign-in pinned to it.
-    doConnect(
-      PASSKEY_CONNECTOR_ID,
-      known.length === 1 ? { credentialId: known[0].credentialId, mode: 'sign-in' } : undefined
-    )
+    doConnect(PASSKEY_CONNECTOR_ID, undefined)
   }, [doConnect])
 
   const handleSelect = useCallback(
@@ -254,8 +258,9 @@ function ConnectModalDialog() {
         {step === 'picker' && (
           <div className="connect-modal__list" data-testid="passkey-picker">
             <p className="connect-modal__hint">
-              This browser knows several passkey accounts. Pick the one to sign into — the app never
-              guesses.
+              {pickerAccounts.length > 1
+                ? 'This browser knows several passkey accounts. Pick the one to sign into — the app never guesses.'
+                : 'Pick a passkey to sign into, use another passkey on this device, or create a new account.'}
             </p>
             {pickerAccounts.map((cred) => (
               <div key={cred.credentialId} className="connect-modal__account-row">
@@ -285,7 +290,7 @@ function ConnectModalDialog() {
               type="button"
               className="connect-modal__option connect-modal__option--secondary"
               disabled={pendingId !== null}
-              onClick={() => doConnect(PASSKEY_CONNECTOR_ID, { mode: 'sign-in' })}
+              onClick={() => doConnect(PASSKEY_CONNECTOR_ID, { mode: 'sign-in', discoverable: true })}
             >
               Use a different passkey…
             </button>

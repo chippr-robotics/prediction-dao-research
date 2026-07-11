@@ -190,17 +190,26 @@ export async function createCredential({ label, userName = 'FairWins account', d
  * but their first account (spec 045, US3). Only a browser with no local book
  * (fresh device) falls back to the bare discoverable-credential request.
  *
+ * `discoverable: true` deliberately skips the local-book `allowCredentials`
+ * even when the book is non-empty, issuing a bare discoverable request so the
+ * platform offers EVERY FairWins passkey on the device — including ones this
+ * browser has never recorded (issue #849: "several passkeys on one device").
+ * The in-app "Use a different passkey…" escape uses this; the app still never
+ * silently guesses because the platform's own chooser makes the pick.
+ *
  * `prfSalt` (optional Uint8Array(32)) also evaluates the PRF extension.
  * Returns the raw fields the signing layer needs:
  *   { credentialId, signature, authenticatorData, clientDataJSON, prfOutput? }
  */
-export async function getAssertion({ challenge, credentialId, prfSalt, deps = {} }) {
+export async function getAssertion({ challenge, credentialId, prfSalt, discoverable = false, deps = {} }) {
   const credentials = deps.credentials ?? globalThis.navigator?.credentials
   if (!credentials) throw new AuthenticatorUnavailable('no credential manager in this context')
 
   const pinnedIds = credentialId
     ? [credentialId]
-    : (deps.knownCredentials ?? knownCredentials)(deps.storage).map((c) => c.credentialId)
+    : discoverable
+      ? []
+      : (deps.knownCredentials ?? knownCredentials)(deps.storage).map((c) => c.credentialId)
   const allowCredentials = []
   for (const id of pinnedIds) {
     try {

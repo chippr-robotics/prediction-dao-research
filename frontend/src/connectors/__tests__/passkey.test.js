@@ -122,6 +122,13 @@ describe('connect', () => {
     expect(readSession().credentialId).toBe('cred-2') // session pins what was ASSERTED
   })
 
+  it('sign-in forwards discoverable to the assertion so any device passkey is reachable (issue #849)', async () => {
+    rememberCompleteRecord()
+    const { connector, deps } = makeConnector({ options: { mode: 'sign-in' } })
+    await connector.connect({ chainId: 80002, discoverable: true })
+    expect(deps.getAssertion).toHaveBeenCalledWith(expect.objectContaining({ discoverable: true }))
+  })
+
   it('sign-in REFUSES (no session) when the record still cannot transact after repair (FR-005)', async () => {
     // Partial record + ambiguous chain state (two passkey owners): the key
     // cannot be reconstructed, so minting a session would just crash later.
