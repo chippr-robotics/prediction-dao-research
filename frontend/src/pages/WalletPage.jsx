@@ -10,6 +10,7 @@ import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
+import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
@@ -46,6 +47,7 @@ const WALLET_TABS = [
   { id: 'preferences', label: 'Preferences' },
   { id: 'security', label: 'Security' },
   { id: 'portfolio', label: 'Portfolio' },
+  { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
   { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'custody', label: 'Protect' },
@@ -571,6 +573,11 @@ function WalletPage() {
                 {activeTab === 'trade' && (
                   <div className="trade-section" role="tabpanel">
                     <TradePanel />
+                  </div>
+                )}
+                {activeTab === 'earn' && (
+                  <div className="earn-section" role="tabpanel">
+                    <EarnPanel />
                   </div>
                 )}
                 </div>

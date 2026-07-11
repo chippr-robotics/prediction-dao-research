@@ -47,6 +47,19 @@ function actionsFor(instance) {
       to: `/wallet?tab=paytransfer&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
     {
+      // Earn (spec 050): lend this asset through the Earn section. Enabled
+      // when the instance's network supports earn and the asset is fungible;
+      // the lend view prefilters to vaults accepting this asset.
+      id: 'earn',
+      label: 'Earn',
+      enabled: asset.kind !== 'nft' && Boolean(net?.earn),
+      reason:
+        asset.kind === 'nft'
+          ? 'Collectibles cannot be lent'
+          : 'Earning is not available on this network',
+      to: `/wallet?tab=earn&view=lend&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
+    },
+    {
       id: 'stake',
       label: 'Stake',
       enabled: false,
