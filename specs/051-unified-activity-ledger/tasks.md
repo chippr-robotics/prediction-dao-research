@@ -101,11 +101,11 @@ independently testable increment.
 - [X] T026 [P] [US3] Write Vitest specs for `ledgerClientStore` (append-only, `supersedes` chain resolution, per-account + chainId scoping via `userStorage`, FR-013 pruning guard + `prunedBefore` disclosure, storage failure never throws into caller) in `frontend/src/data/ledger/ledgerClientStore.test.js`
 - [X] T027 [US3] Implement `frontend/src/data/ledger/ledgerClientStore.js` to pass T026
 - [X] T028 [US3] Write Vitest specs + update `frontend/src/hooks/useTransfer.js` to mirror record/updateTransfer calls into `ledgerClientStore` as append+supersede records (transfer flow must never fail on ledger write) in `useTransfer.test.js`
-- [ ] T029 [P] [US3] Write Vitest specs for one-time idempotent migration of `fairwins.transfers.v1` (statuses/errors/txHash/createdAt preserved, marker prevents re-import) in `frontend/src/data/ledger/migrate.test.js`
-- [ ] T030 [US3] Implement `frontend/src/data/ledger/migrate.js` + invoke on app bootstrap to pass T029 (FR-017, SC-007)
-- [ ] T031 [P] [US3] Write backup round-trip Vitest spec (load → union merge by entryId, replace mode also unions, restore dedups against re-derived entries) in `frontend/src/lib/backup/activityLedgerObject.test.js`
-- [ ] T032 [US3] Register the `activityLedger` synced object in `frontend/src/lib/backup/syncedObjects.js` per `contracts/backup-object.md` to pass T031
-- [ ] T033 [US3] Update the restore flow UI (+ test) to surface "device-local activity history was not recovered" when no/undecryptable backup (FR-012) in the spec-032 restore components
+- [X] T029 [P] [US3] Write Vitest specs for one-time idempotent migration of `fairwins.transfers.v1` (statuses/errors/txHash/createdAt preserved, marker prevents re-import) in `frontend/src/data/ledger/migrate.test.js`
+- [X] T030 [US3] Implement `frontend/src/data/ledger/migrate.js` + invoke on app bootstrap to pass T029 (FR-017, SC-007)
+- [X] T031 [P] [US3] Write backup round-trip Vitest spec (load → union merge by entryId, replace mode also unions, restore dedups against re-derived entries) in `frontend/src/lib/backup/activityLedgerObject.test.js`
+- [X] T032 [US3] Register the `activityLedger` synced object in `frontend/src/lib/backup/syncedObjects.js` per `contracts/backup-object.md` to pass T031
+- [X] T033 [US3] Update the restore flow UI (+ test) to surface "device-local activity history was not recovered" when no/undecryptable backup (FR-012) in the spec-032 restore components
 
 **Checkpoint**: Full wipe-and-recover path proven
 

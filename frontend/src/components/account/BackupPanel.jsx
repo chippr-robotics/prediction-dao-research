@@ -27,9 +27,9 @@ function BackupPanel() {
     <section className="backup-panel" aria-labelledby="backup-heading">
       <h3 id="backup-heading" className="backup-title">Data backup</h3>
       <p className="backup-intro">
-        Back up your address book and preferences as a single <strong>encrypted</strong> file on IPFS, located
-        by a trustless on-chain pointer. Only your wallet can read it — restore on any device with the same
-        wallet. This is an explicit step; nothing leaves your device until you back up.
+        Back up your address book, preferences, and activity history as a single <strong>encrypted</strong> file
+        on IPFS, located by a trustless on-chain pointer. Only your wallet can read it — restore on any device
+        with the same wallet. This is an explicit step; nothing leaves your device until you back up.
       </p>
 
       {!available ? (
@@ -49,6 +49,14 @@ function BackupPanel() {
               <dd>{hasRemote ? 'Yes — a backup exists for this wallet' : 'None found'}</dd>
             </div>
           </dl>
+
+          {!hasRemote && (
+            <p className="backup-notice" role="status">
+              Without a backup, device-local activity history — sent transfers, failed operations, and earn
+              actions — cannot be recovered if this device’s data is cleared. On-chain activity (wagers, pools,
+              memberships) always rebuilds automatically.
+            </p>
+          )}
 
           {!onCanonical && (
             <p className="backup-notice" role="status">

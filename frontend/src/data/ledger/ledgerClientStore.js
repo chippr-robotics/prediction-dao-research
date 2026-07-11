@@ -143,6 +143,45 @@ export function mergeClientRecords(account, chainId, incoming = []) {
   return { added: fresh.length }
 }
 
+/**
+ * All client records for the account across every chain (flat array; each
+ * record carries its chainId) — the spec-032 backup payload. Chain ids are
+ * discovered from the account's storage keys so no network registry is needed.
+ */
+export function listClientRecordsAllChains(account) {
+  if (!account || typeof localStorage === 'undefined') return []
+  const prefix = `fw_user_${String(account).toLowerCase()}_activity_ledger_v1_`
+  const out = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (!key || !key.startsWith(prefix)) continue
+    const chainId = Number(key.slice(prefix.length))
+    if (Number.isFinite(chainId)) out.push(...listAllClientRecords(account, chainId))
+  }
+  return out
+}
+
+/**
+ * Merge a flat cross-chain record array (from a backup) into the store.
+ * Append-only union by entryId per chain (FR-011). Both restore modes use
+ * this — "replace" would delete history and violate FR-008.
+ * @returns {{added: number}}
+ */
+export function mergeClientRecordsAllChains(account, incoming = []) {
+  const byChain = new Map()
+  for (const r of incoming || []) {
+    if (!r?.entryId || r.chainId == null) continue
+    const cid = Number(r.chainId)
+    if (!byChain.has(cid)) byChain.set(cid, [])
+    byChain.get(cid).push(r)
+  }
+  let added = 0
+  for (const [chainId, records] of byChain) {
+    added += mergeClientRecords(account, chainId, records).added
+  }
+  return { added }
+}
+
 /** Test/util seam: wipe every account's client ledger (localStorage scan). */
 export function __clearClientLedger() {
   if (typeof localStorage === 'undefined') return
