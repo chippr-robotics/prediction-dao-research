@@ -1,16 +1,22 @@
 /**
  * ERC-4626 vault reads + actions for the Earn section (spec 050).
  *
- * Deposits and withdrawals run directly from the member's own wallet against
- * curated Morpho vaults — FairWins never takes custody. Safety rails
- * (research.md R1/R9):
+ * Deposits and withdrawals run from the member's own account against curated
+ * Morpho vaults — FairWins never takes custody. Writes are expressed as
+ * `{ target, data, value }` call batches for WalletContext.sendCalls (spec
+ * 041's unified rail): passkey sessions authorize the WHOLE batch (approve +
+ * deposit) with ONE ceremony via UserOp; classic wallets sign sequentially.
+ * A raw ethers signer is never required — passkey sessions don't have one.
+ *
+ * Safety rails (research.md R1/R9):
  *   - pure validators reject bad amounts BEFORE any wallet prompt;
- *   - deposits are quoted with previewDeposit and dry-run with staticCall
- *     before the real transaction;
+ *   - actions that are spendable now are dry-run with staticCall (from the
+ *     member's address) before anything is signed;
+ *   - approvals are for the exact amount (no unlimited allowances);
  *   - withdrawals are bounded by maxWithdraw (the vault's honest liquidity
  *     limit), full exits use redeem(shares) so dust never strands.
  */
-import { Contract } from 'ethers'
+import { Contract, Interface } from 'ethers'
 import { ERC4626_VAULT_ABI } from '../../abis/ERC4626Vault'
 
 const ERC20_MIN_ABI = [
@@ -18,6 +24,9 @@ const ERC20_MIN_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 value) returns (bool)',
 ]
+
+const VAULT_IFACE = new Interface(ERC4626_VAULT_ABI)
+const ERC20_IFACE = new Interface(ERC20_MIN_ABI)
 
 /**
  * Read the member's state against one vault over a read provider:
@@ -77,52 +86,54 @@ export function validateWithdrawAmount({ amount, maxWithdrawAssets }) {
 }
 
 /**
- * Whether a deposit of `amount` needs an approval transaction first.
+ * Build the sendCalls batch for a deposit: an exact-amount approval when the
+ * current allowance is short, then the deposit itself. When the deposit is
+ * already spendable (no approval leg), it is dry-run with staticCall from the
+ * member's address so vault-side rejections (cap reached, paused) surface
+ * before anything is signed. Reads go over the chain's read `provider` — a
+ * signer is never needed here.
+ * Returns { calls, requiresApproval }.
  */
-export async function needsApproval({ vault, account, amount, provider }) {
+export async function buildDepositCalls({ vault, account, amount, provider }) {
   const token = new Contract(vault.asset.address, ERC20_MIN_ABI, provider)
   const allowance = await token.allowance(account, vault.address)
-  return allowance < amount
-}
-
-/**
- * Send the approval for exactly `amount` (no unlimited allowances — the
- * member approves what they are depositing). Returns the tx receipt.
- */
-export async function approveDeposit({ vault, amount, signer }) {
-  const token = new Contract(vault.asset.address, ERC20_MIN_ABI, signer)
-  const tx = await token.approve(vault.address, amount)
-  return tx.wait()
-}
-
-/**
- * Quote then execute a deposit. The staticCall dry-run surfaces vault-side
- * rejections (cap reached, paused) before the member pays gas.
- * Returns { receipt, expectedShares }.
- */
-export async function depositToVault({ vault, account, amount, signer }) {
-  const vaultContract = new Contract(vault.address, ERC4626_VAULT_ABI, signer)
-  const expectedShares = await vaultContract.previewDeposit(amount)
-  await vaultContract.deposit.staticCall(amount, account)
-  const tx = await vaultContract.deposit(amount, account)
-  const receipt = await tx.wait()
-  return { receipt, expectedShares }
-}
-
-/**
- * Withdraw `amount` of the underlying, or the full position via redeem when
- * `redeemAllShares` is set (so share dust never strands). Returns { receipt }.
- */
-export async function withdrawFromVault({ vault, account, amount, redeemAllShares, signer }) {
-  const vaultContract = new Contract(vault.address, ERC4626_VAULT_ABI, signer)
-  let tx
-  if (redeemAllShares != null && redeemAllShares > 0n) {
-    await vaultContract.redeem.staticCall(redeemAllShares, account, account)
-    tx = await vaultContract.redeem(redeemAllShares, account, account)
+  const requiresApproval = allowance < amount
+  const calls = []
+  if (requiresApproval) {
+    calls.push({
+      target: vault.asset.address,
+      data: ERC20_IFACE.encodeFunctionData('approve', [vault.address, amount]),
+      value: 0n,
+    })
   } else {
-    await vaultContract.withdraw.staticCall(amount, account, account)
-    tx = await vaultContract.withdraw(amount, account, account)
+    // Only dry-runnable when the allowance already covers the deposit — with
+    // an approval leg in the batch the simulation would revert on allowance.
+    const vaultContract = new Contract(vault.address, ERC4626_VAULT_ABI, provider)
+    await vaultContract.deposit.staticCall(amount, account, { from: account })
   }
-  const receipt = await tx.wait()
-  return { receipt }
+  calls.push({
+    target: vault.address,
+    data: VAULT_IFACE.encodeFunctionData('deposit', [amount, account]),
+    value: 0n,
+  })
+  return { calls, requiresApproval }
+}
+
+/**
+ * Build the sendCalls batch for a withdrawal: `withdraw(assets)` for partial
+ * exits, `redeem(shares)` for full exits (so share dust never strands). The
+ * call is dry-run with staticCall from the member's address first.
+ * Returns { calls }.
+ */
+export async function buildWithdrawCalls({ vault, account, amount, redeemAllShares, provider }) {
+  const vaultContract = new Contract(vault.address, ERC4626_VAULT_ABI, provider)
+  let data
+  if (redeemAllShares != null && redeemAllShares > 0n) {
+    await vaultContract.redeem.staticCall(redeemAllShares, account, account, { from: account })
+    data = VAULT_IFACE.encodeFunctionData('redeem', [redeemAllShares, account, account])
+  } else {
+    await vaultContract.withdraw.staticCall(amount, account, account, { from: account })
+    data = VAULT_IFACE.encodeFunctionData('withdraw', [amount, account, account])
+  }
+  return { calls: [{ target: vault.address, data, value: 0n }] }
 }
