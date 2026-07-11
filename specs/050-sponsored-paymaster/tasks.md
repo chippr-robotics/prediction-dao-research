@@ -62,10 +62,10 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **Independent Test**: on Amoy, from an account holding only USDC, send USDC and native — both included, sponsored, native balance unchanged.
 
-- [ ] T009 [P] [US1] Gateway grant-path test in `services/relay-gateway/test/paymaster.test.js`: `pm_getPaymasterData` returns a recoverable, correctly-packed `paymasterAndData` whose hash matches the contract `getHash`; stub length == real length (TDD)
-- [ ] T010 [US1] Implement `services/relay-gateway/src/paymaster/build.js` — `getHash` + pack/stub `paymasterAndData`, **byte-identical to `FairWinsVerifyingPaymaster.getHash`** (cross-checked in T009)
-- [ ] T011 [US1] Implement `services/relay-gateway/src/paymaster/sign.js` — KMS digest sign → 65-byte `{r,s,v}`; derive + cache signer address; boot health-check
-- [ ] T012 [US1] Add `POST /v1/paymaster` (`pm_getPaymasterStubData` / `pm_getPaymasterData` grant path: killswitch + sanctions screen + sign) to `services/relay-gateway/src/server.js`; add config keys (`PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_APPROVAL_TTL_SEC`) in `services/relay-gateway/src/config/index.js` + startup check `KMS signer address == on-chain verifyingSigner`
+- [x] T009 [P] [US1] Gateway grant-path test in `services/relay-gateway/test/paymaster.test.js`: `pm_getPaymasterData` returns a recoverable, correctly-packed `paymasterAndData` whose hash matches the contract `getHash`; stub length == real length (TDD)
+- [x] T010 [US1] Implement `services/relay-gateway/src/paymaster/build.js` — `getHash` + pack/stub `paymasterAndData`, **byte-identical to `FairWinsVerifyingPaymaster.getHash`** (cross-checked in T009)
+- [x] T011 [US1] Implement `services/relay-gateway/src/paymaster/sign.js` — KMS digest sign → 65-byte `{r,s,v}`; derive + cache signer address; boot health-check
+- [x] T012 [US1] Add `POST /v1/paymaster` (`pm_getPaymasterStubData` / `pm_getPaymasterData` grant path: killswitch + sanctions screen + sign) to `services/relay-gateway/src/server.js`; add config keys (`PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_APPROVAL_TTL_SEC`) in `services/relay-gateway/src/config/index.js` + startup check `KMS signer address == on-chain verifyingSigner`
 - [ ] T013 [P] [US1] Rename `erc20PaymasterUrl` → `sponsorPaymasterUrl` and read `VITE_SPONSOR_PAYMASTER_<net>` in `frontend/src/config/networks.js`
 - [ ] T014 [US1] Wire `createPaymasterClient(http(sponsorPaymasterUrl))` (+ `context: {}`) into `frontend/src/lib/passkey/smartAccount.js#buildAccount`; expose a "paymaster-wired" flag for the US2 fallback
 - [ ] T015 [US1] Execute deploy + fund on Amoy (T008), wire gateway (`PAYMASTER_ADDRESS_80002`, `PM_SIGNER_KMS_KEY`) + SPA (`VITE_SPONSOR_PAYMASTER_AMOY`), run the headline test per [quickstart.md](./quickstart.md) §3 (SC-001)
@@ -97,9 +97,9 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **Independent Test**: sanctioned/over-quota/over-cost requests refused (self-submit still offered); killswitch stops all sponsorship within one request; deposit never exceeds the funded cap.
 
-- [ ] T022 [P] [US3] Gateway policy tests in `services/relay-gateway/test/paymaster.test.js`: sanctioned → 403; over-quota → 429 `{retryAfterSec}`; over-`PM_MAX_COST_WEI` → 400 `cost_ceiling_exceeded`; over-`PM_MAX_GAS` → 400; killswitch → 503; refusal spends nothing; boot fails on signer mismatch (TDD)
-- [ ] T023 [US3] Implement `services/relay-gateway/src/paymaster/policy.js` — `estCostWei`/gas-ceiling checks composing the existing `policy/sanctions.js`, `policy/quotas.js`, `policy/killswitch.js`
-- [ ] T024 [US3] Wire `policy.js` into the `POST /v1/paymaster` pipeline in `services/relay-gateway/src/server.js` (order per [contracts/gateway-paymaster-api.md](./contracts/gateway-paymaster-api.md)); add `PM_ACCOUNT_QUOTA_PER_MIN/DAY`, `PM_GLOBAL_QUOTA_PER_DAY`, `PM_MAX_COST_WEI`, `PM_MAX_GAS` to config
+- [x] T022 [P] [US3] Gateway policy tests in `services/relay-gateway/test/paymaster.test.js`: sanctioned → 403; over-quota → 429 `{retryAfterSec}`; over-`PM_MAX_COST_WEI` → 400 `cost_ceiling_exceeded`; over-`PM_MAX_GAS` → 400; killswitch → 503; refusal spends nothing; boot fails on signer mismatch (TDD)
+- [x] T023 [US3] Implement `services/relay-gateway/src/paymaster/policy.js` — `estCostWei`/gas-ceiling checks composing the existing `policy/sanctions.js`, `policy/quotas.js`, `policy/killswitch.js`
+- [x] T024 [US3] Wire `policy.js` into the `POST /v1/paymaster` pipeline in `services/relay-gateway/src/server.js` (order per [contracts/gateway-paymaster-api.md](./contracts/gateway-paymaster-api.md)); add `PM_ACCOUNT_QUOTA_PER_MIN/DAY`, `PM_GLOBAL_QUOTA_PER_DAY`, `PM_MAX_COST_WEI`, `PM_MAX_GAS` to config
 - [ ] T025 [US3] Validate the abuse matrix on Amoy (sanctioned/over-quota refused with working self-submit; killswitch halts; deposit bounded) per [quickstart.md](./quickstart.md) §3 (SC-005, SC-006)
 
 **Checkpoint**: the pool is drain-protected; US1–US3 all independently functional.
