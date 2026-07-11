@@ -134,9 +134,25 @@ export async function deriveAddress({ chainId, ownersBytes, nonce = 0n, deps = {
   })
 }
 
+/**
+ * Minimal viem Chain descriptor from our own network config. Without a `chain`,
+ * `createPublicClient` leaves `client.chain` undefined — and viem's smart-account
+ * signing methods (toCoinbaseSmartAccount's `sign`/`signUserOperation`) read
+ * `client.chain.id` unconditionally, so every passkey ceremony crashed with
+ * "Cannot read properties of undefined (reading 'id')" (issue #854).
+ */
+function toViemChain(net) {
+  return {
+    id: net.chainId,
+    name: net.name,
+    nativeCurrency: net.nativeCurrency,
+    rpcUrls: { default: { http: [net.rpcUrl] } },
+  }
+}
+
 export function defaultPublicClient(chainId) {
   const net = getNetwork(chainId)
-  return createPublicClient({ transport: http(net.rpcUrl) })
+  return createPublicClient({ chain: toViemChain(net), transport: http(net.rpcUrl) })
 }
 
 /**
