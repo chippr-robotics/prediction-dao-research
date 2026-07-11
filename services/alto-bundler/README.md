@@ -16,7 +16,7 @@ browser ─▶ bundler.fairwins.app ─▶ Cloudflare (Transform Rule: +X-Origin
 
 | File | Purpose |
 |---|---|
-| `nginx/bundler.conf.template` | origin-lock map (`$origin_denied`, `map_hash_bucket_size 128`) + `/healthz` exempt + proxy to `127.0.0.1:3000` |
+| `nginx/bundler.conf.template` | origin-lock map (`$origin_denied`, `map_hash_bucket_size 128`) + **CORS allow-list** (`$cors_allow_origin`) + `/healthz` exempt + proxy to `127.0.0.1:3000` |
 | `nginx/docker-entrypoint.sh` | derives `ORIGIN_LOCK_ENABLED` from whether `ORIGIN_LOCK_SECRET` is set (fail-open, never a 403-brick); trims the secret |
 | `nginx/Dockerfile` | `nginx:1.27-alpine` + `envsubst` |
 | `cloudbuild.yaml` | manual/isolated rollout — build the nginx image + `gcloud run services replace` the full 2-container spec |
@@ -30,6 +30,24 @@ change here rolls the bundler out automatically. (It redeploys on *every* main m
 The origin lock is **fail-open by design**: no `ORIGIN_LOCK_SECRET` → `ORIGIN_LOCK_ENABLED=0` → all
 traffic allowed. Mounting the Secret-Manager `origin-lock-secret` is the single switch that arms it, so
 you cannot half-configure it into a deny-everything state.
+
+## CORS (why the bundler needs it)
+
+The SPA (`fairwins.app`) and the bundler (`bundler.fairwins.app`) are **different origins**, so viem's
+browser bundler client makes a **cross-origin** request: its `application/json` UserOp POST
+(`eth_estimateUserOperationGas` / `eth_sendUserOperation`) triggers a CORS preflight. The origin lock is
+*orthogonal* to CORS — it lets the request through, but the browser still blocks it unless the response
+carries `Access-Control-Allow-Origin`. alto emits no CORS headers and 404s `OPTIONS`, so before this the
+first passkey transfer failed with viem's `UserOperationExecutionError: … HTTP request failed` **even
+though the bundler was healthy server-side** (`eth_chainId` → `0x89`). The nginx ingress now:
+
+- answers the preflight `OPTIONS` itself, **before** the origin lock (browsers can't attach
+  `X-Origin-Auth` to a preflight, and `OPTIONS` is side-effect-free), and
+- echoes an allow-listed `Origin` on the actual response.
+
+The allow-list lives in the `$cors_allow_origin` map in `nginx/bundler.conf.template` — **keep it in sync
+with the relay-gateway's `ALLOWED_ORIGINS`** (`services/relay-gateway/src/server.js`), which this mirrors.
+Add one line per SPA origin. A non-allow-listed `Origin` gets no header, so it stays denied by the browser.
 
 ## Rollout status
 

@@ -20,6 +20,19 @@ map "${ORIGIN_LOCK_ENABLED}:$http_x_origin_auth" $origin_denied {
     "1:${ORIGIN_LOCK_SECRET}"    0;   # enforcement on + exact secret match => allow
 }
 
+# CORS allow-list. The SPA (fairwins.app) is a DIFFERENT origin than the bundler
+# (bundler.fairwins.app), so viem's browser bundler client makes a cross-origin request: the
+# application/json POST triggers a preflight, and the browser blocks the UserOp unless both the
+# preflight and the actual response carry Access-Control-Allow-Origin. Without this the passkey
+# transfer failed with viem's "HTTP request failed" even though the bundler itself was healthy.
+# $cors_allow_origin echoes the request Origin only when allow-listed (else "" — nginx then omits
+# the header, so unknown origins stay blocked). Keep in sync with the relay-gateway's
+# ALLOWED_ORIGINS (services/relay-gateway/src/server.js); add one line per additional SPA origin.
+map $http_origin $cors_allow_origin {
+    default                 "";
+    "https://fairwins.app"  "https://fairwins.app";
+}
+
 log_format bundler_edge '$remote_addr cf_ip=$http_cf_connecting_ip '
                         'cf_country=$http_cf_ipcountry "$request" $status '
                         '$body_bytes_sent rt=$request_time';
@@ -45,7 +58,25 @@ server {
     # JSON-RPC surface (eth_sendUserOperation, eth_estimateUserOperationGas, pimlico_*). Only
     # Cloudflare-proxied requests carrying the origin-lock secret may reach the bundler.
     location / {
+        # CORS preflight — answer HERE, before the origin lock. Browsers can't attach the
+        # X-Origin-Auth header to a preflight, and OPTIONS is side-effect-free, so we never proxy it
+        # to alto (which 404s OPTIONS and emits no CORS headers). Mirrors relay-gateway server.js.
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin  $cors_allow_origin    always;
+            add_header Vary                         Origin                always;
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS"  always;
+            add_header Access-Control-Allow-Headers "Content-Type"        always;
+            add_header Access-Control-Max-Age       600                   always;
+            return 204;
+        }
+
         if ($origin_denied) { return 403; }
+
+        # CORS on the actual response too — the browser checks Access-Control-Allow-Origin on the
+        # real POST, not only the preflight. Empty $cors_allow_origin (non-allow-listed Origin) makes
+        # nginx omit the header, so unknown origins stay denied.
+        add_header Access-Control-Allow-Origin $cors_allow_origin always;
+        add_header Vary                        Origin             always;
 
         proxy_pass http://alto;
         proxy_http_version 1.1;
