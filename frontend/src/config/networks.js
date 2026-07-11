@@ -38,6 +38,20 @@ const PRIMARY_CHAIN_ID = 137
 const MAINNET_CHAIN_ID = 137
 const TESTNET_CHAIN_ID = 80002
 
+// Earn / lending integration (spec 050). Declared per network — only chains
+// where Morpho vaults AND the Morpho data API are live get a block; everywhere
+// else the earn capability self-discloses off (honest-state, no mock vaults).
+// The Merkl Distributor is Merkl's canonical claim contract, deployed at the
+// same address on every chain it supports; it is config-fixed here and never
+// derived from user input or API responses.
+// See specs/050-earn-lending-rewards/contracts/earn-config.md.
+const MERKL_DISTRIBUTOR = '0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae'
+const earnConfig = () => ({
+  provider: { name: 'Morpho', url: 'https://app.morpho.org' },
+  merklDistributor: MERKL_DISTRIBUTOR,
+  legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
+})
+
 // Passkey smart-account submission config (spec 041, data-model
 // "SubmissionRoute"). Parses a comma-separated ERC-4337 bundler URL list
 // (ordered: self-hosted alto first, public fallbacks). Empty/unset → null so
@@ -125,6 +139,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
+        earn: Boolean(this.earn),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
@@ -202,6 +217,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
+        earn: Boolean(this.earn),
         friendMarkets: true,
         passkeyAccounts: false,
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
@@ -268,6 +284,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
+        earn: Boolean(this.earn),
         friendMarkets: true,
         passkeyAccounts: false,
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
@@ -320,6 +337,8 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap?chain=polygon',
     },
+    // Earn / lending (spec 050): Morpho vaults + data API are live on Polygon PoS.
+    earn: earnConfig(),
     // Passkey smart accounts (spec 041) — production network: RIP-7212
     // precompile live since the Napoli upgrade, canonical EntryPoint v0.6.
     passkey: passkeyConfig(
@@ -330,6 +349,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
+        earn: Boolean(this.earn),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
@@ -370,6 +390,8 @@ const NETWORKS = {
     },
     // No in-app DEX/swap on this network in this cut (ClearPath-only).
     dex: null,
+    // Earn / lending (spec 050): Morpho's home chain — vaults + data API live.
+    earn: earnConfig(),
     contracts: {}, // no wager/membership deployment — ClearPath needs none (registry-optional)
     polymarket: null,
     // Passkey smart accounts are not enabled on this ClearPath-only network in this cut.
@@ -378,6 +400,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: false,
+        earn: Boolean(this.earn),
         friendMarkets: false,
         passkeyAccounts: false,
         // The single enabled capability: ClearPath DAO governance (ENS, Uniswap, …).
@@ -415,6 +438,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: false,
+        earn: Boolean(this.earn),
         friendMarkets: false,
         passkeyAccounts: false,
         clearpath: false,
@@ -451,6 +475,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: false,
+        earn: Boolean(this.earn),
         friendMarkets: false,
         passkeyAccounts: false,
         clearpath: false,
@@ -480,6 +505,7 @@ const NETWORKS = {
       return {
         polymarketSidebets: false,
         dex: false,
+        earn: Boolean(this.earn),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // Local Hardhat sandbox is not a ClearPath governance network.
@@ -514,6 +540,37 @@ export function isDexAvailable(chainId) {
  */
 export function getDexProvider(chainId) {
   return getNetwork(chainId)?.dexProvider ?? null
+}
+
+/**
+ * Whether the Earn (lending) section is live on `chainId` (spec 050). True only
+ * where a real Morpho deployment + data API exist; everywhere else the Earn UI
+ * shows an honest unavailable state naming the enabled networks.
+ * Resolved strictly per-chain (no getNetwork fallback) so a chain without an
+ * entry never inherits another network's earn support.
+ */
+export function isEarnAvailable(chainId) {
+  const net = chainId != null ? NETWORKS[chainId] : null
+  return Boolean(net?.earn)
+}
+
+/**
+ * The earn config block (`{ provider, merklDistributor, legacyRewardsUrl }`)
+ * for `chainId`, or null when earn is not available there.
+ */
+export function getEarnConfig(chainId) {
+  const net = chainId != null ? NETWORKS[chainId] : null
+  return net?.earn ?? null
+}
+
+/**
+ * The networks where Earn is live — used by the honest unavailable-state copy
+ * ("Lending is available on Ethereum and Polygon") and by tests.
+ */
+export function getEarnNetworks() {
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net?.earn)
 }
 
 /**

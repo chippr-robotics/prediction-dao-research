@@ -23,6 +23,9 @@ export const NAV_GROUPS = [
     label: 'Finance',
     items: [
       { id: 'portfolio', label: 'Portfolio', icon: 'trending' },
+      // Earn — lending & rewards (spec 050). Always present; the panel
+      // self-discloses per-network availability.
+      { id: 'earn', label: 'Earn', icon: 'sprout' },
       { id: 'trade', label: 'Trade', icon: 'trade' },
       { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
