@@ -105,20 +105,21 @@ export function useVaultProposals(vault) {
   }, [refresh])
 
   /** Propose a transaction: build the SafeTx at the current nonce, broadcast it, and record the proposer's
-   *  first approval on-chain. */
+   *  first approval on-chain. An explicit `nonce` may be passed to queue ordered follow-ups (spec 049
+   *  attach flow: configureRules at N, setGuard at N+1 — the chain then enforces the order). */
   const propose = useCallback(
-    async ({ to, value = 0n, data = '0x', operation = 0 }) => {
+    async ({ to, value = 0n, data = '0x', operation = 0, nonce: nonceOverride }) => {
       if (!signer) throw new Error('Connect a wallet to propose')
       if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
       const safe = new Contract(vaultAddress, SAFE_ABI, signer)
-      const nonce = await safe.nonce()
+      const nonce = nonceOverride ?? (await safe.nonce())
       const safeTx = buildSafeTx({ to, value, data, operation, nonce })
       const safeTxHash = computeSafeTxHash(vaultAddress, chainId, safeTx)
       await emitProposal({ hubAddress, safe: vaultAddress, safeTx, safeTxHash, signer })
       const approveTx = await safe.approveHash(safeTxHash)
       await approveTx.wait()
       await refresh()
-      return { safeTxHash }
+      return { safeTxHash, nonce: Number(nonce) }
     },
     [signer, vaultAddress, hubAddress, chainId, refresh],
   )

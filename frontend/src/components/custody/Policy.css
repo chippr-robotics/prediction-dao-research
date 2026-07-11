@@ -1,0 +1,138 @@
+/* Spec 049 — multisig policy engine surfaces (badge, panel, queue decoration). Follows the
+   Custody.css conventions: `custody-` prefix, app spacing/typography tokens, WCAG AA contrast. */
+
+.custody-policy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  max-width: 100%;
+}
+
+.custody-policy-badge svg {
+  flex: none;
+}
+
+.custody-policy-badge--managed {
+  color: #047857;
+}
+
+.custody-policy-badge--foreign {
+  color: #b45309;
+}
+
+.custody-policy-badge-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custody-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.custody-policy-rules,
+.custody-policy-live,
+.custody-policy-allowlist {
+  list-style: disc;
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.custody-policy-allowlist {
+  list-style: none;
+  padding-left: 0;
+  word-break: break-all;
+}
+
+.custody-policy-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.custody-policy-compare {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0.5rem 0;
+}
+
+@media (min-width: 720px) {
+  .custody-policy-compare {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.custody-policy-compare-col {
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.25));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.custody-policy-compare-col h6 {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.custody-policy-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-bottom: 0.375rem;
+}
+
+.custody-policy-token-row .custody-field {
+  margin: 0;
+}
+
+.custody-policy-cooldown {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.custody-policy-cooldown .custody-field {
+  margin: 0;
+}
+
+.custody-warning {
+  color: #b45309;
+  font-size: 0.875rem;
+  border: 1px solid currentColor;
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  margin: 0.5rem 0;
+}
+
+.custody-policy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #047857;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.custody-policy-diff {
+  list-style: disc;
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}

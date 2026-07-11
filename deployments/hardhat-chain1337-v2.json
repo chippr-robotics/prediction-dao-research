@@ -10,7 +10,9 @@
     "polymarketAdapter": "0x423d2Ca885d67E46062CFF732Eff952f4F736136",
     "membershipManager": "0x9D29Dfe091111099dCd317159Fa41f8E80F50489",
     "wagerRegistry": "0x31F2B0a0d14a8814af2430154ee39E551b66BA8A",
-    "keyRegistry": "0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb"
+    "keyRegistry": "0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb",
+    "safePolicyGuard": "0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38",
+    "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b"
   },
   "mocks": {
     "mockUSDC": "0x065606eeE0D7BB3d2e7959D56c3ca177625385a7",
@@ -20,6 +22,12 @@
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-05-22T01:20:23.586Z",
   "deployBlocks": {
-    "wagerRegistry": null
+    "wagerRegistry": null,
+    "safePolicyGuard": 3,
+    "policyGuardSetup": 4
+  },
+  "constructorArgs": {
+    "safePolicyGuard": [],
+    "policyGuardSetup": []
   }
 }

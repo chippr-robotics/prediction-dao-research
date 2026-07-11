@@ -54,6 +54,9 @@ const HARDHAT_CONTRACTS = {
   polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
   paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
+  // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
+  safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)

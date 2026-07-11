@@ -3,6 +3,10 @@
  * active network: a pending proposal that needs the member's approval (action: approve), a proposal newly
  * executed, and an owners/threshold governance change. Pure snapshot-diff (first-sight = baseline). No hooks;
  * read-only provider. No-ops until the SafeProposalHub is deployed + its block recorded (never scans genesis).
+ *
+ * Spec 049 (FR-016): the SafePolicyGuard's rule events (RulesConfigured, CooldownSet, AllowlistEnabled,
+ * AllowlistChanged) join the same snapshot-diff — a per-vault event count is snapped, and any increase emits a
+ * "policy-changed" entry in the custody domain. No-ops until the guard is deployed + its block recorded.
  */
 import { ethers } from 'ethers'
 import { getProvider } from '../../../utils/blockchainService'
@@ -10,6 +14,7 @@ import { getContractAddressForChain, getDeploymentBlockForChain } from '../../..
 import { getSafeContracts } from '../../../config/safeContracts'
 import { loadVaultReferences } from '../../../lib/custody/vaultReferences'
 import { readVaultProposalState } from '../../../lib/custody/vaultProposalReads'
+import { readPolicyEventCount } from '../../../lib/custody/policyEvents'
 import { STATUS } from '../../../lib/custody/proposalStatus'
 
 const EMPTY = { ok: true, entries: [], nextSnapshots: {}, currentIds: [], actionNeededById: {} }
@@ -26,6 +31,11 @@ export const custodySource = {
 
     const refs = loadVaultReferences(account).filter((r) => r.chainId === Number(chainId))
     if (refs.length === 0) return EMPTY
+
+    // Spec 049 — policy engine coordinates (optional; policy diffing no-ops when absent).
+    const guardAddress = getContractAddressForChain('safePolicyGuard', chainId)
+    const guardFromBlock = getDeploymentBlockForChain('safePolicyGuard', chainId)
+    const policyEnabled = !!guardAddress && ethers.isAddress(guardAddress) && !!guardFromBlock
 
     let provider
     try {
@@ -79,7 +89,24 @@ export const custodySource = {
       const govKey = `${state.owners.length}:${state.threshold}`
 
       const prev = prior.snapshots?.[sid]
-      nextSnapshots[sid] = { needMe, executedCount, govKey, snappedAt: nowMs }
+
+      // Spec 049 (FR-016) — count the guard's rule events for this vault; on failure keep the
+      // prior count so the baseline survives a flaky read (no false "changed" later).
+      let policyEventCount = prev?.policyEventCount
+      if (policyEnabled) {
+        try {
+          policyEventCount = await readPolicyEventCount({
+            guardAddress,
+            safeAddress: vaultAddr,
+            provider,
+            fromBlock: guardFromBlock,
+          })
+        } catch {
+          // keep prior count
+        }
+      }
+
+      nextSnapshots[sid] = { needMe, executedCount, govKey, policyEventCount, snappedAt: nowMs }
 
       if (needMe.length > 0) actionNeededById[sid] = 'approve'
 
@@ -93,6 +120,13 @@ export const custodySource = {
         }
         if (prev.govKey && prev.govKey !== govKey) {
           entries.push(mk(vaultAddr, 'governance-changed', `The owners or threshold on “${label}” changed`, 'info', false))
+        }
+        if (
+          policyEventCount != null &&
+          prev.policyEventCount != null &&
+          policyEventCount > prev.policyEventCount
+        ) {
+          entries.push(mk(vaultAddr, 'policy-changed', `The policy rules on “${label}” changed`, 'info', false))
         }
       }
     }

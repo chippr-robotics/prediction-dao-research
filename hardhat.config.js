@@ -287,9 +287,45 @@ module.exports = {
     // and OOM-thrashes a 16 GB box (and would do the same to CI). These are deployed standalone and
     // linked/held by address, so different codegen here cannot affect the viaIR app contracts.
     // Nothing in contracts/ imports this closure except SemaphoreDeploy.sol.
+    //
+    // The vendored Safe v1.4.1 closure (spec 049 test shim contracts/mocks/vendor/) likewise
+    // compiles WITHOUT viaIR: Safe's inline assembly is not annotated memory-safe, so the Yul IR
+    // pipeline cannot place a memoryguard and dies with a stack-too-deep YulException. The shim
+    // is test-only (never deployed by scripts) and nothing in contracts/ imports it, so legacy
+    // codegen here cannot affect the viaIR app contracts.
     overrides: Object.fromEntries(
       [
         "contracts/pools/SemaphoreDeploy.sol",
+        "contracts/mocks/vendor/SafeVendorImports.sol",
+        "@safe-global/safe-contracts/contracts/Safe.sol",
+        "@safe-global/safe-contracts/contracts/SafeL2.sol",
+        "@safe-global/safe-contracts/contracts/base/Executor.sol",
+        "@safe-global/safe-contracts/contracts/base/FallbackManager.sol",
+        "@safe-global/safe-contracts/contracts/base/GuardManager.sol",
+        "@safe-global/safe-contracts/contracts/base/ModuleManager.sol",
+        "@safe-global/safe-contracts/contracts/base/OwnerManager.sol",
+        "@safe-global/safe-contracts/contracts/common/Enum.sol",
+        "@safe-global/safe-contracts/contracts/common/NativeCurrencyPaymentFallback.sol",
+        "@safe-global/safe-contracts/contracts/common/SecuredTokenTransfer.sol",
+        "@safe-global/safe-contracts/contracts/common/SelfAuthorized.sol",
+        "@safe-global/safe-contracts/contracts/common/SignatureDecoder.sol",
+        "@safe-global/safe-contracts/contracts/common/Singleton.sol",
+        "@safe-global/safe-contracts/contracts/common/StorageAccessible.sol",
+        "@safe-global/safe-contracts/contracts/external/SafeMath.sol",
+        "@safe-global/safe-contracts/contracts/handler/CompatibilityFallbackHandler.sol",
+        "@safe-global/safe-contracts/contracts/handler/HandlerContext.sol",
+        "@safe-global/safe-contracts/contracts/handler/TokenCallbackHandler.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/ERC1155TokenReceiver.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/ERC721TokenReceiver.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/ERC777TokensRecipient.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/IERC165.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/ISignatureValidator.sol",
+        "@safe-global/safe-contracts/contracts/interfaces/ViewStorageAccessible.sol",
+        "@safe-global/safe-contracts/contracts/libraries/MultiSendCallOnly.sol",
+        "@safe-global/safe-contracts/contracts/libraries/SafeStorage.sol",
+        "@safe-global/safe-contracts/contracts/proxies/IProxyCreationCallback.sol",
+        "@safe-global/safe-contracts/contracts/proxies/SafeProxy.sol",
+        "@safe-global/safe-contracts/contracts/proxies/SafeProxyFactory.sol",
         "@semaphore-protocol/contracts/Semaphore.sol",
         "@semaphore-protocol/contracts/base/SemaphoreGroups.sol",
         "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol",
