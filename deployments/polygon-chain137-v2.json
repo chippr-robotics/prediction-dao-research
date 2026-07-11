@@ -31,7 +31,9 @@
     "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     "accountFactory": "0xd519C25e9dEd0DAC586B764574100479CB318734",
     "accountImpl": "0xfC5086A397e4FbAAF8f73892807415Da8d255E61",
-    "p256Verifier": null
+    "p256Verifier": null,
+    "verifyingPaymaster": "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105",
+    "verifyingPaymasterSigner": "0x9Ec0d8fF320c3590b47Da5B06ae0253Ab1Ca22CD"
   },
   "mocks": null,
   "constructorArgs": {

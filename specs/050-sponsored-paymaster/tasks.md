@@ -126,7 +126,7 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 - [ ] T030 [P] `npm run sync:frontend-contracts:<net>` (paymaster address into frontend artifacts, never hardcoded) + `npm run verify:<net>` for the deployed paymaster
 - [ ] T031 [P] Flip docs from "planned" → live where deployed: `docs/developer-guide/gasless-intents.md`, `docs/developer-guide/passkey-accounts.md`, `docs/runbooks/paymaster-operations.md`
 - [ ] T032 Run the full [quickstart.md](./quickstart.md) validation (fork → Amoy → Polygon) and record results
-- [ ] T033 Production rollout: execute deploy + fund + monitor + verify on Polygon 137 (EntryPoint v0.6) per the runbook; register `paymasterDepositRunwayHrs` in prod monitoring
+- [~] T033 **Contract deployed + funded on Polygon 137** (2026-07-11): FairWinsVerifyingPaymaster `0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105`, deposit **5 POL**, verifyingSigner = KMS `0x9Ec0…22CD` (confirmed on-chain), owner = deployer `0x5250…F6e1` (**transfer to a secure key before this deposit matters**). Security review clean; fork + Amoy validated. **Remaining rollout:** deploy the `/v1/paymaster` gateway + wire `PAYMASTER_ADDRESS_137`/`PM_SIGNER_KMS_KEY` (+ gateway `cloudkms.signerVerifier` IAM) + `VITE_SPONSOR_PAYMASTER_POLYGON`; register `paymasterDepositRunwayHrs` monitoring; `verify:polygon`; run Slither/Medusa in CI
 
 ---
 
