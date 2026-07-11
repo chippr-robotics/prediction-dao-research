@@ -1,9 +1,13 @@
 # Contract: FairWinsVerifyingPaymaster (on-chain, EntryPoint v0.6)
 
-`contracts/account/FairWinsVerifyingPaymaster.sol`, extending vendored v0.6 `BasePaymaster`.
-Minimal verifying paymaster: sponsors a UserOp iff `paymasterAndData` carries a valid
-`verifyingSigner` signature over the op + validity window. **No external calls and no storage reads
-in validation** (signature-only) — the safest ERC-4337 posture and portable to any bundler.
+`contracts/account/FairWinsVerifyingPaymaster.sol` — **self-contained** `is IPaymaster, Ownable`
+(reuses the already-vendored `UserOperation` + `_packValidationData`, OZ `ECDSA`/`MessageHashUtils`,
+and an inline minimal `IEntryPointStake` deposit/stake interface; no `BasePaymaster` dependency —
+smaller audited surface). Minimal verifying paymaster: sponsors a UserOp iff `paymasterAndData`
+carries a valid `verifyingSigner` signature over the op + validity window. **No external calls and no
+storage reads in validation** (signature-only) — the safest ERC-4337 posture and portable to any
+bundler. **Status (impl)**: compiles (paris), 9 unit tests passing; fork test + Slither/Medusa +
+security review still pending before merge.
 
 ## State
 

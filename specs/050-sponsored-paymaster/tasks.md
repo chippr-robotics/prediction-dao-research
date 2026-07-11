@@ -33,8 +33,8 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **Purpose**: vendor the v0.6 paymaster substrate and scaffold surfaces.
 
-- [ ] T001 [P] Vendor eth-infinitism **v0.6** paymaster interfaces into `contracts/account/lib/account-abstraction/interfaces/` (`IPaymaster.sol`, `IEntryPoint.sol`, `IStakeManager.sol`, `INonceManager.sol`), path-only import rewrites per `contracts/account/README.md` vendoring rules (no logic edits)
-- [ ] T002 [P] Vendor **v0.6** `core/BasePaymaster.sol` into `contracts/account/lib/account-abstraction/core/` (deposit/stake helpers, `onlyEntryPoint`)
+- [x] T001 [P] Vendor eth-infinitism **v0.6** `IPaymaster.sol` into `contracts/account/lib/account-abstraction/interfaces/` (path-only rewrite, no logic edits). **Refinement**: the paymaster is **self-contained** (reuses the already-vendored `UserOperation` + `_packValidationData`, OZ `ECDSA`/`Ownable`, and an inline minimal `IEntryPointStake` deposit/stake interface), so the full `IEntryPoint`/`IStakeManager`/`INonceManager` tree is **not** vendored — smaller audited surface (YAGNI)
+- [x] T002 [P] ~~Vendor `core/BasePaymaster.sol`~~ **Superseded by the self-contained design (T001)** — no `BasePaymaster` dependency; deposit/stake handled directly against the inline `IEntryPointStake` interface
 - [ ] T003 [P] Document env vars: add `VITE_SPONSOR_PAYMASTER_POLYGON` / `VITE_SPONSOR_PAYMASTER_AMOY` (and deprecate `VITE_ERC20_PAYMASTER_*`) in `frontend/.env.example`; add `PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_ACCOUNT_QUOTA_PER_MIN/DAY`, `PM_GLOBAL_QUOTA_PER_DAY`, `PM_MAX_COST_WEI`, `PM_MAX_GAS`, `PM_APPROVAL_TTL_SEC`, `PM_RUNWAY_WARN_HRS` in `services/relay-gateway/.env.example`
 - [ ] T004 [P] Scaffold `services/relay-gateway/src/paymaster/` (`build.js`, `sign.js`, `policy.js` stubs) + `services/relay-gateway/test/paymaster.test.js` skeleton
 
@@ -47,8 +47,8 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **⚠️ CRITICAL**: No user story can complete until Phase 2 is done.
 
-- [ ] T005 [P] Write contract unit tests `test/account/VerifyingPaymaster.test.js` (TDD — must fail first): valid sig sponsors; invalid/tampered/expired sig → `SIG_VALIDATION_FAILED`; `setVerifyingSigner` owner-only; `withdrawTo` owner-only; malformed `paymasterAndData` length reverts — per [contracts/paymaster-contract.md](./contracts/paymaster-contract.md)
-- [ ] T006 Implement `contracts/account/FairWinsVerifyingPaymaster.sol` (extends vendored `BasePaymaster`; `verifyingSigner`; signature-only, zero-storage `validatePaymasterUserOp`; `getHash`; `setVerifyingSigner`; owner-gated withdrawals) to pass T005 — EntryPoint v0.6
+- [x] T005 [P] Contract unit tests `test/account/VerifyingPaymaster.test.js` + `contracts/mocks/MockEntryPointStake.sol`: valid sig sponsors (sigFailed=0, window echoed); wrong-signer + tampered-op → sigFailed=1; `onlyEntryPoint` guard; malformed `paymasterAndData` reverts; `setVerifyingSigner` owner-only + zero rejected + rotation flips who can sponsor; `deposit`/owner-only `withdrawTo`; zero-signer constructor rejected. **9 passing.**
+- [x] T006 Implement `contracts/account/FairWinsVerifyingPaymaster.sol` (self-contained `is IPaymaster, Ownable`; `verifyingSigner`; signature-only, zero-storage `validatePaymasterUserOp`; `getHash`; `setVerifyingSigner`; owner-gated `withdrawTo`/stake) — EntryPoint v0.6. **Compiles (paris), unit tests green.** ⚠️ still needs the fork test (T007), Slither/Medusa + security review (T029) before merge.
 - [ ] T007 [P] Write fork test `test/account/fork/VerifyingPaymaster.fork.test.js` (real EntryPoint v0.6 on a Polygon fork): fund deposit, sign an approval with a local key standing in for KMS, submit a **first-use** `executeBatch` UserOp for a **zero-native** counterfactual account, assert inclusion + sender native balance unchanged
 - [ ] T008 Implement `scripts/deploy/deploy-verifying-paymaster.js` (CREATE2 deploy, set `verifyingSigner` to the KMS-derived address, record `deployments/<net>.json` `{verifyingPaymaster, verifyingSigner, entryPoint}`, optional `--deposit`) — mirrors `scripts/deploy/deploy-account-stack.js`
 
