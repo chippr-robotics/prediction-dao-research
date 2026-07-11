@@ -30,12 +30,18 @@ steps:
       - 'VITE_WAGER_SOURCE=subgraph'
       # Passkey smart accounts (spec 041): self-hosted alto ERC-4337 bundler, colocated with the
       # relay gateway (SC-009). Baked in at build; passkeyConfig(137) is null without it, so passkey
-      # accounts stay disabled on Polygon until this is set. EntryPoint v0.6; FairWins sponsors no gas.
+      # accounts stay disabled on Polygon until this is set. EntryPoint v0.6.
       - '--build-arg'
       # Cloudflare-fronted edge host (origin-lock ARMED 2026-07-06). Cloudflare injects X-Origin-Auth on
       # *.fairwins.app; the bare run.app URL now 403s (no header), so the SPA MUST use this host. CSP
       # connect-src already allows it (frontend/nginx.conf).
       - 'VITE_BUNDLER_URLS_POLYGON=https://bundler.fairwins.app'
+      - '--build-arg'
+      # Sponsored paymaster (spec 050): FairWins sponsors passkey UserOp gas on Polygon via the
+      # relay-gateway's /v1/paymaster (verifying paymaster 0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105,
+      # KMS signer). Set => passkey transfers are gasless; unset => the account self-funds and the
+      # confirm UI discloses the native fee honestly (never a false "sponsored").
+      - 'VITE_SPONSOR_PAYMASTER_POLYGON=https://relay.fairwins.app/v1/paymaster'
       - '-t'
       - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
       - '-t'
