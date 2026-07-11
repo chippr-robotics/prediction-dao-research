@@ -4,8 +4,16 @@ Operating the FairWins verifying paymaster that sponsors passkey UserOps. Compan
 `docs/runbooks/relayer-operations.md` (the gateway/engine) and `services/alto-bundler/README.md`
 (the bundler). Design: `specs/050-sponsored-paymaster/`.
 
-> **Status**: spec 050 (planned). This runbook is the operating procedure to follow once the
-> paymaster is deployed; addresses land in `deployments/<net>.json` at deploy time.
+> **Status (2026-07-11): contract DEPLOYED + verified, not yet live for users.**
+> `FairWinsVerifyingPaymaster` is deployed on **Polygon 137** at `0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105`
+> (source-verified on Polygonscan, deposit 5 POL) and on **Amoy 80002** at
+> `0xA00A06ae44FA2bd40Ec10D9613c96afD779b6898` (deposit 0.1 POL). Both: `verifyingSigner` = HSM KMS
+> `paymaster-signer-polygon` → `0x9Ec0d8fF320c3590b47Da5B06ae0253Ab1Ca22CD`; `owner` = deployer
+> `0x5250…F6e1` (**transfer to a secure key before the deposit matters**). Recorded in
+> `deployments/<net>-chain<id>-v2.json`. Security review clean; Slither clean (2 informational false
+> positives); fork + live-Amoy sponsored-UserOp validated. **Not user-live until the `/v1/paymaster`
+> gateway is deployed + wired** (`PAYMASTER_ADDRESS_137` / `PM_SIGNER_KMS_KEY` + gateway
+> `cloudkms.signerVerifier` IAM + `VITE_SPONSOR_PAYMASTER_POLYGON`), so the deposit is idle until go-live.
 
 ## Components & keys
 

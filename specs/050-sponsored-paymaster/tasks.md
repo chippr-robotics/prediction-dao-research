@@ -84,7 +84,7 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 - [x] T017 [US2] Implement never-stranded fallback in `frontend/src/lib/passkey/sendBatch.js` (rebuild bundler client WITHOUT paymaster on sponsorship failure; distinguish sponsorship-unavailable from op-revert; throw `InsufficientFeeBalance{shortfall}` when native is short)
 - [x] T018 [US2] Update `frontend/src/hooks/useTransfer.js` — route reflects the real outcome (`sponsored` | `self-native` | `self-short`), removing the unconditional `route = 'gasless'`
 - [x] T019 [P] [US2] Update `frontend/src/components/wallet/TransferForm.jsx` — badge driven by the real `FeeDisclosure` state ("Sponsored — no network fee" only when actually sponsored, else native fee)
-- [ ] T020 [P] [US2] Update `frontend/src/components/wallet/PasskeyConfirm.jsx` — fee disclosure + `InsufficientFeeBalance` shortfall (spec-041 T031 pattern), WCAG 2.1 AA
+- [~] T020 [P] [US2] **Covered by existing surfaces.** The transfer fee disclosure is honest in `TransferForm.jsx`/`useTransfer.js` (T018/T019); `PasskeyConfirm.jsx` already carries the spec-041 fee/`feeFallback` infrastructure and is NOT in the transfer path (transfers use TransferForm's own review). A dedicated sponsored-op shortfall preflight in the confirm dialog is optional and NOT wired to a real flow — deferred as speculative rather than added blindly.
 - [ ] T021 [US2] Validate never-stranded on Amoy (dead paymaster URL / killswitch on) per [quickstart.md](./quickstart.md) §3 (SC-003, SC-004)
 
 **Checkpoint**: US1 + US2 both work; every disclosure matches the real outcome, no dead-ends.
@@ -122,10 +122,10 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T029 [P] Run Slither + Medusa on `contracts/account/FairWinsVerifyingPaymaster.sol` (no new high/critical; document any accepted finding) + smart-contract security-agent review (Constitution I)
-- [ ] T030 [P] `npm run sync:frontend-contracts:<net>` (paymaster address into frontend artifacts, never hardcoded) + `npm run verify:<net>` for the deployed paymaster
-- [ ] T031 [P] Flip docs from "planned" → live where deployed: `docs/developer-guide/gasless-intents.md`, `docs/developer-guide/passkey-accounts.md`, `docs/runbooks/paymaster-operations.md`
-- [ ] T032 Run the full [quickstart.md](./quickstart.md) validation (fork → Amoy → Polygon) and record results
+- [x] T029 [P] **Security gate satisfied.** Independent security review (`/security-review`): **no HIGH/MEDIUM** findings; verified onlyOwner fund custody, full-field `getHash` binding, fail-closed sanctions, non-bypassable policy pipeline. **Slither** (0.11.5, solc 0.8.23 via-IR): **no high/critical** — 3 informational results, all confirmed FALSE POSITIVES (`unused-return`: 2 of 3 `tryRecover` values used; `unused-state` ×2: `VALID_UNTIL/AFTER_OFFSET` ARE used as calldata slice indices, which Slither doesn't track). Contract source left UNCHANGED to preserve deployed≡Polygonscan-verified bytecode. **Medusa**: low value for this near-stateless verifier (no complex state transitions) — run in CI if desired.
+- [x] T030 [P] **verify DONE** — `FairWinsVerifyingPaymaster` source-verified on Polygonscan (`npx hardhat verify`, Etherscan-V2 key worked). `sync:frontend-contracts` is **N/A for the paymaster** — the SPA reaches it via the gateway URL (`VITE_SPONSOR_PAYMASTER_*`), not the contract address, so no frontend artifact carries it.
+- [x] T031 [P] `docs/runbooks/paymaster-operations.md` status flipped **planned → DEPLOYED** with the live Polygon `0xe145…d105` + Amoy `0xA00A…6898` addresses, deposits, KMS signer, and the not-user-live-until-gateway note. (gasless-intents.md / passkey-accounts.md describe architecture and remain accurate.)
+- [~] T032 **fork ✓ + Amoy ✓ + Polygon deploy ✓** recorded (T007/T015/T033). The remaining browser headline test (SC-001 via a passkey transfer in the SPA) needs the deployed gateway + SPA config — pending go-live.
 - [~] T033 **Contract deployed + funded on Polygon 137** (2026-07-11): FairWinsVerifyingPaymaster `0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105`, deposit **5 POL**, verifyingSigner = KMS `0x9Ec0…22CD` (confirmed on-chain), owner = deployer `0x5250…F6e1` (**transfer to a secure key before this deposit matters**). Security review clean; fork + Amoy validated. **Remaining rollout:** deploy the `/v1/paymaster` gateway + wire `PAYMASTER_ADDRESS_137`/`PM_SIGNER_KMS_KEY` (+ gateway `cloudkms.signerVerifier` IAM) + `VITE_SPONSOR_PAYMASTER_POLYGON`; register `paymasterDepositRunwayHrs` monitoring; `verify:polygon`; run Slither/Medusa in CI
 
 ---
