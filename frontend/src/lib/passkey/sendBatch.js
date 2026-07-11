@@ -109,15 +109,31 @@ export async function sendPasskeyBatch({
     credential,
     deps,
   })
-  const { bundlerClient } = await (deps.buildAccount ?? buildAccount)({
-    chainId,
-    credential,
-    ownerIndex,
-    deps,
-  })
+  const build = deps.buildAccount ?? buildAccount
+  let acct = await build({ chainId, credential, ownerIndex, deps })
   const { calls: shaped } = buildAction(calls)
-  const hash = await bundlerClient.sendUserOperation({ calls: shaped })
-  onState?.({ state: LIFECYCLE.SUBMITTED, route, userOpHash: hash })
+
+  // Sponsored attempt with a never-stranded self-funded fallback (spec 050 / FR-007): if a paymaster
+  // was wired and sponsorship couldn't be applied (endpoint down/refused, transport error — NOT an
+  // on-chain revert of the user's op), rebuild self-funded and retry ONCE. A reverting op is
+  // surfaced, never silently re-sent.
+  let sponsored = acct.sponsored
+  let bundlerClient = acct.bundlerClient
+  let hash
+  try {
+    hash = await bundlerClient.sendUserOperation({ calls: shaped })
+  } catch (err) {
+    if (sponsored && isSponsorshipUnavailable(err)) {
+      onState?.({ state: LIFECYCLE.DRAFT, route, sponsored: false })
+      acct = await build({ chainId, credential, ownerIndex, deps: { ...deps, noPaymaster: true } })
+      sponsored = false
+      bundlerClient = acct.bundlerClient
+      hash = await bundlerClient.sendUserOperation({ calls: shaped })
+    } else {
+      throw err
+    }
+  }
+  onState?.({ state: LIFECYCLE.SUBMITTED, route, userOpHash: hash, sponsored })
 
   const outcome = await trackToInclusion({
     checkIncluded: async () => {
@@ -129,5 +145,20 @@ export async function sendPasskeyBatch({
     },
     onState,
   })
-  return { route, userOpHash: hash, ...outcome }
+  return { route, sponsored, userOpHash: hash, ...outcome }
+}
+
+/**
+ * Classify a failed sponsored submission: retry self-funded ONLY when sponsorship — not the user's
+ * operation — is the problem. An on-chain revert of the account/execution (a self-funded retry would
+ * fail identically) is surfaced, never re-sent (FR-006/FR-007).
+ */
+export function isSponsorshipUnavailable(err) {
+  const msg = String(err?.details || err?.shortMessage || err?.message || err || '').toLowerCase()
+  if (/aa1[0-9]|aa2[0-9]|execution reverted|reverted with|account validation|out of gas|invalid userop/.test(msg)) {
+    return false
+  }
+  // Paymaster AA3x, our endpoint's refusals, and HTTP/RPC/transport failures all mean sponsorship
+  // simply couldn't be applied — a self-funded attempt is worth it.
+  return true
 }

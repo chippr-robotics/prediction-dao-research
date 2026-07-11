@@ -95,7 +95,7 @@ export function requirePasskeySupport(chainId) {
     factory,
     entryPoint,
     bundlerUrls: net.passkey.bundlerUrls,
-    erc20PaymasterUrl: net.passkey.erc20PaymasterUrl ?? null,
+    sponsorPaymasterUrl: net.passkey.sponsorPaymasterUrl ?? null,
   }
 }
 
@@ -183,7 +183,7 @@ export async function resolveOwnerIndex({ chainId, accountAddress, credential, d
  * `signPayload` lets the connector own the ceremony UX (deps-injectable).
  */
 export async function buildAccount({ chainId, credential, ownersBytes, ownerIndex, nonce = 0n, deps = {} }) {
-  const { entryPoint, bundlerUrls, erc20PaymasterUrl } = requirePasskeySupport(chainId)
+  const { entryPoint, bundlerUrls, sponsorPaymasterUrl } = requirePasskeySupport(chainId)
   const client = deps.publicClient ?? defaultPublicClient(chainId)
 
   // Refuse incomplete records BEFORE any ceremony — an undefined id/key here
@@ -224,13 +224,14 @@ export async function buildAccount({ chainId, credential, ownersBytes, ownerInde
     ...(ownersBytes ? {} : {}),
   })
 
-  // Fee-in-USDC path (spec 041 §4/FR-014): when a third-party ERC-20 paymaster is configured
-  // for this network, the bundler client fetches paymaster data automatically so the account
-  // never needs a native-token balance to pay gas — the config was previously parsed but never
-  // reached the bundler client, so every UserOp silently required native token (issue #854).
-  // Falls back to native-token fee payment when unconfigured (clarification Q3).
-  const paymaster =
-    deps.paymaster ?? (erc20PaymasterUrl ? createPaymasterClient({ transport: http(erc20PaymasterUrl) }) : undefined)
+  // FairWins-sponsored paymaster (spec 050): when a sponsor endpoint is configured for this network,
+  // the bundler client fetches a signed sponsorship automatically so the account never needs a
+  // native-token balance to pay gas. Falls back to native-token fees when unconfigured — or when
+  // `deps.noPaymaster` forces self-funding (the never-stranded retry in sendBatch.js when sponsorship
+  // is unavailable). `deps.paymaster` still lets tests inject a client directly.
+  const paymaster = deps.noPaymaster
+    ? undefined
+    : deps.paymaster ?? (sponsorPaymasterUrl ? createPaymasterClient({ transport: http(sponsorPaymasterUrl) }) : undefined)
 
   const bundlerClient = createBundlerClient({
     account,
@@ -239,7 +240,9 @@ export async function buildAccount({ chainId, credential, ownersBytes, ownerInde
     ...(paymaster ? { paymaster } : {}),
   })
 
-  return { account, bundlerClient, entryPoint, bundlerUrls, publicClient: client }
+  // `sponsored` = a paymaster is wired for this attempt; the caller uses it for honest fee
+  // disclosure and to decide whether a self-funded fallback is still possible.
+  return { account, bundlerClient, entryPoint, bundlerUrls, publicClient: client, sponsored: Boolean(paymaster) }
 }
 
 /**

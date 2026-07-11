@@ -35,8 +35,8 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 - [x] T001 [P] Vendor eth-infinitism **v0.6** `IPaymaster.sol` into `contracts/account/lib/account-abstraction/interfaces/` (path-only rewrite, no logic edits). **Refinement**: the paymaster is **self-contained** (reuses the already-vendored `UserOperation` + `_packValidationData`, OZ `ECDSA`/`Ownable`, and an inline minimal `IEntryPointStake` deposit/stake interface), so the full `IEntryPoint`/`IStakeManager`/`INonceManager` tree is **not** vendored — smaller audited surface (YAGNI)
 - [x] T002 [P] ~~Vendor `core/BasePaymaster.sol`~~ **Superseded by the self-contained design (T001)** — no `BasePaymaster` dependency; deposit/stake handled directly against the inline `IEntryPointStake` interface
-- [ ] T003 [P] Document env vars: add `VITE_SPONSOR_PAYMASTER_POLYGON` / `VITE_SPONSOR_PAYMASTER_AMOY` (and deprecate `VITE_ERC20_PAYMASTER_*`) in `frontend/.env.example`; add `PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_ACCOUNT_QUOTA_PER_MIN/DAY`, `PM_GLOBAL_QUOTA_PER_DAY`, `PM_MAX_COST_WEI`, `PM_MAX_GAS`, `PM_APPROVAL_TTL_SEC`, `PM_RUNWAY_WARN_HRS` in `services/relay-gateway/.env.example`
-- [ ] T004 [P] Scaffold `services/relay-gateway/src/paymaster/` (`build.js`, `sign.js`, `policy.js` stubs) + `services/relay-gateway/test/paymaster.test.js` skeleton
+- [x] T003 [P] Document env vars: add `VITE_SPONSOR_PAYMASTER_POLYGON` / `VITE_SPONSOR_PAYMASTER_AMOY` (and deprecate `VITE_ERC20_PAYMASTER_*`) in `frontend/.env.example`; add `PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_ACCOUNT_QUOTA_PER_MIN/DAY`, `PM_GLOBAL_QUOTA_PER_DAY`, `PM_MAX_COST_WEI`, `PM_MAX_GAS`, `PM_APPROVAL_TTL_SEC`, `PM_RUNWAY_WARN_HRS` in `services/relay-gateway/.env.example`
+- [x] T004 [P] Scaffold `services/relay-gateway/src/paymaster/` (`build.js`, `sign.js`, `policy.js` stubs) + `services/relay-gateway/test/paymaster.test.js` skeleton
 
 ---
 
@@ -66,8 +66,8 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 - [x] T010 [US1] Implement `services/relay-gateway/src/paymaster/build.js` — `getHash` + pack/stub `paymasterAndData`, **byte-identical to `FairWinsVerifyingPaymaster.getHash`** (cross-checked in T009)
 - [x] T011 [US1] Implement `services/relay-gateway/src/paymaster/sign.js` — KMS digest sign → 65-byte `{r,s,v}`; derive + cache signer address; boot health-check
 - [x] T012 [US1] Add `POST /v1/paymaster` (`pm_getPaymasterStubData` / `pm_getPaymasterData` grant path: killswitch + sanctions screen + sign) to `services/relay-gateway/src/server.js`; add config keys (`PAYMASTER_ADDRESS_<id>`, `ENTRYPOINT_V06_<id>`, `PM_SIGNER_KMS_KEY`, `PM_APPROVAL_TTL_SEC`) in `services/relay-gateway/src/config/index.js` + startup check `KMS signer address == on-chain verifyingSigner`
-- [ ] T013 [P] [US1] Rename `erc20PaymasterUrl` → `sponsorPaymasterUrl` and read `VITE_SPONSOR_PAYMASTER_<net>` in `frontend/src/config/networks.js`
-- [ ] T014 [US1] Wire `createPaymasterClient(http(sponsorPaymasterUrl))` (+ `context: {}`) into `frontend/src/lib/passkey/smartAccount.js#buildAccount`; expose a "paymaster-wired" flag for the US2 fallback
+- [x] T013 [P] [US1] Rename `erc20PaymasterUrl` → `sponsorPaymasterUrl` and read `VITE_SPONSOR_PAYMASTER_<net>` in `frontend/src/config/networks.js`
+- [x] T014 [US1] Wire `createPaymasterClient(http(sponsorPaymasterUrl))` (+ `context: {}`) into `frontend/src/lib/passkey/smartAccount.js#buildAccount`; expose a "paymaster-wired" flag for the US2 fallback
 - [ ] T015 [US1] Execute deploy + fund on Amoy (T008), wire gateway (`PAYMASTER_ADDRESS_80002`, `PM_SIGNER_KMS_KEY`) + SPA (`VITE_SPONSOR_PAYMASTER_AMOY`), run the headline test per [quickstart.md](./quickstart.md) §3 (SC-001)
 
 **Checkpoint**: a native-token-less account transacts for free on Amoy — MVP demonstrable.
@@ -80,10 +80,10 @@ sponsorship signer; a **floppy-keystore** admin for the paymaster `owner`; MATIC
 
 **Independent Test**: force sponsorship-unavailable (dead URL / killswitch) → confirm reads "you pay the network fee"; account with native completes self-submit; account without native sees the exact shortfall.
 
-- [ ] T016 [P] [US2] Vitest in `frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js`: sponsorship 503/unreachable → fallback to self-native; native shortfall → `InsufficientFeeBalance`; a **reverting** op is NOT retried as self-submit (TDD)
-- [ ] T017 [US2] Implement never-stranded fallback in `frontend/src/lib/passkey/sendBatch.js` (rebuild bundler client WITHOUT paymaster on sponsorship failure; distinguish sponsorship-unavailable from op-revert; throw `InsufficientFeeBalance{shortfall}` when native is short)
-- [ ] T018 [US2] Update `frontend/src/hooks/useTransfer.js` — route reflects the real outcome (`sponsored` | `self-native` | `self-short`), removing the unconditional `route = 'gasless'`
-- [ ] T019 [P] [US2] Update `frontend/src/components/wallet/TransferForm.jsx` — badge driven by the real `FeeDisclosure` state ("Sponsored — no network fee" only when actually sponsored, else native fee)
+- [x] T016 [P] [US2] Vitest in `frontend/src/lib/passkey/__tests__/sendBatch.fallback.test.js`: sponsorship 503/unreachable → fallback to self-native; native shortfall → `InsufficientFeeBalance`; a **reverting** op is NOT retried as self-submit (TDD)
+- [x] T017 [US2] Implement never-stranded fallback in `frontend/src/lib/passkey/sendBatch.js` (rebuild bundler client WITHOUT paymaster on sponsorship failure; distinguish sponsorship-unavailable from op-revert; throw `InsufficientFeeBalance{shortfall}` when native is short)
+- [x] T018 [US2] Update `frontend/src/hooks/useTransfer.js` — route reflects the real outcome (`sponsored` | `self-native` | `self-short`), removing the unconditional `route = 'gasless'`
+- [x] T019 [P] [US2] Update `frontend/src/components/wallet/TransferForm.jsx` — badge driven by the real `FeeDisclosure` state ("Sponsored — no network fee" only when actually sponsored, else native fee)
 - [ ] T020 [P] [US2] Update `frontend/src/components/wallet/PasskeyConfirm.jsx` — fee disclosure + `InsufficientFeeBalance` shortfall (spec-041 T031 pattern), WCAG 2.1 AA
 - [ ] T021 [US2] Validate never-stranded on Amoy (dead paymaster URL / killswitch on) per [quickstart.md](./quickstart.md) §3 (SC-003, SC-004)
 

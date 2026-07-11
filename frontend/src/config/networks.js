@@ -42,16 +42,17 @@ const TESTNET_CHAIN_ID = 80002
 // "SubmissionRoute"). Parses a comma-separated ERC-4337 bundler URL list
 // (ordered: self-hosted alto first, public fallbacks). Empty/unset → null so
 // the passkey capability flips off and the login surface hides the option
-// honestly (FR-004) instead of offering a dead path. erc20PaymasterUrl is the
-// optional fee-in-USDC path; null → UserOp fees fall back to the account's
-// native balance (spec 041 clarification Q3).
-const passkeyConfig = (urlsEnv, paymasterEnv) => {
+// honestly (FR-004) instead of offering a dead path. sponsorPaymasterUrl is the
+// optional FairWins-sponsored paymaster endpoint (spec 050 → the relay-gateway's
+// /v1/paymaster); null → UserOp fees fall back to the account's native balance and
+// the confirm UI discloses the native fee honestly (never a false "sponsored").
+const passkeyConfig = (urlsEnv, sponsorEnv) => {
   const bundlerUrls = (urlsEnv || '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
   if (bundlerUrls.length === 0) return null
-  return { bundlerUrls, erc20PaymasterUrl: paymasterEnv || null }
+  return { bundlerUrls, sponsorPaymasterUrl: sponsorEnv || null }
 }
 
 const NETWORKS = {
@@ -119,7 +120,7 @@ const NETWORKS = {
     // network: RIP-7212 P-256 precompile live, canonical EntryPoint v0.6.
     passkey: passkeyConfig(
       import.meta.env?.VITE_BUNDLER_URLS_AMOY,
-      import.meta.env?.VITE_ERC20_PAYMASTER_AMOY
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_AMOY
     ),
     get capabilities() {
       return {
@@ -324,7 +325,7 @@ const NETWORKS = {
     // precompile live since the Napoli upgrade, canonical EntryPoint v0.6.
     passkey: passkeyConfig(
       import.meta.env?.VITE_BUNDLER_URLS_POLYGON,
-      import.meta.env?.VITE_ERC20_PAYMASTER_POLYGON
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_POLYGON
     ),
     get capabilities() {
       return {

@@ -12,7 +12,7 @@ vi.mock('../../config/networks', () => ({
           chainId: 80002,
           rpcUrl: 'https://rpc.example',
           capabilities: { passkeyAccounts: true },
-          passkey: { bundlerUrls: ['https://bundler.example'], erc20PaymasterUrl: null },
+          passkey: { bundlerUrls: ['https://bundler.example'], sponsorPaymasterUrl: null },
         }
       : { chainId, capabilities: { passkeyAccounts: false }, passkey: null }
   ),
