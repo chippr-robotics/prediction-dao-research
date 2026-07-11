@@ -37,6 +37,11 @@ const REQUIRED_RPCS = [
   'https://polygon-bor-rpc.publicnode.com', // Polygon mainnet (137)
   'https://rpc.mordor.etccooperative.org', // Ethereum Classic Mordor (63)
   'https://etc.rivet.link', // Ethereum Classic mainnet (61)
+  // Ethereum family (spec 048) — selectable value networks; portfolio reads and
+  // earn position reads (spec 050) hit these directly.
+  'https://ethereum-rpc.publicnode.com', // Ethereum mainnet (1)
+  'https://ethereum-sepolia-rpc.publicnode.com', // Sepolia (11155111)
+  'https://ethereum-hoodi-rpc.publicnode.com', // Hoodi (560048)
 ]
 
 // Gasless infrastructure the SPA POSTs to directly (specs 035/036 + 041). Without these in connect-src
@@ -45,6 +50,14 @@ const REQUIRED_RPCS = [
 const REQUIRED_GASLESS_HOSTS = [
   'https://relay.fairwins.app', // relay-gateway (VITE_RELAYER_URL) — intent submission + status
   'https://bundler.fairwins.app', // alto ERC-4337 bundler (edge-fronted target, spec 041)
+]
+
+// Earn data services (spec 050). Without these the vault list and reward balances can never
+// load in production — both Earn views permanently show the "temporarily unavailable" state
+// even though the services are up (exactly how the section broke on first deploy).
+const REQUIRED_EARN_HOSTS = [
+  'https://api.morpho.org', // Morpho GraphQL — vault discovery/APY + position enrichment
+  'https://api.merkl.xyz', // Merkl REST — reward balances + claim proofs
 ]
 
 describe('nginx CSP connect-src blockchain RPC allowlist', () => {
@@ -71,6 +84,13 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
       expect(
         connectSrc,
         `${path} connect-src is missing ${host} — the gasless relay/bundler call will be blocked by CSP`,
+      ).toContain(host)
+    }
+
+    for (const host of REQUIRED_EARN_HOSTS) {
+      expect(
+        connectSrc,
+        `${path} connect-src is missing ${host} — the Earn section's data fetch will be blocked by CSP`,
       ).toContain(host)
     }
 
