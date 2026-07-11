@@ -68,12 +68,28 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
       {status === REPORT_STATUS.READY && report && (
         <div className="report-result">
           {isEmpty ? (
-            <p className="report-empty">No wager activity in this period.</p>
+            <p className="report-empty">
+              {report.source === 'ledger'
+                ? 'No activity in this period.'
+                : 'No wager activity in this period.'}
+            </p>
           ) : (
             <>
               <p>
-                {`${report.lineItems.length} transfer(s) for ${report.period.label} on ${report.networkName}.`}
+                {report.source === 'ledger'
+                  ? `${report.lineItems.length} activity entr${report.lineItems.length === 1 ? 'y' : 'ies'} for ${report.period.label} on ${report.networkName}.`
+                  : `${report.lineItems.length} transfer(s) for ${report.period.label} on ${report.networkName}.`}
               </p>
+              {report.totals?.overall?.failedCount > 0 && (
+                <p className="report-note">
+                  {`${report.totals.overall.failedCount} failed operation(s) are listed but excluded from all totals.`}
+                </p>
+              )}
+              {report.staleClasses?.length > 0 && (
+                <p className="report-note" role="status">
+                  {`Could not refresh: ${report.staleClasses.join(', ')} — entries for these classes may be missing.`}
+                </p>
+              )}
               <Totals totals={report.totals} />
             </>
           )}

@@ -14,6 +14,7 @@ import { getContractAddressForChain } from '../config/contracts'
 import { resolvePeriod, resolveCustomPeriod, validateRange } from '../utils/reportPeriods'
 import { buildReport as defaultBuildReport } from '../data/reports/reportBuilder'
 import { createReportDataSource } from '../data/reports/reportDataSource'
+import { getDefaultLedgerRepository } from '../data/ledger'
 import * as pdfReport from '../data/reports/pdfReport'
 import * as csvReport from '../data/reports/csvReport'
 import * as historyStore from '../data/reports/reportHistoryStore'
@@ -37,6 +38,13 @@ export function useTaxReport(options = {}) {
   // useCallback hooks below keep stable identities across renders.
   const buildReportFn = useMemo(() => options.buildReport || defaultBuildReport, [options.buildReport])
   const makeDataSource = useMemo(() => options.createDataSource || createReportDataSource, [options.createDataSource])
+  // Spec 051: the report reads the SAME activity ledger the Account tab
+  // renders, so line items and totals can never disagree (FR-014/FR-015).
+  // Injectable for tests; `ledger: null` forces the legacy wager-only path.
+  const ledger = useMemo(
+    () => ('ledger' in options ? options.ledger : getDefaultLedgerRepository()),
+    [options.ledger],
+  )
   const networkOf = useMemo(() => options.getNetwork || getNetwork, [options.getNetwork])
   const escrowOf = useMemo(
     () =>
@@ -102,6 +110,7 @@ export function useTaxReport(options = {}) {
           period,
           dataSource: makeDataSource({ chainId }),
           networkMeta,
+          ledger,
           generatedAt: nowMs,
           onProgress: (fraction, label) => setProgress({ fraction, label }),
         })
@@ -122,7 +131,7 @@ export function useTaxReport(options = {}) {
         return null
       }
     },
-    [account, chainId, buildReportFn, makeDataSource, networkOf, escrowOf, history, refreshHistory, now],
+    [account, chainId, buildReportFn, makeDataSource, ledger, networkOf, escrowOf, history, refreshHistory, now],
   )
 
   const downloadPdf = useCallback(
@@ -166,6 +175,7 @@ export function useTaxReport(options = {}) {
         period,
         dataSource: makeDataSource({ chainId }),
         networkMeta,
+        ledger,
         generatedAt: now(),
       })
       if (format === 'csv') {
@@ -175,7 +185,7 @@ export function useTaxReport(options = {}) {
       }
       return built
     },
-    [account, chainId, buildReportFn, makeDataSource, networkOf, escrowOf, saveAs, now],
+    [account, chainId, buildReportFn, makeDataSource, ledger, networkOf, escrowOf, saveAs, now],
   )
 
   return {

@@ -83,10 +83,10 @@ independently testable increment.
 
 **Independent Test**: quickstart.md §4 — CSV for a seeded period matches the Account tab line-for-line and total-for-total (SC-002)
 
-- [ ] T022 [P] [US2] Write parity Vitest spec: same (account, chainId, period) ⇒ report entry set ≡ Account tab entry set and totals equal, in `frontend/src/data/reports/reportParity.test.js`
-- [ ] T023 [US2] Update `frontend/src/data/reports/reportDataSource.js` to enumerate via `ledgerRepository.listEntries` (period filter) instead of its own `WagerTransfer` query path, keeping the bounded gas-fee receipt lookups
-- [ ] T024 [US2] Update `frontend/src/data/reports/reportBuilder.js` + `csvReport.js`/`pdfReport.js` (+ tests) to the column contract in `contracts/ledger-entry.md` (all classes, `status`/`failureReason`, `valuationStatus` flagged never zeroed, network-scope + `prunedBefore` disclosure header, null-timestamp rows flagged and sorted last)
-- [ ] T025 [US2] Update `frontend/src/hooks/useTaxReport.js` + `TaxReportsPanel.jsx` (+ tests) for the extended classes/columns and disclosure copy
+- [X] T022 [P] [US2] Write parity Vitest spec: same (account, chainId, period) ⇒ report entry set ≡ Account tab entry set and totals equal, in `frontend/src/data/reports/reportParity.test.js`
+- [X] T023 [US2] Update `frontend/src/data/reports/reportDataSource.js` to enumerate via `ledgerRepository.listEntries` (period filter) instead of its own `WagerTransfer` query path, keeping the bounded gas-fee receipt lookups
+- [X] T024 [US2] Update `frontend/src/data/reports/reportBuilder.js` + `csvReport.js`/`pdfReport.js` (+ tests) to the column contract in `contracts/ledger-entry.md` (all classes, `status`/`failureReason`, `valuationStatus` flagged never zeroed, network-scope + `prunedBefore` disclosure header, null-timestamp rows flagged and sorted last)
+- [X] T025 [US2] Update `frontend/src/hooks/useTaxReport.js` + `TaxReportsPanel.jsx` (+ tests) for the extended classes/columns and disclosure copy
 
 **Checkpoint**: Dashboard and report structurally cannot disagree
 

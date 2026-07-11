@@ -12,6 +12,9 @@ function setup(overrides = {}) {
     account: USER,
     chainId: CHAIN_ID,
     createDataSource: () => makeFixtureDataSource(),
+    // These cases exercise the legacy wager-only pipeline against the wager
+    // fixtures; ledger-path behavior is covered in reportParity.test.js.
+    ledger: null,
     getNetwork: () => ({ name: 'Polygon', isTestnet: false, nativeCurrency: { symbol: 'MATIC' } }),
     getEscrow: () => REGISTRY,
     saveAs,
