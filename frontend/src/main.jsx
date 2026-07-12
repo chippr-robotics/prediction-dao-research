@@ -17,6 +17,7 @@ import {
   PrivacyProvider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import TxProgressOverlay from './components/wallet/TxProgressOverlay'
 import { validateTheme } from './utils/validateTheme'
 import { registerServiceWorker } from './lib/pwa/serviceWorkerUpdate'
 
@@ -42,6 +43,10 @@ createRoot(document.getElementById('root')).render(
                       <UIProvider>
                         <PriceProvider>
                           <App />
+                          {/* Global passkey tx-progress overlay: renders the
+                              signature → submission → confirmation lifecycle for
+                              every sendCalls batch (spec 041 FR-017). */}
+                          <TxProgressOverlay />
                         </PriceProvider>
                       </UIProvider>
                     </DexProvider>
