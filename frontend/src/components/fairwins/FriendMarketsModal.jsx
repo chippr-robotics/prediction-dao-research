@@ -38,6 +38,7 @@ import { formatTimelineSpan, fromDatetimeLocal } from './wagerTimeline'
 import DeadlineTimeline from './DeadlineTimeline'
 import PillSelect from '../ui/PillSelect'
 import InfoTip from '../ui/InfoTip'
+import AmountKeypad from '../ui/AmountKeypad'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -1475,14 +1476,22 @@ function FriendMarketsModal({
                     )}
 
 
-                    {/* Stake amount + token on one line (spec 038 FR-011): the token
-                        control is always interactive, even though most flows only
-                        offer one meaningful default. */}
-                    <div className="fm-form-group fm-form-full">
-                      <span className="fm-label-row">
-                        <label htmlFor="fm-stake">
-                          Stake Amount <span className="fm-required">*</span>
-                        </label>
+                    {/* Payments-style hero (spec 052): the stake is the amount
+                        centerpiece, entered with the on-screen number pad. The
+                        multi-token control (spec 038 FR-011) stays adjacent — the
+                        prefix follows the selected token ($ for stable/custom). */}
+                    <div className="fm-form-group fm-form-full fm-pay-hero">
+                      <AmountKeypad
+                        value={formData.stakeAmount}
+                        onChange={(v) => handleFormChange('stakeAmount', v)}
+                        prefix={(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') ? '$' : ''}
+                        token={selectedStakeToken?.symbol || ''}
+                        disabled={submitting}
+                        ariaLabel="Stake amount"
+                        id="fm-stake"
+                      />
+                      <span className="fm-label-row fm-pay-hero-caption">
+                        <span className="fm-label">Stake Amount <span className="fm-required">*</span></span>
                         <InfoTip label="About: Stake Amount">
                           {formData.stakeTokenId === 'STABLE'
                             ? 'Enter amount in USD (e.g., 10.00 for $10)'
@@ -1495,37 +1504,20 @@ function FriendMarketsModal({
                             : `${selectedStakeToken?.name} from the active chain`}
                         </InfoTip>
                       </span>
-                      <div className="fm-stake-input-wrapper fm-stake-row">
-                        {(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') && (
-                          <span className="fm-stake-prefix">$</span>
-                        )}
-                        <input
-                          id="fm-stake"
-                          type="number"
-                          value={formData.stakeAmount}
-                          onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
-                          placeholder={formData.stakeTokenId === 'STABLE' ? '10.00' : '10'}
-                          min="0.1"
-                          max="1000"
-                          step="0.01"
-                          disabled={submitting}
-                          className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'STABLE' ? 'fm-stake-usd' : ''}`}
-                        />
-                        <select
-                          id="fm-stake-token"
-                          aria-label="Stake Token"
-                          value={formData.stakeTokenId}
-                          onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
-                          disabled={submitting}
-                          className="fm-token-select fm-stake-token-inline"
-                        >
-                          {STAKE_TOKEN_OPTIONS.map(token => (
-                            <option key={token.id} value={token.id}>
-                              {token.icon} {token.symbol}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <select
+                        id="fm-stake-token"
+                        aria-label="Stake Token"
+                        value={formData.stakeTokenId}
+                        onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
+                        disabled={submitting}
+                        className="fm-token-select fm-pay-token-select"
+                      >
+                        {STAKE_TOKEN_OPTIONS.map(token => (
+                          <option key={token.id} value={token.id}>
+                            {token.icon} {token.symbol}
+                          </option>
+                        ))}
+                      </select>
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 

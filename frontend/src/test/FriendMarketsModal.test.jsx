@@ -509,12 +509,13 @@ describe('FriendMarketsModal', () => {
   })
 
   describe('Create Form', () => {
-    it('puts stake amount and stake token on one line, with the token always interactive (spec 038 FR-011)', () => {
+    it('enters the stake on the payments-style number pad, with the token still interactive (spec 052 / 038 FR-011)', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      const amountInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
+      // The amount is now the payments-style hero + pad; the multi-token select
+      // stays adjacent and always interactive.
+      expect(screen.getByTestId('amount-keypad-hero')).toBeInTheDocument()
       const tokenSelect = screen.getByLabelText(/^stake token$/i)
-      // Same wrapper row, not two separate stacked groups.
-      expect(amountInput.closest('.fm-stake-input-wrapper')).toBe(tokenSelect.closest('.fm-stake-input-wrapper'))
+      expect(tokenSelect.closest('.fm-pay-hero')).not.toBeNull()
       expect(tokenSelect.tagName).toBe('SELECT')
       expect(tokenSelect).not.toBeDisabled()
       expect(tokenSelect.querySelectorAll('option').length).toBeGreaterThan(1)
@@ -570,12 +571,13 @@ describe('FriendMarketsModal', () => {
       })
     })
 
-    it('should have stake input with default value', () => {
+    it('shows the default stake amount on the number-pad hero', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      const stakeInput = screen.getByLabelText(/stake amount/i, { selector: 'input' })
-      expect(stakeInput).toHaveValue(10)
-      expect(stakeInput).toHaveAttribute('min', '0.1')
+      // Default stake (WAGER_DEFAULTS.STAKE_AMOUNT = '10') renders in the hero;
+      // the $ prefix shows for the stable-token default. Min/max is enforced by
+      // validateForm rather than an input attribute now.
+      const hero = screen.getByTestId('amount-keypad-hero')
+      expect(hero).toHaveTextContent('$10')
     })
 
     it('should require an opponent address for an Offer wager', async () => {
