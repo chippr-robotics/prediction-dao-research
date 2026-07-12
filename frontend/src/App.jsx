@@ -42,11 +42,14 @@ import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
 import PwaUpdateNotification from './components/pwa/PwaUpdateNotification'
 
 function AppLayout() {
-  // The global nav drawer ("us") already carries the legal/policy footer, and the
-  // My Account screen is a dense tab host, so it omits the redundant page-level
-  // footer; every other in-app route keeps it.
+  // The global nav drawer ("us") already carries the legal/policy footer, so the
+  // page-level footer is redundant on the dense hosts: the My Account screen
+  // (/wallet) and the create-a-challenge home (/app, /main, /fairwins), where it
+  // also pushed the ticker off the bottom of the view. Every other in-app route
+  // keeps it.
   const { pathname } = useLocation()
-  const showPageFooter = pathname !== '/wallet'
+  const HIDE_PAGE_FOOTER = ['/wallet', '/app', '/main', '/fairwins']
+  const showPageFooter = !HIDE_PAGE_FOOTER.includes(pathname)
 
   return (
     /* Spec 031: platform-wide activity watcher scoped to the app-mode tree — the header bell and the views

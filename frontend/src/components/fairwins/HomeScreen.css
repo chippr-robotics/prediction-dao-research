@@ -46,6 +46,10 @@
   width: 100%;
 }
 
+/* Dock the ticker to the bottom of the view: the auto top-margin absorbs any
+   spare vertical space in the full-height flex column, so the crawler stays
+   pinned at the bottom instead of floating mid-screen (design feedback). */
 .home-ticker {
-  margin-top: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
 }
