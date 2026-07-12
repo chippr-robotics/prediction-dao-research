@@ -11,6 +11,7 @@ import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
 import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 import { DexContext } from './DexContext'
 import { toSdkToken, buildTradeMetrics, ROUTED_FEE_TIERS } from '../lib/uniswap/trade'
+import { makeReadProvider } from '../utils/rpcProvider'
 import logger from '../utils/logger'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
@@ -23,15 +24,28 @@ const ZERO = '0x0000000000000000000000000000000000000000'
  * provider via `dexProvider` from the returned context.
  */
 export function DexProvider({ children }) {
-  const { provider, signer, address, isConnected, sendCalls, loginMethod } = useWallet()
-  // Passkey smart-account sessions (spec 041/050) have NO ethers signer — their writes go through
-  // `sendCalls(calls)` (one sponsored ERC-4337 UserOp per batch) while reads use the RPC read `provider`.
-  const isPasskey = loginMethod === 'passkey'
+  const { provider, address, isConnected, sendCalls } = useWallet()
   // Spec 043 (US3): swapping while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, identity: activeIdentity, submit: submitAsActive } = useActiveAccount()
   const wagmiChainId = useChainId()
   const chainId = wagmiChainId || getCurrentChainId()
   const network = getNetwork(chainId)
+
+  // Reads must not depend on a wallet signer-provider: passkey sessions have
+  // none (WalletContext leaves provider/signer null), yet they still need
+  // balances and quotes. Fall back to the chain's public read provider, the
+  // same pattern Portfolio and Earn use.
+  const readProvider = useMemo(() => {
+    if (provider) return provider
+    if (!network?.rpcUrl) return null
+    return makeReadProvider(network.rpcUrl, chainId)
+  }, [provider, network?.rpcUrl, chainId])
+
+  // The account whose funds the trade ticket represents: the vault when the
+  // member operates as one (on the vault's own network), else the connected
+  // wallet. Balances and swap recipients follow this address so "available to
+  // trade" is accurate for the selected account (Spec 043).
+  const tradingAddress = operatingAsVault && canActAsVault ? activeIdentity.vaultAddress : address
 
   const dexConfig = network?.dex || null
   const stableConfig = network?.stablecoin || null
@@ -99,45 +113,45 @@ export function DexProvider({ children }) {
 
   // Stablecoin contract for balance reads — available even when DEX is not.
   const stableContract = useMemo(() => {
-    if (!provider || !stableConfig?.address) return null
-    return new ethers.Contract(stableConfig.address, ERC20_ABI, provider)
-  }, [provider, stableConfig])
+    if (!readProvider || !stableConfig?.address) return null
+    return new ethers.Contract(stableConfig.address, ERC20_ABI, readProvider)
+  }, [readProvider, stableConfig])
 
   const contracts = useMemo(() => {
-    if (!provider || !isDexAvailable) return null
+    if (!readProvider || !isDexAvailable) return null
 
     return {
-      wnative: new ethers.Contract(addresses.WNATIVE, WNATIVE_ABI, provider),
-      stable: new ethers.Contract(addresses.STABLECOIN, ERC20_ABI, provider),
-      swapRouter: new ethers.Contract(addresses.SWAP_ROUTER_02, SWAP_ROUTER_02_ABI, provider),
-      quoter: new ethers.Contract(addresses.QUOTER_V2, QUOTER_V2_ABI, provider),
+      wnative: new ethers.Contract(addresses.WNATIVE, WNATIVE_ABI, readProvider),
+      stable: new ethers.Contract(addresses.STABLECOIN, ERC20_ABI, readProvider),
+      swapRouter: new ethers.Contract(addresses.SWAP_ROUTER_02, SWAP_ROUTER_02_ABI, readProvider),
+      quoter: new ethers.Contract(addresses.QUOTER_V2, QUOTER_V2_ABI, readProvider),
     }
-  }, [provider, isDexAvailable, addresses])
+  }, [readProvider, isDexAvailable, addresses])
 
   const fetchBalances = useCallback(async () => {
     if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
       return
     }
 
-    if (!provider || !address) return
+    if (!readProvider || !tradingAddress) return
     // Need at least stableContract or full DEX contracts to fetch anything useful
     if (!stableContract && !contracts) return
 
     try {
       setLoading(true)
 
-      const nativeBalance = await provider.getBalance(address)
+      const nativeBalance = await readProvider.getBalance(tradingAddress)
 
       // Fetch wnative only when DEX contracts are available
       const wnativeBalance = contracts
-        ? await contracts.wnative.balanceOf(address)
+        ? await contracts.wnative.balanceOf(tradingAddress)
         : 0n
 
       // Fetch stable balance from DEX contracts if available, otherwise
       // fall back to the standalone stableContract
       const stableReader = contracts?.stable || stableContract
       const stableBalance = stableReader
-        ? await stableReader.balanceOf(address)
+        ? await stableReader.balanceOf(tradingAddress)
         : 0n
 
       const newBalances = {
@@ -160,13 +174,14 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [provider, address, contracts, stableContract, tokens.STABLE.decimals])
+  }, [readProvider, tradingAddress, contracts, stableContract, tokens.STABLE.decimals])
 
-  // Reset balances when chain changes so the user doesn't see stale numbers.
+  // Reset balances when the chain or the active account changes so the user
+  // doesn't see stale numbers (e.g. personal balances while operating as a vault).
   useEffect(() => {
     setBalances({ native: '0', wnative: '0', stable: '0' })
     setBalanceHistory([])
-  }, [chainId])
+  }, [chainId, tradingAddress])
 
   useEffect(() => {
     if (isConnected) {
@@ -176,83 +191,71 @@ export function DexProvider({ children }) {
     }
   }, [isConnected, fetchBalances])
 
+  // Wrap/unwrap ride the unified spec-041 write rail (WalletContext.sendCalls)
+  // so BOTH session kinds work: passkey sessions authorize with one WebAuthn
+  // ceremony (they have no ethers signer), classic wallets sign per call.
+  // Operating as a vault turns the action into a threshold-gated proposal.
   const wrapNative = useCallback(async (amount) => {
-    if ((!isPasskey && !signer) || !contracts) {
-      throw new Error('Wallet not connected')
+    if (!contracts) {
+      throw new Error('DEX is not available on the current network')
     }
 
     try {
       setLoading(true)
       const amountWei = ethers.parseEther(amount)
+      const data = contracts.wnative.interface.encodeFunctionData('deposit', [])
+      const call = { to: addresses.WNATIVE, value: amountWei, data }
 
-      // Passkey session (no signer): wrap via one sponsored ERC-4337 UserOp — deposit() with the
-      // native amount as the call value, addressed to the WNATIVE contract.
-      if (isPasskey) {
-        if (typeof sendCalls !== 'function') {
-          throw new Error('This wallet cannot wrap on the current transaction rail.')
-        }
-        const wnativeAddress = contracts.wnative.target
-        const sent = await sendCalls([{
-          target: wnativeAddress,
-          data: contracts.wnative.interface.encodeFunctionData('deposit', []),
-          value: amountWei,
-        }])
-        await fetchBalances()
-        return sent
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to act as the vault.")
+        const res = await submitAsActive({ batch: [call] })
+        return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
-      const wnativeWithSigner = contracts.wnative.connect(signer)
-      const tx = await wnativeWithSigner.deposit({ value: amountWei })
-      await tx.wait()
+      if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
+      const res = await sendCalls([call])
+      if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
 
       await fetchBalances()
-      return tx
+      return res
     } catch (error) {
       console.error('Error wrapping native:', error)
       throw error
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, fetchBalances, isPasskey, sendCalls])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
 
   const unwrapNative = useCallback(async (amount) => {
-    if ((!isPasskey && !signer) || !contracts) {
-      throw new Error('Wallet not connected')
+    if (!contracts) {
+      throw new Error('DEX is not available on the current network')
     }
 
     try {
       setLoading(true)
       const amountWei = ethers.parseEther(amount)
+      const data = contracts.wnative.interface.encodeFunctionData('withdraw', [amountWei])
+      const call = { to: addresses.WNATIVE, value: 0n, data }
 
-      // Passkey session (no signer): unwrap via one sponsored ERC-4337 UserOp — withdraw(amount) with
-      // zero call value, addressed to the WNATIVE contract.
-      if (isPasskey) {
-        if (typeof sendCalls !== 'function') {
-          throw new Error('This wallet cannot unwrap on the current transaction rail.')
-        }
-        const wnativeAddress = contracts.wnative.target
-        const sent = await sendCalls([{
-          target: wnativeAddress,
-          data: contracts.wnative.interface.encodeFunctionData('withdraw', [amountWei]),
-          value: 0n,
-        }])
-        await fetchBalances()
-        return sent
+      if (operatingAsVault) {
+        if (!canActAsVault) throw new Error("Switch to the vault's network to act as the vault.")
+        const res = await submitAsActive({ batch: [call] })
+        return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
-      const wnativeWithSigner = contracts.wnative.connect(signer)
-      const tx = await wnativeWithSigner.withdraw(amountWei)
-      await tx.wait()
+      if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
+      const res = await sendCalls([call])
+      if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
 
       await fetchBalances()
-      return tx
+      return res
     } catch (error) {
       console.error('Error unwrapping native:', error)
       throw error
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, fetchBalances, isPasskey, sendCalls])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
 
   // Decimals lookup for a token by address used in quote/swap calls below.
   // Defaults to 18 (native/wrapped) when the token isn't in our known set.
@@ -398,8 +401,17 @@ export function DexProvider({ children }) {
     }
   }, [contracts, decimalsOf, symbolOf, chainId, slippage])
 
-  const swap = useCallback(async (tokenIn, tokenOut, amountIn) => {
-    if ((!isPasskey && !signer) || !contracts || !address) {
+  /**
+   * Execute (or, as a vault, propose) a swap.
+   *
+   * `opts.limitMinOutWei` — a Limit order's floor: the member's limit price
+   * expressed as the minimum output amount. Uniswap V3 enforces it on-chain
+   * via `amountOutMinimum`, making the order immediate-or-cancel — it fills at
+   * the limit or better, or not at all. We pre-check against the fresh quote
+   * so an unfillable limit fails with a plain reason before any wallet prompt.
+   */
+  const swap = useCallback(async (tokenIn, tokenOut, amountIn, opts = {}) => {
+    if (!contracts || !tradingAddress) {
       throw new Error('Wallet not connected')
     }
 
@@ -412,24 +424,34 @@ export function DexProvider({ children }) {
 
       const decIn = decimalsOf(tokenIn)
       const amountInWei = ethers.parseUnits(amountIn, decIn)
-      const minAmountOutWei = quote.minimumReceivedWei
+      const isLimit = opts.limitMinOutWei != null
+      const minAmountOutWei = isLimit ? BigInt(opts.limitMinOutWei) : quote.minimumReceivedWei
+
+      if (isLimit && quote.amountOutWei < minAmountOutWei) {
+        throw new Error(
+          'The market is below your limit price right now — the order was not placed. Nothing was moved.'
+        )
+      }
+
+      const erc20 = new ethers.Interface(ERC20_ABI)
+      const swapParams = (recipient) => ({
+        tokenIn,
+        tokenOut,
+        fee: quote.feeTier,
+        recipient,
+        amountIn: amountInWei,
+        amountOutMinimum: minAmountOutWei,
+        sqrtPriceLimitX96: 0,
+      })
 
       // Spec 043 (US3, FR-022a): swap AS a vault → batch [approve, exactInputSingle] with recipient = the
       // vault, proposed as a threshold-gated vault transaction. Only in the vault queue until executed.
       if (operatingAsVault) {
         if (!canActAsVault) throw new Error("Switch to the vault's network to swap as the vault.")
-        const erc20 = new ethers.Interface(ERC20_ABI)
         const approveData = erc20.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei])
-        const vaultParams = {
-          tokenIn,
-          tokenOut,
-          fee: quote.feeTier,
-          recipient: activeIdentity.vaultAddress,
-          amountIn: amountInWei,
-          amountOutMinimum: minAmountOutWei,
-          sqrtPriceLimitX96: 0,
-        }
-        const swapData = contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [vaultParams])
+        const swapData = contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [
+          swapParams(activeIdentity.vaultAddress),
+        ])
         const res = await submitAsActive({
           batch: [
             { to: tokenIn, value: 0n, data: approveData },
@@ -439,78 +461,43 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
-      // Personal passkey session (no signer): batch [approve?, exactInputSingle] into one sponsored
-      // ERC-4337 UserOp. Reads (allowance) go through the RPC read `provider`; the swap value mirrors the
-      // classic personal path, which passes NO native value to exactInputSingle (tokenIn is always an
-      // ERC20 here — the UI wraps native to WNATIVE first), so every call carries value 0n.
-      if (isPasskey) {
-        if (typeof sendCalls !== 'function') {
-          throw new Error('This wallet cannot swap on the current transaction rail.')
-        }
-        const calls = []
-        const erc20Iface = new ethers.Interface(ERC20_ABI)
-        const tokenInReader = new ethers.Contract(tokenIn, ERC20_ABI, provider)
-        const passkeyAllowance = await tokenInReader.allowance(address, addresses.SWAP_ROUTER_02)
-        if (passkeyAllowance < amountInWei) {
-          calls.push({
-            target: tokenIn,
-            data: erc20Iface.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei]),
-            value: 0n,
-          })
-        }
-        const passkeyParams = {
-          tokenIn,
-          tokenOut,
-          fee: quote.feeTier,
-          recipient: address,
-          amountIn: amountInWei,
-          amountOutMinimum: minAmountOutWei,
-          sqrtPriceLimitX96: 0,
-        }
-        calls.push({
-          target: addresses.SWAP_ROUTER_02,
-          data: contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [passkeyParams]),
-          value: 0n,
-        })
-        const sent = await sendCalls(calls)
-        await fetchBalances()
-        return sent
-      }
+      // Personal mode rides the unified spec-041 write rail: one batch through
+      // sendCalls covers approval (only when needed, for the exact amount) and
+      // the swap — a single WebAuthn ceremony for passkey sessions, sequential
+      // signed transactions for classic wallets.
+      if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
 
-      const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
-      const allowance = await tokenInContract.allowance(address, addresses.SWAP_ROUTER_02)
+      const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, readProvider)
+      const allowance = await tokenInContract.allowance(tradingAddress, addresses.SWAP_ROUTER_02)
 
+      const calls = []
       if (allowance < amountInWei) {
-        const approveTx = await tokenInContract.approve(
-          addresses.SWAP_ROUTER_02,
-          ethers.MaxUint256
-        )
-        await approveTx.wait()
+        calls.push({
+          to: tokenIn,
+          value: 0n,
+          data: erc20.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei]),
+        })
       }
+      calls.push({
+        to: addresses.SWAP_ROUTER_02,
+        value: 0n,
+        data: contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [
+          swapParams(tradingAddress),
+        ]),
+      })
 
-      const swapRouterWithSigner = contracts.swapRouter.connect(signer)
-      const params = {
-        tokenIn,
-        tokenOut,
-        fee: quote.feeTier,
-        recipient: address,
-        amountIn: amountInWei,
-        amountOutMinimum: minAmountOutWei,
-        sqrtPriceLimitX96: 0,
-      }
-
-      const tx = await swapRouterWithSigner.exactInputSingle(params)
-      await tx.wait()
+      const res = await sendCalls(calls)
+      if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
 
       await fetchBalances()
-      return tx
+      return res
     } catch (error) {
       console.error('Error performing swap:', error)
       throw error
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive, isPasskey, sendCalls, provider])
+  }, [contracts, tradingAddress, readProvider, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive, sendCalls])
 
   const value = {
     balances,
@@ -533,6 +520,7 @@ export function DexProvider({ children }) {
     dexProvider,
     chainId,
     network,
+    tradingAddress,
   }
 
   return (

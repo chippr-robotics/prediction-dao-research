@@ -106,6 +106,35 @@ export const SLIPPAGE_OPTIONS = [
 // Default slippage (0.5%)
 export const DEFAULT_SLIPPAGE = 50
 
+// Price types the order ticket offers — the execution styles Uniswap V3
+// actually supports through SwapRouter02. "Market" fills at the routed price
+// within the slippage tolerance; "Limit" is an immediate-or-cancel order that
+// enforces the member's price as the on-chain minimum received (amountOutMinimum)
+// — it fills at the limit or better, or not at all. There is no resting order
+// book, so we never pretend an unfilled limit is "working".
+export const PRICE_TYPES = [
+  { value: 'market', label: 'Market' },
+  { value: 'limit', label: 'Limit' },
+]
+
+// Order types for the spot ticket. Direction maps onto the swap pair: buying
+// receives the network asset, selling pays it away.
+export const SPOT_ORDER_TYPES = [
+  { value: 'buy', label: 'Buy' },
+  { value: 'sell', label: 'Sell' },
+]
+
+// Order types that only exist where a perpetuals venue is configured for the
+// network (`network.perps` in config/networks.js). No supported network has
+// one today, so these stay hidden — honest-state over dead buttons.
+export const PERPS_ORDER_TYPES = [
+  { value: 'sell_short', label: 'Sell Short' },
+  { value: 'buy_to_cover', label: 'Buy to Cover' },
+]
+
+// The perpetuals venue for a network, or null when the network has none.
+export const getPerpsVenue = (network) => network?.perps || null
+
 // Time horizon options for balance charts (in seconds)
 export const TIME_HORIZONS = {
   '1H': 3600,
