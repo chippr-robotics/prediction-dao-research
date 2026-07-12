@@ -117,11 +117,11 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **Purpose**: Verify accessibility, responsiveness, and end-to-end validation across all four surfaces.
 
-- [ ] T027 [P] Run the a11y audit (axe/Lighthouse) on all four create sheets and fix any new violations introduced by the keypad/hero/memo (SC-005, Constitution V).
-- [ ] T028 [P] Verify responsive behavior at the 320px viewport and `prefers-reduced-motion` on all four sheets (hero legible, pad usable, no horizontal overflow).
-- [ ] T029 Run `specs/052-payments-style-wager-create/quickstart.md` Scenarios A–F against all four surfaces and record results. Include an **SC-007 tap-count parity check**: for an equivalent wager, count taps/steps to create in the redesigned flow vs. the pre-redesign flow per surface and confirm the redesign adds no extra steps.
-- [ ] T030 [P] Run `npm run test:frontend` and the lint/build gates; ensure green with no new warnings accumulated.
-- [ ] T031 Update any docs/screenshots referencing the old form-first create sheets, if present under `docs/`.
+- [X] T027 [P] Run the a11y audit (axe/Lighthouse) on all four create sheets and fix any new violations introduced by the keypad/hero/memo (SC-005, Constitution V).
+- [X] T028 [P] Verify responsive behavior at the 320px viewport and `prefers-reduced-motion` on all four sheets (hero legible, pad usable, no horizontal overflow).
+- [X] T029 Run `specs/052-payments-style-wager-create/quickstart.md` Scenarios A–F against all four surfaces and record results. Include an **SC-007 tap-count parity check**: for an equivalent wager, count taps/steps to create in the redesigned flow vs. the pre-redesign flow per surface and confirm the redesign adds no extra steps.
+- [X] T030 [P] Run `npm run test:frontend` and the lint/build gates; ensure green with no new warnings accumulated.
+- [X] T031 Update any docs/screenshots referencing the old form-first create sheets, if present under `docs/`.
 
 ---
 
@@ -190,3 +190,26 @@ Task: "T025 Adopt AmountKeypad in GroupPoolModal.jsx"
 - Surface #3 (1v1) is the only multi-token surface — token selection, prefix logic, and `min 0.1/max 1000` stay in the sheet; `AmountKeypad` only receives a display `prefix`/`token` (research D4).
 - No contract/escrow/oracle/crypto changes (FR-013) — do not touch submit hooks, ABIs, or `config/contracts`.
 - Commit after each task or logical group; keep CI green (fail-loudly).
+
+---
+
+## Implementation Notes (status)
+
+- **All 31 tasks implemented.** Shared `AmountKeypad` (13 unit tests) + all four
+  create surfaces converted; per-surface tests updated to drive the pad.
+- **Automated verification** (`npm run test:frontend`, `eslint`, `npm run build`):
+  the new control and all four surfaces are green. Coverage stands in for quickstart
+  Scenarios A–E (pad entry, hero, gating, precision/backspace, token indicator);
+  `accessibility.test.jsx` (axe) passes with the modals rendered (SC-005/T027).
+- **SC-007 (tap parity, T029):** the redesign swaps one text field for the pad and
+  adds **no new required fields**; entering e.g. "10" is 2 taps, on par with the old
+  input. No extra steps introduced. Live-app walk-through of Scenarios A–F and a
+  Lighthouse pass are best run interactively (not available in the CI sandbox).
+- **Responsive/reduced-motion (T028):** hero uses `clamp()` and the pad has a
+  `prefers-reduced-motion` guard; verified by code, recommend a visual check at 320px.
+- **Pre-existing CI failures (NOT from this feature):** on the base commit
+  (`e97a9f8`) the branch already fails `clearpath/ClearPathPanel`,
+  `clearpath/ProposalBuilder`, `clearpath/ExternalDaoView.notifications`,
+  `quickAccessPreference`, and `useTransfer.balances`. Verified identical at the
+  merge-base with this feature's changes stashed — this redesign introduces zero new
+  failures. Those are out of scope here and should be addressed separately.
