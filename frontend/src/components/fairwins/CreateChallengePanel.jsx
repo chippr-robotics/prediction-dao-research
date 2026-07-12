@@ -305,7 +305,7 @@ function CreateChallengePanel({
             { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'Arbitrator', icon: <ThirdPartyIcon /> },
             {
               value: String(OPEN_RESOLUTION_TYPES.Polymarket),
-              label: 'Oracle',
+              label: 'Event',
               icon: <OracleIcon />,
               disabled: !polymarketAvailable,
               disabledReason: 'Requires a Polymarket-enabled network. Switch networks to settle from a market.',
