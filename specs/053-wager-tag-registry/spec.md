@@ -8,6 +8,15 @@
 
 **Input**: User description: "Wager tag naming registry: members can register a short unique handle (\"wager tag\", displayed with a % prefix, e.g. %chipprbots) tied to their membership, used for fast identity lookup and address entry across pools, wagers, and the address book. Resolution priority becomes address book > wager tag > ENS > random name. Must include abuse/fraud protections against impersonation and accidental account takeover, follow industry standards for naming registries, and support both individual users and businesses."
 
+## Clarifications
+
+### Session 2026-07-12
+
+- Q: Where does the wager tag registry's source of truth live? → A: An in-house **on-chain registry contract** (like the platform's other core primitives): trustless resolution, operator moderation via roles, registration expected to be gasless via the existing relay rails.
+- Q: Is a tag permanently bound to one wallet address, or can the owner repoint it? → A: **Owner-authorized repointing with a security delay** (48 hours): the change takes effect only after the delay, during which the tag does not resolve for new value-bearing actions and surfaces show an "address changing" state.
+- Q: Quarantine and change-cooldown windows? → A: Confirmed at **90-day quarantine** after release/change and **at most one tag change per 30 days**.
+- Q: What happens to a tag when membership lapses? → A: **Grace then release**: the tag stays bound and resolving for a 12-month grace period after lapse; if membership is not renewed by then, the tag is released into the standard 90-day quarantine and becomes claimable afterward.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Register a Wager Tag (Priority: P1)
@@ -76,7 +85,8 @@ A tag owner can change their tag or release it entirely. To prevent fraud and ac
 2. **Given** a tag was released or replaced, **When** any other account attempts to register that tag during the quarantine period, **Then** registration is refused.
 3. **Given** a tag was released or replaced, **When** a user attempts to resolve the old tag during quarantine, **Then** resolution fails with a clear "tag no longer active" outcome rather than resolving to the previous owner or anyone else.
 4. **Given** an owner who changed their tag recently, **When** they attempt another change inside the cooldown window, **Then** the change is refused with the date the next change becomes available.
-5. **Given** a member's membership lapses, **When** their tag is viewed or resolved, **Then** the tag remains bound to their account (it is not silently freed for others to claim), though registering a *new* tag requires active membership.
+5. **Given** a member's membership lapses, **When** their tag is viewed or resolved during the 12-month grace period, **Then** the tag remains bound to their account and resolves normally; **When** the grace period ends without renewal, **Then** the tag is released into the standard quarantine and only becomes claimable by others after quarantine expires.
+6. **Given** a tag owner initiates a repoint of their tag to a new wallet address, **When** any user resolves the tag for a value-bearing action during the 48-hour security delay, **Then** the resolution is refused with an "address changing" outcome; **When** the delay elapses, **Then** the tag resolves to the new address.
 
 ---
 
@@ -103,7 +113,8 @@ Businesses on the platform can hold a wager tag and receive a verification marke
 - A user types a tag with the `%` prefix, without it, or with surrounding whitespace/mixed case — all normalize to the same lookup.
 - A tag lookup happens while the owner is mid-change (old tag released, new tag pending) — the old tag must not resolve; the new tag resolves only once registration completes.
 - A viewer's address-book nickname for an address disagrees with that address's tag — the viewer's own nickname wins (their private label is authoritative for them), but confirmation screens still show the tag and address.
-- A tag owner's wallet is rotated/recovered (e.g. passkey account controller change) — the tag follows the account per the account's normal recovery process; it must not be claimable by a third party during recovery.
+- A tag owner's wallet is rotated/recovered (e.g. passkey account controller change) — if the account's address is unchanged the tag is unaffected; if the address changes, the owner uses the repoint flow (48-hour delay, FR-022) and the tag is never claimable by a third party during recovery.
+- A repoint is initiated by a compromised session — the 48-hour delay plus the visible "address changing" state gives the real owner time to notice and cancel before any payment can be redirected.
 - The registry is unreachable or lookup fails transiently — address entry falls back to requiring a raw address; display falls back to the existing name chain (address book > ENS > generated); no surface blocks on tag resolution.
 - A tag that quarantine has expired for is re-registered by a new owner — any user who previously saved the old owner via tag-based entry has the *address* (not the tag) in their address book, so their saved contact still points at the original person.
 - A user attempts to resolve their own tag or register a tag identical to their address-book nickname for someone else — allowed; nicknames are private and tags are global, and confirmation screens always disambiguate.
@@ -143,18 +154,19 @@ Businesses on the platform can hold a wager tag and receive a verification marke
 - **FR-018**: Tags MUST be non-transferable between accounts; the only path to a new owner is release, quarantine expiry, and fresh registration.
 - **FR-019**: A released or replaced tag MUST enter a quarantine period of 90 days during which it cannot be registered by any account and does not resolve.
 - **FR-020**: Tag changes MUST be rate-limited to at most one change per 30 days per account.
-- **FR-021**: A lapsed membership MUST NOT free the account's existing tag for others; registering a new or changed tag MUST require an active membership.
-- **FR-022**: System MUST keep an auditable history of tag registrations, changes, releases, and suspensions sufficient to investigate fraud reports.
+- **FR-021**: A lapsed membership MUST NOT immediately free the account's tag: the tag remains bound and resolving for a 12-month grace period after lapse. If membership is not renewed within the grace period, the tag is released into the standard quarantine (FR-019). Registering a new or changed tag MUST require an active membership.
+- **FR-022**: The owning account MUST be able to repoint its tag to a new wallet address (e.g. wallet migration or recovery), taking effect only after a 48-hour security delay. During the delay the tag MUST NOT resolve for new value-bearing actions, affected surfaces MUST show an "address changing" state, and the pending change MUST be cancellable by the owner.
+- **FR-023**: System MUST keep an auditable history of tag registrations, changes, repoints, releases, and suspensions sufficient to investigate fraud reports.
 
 **Businesses, verification & moderation**
 
-- **FR-023**: System MUST support a verification marker on tags, granted through an operator review process (intended for businesses and notable accounts), and MUST display verification status wherever the tag appears in confirmation and profile contexts.
-- **FR-024**: Users MUST be able to report a tag for abuse or impersonation.
-- **FR-025**: Operators MUST be able to suspend a tag (it stops resolving and displaying) in response to abuse; suspension MUST NOT reassign the tag, seize funds, or affect the account's non-tag functionality. Suspension actions MUST be logged (FR-022).
+- **FR-024**: System MUST support a verification marker on tags, granted through an operator review process (intended for businesses and notable accounts), and MUST display verification status wherever the tag appears in confirmation and profile contexts.
+- **FR-025**: Users MUST be able to report a tag for abuse or impersonation.
+- **FR-026**: Operators MUST be able to suspend a tag (it stops resolving and displaying) in response to abuse; suspension MUST NOT reassign the tag, seize funds, or affect the account's non-tag functionality. Suspension actions MUST be logged (FR-023).
 
 ### Key Entities
 
-- **Wager Tag**: A globally unique, normalized handle (3–20 chars, restricted charset) bound to exactly one account; displayed as `%<tag>`. Attributes: name, owning account/address, registration time, verification status, active/suspended state.
+- **Wager Tag**: A globally unique, normalized handle (3–20 chars, restricted charset) bound to exactly one account; displayed as `%<tag>`. Attributes: name, owning account/address, registration time, verification status, active/suspended state, pending address change (repoint target + effective time), membership-lapse grace deadline (when applicable).
 - **Tag Owner (Member Account)**: A platform account with (at registration time) an active membership; may be an individual or a business. Holds at most one tag.
 - **Reserved Term**: An operator-maintained name that can never be registered (brand terms, operational terms).
 - **Quarantined Tag**: A previously registered tag inside its 90-day post-release window; resolves to nothing and cannot be registered.
@@ -172,15 +184,16 @@ Businesses on the platform can hold a wager tag and receive a verification marke
 - **SC-006**: In display contexts, counterparties with a tag and no address-book nickname show the tag (not ENS or generated name) in 100% of sampled surfaces; adding a nickname flips display to the nickname.
 - **SC-007**: 100% of value-bearing flows addressed by tag present the full resolved address for confirmation before commitment.
 - **SC-008**: No user flow hard-fails when tag resolution is unavailable — all affected surfaces degrade to raw-address entry and the existing naming chain.
+- **SC-009**: Zero value-bearing actions resolve through a tag while a repoint security delay is pending (verified by test): during the delay every such resolution is refused with the "address changing" outcome.
 
 ## Assumptions
 
 - Tag registration is included with an active membership at no additional charge, and each account may hold exactly one tag. Paid/premium tags, auctions, and paid renewals are out of scope for v1.
-- Tags are non-transferable in v1; a secondary market or transfer flow is explicitly out of scope.
-- Default protection windows: 90-day quarantine after release/change, 30-day cooldown between changes. These are policy parameters and may be tuned before launch without changing the feature's shape.
+- Tags are non-transferable in v1; a secondary market or transfer flow is explicitly out of scope. Repointing (FR-022) changes the resolved address for the same owner — it is not a transfer of the tag to another account.
+- Protection windows (confirmed via clarification): 90-day quarantine after release/change, 30-day cooldown between changes, 48-hour repoint delay, 12-month membership-lapse grace period. These are policy parameters and may be tuned before launch without changing the feature's shape.
 - The character set is intentionally ASCII-only (lowercase letters, digits, single interior hyphens) as the primary defense against homoglyph/confusable impersonation, following the same tradeoff mainstream handle systems make. Unicode tag support is out of scope.
 - Business verification is a manual operator review in v1; automated verification (e.g. domain proof) is a possible follow-up.
 - Tags are public information by design (they exist to be looked up); the feature intentionally does not interact with the pools' anonymity/nickname system — pool two-word nicknames remain client-side and unchanged where anonymity is the point.
-- The registry is "in house": operated by the platform as the authoritative source of truth for tags, independent of ENS. ENS remains a lower-priority display fallback only.
+- The registry is "in house": an on-chain registry contract operated by the platform as the authoritative source of truth for tags (per clarification), independent of ENS. ENS remains a lower-priority display fallback only. Registration and management are expected to be reachable gaslessly through the platform's existing relay rails, with the standard self-submit fallback.
 - The existing membership system is the eligibility gate; no new identity verification is introduced for basic (unverified) tags beyond what membership purchase already enforces.
 - Existing address-book behavior is unchanged: the viewer's saved nickname remains the top display priority, and address book entries continue to store addresses (not tags), so a tag changing hands never silently redirects a saved contact.
