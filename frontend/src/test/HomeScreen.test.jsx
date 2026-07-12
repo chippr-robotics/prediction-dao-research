@@ -4,13 +4,14 @@ import { MemoryRouter } from 'react-router-dom'
 
 // Stub the heavy children to assert the HomeScreen wiring (not their internals).
 vi.mock('../components/fairwins/CreateChallengePanel', () => ({
-  default: ({ embedded, initialResolutionType, onDone }) => (
+  default: ({ embedded, initialResolutionType, onDone, onOracleModeChange }) => (
     <div
       data-testid="create-panel"
       data-embedded={String(!!embedded)}
       data-initial-resolution={initialResolutionType ?? ''}
     >
       <button type="button" onClick={() => onDone?.()}>done</button>
+      <button type="button" onClick={() => onOracleModeChange?.(true)}>enter oracle mode</button>
     </div>
   ),
 }))
@@ -61,11 +62,21 @@ describe('HomeScreen (spec 053) — the create-a-challenge landing', () => {
     expect(screen.getByTestId('unified-modal')).toBeInTheDocument()
   })
 
-  it('My rewards opens My Wagers (US3)', () => {
+  it('My Wagers opens the My Wagers modal (US3)', () => {
     renderHome()
     expect(screen.queryByTestId('my-wagers-modal')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /my rewards/i }))
+    fireEvent.click(screen.getByRole('button', { name: /my wagers/i }))
     expect(screen.getByTestId('my-wagers-modal')).toBeInTheDocument()
+  })
+
+  it('hides the secondary actions while the create panel is on its oracle path (design feedback)', () => {
+    renderHome()
+    expect(screen.getByRole('button', { name: /accept a challenge/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /my wagers/i })).toBeInTheDocument()
+    // The panel reports it switched to the oracle path → the secondary actions collapse.
+    fireEvent.click(screen.getByRole('button', { name: /enter oracle mode/i }))
+    expect(screen.queryByRole('button', { name: /accept a challenge/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /my wagers/i })).toBeNull()
   })
 
   it('a ticker pick routes the create view into its oracle path (US2)', () => {

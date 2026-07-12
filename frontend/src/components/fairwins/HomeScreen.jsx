@@ -40,6 +40,9 @@ function HomeScreen() {
   const [unifiedAutoResolve, setUnifiedAutoResolve] = useState(false)
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [initialWagerId, setInitialWagerId] = useState(null)
+  // While the create panel is on its oracle path, hide the secondary actions so the
+  // taller oracle form (market + side picker) fits without scrolling (design feedback).
+  const [oracleMode, setOracleMode] = useState(false)
 
   // Feed → wager navigation (spec 012): open My Wagers on a specific wager, then clear state.
   useEffect(() => {
@@ -101,19 +104,23 @@ function HomeScreen() {
           embedded
           initialResolutionType={oraclePreselect ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
           initialMarket={oracleMarket}
+          onOracleModeChange={setOracleMode}
           onDone={handleCreated}
         />
       </section>
 
-      {/* Secondary actions: take a challenge, and view winnings/rewards. */}
-      <section className="home-actions" aria-label="Other actions">
-        <button type="button" className="fm-btn-secondary home-action" onClick={openAccept}>
-          Accept a challenge
-        </button>
-        <button type="button" className="fm-btn-secondary home-action" onClick={() => setShowMyWagers(true)}>
-          My rewards
-        </button>
-      </section>
+      {/* Secondary actions: take a challenge, and view winnings. Hidden on the oracle
+          path so the taller oracle form fits without scrolling (design feedback). */}
+      {!oracleMode && (
+        <section className="home-actions" aria-label="Other actions">
+          <button type="button" className="fm-btn-secondary home-action" onClick={openAccept}>
+            Accept a challenge
+          </button>
+          <button type="button" className="fm-btn-secondary home-action" onClick={() => setShowMyWagers(true)}>
+            My Wagers
+          </button>
+        </section>
+      )}
 
       {/* Polymarket ticker — picks route into the create view's oracle path. */}
       <section className="dashboard-section home-ticker">

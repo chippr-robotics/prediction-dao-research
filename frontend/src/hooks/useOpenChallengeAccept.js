@@ -235,7 +235,15 @@ export function useOpenChallengeAccept() {
       try {
         await registry.acceptOpenWager.staticCall(wagerId, signature, { from: actor })
       } catch (sim) {
-        throw new Error(translateAcceptRevert(sim.reason || sim.shortMessage || sim.message || ''))
+        const raw = sim.reason || sim.shortMessage || sim.message || ''
+        // A not-yet-granted allowance is expected here: the approve above is batched with the
+        // accept and runs first, so the isolated pre-flight would spuriously revert on it and
+        // deadlock a fresh passkey taker. Only that case is swallowed; every real revert
+        // (expired, wrong signature, membership, …) is still surfaced.
+        const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
+        if (!(isAllowanceRevert && allowance < stake)) {
+          throw new Error(translateAcceptRevert(raw))
+        }
       }
       onProgress({ step: 'accept', message: 'Confirm acceptance in your wallet…' })
       calls.push({

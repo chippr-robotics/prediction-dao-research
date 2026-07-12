@@ -9,6 +9,8 @@ const h = vi.hoisted(() => ({
   allowance: 0n,
   balance: 100_000_000n,
   calls: [],
+  // When set, the createOpenWager pre-flight staticCall rejects with this reason.
+  staticCallReject: null,
   sendCalls: vi.fn(async () => ({ txHash: '0xpasskeytx' })),
   signer: { provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) } },
   provider: {
@@ -61,7 +63,10 @@ vi.mock('ethers', async () => {
         h.calls.push('create')
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1, hash: '0xcreate', logs: [] }) })
       }
-      createOpenWager.staticCall = () => Promise.resolve()
+      createOpenWager.staticCall = () =>
+        h.staticCallReject
+          ? Promise.reject(Object.assign(new Error(h.staticCallReject), { reason: h.staticCallReject }))
+          : Promise.resolve()
       return {
         interface: { encodeFunctionData: vi.fn(() => '0xcreatecalldata'), parseLog: () => null },
         createOpenWager,
@@ -94,6 +99,7 @@ describe('useOpenChallengeCreate', () => {
     h.allowance = 0n
     h.balance = 100_000_000n
     h.calls.length = 0
+    h.staticCallReject = null
     h.signer = { provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) } }
     h.sendCalls.mockReset().mockResolvedValue({ txHash: '0xpasskeytx' })
     h.provider.getTransactionReceipt.mockReset().mockResolvedValue({ status: 1, hash: '0xpasskeytx', logs: [] })
@@ -122,5 +128,39 @@ describe('useOpenChallengeCreate', () => {
     expect(h.sendCalls).toHaveBeenCalledTimes(1)
     expect(h.sendCalls.mock.calls[0][0]).toHaveLength(2) // approve + create
     expect(h.calls).toEqual([])
+  })
+
+  it('does not let the isolated pre-flight block a passkey creator on a not-yet-granted allowance', async () => {
+    // A fresh passkey smart account has 0 allowance; the approve is batched with create,
+    // so the pre-flight staticCall reverts on the allowance. This must NOT be fatal —
+    // otherwise the account can never post its first challenge.
+    h.loginMethod = 'passkey'
+    h.allowance = 0n
+    h.staticCallReject = 'ERC20: transfer amount exceeds allowance'
+    const { result } = renderHook(() => useOpenChallengeCreate())
+    let out
+    await act(async () => {
+      out = await result.current.createOpenChallenge({ stake: '10', acceptDeadline: 1000, resolveDeadline: 2000 })
+    })
+    expect(out.txHash).toBe('0xpasskeytx')
+    // The batched approve + create still submits (the allowance is granted before create runs).
+    expect(h.sendCalls).toHaveBeenCalledTimes(1)
+    expect(h.sendCalls.mock.calls[0][0]).toHaveLength(2)
+  })
+
+  it('still surfaces a real pre-flight revert (e.g. membership gate) even before approve', async () => {
+    h.allowance = 0n
+    h.staticCallReject = 'InsufficientMembershipTier()'
+    const { result } = renderHook(() => useOpenChallengeCreate())
+    let err
+    await act(async () => {
+      try {
+        await result.current.createOpenChallenge({ stake: '10', acceptDeadline: 1000, resolveDeadline: 2000 })
+      } catch (e) { err = e }
+    })
+    expect(err?.message).toMatch(/silver/i)
+    // The gate stopped it before any write.
+    expect(h.calls).toEqual([])
+    expect(h.sendCalls).not.toHaveBeenCalled()
   })
 })
