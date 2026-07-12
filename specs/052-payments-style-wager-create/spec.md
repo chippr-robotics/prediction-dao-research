@@ -192,8 +192,12 @@ description, with the same interaction behavior.
   ignore keystrokes that would violate this.
 - **FR-008**: The value submitted to the create action MUST equal the amount shown
   in the hero, preserving the existing equal-stake (each-side) semantics.
-- **FR-009**: The wager description MUST be presented as a secondary, memo-style
-  field positioned below and visually subordinate to the amount.
+- **FR-009**: On surfaces that have a free-text wager description (Open Challenge,
+  1v1 create-a-wager), that description MUST be presented as a secondary, memo-style
+  field positioned below and visually subordinate to the amount. Surfaces whose
+  description is auto-composed (Oracle Open Challenge) or absent (Wager Pool) MUST
+  NOT invent a memo field; their primary context (market/side selection, pool
+  settings) is presented below the hero instead.
 - **FR-010**: The redesign MUST retain every control available in today's create
   sheets — resolution-path selection (either-side / third-party arbitrator), oracle
   market/side selection where applicable, arbitrator address entry (including its

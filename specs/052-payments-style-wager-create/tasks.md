@@ -63,7 +63,7 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 - [ ] T012 [US1] In `frontend/src/components/fairwins/OpenChallengeModal.jsx` (`MakerPanel`), replace the `fm-stake-input-wrapper` block (lines ~208–226) with `<AmountKeypad value={stake} onChange={setStake} prefix="$" token="USDC" disabled={busy} />`; preserve the existing `onBlur` `toFixed(2)` normalization behavior (apply on submit/blur equivalent).
 - [ ] T013 [US1] Reflow `MakerPanel`'s form in `frontend/src/components/fairwins/OpenChallengeModal.jsx` so the amount hero renders at the top of the sheet, above the description and details.
 - [ ] T014 [P] [US1] Add shared payments-layout helper classes (hero region wrapper, details region) in `frontend/src/components/fairwins/FriendMarketsModal.css` (and any Open-Challenge-specific bits in `frontend/src/components/fairwins/OpenChallengeModal.css`) using existing tokens.
-- [ ] T015 [US1] Add/extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — assert `AmountKeypad` renders on the Open Challenge sheet and that entering via the pad then submitting passes the hero value as `stake` to the mocked `createOpenChallenge`.
+- [ ] T015 [US1] Add/extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — assert `AmountKeypad` renders on the Open Challenge sheet and that entering via the pad then submitting passes the hero value as `stake` to the mocked `createOpenChallenge`. Also assert the zero-state keeps the primary action disabled (FR-016) and that the membership gate + claim-code result path (`ClaimCodeResultPanel`) are unchanged (FR-012).
 
 **Checkpoint**: A user can enter a stake on Open Challenge using only the pad, amount is the hero (SC-001, SC-002 for this surface).
 
@@ -104,10 +104,10 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 - [ ] T021 [P] [US4] Adopt `AmountKeypad` in `frontend/src/components/fairwins/OracleOpenChallengeModal.jsx` (`OracleMakerPanel`) — hero = `stake` (`prefix="$"`, `token="USDC"`); place the selected-market card + YES/NO side picker as the primary context under the hero (auto-composed description stays); derived read-only timeline in the details region. Replace the `fm-stake` block (lines ~307–323).
 - [ ] T022 [P] [US4] Oracle layout CSS adjustments in `frontend/src/components/fairwins/OracleOpenChallengeModal.css` for the hero/context/details ordering.
-- [ ] T023 [US4] Adopt `AmountKeypad` in `frontend/src/components/fairwins/FriendMarketsModal.jsx` (1v1) — hero = `stakeAmount` with **token-driven prefix** (`$` for STABLE/CUSTOM, symbol/none otherwise); keep the multi-token `<select>` adjacent to the hero and the custom-token address field + `min 0.1 / max 1000` validation in `validateForm` unchanged; demote `description` to a memo. Replace the `fm-stake` block (lines ~1481–1530).
+- [ ] T023 [US4] Adopt `AmountKeypad` in `frontend/src/components/fairwins/FriendMarketsModal.jsx` (1v1) — hero = `stakeAmount` with **token-driven prefix** (`$` for STABLE/CUSTOM, symbol/none otherwise); keep the multi-token `<select>` adjacent to the hero and the custom-token address field + `min 0.1 / max 1000` validation in `validateForm` unchanged; demote `description` to a memo (this also satisfies US2 for the 1v1 surface, FR-009). Replace the `fm-stake` block (lines ~1481–1530).
 - [ ] T024 [P] [US4] 1v1 hero/memo/details layout CSS in `frontend/src/components/fairwins/FriendMarketsModal.css` (accommodate the adjacent token `<select>`).
 - [ ] T025 [P] [US4] Adopt `AmountKeypad` in `frontend/src/components/fairwins/GroupPoolModal.jsx` (`CreatePanel`) — hero = `buyIn` (`prefix="$"`, `token="USDC"`, label "Buy-in — each member"); details region keeps max-members input, approval-threshold `PillSelect`, and join/resolve `DeadlineTimeline`; do NOT invent a memo field (pools have none). Replace the `fm-stake` block (lines ~245–271).
-- [ ] T026 [US4] Add per-surface wiring tests under `frontend/src/components/fairwins/__tests__/` — for Oracle, 1v1 (incl. token-driven prefix), and Pool: `AmountKeypad` renders and the submitted amount equals the hero value via the mocked submit hook (`createOpenChallenge` / `createFriendMarket` / `createPool`).
+- [ ] T026 [US4] Add per-surface wiring tests under `frontend/src/components/fairwins/__tests__/` — for Oracle, 1v1 (incl. token-driven prefix), and Pool: `AmountKeypad` renders and the submitted amount equals the hero value via the mocked submit hook (`createOpenChallenge` / `createFriendMarket` / `createPool`). Each also asserts the surface's existing gating and success/claim-code (or pool share) outcome is unchanged (FR-012).
 
 **Checkpoint**: All four surfaces present the consistent payments-style layout (SC-006) with no capability loss (SC-003).
 
@@ -119,7 +119,7 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 - [ ] T027 [P] Run the a11y audit (axe/Lighthouse) on all four create sheets and fix any new violations introduced by the keypad/hero/memo (SC-005, Constitution V).
 - [ ] T028 [P] Verify responsive behavior at the 320px viewport and `prefers-reduced-motion` on all four sheets (hero legible, pad usable, no horizontal overflow).
-- [ ] T029 Run `specs/052-payments-style-wager-create/quickstart.md` Scenarios A–F against all four surfaces and record results.
+- [ ] T029 Run `specs/052-payments-style-wager-create/quickstart.md` Scenarios A–F against all four surfaces and record results. Include an **SC-007 tap-count parity check**: for an equivalent wager, count taps/steps to create in the redesigned flow vs. the pre-redesign flow per surface and confirm the redesign adds no extra steps.
 - [ ] T030 [P] Run `npm run test:frontend` and the lint/build gates; ensure green with no new warnings accumulated.
 - [ ] T031 Update any docs/screenshots referencing the old form-first create sheets, if present under `docs/`.
 
