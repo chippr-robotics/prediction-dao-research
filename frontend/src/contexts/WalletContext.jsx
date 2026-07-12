@@ -11,6 +11,7 @@ import {
 } from '../utils/roleStorage'
 import { hasRoleOnChain } from '../utils/blockchainService'
 import { WalletContext } from './WalletContext'
+import { beginTx, publishLifecycle, failTx } from '../lib/passkey/txProgressBus'
 
 export function WalletProvider({ children }) {
   // Wagmi hooks for wallet connection
@@ -121,11 +122,42 @@ export function WalletProvider({ children }) {
           import('../lib/passkey/sendBatch'),
           import('../connectors/passkey'),
         ])
-        // Pin the ceremony to the credential this session signed in with —
-        // never a different passkey that happens to share the address book
-        // (spec 045 US3/FR-008). `onState` (optional) surfaces the honest
-        // submitted→included|failed|stalled lifecycle to the caller's UI.
-        return sendPasskeyBatch({ chainId, address, calls, credentialId: readSession()?.credentialId, onState })
+        // Publish the honest lifecycle to the global progress overlay so EVERY
+        // passkey write (transfer, vouchers, wagers, tokens, swap, DAO, custody)
+        // shows a signature → submission → confirmation walk-through instead of a
+        // frozen "Sending…". The caller's own `onState` (if any) still fires — the
+        // bus is additive, and a broken listener never breaks the batch.
+        beginTx({ chainId })
+        const observe = (s) => {
+          try {
+            publishLifecycle(s)
+          } catch {
+            /* progress is best-effort */
+          }
+          try {
+            onState?.(s)
+          } catch {
+            /* caller observer must not break submission */
+          }
+        }
+        try {
+          // Pin the ceremony to the credential this session signed in with —
+          // never a different passkey that happens to share the address book
+          // (spec 045 US3/FR-008).
+          return await sendPasskeyBatch({
+            chainId,
+            address,
+            calls,
+            credentialId: readSession()?.credentialId,
+            onState: observe,
+          })
+        } catch (err) {
+          // A throw (revert surfaced, or no submission path) never reaches the
+          // lifecycle observer — reflect it so the overlay shows the failure
+          // instead of vanishing mid-flight.
+          failTx(err?.shortMessage || err?.message || 'Transaction failed.')
+          throw err
+        }
       }
       if (!signer) throw new Error('No signer available')
       const receipts = []
