@@ -66,14 +66,11 @@ export default function GroupPoolModal({ isOpen, onClose }) {
             <div className="fm-brand">
               <span className="fm-brand-icon" aria-hidden="true">&#128101;</span>
               <h2 id="group-pool-title">Group Pool</h2>
-            </div>
-            <p className="fm-subtitle">
-              A larger pool — share four words so friends can join
               <InfoTip label="About group pools">
                 Everyone pays the same buy-in into one pot. When it&apos;s decided, you propose the payout and the
                 group approves it anonymously.
               </InfoTip>
-            </p>
+            </div>
           </div>
           <button className="fm-close-btn" onClick={onClose} aria-label="Close modal">
             <CloseIcon />
@@ -258,12 +255,6 @@ function CreatePanel({ onClose }) {
           ariaLabel="Buy-in, each member"
           id="gp-buyin"
         />
-        <p className="fm-pay-hero-caption">
-          Buy-in — each member
-          <InfoTip label="About: Buy-in — each member">
-            Enter the amount in USD. Only USDC is supported for group pools on this network.
-          </InfoTip>
-        </p>
       </div>
 
       {/* Pool settings grouped as compact details below the hero. */}

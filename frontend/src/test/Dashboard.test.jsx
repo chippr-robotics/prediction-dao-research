@@ -18,12 +18,13 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
   ) : null,
 }))
 
-// Stub the unified phrase lookup (spec 037) so we assert the Dashboard wiring — the "Enter a Phrase"
-// quick action and the ?oc=take&code= deep-link reroute — without its resolver/hook internals.
-// Stub the oracle open challenge modal (spec 041) to assert the Dashboard card wiring
-// without the picker/create internals (covered by OracleOpenChallengeModal.test.jsx).
-vi.mock('../components/fairwins/OracleOpenChallengeModal', () => ({
-  default: ({ isOpen }) => isOpen ? <div data-testid="oracle-open-challenge-modal" /> : null,
+// Stub the Open Challenge modal (spec 052 consolidates oracle settlement into it) so we can assert
+// the Dashboard card wiring — including which initial resolution path the card opens it on — without
+// the picker/create internals (covered by OpenChallengeModal.test.jsx).
+vi.mock('../components/fairwins/OpenChallengeModal', () => ({
+  default: ({ isOpen, initialResolutionType }) => isOpen ? (
+    <div data-testid="open-challenge-modal" data-initial-resolution={initialResolutionType ?? ''} />
+  ) : null,
 }))
 
 vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
