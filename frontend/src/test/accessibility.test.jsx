@@ -253,7 +253,9 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
 
   it('has no axe violations with an info bubble open (spec 039 FR-007)', async () => {
     const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('button', { name: 'About: How is it resolved?' }))
+    // The "How is it resolved?" InfoTip was removed (spec 054); use a surviving
+    // field explainer to exercise the info-bubble-open a11y state.
+    fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
     expect(screen.getByRole('note')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
