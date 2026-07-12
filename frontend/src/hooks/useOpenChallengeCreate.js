@@ -109,11 +109,23 @@ export function useOpenChallengeCreate() {
       ]
 
       // Pre-flight to surface a clear revert (e.g. Silver-tier gate) before the wallet prompt.
+      // The stake is pulled with transferFrom, so simulating createOpenWager in isolation also
+      // exercises the token allowance. When the stake token isn't approved yet the approve leg
+      // runs first — batched atomically for passkey/smart accounts, sequential for EOAs — so the
+      // allowance IS in place by the time create executes. Treat a not-yet-granted-allowance
+      // revert here as expected (never fatal): otherwise the isolated pre-flight would spuriously
+      // fail and permanently block first-time creators (a fresh passkey account has 0 allowance
+      // and no way to pre-approve, so it can never get past this check). Every other revert
+      // (Silver-tier gate, bad deadlines, resolved condition, …) is still surfaced for all users.
       onProgress({ step: 'create', message: 'Validating…' })
       try {
         await registry.createOpenWager.staticCall(...args, { from: actor })
       } catch (sim) {
-        throw new Error(translateOpenCreateRevert(sim.reason || sim.shortMessage || sim.message || ''))
+        const raw = sim.reason || sim.shortMessage || sim.message || ''
+        const isAllowanceRevert = /(exceeds|insufficient) allowance/i.test(raw)
+        if (!(isAllowanceRevert && allowance < stakeWei)) {
+          throw new Error(translateOpenCreateRevert(raw))
+        }
       }
 
       let receipt
