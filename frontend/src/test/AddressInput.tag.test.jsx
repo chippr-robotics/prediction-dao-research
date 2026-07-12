@@ -34,6 +34,8 @@ describe('AddressInput — wager tag entry (spec 054)', () => {
     expect(screen.getByText(/0x1111\.\.\.1111/)).toBeInTheDocument()
     // verification marker present for a verified tag
     expect(screen.getByLabelText(/verified/i)).toBeInTheDocument()
+    // abuse-report affordance is offered on a resolved counterparty tag (FR-025)
+    expect(screen.getByRole('link', { name: /report/i })).toBeInTheDocument()
     // the tag-resolved address is reported to the parent (committable)
     expect(onResolvedChange).toHaveBeenLastCalledWith(OWNER)
   })
@@ -50,5 +52,16 @@ describe('AddressInput — wager tag entry (spec 054)', () => {
     render(<AddressInput id="c" value={OWNER} onChange={() => {}} onResolvedChange={onResolvedChange} />)
     expect(screen.queryByText(/resolves to:/i)).not.toBeInTheDocument()
     expect(onResolvedChange).toHaveBeenLastCalledWith(OWNER)
+  })
+
+  it('degrades gracefully when the registry is unreachable — no error, no false address (FR-013/SC-008)', () => {
+    // Soft-fail state useTagResolution returns for a tag-shaped input it could not resolve
+    // (undeployed / unreachable registry): isTag true, but address/status/message all null.
+    Object.assign(tagState, { isTag: true, address: null, status: null, message: null })
+    render(<AddressInput id="d" value="%chipprbots" onChange={() => {}} onResolvedChange={onResolvedChange} />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/resolves to:/i)).not.toBeInTheDocument()
+    // No committable address is fabricated; the field falls back to whatever ENS/raw entry produced (null here).
+    expect(onResolvedChange).toHaveBeenLastCalledWith(null)
   })
 })

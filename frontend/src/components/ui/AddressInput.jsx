@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useCallback } from 'react'
 import { useEnsResolution, useEnsReverseLookup } from '../../hooks/useEnsResolution'
 import { useTagResolution } from '../../hooks/useTagResolution'
-import { formatTag, isValidTag } from '../../lib/tags/normalizeTag'
+import { formatTag, isValidTag, normalizeTag } from '../../lib/tags/normalizeTag'
 import { TagStatus } from '../../lib/tags/resolveTag'
+import ReportTagButton from '../tags/ReportTagButton'
 import AddressInputBookAddon from './AddressInputBookAddon'
 import styles from './AddressInput.module.css'
 
@@ -101,6 +102,16 @@ const AddressInput = forwardRef(({
   const showSuccess = effectiveResolvedAddress && !hasError && !showLoading
   const showEnsLabel = isEns && !isLoading
   const showTagResolved = tagRes.isTag && !!tagRes.address && !showLoading && !hasError
+
+  // Canonical form of a resolved tag (no `%`), for display + the abuse-report affordance.
+  let canonicalTag = ''
+  if (showTagResolved) {
+    try {
+      canonicalTag = normalizeTag(value)
+    } catch {
+      canonicalTag = ''
+    }
+  }
 
   // Format address for display
   const formatAddress = (addr) => {
@@ -201,6 +212,14 @@ const AddressInput = forwardRef(({
           <code className={styles.resolvedAddress}>{formatAddress(tagRes.address)}</code>
           {tagRes.verified && (
             <span className={styles.ensLabel} aria-label="Verified business tag" title="Verified">✓</span>
+          )}
+          {canonicalTag && (
+            <ReportTagButton
+              tag={canonicalTag}
+              address={tagRes.address}
+              chainId={chainId}
+              className={styles.reportLink}
+            />
           )}
         </div>
       )}

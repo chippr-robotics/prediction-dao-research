@@ -81,11 +81,11 @@ a tagless account still transacts normally (FR-001a).
 - [X] T013 [US1] Implement `makeCommitment` + `commit` + `register` in `WagerTagRegistry.sol` (commit–reveal `[minCommitmentAge, maxCommitmentAge]`; guards: canonical, not reserved, not registered, not quarantined, caller holds no tag, `_requireGold`, `_requireNotSanctioned`; set `records`/`tagHashOf`; emit `TagCommitted`/`TagRegistered`) (FR-001/002/006, research R3)
 - [X] T014 [US1] Implement gasless twins `commitWithSig` + `registerWithSig` in `WagerTagRegistry.sol` via `SignerIntentBase._verifyIntent` (`CommitTagIntent`/`RegisterTagIntent` typehashes; signer must equal `owner`) with self-submit fallback intact
 - [X] T015 [P] [US1] Add `CommitTagIntent` + `RegisterTagIntent` structs to `frontend/src/lib/relay/intentTypes.js` — byte-identical to the typehashes (three-way sync rule)
-- [ ] T016 [P] [US1] Add the same structs + policy allowlist entries to `services/relay-gateway/src/intent/intentTypes.js` (with a Gold-tier pre-screen note so the gateway doesn't relay a call that will revert)
+- [X] T016 [P] [US1] Add the same structs + policy allowlist entries to `services/relay-gateway/src/intent/intentTypes.js` (with a Gold-tier pre-screen note so the gateway doesn't relay a call that will revert)
 - [X] T017 [P] [US1] Implement `normalizeTag` / `isTagLike` / `formatTag` in `frontend/src/lib/tags/normalizeTag.js` (single source shared with tests; `formatTag` → `%<tag>`, FR-015)
 - [X] T018 [P] [US1] Add the `WagerTagRegistry` ABI to `frontend/src/abis/wagerTagRegistry.js` (hand-maintained per repo convention — sync script only does addresses)
-- [ ] T019 [US1] Create `frontend/src/components/account/WagerTagPanel.jsx` — two-step commit→register UI (second step enabled after commit ages), gated on `useRoleDetails('WAGER_PARTICIPANT').tier >= MembershipTier.GOLD`, upgrade prompt (not a dead control) for below-Gold, and **Gold-specific** copy for the `InsufficientMembershipTier` revert (must NOT reuse the Silver open-challenge wording — research R5)
-- [ ] T020 [US1] Mount `WagerTagPanel` in the account settings surface (`frontend/src/pages/WalletPage.jsx` Account/Membership tab) as an optional, non-forced perk — no onboarding/transaction step requires a tag (FR-001a)
+- [X] T019 [US1] Create `frontend/src/components/account/WagerTagPanel.jsx` — two-step commit→register UI (second step enabled after commit ages), gated on `useRoleDetails('WAGER_PARTICIPANT').tier >= MembershipTier.GOLD`, upgrade prompt (not a dead control) for below-Gold, and **Gold-specific** copy for the `InsufficientMembershipTier` revert (must NOT reuse the Silver open-challenge wording — research R5)
+- [X] T020 [US1] Mount `WagerTagPanel` in the account settings surface (`frontend/src/pages/WalletPage.jsx` Account/Membership tab) as an optional, non-forced perk — no onboarding/transaction step requires a tag (FR-001a)
 - [ ] T021 [US1] Integration test `test/integration/wagerTagRegistry.membership.test.js` against a real `MembershipManager` proxy — Gold/Platinum register succeeds, Silver/Bronze/None revert, and a tagless account completes a full wager create/transfer (FR-001a; SC-011)
 
 **Checkpoint**: US1 fully functional — registration works, tier-gated, optional, snipe-proof.
@@ -104,14 +104,14 @@ tag" with no near-match; sanctions still apply to the resolved address.
 ### Tests for User Story 2 (write first, must FAIL)
 
 - [X] T022 [P] [US2] Unit tests in `test/wagerTagRegistry.test.js` — `resolve` returns owner + `ACTIVE`; unknown tag → `NONE` (never a near-match, SC-005); `tagOf` reverse only reports a tag whose forward resolution matches (FR-008 invariant); `isAvailable` correctness
-- [ ] T023 [P] [US2] Frontend tests `frontend/src/lib/tags/__tests__/resolveTag.test.js` + an `AddressInput` tag-entry test (`%tag` → resolved address shown; non-`ACTIVE` not committable; raw-address entry unaffected)
+- [X] T023 [P] [US2] Frontend tests `frontend/src/lib/tags/__tests__/resolveTag.test.js` + an `AddressInput` tag-entry test (`%tag` → resolved address shown; non-`ACTIVE` not committable; raw-address entry unaffected)
 
 ### Implementation for User Story 2
 
 - [X] T024 [US2] Implement resolution views `resolve(tag)` / `tagOf(address)` / `isAvailable(tag)` in `WagerTagRegistry.sol` — exact-match only after normalization, reverse guarded by the forward==reverse invariant (FR-008/010)
 - [X] T025 [P] [US2] Implement `resolveTag` + `lookupTagOf` in `frontend/src/lib/tags/resolveTag.js` — read the contract via `getContractAddressForChain`; return `{ address, status, verified, tag }`; errors → soft-fail (FR-013)
-- [ ] T026 [US2] Integrate tag entry into `frontend/src/components/ui/AddressInput.jsx` — `isTagLike` input → `resolveTag` → render resolved full address + verification badge in the existing confirmation affordance; only `ACTIVE` is committable; raw-address entry always available and never required; sanctions run on the resolved address (FR-009/011/012)
-- [ ] T027 [P] [US2] `AddressInput` tests in `frontend/src/test/` — confirmation shows full address (SC-007), non-`ACTIVE` blocked, and registry-unreachable degrades to raw entry (FR-013; SC-008)
+- [X] T026 [US2] Integrate tag entry into `frontend/src/components/ui/AddressInput.jsx` — `isTagLike` input → `resolveTag` → render resolved full address + verification badge in the existing confirmation affordance; only `ACTIVE` is committable; raw-address entry always available and never required; sanctions run on the resolved address (FR-009/011/012)
+- [X] T027 [P] [US2] `AddressInput` tests in `frontend/src/test/` — confirmation shows full address (SC-007), non-`ACTIVE` blocked, and registry-unreachable degrades to raw entry (FR-013; SC-008)
 
 **Checkpoint**: MVP complete — register (US1) + resolve/send (US2) work end-to-end.
 
@@ -158,9 +158,9 @@ cancellable, and finalizes after; a below-Gold-past-grace tag becomes reclaimabl
 - [X] T034 [US4] Implement `requestRepoint` / `cancelRepoint` / `finalizeRepoint` in `WagerTagRegistry.sol` — 48h delay, **tier-exempt**, `finalizeRepoint` permissionless after delay, atomic owner + `tagHashOf` move; emit repoint events (FR-022)
 - [X] T035 [US4] Implement permissionless `reclaimLapsed(tagHash)` in `WagerTagRegistry.sol` (`getActiveTier(owner, membershipRole) < minTier` AND `now > expiresAt + lapseGrace`) and extend `_statusOf` with `REPOINTING`/`QUARANTINED`/`SUSPENDED`/`LAPSED_RECLAIMABLE` (FR-021; data-model.md §status)
 - [X] T036 [US4] Implement gasless twins `releaseWithSig` / `changeTagWithSig` / `requestRepointWithSig` / `cancelRepointWithSig` in `WagerTagRegistry.sol` (intents pin `tagHash`; `finalizeRepoint`/`reclaimLapsed` need no twin)
-- [ ] T037 [P] [US4] Add `ReleaseTagIntent` / `ChangeTagIntent` / `RequestRepointIntent` / `CancelRepointIntent` structs to `frontend/src/lib/relay/intentTypes.js` AND `services/relay-gateway/src/intent/intentTypes.js` (byte-identical; gateway policy: short `validBefore` for repoint)
-- [ ] T038 [US4] Extend `frontend/src/components/account/WagerTagPanel.jsx` with change / release / repoint flows surfacing each window (next-change date, 90-day quarantine, 48h "address changing" state + cancel) — honest finality (constitution III)
-- [ ] T039 [US4] Make resolve consumers refuse `REPOINTING`/`QUARANTINED`/`SUSPENDED` for value-bearing actions in `frontend/src/lib/tags/resolveTag.js` + `AddressInput.jsx` with truthful status messaging (FR-011/016/022; SC-009)
+- [X] T037 [P] [US4] Add `ReleaseTagIntent` / `ChangeTagIntent` / `RequestRepointIntent` / `CancelRepointIntent` structs to `frontend/src/lib/relay/intentTypes.js` AND `services/relay-gateway/src/intent/intentTypes.js` (byte-identical; gateway policy: short `validBefore` for repoint)
+- [X] T038 [US4] Extend `frontend/src/components/account/WagerTagPanel.jsx` with change / release / repoint flows surfacing each window (next-change date, 90-day quarantine, 48h "address changing" state + cancel) — honest finality (constitution III)
+- [X] T039 [US4] Make resolve consumers refuse `REPOINTING`/`QUARANTINED`/`SUSPENDED` for value-bearing actions in `frontend/src/lib/tags/resolveTag.js` + `AddressInput.jsx` with truthful status messaging (FR-011/016/022; SC-009)
 
 **Checkpoint**: Full lifecycle with takeover protections; MVP + US3 + US4 stable.
 
@@ -181,8 +181,8 @@ the marker everywhere; suspending a tag stops resolution while ownership and ass
 ### Implementation for User Story 5
 
 - [X] T041 [US5] Implement `setReserved` (CURATOR) / `setSuspended` (MODERATOR) / `setVerified` (VERIFIER) in `WagerTagRegistry.sol` + `SUSPENDED` status handling + events (FR-023/024/026)
-- [ ] T042 [P] [US5] Render the verification badge wherever `%tag` appears (`AddressInput` confirmation, `WagerTagPanel`, `useWagerTag` consumers) and never for unverified tags (FR-024)
-- [ ] T043 [P] [US5] Add an abuse-report affordance to `frontend/src/components/account/WagerTagPanel.jsx` / tag display (routes to the operator process; no backend — emits an on-chain report event or opens the operator contact path) (FR-025)
+- [X] T042 [P] [US5] Render the verification badge wherever `%tag` appears (`AddressInput` confirmation, `WagerTagPanel`, `useWagerTag` consumers) and never for unverified tags (FR-024)
+- [X] T043 [P] [US5] Add an abuse-report affordance to `frontend/src/components/account/WagerTagPanel.jsx` / tag display (routes to the operator process; no backend — emits an on-chain report event or opens the operator contact path) (FR-025)
 - [X] T044 [US5] Seed the reserved list at deploy — load `config/reserved-tags.json` in `scripts/deploy/deploy-wager-tag-registry.js` and batch `setReserved` (FR-004)
 
 **Checkpoint**: All five stories independently functional.
