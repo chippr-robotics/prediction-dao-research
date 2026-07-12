@@ -1,4 +1,4 @@
-# Data Model: Wager Tag Naming Registry (spec 053)
+# Data Model: Wager Tag Naming Registry (spec 054)
 
 ## On-chain state (`WagerTagRegistry`, UUPS proxy)
 

@@ -1,4 +1,4 @@
-# Contract Interface: `IWagerTagRegistry` (spec 053)
+# Contract Interface: `IWagerTagRegistry` (spec 054)
 
 New file `contracts/interfaces/IWagerTagRegistry.sol`; implemented by
 `contracts/naming/WagerTagRegistry.sol` (UUPS proxy: `UUPSManaged` + `SignerIntentBase`).

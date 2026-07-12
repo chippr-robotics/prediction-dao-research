@@ -1121,7 +1121,6 @@ function FriendMarketsModal({
               <span className="fm-brand-icon">&#127808;</span>
               <h2 id="friend-markets-modal-title">Wagers</h2>
             </div>
-            <p className="fm-subtitle">Private wagers with friends</p>
           </div>
           <button
             className="fm-close-btn"

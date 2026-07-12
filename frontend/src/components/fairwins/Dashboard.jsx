@@ -10,7 +10,7 @@ import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import { isCardVisible, subscribe as subscribeQuickAccess } from '../../utils/quickAccessPreference'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
-import OracleOpenChallengeModal from './OracleOpenChallengeModal'
+import { OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import GroupPoolModal from './GroupPoolModal'
 import UnifiedLookupModal from './UnifiedLookupModal'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
@@ -499,9 +499,11 @@ function Dashboard() {
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
-  const [showOracleOpenChallenge, setShowOracleOpenChallenge] = useState(false)
-  // A Polymarket market pre-selected via the ticker crawler (null when the flow
-  // is opened from the quick-action card and the picker starts empty).
+  // Oracle settlement is now a resolution path inside Open Challenge (spec 052/053);
+  // this preselects it when the sheet is opened from a Polymarket entry point.
+  const [openChallengeOracle, setOpenChallengeOracle] = useState(false)
+  // A Polymarket market pre-selected via the ticker crawler (main #877) — null when the
+  // flow is opened from the quick-action card and the picker starts empty.
   const [oracleInitialMarket, setOracleInitialMarket] = useState(null)
   const [showGroupPool, setShowGroupPool] = useState(false)
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
@@ -571,11 +573,14 @@ function Dashboard() {
         setShowCreateWager(true)
         break
       case 'open-challenge':
+        setOpenChallengeOracle(false)
         setShowOpenChallenge(true)
         break
       case 'oracle-open-challenge':
+        // Consolidated (spec 052/053): opens the Open Challenge sheet on its oracle path.
         setOracleInitialMarket(null)
-        setShowOracleOpenChallenge(true)
+        setOpenChallengeOracle(true)
+        setShowOpenChallenge(true)
         break
       case 'create-pool':
         setShowGroupPool(true)
@@ -600,8 +605,11 @@ function Dashboard() {
   }, [navigate])
 
   const handlePolymarketTickerClick = useCallback((market) => {
+    // Open the consolidated sheet on its oracle (Polymarket) path, with the clicked
+    // market pre-selected (main #877).
     setOracleInitialMarket(market || null)
-    setShowOracleOpenChallenge(true)
+    setOpenChallengeOracle(true)
+    setShowOpenChallenge(true)
   }, [])
 
   const handleQrScanSuccess = useCallback((decodedText) => {
@@ -691,7 +699,7 @@ function Dashboard() {
         <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
       </section>
 
-      {/* Polymarket ticker crawler — clicking a title opens Open Oracle Challenge. */}
+      {/* Polymarket ticker crawler — clicking a title opens the Open Challenge sheet's oracle path. */}
       <section className="dashboard-section">
         <PolymarketTickerCrawler onSelectMarket={handlePolymarketTickerClick} />
       </section>
@@ -708,25 +716,18 @@ function Dashboard() {
         resolutionCategory={createResolutionCategory}
       />
 
-      {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037). */}
+      {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037).
+          Oracle (Polymarket) settlement is a resolution path within it (spec 052/053); a ticker pick
+          pre-selects that market (main #877). */}
       <OpenChallengeModal
         key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
         isOpen={showOpenChallenge}
-        onClose={() => setShowOpenChallenge(false)}
+        initialResolutionType={openChallengeOracle ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
+        initialMarket={oracleInitialMarket}
+        onClose={() => { setShowOpenChallenge(false); setOpenChallengeOracle(false); setOracleInitialMarket(null) }}
         onBuyMembership={() => {
           setShowOpenChallenge(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })
-        }}
-      />
-
-      {/* Oracle Open Challenge (spec 041) — code-gated open challenge settled by a linked Polymarket market. */}
-      <OracleOpenChallengeModal
-        key={showOracleOpenChallenge ? 'ooc-open' : 'ooc-closed'}
-        isOpen={showOracleOpenChallenge}
-        initialMarket={oracleInitialMarket}
-        onClose={() => {
-          setShowOracleOpenChallenge(false)
-          setOracleInitialMarket(null)
         }}
       />
 

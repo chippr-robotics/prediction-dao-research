@@ -143,15 +143,12 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
   it('hides the static field explainers by default and reveals each from its icon, one at a time', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     expect(screen.queryByText(/the taker takes the opposite/i)).toBeNull()
-    expect(screen.queryByText(/only USDC is supported/i)).toBeNull()
     expect(screen.queryByText(/single-party self-resolution/i)).toBeNull()
 
+    // The stake caption + its InfoTip were removed to conserve space (spec 052 feedback);
+    // the remaining field explainers still reveal one at a time from their icons.
     fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
     expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
-
-    fireEvent.click(screen.getByRole('button', { name: 'About: Stake — each side' }))
-    expect(screen.getAllByRole('note')).toHaveLength(1)
-    expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
 
     fireEvent.click(screen.getByRole('button', { name: 'About: How is it resolved?' }))
     expect(screen.getByRole('note')).toHaveTextContent(/single-party self-resolution/i)

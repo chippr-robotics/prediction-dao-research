@@ -1,4 +1,4 @@
-# Research: Wager Tag Naming Registry (spec 053)
+# Research: Wager Tag Naming Registry (spec 054)
 
 All Technical Context unknowns resolved. Each decision below records what was chosen, why,
 and what was rejected.

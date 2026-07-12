@@ -1,4 +1,4 @@
-# Quickstart Validation: Wager Tag Naming Registry (spec 053)
+# Quickstart Validation: Wager Tag Naming Registry (spec 054)
 
 Runnable scenarios proving the feature end-to-end. Interfaces:
 [contracts/wager-tag-registry-interface.md](./contracts/wager-tag-registry-interface.md);

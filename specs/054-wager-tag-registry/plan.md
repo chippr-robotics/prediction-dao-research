@@ -2,7 +2,7 @@
 
 **Branch**: `claude/wager-tag-registry-lmikng` | **Date**: 2026-07-12 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/053-wager-tag-registry/spec.md`
+**Input**: Feature specification from `/specs/054-wager-tag-registry/spec.md`
 
 ## Summary
 
@@ -82,7 +82,7 @@ touched + 1 settings panel + deploy script
 ### Documentation (this feature)
 
 ```text
-specs/053-wager-tag-registry/
+specs/054-wager-tag-registry/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — 10 resolved decisions
 ├── data-model.md        # Phase 1 — storage, roles, statuses, transitions

@@ -1,4 +1,4 @@
-# EIP-712 Intent Schemas: Wager Tag Registry (spec 053)
+# EIP-712 Intent Schemas: Wager Tag Registry (spec 054)
 
 Domain: the registry's own (`name: "WagerTagRegistry"`, `version: "1"`, chainId,
 verifyingContract) via `SignerIntentBase` / `EIP712Upgradeable` — network + contract

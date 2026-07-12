@@ -12,7 +12,8 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 // Main flow
 import LandingPage from './components/LandingPage'
-import Dashboard from './components/fairwins/Dashboard'
+import HomeScreen from './components/fairwins/HomeScreen'
+import WagersPage from './components/fairwins/WagersPage'
 import Header from './components/Header'
 import Footer from './components/Footer'
 
@@ -140,9 +141,10 @@ function AppContent() {
 
         {/* App routes with header + wallet button */}
         <Route element={<AppLayout />}>
-          <Route path="/app" element={<Dashboard />} />
-          <Route path="/main" element={<Dashboard />} />
-          <Route path="/fairwins" element={<Dashboard />} />
+          <Route path="/app" element={<HomeScreen />} />
+          <Route path="/main" element={<HomeScreen />} />
+          <Route path="/fairwins" element={<HomeScreen />} />
+          <Route path="/wagers" element={<WagersPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />

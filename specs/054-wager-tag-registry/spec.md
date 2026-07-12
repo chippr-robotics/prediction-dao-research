@@ -1,6 +1,6 @@
 # Feature Specification: Wager Tag Naming Registry
 
-**Feature Branch**: `053-wager-tag-registry`
+**Feature Branch**: `054-wager-tag-registry`
 
 **Created**: 2026-07-12
 

@@ -261,11 +261,13 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
   it('info icons are keyboard operable: focus, Enter opens, Escape closes and restores focus (spec 039 FR-007)', async () => {
     const user = userEvent.setup()
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const icon = screen.getByRole('button', { name: 'About: Stake — each side' })
+    // The stake caption + its InfoTip were removed to conserve space (spec 052); use a
+    // surviving field explainer to exercise keyboard operability of the info icons.
+    const icon = screen.getByRole('button', { name: "About: What's the wager?" })
     icon.focus()
     expect(icon).toHaveFocus()
     await user.keyboard('{Enter}')
-    expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
+    expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
     expect(icon).toHaveFocus()
@@ -338,21 +340,27 @@ vi.mock('../hooks/usePolymarketMarket', () => ({
   }),
 }))
 
-import OracleOpenChallengeModal from '../components/fairwins/OracleOpenChallengeModal'
+import { OPEN_RESOLUTION_TYPES } from '../hooks/useOpenChallengeCreate'
 import TakeChallengePanel from '../components/fairwins/TakeChallengePanel'
 
-describe('Oracle open challenge accessibility (spec 041)', () => {
+// Oracle settlement is consolidated into the Open Challenge modal (spec 052/053) as a
+// network-gated resolution path; preselecting it opens the market-search step.
+describe('Oracle open challenge accessibility (spec 041 → consolidated)', () => {
   it('has no axe violations on the market-picker step', async () => {
-    const { container } = render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    const { container } = render(
+      <OpenChallengeModal isOpen initialResolutionType={OPEN_RESOLUTION_TYPES.Polymarket} onClose={() => {}} />
+    )
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
   it('has no axe violations on the configure step (side picker + stake + derived timeline)', async () => {
-    const { container } = render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
+    render(
+      <OpenChallengeModal isOpen initialResolutionType={OPEN_RESOLUTION_TYPES.Polymarket} onClose={() => {}} />
+    )
     fireEvent.click(screen.getByRole('button', { name: /pick market/i }))
     fireEvent.click(screen.getByRole('button', { name: /taking yes/i }))
-    const results = await axe(container)
+    const results = await axe(document.body)
     expect(results).toHaveNoViolations()
   })
 
