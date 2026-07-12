@@ -18,6 +18,7 @@ export function useActiveAccount() {
   const custody = useContext(CustodyContext)
   const active = custody?.active ?? PERSONAL
   const operateAsPersonal = custody?.operateAsPersonal ?? NOOP
+  const operateAsVault = custody?.operateAsVault ?? NOOP
   const { chainId, signer, provider } = useWallet()
   const isVault = active.mode === 'vault'
 
@@ -42,7 +43,7 @@ export function useActiveAccount() {
   // Whether a vault action can currently be sent (connected to the vault's network).
   const canActAsVault = isVault && Number(chainId) === Number(active.chainId)
 
-  return { identity: active, isVault, canActAsVault, submit, operateAsPersonal }
+  return { identity: active, isVault, canActAsVault, submit, operateAsPersonal, operateAsVault }
 }
 
 export default useActiveAccount

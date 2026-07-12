@@ -1,23 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-// TradePanel is the renamed, SDK-driven successor to SwapPanel. It must:
+// TradePanel is the brokerage-style order ticket for on-chain swaps. It must:
 //  - name/link the DEX provider for the active network (ETCswap on the ETC
 //    family, Uniswap elsewhere) while subtly attributing the Uniswap V3 protocol
 //    that powers routing (Spec 033 provider-awareness, preserved);
 //  - present a professional trade read-out (rate, price impact, minimum
-//    received, route) fed by getBestQuote().
-// We mock the DEX/wallet/token hooks so the component is exercised in isolation.
+//    received, route) fed by getBestQuote();
+//  - let the member trade as their personal wallet or as a saved multisig
+//    vault (Spec 043), with balances that follow the selected account;
+//  - offer the price types Uniswap V3 actually supports (Market, and Limit as
+//    immediate-or-cancel via amountOutMinimum) and gate perpetuals order types
+//    (Sell Short / Buy to Cover) on a per-network perps venue — hidden where
+//    none exists (honest-state).
+// We mock the DEX/wallet/token/account hooks so the component is exercised in
+// isolation.
 
-const { mockUseDex, mockUseWallet, mockUseChainTokens } = vi.hoisted(() => ({
+const {
+  mockUseDex,
+  mockUseWallet,
+  mockUseChainTokens,
+  mockUseActiveAccount,
+  mockUseCustodyVaults,
+} = vi.hoisted(() => ({
   mockUseDex: vi.fn(),
   mockUseWallet: vi.fn(),
   mockUseChainTokens: vi.fn(),
+  mockUseActiveAccount: vi.fn(),
+  mockUseCustodyVaults: vi.fn(),
 }))
 
 vi.mock('../hooks/useDex', () => ({ useDex: mockUseDex }))
 vi.mock('../hooks', () => ({ useWallet: mockUseWallet }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: mockUseChainTokens }))
+vi.mock('../hooks/useActiveAccount', () => ({ useActiveAccount: mockUseActiveAccount }))
+vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: mockUseCustodyVaults }))
 
 import TradePanel from '../components/fairwins/TradePanel'
 
@@ -58,6 +75,7 @@ function dexValue(overrides = {}) {
     slippage: 50,
     setSlippage: vi.fn(),
     addresses: ETC_ADDRESSES,
+    tokens: { STABLE: { decimals: 6, symbol: 'USC' }, WNATIVE: { decimals: 18, symbol: 'WETC' } },
     isDexAvailable: true,
     dexProvider: { name: 'ETCswap', url: 'https://v3.etcswap.org' },
     network: { name: 'Ethereum Classic', chainId: 61 },
@@ -68,14 +86,32 @@ function dexValue(overrides = {}) {
 const polygonDex = (overrides = {}) =>
   dexValue({
     addresses: POLYGON_ADDRESSES,
+    tokens: { STABLE: { decimals: 6, symbol: 'USDC' }, WNATIVE: { decimals: 18, symbol: 'WPOL' } },
     dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=polygon' },
     network: { name: 'Polygon', chainId: 137 },
     ...overrides,
   })
 
+function personalAccount(overrides = {}) {
+  return {
+    identity: { mode: 'personal' },
+    isVault: false,
+    canActAsVault: false,
+    submit: vi.fn(),
+    operateAsPersonal: vi.fn(),
+    operateAsVault: vi.fn(),
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockUseActiveAccount.mockReturnValue(personalAccount())
+  mockUseCustodyVaults.mockReturnValue({ vaults: [], supported: false })
+})
+
 describe('TradePanel — provider identity & attribution', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     mockUseWallet.mockReturnValue({ isConnected: true, chainId: 61 })
     mockUseChainTokens.mockReturnValue({ native: 'ETC', stable: 'USC' })
   })
@@ -136,7 +172,6 @@ describe('TradePanel — provider identity & attribution', () => {
 
 describe('TradePanel — SDK-driven trade read-out', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
     mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
   })
@@ -196,5 +231,174 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     expect(screen.getByRole('tab', { name: 'Swap' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Wrap' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Unwrap' })).toBeInTheDocument()
+  })
+})
+
+describe('TradePanel — account selection (spec 043)', () => {
+  beforeEach(() => {
+    mockUseWallet.mockReturnValue({
+      isConnected: true,
+      chainId: 137,
+      address: '0x1111222233334444555566667777888899990000',
+    })
+    mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
+    mockUseDex.mockReturnValue(polygonDex())
+  })
+
+  it('lists the personal wallet and every saved multisig, and shows account balances', () => {
+    mockUseCustodyVaults.mockReturnValue({
+      supported: true,
+      vaults: [
+        { address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
+        { address: '0xVaultBBB', chainId: 137, label: '' },
+      ],
+    })
+    render(<TradePanel />)
+
+    const picker = screen.getByLabelText('Account')
+    expect(picker).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Personal wallet · 0x1111…0000/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Ops Treasury · Multisig/ })).toBeInTheDocument()
+
+    // Available-to-trade figures for the selected account (pay leg = WPOL).
+    expect(screen.getByText(/Available to trade \(WPOL\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Cash available \(USDC\)/)).toBeInTheDocument()
+  })
+
+  it('switches the active identity when a multisig is selected', () => {
+    const operateAsVault = vi.fn()
+    const vault = { address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }
+    mockUseActiveAccount.mockReturnValue(personalAccount({ operateAsVault }))
+    mockUseCustodyVaults.mockReturnValue({ supported: true, vaults: [vault] })
+    render(<TradePanel />)
+
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '0xVaultAAA' } })
+    expect(operateAsVault).toHaveBeenCalledWith(vault)
+  })
+
+  it('discloses the proposal flow while operating as a multisig', () => {
+    mockUseActiveAccount.mockReturnValue(
+      personalAccount({
+        identity: { mode: 'vault', vaultAddress: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' },
+        isVault: true,
+        canActAsVault: true,
+      }),
+    )
+    mockUseCustodyVaults.mockReturnValue({
+      supported: true,
+      vaults: [{ address: '0xVaultAAA', chainId: 137, label: 'Ops Treasury' }],
+    })
+    render(<TradePanel />)
+
+    expect(screen.getByText('Multisig proposal')).toBeInTheDocument()
+    expect(screen.getByText(/proposed to the multisig/)).toBeInTheDocument()
+  })
+})
+
+describe('TradePanel — order & price types', () => {
+  beforeEach(() => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
+    mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
+  })
+
+  it('keeps order type and pair direction in sync (Buy receives the network asset)', () => {
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    // Default direction WPOL → USDC reads as Sell.
+    expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
+
+    fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
+    expect(screen.getByLabelText('Token to sell').value).toBe('STABLE')
+    expect(screen.getByLabelText('Token to buy').value).toBe('WNATIVE')
+
+    // Flipping the pair back flips the order type too.
+    fireEvent.change(screen.getByLabelText('Token to sell'), { target: { value: 'WNATIVE' } })
+    fireEvent.change(screen.getByLabelText('Token to buy'), { target: { value: 'STABLE' } })
+    expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
+  })
+
+  it('offers Market and Limit price types and passes the limit floor to swap()', async () => {
+    const swap = vi.fn().mockResolvedValue({})
+    mockUseDex.mockReturnValue(polygonDex({ swap }))
+    render(<TradePanel />)
+
+    fireEvent.change(screen.getByLabelText(/Price Type/), { target: { value: 'limit' } })
+    fireEvent.change(screen.getByLabelText(/Limit Price/), { target: { value: '1.3' } })
+    fireEvent.change(screen.getByLabelText('You pay'), { target: { value: '1' } })
+
+    // Limit orders are immediate-or-cancel — the term row says so honestly.
+    expect(screen.getByText('Fill at limit or cancel')).toBeInTheDocument()
+
+    const execBtn = await screen.findByRole('button', { name: /Place limit order/ })
+    fireEvent.click(execBtn)
+
+    // 1 × 1.3 at 6 stable decimals → 1300000n enforced as amountOutMinimum.
+    await waitFor(() =>
+      expect(swap).toHaveBeenCalledWith(
+        POLYGON_ADDRESSES.WNATIVE,
+        POLYGON_ADDRESSES.STABLECOIN,
+        '1',
+        { limitMinOutWei: 1300000n },
+      ),
+    )
+  })
+
+  it('hides perpetuals order types on networks without a perps venue', () => {
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    expect(screen.queryByRole('option', { name: 'Sell Short' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'Buy to Cover' })).toBeNull()
+  })
+
+  it('offers Sell Short / Buy to Cover only where the network has a perps venue', () => {
+    mockUseDex.mockReturnValue(
+      polygonDex({ network: { name: 'Polygon', chainId: 137, perps: { name: 'TestPerps' } } }),
+    )
+    render(<TradePanel />)
+
+    expect(screen.getByRole('option', { name: 'Sell Short' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Buy to Cover' })).toBeInTheDocument()
+  })
+})
+
+describe('TradePanel — session rails (passkey & gasless)', () => {
+  beforeEach(() => {
+    mockUseChainTokens.mockReturnValue({ native: 'POL', stable: 'USDC' })
+  })
+
+  it('shows the sponsored-gasless badge for passkey sessions on sponsored networks', () => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137, loginMethod: 'passkey' })
+    mockUseDex.mockReturnValue(
+      polygonDex({
+        network: {
+          name: 'Polygon',
+          chainId: 137,
+          passkey: { sponsorPaymasterUrl: 'https://relay.example/v1/paymaster' },
+        },
+      }),
+    )
+    render(<TradePanel />)
+
+    expect(screen.getByText(/Gasless · sponsored/)).toBeInTheDocument()
+    expect(screen.getByText(/One passkey confirmation covers the whole order/)).toBeInTheDocument()
+  })
+
+  it('is honest when a passkey session cannot transact on this network', () => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 61, loginMethod: 'passkey' })
+    mockUseDex.mockReturnValue(dexValue()) // network has no passkey rail
+    render(<TradePanel />)
+
+    expect(screen.getByText(/Passkey accounts can’t send transactions on Ethereum Classic yet/)).toBeInTheDocument()
+    expect(screen.getByText('Network fee applies')).toBeInTheDocument()
+  })
+
+  it('shows the fee badge for classic wallet sessions', () => {
+    mockUseWallet.mockReturnValue({ isConnected: true, chainId: 137 })
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    expect(screen.getByText('Network fee applies')).toBeInTheDocument()
   })
 })

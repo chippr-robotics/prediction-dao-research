@@ -1,14 +1,27 @@
 /* Trade panel — a compact, professional order-ticket for on-chain swaps.
-   Colors come from the app theme tokens so it tracks light/dark automatically. */
+   All colors alias the app theme tokens (theme.css) so the panel tracks
+   light/dark automatically, the same way Portfolio and Earn do. */
 
 .trade-panel {
+  --trade-surface: var(--surface-color, #ffffff);
+  --trade-surface-2: var(--bg-secondary, #f5f6f8);
+  --trade-text: var(--text-primary, #111827);
+  --trade-text-2: var(--text-secondary, #6b7280);
+  --trade-text-3: var(--text-muted, #9ca3af);
+  --trade-border: var(--border-color, #e5e7eb);
+  --trade-accent: var(--brand-primary, #36b37e);
+  --trade-accent-hover: var(--primary-button-hover, var(--brand-secondary, #2e9e6b));
+  --trade-success: var(--success-color, #48bb78);
+  --trade-warning: var(--warning-color, #d69e2e);
+  --trade-danger: var(--danger-color, #e5533d);
+
   max-width: 480px;
   margin: 1.5rem auto;
   padding: 1.25rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--trade-surface);
+  border: 1px solid var(--trade-border);
   border-radius: 16px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-md, 0 8px 28px rgba(0, 0, 0, 0.06));
 }
 
 /* Header */
@@ -28,7 +41,7 @@
   font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--color-text);
+  color: var(--trade-text);
 }
 
 .trade-venue {
@@ -36,9 +49,9 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-secondary);
-  background: var(--color-surface-secondary);
-  border: 1px solid var(--color-border);
+  color: var(--trade-text-2);
+  background: var(--trade-surface-2);
+  border: 1px solid var(--trade-border);
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
 }
@@ -46,15 +59,106 @@
 .trade-subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.82rem;
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
 }
 
 /* Empty / disconnected states */
 .trade-empty {
   padding: 2rem 1rem;
   text-align: center;
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
   font-size: 0.9rem;
+}
+
+/* Account block — whose money the ticket trades */
+.trade-account {
+  margin-bottom: 1rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--trade-surface-2);
+  border: 1px solid var(--trade-border);
+  border-radius: 12px;
+}
+
+.trade-account-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.trade-account-select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: var(--trade-surface);
+  border: 1px solid var(--trade-border);
+  border-radius: 9px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--trade-text);
+  cursor: pointer;
+}
+
+.trade-account-rows {
+  margin: 0.65rem 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.trade-account-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--trade-border);
+}
+
+.trade-account-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.trade-account-row dt {
+  font-size: 0.8rem;
+  color: var(--trade-text-2);
+}
+
+.trade-account-row dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--trade-text);
+}
+
+.trade-account-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--trade-text-2);
+}
+
+/* Session/fee badges */
+.trade-badge {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--trade-border);
+  color: var(--trade-text-2);
+  background: var(--trade-surface);
+}
+
+.trade-badge-gasless {
+  color: var(--trade-success);
+  border-color: var(--trade-success);
+}
+
+.trade-badge-proposal {
+  color: var(--trade-accent);
+  border-color: var(--trade-accent);
 }
 
 /* Mode selector (segmented control) */
@@ -62,10 +166,10 @@
   display: flex;
   gap: 0.25rem;
   margin-bottom: 1rem;
-  background: var(--color-surface-secondary);
+  background: var(--trade-surface-2);
   padding: 0.25rem;
   border-radius: 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--trade-border);
 }
 
 .trade-mode-btn {
@@ -77,18 +181,74 @@
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
   transition: background 0.15s, color 0.15s;
 }
 
 .trade-mode-btn:hover {
-  color: var(--color-text);
+  color: var(--trade-text);
 }
 
 .trade-mode-btn.active {
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--trade-surface);
+  color: var(--trade-text);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Order controls grid (order type / price type / limit price / term) */
+.trade-order-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 0.9rem;
+  margin-bottom: 0.85rem;
+}
+
+.trade-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.trade-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--trade-text-2);
+}
+
+.trade-field-select,
+.trade-field-input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: var(--trade-surface-2);
+  border: 1px solid var(--trade-border);
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--trade-text);
+}
+
+.trade-field-select {
+  cursor: pointer;
+}
+
+.trade-field-input:focus,
+.trade-field-select:focus,
+.trade-account-select:focus {
+  outline: none;
+  border-color: var(--trade-accent);
+}
+
+.trade-field-static {
+  padding: 0.5rem 0.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--trade-text);
 }
 
 /* Order ticket legs */
@@ -100,14 +260,14 @@
 
 .trade-leg {
   padding: 0.85rem 0.95rem;
-  background: var(--color-surface-secondary);
-  border: 1px solid var(--color-border);
+  background: var(--trade-surface-2);
+  border: 1px solid var(--trade-border);
   border-radius: 12px;
   transition: border-color 0.15s;
 }
 
 .trade-leg:focus-within {
-  border-color: var(--color-primary);
+  border-color: var(--trade-accent);
 }
 
 .trade-leg-top {
@@ -122,12 +282,12 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
 }
 
 .trade-balance {
   font-size: 0.75rem;
-  color: var(--color-text-tertiary, var(--color-text-secondary));
+  color: var(--trade-text-3);
 }
 
 .trade-leg-body {
@@ -143,7 +303,7 @@
   font-size: 1.5rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text);
+  color: var(--trade-text);
   border: none;
   background: transparent;
   padding: 0;
@@ -154,7 +314,7 @@
 }
 
 .trade-amount-input::placeholder {
-  color: var(--color-text-tertiary, var(--color-text-secondary));
+  color: var(--trade-text-3);
 }
 
 .trade-receive-value {
@@ -168,12 +328,12 @@
 .trade-token-static {
   flex-shrink: 0;
   padding: 0.4rem 0.7rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--trade-surface);
+  border: 1px solid var(--trade-border);
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.85rem;
-  color: var(--color-text);
+  color: var(--trade-text);
 }
 
 .trade-token-select {
@@ -184,8 +344,8 @@
   flex-shrink: 0;
   padding: 0.35rem 0.6rem;
   background: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-border);
+  color: var(--trade-accent);
+  border: 1px solid var(--trade-border);
   border-radius: 7px;
   font-size: 0.68rem;
   font-weight: 700;
@@ -195,8 +355,8 @@
 }
 
 .trade-max-btn:hover {
-  background: var(--color-surface);
-  border-color: var(--color-primary);
+  background: var(--trade-surface);
+  border-color: var(--trade-accent);
 }
 
 /* Switch direction control, overlapping the two legs */
@@ -216,13 +376,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-surface);
-  border: 3px solid var(--color-surface);
-  outline: 1px solid var(--color-border);
+  background: var(--trade-surface);
+  border: 3px solid var(--trade-surface);
+  outline: 1px solid var(--trade-border);
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--trade-text);
 }
 
 .trade-switch-btn {
@@ -231,16 +391,16 @@
 }
 
 .trade-switch-btn:hover {
-  color: var(--color-primary);
-  outline-color: var(--color-primary);
+  color: var(--trade-accent);
+  outline-color: var(--trade-accent);
 }
 
 /* Summary read-out */
 .trade-summary {
   margin-top: 0.85rem;
   padding: 0.5rem 0.85rem;
-  background: var(--color-surface-secondary);
-  border: 1px solid var(--color-border);
+  background: var(--trade-surface-2);
+  border: 1px solid var(--trade-border);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -253,7 +413,7 @@
   gap: 0.75rem;
   padding: 0.4rem 0;
   font-size: 0.8rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--trade-border);
 }
 
 .trade-summary-row:last-child {
@@ -261,17 +421,17 @@
 }
 
 .trade-summary-key {
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
   font-weight: 500;
 }
 
 .trade-summary-note {
-  color: var(--color-text-tertiary, var(--color-text-secondary));
+  color: var(--trade-text-3);
   font-weight: 400;
 }
 
 .trade-summary-val {
-  color: var(--color-text);
+  color: var(--trade-text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -281,13 +441,13 @@ button.trade-rate {
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--trade-border);
   cursor: pointer;
   font: inherit;
 }
 
 button.trade-rate .trade-summary-val {
-  color: var(--color-primary);
+  color: var(--trade-accent);
 }
 
 .trade-route {
@@ -299,35 +459,35 @@ button.trade-rate .trade-summary-val {
 .trade-route-fee {
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  color: var(--trade-text-2);
+  background: var(--trade-surface);
+  border: 1px solid var(--trade-border);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
 }
 
 /* Price-impact coloring */
 .impact-low {
-  color: var(--color-success, #48bb78);
+  color: var(--trade-success);
 }
 .impact-warn {
-  color: var(--color-warning, #d69e2e);
+  color: var(--trade-warning);
 }
 .impact-high {
-  color: var(--color-error, #e5533d);
+  color: var(--trade-danger);
 }
 .impact-unknown {
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
 }
 
 .trade-slippage-select {
   padding: 0.3rem 0.5rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--trade-border);
   border-radius: 7px;
-  background: var(--color-surface);
+  background: var(--trade-surface);
   cursor: pointer;
   font-size: 0.8rem;
-  color: var(--color-text);
+  color: var(--trade-text);
 }
 
 .trade-impact-warning {
@@ -335,9 +495,9 @@ button.trade-rate .trade-summary-val {
   padding: 0.6rem 0.8rem;
   font-size: 0.78rem;
   border-radius: 9px;
-  background: var(--color-error-bg, rgba(229, 83, 61, 0.1));
-  color: var(--color-error, #e5533d);
-  border: 1px solid var(--color-error, #e5533d);
+  background: color-mix(in srgb, var(--trade-danger) 10%, transparent);
+  color: var(--trade-danger);
+  border: 1px solid var(--trade-danger);
 }
 
 /* Execute */
@@ -345,7 +505,7 @@ button.trade-rate .trade-summary-val {
   width: 100%;
   margin-top: 0.85rem;
   padding: 0.95rem;
-  background: var(--color-primary);
+  background: var(--trade-accent);
   color: var(--primary-button-text, #ffffff);
   border: none;
   border-radius: 12px;
@@ -356,16 +516,24 @@ button.trade-rate .trade-summary-val {
 }
 
 .trade-execute-btn:hover:not(:disabled) {
-  background: var(--color-primary-dark);
+  background: var(--trade-accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
 .trade-execute-btn:disabled {
-  background: var(--color-border);
-  color: var(--color-text-secondary);
+  background: var(--trade-border);
+  color: var(--trade-text-2);
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* Session note under the execute button (passkey ceremony + sponsorship) */
+.trade-session-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--trade-text-2);
+  text-align: center;
 }
 
 /* Messages */
@@ -378,22 +546,22 @@ button.trade-rate .trade-summary-val {
 }
 
 .trade-error {
-  background: var(--color-error-bg, rgba(229, 83, 61, 0.1));
-  color: var(--color-error, #e5533d);
-  border-color: var(--color-error, #e5533d);
+  background: color-mix(in srgb, var(--trade-danger) 10%, transparent);
+  color: var(--trade-danger);
+  border-color: var(--trade-danger);
 }
 
 .trade-success {
-  background: var(--color-success-bg, rgba(72, 187, 120, 0.1));
-  color: var(--color-success, #48bb78);
-  border-color: var(--color-success, #48bb78);
+  background: color-mix(in srgb, var(--trade-success) 10%, transparent);
+  color: var(--trade-success);
+  border-color: var(--trade-success);
 }
 
 /* Footer — subtle attribution + venue links */
 .trade-footer {
   margin-top: 1.1rem;
   padding-top: 0.85rem;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--trade-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -407,15 +575,15 @@ button.trade-rate .trade-summary-val {
   gap: 0.4rem;
   font-size: 0.72rem;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--trade-text-2);
 }
 
 .trade-attribution-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  background: var(--trade-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--trade-accent) 20%, transparent);
 }
 
 .trade-links {
@@ -426,7 +594,7 @@ button.trade-rate .trade-summary-val {
 .trade-link {
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--trade-accent);
   text-decoration: none;
 }
 
@@ -439,6 +607,10 @@ button.trade-rate .trade-summary-val {
   .trade-panel {
     margin: 1rem;
     padding: 1rem;
+  }
+
+  .trade-order-grid {
+    grid-template-columns: 1fr;
   }
 
   .trade-amount-input,
