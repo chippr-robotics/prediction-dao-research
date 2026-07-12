@@ -38,4 +38,15 @@
   `/speckit-clarify` or `/speckit-plan` if they need adjusting.
 - Whether the registry lives on-chain or off-chain is deliberately not specified here;
   that is a `/speckit-plan` decision (the constitution's security principles apply
-  either way given tags route value-bearing actions).
+  either way given tags route value-bearing actions). Resolved in planning: on-chain
+  UUPS registry.
+- **2026-07-12 decision (product owner)**: eligibility is restricted to **Gold membership
+  tier and above** (Gold or Platinum), enforced on-chain via
+  `getActiveTier(user, WAGER_PARTICIPANT_ROLE) >= Gold` (FR-001, FR-021; SC-010). Re-validated
+  "Requirements are testable and unambiguous" and "Scope is clearly bounded" against the
+  revised FRs — still passing.
+- **2026-07-12 decision (product owner)**: wager tags are **strictly optional / opt-in** —
+  no account is ever required to hold one and every flow works fully for tagless accounts
+  (FR-001a, FR-009; SC-011; tagless edge case). Re-validated "User scenarios cover primary
+  flows" and "Feature meets measurable outcomes" against the new optionality FR/SC — still
+  passing.

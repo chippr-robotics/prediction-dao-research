@@ -6,14 +6,17 @@
 
 ## Summary
 
-Members register a unique `%tag` handle bound to their wallet, resolvable everywhere an
-address is entered and shown in the display-name chain (book > tag > ENS > generated).
-Technical approach (per clarifications + research.md): a new **on-chain UUPS registry
-contract** (`WagerTagRegistry`, `UUPSManaged` + `SignerIntentBase`) with ENS-style
-commit–reveal registration, canonical ASCII-only tags keyed by hash, 90-day release
-quarantine, 30-day change cooldown, 48-hour delayed repointing, permissionless 12-month
-lapse reclamation, and least-privilege curator/moderator/verifier roles that can never
-reassign a tag. Frontend integrates via a new `lib/tags/` module + `useWagerTag` hook
+**Gold-tier-and-above** members can *optionally* register a unique `%tag` handle bound to
+their wallet, resolvable everywhere an address is entered and shown in the display-name
+chain (book > tag > ENS > generated). Tags are strictly opt-in — no user is ever required to
+hold one and every flow works fully for tagless accounts. Technical approach (per
+clarifications + research.md): a new **on-chain UUPS registry contract** (`WagerTagRegistry`,
+`UUPSManaged` + `SignerIntentBase`) with a Gold-tier eligibility gate
+(`getActiveTier(user, WAGER_PARTICIPANT_ROLE) >= Gold`, mirroring the live Silver+ gates),
+ENS-style commit–reveal registration, canonical ASCII-only tags keyed by hash, 90-day
+release quarantine, 30-day change cooldown, 48-hour delayed repointing (tier-exempt),
+permissionless 12-month lapse reclamation, and least-privilege curator/moderator/verifier
+roles that can never reassign a tag. Frontend integrates via a new `lib/tags/` module + `useWagerTag` hook
 (extending spec 040's `useOpponentName`) and tag-aware `AddressInput`; gasless via spec
 035 relayed intents with self-submit fallback.
 
@@ -40,10 +43,12 @@ follows the platform's standard testnet → mainnet flow); frontend web app
 reverse lookups cached short-TTL alongside the ENS cache; registration end-to-end ≤ 2 min
 including the 60 s commit age (SC-001)
 
-**Constraints**: Registration/changes gated on active membership + sanctions screening;
-never-stranded rule (every gasless action has self-submit fallback); no flow may hard-block
-when the registry is unreachable (FR-013); tags never on-chain-linked to pool anonymity
-(spec 034 nicknames untouched)
+**Constraints**: Registration/changes gated on a **Gold-tier-or-above** membership
+(`getActiveTier >= Gold`) + sanctions screening; tags are **strictly optional** — no flow may
+require a tag and the tagless path is first-class (a stronger invariant than, and independent
+of, the FR-013 registry-unreachable degradation); never-stranded rule (every gasless action
+has self-submit fallback); no flow may hard-block when the registry is unreachable (FR-013);
+tags never on-chain-linked to pool anonymity (spec 034 nicknames untouched)
 
 **Scale/Scope**: One singleton registry per network; membership-sized population (≤ tens of
 thousands of tags); 1 contract + 1 interface + ~6 intent structs + 1 frontend lib + 2 hooks

@@ -78,24 +78,58 @@ the mental model honest.
 surface, complicates reverse-resolution integrity FR-008); instant repoint or permanent
 binding (both rejected in clarification session).
 
-## R5. Membership gate and lapse grace
+## R5. Membership gate (Gold tier and above) and lapse grace
 
-**Decision**: Registration/change/repoint require an active membership:
-`IMembershipManager.hasActiveRole(user, role)` for any role in an admin-configurable
-qualifying-role set (initially `MARKET_CREATOR_ROLE` and `POOL_PARTICIPANT_ROLE`).
-Lapse-then-release is enforced lazily: once the account's latest qualifying-membership
-`expiresAt` is more than the 12-month grace in the past, anyone may call
-`reclaimLapsed(tag)`, which releases the tag into the standard 90-day quarantine. Until
-that call, views still resolve the tag (grace is honored by timestamp math, not by a keeper).
+**Decision**: Registration and tag-change require an active **Gold-tier-or-above** membership,
+enforced on-chain exactly like the existing minimum-tier gates:
+`uint8(IMembershipManager.getActiveTier(user, membershipRole)) >= uint8(Tier.Gold)`, else
+revert `InsufficientMembershipTier`. `membershipRole` and `minTier` are admin-settable (minTier
+hard-bounded so it can never drop below `Gold`), defaulting to **`WAGER_PARTICIPANT_ROLE`** and
+`Tier.Gold`. Repointing an already-held tag is exempt from the tier check (a recovery/migration
+safety action available to the current holder while the tag is held, FR-022). Tags are optional:
+this gate only fires when a user *chooses* to register/change — no non-holder path touches it.
 
-**Rationale**: Reuses the existing membership proxy (`getMembership(...).expiresAt` is
-already exposed) rather than duplicating membership state. Lazy, permissionless reclamation
-avoids any trusted keeper: the incentive to call it is wanting the tag. Timestamp-computed
-views mean no one can capture a tag early by racing a cron job.
+Lapse-then-release is enforced lazily and from **observable state only**. The contract can
+read the current `getActiveTier(user, membershipRole)` and the membership's `expiresAt`, but
+NOT a historical "dropped below Gold" timestamp. So the reclaim condition is:
+`getActiveTier(owner, membershipRole) < minTier` AND `now > membership.expiresAt + lapseGrace`.
+When that holds, anyone may call `reclaimLapsed(tag)`, releasing it into the 90-day quarantine.
+This means the practical lapse is **expiry** — a Gold membership expires (`getActiveTier` → None),
+and the 12-month grace runs from its `expiresAt`. An account that is admin-**downgraded** below
+Gold while its membership is still unexpired is *honored until `expiresAt`* (the member paid for
+that period), then the same grace clock applies — a deliberate, honest choice given the contract
+cannot see a mid-term downgrade moment. Until the condition holds, views still resolve the tag
+(grace honored by timestamp math, not a keeper).
 
-**Alternatives considered**: Operator-run expiry sweeps (rejected: trusted keeper +
-liveness dependency); registry subscribing to membership events (rejected: MembershipManager
-has no such hook surface and adding one couples two proxies' upgrade cadences).
+**Rationale**: `getActiveTier` returns `Tier.None` (0) once a membership expires, so a single
+`>= Gold` comparison covers absent / expired / too-low in one check — no separate
+`hasActiveRole` needed. This mirrors the live precedents byte-for-byte: the open-challenge
+Silver+ gate (`contracts/wagers/WagerRegistry.sol:270`) and the ExternalDAO Silver+ gate
+(`contracts/clearpath/ExternalDAORegistry.sol:67`), both `uint8`-cast comparisons with no
+`checkCanCreate` (registration is metadata-only — no quota semantics wanted). Reuses the
+membership proxy already exposed; lazy permissionless reclamation avoids any trusted keeper.
+
+**Critical correction (from code audit)**: membership is **per-role**, and the only
+user-purchasable / frontend-read role in the live system is **`WAGER_PARTICIPANT_ROLE`**
+(`contracts/access/MembershipManager.sol:15`, `frontend/src/hooks/useRoleDetails.js:40`). The
+earlier draft's `MARKET_CREATOR_ROLE` **does not exist anywhere in the codebase** and
+`POOL_PARTICIPANT_ROLE` is a *separate* membership slot — gating on either would pass for
+(almost) nobody. The gate therefore reads the tier of the role where Gold is actually sold.
+A single configured role + `minTier` replaces the earlier "qualifying-role set" (simpler, and
+`getActiveTier` is single-role with no built-in max across a set).
+
+**Frontend note**: the UI gates on the same value it already fetches —
+`getRoleDetails('WAGER_PARTICIPANT').tier >= MembershipTier.GOLD` (`useRoleDetails.js:16-22,64`,
+`isActive` already folds in expiry). The on-chain `InsufficientMembershipTier` revert is already
+mapped to *"requires a Silver membership or above"* copy at `useOpenChallengeCreate.js:214` — a
+new Gold gate MUST add a distinct message branch (e.g. keyed on the registry call site) so it
+reads *"requires a Gold membership or above"* rather than reusing the Silver wording.
+
+**Alternatives considered**: keeping `hasActiveRole` over a role set (rejected: gates on
+presence not tier, and referenced a non-existent role); a set-of-roles + max-tier gate
+(rejected: over-engineered — one purchasable role exists; single role + minTier is exact);
+operator-run expiry sweeps (rejected: trusted keeper + liveness); registry subscribing to
+membership events (rejected: no such hook; couples two proxies' upgrade cadences).
 
 ## R6. Reserved names and moderation
 

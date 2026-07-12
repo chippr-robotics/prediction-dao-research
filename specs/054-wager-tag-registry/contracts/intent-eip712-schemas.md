@@ -57,4 +57,9 @@ Notes:
   the highest-risk intent (payout redirect); the 48 h on-chain delay remains the backstop.
 - Relay-gateway policy additions: per-signer rate limits consistent with on-chain cooldowns;
   the existing screening/quota/killswitch middleware applies unchanged.
-```
+- Eligibility is NOT encoded in the struct — no field changes for the Gold-tier gate. The
+  `CommitTagIntent` / `RegisterTagIntent` / `ChangeTagIntent` executions are only accepted
+  on-chain while the signer holds a Gold-tier-or-above membership (revert
+  `InsufficientMembershipTier` otherwise); the relay-gateway policy SHOULD pre-screen the
+  signer's tier before relaying so it does not burn gas on a call that will revert.
+  `RequestRepointIntent` is exempt from the tier check (recovery/migration safety, FR-022).

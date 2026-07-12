@@ -53,7 +53,9 @@ interface IWagerTagRegistry {
         uint64 minCommitmentAge, uint64 maxCommitmentAge, uint64 quarantinePeriod,
         uint64 changeCooldown, uint64 repointDelay, uint64 lapseGrace
     ) external;
-    function setQualifyingRoles(bytes32[] calldata roles) external;
+    /// Membership eligibility gate: which role's tier is checked and the minimum tier.
+    /// `tier` is hard-bounded >= Tier.Gold so the gate can never be relaxed below Gold.
+    function setMembershipGate(bytes32 role, IMembershipManager.Tier tier) external; // ADMIN
 }
 ```
 
@@ -72,9 +74,23 @@ needed. EIP-712 schemas in [intent-eip712-schemas.md](./intent-eip712-schemas.md
 
 **Registration guards** (in `register` / `changeTag`): canonical-form bytes validation
 (FR-003), not reserved (FR-004), not registered/quarantined (FR-002/FR-019), caller holds
-no tag (FR-001), active qualifying membership via `IMembershipManager.hasActiveRole`
-(FR-001), sanctions-clear via `ISanctionsGuard` (FR-007), commitment aged within
-`[minCommitmentAge, maxCommitmentAge]` (FR-006), cooldown satisfied for changes (FR-020).
+no tag (FR-001), **Gold-tier-or-above membership** via
+`uint8(IMembershipManager.getActiveTier(caller, membershipRole)) >= uint8(minTier)` else
+revert `InsufficientMembershipTier` (FR-001; `getActiveTier` returns `None` when expired, so
+this one check covers absent/expired/too-low), sanctions-clear via `ISanctionsGuard`
+(FR-007), commitment aged within `[minCommitmentAge, maxCommitmentAge]` (FR-006), cooldown
+satisfied for changes (FR-020). `requestRepoint` intentionally does NOT apply the tier guard
+(FR-022 — a holder can always move their own identity). This mirrors the live Silver+ gates
+at `WagerRegistry.sol:270` / `ExternalDAORegistry.sol:67`.
+
+> Frontend: the `InsufficientMembershipTier` selector is already mapped to *"requires a
+> Silver membership or above"* copy (`useOpenChallengeCreate.js:214`); the tag surfaces MUST
+> add a distinct Gold-specific message so the revert reads *"requires a Gold membership or
+> above"* rather than reusing the Silver wording.
+
+**Optionality** (FR-001a): the gate above only executes on a *voluntary* register/change.
+No contract function requires a tag as a precondition of any other action, and the frontend
+lib never blocks a flow on tag ownership — a tagless account is a first-class caller.
 
 **Explicitly absent** (spec FR-017/FR-018/FR-026): any function that moves a tag to a
 different owner without the owner's own authorization. No operator transfer, no admin

@@ -29,14 +29,15 @@ Keyed by `tagHash = keccak256(bytes(canonicalTag))`.
 | `reserved` | `mapping(bytes32 => bool)` | Curator-maintained reserved terms (FR-004). |
 | `commitments` | `mapping(bytes32 => uint64)` | Commit–reveal: commitment hash → commit time (research R3). |
 | `lastChangeAt` | `mapping(address => uint64)` | Change-cooldown anchor per account (FR-020). |
-| `qualifyingRoles` | `bytes32[]` | Membership roles that satisfy the active-membership gate (research R5). |
+| `membershipRole` | `bytes32` | The membership role whose active tier is checked for eligibility; default `WAGER_PARTICIPANT_ROLE` — the only user-purchasable role (research R5). Admin-settable. |
+| `minTier` | `IMembershipManager.Tier` (uint8) | Minimum eligible tier for register/change; default `Gold` (3), admin-settable but hard-bounded so it can never drop below `Gold` (research R5/R10). |
 | params | `uint64` each | `minCommitmentAge` (60 s), `maxCommitmentAge` (24 h), `quarantinePeriod` (90 d), `changeCooldown` (30 d), `repointDelay` (48 h), `lapseGrace` (365 d) — admin-settable within hard bounds (research R10). |
 
 ### Roles (AccessControl, least privilege — none can reassign a tag)
 
 | Role | Powers |
 |---|---|
-| `DEFAULT_ADMIN_ROLE` | Param tuning (bounded), qualifying-role set, role admin. |
+| `DEFAULT_ADMIN_ROLE` | Param tuning (bounded), membership role + `minTier` (bounded ≥ Gold), role admin. |
 | `UPGRADER_ROLE` | UUPS upgrades (from `UUPSManaged`). |
 | `REGISTRY_CURATOR_ROLE` | Reserved-term list add/remove. |
 | `MODERATOR_ROLE` | Suspend / unsuspend tags. |
@@ -49,11 +50,11 @@ Keyed by `tagHash = keccak256(bytes(canonicalTag))`.
 | Status | Condition | Value-bearing use |
 |---|---|---|
 | `NONE` | No record, or released and quarantine expired | ✗ ("no such tag", FR-010) |
-| `ACTIVE` | Owner set, not suspended, no pending repoint, within membership grace | ✓ (resolves to `owner`) |
+| `ACTIVE` | Owner set, not suspended, no pending repoint, within Gold-membership grace | ✓ (resolves to `owner`) |
 | `REPOINTING` | `pendingOwner != 0` and `now < repointEffectiveAt`… and until finalized | ✗ ("address changing", FR-022) |
 | `QUARANTINED` | `now < quarantinedUntil[tagHash]` | ✗ ("tag no longer active", FR-019) |
 | `SUSPENDED` | `suspended == true` | ✗ (FR-026) |
-| `LAPSED_RECLAIMABLE` | Membership `expiresAt + lapseGrace < now`, not yet reclaimed | ✗ for new value-bearing use; `reclaimLapsed` callable by anyone (FR-021) |
+| `LAPSED_RECLAIMABLE` | `getActiveTier(owner, membershipRole) < minTier` AND `now > membership.expiresAt + lapseGrace`, not yet reclaimed. (Computed from observable state only: practical trigger is Gold **expiry**; an active-but-downgraded membership is honored until its `expiresAt`, then grace runs — research R5.) | ✗ for new value-bearing use; `reclaimLapsed` callable by anyone (FR-021) |
 
 ## State transitions
 
@@ -67,8 +68,10 @@ ACTIVE --suspend (moderator)--> SUSPENDED --unsuspend--> ACTIVE
 ```
 
 Guards: register requires — valid canonical tag, not reserved, not registered, not
-quarantined, caller has no tag, active qualifying membership, sanctions-clear, valid aged
-commitment. `change` = release(old, quarantine) + register(new) under one cooldown check.
+quarantined, caller has no tag, active **Gold-tier-or-above** membership
+(`getActiveTier(caller, membershipRole) >= minTier`), sanctions-clear, valid aged
+commitment. `change` = release(old, quarantine) + register(new) under one cooldown check
+(same tier guard). Repoint of a held tag skips the tier guard (FR-022).
 Every transition emits a dedicated event (`TagRegistered`, `TagReleased`, `TagRepointRequested`,
 `TagRepointCancelled`, `TagRepointFinalized`, `TagReclaimed`, `TagSuspended`, `TagUnsuspended`,
 `TagVerificationSet`, `TagReserved`) — the FR-023 audit trail.
