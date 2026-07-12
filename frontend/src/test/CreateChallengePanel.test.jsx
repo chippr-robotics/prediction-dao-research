@@ -69,13 +69,13 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
   it('locks the oracle resolution option where Polymarket is unavailable', () => {
     capsHolder.capabilities = { polymarketSidebets: false }
     render(<CreateChallengePanel embedded onClose={() => {}} />)
-    const oracle = screen.getByRole('radio', { name: /an oracle settles it/i })
+    const oracle = screen.getByRole('radio', { name: /^oracle$/i })
     expect(oracle).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('opens the market-search step when oracle is chosen, then returns with a side picker', () => {
     render(<CreateChallengePanel embedded onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('radio', { name: /an oracle settles it/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /^oracle$/i }))
     // Swaps to the market-search sub-view.
     expect(screen.getByTestId('pm-browser')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
