@@ -2,11 +2,19 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUnifiedLookup } from '../../hooks/useUnifiedLookup'
 import { normalizePhrase } from '../../lib/lookup/resolvePhraseLookup.js'
+import { isValidWord } from '../../utils/claimCode/wordlist'
 import TakeChallengePanel from './TakeChallengePanel'
 import JoinPoolPanel from './JoinPoolPanel'
+import PhraseWordInputs from './PhraseWordInputs'
 import InfoTip from '../ui/InfoTip'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
+
+// Split a raw phrase into exactly four editable slots (pad/truncate) for the per-word inputs.
+const toWordSlots = (phrase) => {
+  const parts = normalizePhrase(phrase || '').split(' ').filter(Boolean).slice(0, 4)
+  return [0, 1, 2, 3].map((i) => parts[i] || '')
+}
 
 const CloseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -25,8 +33,11 @@ const CloseIcon = () => (
 export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, initialPhrase = '', autoResolve = false }) {
   const { status, result, submit, reset } = useUnifiedLookup()
   const navigate = useNavigate()
-  const [phrase, setPhrase] = useState(initialPhrase)
+  const [words, setWords] = useState(() => toWordSlots(initialPhrase))
   const [choice, setChoice] = useState(null) // collision disambiguation: 'challenge' | 'pool'
+
+  const phrase = words.join(' ').trim()
+  const allWordsValid = words.every(isValidWord)
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -38,7 +49,7 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
   // Deep-link prefill + auto-resolve (FR-013): a shared ?oc=take&code= link opens here pre-resolved.
   useEffect(() => {
     if (isOpen && autoResolve && initialPhrase) {
-      setPhrase(initialPhrase)
+      setWords(toWordSlots(initialPhrase))
       submit(initialPhrase)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,9 +57,10 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
 
   const onSubmit = useCallback((e) => {
     e.preventDefault()
+    if (!allWordsValid) return
     setChoice(null)
     submit(phrase)
-  }, [submit, phrase])
+  }, [submit, phrase, allWordsValid])
 
   const searchAgain = useCallback(() => { setChoice(null); reset() }, [reset])
 
@@ -153,17 +165,18 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
               <form className="fm-form" onSubmit={onSubmit}>
                 <div className="fm-form-group fm-form-full">
                   <span className="fm-label-row">
-                    <label htmlFor="unified-phrase-input">Four-word phrase <span className="fm-required">*</span></label>
+                    <label htmlFor="phrase-word-0">Four-word phrase <span className="fm-required">*</span></label>
                     <InfoTip label="About: Four-word phrase">
-                      We’ll find whatever the words point to — a challenge or a pool.
+                      We’ll find whatever the words point to — a challenge or a pool. Type each word and
+                      pick from the suggestions — a mistyped word is flagged before you finish.
                     </InfoTip>
                   </span>
-                  <input
-                    id="unified-phrase-input" type="text" autoComplete="off" spellCheck="false"
-                    placeholder="e.g. crystal orbit harbor violet"
-                    value={phrase} onChange={(e) => setPhrase(e.target.value)}
+                  <PhraseWordInputs
+                    words={words}
+                    onChange={setWords}
                     disabled={status === 'resolving'}
                   />
+                  <span className="fm-hint">e.g. crystal orbit harbor violet</span>
                 </div>
 
                 {status === 'result' && result?.kind === 'format-error' && (
@@ -183,7 +196,7 @@ export default function UnifiedLookupModal({ isOpen, onClose, onBuyMembership, i
                 )}
 
                 <div className="fm-success-actions">
-                  <button type="submit" className="fm-btn-primary" disabled={status === 'resolving' || phrase.trim() === ''}>
+                  <button type="submit" className="fm-btn-primary" disabled={status === 'resolving' || !allWordsValid}>
                     {status === 'resolving' ? 'Looking up…' : 'Find'}
                   </button>
                 </div>
