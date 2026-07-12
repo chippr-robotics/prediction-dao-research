@@ -20,9 +20,8 @@ describe('OpenChallengeModal public mode state (SC-005)', () => {
 
   it('renders public / no-named-opponent messaging', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // Modal subtitle states there is no named opponent.
-    expect(screen.getByText(/no opponent named up front/i)).toBeInTheDocument()
-    // The full explainer moved behind the subtitle's info icon (spec 039):
+    // The subtitle sentence was removed to conserve space (spec 052 feedback); the
+    // full "no named opponent" explainer now sits behind the title's info icon —
     // hidden by default, revealed in a bubble on demand.
     expect(screen.queryByText(/anyone you share the code with can take the other side/i)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'About open challenges' }))
