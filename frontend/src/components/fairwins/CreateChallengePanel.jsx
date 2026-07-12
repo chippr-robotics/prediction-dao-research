@@ -39,7 +39,21 @@ const BackIcon = () => (
  *   - initialMarket: a Polymarket market to pre-select on the oracle path (e.g. a ticker click),
  *     skipping the market-search step.
  */
-function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolutionType, initialMarket = null }) {
+function CreateChallengePanel({
+  embedded = false,
+  onClose,
+  onDone,
+  onOracleModeChange,
+  // Connection is injected by the host so the panel stays presentational (and testable
+  // without a WalletProvider). Defaults to connected: hosts that only mount it post-connect
+  // (e.g. the modal opened from the dashboard) need no wiring. The home screen passes the
+  // live state + a connect handler so tapping the primary button opens the connect panel as
+  // part of the create flow (spec 053 feedback), then continues to create once connected.
+  isConnected = true,
+  onConnect,
+  initialResolutionType,
+  initialMarket = null,
+}) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const { capabilities } = useChainTokens()
   // Oracle settlement is only offered where the Polymarket CTF is reachable and
@@ -75,9 +89,19 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
+  // Set when the user taps the primary button while disconnected: we open the connect panel,
+  // then auto-continue the create once the wallet connects (see the effect below).
+  const [pendingSubmit, setPendingSubmit] = useState(false)
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const isOracle = Number(resolutionType) === OPEN_RESOLUTION_TYPES.Polymarket
+
+  // Let an embedding host react to the oracle path (the home screen hides its
+  // secondary actions while an oracle challenge is being composed — the market +
+  // side picker need the room and the goal is a no-scroll view).
+  useEffect(() => {
+    onOracleModeChange?.(isOracle)
+  }, [isOracle, onOracleModeChange])
   const arbitratorAddr = arbitratorResolved || arbitrator
   const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
   const acceptMs = fromDatetimeLocal(acceptBy)
@@ -145,6 +169,18 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()
     setError(null)
+    // Not signed in yet? Open the connect panel as part of this flow, then let the effect
+    // below resume the create once the wallet connects. If the host gave us no connect
+    // handler we fall through and let the create hook surface its own "connect" error.
+    if (!isConnected && onConnect) {
+      setPendingSubmit(true)
+      try {
+        await onConnect()
+      } catch {
+        setPendingSubmit(false)
+      }
+      return
+    }
     // Normalize the pad string (e.g. "10." → "10", "10.50" → "10.5").
     const cleanStake = Number(stake) > 0 ? String(Number(stake)) : stake
     try {
@@ -184,7 +220,15 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
     } finally {
       setProgress(null)
     }
-  }, [isOracle, composedDescription, stake, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isConnected, onConnect, isOracle, composedDescription, stake, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume a create that was waiting on the wallet: the moment the connection lands, continue.
+  useEffect(() => {
+    if (pendingSubmit && isConnected) {
+      setPendingSubmit(false)
+      handleCreate()
+    }
+  }, [pendingSubmit, isConnected, handleCreate])
 
   if (result) {
     return (
@@ -379,7 +423,7 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
 
       <div className="fm-success-actions">
         <button type="submit" className="fm-btn-primary" disabled={!canCreate}>
-          {busy ? 'Creating…' : 'Create & generate code'}
+          {busy ? 'Opening…' : 'Open wager'}
         </button>
       </div>
     </form>

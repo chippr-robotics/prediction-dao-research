@@ -32,7 +32,7 @@
   font-weight: 700;
   line-height: 1;
   /* Scales down on narrow screens; stays large and glanceable on wide ones. */
-  font-size: clamp(2.75rem, 15vw, 4.5rem);
+  font-size: clamp(4.25rem, 23vw, 7rem);
   letter-spacing: -0.02em;
   overflow: hidden;
 }
@@ -82,7 +82,7 @@
 .amount-keypad-pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
+  gap: 0.6rem;
 }
 
 /* Keys are deliberately wider than tall (short landscape keys) so the pad
@@ -95,14 +95,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.4rem;
+  min-height: 3.6rem;
   padding: 0.3rem;
   background: transparent;
   border: none;
   border-radius: var(--radius-full, 9999px);
   color: var(--text-primary, #E6EDF3);
   font-family: inherit;
-  font-size: 1.5rem;
+  font-size: 2.3rem;
   font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast, 0.15s) ease,
@@ -135,8 +135,8 @@
 }
 
 .amount-keypad-key--fn svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 /* Respect reduced-motion — drop the press-scale animation. */
@@ -151,10 +151,10 @@
 
 @media (max-width: 640px) {
   .amount-keypad-hero {
-    font-size: clamp(2.5rem, 17vw, 4rem);
+    font-size: clamp(3.75rem, 26vw, 6.25rem);
   }
   .amount-keypad-key {
-    min-height: 2.2rem;
-    font-size: 1.4rem;
+    min-height: 3.2rem;
+    font-size: 2.1rem;
   }
 }

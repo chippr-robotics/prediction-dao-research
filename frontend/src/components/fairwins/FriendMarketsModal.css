@@ -564,25 +564,26 @@
   gap: 0.4rem;
 }
 
-/* Softened, borderless pills to match the borderless number pad — no hard
-   edges; a subtle fill carries the selected/hover state instead of an outline. */
+/* Borderless, fill-free pills to match the borderless number pad — no box and
+   no background tint; the green icon + label alone carry the selected state
+   (design feedback: "the colored text is enough"). */
 .fm-pay-resolution .pill-select-option {
   flex: 1 1 auto;
   justify-content: center;
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   border-color: transparent;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.06);
+  background: transparent;
 }
 
 .fm-pay-resolution .pill-select-option:hover:not(:disabled) {
   border-color: transparent;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.12);
+  background: transparent;
 }
 
 .fm-pay-resolution .pill-select-option.active {
   border-color: transparent;
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.16);
+  background: transparent;
 }
 
 .fm-pay-oracle-hint {
