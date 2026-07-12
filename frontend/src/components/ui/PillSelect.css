@@ -28,6 +28,14 @@
   align-items: flex-start;
 }
 
+/* Subtle square outline around the options — used where the label is
+   visually hidden and the box itself needs to read as one control. */
+.pill-select-bordered {
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
 .pill-select-option {
   display: inline-flex;
   align-items: center;

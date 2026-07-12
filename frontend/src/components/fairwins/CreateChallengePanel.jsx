@@ -305,7 +305,7 @@ function CreateChallengePanel({
             { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'Arbitrator', icon: <ThirdPartyIcon /> },
             {
               value: String(OPEN_RESOLUTION_TYPES.Polymarket),
-              label: 'Oracle',
+              label: 'Event',
               icon: <OracleIcon />,
               disabled: !polymarketAvailable,
               disabledReason: 'Requires a Polymarket-enabled network. Switch networks to settle from a market.',
@@ -314,6 +314,8 @@ function CreateChallengePanel({
           value={resolutionType}
           onChange={handleResolutionChange}
           disabled={busy}
+          hideLabel
+          bordered
         />
       </div>
 
@@ -423,7 +425,7 @@ function CreateChallengePanel({
 
       <div className="fm-success-actions">
         <button type="submit" className="fm-btn-primary" disabled={!canCreate}>
-          {busy ? 'Opening…' : 'Open wager'}
+          {busy ? 'Opening…' : 'Lock in!'}
         </button>
       </div>
     </form>

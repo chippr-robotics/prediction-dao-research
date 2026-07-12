@@ -55,7 +55,7 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     const onDone = vi.fn()
     render(<CreateChallengePanel embedded onClose={() => {}} onDone={onDone} />)
-    const createBtn = screen.getByRole('button', { name: /open wager/i })
+    const createBtn = screen.getByRole('button', { name: /lock in/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
@@ -73,7 +73,7 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     )
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    const openBtn = screen.getByRole('button', { name: /open wager/i })
+    const openBtn = screen.getByRole('button', { name: /lock in/i })
     expect(openBtn).toBeEnabled()
     // Disconnected → tapping opens the connect panel and does NOT create yet.
     fireEvent.click(openBtn)
@@ -88,13 +88,13 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
   it('locks the oracle resolution option where Polymarket is unavailable', () => {
     capsHolder.capabilities = { polymarketSidebets: false }
     render(<CreateChallengePanel embedded onClose={() => {}} />)
-    const oracle = screen.getByRole('radio', { name: /^oracle$/i })
+    const oracle = screen.getByRole('radio', { name: /^event$/i })
     expect(oracle).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('opens the market-search step when oracle is chosen, then returns with a side picker', () => {
     render(<CreateChallengePanel embedded onClose={() => {}} />)
-    fireEvent.click(screen.getByRole('radio', { name: /^oracle$/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /^event$/i }))
     // Swaps to the market-search sub-view.
     expect(screen.getByTestId('pm-browser')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /pick eligible/i }))
