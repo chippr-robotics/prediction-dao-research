@@ -33,9 +33,10 @@ const METRICS = {
   },
 }
 
-// A signer whose provider rejects contract reads — loadConfig then catches and leaves roles false,
-// which is the correct "connected admin who holds no tag-registry operator role" render.
-const signer = { provider: {} }
+// Null provider → `reader` is null → loadConfig is a no-op (roles stay false), so the render is fully
+// synchronous with no dangling contract-read promise. That models the "connected admin who holds no
+// tag-registry operator role" render without leaving async work that would fire after teardown.
+const signer = { provider: null }
 const baseProps = { signer, account: OWNER, contracts: {}, chainId: 137, runTx: vi.fn(), pendingTx: false }
 
 describe('TagRegistryAdmin (spec 054 operator screen)', () => {
