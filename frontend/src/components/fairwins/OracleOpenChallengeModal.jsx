@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefaults'
@@ -26,7 +26,7 @@ const CloseIcon = () => (
  * market closes, settle after it resolves; both capped to the contract windows). Reuses
  * the feature-024 claim-code machinery unchanged (ClaimCodeResultPanel).
  */
-function OracleOpenChallengeModal({ isOpen, onClose }) {
+function OracleOpenChallengeModal({ isOpen, onClose, initialMarket = null }) {
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -70,7 +70,7 @@ function OracleOpenChallengeModal({ isOpen, onClose }) {
 
         <div className="fm-content">
           <div className="fm-panel">
-            <OracleMakerPanel onClose={onClose} />
+            <OracleMakerPanel onClose={onClose} initialMarket={initialMarket} />
           </div>
         </div>
       </div>
@@ -81,7 +81,7 @@ function OracleOpenChallengeModal({ isOpen, onClose }) {
 // ---------------------------------------------------------------------------
 // Maker — pick market → pick side → stake → create (timeline derived, not edited)
 // ---------------------------------------------------------------------------
-function OracleMakerPanel({ onClose }) {
+function OracleMakerPanel({ onClose, initialMarket = null }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const { capabilities } = useChainTokens()
   const polymarketAvailable =
@@ -118,6 +118,16 @@ function OracleMakerPanel({ onClose }) {
     setMarket(m)
     setSide('')
   }, [])
+
+  // Pre-select a market handed in from the ticker crawler (FR: clicking a market
+  // opens this view with it already selected). Seed once, and only while the
+  // picker is still empty, so re-picks and the Change affordance aren't clobbered.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (seededRef.current || !initialMarket) return
+    seededRef.current = true
+    handleSelectMarket(initialMarket)
+  }, [initialMarket, handleSelectMarket])
 
   const clearMarket = useCallback(() => {
     setMarket(null)

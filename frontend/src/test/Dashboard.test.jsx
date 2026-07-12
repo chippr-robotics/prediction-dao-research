@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { useChainId } from 'wagmi'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
 import { setCardVisible } from '../utils/quickAccessPreference'
@@ -23,7 +24,12 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
 // Stub the oracle open challenge modal (spec 041) to assert the Dashboard card wiring
 // without the picker/create internals (covered by OracleOpenChallengeModal.test.jsx).
 vi.mock('../components/fairwins/OracleOpenChallengeModal', () => ({
-  default: ({ isOpen }) => isOpen ? <div data-testid="oracle-open-challenge-modal" /> : null,
+  default: ({ isOpen, initialMarket }) => isOpen ? (
+    <div
+      data-testid="oracle-open-challenge-modal"
+      data-initial-market={initialMarket?.conditionId || ''}
+    />
+  ) : null,
 }))
 
 vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
@@ -34,7 +40,7 @@ vi.mock('../components/fairwins/UnifiedLookupModal', () => ({
 
 vi.mock('../components/fairwins/PolymarketTickerCrawler', () => ({
   default: ({ onSelectMarket }) => (
-    <button type="button" onClick={() => onSelectMarket?.()}>
+    <button type="button" onClick={() => onSelectMarket?.({ conditionId: '0xticker' })}>
       Ticker: Will event happen?
     </button>
   ),
@@ -159,6 +165,10 @@ describe('Dashboard Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default the dashboard onto a Polymarket-enabled chain (Polygon) so the
+    // oracle card + ticker render; individual tests override for the
+    // no-on-chain-oracle case.
+    useChainId.mockReturnValue(137)
     localStorage.removeItem('fairwins_quickaccess_v1')
   })
 
@@ -390,19 +400,25 @@ describe('Dashboard Component', () => {
       expect(screen.getByText(/share a code — Polymarket settles it automatically/i)).toBeInTheDocument()
     })
 
-    it('clicking the card opens the oracle open challenge modal (not the 1v1 flow)', () => {
+    it('clicking the card opens the oracle open challenge modal (not the 1v1 flow) with an empty picker', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
       fireEvent.click(screen.getByText('Open Oracle Challenge'))
-      expect(screen.getByTestId('oracle-open-challenge-modal')).toBeInTheDocument()
+      const modal = screen.getByTestId('oracle-open-challenge-modal')
+      expect(modal).toBeInTheDocument()
+      // Opened from the card → no market pre-selected.
+      expect(modal).toHaveAttribute('data-initial-market', '')
       expect(screen.queryByTestId('friend-modal')).toBeNull()
     })
 
-    it('clicking a ticker title opens the oracle open challenge modal', () => {
+    it('clicking a ticker market opens the oracle open challenge modal with that market pre-selected', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
       fireEvent.click(screen.getByText('Ticker: Will event happen?'))
-      expect(screen.getByTestId('oracle-open-challenge-modal')).toBeInTheDocument()
+      const modal = screen.getByTestId('oracle-open-challenge-modal')
+      expect(modal).toBeInTheDocument()
+      // The ticker forwards the picked market's conditionId into the modal.
+      expect(modal).toHaveAttribute('data-initial-market', '0xticker')
     })
 
     it('the card is toggleable via quick-access preferences like any other (spec 038 US5)', () => {
@@ -420,6 +436,27 @@ describe('Dashboard Component', () => {
       // the card itself is an h4, the modal title an h2.
       expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
       expect(screen.getByRole('heading', { level: 2, name: 'Open Challenge' })).toBeInTheDocument()
+    })
+  })
+
+  // Networks without an on-chain oracle (no Polymarket) hide the oracle open
+  // challenge card while keeping the plain Open Challenge available. The ticker
+  // crawler self-hides on the same capability (covered by its own test).
+  describe('Networks without an on-chain oracle', () => {
+    it('hides the Open Oracle Challenge card', () => {
+      useChainId.mockReturnValue(63) // Ethereum Classic Mordor — no Polymarket
+      setCardVisible('oracle-open-challenge', true)
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByText('Open Oracle Challenge')).toBeNull()
+    })
+
+    it('surfaces the plain Open Challenge card by default (replacing the hidden oracle card)', () => {
+      useChainId.mockReturnValue(63)
+      // No setCardVisible: open-challenge is otherwise default-hidden, but a
+      // network without an on-chain oracle promotes it to the default entry.
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Open Challenge')).toBeInTheDocument()
+      expect(screen.queryByText('Open Oracle Challenge')).toBeNull()
     })
   })
 })
