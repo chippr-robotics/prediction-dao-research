@@ -55,7 +55,7 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     const onDone = vi.fn()
     render(<CreateChallengePanel embedded onClose={() => {}} onDone={onDone} />)
-    const createBtn = screen.getByRole('button', { name: /open wager/i })
+    const createBtn = screen.getByRole('button', { name: /lock in/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
@@ -73,7 +73,7 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     )
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    const openBtn = screen.getByRole('button', { name: /open wager/i })
+    const openBtn = screen.getByRole('button', { name: /lock in/i })
     expect(openBtn).toBeEnabled()
     // Disconnected → tapping opens the connect panel and does NOT create yet.
     fireEvent.click(openBtn)

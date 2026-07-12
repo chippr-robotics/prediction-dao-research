@@ -10,8 +10,12 @@ import './PillSelect.css'
  * options: [{ value, label, icon?, disabled?, disabledReason? }]
  * `info` (spec 039): an optional InfoTip rendered beside the label but outside
  * the labelId span, so the radiogroup's accessible name stays clean.
+ * `hideLabel`: keep the label wired up for a11y (aria-labelledby) but visually
+ * hide the text — used where the pills are self-explanatory on screen.
+ * `bordered`: wrap the options row in a subtle outline (a light card around
+ * the pills) instead of them floating directly on the surface.
  */
-function PillSelect({ label, options, value, onChange, disabled = false, multiline = false, info = null }) {
+function PillSelect({ label, options, value, onChange, disabled = false, multiline = false, info = null, hideLabel = false, bordered = false }) {
   const labelId = useId()
   const enabledValues = options.filter((o) => !o.disabled).map((o) => o.value)
   // Roving tabindex: the selected pill is the tab stop when it's enabled;
@@ -49,11 +53,11 @@ function PillSelect({ label, options, value, onChange, disabled = false, multili
     <div className="pill-select-wrap">
       {label && (
         info
-          ? <span className="fm-label-row"><span id={labelId} className="fm-label">{label}</span>{info}</span>
-          : <span id={labelId} className="fm-label">{label}</span>
+          ? <span className="fm-label-row"><span id={labelId} className={hideLabel ? 'sr-only' : 'fm-label'}>{label}</span>{info}</span>
+          : <span id={labelId} className={hideLabel ? 'sr-only' : 'fm-label'}>{label}</span>
       )}
       <div
-        className={`pill-select${multiline ? ' pill-select-multiline' : ''}`}
+        className={`pill-select${multiline ? ' pill-select-multiline' : ''}${bordered ? ' pill-select-bordered' : ''}`}
         role="radiogroup"
         aria-labelledby={label ? labelId : undefined}
       >

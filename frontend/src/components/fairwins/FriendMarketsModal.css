@@ -541,7 +541,7 @@
 }
 
 .fm-pay-memo > .fm-label-row {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* Details region — the secondary controls (resolution, arbitrator, deadlines)
