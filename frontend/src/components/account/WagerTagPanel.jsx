@@ -168,6 +168,8 @@ function describeError(err, iface) {
         return 'Your reservation is still settling. Wait a few seconds and try again.'
       case 'CommitmentExpired':
         return 'Your reservation expired before you completed it. Start over to pick your tag.'
+      case 'CommitmentPending':
+        return 'A matching reservation is still active. Wait for it to settle or expire, then try again.'
       case 'SanctionedAccount':
         return 'This action is blocked by sanctions screening.'
       default:

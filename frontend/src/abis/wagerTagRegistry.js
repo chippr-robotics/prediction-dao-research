@@ -61,6 +61,7 @@ export const WAGER_TAG_REGISTRY_ABI = [
   'error NoCommitment()',
   'error CommitmentTooNew()',
   'error CommitmentExpired()',
+  'error CommitmentPending()',
   'error ChangeCooldownActive(uint64 nextAllowedAt)',
   'error SanctionedAccount()',
 ]
