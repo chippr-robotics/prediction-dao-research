@@ -9,6 +9,12 @@ It's the difference between *"hey Alice, 10 USDC says it rains tomorrow"* and
 *"10 USDC says it rains tomorrow — first taker gets the other side, here's the
 code."*
 
+> **The app opens right here.** Open challenges are FairWins' core mechanic, so the
+> **home screen is the create-a-challenge view itself** — an amount keypad, a memo, and
+> a resolution choice (either side settles, a third-party arbitrator, or an oracle where
+> available). "Accept a challenge" and "My rewards" sit alongside it. Every other wager
+> type (1v1, Make an Offer, group pools) lives in the **Wagers** section from the menu.
+
 ## How it works at a glance
 
 1. You create an open challenge and the app gives you a **four-word code**
