@@ -58,6 +58,10 @@ function mirrorToLedger(account, record, patch = null, suffix = null) {
 
 export const TRANSFER_KIND = Object.freeze({ NATIVE: 'native', STABLE: 'stable' })
 
+// Honest passkey-UserOp lifecycle states as returned by sendCalls (mirrors LIFECYCLE in
+// lib/passkey/submission.js — kept as literals here to avoid pulling the relay graph into this hook).
+const OP_STATE = Object.freeze({ SUBMITTED: 'submitted', INCLUDED: 'included', FAILED: 'failed' })
+
 const ERC20_IFACE = new ethers.Interface(TRANSFER_ABI)
 
 export function useTransfer() {
@@ -213,12 +217,42 @@ export function useTransfer() {
               ? [{ target: m.address, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]), value: 0n }]
               : [{ target: to, data: '0x', value }]
           setStatus('submitting')
-          const res = await sendCalls(calls)
-          txHash = res?.txHash ?? res?.userOpHash ?? res?.intentId ?? null
+          // Reflect the honest lifecycle while the batch is tracked to inclusion (spec 041 FR-017):
+          // a passkey UserOp is "submitted" for up to ~90s before it is "included", so flip the button
+          // to a truthful pending state instead of a frozen "Sending…".
+          const res = await sendCalls(calls, {
+            onState: (s) => {
+              if (s?.state === OP_STATE.SUBMITTED) setStatus('pending')
+            },
+          })
           // Honest route: reflect whether the batch was ACTUALLY sponsored. sendCalls falls back to a
           // self-funded UserOp when sponsorship is unavailable (spec 050), so trust its `sponsored`
           // flag rather than assuming gasless.
           route = res?.sponsored === false ? 'self' : res?.sponsored === true || passkeySponsored ? 'gasless' : 'self'
+
+          // A passkey batch resolves to an honest terminal state — included | failed | stalled — and
+          // sendCalls NEVER throws on a stalled/never-included UserOp (submission.js#trackToInclusion).
+          // We MUST branch on that state: only an on-chain inclusion is a real transfer, and a
+          // userOpHash is NOT a transaction hash (block explorers cannot resolve it), so it must never
+          // be recorded or displayed as one (Constitution III, honest-state). This is the fix for a
+          // stalled sponsored UserOp being force-marked "complete" with its userOpHash as the txHash.
+          if (res?.state === OP_STATE.FAILED) {
+            throw new Error(res.reason || 'The transfer reverted on-chain and was not sent.')
+          }
+          if (res?.state && res.state !== OP_STATE.INCLUDED) {
+            // Submitted but not yet confirmed (stalled): keep it truthfully "in process" with the
+            // UserOp reference for later reconciliation — do NOT mark complete or fabricate a txHash.
+            const ref = res.userOpHash ?? res.intentId ?? null
+            updateTransfer(address, entry.id, { status: TRANSFER_STATUS.IN_PROCESS, route, userOpHash: ref })
+            mirrorToLedger(address, entry, { status: TRANSFER_STATUS.IN_PROCESS, route }, 'submitted')
+            setStatus('pending')
+            const pending = { txHash: null, userOpHash: ref, route, id: entry.id, pending: true }
+            setLastResult(pending)
+            refreshBalances()
+            return pending
+          }
+          // Included: use the REAL on-chain transaction hash only.
+          txHash = res?.txHash ?? null
         } else if (kind === TRANSFER_KIND.STABLE && stableDomainVersion != null && hasRelayer) {
           // Classic EOA, gasless: sign an EIP-3009 authorization; a relayer submits + pays gas.
           const auth = await signTransferAuthorization({

@@ -163,4 +163,41 @@ describe('useOpenChallengeCreate', () => {
     expect(h.calls).toEqual([])
     expect(h.sendCalls).not.toHaveBeenCalled()
   })
+
+  it('uses the real on-chain hash for an included passkey UserOp', async () => {
+    h.loginMethod = 'passkey'
+    h.sendCalls.mockResolvedValue({ state: 'included', txHash: '0xrealtxhash', userOpHash: '0xuop' })
+    h.provider.getTransactionReceipt.mockResolvedValue({ status: 1, hash: '0xrealtxhash', logs: [] })
+    const { result } = renderHook(() => useOpenChallengeCreate())
+    let out
+    await act(async () => {
+      out = await result.current.createOpenChallenge({ stake: '10', acceptDeadline: 1000, resolveDeadline: 2000 })
+    })
+    expect(out.txHash).toBe('0xrealtxhash')
+    // Only the real tx hash is ever used to reconcile — never the userOpHash.
+    expect(h.provider.getTransactionReceipt).toHaveBeenCalledWith('0xrealtxhash')
+    expect(h.provider.getTransactionReceipt).not.toHaveBeenCalledWith('0xuop')
+  })
+
+  it('does NOT present a stalled passkey UserOp as a created challenge (no phantom code, no userOpHash poll)', async () => {
+    h.loginMethod = 'passkey'
+    // A sponsored UserOp that was submitted but never landed on-chain: no txHash, only a userOpHash.
+    h.sendCalls.mockResolvedValue({ state: 'stalled', userOpHash: '0xuop', lastKnown: { state: 'pending' } })
+    const { result } = renderHook(() => useOpenChallengeCreate())
+    await expect(
+      result.current.createOpenChallenge({ stake: '10', acceptDeadline: 1000, resolveDeadline: 2000 })
+    ).rejects.toThrow(/hasn.t confirmed on-chain/i)
+    // The userOpHash must never be polled as if it were a transaction hash.
+    expect(h.provider.getTransactionReceipt).not.toHaveBeenCalled()
+  })
+
+  it('surfaces the revert reason for a failed passkey UserOp', async () => {
+    h.loginMethod = 'passkey'
+    h.sendCalls.mockResolvedValue({ state: 'failed', reason: 'user operation reverted', userOpHash: '0xuop' })
+    const { result } = renderHook(() => useOpenChallengeCreate())
+    await expect(
+      result.current.createOpenChallenge({ stake: '10', acceptDeadline: 1000, resolveDeadline: 2000 })
+    ).rejects.toThrow(/reverted/i)
+    expect(h.provider.getTransactionReceipt).not.toHaveBeenCalled()
+  })
 })

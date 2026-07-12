@@ -85,6 +85,27 @@ describe('TransferForm', () => {
     await waitFor(() => expect(showNotification).toHaveBeenCalled())
   })
 
+  it('reports a stalled (pending) passkey transfer honestly — info notice, not a "success"', async () => {
+    // A sponsored UserOp submitted but not yet confirmed on-chain: send() resolves with { pending: true }
+    // and no real txHash. The form must NOT claim it cleared.
+    send.mockResolvedValueOnce({ txHash: null, userOpHash: '0xuop', route: 'gasless', id: 't1', pending: true })
+    const user = userEvent.setup()
+    render(<TransferForm />)
+
+    await user.type(screen.getByLabelText('To'), '0xBbBb000000000000000000000000000000000002')
+    await user.type(screen.getByLabelText('Amount'), '10')
+    const preview = screen.getByRole('button', { name: 'Preview' })
+    await waitFor(() => expect(preview).toBeEnabled())
+    await user.click(preview)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(showNotification).toHaveBeenCalled())
+    const [message, type] = showNotification.mock.calls.at(-1)
+    expect(type).toBe('info')
+    expect(message).toMatch(/still confirming on-chain/i)
+    expect(message).not.toMatch(/^Sent /)
+  })
+
   it('blocks Preview when the amount exceeds the balance', async () => {
     const user = userEvent.setup()
     render(<TransferForm />)

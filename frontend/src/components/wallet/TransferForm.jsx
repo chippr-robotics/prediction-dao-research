@@ -93,10 +93,19 @@ export default function TransferForm({ onSent }) {
     setFormError(null)
     try {
       const res = await send({ kind, to: toResolved, amount })
-      showNotification(
-        `Sent ${amount} ${m.symbol} to ${short(toResolved)}${res.route === 'gasless' ? ' (gasless)' : ''}.`,
-        'success'
-      )
+      if (res?.pending) {
+        // Submitted but not yet confirmed on-chain (a stalled/never-included UserOp): tell the truth
+        // rather than claiming it cleared. It stays "In process" in Activity until it settles.
+        showNotification(
+          `Submitted ${amount} ${m.symbol} to ${short(toResolved)} — still confirming on-chain. It will show as complete in Activity once settled.`,
+          'info'
+        )
+      } else {
+        showNotification(
+          `Sent ${amount} ${m.symbol} to ${short(toResolved)}${res.route === 'gasless' ? ' (gasless)' : ''}.`,
+          'success'
+        )
+      }
       resetForm()
       onSent?.(res)
     } catch (err) {

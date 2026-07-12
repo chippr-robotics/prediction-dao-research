@@ -114,7 +114,7 @@ export function WalletProvider({ children }) {
    * Each call: { target, data, value? }.
    */
   const sendCalls = useCallback(
-    async (calls) => {
+    async (calls, { onState } = {}) => {
       if (!calls?.length) throw new Error('sendCalls: empty batch')
       if (loginMethod === 'passkey') {
         const [{ sendPasskeyBatch }, { readSession }] = await Promise.all([
@@ -123,8 +123,9 @@ export function WalletProvider({ children }) {
         ])
         // Pin the ceremony to the credential this session signed in with —
         // never a different passkey that happens to share the address book
-        // (spec 045 US3/FR-008).
-        return sendPasskeyBatch({ chainId, address, calls, credentialId: readSession()?.credentialId })
+        // (spec 045 US3/FR-008). `onState` (optional) surfaces the honest
+        // submitted→included|failed|stalled lifecycle to the caller's UI.
+        return sendPasskeyBatch({ chainId, address, calls, credentialId: readSession()?.credentialId, onState })
       }
       if (!signer) throw new Error('No signer available')
       const receipts = []
