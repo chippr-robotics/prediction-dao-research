@@ -72,6 +72,18 @@ vi.mock('../components/ui/PremiumPurchaseModal', () => ({
   )
 }))
 
+vi.mock('../components/ui/AddressQRModal', () => ({
+  default: ({ isOpen, onClose, address, variant }) => (
+    isOpen
+      ? (
+        <div role="dialog" aria-label="Address QR Modal" data-variant={variant} data-address={address}>
+          <button onClick={onClose}>Close</button>
+        </div>
+      )
+      : null
+  )
+}))
+
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useWalletRoles, useWeb3 } from '../hooks'
 import { useDex } from '../hooks/useDex'
@@ -293,6 +305,27 @@ describe('WalletButton Component - Wagers', () => {
       expect(await navigator.clipboard.readText()).toBe(
         '0x1234567890123456789012345678901234567890'
       )
+    })
+
+    it('opens the address QR modal from the dropdown header and closes the dropdown', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<WalletButton />)
+
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+      await screen.findByRole('menu')
+
+      const qrButton = screen.getByRole('button', { name: /show wallet address qr code/i })
+      await user.click(qrButton)
+
+      const qrModal = await screen.findByRole('dialog', { name: /address qr modal/i })
+      expect(qrModal).toHaveAttribute('data-variant', 'quick')
+      expect(qrModal).toHaveAttribute('data-address', '0x1234567890123456789012345678901234567890')
+
+      // Opening the QR modal closes the account dropdown.
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Close' }))
+      expect(screen.queryByRole('dialog', { name: /address qr modal/i })).not.toBeInTheDocument()
     })
 
     it('hides Create Prediction Market button (removed feature)', async () => {

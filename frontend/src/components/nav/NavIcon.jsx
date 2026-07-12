@@ -43,6 +43,9 @@ const ICON_PATHS = {
   trending: <><path d="M4 15.5 9.5 10l3.5 3.5L20 6" /><path d="M15.5 6H20v4.5" /></>,
   // Earn (spec 050) — a sprouting seedling: assets at rest, growing.
   sprout: <><path d="M12 20v-7" /><path d="M12 13c0-3.3-2.7-6-6-6H4.5v.5c0 3.3 2.7 6 6 6H12" /><path d="M12 11c0-2.8 2.2-5 5-5h2.5v.5c0 2.8-2.2 5-5 5H12" /><path d="M7.5 20h9" /></>,
+  // Share address as QR (spec 011 quick-share entry point) — the three QR
+  // finder-pattern corners plus scattered data pixels, universally read as "QR".
+  qrcode: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h3v3" /><path d="M20 14v.01" /><path d="M14 20v.01" /><path d="M20 20v.01" /><path d="M17 17v.01" /></>,
 }
 
 export default function NavIcon({ name, size = 18, className = '' }) {

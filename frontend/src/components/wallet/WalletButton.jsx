@@ -15,6 +15,7 @@ import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
+import AddressQRModal from '../ui/AddressQRModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
@@ -33,6 +34,7 @@ import './RoleDetailsCard.css'
 
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [showAddressQR, setShowAddressQR] = useState(false)
   const { address, isConnected } = useAccount()
   const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
@@ -123,6 +125,11 @@ function WalletButton({ className = '' }) {
     await Promise.all([refreshRoles(), refreshRoleDetails()])
   }
 
+  const handleOpenAddressQR = () => {
+    setIsOpen(false)
+    setShowAddressQR(true)
+  }
+
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
     navigate('/admin')
@@ -197,6 +204,15 @@ function WalletButton({ className = '' }) {
                     </span>
                     <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>
+                  <button
+                    type="button"
+                    className="account-qr-btn"
+                    onClick={handleOpenAddressQR}
+                    aria-label="Show wallet address QR code"
+                    title="Share address via QR code"
+                  >
+                    <NavIcon name="qrcode" size={18} />
+                  </button>
                 </div>
               </div>
 
@@ -300,6 +316,17 @@ function WalletButton({ className = '' }) {
         </>
       )}
 
+      {/* Address QR Modal (spec 011) — quick variant: clean QR using the
+          persisted Account-page color, no color options, no visible address.
+          Mounted per open so the preference is re-read each time. */}
+      {showAddressQR && (
+        <AddressQRModal
+          isOpen
+          onClose={() => setShowAddressQR(false)}
+          address={address}
+          variant="quick"
+        />
+      )}
     </div>
   )
 }
