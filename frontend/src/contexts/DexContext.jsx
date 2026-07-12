@@ -5,6 +5,7 @@ import { useWallet } from '../hooks/useWalletManagement'
 import { useActiveAccount } from '../hooks/useActiveAccount'
 import { FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/dex'
 import { getNetwork, getCurrentChainId } from '../config/networks'
+import { getPortfolioRegistry } from '../config/assetTaxonomy'
 import { ERC20_ABI } from '../abis/ERC20'
 import { WNATIVE_ABI } from '../abis/WNative'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
@@ -100,10 +101,38 @@ export function DexProvider({ children }) {
     },
   }), [addresses, stableConfig, nativeConfig])
 
+  // The tradeable universe for the active chain: every fungible ERC-20 the
+  // portfolio registry knows about on this network (wrapped native + stablecoin
+  // from app-config, plus curated commodities/tools/stables) — i.e. the
+  // portfolio assets that have a routeable pair on a chain we support. Native
+  // coins (must be wrapped first) and NFT credentials are excluded. Swaps
+  // execute on the active chain, so the list is per-chain (honest-state: we only
+  // offer what can actually route here). Falls back to []/no-DEX cleanly.
+  const tradeTokens = useMemo(() => {
+    if (!isDexAvailable) return []
+    return getPortfolioRegistry(chainId)
+      .filter((entry) => entry.kind === 'erc20' && entry.address)
+      .map((entry) => ({
+        address: entry.address,
+        symbol: entry.symbol,
+        name: entry.name,
+        decimals: entry.decimals,
+      }))
+  }, [chainId, isDexAvailable])
+
+  // Address → metadata lookup so quote/swap math uses the right decimals and
+  // ticker for any tradeable token, not just wrapped-native and the stablecoin.
+  const tokenMeta = useMemo(() => {
+    const map = new Map()
+    for (const t of tradeTokens) map.set(t.address.toLowerCase(), t)
+    return map
+  }, [tradeTokens])
+
   const [balances, setBalances] = useState({
     native: '0',
     wnative: '0',
     stable: '0',
+    tokens: {},
   })
 
   const [balanceHistory, setBalanceHistory] = useState([])
@@ -160,6 +189,33 @@ export function DexProvider({ children }) {
         stable: ethers.formatUnits(stableBalance, tokens.STABLE.decimals),
       }
 
+      // Balances for the rest of the tradeable set (curated commodities/tools/
+      // stables) so the ticket's "available to trade" line is accurate for any
+      // selected asset, not just wrapped-native/stablecoin. Read-only, a handful
+      // of tokens per chain, tolerant of per-token failure.
+      const wnativeLower = addresses.WNATIVE.toLowerCase()
+      const stableLower = addresses.STABLECOIN.toLowerCase()
+      const tokenBalances = {
+        [wnativeLower]: newBalances.wnative,
+        [stableLower]: newBalances.stable,
+      }
+      const extraTokens = tradeTokens.filter((t) => {
+        const lower = t.address.toLowerCase()
+        return lower !== wnativeLower && lower !== stableLower
+      })
+      await Promise.all(
+        extraTokens.map(async (t) => {
+          try {
+            const erc20 = new ethers.Contract(t.address, ERC20_ABI, readProvider)
+            const bal = await erc20.balanceOf(tradingAddress)
+            tokenBalances[t.address.toLowerCase()] = ethers.formatUnits(bal, t.decimals)
+          } catch {
+            tokenBalances[t.address.toLowerCase()] = '0'
+          }
+        }),
+      )
+      newBalances.tokens = tokenBalances
+
       setBalances(newBalances)
 
       setBalanceHistory(prev => [
@@ -174,12 +230,12 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [readProvider, tradingAddress, contracts, stableContract, tokens.STABLE.decimals])
+  }, [readProvider, tradingAddress, contracts, stableContract, tokens.STABLE.decimals, tradeTokens, addresses])
 
   // Reset balances when the chain or the active account changes so the user
   // doesn't see stale numbers (e.g. personal balances while operating as a vault).
   useEffect(() => {
-    setBalances({ native: '0', wnative: '0', stable: '0' })
+    setBalances({ native: '0', wnative: '0', stable: '0', tokens: {} })
     setBalanceHistory([])
   }, [chainId, tradingAddress])
 
@@ -263,8 +319,8 @@ export function DexProvider({ children }) {
     const lower = tokenAddress?.toLowerCase?.()
     if (lower === addresses.STABLECOIN.toLowerCase()) return tokens.STABLE.decimals
     if (lower === addresses.WNATIVE.toLowerCase()) return 18
-    return 18
-  }, [addresses, tokens.STABLE.decimals])
+    return tokenMeta.get(lower)?.decimals ?? 18
+  }, [addresses, tokens.STABLE.decimals, tokenMeta])
 
   // Symbol lookup for a token by address, used to label SDK Token instances so
   // the trade surface reads the right ticker on every chain.
@@ -272,8 +328,8 @@ export function DexProvider({ children }) {
     const lower = tokenAddress?.toLowerCase?.()
     if (lower === addresses.STABLECOIN.toLowerCase()) return tokens.STABLE.symbol
     if (lower === addresses.WNATIVE.toLowerCase()) return tokens.WNATIVE.symbol
-    return 'TOKEN'
-  }, [addresses, tokens.STABLE.symbol, tokens.WNATIVE.symbol])
+    return tokenMeta.get(lower)?.symbol ?? 'TOKEN'
+  }, [addresses, tokens.STABLE.symbol, tokens.WNATIVE.symbol, tokenMeta])
 
   const getQuote = useCallback(async (tokenIn, tokenOut, amountIn, feeTier = FEE_TIERS.MEDIUM) => {
     if (!contracts) {
@@ -515,6 +571,7 @@ export function DexProvider({ children }) {
     setSlippage,
 
     tokens,
+    tradeTokens,
     addresses,
     isDexAvailable,
     dexProvider,

@@ -18,10 +18,6 @@ import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
 import './TradePanel.css'
 
-const FROM_NATIVE = 'NATIVE'
-const FROM_WNATIVE = 'WNATIVE'
-const FROM_STABLE = 'STABLE'
-
 // Price impact bands used to color the trade summary, mirroring the thresholds
 // mainstream V3 clients use to warn a trader.
 const IMPACT_WARN = 1 // %
@@ -40,19 +36,19 @@ const shortAddress = (addr) =>
 const fmtBalance = (value) =>
   Number(value || 0).toLocaleString(undefined, { maximumSignificantDigits: 8 })
 
+const sameAddr = (a, b) => Boolean(a) && Boolean(b) && a.toLowerCase() === b.toLowerCase()
+
 function TradePanel() {
   const {
     balances,
     loading,
     quotingPrice,
-    wrapNative,
-    unwrapNative,
     swap,
     getBestQuote,
     slippage,
     setSlippage,
     addresses,
-    tokens,
+    tradeTokens,
     isDexAvailable,
     dexProvider,
     network,
@@ -91,48 +87,51 @@ function TradePanel() {
     : `Powered by ${providerName} · Uniswap v3 protocol`
 
   const wnativeSymbol = nativeSymbol ? `W${nativeSymbol}` : 'WNATIVE'
-  const labelFor = (key) => {
-    if (key === FROM_NATIVE) return nativeSymbol
-    if (key === FROM_WNATIVE) return wnativeSymbol
-    return stableSymbol
-  }
 
-  const [mode, setMode] = useState('trade')
-  const [fromToken, setFromToken] = useState(FROM_WNATIVE)
-  const [toToken, setToToken] = useState(FROM_STABLE)
+  // The tradeable set for the active chain (wrapped-native, the stablecoin, and
+  // every curated portfolio asset with a routeable pair here). Keyed by address.
+  const assets = useMemo(() => tradeTokens || [], [tradeTokens])
+  const tokenFor = useCallback(
+    (addr) => assets.find((t) => sameAddr(t.address, addr)) || null,
+    [assets],
+  )
+  const symbolFor = useCallback((addr) => tokenFor(addr)?.symbol || '—', [tokenFor])
+  const balanceFor = useCallback(
+    (addr) => balances.tokens?.[addr?.toLowerCase?.()] ?? '0',
+    [balances],
+  )
+
+  const [fromToken, setFromToken] = useState(addresses.WNATIVE)
+  const [toToken, setToToken] = useState(addresses.STABLECOIN)
+  // Re-seed the pair to the chain default (sell wrapped-native for the
+  // stablecoin) whenever the active chain changes, without an effect: adjust
+  // state during render keyed on the chain's core addresses (React-endorsed),
+  // so a mid-chain token pick is never clobbered by a re-render.
+  const [chainKey, setChainKey] = useState(addresses.WNATIVE)
+  if (chainKey !== addresses.WNATIVE) {
+    setChainKey(addresses.WNATIVE)
+    setFromToken(addresses.WNATIVE)
+    setToToken(addresses.STABLECOIN)
+  }
   const [orderType, setOrderType] = useState('sell')
   const [priceType, setPriceType] = useState('market')
   const [limitPrice, setLimitPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [quote, setQuote] = useState(null)
-  const [wrapOutput, setWrapOutput] = useState('')
   const [rateInverted, setRateInverted] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const addrFor = useCallback(
-    (key) => (key === FROM_WNATIVE ? addresses.WNATIVE : addresses.STABLECOIN),
-    [addresses],
-  )
-
   const isPerpsOrder = orderType === 'sell_short' || orderType === 'buy_to_cover'
 
-  // Live quoting — debounced. Trade mode routes through the DEX; wrap/unwrap is
-  // always 1:1 so we mirror the input.
+  // Live quoting — debounced. Routes through the DEX for the selected pair.
   useEffect(() => {
     if (!amount || parseFloat(amount) <= 0) {
       setQuote(null)
-      setWrapOutput('')
       return
     }
 
-    if (mode !== 'trade') {
-      setWrapOutput(amount)
-      setQuote(null)
-      return
-    }
-
-    if (fromToken === toToken || isPerpsOrder) {
+    if (!fromToken || !toToken || sameAddr(fromToken, toToken) || isPerpsOrder) {
       setQuote(null)
       return
     }
@@ -140,7 +139,7 @@ function TradePanel() {
     let cancelled = false
     const timeoutId = setTimeout(async () => {
       try {
-        const result = await getBestQuote(addrFor(fromToken), addrFor(toToken), amount)
+        const result = await getBestQuote(fromToken, toToken, amount)
         if (!cancelled) {
           setQuote(result)
           setError('')
@@ -157,34 +156,15 @@ function TradePanel() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [amount, fromToken, toToken, mode, isPerpsOrder, getBestQuote, addrFor])
+  }, [amount, fromToken, toToken, isPerpsOrder, getBestQuote])
 
-  const handleModeChange = (next) => {
-    setMode(next)
-    setAmount('')
-    setQuote(null)
-    setWrapOutput('')
-    setError('')
-    setSuccess('')
-
-    if (next === 'wrap') {
-      setFromToken(FROM_NATIVE)
-      setToToken(FROM_WNATIVE)
-    } else if (next === 'unwrap') {
-      setFromToken(FROM_WNATIVE)
-      setToToken(FROM_NATIVE)
-    } else {
-      setFromToken(FROM_WNATIVE)
-      setToToken(FROM_STABLE)
-      setOrderType('sell')
-    }
-  }
-
-  // Spot order type maps onto the pair direction: Buy receives the network
-  // asset, Sell pays it away. The two stay in sync in both directions.
+  // Spot order type maps onto the pair direction relative to cash: paying the
+  // stablecoin to receive an asset is a Buy; paying an asset for the stablecoin
+  // is a Sell. Asset-for-asset pairs leave the order type unchanged.
   const deriveOrderType = (from, to) => {
-    if (to === FROM_WNATIVE && from === FROM_STABLE) return 'buy'
-    if (from === FROM_WNATIVE && to === FROM_STABLE) return 'sell'
+    const stable = addresses.STABLECOIN
+    if (sameAddr(to, stable) && !sameAddr(from, stable)) return 'sell'
+    if (sameAddr(from, stable) && !sameAddr(to, stable)) return 'buy'
     return null
   }
 
@@ -194,11 +174,11 @@ function TradePanel() {
     setError('')
     setSuccess('')
     if (next === 'buy') {
-      setFromToken(FROM_STABLE)
-      setToToken(FROM_WNATIVE)
+      setFromToken(addresses.STABLECOIN)
+      setToToken(addresses.WNATIVE)
     } else if (next === 'sell') {
-      setFromToken(FROM_WNATIVE)
-      setToToken(FROM_STABLE)
+      setFromToken(addresses.WNATIVE)
+      setToToken(addresses.STABLECOIN)
     }
   }
 
@@ -236,8 +216,7 @@ function TradePanel() {
 
   // A Limit order's floor: limit price (output per 1 unit paid) × quantity,
   // enforced on-chain as the swap's minimum received.
-  const outDecimals =
-    toToken === FROM_STABLE ? tokens?.STABLE?.decimals ?? 6 : 18
+  const outDecimals = tokenFor(toToken)?.decimals ?? 18
   const limitFloor = useMemo(() => {
     if (priceType !== 'limit') return null
     const qty = parseFloat(amount)
@@ -259,63 +238,32 @@ function TradePanel() {
       setError('Enter an amount to trade')
       return
     }
-    if (mode === 'trade' && priceType === 'limit' && !limitFloor) {
+    if (priceType === 'limit' && !limitFloor) {
       setError('Enter a limit price to place a limit order')
       return
     }
 
     try {
       const proposedNote = `Proposed to ${identity.label || 'the multisig'} — owners approve before it executes.`
-      if (mode === 'wrap') {
-        const res = await wrapNative(amount)
-        setSuccess(
-          res?.proposed
-            ? proposedNote
-            : `Wrapped ${amount} ${nativeSymbol} → ${wnativeSymbol}`,
-        )
-      } else if (mode === 'unwrap') {
-        const res = await unwrapNative(amount)
-        setSuccess(
-          res?.proposed
-            ? proposedNote
-            : `Unwrapped ${amount} ${wnativeSymbol} → ${nativeSymbol}`,
-        )
-      } else {
-        const res =
-          priceType === 'limit'
-            ? await swap(addrFor(fromToken), addrFor(toToken), amount, {
-                limitMinOutWei: limitFloor.wei,
-              })
-            : await swap(addrFor(fromToken), addrFor(toToken), amount)
-        setSuccess(
-          res?.proposed
-            ? proposedNote
-            : `Swapped ${amount} ${labelFor(fromToken)} → ${labelFor(toToken)}`,
-        )
-      }
+      const res =
+        priceType === 'limit'
+          ? await swap(fromToken, toToken, amount, { limitMinOutWei: limitFloor.wei })
+          : await swap(fromToken, toToken, amount)
+      setSuccess(
+        res?.proposed
+          ? proposedNote
+          : `Swapped ${amount} ${symbolFor(fromToken)} → ${symbolFor(toToken)}`,
+      )
       setAmount('')
       setQuote(null)
-      setWrapOutput('')
     } catch (err) {
       console.error('Trade error:', err)
       setError(err.message || 'Transaction failed')
     }
   }
 
-  const balanceFor = (key) => {
-    if (key === FROM_NATIVE) return balances.native
-    if (key === FROM_WNATIVE) return balances.wnative
-    return balances.stable
-  }
-
   const handleSetMax = () => {
-    if (fromToken === FROM_NATIVE) {
-      // Leave a little native for gas.
-      const maxAmount = Math.max(0, parseFloat(balances.native) - 0.01)
-      setAmount(maxAmount.toString())
-    } else {
-      setAmount(balanceFor(fromToken))
-    }
+    setAmount(balanceFor(fromToken))
   }
 
   if (!isConnected) {
@@ -323,7 +271,7 @@ function TradePanel() {
       <div className="trade-panel">
         <div className="trade-header">
           <h2>Trade</h2>
-          <p className="trade-subtitle">Swap, wrap and unwrap on {networkName}</p>
+          <p className="trade-subtitle">Trade on {networkName}</p>
         </div>
         <div className="trade-empty">
           <p>Connect your wallet to start trading.</p>
@@ -350,14 +298,11 @@ function TradePanel() {
     )
   }
 
-  const isTrade = mode === 'trade'
-  const receiveValue = isTrade
-    ? quotingPrice
-      ? '…'
-      : quote?.amountOut
-        ? Number(quote.amountOut).toLocaleString(undefined, { maximumSignificantDigits: 8 })
-        : '0.0'
-    : wrapOutput || '0.0'
+  const receiveValue = quotingPrice
+    ? '…'
+    : quote?.amountOut
+      ? Number(quote.amountOut).toLocaleString(undefined, { maximumSignificantDigits: 8 })
+      : '0.0'
 
   const severity = impactSeverity(quote?.priceImpactPercent)
   const canExecute =
@@ -366,8 +311,8 @@ function TradePanel() {
     !isPerpsOrder &&
     amount &&
     parseFloat(amount) > 0 &&
-    (!isTrade || Boolean(quote)) &&
-    (!isTrade || priceType !== 'limit' || Boolean(limitFloor))
+    Boolean(quote) &&
+    (priceType !== 'limit' || Boolean(limitFloor))
 
   const rateLabel =
     quote && !rateInverted
@@ -423,7 +368,7 @@ function TradePanel() {
         </select>
         <dl className="trade-account-rows">
           <div className="trade-account-row">
-            <dt>Available to trade ({labelFor(fromToken)})</dt>
+            <dt>Available to trade ({symbolFor(fromToken)})</dt>
             <dd>
               <SensitiveValue>{fmtBalance(balanceFor(fromToken))}</SensitiveValue>
             </dd>
@@ -449,120 +394,92 @@ function TradePanel() {
         )}
       </section>
 
-      <div className="trade-modes" role="tablist" aria-label="Trade mode">
-        <button
-          role="tab"
-          aria-selected={mode === 'trade'}
-          className={`trade-mode-btn ${mode === 'trade' ? 'active' : ''}`}
-          onClick={() => handleModeChange('trade')}
-        >
-          Swap
-        </button>
-        <button
-          role="tab"
-          aria-selected={mode === 'wrap'}
-          className={`trade-mode-btn ${mode === 'wrap' ? 'active' : ''}`}
-          onClick={() => handleModeChange('wrap')}
-        >
-          Wrap
-        </button>
-        <button
-          role="tab"
-          aria-selected={mode === 'unwrap'}
-          className={`trade-mode-btn ${mode === 'unwrap' ? 'active' : ''}`}
-          onClick={() => handleModeChange('unwrap')}
-        >
-          Unwrap
-        </button>
-      </div>
-
-      {/* Order ticket controls — order type, price type, term (brokerage-style). */}
-      {isTrade && (
-        <div className="trade-order-grid">
-          <div className="trade-field">
-            <span className="trade-field-label">
-              <label htmlFor="trade-order-type">Order Type</label>
-              <InfoTip label="About order types" className="trade-info">
-                Buy receives {wnativeSymbol} for {stableSymbol}; Sell does the reverse.
-                Sell Short and Buy to Cover appear on networks with a perpetuals venue —
-                {perpsVenue ? ` ${perpsVenue.name} on this network.` : ' none of the supported networks has one yet.'}
-              </InfoTip>
-            </span>
-            <select
-              id="trade-order-type"
-              className="trade-field-select"
-              value={orderType}
-              onChange={(e) => handleOrderTypeChange(e.target.value)}
-            >
-              {SPOT_ORDER_TYPES.map((o) => (
+      {/* Order ticket controls — order type + price type share a row, with the
+          limit price / term beneath (brokerage-style). */}
+      <div className="trade-order-grid">
+        <div className="trade-field">
+          <span className="trade-field-label">
+            <label htmlFor="trade-order-type">Order Type</label>
+            <InfoTip label="About order types" className="trade-info">
+              Buy receives {wnativeSymbol} for {stableSymbol}; Sell does the reverse.
+              Sell Short and Buy to Cover appear on networks with a perpetuals venue —
+              {perpsVenue ? ` ${perpsVenue.name} on this network.` : ' none of the supported networks has one yet.'}
+            </InfoTip>
+          </span>
+          <select
+            id="trade-order-type"
+            className="trade-field-select"
+            value={orderType}
+            onChange={(e) => handleOrderTypeChange(e.target.value)}
+          >
+            {SPOT_ORDER_TYPES.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+            {perpsVenue &&
+              PERPS_ORDER_TYPES.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-              {perpsVenue &&
-                PERPS_ORDER_TYPES.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div className="trade-field">
-            <span className="trade-field-label">
-              <label htmlFor="trade-price-type">Price Type</label>
-              <InfoTip label="About price types" className="trade-info">
-                Market fills at the best routed price within your slippage tolerance.
-                Limit fills at your price or better, or not at all — orders don’t rest
-                on a book.
-              </InfoTip>
-            </span>
-            <select
-              id="trade-price-type"
-              className="trade-field-select"
-              value={priceType}
-              onChange={(e) => {
-                setPriceType(e.target.value)
-                setError('')
-              }}
-            >
-              {PRICE_TYPES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {priceType === 'limit' && (
-            <div className="trade-field">
-              <label className="trade-field-label" htmlFor="trade-limit-price">
-                Limit Price ({labelFor(toToken)} per {labelFor(fromToken)})
-              </label>
-              <input
-                id="trade-limit-price"
-                className="trade-field-input"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.000001"
-                placeholder="0.0"
-                value={limitPrice}
-                onChange={(e) => setLimitPrice(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="trade-field">
-            <span className="trade-field-label">Term</span>
-            <span className="trade-field-static">
-              {priceType === 'limit' ? 'Fill at limit or cancel' : 'Immediate'}
-            </span>
-          </div>
+          </select>
         </div>
-      )}
 
-      {isTrade && isPerpsOrder && (
+        <div className="trade-field">
+          <span className="trade-field-label">
+            <label htmlFor="trade-price-type">Price Type</label>
+            <InfoTip label="About price types" className="trade-info">
+              Market fills at the best routed price within your slippage tolerance.
+              Limit fills at your price or better, or not at all — orders don’t rest
+              on a book.
+            </InfoTip>
+          </span>
+          <select
+            id="trade-price-type"
+            className="trade-field-select"
+            value={priceType}
+            onChange={(e) => {
+              setPriceType(e.target.value)
+              setError('')
+            }}
+          >
+            {PRICE_TYPES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {priceType === 'limit' && (
+          <div className="trade-field">
+            <label className="trade-field-label" htmlFor="trade-limit-price">
+              Limit Price ({symbolFor(toToken)} per {symbolFor(fromToken)})
+            </label>
+            <input
+              id="trade-limit-price"
+              className="trade-field-input"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.000001"
+              placeholder="0.0"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+            />
+          </div>
+        )}
+
+        <div className="trade-field">
+          <span className="trade-field-label">Term</span>
+          <span className="trade-field-static">
+            {priceType === 'limit' ? 'Fill at limit or cancel' : 'Immediate'}
+          </span>
+        </div>
+      </div>
+
+      {isPerpsOrder && (
         <div className="trade-message trade-error" role="alert">
           {perpsVenue
             ? `${orderType === 'sell_short' ? 'Sell Short' : 'Buy to Cover'} orders route to ${perpsVenue.name}, which isn’t wired into in-app execution yet.`
@@ -591,19 +508,18 @@ function TradePanel() {
               inputMode="decimal"
               className="trade-amount-input"
             />
-            {isTrade ? (
-              <select
-                aria-label="Token to sell"
-                value={fromToken}
-                onChange={(e) => handlePairChange('from', e.target.value)}
-                className="trade-token-select"
-              >
-                <option value={FROM_WNATIVE}>{wnativeSymbol}</option>
-                <option value={FROM_STABLE}>{stableSymbol}</option>
-              </select>
-            ) : (
-              <span className="trade-token-static">{labelFor(fromToken)}</span>
-            )}
+            <select
+              aria-label="Token to sell"
+              value={fromToken}
+              onChange={(e) => handlePairChange('from', e.target.value)}
+              className="trade-token-select"
+            >
+              {assets.map((t) => (
+                <option key={t.address} value={t.address}>
+                  {t.symbol}
+                </option>
+              ))}
+            </select>
             <button type="button" onClick={handleSetMax} className="trade-max-btn">
               MAX
             </button>
@@ -611,18 +527,14 @@ function TradePanel() {
         </div>
 
         <div className="trade-switch-row">
-          {isTrade ? (
-            <button
-              type="button"
-              onClick={handleFlipTokens}
-              className="trade-switch-btn"
-              aria-label="Switch direction"
-            >
-              ↓↑
-            </button>
-          ) : (
-            <span className="trade-switch-static" aria-hidden="true">↓</span>
-          )}
+          <button
+            type="button"
+            onClick={handleFlipTokens}
+            className="trade-switch-btn"
+            aria-label="Switch direction"
+          >
+            ↓↑
+          </button>
         </div>
 
         {/* Receive leg */}
@@ -637,25 +549,24 @@ function TradePanel() {
             <div className="trade-receive-value" aria-live="polite">
               <SensitiveValue>{receiveValue}</SensitiveValue>
             </div>
-            {isTrade ? (
-              <select
-                aria-label="Token to buy"
-                value={toToken}
-                onChange={(e) => handlePairChange('to', e.target.value)}
-                className="trade-token-select"
-              >
-                <option value={FROM_WNATIVE}>{wnativeSymbol}</option>
-                <option value={FROM_STABLE}>{stableSymbol}</option>
-              </select>
-            ) : (
-              <span className="trade-token-static">{labelFor(toToken)}</span>
-            )}
+            <select
+              aria-label="Token to buy"
+              value={toToken}
+              onChange={(e) => handlePairChange('to', e.target.value)}
+              className="trade-token-select"
+            >
+              {assets.map((t) => (
+                <option key={t.address} value={t.address}>
+                  {t.symbol}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
 
       {/* Trade summary — the capital-markets read-out */}
-      {isTrade && quote && (
+      {quote && (
         <div className="trade-summary" role="group" aria-label="Trade details">
           <button
             type="button"
@@ -723,7 +634,7 @@ function TradePanel() {
         </div>
       )}
 
-      {isTrade && severity === 'high' && (
+      {severity === 'high' && (
         <div className="trade-impact-warning" role="alert">
           High price impact — you may receive substantially less than the market rate.
         </div>
@@ -737,17 +648,13 @@ function TradePanel() {
       >
         {loading
           ? 'Processing…'
-          : mode === 'wrap'
-            ? `Wrap ${nativeSymbol}`
-            : mode === 'unwrap'
-              ? `Unwrap ${wnativeSymbol}`
-              : quotingPrice
-                ? 'Fetching best price…'
-                : quote
-                  ? priceType === 'limit'
-                    ? `Place limit order — ${labelFor(fromToken)} for ${labelFor(toToken)}`
-                    : `Swap ${labelFor(fromToken)} for ${labelFor(toToken)}`
-                  : 'Enter an amount'}
+          : quotingPrice
+            ? 'Fetching best price…'
+            : quote
+              ? priceType === 'limit'
+                ? `Place limit order — ${symbolFor(fromToken)} for ${symbolFor(toToken)}`
+                : `Swap ${symbolFor(fromToken)} for ${symbolFor(toToken)}`
+              : 'Enter an amount'}
       </button>
 
       {isPasskey && passkeyReady && !isVault && (

@@ -15,13 +15,16 @@
   --trade-warning: var(--warning-color, #d69e2e);
   --trade-danger: var(--danger-color, #e5533d);
 
-  max-width: 480px;
-  margin: 1.5rem auto;
-  padding: 1.25rem;
-  background: var(--trade-surface);
-  border: 1px solid var(--trade-border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-md, 0 8px 28px rgba(0, 0, 0, 0.06));
+  /* The panel is a frameless layout container — its parent tab already supplies
+     the page padding, and the inner blocks (account, legs, summary) carry their
+     own cards, so an extra outer frame + padding just crowds the content. */
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* Header */
@@ -161,40 +164,6 @@
   border-color: var(--trade-accent);
 }
 
-/* Mode selector (segmented control) */
-.trade-modes {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-  background: var(--trade-surface-2);
-  padding: 0.25rem;
-  border-radius: 10px;
-  border: 1px solid var(--trade-border);
-}
-
-.trade-mode-btn {
-  flex: 1;
-  padding: 0.55rem 0.5rem;
-  background: transparent;
-  border: none;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--trade-text-2);
-  transition: background 0.15s, color 0.15s;
-}
-
-.trade-mode-btn:hover {
-  color: var(--trade-text);
-}
-
-.trade-mode-btn.active {
-  background: var(--trade-surface);
-  color: var(--trade-text);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
 /* Order controls grid (order type / price type / limit price / term) */
 .trade-order-grid {
   display: grid;
@@ -324,8 +293,7 @@
 }
 
 /* Token pill */
-.trade-token-select,
-.trade-token-static {
+.trade-token-select {
   flex-shrink: 0;
   padding: 0.4rem 0.7rem;
   background: var(--trade-surface);
@@ -334,9 +302,6 @@
   font-weight: 700;
   font-size: 0.85rem;
   color: var(--trade-text);
-}
-
-.trade-token-select {
   cursor: pointer;
 }
 
@@ -368,8 +333,7 @@
   z-index: 1;
 }
 
-.trade-switch-btn,
-.trade-switch-static {
+.trade-switch-btn {
   width: 34px;
   height: 34px;
   margin-top: -17px;
@@ -383,9 +347,6 @@
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--trade-text);
-}
-
-.trade-switch-btn {
   cursor: pointer;
   transition: color 0.15s, outline-color 0.15s;
 }
@@ -604,15 +565,9 @@ button.trade-rate .trade-summary-val {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .trade-panel {
-    margin: 1rem;
-    padding: 1rem;
-  }
-
-  .trade-order-grid {
-    grid-template-columns: 1fr;
-  }
-
+  /* Order Type / Price Type stay side-by-side on narrow screens — two compact
+     selects fit a phone width comfortably and reading them on one line matches
+     a brokerage ticket. */
   .trade-amount-input,
   .trade-receive-value {
     font-size: 1.3rem;

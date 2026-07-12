@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 // TradePanel is the brokerage-style order ticket for on-chain swaps. It must:
 //  - name/link the DEX provider for the active network (ETCswap on the ETC
@@ -63,9 +63,34 @@ const SAMPLE_QUOTE = {
   tokenOutSymbol: 'USDC',
 }
 
+// Tradeable-token universe (spec: the selectors list every portfolio asset with
+// a routeable pair on the active chain). Keyed by address; wrapped-native and
+// the stablecoin lead, followed by curated commodities/tools.
+const ETC_TOKENS = [
+  { address: ETC_ADDRESSES.WNATIVE, symbol: 'WETC', name: 'Wrapped Ethereum Classic', decimals: 18 },
+  { address: ETC_ADDRESSES.STABLECOIN, symbol: 'USC', name: 'Classic USD', decimals: 6 },
+]
+const POLYGON_TOKENS = [
+  { address: POLYGON_ADDRESSES.WNATIVE, symbol: 'WPOL', name: 'Wrapped POL', decimals: 18 },
+  { address: POLYGON_ADDRESSES.STABLECOIN, symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+  { address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', symbol: 'WETH', name: 'Wrapped Ether', decimals: 18 },
+  { address: '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6', symbol: 'WBTC', name: 'Wrapped BTC', decimals: 8 },
+  { address: '0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 },
+  { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', symbol: 'USDT', name: 'Tether USD', decimals: 6 },
+]
+
+const balancesFor = (tokenList) => ({
+  native: '10',
+  wnative: '5',
+  stable: '100',
+  tokens: Object.fromEntries(
+    tokenList.map((t) => [t.address.toLowerCase(), t.symbol === 'USC' || t.symbol === 'USDC' ? '100' : '5']),
+  ),
+})
+
 function dexValue(overrides = {}) {
   return {
-    balances: { native: '10', wnative: '5', stable: '100' },
+    balances: balancesFor(ETC_TOKENS),
     loading: false,
     quotingPrice: false,
     wrapNative: vi.fn(),
@@ -76,6 +101,7 @@ function dexValue(overrides = {}) {
     setSlippage: vi.fn(),
     addresses: ETC_ADDRESSES,
     tokens: { STABLE: { decimals: 6, symbol: 'USC' }, WNATIVE: { decimals: 18, symbol: 'WETC' } },
+    tradeTokens: ETC_TOKENS,
     isDexAvailable: true,
     dexProvider: { name: 'ETCswap', url: 'https://v3.etcswap.org' },
     network: { name: 'Ethereum Classic', chainId: 61 },
@@ -85,8 +111,10 @@ function dexValue(overrides = {}) {
 
 const polygonDex = (overrides = {}) =>
   dexValue({
+    balances: balancesFor(POLYGON_TOKENS),
     addresses: POLYGON_ADDRESSES,
     tokens: { STABLE: { decimals: 6, symbol: 'USDC' }, WNATIVE: { decimals: 18, symbol: 'WPOL' } },
+    tradeTokens: POLYGON_TOKENS,
     dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=polygon' },
     network: { name: 'Polygon', chainId: 137 },
     ...overrides,
@@ -224,13 +252,25 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     )
   })
 
-  it('offers Swap, Wrap and Unwrap modes', () => {
+  it('has no swap/wrap/unwrap mode selector', () => {
     mockUseDex.mockReturnValue(polygonDex())
     render(<TradePanel />)
 
-    expect(screen.getByRole('tab', { name: 'Swap' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Wrap' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Unwrap' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: 'Trade mode' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Wrap' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Unwrap' })).toBeNull()
+  })
+
+  it('lists every tradeable portfolio asset in both selectors', () => {
+    mockUseDex.mockReturnValue(polygonDex())
+    render(<TradePanel />)
+
+    const sell = screen.getByLabelText('Token to sell')
+    const buy = screen.getByLabelText('Token to buy')
+    for (const symbol of ['WPOL', 'USDC', 'WETH', 'WBTC', 'LINK', 'USDT']) {
+      expect(within(sell).getByRole('option', { name: symbol })).toBeInTheDocument()
+      expect(within(buy).getByRole('option', { name: symbol })).toBeInTheDocument()
+    }
   })
 })
 
@@ -309,12 +349,13 @@ describe('TradePanel — order & price types', () => {
     expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
 
     fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
-    expect(screen.getByLabelText('Token to sell').value).toBe('STABLE')
-    expect(screen.getByLabelText('Token to buy').value).toBe('WNATIVE')
+    // Buy pays the stablecoin to receive the wrapped-native asset.
+    expect(screen.getByLabelText('Token to sell').value).toBe(POLYGON_ADDRESSES.STABLECOIN)
+    expect(screen.getByLabelText('Token to buy').value).toBe(POLYGON_ADDRESSES.WNATIVE)
 
     // Flipping the pair back flips the order type too.
-    fireEvent.change(screen.getByLabelText('Token to sell'), { target: { value: 'WNATIVE' } })
-    fireEvent.change(screen.getByLabelText('Token to buy'), { target: { value: 'STABLE' } })
+    fireEvent.change(screen.getByLabelText('Token to sell'), { target: { value: POLYGON_ADDRESSES.WNATIVE } })
+    fireEvent.change(screen.getByLabelText('Token to buy'), { target: { value: POLYGON_ADDRESSES.STABLECOIN } })
     expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
   })
 
