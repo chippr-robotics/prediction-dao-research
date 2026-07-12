@@ -23,6 +23,11 @@ const cp = {
 }
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
+// ExternalDaoView (rendered within) now reads sendCalls/loginMethod from useWallet (passkey rail);
+// these tests drive the classic signer-prop path, so return a non-passkey session.
+vi.mock('../../../hooks/useWalletManagement', () => ({
+  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
+}))
 
 const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn(), detectTreasuryFunding: vi.fn() }
 vi.mock('../governorConnector', () => ({

@@ -49,7 +49,10 @@ function cachedReadProvider(rpcUrl, chainId) {
  * network's public RPC with a wallet-managed routing option (FR-019); writes always use the wallet signer.
  */
 export function useClearPath() {
-  const { account, signer, provider, chainId, isConnected } = useWallet()
+  // Spec 041/050: passkey smart-account sessions have no `signer`; their writes go through `sendCalls`
+  // (one sponsored ERC-4337 UserOp). `loginMethod` picks the rail for the on-chain register write.
+  const { account, signer, provider, chainId, isConnected, sendCalls, loginMethod } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   const { showNotification } = useNotification()
 
   const net = getNetwork(chainId)
@@ -154,9 +157,30 @@ export function useClearPath() {
         showNotification('This network has no on-chain DAO registry.', 'warning')
         throw new Error('no registry')
       }
-      if (!signer) {
+      // A passkey session has no `signer` but can register via `sendCalls`; only block when neither rail exists.
+      if (!isPasskey && !signer) {
         showNotification('Connect a wallet to register a DAO.', 'warning')
         throw new Error('no signer')
+      }
+      // Spec 041/050 passkey rail: encode the same registerExternalDAO calldata and send it as one sponsored
+      // UserOp via `sendCalls` (which already awaits inclusion) instead of a signer-backed contract call.
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          showNotification('This wallet cannot register a DAO on the current transaction rail.', 'error')
+          throw new Error('no sendCalls')
+        }
+        try {
+          showNotification('Register DAO: confirm in your wallet…', 'info', 0)
+          const data = new ethers.Interface(EXTERNAL_DAO_REGISTRY_ABI).encodeFunctionData('registerExternalDAO', [dao, framework, label])
+          const sent = await sendCalls([{ target: registryAddress, data, value: 0n }])
+          const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
+          const ref = txHash ? ` · tx ${String(txHash).slice(0, 6)}…${String(txHash).slice(-4)}` : ''
+          showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
+          return sent
+        } catch (e) {
+          showNotification(e?.shortMessage || e?.reason || e?.message || 'Register failed.', 'error')
+          throw e
+        }
       }
       const reg = new ethers.Contract(registryAddress, EXTERNAL_DAO_REGISTRY_ABI, signer)
       try {
@@ -176,7 +200,7 @@ export function useClearPath() {
         throw e
       }
     },
-    [hasRegistry, signer, registryAddress, showNotification]
+    [hasRegistry, isPasskey, sendCalls, signer, registryAddress, showNotification]
   )
 
   /**

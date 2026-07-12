@@ -35,7 +35,8 @@ async function readPolicyBadge(vaultAddress, chainId, provider) {
 }
 
 export function useCustodyVaults() {
-  const { address, chainId, signer, provider } = useWallet()
+  const { address, chainId, signer, provider, sendCalls, loginMethod } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   const [vaults, setVaults] = useState([])
   const [activeAddress, setActiveAddress] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -107,16 +108,23 @@ export function useCustodyVaults() {
    * attaches a policy guard atomically at creation. */
   const createVault = useCallback(
     async ({ owners, threshold, saltNonce, label = '', policySetup }, nowMs = 0) => {
-      if (!signer) throw new Error('Connect a wallet to create a vault')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to create a vault')
       setError(null)
-      const { address: vaultAddress, txHash } = await createVaultTx({
-        signer,
-        chainId,
-        owners,
-        threshold,
-        saltNonce,
-        policySetup,
-      })
+      let vaultAddress
+      let txHash
+      if (isPasskey) {
+        // Passkey rail: send createProxyWithNonce as ONE sponsored UserOp. A UserOp receipt has no
+        // parseable ProxyCreation log, so the deterministic CREATE2 address (predictedAddress) is
+        // authoritative for the deployed vault.
+        const tx = await buildCreateVaultTx({ chainId, owners, threshold, saltNonce, policySetup, provider })
+        const sent = await sendCalls([{ target: tx.to, data: tx.data, value: tx.value ?? 0n }])
+        vaultAddress = tx.predictedAddress
+        txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
+      } else {
+        const res = await createVaultTx({ signer, chainId, owners, threshold, saltNonce, policySetup })
+        vaultAddress = res.address
+        txHash = res.txHash
+      }
       upsertVaultReference(
         address,
         { chainId: Number(chainId), address: vaultAddress, label, role: 'owner' },
@@ -126,7 +134,7 @@ export function useCustodyVaults() {
       setActiveAddress(vaultAddress)
       return { address: vaultAddress, txHash }
     },
-    [signer, address, chainId, refresh],
+    [isPasskey, signer, sendCalls, provider, address, chainId, refresh],
   )
 
   /** Preview the deterministic address a new vault would deploy to (before signing, FR US1). */

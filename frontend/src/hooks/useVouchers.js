@@ -25,7 +25,12 @@ import { useGaslessWrite } from '../lib/relay/useGaslessWrite'
  * network, {voucherAvailable} is false and the UI surfaces that honestly rather than implying it works.
  */
 export function useVouchers() {
-  const { account, signer, provider, chainId } = useWallet()
+  const { account, signer, provider, chainId, sendCalls, loginMethod } = useWallet()
+  // Passkey smart-account sessions have no ethers signer (spec 041): their writes go through
+  // WalletContext.sendCalls (one sponsored ERC-4337 UserOp, approve+action batched), exactly like
+  // the transfer/earn/pool surfaces. Reads use the session read `provider` (a live RPC reader for
+  // passkey on supported chains). Classic wallets keep the signer path unchanged.
+  const isPasskey = loginMethod === 'passkey'
   const [status, setStatus] = useState('idle') // idle | minting | redeeming | transferring | listing | success | error
   const [error, setError] = useState(null)
   const [lastTxHash, setLastTxHash] = useState(null)
@@ -64,7 +69,7 @@ export function useVouchers() {
    */
   const mintVouchers = useCallback(
     async (roleHash, tierId, quantity = 1, recipient = '') => {
-      if (!signer) throw new Error('Connect a wallet to buy a voucher.')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to buy a voucher.')
       if (!voucherAvailable) throw new Error('Membership vouchers are not available on this network yet.')
 
       const qty = Math.max(1, Math.floor(Number(quantity) || 1))
@@ -77,6 +82,39 @@ export function useVouchers() {
       setError(null)
       setLastTxHash(null)
       try {
+        if (isPasskey) {
+          // Passkey rail: batch approve (only if the allowance is short) + the mint into ONE
+          // sponsored UserOp. Reads over the session read provider; encoding needs no signer.
+          if (needsHelper && !batchMintAvailable) {
+            throw new Error('Buying multiple vouchers or gifting isn’t available on this network yet.')
+          }
+          const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, provider)
+          const cfg = await manager.getTierConfig(roleHash, tierId)
+          if (!cfg.active) throw new Error('That tier is not available for purchase.')
+          const price = cfg.priceUSDC
+          const spender = needsHelper ? batchMinterAddress : voucherAddress
+          const amount = needsHelper ? price * BigInt(qty) : price
+          const token = new ethers.Contract(paymentTokenAddress, ERC20_ABI, provider)
+          const allowance = await token.allowance(account, spender)
+          const calls = []
+          if (allowance < amount) {
+            calls.push({ target: paymentTokenAddress, data: token.interface.encodeFunctionData('approve', [spender, amount]), value: 0n })
+          }
+          if (needsHelper) {
+            const minter = new ethers.Contract(batchMinterAddress, VOUCHER_BATCH_MINTER_ABI, provider)
+            calls.push({ target: batchMinterAddress, data: minter.interface.encodeFunctionData('mintBatch', [roleHash, tierId, qty, to]), value: 0n })
+          } else {
+            const voucher = new ethers.Contract(voucherAddress, MEMBERSHIP_VOUCHER_ABI, provider)
+            calls.push({ target: voucherAddress, data: voucher.interface.encodeFunctionData('mint', [roleHash, tierId]), value: 0n })
+          }
+          const res = await sendCalls(calls)
+          const txHash = res?.txHash ?? res?.userOpHash ?? null
+          setLastTxHash(txHash)
+          setStatus('success')
+          // tokenId isn't parsed from a UserOp receipt; the holdings refresh reads it back on-chain.
+          return { count: qty, recipient: to, gift: isGift, tokenId: needsHelper ? undefined : null, txHash }
+        }
+
         const manager = new ethers.Contract(managerAddress, MEMBERSHIP_MANAGER_ABI, signer)
         const cfg = await manager.getTierConfig(roleHash, tierId)
         if (!cfg.active) throw new Error('That tier is not available for purchase.')
@@ -132,7 +170,7 @@ export function useVouchers() {
         throw e
       }
     },
-    [signer, account, voucherAvailable, batchMintAvailable, voucherAddress, managerAddress, batchMinterAddress, paymentTokenAddress]
+    [isPasskey, provider, sendCalls, signer, account, voucherAvailable, batchMintAvailable, voucherAddress, managerAddress, batchMinterAddress, paymentTokenAddress]
   )
 
   /**
@@ -142,7 +180,7 @@ export function useVouchers() {
    */
   const transferVoucher = useCallback(
     async (tokenId, to) => {
-      if (!signer) throw new Error('Connect a wallet to transfer a voucher.')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to transfer a voucher.')
       if (!voucherAvailable) throw new Error('Membership vouchers are not available on this network yet.')
       const dest = (to || '').trim()
       if (!ethers.isAddress(dest)) throw new Error('Enter a valid recipient address.')
@@ -153,9 +191,19 @@ export function useVouchers() {
       setError(null)
       setLastTxHash(null)
       try {
-        const voucher = new ethers.Contract(voucherAddress, MEMBERSHIP_VOUCHER_ABI, signer)
         // The voucher overloads safeTransferFrom; pick the 3-arg (no data) form explicitly.
-        const tx = await voucher['safeTransferFrom(address,address,uint256)'](account, dest, tokenId)
+        const SIG = 'safeTransferFrom(address,address,uint256)'
+        if (isPasskey) {
+          const iface = new ethers.Interface(MEMBERSHIP_VOUCHER_ABI)
+          const data = iface.encodeFunctionData(SIG, [account, dest, tokenId])
+          const res = await sendCalls([{ target: voucherAddress, data, value: 0n }])
+          const txHash = res?.txHash ?? res?.userOpHash ?? null
+          setLastTxHash(txHash)
+          setStatus('success')
+          return { tokenId, to: dest, txHash }
+        }
+        const voucher = new ethers.Contract(voucherAddress, MEMBERSHIP_VOUCHER_ABI, signer)
+        const tx = await voucher[SIG](account, dest, tokenId)
         setLastTxHash(tx.hash)
         await tx.wait()
         setStatus('success')
@@ -166,18 +214,29 @@ export function useVouchers() {
         throw e
       }
     },
-    [signer, account, voucherAvailable, voucherAddress]
+    [isPasskey, sendCalls, signer, account, voucherAvailable, voucherAddress]
   )
 
   /** Redeem voucher `tokenId` into a soulbound membership for the connected wallet. `termsHash` may be 0x0. */
   const redeemVoucher = useCallback(
     async (tokenId, termsHash) => {
-      if (!signer) throw new Error('Connect a wallet to redeem.')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to redeem.')
       if (!voucherAvailable) throw new Error('Membership vouchers are not available on this network yet.')
       setStatus('redeeming')
       setError(null)
       setLastTxHash(null)
       try {
+        if (isPasskey) {
+          // Passkey rail: redeemVoucher as one sponsored UserOp (the 035 relay/intent path is
+          // signer-only). The redeemer is the smart account — the connected passkey session.
+          const iface = new ethers.Interface(MEMBERSHIP_MANAGER_ABI)
+          const data = iface.encodeFunctionData('redeemVoucher', [tokenId, termsHash || ethers.ZeroHash])
+          const res = await sendCalls([{ target: managerAddress, data, value: 0n }])
+          const txHash = res?.txHash ?? res?.userOpHash ?? null
+          setLastTxHash(txHash)
+          setStatus('success')
+          return { txHash }
+        }
         const result = await voucherTx.run(tokenId, termsHash)
         if (result?.error) throw result.error
         setLastTxHash(result.txHash || lastTxHash)
@@ -189,7 +248,7 @@ export function useVouchers() {
         throw e
       }
     },
-    [signer, voucherAvailable, voucherTx, lastTxHash]
+    [isPasskey, sendCalls, managerAddress, signer, voucherAvailable, voucherTx, lastTxHash]
   )
 
   /**

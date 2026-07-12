@@ -383,13 +383,16 @@ export function proposeAction(signer, governor, { targets, values, calldatas, de
 }
 
 // Spec 043 (US3, FR-022a): encode a management action's calldata (to the governor) so it can be proposed as a
-// vault transaction when operating as a Safe. Returns { to, data }.
+// vault transaction when operating as a Safe. Spec 041/050 reuses the same encoding for the passkey smart-account
+// rail (sendCalls). `propose` is included so the ProposalBuilder's passkey path can encode the framework-correct
+// OZ propose(targets, values, calldatas, description) without re-deriving the signature. Returns { to, data }.
 export function encodeManagementAction(governor, action, args) {
   const iface = new ethers.Interface(GOVERNOR_WRITE_ABI)
   let data
   if (action === 'castVote') data = iface.encodeFunctionData('castVote', [args.proposalId, args.support])
   else if (action === 'queue') data = iface.encodeFunctionData('queue', [args.p.targets, args.p.values, args.p.calldatas, args.p.descriptionHash])
   else if (action === 'execute') data = iface.encodeFunctionData('execute', [args.p.targets, args.p.values, args.p.calldatas, args.p.descriptionHash])
+  else if (action === 'propose') data = iface.encodeFunctionData('propose', [args.targets, args.values, args.calldatas, args.description])
   else throw new Error(`Unsupported vault governance action: ${action}`)
   return { to: governor, data }
 }

@@ -23,7 +23,10 @@ const ZERO = '0x0000000000000000000000000000000000000000'
  * provider via `dexProvider` from the returned context.
  */
 export function DexProvider({ children }) {
-  const { provider, signer, address, isConnected } = useWallet()
+  const { provider, signer, address, isConnected, sendCalls, loginMethod } = useWallet()
+  // Passkey smart-account sessions (spec 041/050) have NO ethers signer — their writes go through
+  // `sendCalls(calls)` (one sponsored ERC-4337 UserOp per batch) while reads use the RPC read `provider`.
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): swapping while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, identity: activeIdentity, submit: submitAsActive } = useActiveAccount()
   const wagmiChainId = useChainId()
@@ -174,15 +177,31 @@ export function DexProvider({ children }) {
   }, [isConnected, fetchBalances])
 
   const wrapNative = useCallback(async (amount) => {
-    if (!signer || !contracts) {
+    if ((!isPasskey && !signer) || !contracts) {
       throw new Error('Wallet not connected')
     }
 
     try {
       setLoading(true)
-      const wnativeWithSigner = contracts.wnative.connect(signer)
       const amountWei = ethers.parseEther(amount)
 
+      // Passkey session (no signer): wrap via one sponsored ERC-4337 UserOp — deposit() with the
+      // native amount as the call value, addressed to the WNATIVE contract.
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot wrap on the current transaction rail.')
+        }
+        const wnativeAddress = contracts.wnative.target
+        const sent = await sendCalls([{
+          target: wnativeAddress,
+          data: contracts.wnative.interface.encodeFunctionData('deposit', []),
+          value: amountWei,
+        }])
+        await fetchBalances()
+        return sent
+      }
+
+      const wnativeWithSigner = contracts.wnative.connect(signer)
       const tx = await wnativeWithSigner.deposit({ value: amountWei })
       await tx.wait()
 
@@ -194,18 +213,34 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, fetchBalances])
+  }, [signer, contracts, fetchBalances, isPasskey, sendCalls])
 
   const unwrapNative = useCallback(async (amount) => {
-    if (!signer || !contracts) {
+    if ((!isPasskey && !signer) || !contracts) {
       throw new Error('Wallet not connected')
     }
 
     try {
       setLoading(true)
-      const wnativeWithSigner = contracts.wnative.connect(signer)
       const amountWei = ethers.parseEther(amount)
 
+      // Passkey session (no signer): unwrap via one sponsored ERC-4337 UserOp — withdraw(amount) with
+      // zero call value, addressed to the WNATIVE contract.
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot unwrap on the current transaction rail.')
+        }
+        const wnativeAddress = contracts.wnative.target
+        const sent = await sendCalls([{
+          target: wnativeAddress,
+          data: contracts.wnative.interface.encodeFunctionData('withdraw', [amountWei]),
+          value: 0n,
+        }])
+        await fetchBalances()
+        return sent
+      }
+
+      const wnativeWithSigner = contracts.wnative.connect(signer)
       const tx = await wnativeWithSigner.withdraw(amountWei)
       await tx.wait()
 
@@ -217,7 +252,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, fetchBalances])
+  }, [signer, contracts, fetchBalances, isPasskey, sendCalls])
 
   // Decimals lookup for a token by address used in quote/swap calls below.
   // Defaults to 18 (native/wrapped) when the token isn't in our known set.
@@ -364,7 +399,7 @@ export function DexProvider({ children }) {
   }, [contracts, decimalsOf, symbolOf, chainId, slippage])
 
   const swap = useCallback(async (tokenIn, tokenOut, amountIn) => {
-    if (!signer || !contracts || !address) {
+    if ((!isPasskey && !signer) || !contracts || !address) {
       throw new Error('Wallet not connected')
     }
 
@@ -404,6 +439,44 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      // Personal passkey session (no signer): batch [approve?, exactInputSingle] into one sponsored
+      // ERC-4337 UserOp. Reads (allowance) go through the RPC read `provider`; the swap value mirrors the
+      // classic personal path, which passes NO native value to exactInputSingle (tokenIn is always an
+      // ERC20 here — the UI wraps native to WNATIVE first), so every call carries value 0n.
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot swap on the current transaction rail.')
+        }
+        const calls = []
+        const erc20Iface = new ethers.Interface(ERC20_ABI)
+        const tokenInReader = new ethers.Contract(tokenIn, ERC20_ABI, provider)
+        const passkeyAllowance = await tokenInReader.allowance(address, addresses.SWAP_ROUTER_02)
+        if (passkeyAllowance < amountInWei) {
+          calls.push({
+            target: tokenIn,
+            data: erc20Iface.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei]),
+            value: 0n,
+          })
+        }
+        const passkeyParams = {
+          tokenIn,
+          tokenOut,
+          fee: quote.feeTier,
+          recipient: address,
+          amountIn: amountInWei,
+          amountOutMinimum: minAmountOutWei,
+          sqrtPriceLimitX96: 0,
+        }
+        calls.push({
+          target: addresses.SWAP_ROUTER_02,
+          data: contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [passkeyParams]),
+          value: 0n,
+        })
+        const sent = await sendCalls(calls)
+        await fetchBalances()
+        return sent
+      }
+
       const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
       const allowance = await tokenInContract.allowance(address, addresses.SWAP_ROUTER_02)
 
@@ -437,7 +510,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive])
+  }, [signer, contracts, address, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive, isPasskey, sendCalls, provider])
 
   const value = {
     balances,

@@ -80,7 +80,8 @@ function MarketAcceptanceModal({
   contractABI
 }) {
   const { isConnected, account } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork, chainId, sendCalls, loginMethod, provider } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): accepting a wager while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const {
@@ -311,7 +312,7 @@ function MarketAcceptanceModal({
   }
 
   const handleAccept = async () => {
-    if (!signer) {
+    if (!isPasskey && !signer) {
       setError('Please connect your wallet')
       return
     }
@@ -334,10 +335,12 @@ function MarketAcceptanceModal({
         throw new Error('The acceptance deadline has passed. This offer can no longer be accepted.')
       }
 
+      // Reads use the signer when present, else the session read provider (a passkey session has no
+      // signer, but WalletContext exposes an RPC reader). Calldata encoding needs no signer.
       const contract = new ethers.Contract(
         contractAddress,
         contractABI,
-        signer
+        signer || provider
       )
 
       // v2: ERC20-only stakes. Pull on-chain wager to get authoritative stake amounts.
@@ -358,7 +361,7 @@ function MarketAcceptanceModal({
           'function symbol() view returns (string)',
           'function decimals() view returns (uint8)',
         ],
-        signer
+        signer || provider
       )
 
       // Spec 043 (US3, FR-021): accepting AS a vault → batch [approve, acceptWager] as a threshold-gated
@@ -392,6 +395,34 @@ function MarketAcceptanceModal({
           `Have ${ethers.formatUnits(balance, tokenDecimals)}, ` +
           `need ${ethers.formatUnits(stakeAmount, tokenDecimals)}.`
         )
+      }
+
+      // Passkey rail (spec 041/050): batch [approve?(exact stake), acceptWager] into ONE sponsored
+      // UserOp via sendCalls (no signer). Mirrors the useOpenChallengeAccept template.
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot accept on the current transaction rail.')
+        }
+        const calls = []
+        const allowance = await tokenContract.allowance(account, contractAddress)
+        if (allowance < stakeAmount) {
+          calls.push({
+            target: stakeTokenAddress,
+            data: tokenContract.interface.encodeFunctionData('approve', [contractAddress, stakeAmount]),
+            value: 0n,
+          })
+        }
+        calls.push({
+          target: contractAddress,
+          data: contract.interface.encodeFunctionData('acceptWager', [marketId]),
+          value: 0n,
+        })
+        const sent = await sendCalls(calls)
+        const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
+        if (txHash) setTxHash(txHash)
+        setStep('success')
+        if (onAccepted) onAccepted(marketId)
+        return
       }
 
       // Gasless-or-self-submit acceptance: the self-submit closure keeps the existing
@@ -508,7 +539,7 @@ function MarketAcceptanceModal({
   })
 
   const handleDecline = async () => {
-    if (!signer) {
+    if (!isPasskey && !signer) {
       setError('Please connect your wallet')
       return
     }
@@ -526,7 +557,17 @@ function MarketAcceptanceModal({
     setError(null)
 
     try {
-      const result = await declineWagerTx.run(marketId)
+      let result
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot decline on the current transaction rail.')
+        }
+        const data = new ethers.Interface(contractABI).encodeFunctionData('declineWager', [marketId])
+        const sent = await sendCalls([{ target: contractAddress, data, value: 0n }])
+        result = { txHash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId }
+      } else {
+        result = await declineWagerTx.run(marketId)
+      }
       if (result?.error) throw result.error
       if (result?.txHash) setTxHash(result.txHash)
       setStep('declined')

@@ -35,7 +35,10 @@ export function v1AbiForStandard(standard) {
  * honest pending/confirmed/failed state (FR-006/FR-024 — no token is surfaced before its tx confirms).
  */
 export function useTokenFactory() {
-  const { account, signer, provider, chainId, isConnected } = useWallet()
+  const { account, signer, provider, chainId, isConnected, sendCalls, loginMethod } = useWallet()
+  // Passkey smart-account sessions (spec 041/050) have NO ethers signer; their writes go through
+  // sendCalls (one sponsored ERC-4337 UserOp). loginMethod is informational — the batch rail is authoritative.
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): creating a token while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
 
@@ -240,11 +243,12 @@ export function useTokenFactory() {
   const runCreate = useCallback(
     async (method, args) => {
       if (!isSupported) throw new Error('Token issuance is not available on this network.')
-      if (!signer) throw new Error('Connect a wallet to create a token.')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to create a token.')
       setStatus('creating')
       setError(null)
       setLastTxHash(null)
       try {
+        // Encoding needs no signer (interface only), so this contract is safe to build on the passkey rail.
         const factory = new ethers.Contract(factoryAddress, TOKEN_FACTORY_ABI, signer)
         // Spec 043 (US3, FR-022a): create AS a vault → propose the factory call as a threshold-gated vault
         // transaction (the Safe becomes the token issuer). Only in the vault queue until executed.
@@ -254,6 +258,24 @@ export function useTokenFactory() {
           const res = await submitAsActive({ to: factoryAddress, value: 0n, data })
           setStatus('success')
           return { proposed: true, safeTxHash: res.safeTxHash }
+        }
+        // Passkey smart-account operating personally (not as vault): route the factory call through the
+        // batched, sponsored ERC-4337 UserOp. No receipt logs come back, so the created address is resolved
+        // later by re-reading the registry — the tx hash is the honest confirmation signal here.
+        if (isPasskey) {
+          if (typeof sendCalls !== 'function') {
+            throw new Error('This wallet cannot create tokens on the current transaction rail.')
+          }
+          const call = {
+            target: factoryAddress,
+            data: factory.interface.encodeFunctionData(method, args),
+            value: 0n,
+          }
+          const sent = await sendCalls([call])
+          const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId ?? null
+          setLastTxHash(txHash)
+          setStatus('success')
+          return { txHash }
         }
         const tx = await factory[method](...args)
         setLastTxHash(tx.hash)
@@ -281,7 +303,7 @@ export function useTokenFactory() {
         throw e
       }
     },
-    [isSupported, factoryAddress, signer, operatingAsVault, canActAsVault, submitAsActive]
+    [isSupported, factoryAddress, signer, isPasskey, sendCalls, operatingAsVault, canActAsVault, submitAsActive]
   )
 
   const createOpenERC20 = useCallback(

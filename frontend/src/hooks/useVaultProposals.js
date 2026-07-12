@@ -4,7 +4,7 @@
 // once per owner on-chain (idempotent); non-owners get read-only.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Contract, getAddress } from 'ethers'
+import { Contract, Interface, getAddress } from 'ethers'
 import { useWallet } from '.'
 import { SAFE_ABI } from '../abis/Safe'
 import { getContractAddressForChain, getDeploymentBlockForChain } from '../config/contracts'
@@ -14,11 +14,20 @@ import {
   buildPrevalidatedSignatures,
   encodeExecTransaction,
 } from '../lib/custody/vaultTransaction'
-import { emitProposal, cancelProposal, readVerifiedProposals } from '../lib/custody/proposalHub'
+import {
+  emitProposal,
+  cancelProposal,
+  emitProposalCall,
+  cancelProposalCall,
+  readVerifiedProposals,
+} from '../lib/custody/proposalHub'
 import { deriveProposalStatus, isQueued, STATUS } from '../lib/custody/proposalStatus'
 
+const safeIface = new Interface(SAFE_ABI)
+
 export function useVaultProposals(vault) {
-  const { chainId, signer, provider } = useWallet()
+  const { chainId, signer, provider, sendCalls, loginMethod } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -109,57 +118,85 @@ export function useVaultProposals(vault) {
    *  attach flow: configureRules at N, setGuard at N+1 — the chain then enforces the order). */
   const propose = useCallback(
     async ({ to, value = 0n, data = '0x', operation = 0, nonce: nonceOverride }) => {
-      if (!signer) throw new Error('Connect a wallet to propose')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to propose')
       if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
-      const safe = new Contract(vaultAddress, SAFE_ABI, signer)
+      // Nonce is a read: use the signer when present, else the session read provider (passkey).
+      const safe = new Contract(vaultAddress, SAFE_ABI, signer || provider)
       const nonce = nonceOverride ?? (await safe.nonce())
       const safeTx = buildSafeTx({ to, value, data, operation, nonce })
       const safeTxHash = computeSafeTxHash(vaultAddress, chainId, safeTx)
-      await emitProposal({ hubAddress, safe: vaultAddress, safeTx, safeTxHash, signer })
-      const approveTx = await safe.approveHash(safeTxHash)
-      await approveTx.wait()
+      if (isPasskey) {
+        // Passkey rail: broadcast the preimage AND record the proposer's approval in ONE sponsored
+        // UserOp — same two on-chain effects as the classic path, batched.
+        const calls = [
+          emitProposalCall({ hubAddress, safe: vaultAddress, safeTx, safeTxHash }),
+          { target: vaultAddress, data: safeIface.encodeFunctionData('approveHash', [safeTxHash]), value: 0n },
+        ]
+        await sendCalls(calls)
+      } else {
+        await emitProposal({ hubAddress, safe: vaultAddress, safeTx, safeTxHash, signer })
+        const approveTx = await safe.approveHash(safeTxHash)
+        await approveTx.wait()
+      }
       await refresh()
       return { safeTxHash, nonce: Number(nonce) }
     },
-    [signer, vaultAddress, hubAddress, chainId, refresh],
+    [isPasskey, signer, sendCalls, provider, vaultAddress, hubAddress, chainId, refresh],
   )
 
   /** Record the connected owner's approval for a proposal (idempotent on-chain). */
   const approve = useCallback(
     async (safeTxHash) => {
-      if (!signer) throw new Error('Connect a wallet to approve')
-      const safe = new Contract(vaultAddress, SAFE_ABI, signer)
-      const tx = await safe.approveHash(safeTxHash)
-      await tx.wait()
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to approve')
+      if (isPasskey) {
+        await sendCalls([
+          { target: vaultAddress, data: safeIface.encodeFunctionData('approveHash', [safeTxHash]), value: 0n },
+        ])
+      } else {
+        const safe = new Contract(vaultAddress, SAFE_ABI, signer)
+        const tx = await safe.approveHash(safeTxHash)
+        await tx.wait()
+      }
       await refresh()
     },
-    [signer, vaultAddress, refresh],
+    [isPasskey, signer, sendCalls, vaultAddress, refresh],
   )
 
   /** Execute a proposal that has reached threshold, using pre-validated (on-chain approval) signatures. */
   const execute = useCallback(
     async (proposal) => {
-      if (!signer) throw new Error('Connect a wallet to execute')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to execute')
       if (proposal.status !== STATUS.READY) throw new Error('Proposal is not ready to execute')
-      const safe = new Contract(vaultAddress, SAFE_ABI, signer)
       const signatures = buildPrevalidatedSignatures(proposal.approvers)
       const args = encodeExecTransaction(proposal.safeTx, signatures)
+      if (isPasskey) {
+        const sent = await sendCalls([
+          { target: vaultAddress, data: safeIface.encodeFunctionData('execTransaction', args), value: 0n },
+        ])
+        await refresh()
+        return { txHash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId }
+      }
+      const safe = new Contract(vaultAddress, SAFE_ABI, signer)
       const tx = await safe.execTransaction(...args)
       const receipt = await tx.wait()
       await refresh()
       return { txHash: receipt.hash }
     },
-    [signer, vaultAddress, refresh],
+    [isPasskey, signer, sendCalls, vaultAddress, refresh],
   )
 
   const cancel = useCallback(
     async (safeTxHash) => {
-      if (!signer) throw new Error('Connect a wallet to cancel')
+      if (!isPasskey && !signer) throw new Error('Connect a wallet to cancel')
       if (!hubAddress) throw new Error('Custody proposals are not configured on this network')
-      await cancelProposal({ hubAddress, safe: vaultAddress, safeTxHash, signer })
+      if (isPasskey) {
+        await sendCalls([cancelProposalCall({ hubAddress, safe: vaultAddress, safeTxHash })])
+      } else {
+        await cancelProposal({ hubAddress, safe: vaultAddress, safeTxHash, signer })
+      }
       await refresh()
     },
-    [signer, hubAddress, vaultAddress, refresh],
+    [isPasskey, signer, sendCalls, hubAddress, vaultAddress, refresh],
   )
 
   const queue = proposals.filter((p) => isQueued(p.status))

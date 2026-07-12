@@ -4,6 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { ethers } from 'ethers'
 import ProposalBuilder from '../ProposalBuilder'
+
+// The component now reads sendCalls/loginMethod from useWallet (passkey rail, spec 041/050); these
+// tests drive the classic signer-prop path, so return a non-passkey session.
+vi.mock('../../../hooks/useWalletManagement', () => ({
+  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
+}))
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from '../proposalEncoding'
 
 // Spec 030 (US5, FR-023/024) — the rich proposal builder: compose a Governor proposal without hand-writing
