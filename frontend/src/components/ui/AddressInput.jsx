@@ -172,17 +172,17 @@ const AddressInput = forwardRef(({
         {/* Status indicators */}
         <div className={styles.statusContainer}>
           {showLoading && (
-            <span className={styles.spinner} aria-label="Resolving..." />
+            <span className={styles.spinner} role="status" aria-label="Resolving..." />
           )}
           {showSuccess && !showLoading && (
-            <span className={styles.successIcon} aria-label="Valid address">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <span className={styles.successIcon} role="img" aria-label="Valid address">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </span>
           )}
           {showEnsLabel && !showLoading && (
-            <span className={styles.ensLabel} aria-label="ENS name detected">ENS</span>
+            <span className={styles.ensLabel} role="img" aria-label="ENS name detected">ENS</span>
           )}
         </div>
       </div>
@@ -211,7 +211,7 @@ const AddressInput = forwardRef(({
           </span>
           <code className={styles.resolvedAddress}>{formatAddress(tagRes.address)}</code>
           {tagRes.verified && (
-            <span className={styles.ensLabel} aria-label="Verified business tag" title="Verified">✓</span>
+            <span className={styles.ensLabel} role="img" aria-label="Verified business tag" title="Verified">✓</span>
           )}
           {canonicalTag && (
             <ReportTagButton

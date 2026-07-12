@@ -86,7 +86,7 @@ a tagless account still transacts normally (FR-001a).
 - [X] T018 [P] [US1] Add the `WagerTagRegistry` ABI to `frontend/src/abis/wagerTagRegistry.js` (hand-maintained per repo convention — sync script only does addresses)
 - [X] T019 [US1] Create `frontend/src/components/account/WagerTagPanel.jsx` — two-step commit→register UI (second step enabled after commit ages), gated on `useRoleDetails('WAGER_PARTICIPANT').tier >= MembershipTier.GOLD`, upgrade prompt (not a dead control) for below-Gold, and **Gold-specific** copy for the `InsufficientMembershipTier` revert (must NOT reuse the Silver open-challenge wording — research R5)
 - [X] T020 [US1] Mount `WagerTagPanel` in the account settings surface (`frontend/src/pages/WalletPage.jsx` Account/Membership tab) as an optional, non-forced perk — no onboarding/transaction step requires a tag (FR-001a)
-- [ ] T021 [US1] Integration test `test/integration/wagerTagRegistry.membership.test.js` against a real `MembershipManager` proxy — Gold/Platinum register succeeds, Silver/Bronze/None revert, and a tagless account completes a full wager create/transfer (FR-001a; SC-011)
+- [X] T021 [US1] Integration test `test/integration/wagerTagRegistry.membership.test.js` against a real `MembershipManager` proxy — Gold/Platinum register succeeds, Silver/Bronze/None revert, and a tagless account completes a full wager create/transfer (FR-001a; SC-011)
 
 **Checkpoint**: US1 fully functional — registration works, tier-gated, optional, snipe-proof.
 
@@ -197,8 +197,8 @@ the marker everywhere; suspending a tag stops resolution while ownership and ass
 - [ ] T046 [P] Add Medusa fuzz targets for the register/release/repoint/reclaim state machine — invariants: one owner per tag, one tag per owner, forward==reverse, no resolution while `QUARANTINED`/`REPOINTING`/`SUSPENDED`, quarantine/delay timestamps never shortened by any call sequence (quickstart §2)
 - [ ] T047 Run `npm run check:storage-layout` (new pair) and full `npm test` + `npm run test:frontend` — all green (constitution II/IV)
 - [ ] T048 [P] Smart-contract security review of `WagerTagRegistry.sol` per `.github/agents/smart-contract-security.agent.md`; document EthTrust-SL2 posture in the contract NatSpec (constitution I)
-- [ ] T049 [P] axe/Lighthouse accessibility assertions for `WagerTagPanel.jsx` and the `AddressInput` tag affordance — WCAG 2.1 AA (constitution V)
-- [ ] T050 [P] Docs: add `docs/developer-guide/wager-tags.md` + a deploy/runbook note; record addresses in `deployments/` and update CLAUDE.md guardrails if the registry becomes a standing primitive
+- [X] T049 [P] axe/Lighthouse accessibility assertions for `WagerTagPanel.jsx` and the `AddressInput` tag affordance — WCAG 2.1 AA (constitution V)
+- [X] T050 [P] Docs: add `docs/developer-guide/wager-tags.md` + a deploy/runbook note; record addresses in `deployments/` and update CLAUDE.md guardrails if the registry becomes a standing primitive
 - [ ] T051 Run `specs/054-wager-tag-registry/quickstart.md` end-to-end (manual dev-chain flow + SC-001…SC-011 mapping) and confirm every success criterion
 
 ---
