@@ -88,20 +88,15 @@ function HomeScreen() {
 
   return (
     <div className="dashboard-container home-screen">
-      {!isConnected && (
-        <div className="home-connect-cta" role="note">
-          <span>Connect your wallet to create a challenge.</span>
-          <button type="button" className="fm-btn-primary home-connect-btn" onClick={() => connectWallet()}>
-            Connect wallet
-          </button>
-        </div>
-      )}
-
-      {/* Primary content: the inline open-challenge create view. */}
+      {/* Primary content: the inline open-challenge create view. No disconnected banner —
+          tapping the panel's primary button opens the connect panel as part of the create
+          flow (spec 053 feedback), then continues once the wallet connects. */}
       <section className="home-create" aria-label="Create a challenge">
         <CreateChallengePanel
           key={createKey}
           embedded
+          isConnected={isConnected}
+          onConnect={connectWallet}
           initialResolutionType={oraclePreselect ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
           initialMarket={oracleMarket}
           onOracleModeChange={setOracleMode}

@@ -55,7 +55,7 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     const onDone = vi.fn()
     render(<CreateChallengePanel embedded onClose={() => {}} onDone={onDone} />)
-    const createBtn = screen.getByRole('button', { name: /create & generate code/i })
+    const createBtn = screen.getByRole('button', { name: /open wager/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
@@ -64,6 +64,25 @@ describe('CreateChallengePanel (spec 053 — shared create panel)', () => {
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     expect(createOpenChallenge.mock.calls[0][0].resolutionType).toBe(OPEN_RESOLUTION_TYPES.Either)
     expect(await screen.findByText('river tiger kite zoo')).toBeInTheDocument()
+  })
+
+  it('opens the connect flow from the primary button when disconnected, then resumes the create once connected', async () => {
+    const onConnect = vi.fn()
+    const { rerender } = render(
+      <CreateChallengePanel embedded onClose={() => {}} isConnected={false} onConnect={onConnect} />
+    )
+    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    tapAmount('10')
+    const openBtn = screen.getByRole('button', { name: /open wager/i })
+    expect(openBtn).toBeEnabled()
+    // Disconnected → tapping opens the connect panel and does NOT create yet.
+    fireEvent.click(openBtn)
+    await waitFor(() => expect(onConnect).toHaveBeenCalled())
+    expect(createOpenChallenge).not.toHaveBeenCalled()
+    // The wallet connects → the pending create resumes on its own (no second tap).
+    createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
+    rerender(<CreateChallengePanel embedded onClose={() => {}} isConnected onConnect={onConnect} />)
+    await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
   })
 
   it('locks the oracle resolution option where Polymarket is unavailable', () => {

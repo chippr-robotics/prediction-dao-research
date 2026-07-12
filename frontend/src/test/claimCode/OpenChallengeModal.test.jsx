@@ -37,7 +37,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
   it('Maker: gates create until description + stake, then shows the generated code + a scannable QR', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const createBtn = screen.getByRole('button', { name: /create & generate code/i })
+    const createBtn = screen.getByRole('button', { name: /open wager/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     // Description alone isn't enough — a positive stake is still required (FR-016).
@@ -63,7 +63,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open wager/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     const form = createOpenChallenge.mock.calls[0][0]
     expect(typeof form.acceptDeadline).toBe('number')
@@ -126,7 +126,7 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open wager/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     await screen.findByText('river tiger kite zoo')
 

@@ -4,14 +4,16 @@ import { MemoryRouter } from 'react-router-dom'
 
 // Stub the heavy children to assert the HomeScreen wiring (not their internals).
 vi.mock('../components/fairwins/CreateChallengePanel', () => ({
-  default: ({ embedded, initialResolutionType, onDone, onOracleModeChange }) => (
+  default: ({ embedded, initialResolutionType, onDone, onOracleModeChange, isConnected, onConnect }) => (
     <div
       data-testid="create-panel"
       data-embedded={String(!!embedded)}
       data-initial-resolution={initialResolutionType ?? ''}
+      data-connected={String(!!isConnected)}
     >
       <button type="button" onClick={() => onDone?.()}>done</button>
       <button type="button" onClick={() => onOracleModeChange?.(true)}>enter oracle mode</button>
+      <button type="button" onClick={() => onConnect?.()}>panel connect</button>
     </div>
   ),
 }))
@@ -29,10 +31,10 @@ vi.mock('../components/fairwins/PolymarketTickerCrawler', () => ({
   ),
 }))
 
-const walletHolder = { isConnected: true }
+const walletHolder = { isConnected: true, connectWallet: vi.fn() }
 vi.mock('../hooks', () => ({
   useWallet: () => ({ isConnected: walletHolder.isConnected, account: '0xabc' }),
-  useWalletConnection: () => ({ connectWallet: vi.fn() }),
+  useWalletConnection: () => ({ connectWallet: walletHolder.connectWallet }),
 }))
 vi.mock('../hooks/useUI', () => ({ useModal: () => ({ showModal: vi.fn(), hideModal: vi.fn() }) }))
 vi.mock('../contexts/FriendMarketsContext.js', () => ({ useFriendMarkets: () => ({ friendMarkets: [] }) }))
@@ -44,7 +46,7 @@ const renderHome = (entries = ['/app']) =>
   render(<MemoryRouter initialEntries={entries}><HomeScreen /></MemoryRouter>)
 
 describe('HomeScreen (spec 053) — the create-a-challenge landing', () => {
-  beforeEach(() => { walletHolder.isConnected = true })
+  beforeEach(() => { walletHolder.isConnected = true; walletHolder.connectWallet = vi.fn() })
 
   it('opens on the inline create view as the primary content — no quick-action grid (US1)', () => {
     renderHome()
@@ -94,10 +96,19 @@ describe('HomeScreen (spec 053) — the create-a-challenge landing', () => {
     expect(modal).toHaveAttribute('data-auto', 'true')
   })
 
-  it('shows a connect prompt when disconnected — the create view still renders, action gated (FR-013)', () => {
+  it('shows no connect banner when disconnected — the create panel handles connect in its own flow', () => {
     walletHolder.isConnected = false
     renderHome()
-    expect(screen.getByTestId('create-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /connect wallet/i })).toBeInTheDocument()
+    // The create view still renders as the landing content…
+    const panel = screen.getByTestId('create-panel')
+    expect(panel).toBeInTheDocument()
+    // …but there is no standalone "connect your wallet" message/button anymore.
+    expect(screen.queryByText(/connect your wallet to create/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /connect wallet/i })).toBeNull()
+    // The panel is told it's disconnected and handed the connect handler so its primary
+    // button can open the connect panel as part of the create flow.
+    expect(panel).toHaveAttribute('data-connected', 'false')
+    fireEvent.click(screen.getByRole('button', { name: /panel connect/i }))
+    expect(walletHolder.connectWallet).toHaveBeenCalled()
   })
 })
