@@ -39,7 +39,7 @@ files in different paths parallelize freely.
 
 - [X] T001 Create `contracts/interfaces/IWagerTagRegistry.sol` from `contracts/wager-tag-registry-interface.md` — `enum TagStatus`, `struct TagInfo`, all function signatures, events, and errors (incl. `InsufficientMembershipTier`, `TagUnavailable`, `TagQuarantined`, `NotTagOwner`, `RepointPending`)
 - [X] T002 [P] Create `config/reserved-tags.json` — seed reserved-term list (platform/brand names, `admin`, `support`, `official`, `help`, and operational terms) with a short header comment on curation (FR-004)
-- [ ] T003 [P] Scaffold `frontend/src/lib/tags/index.js` exporting the module surface (`normalizeTag`, `isTagLike`, `formatTag`, `resolveTag`, `lookupTagOf`) per the frontend contract in `contracts/wager-tag-registry-interface.md`
+- [X] T003 [P] Scaffold `frontend/src/lib/tags/index.js` exporting the module surface (`normalizeTag`, `isTagLike`, `formatTag`, `resolveTag`, `lookupTagOf`) per the frontend contract in `contracts/wager-tag-registry-interface.md`
 
 ---
 
@@ -56,7 +56,7 @@ storage-layout + frontend address wiring. **No user story can begin until this i
 - [X] T007 Implement `_statusOf(bytes32) → TagStatus` + `getTagInfoByHash` view in `WagerTagRegistry.sol` covering `NONE`/`ACTIVE` only for now (REPOINTING/QUARANTINED/SUSPENDED/LAPSED_RECLAIMABLE land in US4/US5); wire policy-param setters `setPolicyParams` + `setMembershipGate(role, tier)` bounded `tier >= Gold` (data-model.md §status, research R10)
 - [X] T008 [P] Create `scripts/deploy/deploy-wager-tag-registry.js` — deploy UUPS proxy via `scripts/deploy/lib/upgradeable.js`, wire membershipManager + sanctionsGuard + `WAGER_PARTICIPANT_ROLE`, record `wagerTagRegistry`/`wagerTagRegistryImpl` in `deployments/<network>.json`
 - [X] T009 [P] Register the `wagerTagRegistry`/`wagerTagRegistryImpl` pair in `scripts/deploy/check-storage-layout.js` (gating in CI)
-- [ ] T010 [P] Add `wagerTagRegistry` resolution to `frontend/src/config/contracts.js` (`getContractAddressForChain('wagerTagRegistry', chainId)`) and the sync-artifact map so addresses come from generated artifacts (constitution V)
+- [X] T010 [P] Add `wagerTagRegistry` resolution to `frontend/src/config/contracts.js` (`getContractAddressForChain('wagerTagRegistry', chainId)`) and the sync-artifact map so addresses come from generated artifacts (constitution V)
 
 **Checkpoint**: Contract compiles, deploys locally, storage-layout passes, address resolvable.
 
@@ -74,16 +74,16 @@ a tagless account still transacts normally (FR-001a).
 ### Tests for User Story 1 (write first, must FAIL)
 
 - [X] T011 [P] [US1] Unit tests in `test/wagerTagRegistry.test.js` — commit→wait→register succeeds (Gold **and** Platinum); reverts for duplicate / reserved / bad-format / below-Gold (None/Bronze/Silver) / sanctioned / uncommitted / too-fresh / expired-commitment; committed-name front-run fails (FR-001/002/003/004/006/007; SC-003/010)
-- [ ] T012 [P] [US1] Unit tests in `frontend/src/lib/tags/__tests__/normalizeTag.test.js` — normalization/validation table (`%` strip, mixed-case → lowercase, hyphen edges, length bounds) mirroring on-chain rules
+- [X] T012 [P] [US1] Unit tests in `frontend/src/lib/tags/__tests__/normalizeTag.test.js` — normalization/validation table (`%` strip, mixed-case → lowercase, hyphen edges, length bounds) mirroring on-chain rules
 
 ### Implementation for User Story 1
 
 - [X] T013 [US1] Implement `makeCommitment` + `commit` + `register` in `WagerTagRegistry.sol` (commit–reveal `[minCommitmentAge, maxCommitmentAge]`; guards: canonical, not reserved, not registered, not quarantined, caller holds no tag, `_requireGold`, `_requireNotSanctioned`; set `records`/`tagHashOf`; emit `TagCommitted`/`TagRegistered`) (FR-001/002/006, research R3)
 - [X] T014 [US1] Implement gasless twins `commitWithSig` + `registerWithSig` in `WagerTagRegistry.sol` via `SignerIntentBase._verifyIntent` (`CommitTagIntent`/`RegisterTagIntent` typehashes; signer must equal `owner`) with self-submit fallback intact
-- [ ] T015 [P] [US1] Add `CommitTagIntent` + `RegisterTagIntent` structs to `frontend/src/lib/relay/intentTypes.js` — byte-identical to the typehashes (three-way sync rule)
+- [X] T015 [P] [US1] Add `CommitTagIntent` + `RegisterTagIntent` structs to `frontend/src/lib/relay/intentTypes.js` — byte-identical to the typehashes (three-way sync rule)
 - [ ] T016 [P] [US1] Add the same structs + policy allowlist entries to `services/relay-gateway/src/intent/intentTypes.js` (with a Gold-tier pre-screen note so the gateway doesn't relay a call that will revert)
-- [ ] T017 [P] [US1] Implement `normalizeTag` / `isTagLike` / `formatTag` in `frontend/src/lib/tags/normalizeTag.js` (single source shared with tests; `formatTag` → `%<tag>`, FR-015)
-- [ ] T018 [P] [US1] Add the `WagerTagRegistry` ABI to `frontend/src/abis/wagerTagRegistry.js` (hand-maintained per repo convention — sync script only does addresses)
+- [X] T017 [P] [US1] Implement `normalizeTag` / `isTagLike` / `formatTag` in `frontend/src/lib/tags/normalizeTag.js` (single source shared with tests; `formatTag` → `%<tag>`, FR-015)
+- [X] T018 [P] [US1] Add the `WagerTagRegistry` ABI to `frontend/src/abis/wagerTagRegistry.js` (hand-maintained per repo convention — sync script only does addresses)
 - [ ] T019 [US1] Create `frontend/src/components/account/WagerTagPanel.jsx` — two-step commit→register UI (second step enabled after commit ages), gated on `useRoleDetails('WAGER_PARTICIPANT').tier >= MembershipTier.GOLD`, upgrade prompt (not a dead control) for below-Gold, and **Gold-specific** copy for the `InsufficientMembershipTier` revert (must NOT reuse the Silver open-challenge wording — research R5)
 - [ ] T020 [US1] Mount `WagerTagPanel` in the account settings surface (`frontend/src/pages/WalletPage.jsx` Account/Membership tab) as an optional, non-forced perk — no onboarding/transaction step requires a tag (FR-001a)
 - [ ] T021 [US1] Integration test `test/integration/wagerTagRegistry.membership.test.js` against a real `MembershipManager` proxy — Gold/Platinum register succeeds, Silver/Bronze/None revert, and a tagless account completes a full wager create/transfer (FR-001a; SC-011)
@@ -109,7 +109,7 @@ tag" with no near-match; sanctions still apply to the resolved address.
 ### Implementation for User Story 2
 
 - [X] T024 [US2] Implement resolution views `resolve(tag)` / `tagOf(address)` / `isAvailable(tag)` in `WagerTagRegistry.sol` — exact-match only after normalization, reverse guarded by the forward==reverse invariant (FR-008/010)
-- [ ] T025 [P] [US2] Implement `resolveTag` + `lookupTagOf` in `frontend/src/lib/tags/resolveTag.js` — read the contract via `getContractAddressForChain`; return `{ address, status, verified, tag }`; errors → soft-fail (FR-013)
+- [X] T025 [P] [US2] Implement `resolveTag` + `lookupTagOf` in `frontend/src/lib/tags/resolveTag.js` — read the contract via `getContractAddressForChain`; return `{ address, status, verified, tag }`; errors → soft-fail (FR-013)
 - [ ] T026 [US2] Integrate tag entry into `frontend/src/components/ui/AddressInput.jsx` — `isTagLike` input → `resolveTag` → render resolved full address + verification badge in the existing confirmation affordance; only `ACTIVE` is committable; raw-address entry always available and never required; sanctions run on the resolved address (FR-009/011/012)
 - [ ] T027 [P] [US2] `AddressInput` tests in `frontend/src/test/` — confirmation shows full address (SC-007), non-`ACTIVE` blocked, and registry-unreachable degrades to raw entry (FR-013; SC-008)
 
@@ -127,12 +127,12 @@ nickname flips display to the nickname; a tagless counterparty shows the existin
 
 ### Tests for User Story 3 (write first, must FAIL)
 
-- [ ] T028 [P] [US3] Extend `frontend/src/test/useOpponentName.test.jsx` + add a `useWagerTag` test — priority book > tag > ENS > generated (FR-014); registry error falls through to the existing chain (FR-013; SC-006)
+- [X] T028 [P] [US3] Extend `frontend/src/test/useOpponentName.test.jsx` + add a `useWagerTag` test — priority book > tag > ENS > generated (FR-014); registry error falls through to the existing chain (FR-013; SC-006)
 
 ### Implementation for User Story 3
 
-- [ ] T029 [P] [US3] Create `frontend/src/hooks/useWagerTag.js` — reverse lookup via `lookupTagOf`, short-TTL cache alongside the ENS cache, error → `null` (null-safe)
-- [ ] T030 [US3] Insert the tag step into `frontend/src/hooks/useOpponentName.js` between address book and ENS (`source` union gains `'wagerTag'`, rendered via `formatTag`), preserving spec-040 behavior and its tests (FR-014/016)
+- [X] T029 [P] [US3] Create `frontend/src/hooks/useWagerTag.js` — reverse lookup via `lookupTagOf`, short-TTL cache alongside the ENS cache, error → `null` (null-safe)
+- [X] T030 [US3] Insert the tag step into `frontend/src/hooks/useOpponentName.js` between address book and ENS (`source` union gains `'wagerTag'`, rendered via `formatTag`), preserving spec-040 behavior and its tests (FR-014/016)
 
 **Checkpoint**: Tags visible across cards, rosters, activity, address book.
 
