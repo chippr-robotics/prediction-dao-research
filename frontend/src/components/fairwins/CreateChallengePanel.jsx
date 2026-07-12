@@ -39,7 +39,7 @@ const BackIcon = () => (
  *   - initialMarket: a Polymarket market to pre-select on the oracle path (e.g. a ticker click),
  *     skipping the market-search step.
  */
-function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolutionType, initialMarket = null }) {
+function CreateChallengePanel({ embedded = false, onClose, onDone, onOracleModeChange, initialResolutionType, initialMarket = null }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const { capabilities } = useChainTokens()
   // Oracle settlement is only offered where the Polymarket CTF is reachable and
@@ -78,6 +78,13 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const isOracle = Number(resolutionType) === OPEN_RESOLUTION_TYPES.Polymarket
+
+  // Let an embedding host react to the oracle path (the home screen hides its
+  // secondary actions while an oracle challenge is being composed — the market +
+  // side picker need the room and the goal is a no-scroll view).
+  useEffect(() => {
+    onOracleModeChange?.(isOracle)
+  }, [isOracle, onOracleModeChange])
   const arbitratorAddr = arbitratorResolved || arbitrator
   const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
   const acceptMs = fromDatetimeLocal(acceptBy)
