@@ -29,10 +29,17 @@ you're on the wrong network the app offers a one-click switch.
 
 ### 3. Fill in the wager details
 
+The create sheet opens payments-app style: the **stake amount is the large
+figure at the top**, and you enter it on the on-screen **number pad** (the same
+across every create flow — 1v1, open challenge, oracle challenge, and group
+pools). The wager description sits just beneath the amount as a short memo.
+
+- **Stake amount** — the amount each side puts up, keyed in on the number pad;
+  default 10 USDC for a 1v1 wager. For an **Offer** you set the odds multiplier
+  and the app derives the two stakes
 - **Description** — what you're betting on, stated clearly enough that both
-  sides (and an arbitrator, if any) can judge the outcome
-- **Stake amount** — default 10 USDC; for an **Offer** you set the odds
-  multiplier and the app derives the two stakes
+  sides (and an arbitrator, if any) can judge the outcome; it reads like the
+  memo on a payment
 - **End time** — when the bet is decided (default 1 day; minimum 1 hour,
   maximum 21 days)
 - **Acceptance deadline** — how long your opponent has to accept before you

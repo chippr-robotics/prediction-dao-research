@@ -11,6 +11,14 @@ vi.mock('../../hooks/useOpenChallengeCreate', async (importOriginal) => {
 import OpenChallengeModal from '../../components/fairwins/OpenChallengeModal'
 import { buildTakeChallengeUrl, parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 
+// Enter a stake amount on the payments-style number pad (spec 052). Each pad key
+// is a button named for its digit; the decimal key is named "Decimal point".
+const tapAmount = (amount) => {
+  for (const ch of String(amount)) {
+    fireEvent.click(screen.getByRole('button', { name: ch === '.' ? 'Decimal point' : ch }))
+  }
+}
+
 describe('OpenChallengeModal (create-only; taking moved to the unified lookup, spec 037)', () => {
   beforeEach(() => { createOpenChallenge.mockReset() })
 
@@ -32,6 +40,9 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    // Description alone isn't enough — a positive stake is still required (FR-016).
+    expect(createBtn).toBeDisabled()
+    tapAmount('10')
     expect(createBtn).toBeEnabled()
     fireEvent.click(createBtn)
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
@@ -51,6 +62,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 1n, txHash: '0x1' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     const form = createOpenChallenge.mock.calls[0][0]
@@ -84,6 +96,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
   it('Maker: the set-time modal rejects a resolve time outside the allowed range', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    tapAmount('10')
     const createBtn = screen.getByRole('button', { name: /create & generate code/i })
     expect(createBtn).toBeEnabled()
 
@@ -98,21 +111,21 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(createBtn).toBeEnabled()
   })
 
-  it('Maker: the USDC stake entry is formatted as money ($ prefix, interactive token control, 2-decimal blur)', () => {
+  it('Maker: the stake is entered on the payments-style number pad (hero amount + USDC token, spec 052)', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const stake = screen.getByLabelText(/stake — each side/i, { selector: 'input' })
-    expect(stake).toHaveValue(10) // default 10.00
-    fireEvent.change(stake, { target: { value: '12.5' } })
-    fireEvent.blur(stake)
-    expect(stake.value).toBe('12.50')
-    // Money chrome around the input.
-    expect(screen.getByText('$')).toBeInTheDocument()
-    // Stake token control is always interactive (spec 038 FR-011), even
-    // though open challenges only support USDC on this network today.
-    const tokenControl = screen.getByLabelText(/^stake token$/i)
-    expect(tokenControl.tagName).toBe('SELECT')
-    expect(tokenControl).not.toBeDisabled()
-    expect(tokenControl.value).toBe('USDC')
+    // Starts in the zero state ($0) — the amount is the hero, driven by the pad.
+    const hero = screen.getByTestId('amount-keypad-hero')
+    expect(hero).toHaveTextContent('$0')
+    tapAmount('12.5')
+    expect(hero).toHaveTextContent('$12.5')
+    // A 3rd fractional digit is ignored (cents precision).
+    fireEvent.click(screen.getByRole('button', { name: '9' }))
+    expect(hero).toHaveTextContent('$12.5')
+    // Backspace removes the right-most character.
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }))
+    expect(hero).toHaveTextContent('$12.')
+    // The stake token (USDC) is shown compactly beside the amount.
+    expect(screen.getByText('USDC')).toBeInTheDocument()
   })
 
   it('deep-link helpers round-trip the code through a take URL', () => {
@@ -148,6 +161,7 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     await screen.findByText('river tiger kite zoo')

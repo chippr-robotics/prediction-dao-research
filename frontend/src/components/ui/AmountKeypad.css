@@ -1,0 +1,152 @@
+/* AmountKeypad (spec 052) — payments-style hero amount + on-screen number pad.
+   Consumes existing theme.css tokens only (no new tokens); styled to sit inside
+   the fm-* wager sheets and match .fm-stake-input-wrapper / .fm-odds-presets. */
+
+.amount-keypad {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  outline: none;
+}
+
+/* ── Hero read-out ─────────────────────────────────────────────────── */
+.amount-keypad-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.amount-keypad-hero {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem;
+  max-width: 100%;
+  color: var(--text-primary, #E6EDF3);
+  font-weight: 700;
+  line-height: 1.05;
+  /* Scales down on narrow screens; stays large and glanceable on wide ones. */
+  font-size: clamp(2.75rem, 14vw, 4.25rem);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+}
+
+.amount-keypad-prefix {
+  color: var(--text-secondary, #AAB6C2);
+  font-weight: 600;
+  font-size: 0.62em;
+  align-self: center;
+}
+
+.amount-keypad-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Zero state — de-emphasized so it reads as "nothing entered yet" (FR-016). */
+.amount-keypad-hero.is-zero {
+  color: var(--text-muted, #7A8590);
+}
+
+.amount-keypad-hero.is-zero .amount-keypad-prefix {
+  color: var(--text-muted, #7A8590);
+}
+
+.amount-keypad-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: var(--radius-full, 9999px);
+  background: var(--bg-secondary, #141C24);
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ── Number pad ────────────────────────────────────────────────────── */
+.amount-keypad-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.amount-keypad-key {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.5rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: var(--radius-md, 12px);
+  color: var(--text-primary, #E6EDF3);
+  font-family: inherit;
+  font-size: 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s) ease,
+              border-color var(--transition-fast, 0.15s) ease,
+              transform var(--transition-fast, 0.15s) ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.amount-keypad-key:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36B37E);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+}
+
+.amount-keypad-key:active:not(:disabled) {
+  transform: scale(0.97);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.14);
+}
+
+.amount-keypad-key:focus-visible {
+  outline: none;
+  border-color: var(--brand-primary, #36B37E);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.25);
+}
+
+.amount-keypad-key:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.amount-keypad-key--fn {
+  color: var(--text-secondary, #AAB6C2);
+}
+
+.amount-keypad-key--fn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Respect reduced-motion — drop the press-scale animation. */
+@media (prefers-reduced-motion: reduce) {
+  .amount-keypad-key {
+    transition: none;
+  }
+  .amount-keypad-key:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .amount-keypad-hero {
+    font-size: clamp(2.5rem, 16vw, 3.75rem);
+  }
+  .amount-keypad-key {
+    min-height: 3rem;
+    font-size: 1.3rem;
+  }
+}

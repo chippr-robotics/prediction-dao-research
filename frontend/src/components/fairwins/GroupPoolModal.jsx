@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { usePools } from '../../hooks/usePools'
 import WagerQRCode from '../ui/WagerQRCode'
+import AmountKeypad from '../ui/AmountKeypad'
 import { buildTakeChallengeUrl } from '../../utils/claimCode/deepLink.js'
 import DeadlineTimeline from './DeadlineTimeline'
 import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
@@ -108,7 +109,9 @@ function CreatePanel({ onClose }) {
   const { isConnected } = useWallet()
   const { createPool, status, error } = usePools()
   const navigate = useNavigate()
-  const [buyIn, setBuyIn] = useState('10.00')
+  // Payments-style entry (spec 052): start from the zero state so the number pad
+  // drives the buy-in, rather than pre-filling an amount to clear.
+  const [buyIn, setBuyIn] = useState('')
   const [maxMembers, setMaxMembers] = useState('10')
   const [thresholdPct, setThresholdPct] = useState(THRESHOLD_CHOICES[0].pct)
   // Windows as two ABSOLUTE instants (spec 034 address-based redesign): the same slider + tap-to-type
@@ -171,7 +174,8 @@ function CreatePanel({ onClose }) {
     e.preventDefault()
     try {
       setResult(await createPool({
-        buyIn,
+        // Normalize the pad string (e.g. "10." → "10") for on-chain parsing.
+        buyIn: Number(buyIn) > 0 ? String(Number(buyIn)) : buyIn,
         maxMembers,
         thresholdPct,
         acceptDeadline: Math.floor(joinMs / 1000),
@@ -241,79 +245,74 @@ function CreatePanel({ onClose }) {
   }
 
   return (
-    <form className="fm-form" onSubmit={onSubmit}>
-      <div className="fm-form-group fm-form-full">
-        <span className="fm-label-row">
-          <label htmlFor="gp-buyin">Buy-in — each member <span className="fm-required">*</span></label>
+    <form className="fm-form fm-pay-form" onSubmit={onSubmit}>
+      {/* Payments-style hero (spec 052): the buy-in is the amount centerpiece,
+          entered with the on-screen number pad. Pools are USDC-locked. */}
+      <div className="fm-pay-hero">
+        <AmountKeypad
+          value={buyIn}
+          onChange={setBuyIn}
+          prefix="$"
+          token="USDC"
+          disabled={status === 'creating'}
+          ariaLabel="Buy-in, each member"
+          id="gp-buyin"
+        />
+        <p className="fm-pay-hero-caption">
+          Buy-in — each member
           <InfoTip label="About: Buy-in — each member">
             Enter the amount in USD. Only USDC is supported for group pools on this network.
           </InfoTip>
-        </span>
-        <div className="fm-stake-input-wrapper fm-stake-row">
-          <span className="fm-stake-prefix">$</span>
-          <input
-            id="gp-buyin" type="number" inputMode="decimal" min="0" step="0.01"
-            placeholder="10.00" className="fm-stake-usd"
-            value={buyIn}
-            onChange={(e) => setBuyIn(e.target.value)}
-            onBlur={() => {
-              const n = Number(buyIn)
-              if (buyIn !== '' && Number.isFinite(n) && n > 0) setBuyIn(n.toFixed(2))
-            }}
-            required
-          />
-          {/* Stake token control is always interactive (spec 038 FR-011), even
-              though group pools only support the chain stablecoin today. */}
-          <select id="gp-buyin-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" value="USDC" onChange={() => {}}>
-            <option value="USDC">💵 USDC</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="fm-form-group fm-form-full">
-        <span className="fm-label-row">
-          <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
-          <InfoTip label="About: Maximum members">
-            Joining closes automatically once the pool fills.
-          </InfoTip>
-        </span>
-        <input
-          id="gp-max" type="number" min="2" max="1000"
-          value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} required
-        />
-      </div>
-
-      <div className="fm-form-group fm-form-full">
-        <PillSelect
-          label={<>Who must approve the payout? <span className="fm-required">*</span></>}
-          options={THRESHOLD_CHOICES.map((c) => ({ value: c.pct, label: c.label }))}
-          value={thresholdPct}
-          onChange={setThresholdPct}
-          info={(
-            <InfoTip label="About: Who must approve the payout?">
-              {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
-            </InfoTip>
-          )}
-        />
-      </div>
-
-      {/* Windows (tester feedback): the shared deadline timeline — drag a dot to pick each
-          time, or tap a tile to open the exact date & time modal. */}
-      <DeadlineTimeline
-        milestones={timelineMilestones}
-        onChange={handleTimelineChange}
-        disabled={status === 'creating'}
-        idPrefix="gp"
-        summary={deadlinesValid
-          ? `Open ${formatTimelineSpan(new Date(mountedAtMs), new Date(joinMs))} for friends to join · ` +
-            `then up to ${formatTimelineSpan(new Date(joinMs), new Date(resolveMs))} to settle`
-          : null}
-      />
-      {!deadlinesValid && (joinBy || resolveBy) && (
-        <p className="fm-hint oc-deadline-warn" role="alert">
-          Pick a join time in the future and a resolve time after it.
         </p>
-      )}
+      </div>
+
+      {/* Pool settings grouped as compact details below the hero. */}
+      <div className="fm-pay-details">
+        <div className="fm-form-group fm-form-full">
+          <span className="fm-label-row">
+            <label htmlFor="gp-max">Maximum members <span className="fm-required">*</span></label>
+            <InfoTip label="About: Maximum members">
+              Joining closes automatically once the pool fills.
+            </InfoTip>
+          </span>
+          <input
+            id="gp-max" type="number" min="2" max="1000"
+            value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} required
+          />
+        </div>
+
+        <div className="fm-form-group fm-form-full">
+          <PillSelect
+            label={<>Who must approve the payout? <span className="fm-required">*</span></>}
+            options={THRESHOLD_CHOICES.map((c) => ({ value: c.pct, label: c.label }))}
+            value={thresholdPct}
+            onChange={setThresholdPct}
+            info={(
+              <InfoTip label="About: Who must approve the payout?">
+                {chosen.detail} If the group never agrees, everyone can take their buy-in back after the resolve time.
+              </InfoTip>
+            )}
+          />
+        </div>
+
+        {/* Windows (tester feedback): the shared deadline timeline — drag a dot to pick each
+            time, or tap a tile to open the exact date & time modal. */}
+        <DeadlineTimeline
+          milestones={timelineMilestones}
+          onChange={handleTimelineChange}
+          disabled={status === 'creating'}
+          idPrefix="gp"
+          summary={deadlinesValid
+            ? `Open ${formatTimelineSpan(new Date(mountedAtMs), new Date(joinMs))} for friends to join · ` +
+              `then up to ${formatTimelineSpan(new Date(joinMs), new Date(resolveMs))} to settle`
+            : null}
+        />
+        {!deadlinesValid && (joinBy || resolveBy) && (
+          <p className="fm-hint oc-deadline-warn" role="alert">
+            Pick a join time in the future and a resolve time after it.
+          </p>
+        )}
+      </div>
 
       {error && <div className="fm-error-banner" role="alert">{error}</div>}
 

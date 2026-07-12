@@ -23,6 +23,13 @@ function renderModal(props) {
   return render(<MemoryRouter><GroupPoolModal isOpen onClose={() => {}} {...props} /></MemoryRouter>)
 }
 
+// Enter the buy-in on the payments-style number pad (spec 052).
+const tapAmount = (amount) => {
+  for (const ch of String(amount)) {
+    fireEvent.click(screen.getByRole('button', { name: ch === '.' ? 'Decimal point' : ch }))
+  }
+}
+
 describe('GroupPoolModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -35,24 +42,22 @@ describe('GroupPoolModal', () => {
     expect(screen.getByRole('dialog')).toHaveClass('friend-markets-modal-backdrop')
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
     expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.getByLabelText(/buy-in — each member/i, { selector: 'input' })).toBeInTheDocument()
+    // The buy-in is entered on the payments-style number pad (spec 052).
+    expect(screen.getByTestId('amount-keypad-hero')).toBeInTheDocument()
   })
 
-  it('the buy-in entry is formatted as money ($ prefix, interactive USDC token control, 2-decimal blur)', () => {
+  it('the buy-in is entered on the payments-style number pad (hero amount + USDC token, spec 052)', () => {
     usePools.mockReturnValue(pools())
     renderModal()
-    const buyIn = screen.getByLabelText(/buy-in — each member/i, { selector: 'input' })
-    expect(buyIn).toHaveValue(10) // default 10.00
-    fireEvent.change(buyIn, { target: { value: '12.5' } })
-    fireEvent.blur(buyIn)
-    expect(buyIn.value).toBe('12.50')
-    expect(screen.getByText('$')).toBeInTheDocument()
-    // Stake token control is always interactive (spec 038 FR-011), even
-    // though group pools only support USDC on this network today.
-    const tokenControl = screen.getByLabelText(/^stake token$/i)
-    expect(tokenControl.tagName).toBe('SELECT')
-    expect(tokenControl).not.toBeDisabled()
-    expect(tokenControl.value).toBe('USDC')
+    const hero = screen.getByTestId('amount-keypad-hero')
+    expect(hero).toHaveTextContent('$0') // zero state
+    tapAmount('12.5')
+    expect(hero).toHaveTextContent('$12.5')
+    // A 3rd fractional digit is ignored (cents precision).
+    fireEvent.click(screen.getByRole('button', { name: '9' }))
+    expect(hero).toHaveTextContent('$12.5')
+    // Pools are USDC-locked — the token indicator is shown compactly beside the amount.
+    expect(screen.getByText('USDC')).toBeInTheDocument()
   })
 
   it('join/resolve windows use the shared timeline element — draggable dots plus tap-to-set modal', () => {
@@ -82,6 +87,7 @@ describe('GroupPoolModal', () => {
     // Majority is the default; switching to Everyone submits 100%.
     expect(screen.getByRole('radio', { name: /majority/i })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(screen.getByRole('radio', { name: /everyone/i }))
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
     await waitFor(() => expect(createPool).toHaveBeenCalled())
     expect(createPool.mock.calls[0][0].thresholdPct).toBe(100)
@@ -91,6 +97,7 @@ describe('GroupPoolModal', () => {
     const createPool = vi.fn().mockResolvedValue({ pool: POOL_ADDR, phrase: 'crystal orbit harbor violet' })
     usePools.mockReturnValue(pools({ createPool }))
     renderModal()
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
     await waitFor(() => expect(createPool).toHaveBeenCalled())
     const form = createPool.mock.calls[0][0]
@@ -108,6 +115,7 @@ describe('GroupPoolModal', () => {
       }),
     }))
     renderModal()
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
     expect(await screen.findByTestId('pool-phrase')).toHaveTextContent('crystal orbit harbor violet')
     // Icon-only copy button (name from aria-label), like the open-challenge code display.
@@ -146,6 +154,7 @@ describe('GroupPoolModal', () => {
       const createPool = vi.fn().mockResolvedValue({ pool: POOL_ADDR, phrase: 'able acid also apex' })
       usePools.mockReturnValue(pools({ createPool }))
       renderModal()
+      tapAmount('10')
       fireEvent.click(screen.getByRole('button', { name: /create pool/i }))
       await waitFor(() => expect(createPool).toHaveBeenCalled())
       await screen.findByTestId('pool-phrase')

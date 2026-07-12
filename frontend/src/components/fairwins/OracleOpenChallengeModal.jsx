@@ -5,6 +5,7 @@ import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefau
 import PolymarketBrowser from './PolymarketBrowser'
 import ClaimCodeResultPanel from './ClaimCodeResultPanel'
 import InfoTip from '../ui/InfoTip'
+import AmountKeypad from '../ui/AmountKeypad'
 import {
   deriveOracleChallengeTimeline,
 } from '../../lib/openChallenge/oracleTimeline'
@@ -88,7 +89,11 @@ function OracleMakerPanel({ onClose }) {
 
   const [market, setMarket] = useState(null)
   const [side, setSide] = useState('') // '' | '0' | '1' — outcome index; 0 = YES side
-  const [stake, setStake] = useState('10.00')
+  // Payments-style entry (spec 052) via the number pad. Unlike the plain open
+  // challenge, the oracle flow keeps a pre-filled default (an integer, so the pad
+  // appends cleanly) to preserve the spec-041 SC-001 quick-flow: pick market →
+  // pick side → create, with the amount already valid.
+  const [stake, setStake] = useState('10')
   // Mount-time "now" anchors the derived timeline so it doesn't drift while the form is open.
   const [nowMs] = useState(() => Date.now())
   const [ineligible, setIneligible] = useState(null) // { question, reason } for a refused pick
@@ -139,7 +144,8 @@ function OracleMakerPanel({ onClose }) {
       const res = await createOpenChallenge(
         {
           description: composedDescription,
-          stake,
+          // Normalize the pad string (e.g. "10." → "10") for on-chain parsing.
+          stake: Number(stake) > 0 ? String(Number(stake)) : stake,
           resolutionType: OPEN_RESOLUTION_TYPES.Polymarket,
           oracleConditionId: market.conditionId,
           creatorIsYes: side === '0',
@@ -195,7 +201,31 @@ function OracleMakerPanel({ onClose }) {
   }
 
   return (
-    <form className="fm-form" onSubmit={handleCreate}>
+    <form className="fm-form fm-pay-form" onSubmit={handleCreate}>
+      {/* Payments-style hero (spec 052): the stake is the amount centerpiece,
+          entered with the on-screen number pad. Oracle challenges are USDC-locked. */}
+      <div className="fm-pay-hero">
+        <AmountKeypad
+          value={stake}
+          onChange={setStake}
+          prefix="$"
+          token="USDC"
+          disabled={busy}
+          ariaLabel="Stake amount, each side"
+          id="ooc-stake"
+        />
+        <p className="fm-pay-hero-caption">
+          Stake — each side
+          <InfoTip label="About: Stake — each side">
+            Enter the amount in USD. Open challenges are equal-stakes — check the market&apos;s
+            current prices below to judge the bet; only USDC is supported on this network.
+          </InfoTip>
+        </p>
+      </div>
+
+      {/* What you're betting on + your side + the event-set timeline sit below the
+          hero as the primary context (the description is auto-composed here). */}
+      <div className="fm-pay-details">
       <div className="fm-form-group fm-form-full">
         <span className="fm-label-row">
           <label htmlFor="ooc-market-picker">
@@ -296,33 +326,6 @@ function OracleMakerPanel({ onClose }) {
             )}
           </div>
 
-          <div className="fm-form-group fm-form-full">
-            <span className="fm-label-row">
-              <label htmlFor="ooc-stake">Stake — each side <span className="fm-required">*</span></label>
-              <InfoTip label="About: Stake — each side">
-                Enter the amount in USD. Open challenges are equal-stakes — check the market&apos;s
-                current prices above to judge the bet; only USDC is supported on this network.
-              </InfoTip>
-            </span>
-            <div className="fm-stake-input-wrapper fm-stake-row">
-              <span className="fm-stake-prefix">$</span>
-              <input
-                id="ooc-stake" type="number" inputMode="decimal" min="0" step="0.01"
-                placeholder="10.00" className="fm-stake-usd"
-                value={stake}
-                onChange={(e) => setStake(e.target.value)}
-                onBlur={() => {
-                  const n = Number(stake)
-                  if (stake !== '' && Number.isFinite(n) && n > 0) setStake(n.toFixed(2))
-                }}
-                disabled={busy}
-              />
-              <select id="ooc-stake-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" disabled={busy} value="USDC" onChange={() => {}}>
-                <option value="USDC">&#128181; USDC</option>
-              </select>
-            </div>
-          </div>
-
           {/* Derived timeline — read-only by design (spec: "the event defines the timelines"). */}
           {timeline?.eligible && (
             <div className="fm-form-group fm-form-full">
@@ -342,6 +345,7 @@ function OracleMakerPanel({ onClose }) {
           )}
         </>
       )}
+      </div>
 
       {progress && <p className="fm-hint" role="status">{progress.message}</p>}
       {error && <div className="fm-error-banner" role="alert">{error}</div>}
