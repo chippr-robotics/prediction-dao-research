@@ -7,6 +7,9 @@ This directory contains step-by-step operational guides, integration procedures,
 ### Integration Guides
 - **[batch-operations.md](./batch-operations.md)** - Complete integration guide for batch processing APIs with examples in JavaScript, Python, and React
 
+### Deploy & Operations
+- **[wager-tags-operations.md](./wager-tags-operations.md)** - Deploy the `%tag` naming registry, wire the frontend, grant operator roles, and moderate / tune / monitor it from the admin screen (spec 054)
+
 ## Purpose
 
 Runbooks provide:

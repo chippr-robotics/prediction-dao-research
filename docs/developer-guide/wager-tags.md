@@ -11,6 +11,8 @@ touching the registry.
 
 - Contract: `contracts/naming/WagerTagRegistry.sol` (interface `contracts/interfaces/IWagerTagRegistry.sol`)
 - Spec: [`specs/054-wager-tag-registry/`](../../specs/054-wager-tag-registry/)
+- Operator runbook (deploy + moderate + monitor): [runbooks/wager-tags-operations.md](../runbooks/wager-tags-operations.md)
+- End-user guide: [user-guide/wager-tags.md](../user-guide/wager-tags.md)
 - Related: [upgradeable-contracts.md](./upgradeable-contracts.md), [gasless-intents.md](./gasless-intents.md)
 
 ## Design at a glance
