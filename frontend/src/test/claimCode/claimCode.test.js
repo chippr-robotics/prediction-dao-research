@@ -7,7 +7,7 @@ import { verifyTypedData } from 'ethers'
 const TAKER_A = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const TAKER_B = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
 const VERIFYING_CONTRACT = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
-import { generateCode, normalizeCode, isValidCode } from '../../utils/claimCode/wordlist.js'
+import { generateCode, normalizeCode, isValidCode, isValidWord, suggestWords } from '../../utils/claimCode/wordlist.js'
 import { deriveFromCode, signOpenAccept, OPEN_ACCEPT_TYPES } from '../../utils/claimCode/deriveFromCode.js'
 import {
   encryptEnvelopeCode,
@@ -40,6 +40,28 @@ describe('claimCode/wordlist', () => {
     expect(isValidCode('river amber tiger kite extra')).toBe(false) // 5 words
     expect(isValidCode('river amber tiger zzzznotaword')).toBe(false)
     expect(isValidCode('')).toBe(false)
+  })
+
+  it('isValidWord: accepts a single BIP-39 word (normalized), rejects everything else', () => {
+    expect(isValidWord('river')).toBe(true)
+    expect(isValidWord('  River  ')).toBe(true) // trimmed + lowercased
+    expect(isValidWord('zzzznotaword')).toBe(false)
+    expect(isValidWord('river amber')).toBe(false) // more than one word
+    expect(isValidWord('')).toBe(false)
+    expect(isValidWord(null)).toBe(false)
+  })
+
+  it('suggestWords: returns list-order completions for a prefix, bounded by the limit', () => {
+    const s = suggestWords('ri', 6)
+    expect(s.length).toBeGreaterThan(0)
+    expect(s.length).toBeLessThanOrEqual(6)
+    expect(s.every((w) => w.startsWith('ri'))).toBe(true)
+    // A full word is its own first completion.
+    expect(suggestWords('river', 3)).toContain('river')
+    // No prefix / no match → nothing (never dump the whole list).
+    expect(suggestWords('')).toEqual([])
+    expect(suggestWords('   ')).toEqual([])
+    expect(suggestWords('zzzz')).toEqual([])
   })
 })
 
