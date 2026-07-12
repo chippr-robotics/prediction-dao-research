@@ -114,5 +114,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/053-home-create-challenge/plan.md
+at specs/054-wager-tag-registry/plan.md
 <!-- SPECKIT END -->
