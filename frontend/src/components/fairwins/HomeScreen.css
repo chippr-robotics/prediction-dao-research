@@ -49,9 +49,3 @@
 .home-ticker {
   margin-top: 0.25rem;
 }
-
-@media (max-width: 480px) {
-  .home-actions {
-    grid-template-columns: 1fr;
-  }
-}
