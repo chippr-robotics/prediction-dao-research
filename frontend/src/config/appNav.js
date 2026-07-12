@@ -16,6 +16,10 @@
 // name (see components/nav/NavIcon.jsx) — flat line glyphs, not emoji.
 export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 
+// Wagers (spec 053) — the relocated create-types + actions grid. Like Home, it is an absolute
+// top-level route (not a `/wallet?tab=` section), pinned near the top of the drawer.
+export const WAGERS_ITEM = { id: 'wagers', label: 'Wagers', icon: 'ticket', to: '/wagers' }
+
 // Grouped section rail. `id` matches the WalletPage tab id; `icon` drives both
 // the drawer and the mobile bottom nav.
 export const NAV_GROUPS = [
@@ -52,9 +56,10 @@ export const NAV_GROUPS = [
   },
 ]
 
-// Path a section item navigates to. Home has its own absolute route.
+// Path a section item navigates to. Home and Wagers have their own absolute routes.
 export function pathForNavItem(id) {
   if (id === HOME_ITEM.id) return HOME_ITEM.to
+  if (id === WAGERS_ITEM.id) return WAGERS_ITEM.to
   return `/wallet?tab=${id}`
 }
 

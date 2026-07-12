@@ -34,8 +34,8 @@ Web app — frontend only. All source under `frontend/src/`.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Create component scaffolds: `frontend/src/components/fairwins/CreateChallengePanel.jsx`, `HomeScreen.jsx`, `WagersPage.jsx` (empty default-export components) so imports resolve.
-- [ ] T002 [P] Create stylesheet scaffolds `frontend/src/components/fairwins/HomeScreen.css` and `WagersPage.css` (empty; consume existing theme tokens).
+- [X] T001 [P] Create component scaffolds: `frontend/src/components/fairwins/CreateChallengePanel.jsx`, `HomeScreen.jsx`, `WagersPage.jsx` (empty default-export components) so imports resolve.
+- [X] T002 [P] Create stylesheet scaffolds `frontend/src/components/fairwins/HomeScreen.css` and `WagersPage.css` (empty; consume existing theme tokens).
 
 ---
 
@@ -59,10 +59,10 @@ Web app — frontend only. All source under `frontend/src/`.
 
 **Independent Test**: Navigate to `/app`; the inline create view (amount hero + pad + memo + resolution) is the primary content, and a challenge can be created from it end-to-end.
 
-- [ ] T008 [US1] Build `frontend/src/components/fairwins/HomeScreen.jsx` — render `<CreateChallengePanel embedded />` as the primary content; carry over the wallet-connect/membership gating so the create action is gated when disconnected/below tier (absorb `WelcomeView` into a light connect affordance near the action, not a full replacement).
-- [ ] T009 [US1] Style `frontend/src/components/fairwins/HomeScreen.css` (center the inline create view, keep it non-scrolling at 320px) using existing theme tokens.
-- [ ] T010 [US1] Point `/app`, `/main`, `/fairwins` at `HomeScreen` in `frontend/src/App.jsx` (replace the `Dashboard` element for those routes).
-- [ ] T011 [US1] Add `frontend/src/test/HomeScreen.test.jsx` — assert the inline create view is the primary content and NO quick-action grid is present; a stake entered on the pad + submit calls the mocked create flow; disconnected renders the view with the create action gated (FR-013).
+- [X] T008 [US1] Build `frontend/src/components/fairwins/HomeScreen.jsx` — render `<CreateChallengePanel embedded />` as the primary content; carry over the wallet-connect/membership gating so the create action is gated when disconnected/below tier (absorb `WelcomeView` into a light connect affordance near the action, not a full replacement).
+- [X] T009 [US1] Style `frontend/src/components/fairwins/HomeScreen.css` (center the inline create view, keep it non-scrolling at 320px) using existing theme tokens.
+- [X] T010 [US1] Point `/app`, `/main`, `/fairwins` at `HomeScreen` in `frontend/src/App.jsx` (replace the `Dashboard` element for those routes).
+- [X] T011 [US1] Add `frontend/src/test/HomeScreen.test.jsx` — assert the inline create view is the primary content and NO quick-action grid is present; a stake entered on the pad + submit calls the mocked create flow; disconnected renders the view with the create action gated (FR-013).
 
 **Checkpoint**: The app opens on the inline create view (SC-001, SC-002).
 
@@ -74,8 +74,8 @@ Web app — frontend only. All source under `frontend/src/`.
 
 **Independent Test**: On `/app`, exercise self / third-party / oracle; oracle locked off-network, selectable on-network → market step; the Polymarket ticker routes into the oracle path.
 
-- [ ] T012 [US2] Wire the Polymarket ticker on `frontend/src/components/fairwins/HomeScreen.jsx` (`PolymarketTickerCrawler`) to open the create view's oracle path (preselect oracle via `initialResolutionType`), reusing the repointed handler from the WIP.
-- [ ] T013 [US2] Extend `frontend/src/test/HomeScreen.test.jsx` — oracle pill locked on a non-Polymarket network and selectable on a Polymarket network (mock `useChainTokens`); selecting oracle opens the market-search step; a ticker click routes into the oracle path; assert no standalone "Open Oracle Challenge" modal exists anywhere (SC-006).
+- [X] T012 [US2] Wire the Polymarket ticker on `frontend/src/components/fairwins/HomeScreen.jsx` (`PolymarketTickerCrawler`) to open the create view's oracle path (preselect oracle via `initialResolutionType`), reusing the repointed handler from the WIP.
+- [X] T013 [US2] Extend `frontend/src/test/HomeScreen.test.jsx` — oracle pill locked on a non-Polymarket network and selectable on a Polymarket network (mock `useChainTokens`); selecting oracle opens the market-search step; a ticker click routes into the oracle path; assert no standalone "Open Oracle Challenge" modal exists anywhere (SC-006).
 
 **Checkpoint**: All resolution paths (incl. gated oracle) work from home (SC-003, SC-006).
 
@@ -87,9 +87,9 @@ Web app — frontend only. All source under `frontend/src/`.
 
 **Independent Test**: From home, Accept opens the phrase-lookup/take flow; My Rewards opens My Wagers; `?oc=take&code=` opens the prefilled lookup.
 
-- [ ] T014 [US3] Add the "Accept a challenge" and "My Rewards" entry points to `frontend/src/components/fairwins/HomeScreen.jsx` (secondary actions near the create view), opening `UnifiedLookupModal` and `MyMarketsModal` respectively via local state (same pattern Dashboard used).
-- [ ] T015 [US3] Move the `?oc=take&code=` deep-link handling from `Dashboard` into `frontend/src/components/fairwins/HomeScreen.jsx` so a take link opens the unified lookup prefilled + auto-resolving (FR-016).
-- [ ] T016 [US3] Extend `frontend/src/test/HomeScreen.test.jsx` — Accept opens the unified lookup (stub); My Rewards opens My Wagers (stub); the `?oc=take&code=` deep link opens the lookup prefilled/auto-resolving.
+- [X] T014 [US3] Add the "Accept a challenge" and "My Rewards" entry points to `frontend/src/components/fairwins/HomeScreen.jsx` (secondary actions near the create view), opening `UnifiedLookupModal` and `MyMarketsModal` respectively via local state (same pattern Dashboard used).
+- [X] T015 [US3] Move the `?oc=take&code=` deep-link handling from `Dashboard` into `frontend/src/components/fairwins/HomeScreen.jsx` so a take link opens the unified lookup prefilled + auto-resolving (FR-016).
+- [X] T016 [US3] Extend `frontend/src/test/HomeScreen.test.jsx` — Accept opens the unified lookup (stub); My Rewards opens My Wagers (stub); the `?oc=take&code=` deep link opens the lookup prefilled/auto-resolving.
 
 **Checkpoint**: Home covers create + accept + rewards (SC-004).
 
@@ -101,16 +101,16 @@ Web app — frontend only. All source under `frontend/src/`.
 
 **Independent Test**: Nav drawer → Wagers → `/wagers` shows every previously-home create type + action, each launching its flow; quick-access visibility still applies; home no longer shows the grid.
 
-- [ ] T017 [US4] Build `frontend/src/components/fairwins/WagersPage.jsx` — move `QuickActions` + `handleQuickAction` + all create/track modal state (`FriendMarketsModal`, `GroupPoolModal`, `OpenChallengeModal`, `UnifiedLookupModal`, `MyMarketsModal`, `QRScanner`, `AddressQRModal`) and the `quickAccessPreference` visibility filtering out of `Dashboard` into this page.
-- [ ] T018 [US4] Split/retire `frontend/src/components/fairwins/Dashboard.jsx` — its `QuickActions`/`WelcomeView`/modal wiring now lives in `WagersPage`/`HomeScreen`; reduce `Dashboard.jsx` to a redirect/re-export or delete it once no route references it.
-- [ ] T019 [P] [US4] Add the `/wagers` route under `AppLayout` in `frontend/src/App.jsx` → `WagersPage`.
-- [ ] T020 [P] [US4] Add the "Wagers" nav item in `frontend/src/config/appNav.js` (absolute-route entry like `HOME_ITEM`, e.g. `{ id: 'wagers', label: 'Wagers', icon: <NavIcon name>, to: '/wagers' }`) and special-case `pathForNavItem('wagers') → '/wagers'`.
-- [ ] T021 [US4] Render the Wagers item in `frontend/src/components/nav/AppNavDrawer.jsx` and mark it active on `/wagers`.
-- [ ] T022 [P] [US4] Style `frontend/src/components/fairwins/WagersPage.css` (grid layout reused from the old Dashboard styles) using existing tokens.
-- [ ] T023 [US4] Add `frontend/src/test/WagersPage.test.jsx` — every previously-home card is present and launches its flow (stub modals); quick-access visibility toggles hide/show cards; the "Open Challenge" card opens the modal (wrapping the panel).
-- [ ] T024 [US4] Rework `frontend/src/test/Dashboard.test.jsx` for the split: home-grid + oracle-entry assertions move to `WagersPage.test.jsx`; the home tests assert the inline create view (or delete/redirect `Dashboard.test` if `Dashboard.jsx` is retired). Update the ticker/oracle-entry expectations to the consolidated flow.
-- [ ] T025 [P] [US4] Add a nav test (extend an existing nav test or add `frontend/src/test/appNav.test.js`) — `pathForNavItem('wagers') === '/wagers'` and the drawer renders/activates the Wagers item.
-- [ ] T026 [US4] Fix `frontend/src/test/accessibility.test.jsx` — the deleted-oracle-modal a11y block now renders the consolidated create view (or is removed); ensure no import of the deleted `OracleOpenChallengeModal`.
+- [X] T017 [US4] Build `frontend/src/components/fairwins/WagersPage.jsx` — move `QuickActions` + `handleQuickAction` + all create/track modal state (`FriendMarketsModal`, `GroupPoolModal`, `OpenChallengeModal`, `UnifiedLookupModal`, `MyMarketsModal`, `QRScanner`, `AddressQRModal`) and the `quickAccessPreference` visibility filtering out of `Dashboard` into this page.
+- [X] T018 [US4] Split/retire `frontend/src/components/fairwins/Dashboard.jsx` — its `QuickActions`/`WelcomeView`/modal wiring now lives in `WagersPage`/`HomeScreen`; reduce `Dashboard.jsx` to a redirect/re-export or delete it once no route references it.
+- [X] T019 [P] [US4] Add the `/wagers` route under `AppLayout` in `frontend/src/App.jsx` → `WagersPage`.
+- [X] T020 [P] [US4] Add the "Wagers" nav item in `frontend/src/config/appNav.js` (absolute-route entry like `HOME_ITEM`, e.g. `{ id: 'wagers', label: 'Wagers', icon: <NavIcon name>, to: '/wagers' }`) and special-case `pathForNavItem('wagers') → '/wagers'`.
+- [X] T021 [US4] Render the Wagers item in `frontend/src/components/nav/AppNavDrawer.jsx` and mark it active on `/wagers`.
+- [X] T022 [P] [US4] Style `frontend/src/components/fairwins/WagersPage.css` (grid layout reused from the old Dashboard styles) using existing tokens.
+- [X] T023 [US4] Add `frontend/src/test/WagersPage.test.jsx` — every previously-home card is present and launches its flow (stub modals); quick-access visibility toggles hide/show cards; the "Open Challenge" card opens the modal (wrapping the panel).
+- [X] T024 [US4] Rework `frontend/src/test/Dashboard.test.jsx` for the split: home-grid + oracle-entry assertions move to `WagersPage.test.jsx`; the home tests assert the inline create view (or delete/redirect `Dashboard.test` if `Dashboard.jsx` is retired). Update the ticker/oracle-entry expectations to the consolidated flow.
+- [X] T025 [P] [US4] Add a nav test (extend an existing nav test or add `frontend/src/test/appNav.test.js`) — `pathForNavItem('wagers') === '/wagers'` and the drawer renders/activates the Wagers item.
+- [X] T026 [US4] Fix `frontend/src/test/accessibility.test.jsx` — the deleted-oracle-modal a11y block now renders the consolidated create view (or is removed); ensure no import of the deleted `OracleOpenChallengeModal`.
 
 **Checkpoint**: Every wager type/action lives in `/wagers`; home is decluttered (SC-005).
 
