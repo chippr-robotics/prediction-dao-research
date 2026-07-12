@@ -30,6 +30,22 @@ import './MyMarketsModal.css'
 import './WagerCard.css'
 
 /**
+ * Passkey rail for a single WagerRegistry write (spec 041/050): a passkey smart-account session has
+ * no ethers signer, so its writes go through WalletContext.sendCalls as one sponsored UserOp instead
+ * of the useGaslessWrite/signer path. Returns the same `{ txHash }` shape the classic `.run()` yields,
+ * so callers stay branch-light. Claim/refund/resolve are single calls (no token approval).
+ */
+async function sendRegistryCall(sendCalls, chainId, method, args) {
+  if (typeof sendCalls !== 'function') {
+    throw new Error('This wallet cannot submit this action on the current transaction rail.')
+  }
+  const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+  const data = new ethers.Interface(WAGER_REGISTRY_ABI).encodeFunctionData(method, args)
+  const sent = await sendCalls([{ target: registryAddr, data, value: 0n }])
+  return { txHash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId }
+}
+
+/**
  * MyMarketsModal Component
  *
  * A comprehensive modal for users to manage their wagers:
@@ -49,7 +65,8 @@ function MyMarketsModal({
   initialSelectedMarketId = null
 }) {
   const { isConnected, account, chainId } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork, sendCalls, loginMethod } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3, FR-022c): a vault-won payout claim is a threshold-gated vault transaction (the registry
   // binds the claimer to the winner). Refunds stay single-owner and need no change.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
@@ -718,18 +735,24 @@ function MyMarketsModal({
     const userAddr = account?.toLowerCase()
     const isCreator = userAddr && market.creator?.toLowerCase() === userAddr
 
-    if (isCreator && signer) {
+    if (isCreator && (signer || isPasskey)) {
       try {
         if (!isCorrectNetwork) {
           try { await switchNetwork() } catch { /* user declined */ }
         }
-        const registry = new ethers.Contract(
-          getContractAddressForChain('wagerRegistry', chainId),
-          WAGER_REGISTRY_ABI,
-          signer
-        )
-        const tx = await registry.claimRefund(market.wagerId ?? market.id)
-        await tx.wait()
+        if (isPasskey) {
+          // Passkey creator reclaims the stake over the sendCalls rail (no signer to reclaim it
+          // otherwise strands the funds and only dismisses the row locally).
+          await sendRegistryCall(sendCalls, chainId, 'claimRefund', [market.wagerId ?? market.id])
+        } else {
+          const registry = new ethers.Contract(
+            getContractAddressForChain('wagerRegistry', chainId),
+            WAGER_REGISTRY_ABI,
+            signer
+          )
+          const tx = await registry.claimRefund(market.wagerId ?? market.id)
+          await tx.wait()
+        }
       } catch (err) {
         const reason = err?.reason || err?.shortMessage || err?.message || ''
         const userRejected = err?.code === 'ACTION_REJECTED' ||
@@ -742,7 +765,7 @@ function MyMarketsModal({
     }
 
     dismissMarket(market.id)
-  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket, chainId])
+  }, [account, signer, isPasskey, sendCalls, isCorrectNetwork, switchNetwork, dismissMarket, chainId])
 
   const handleClearAllExpired = useCallback((markets) => {
     dismissMarkets(markets.map(m => m.id))
@@ -773,7 +796,7 @@ function MyMarketsModal({
   })
 
   const handleClaimPayout = useCallback(async (market) => {
-    if (!signer) return
+    if (!isPasskey && !signer) return
     const id = String(market.id)
 
     if (!isCorrectNetwork) {
@@ -800,7 +823,9 @@ function MyMarketsModal({
         fireToast('Vault claim proposed — awaiting co-owner approval')
         return
       }
-      const result = await claimPayoutTx.run(wagerId)
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'claimPayout', [wagerId])
+        : await claimPayoutTx.run(wagerId)
       if (result?.error) throw result.error
       // Pull fresh on-chain data so the claimed wager flips to paid (which
       // hides the Claim affordances) and clear its unread activity.
@@ -826,7 +851,7 @@ function MyMarketsModal({
     } finally {
       setClaimingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx, operatingAsVault, canActAsVault, submitAsActive, chainId])
+  }, [signer, isPasskey, sendCalls, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimPayoutTx, operatingAsVault, canActAsVault, submitAsActive, chainId])
 
   // Participant reclaims their stake on a wager that ran past its resolution
   // window without a winner being declared (the "refundable" state). Mirrors
@@ -852,7 +877,7 @@ function MyMarketsModal({
   })
 
   const handleClaimRefund = useCallback(async (market) => {
-    if (!signer) return
+    if (!isPasskey && !signer) return
     const id = String(market.id)
 
     if (!isCorrectNetwork) {
@@ -868,7 +893,10 @@ function MyMarketsModal({
     setRefundError(null)
 
     try {
-      const result = await claimRefundRowTx.run(market.wagerId ?? market.id)
+      const wagerId = market.wagerId ?? market.id
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
+        : await claimRefundRowTx.run(wagerId)
       if (result?.error) throw result.error
       // Pull fresh on-chain data so the refunded wager leaves the list and clear
       // its unread activity.
@@ -892,7 +920,7 @@ function MyMarketsModal({
     } finally {
       setRefundingId(null)
     }
-  }, [signer, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
+  }, [signer, isPasskey, sendCalls, chainId, isCorrectNetwork, switchNetwork, markWagerRead, refreshFriendMarkets, fireToast, claimRefundRowTx])
 
   if (!isOpen) return null
 
@@ -1420,7 +1448,8 @@ function MarketDetailView({
 
   // Active chain id so explorer links resolve to the right network
   // (Polygon mainnet vs Amoy testnet) instead of a hardcoded testnet URL.
-  const { chainId } = useWeb3()
+  const { chainId, sendCalls, loginMethod } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
 
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawError, setWithdrawError] = useState(null)
@@ -1444,7 +1473,7 @@ function MarketDetailView({
   })
 
   const handleWithdraw = async () => {
-    if (!signer) return
+    if (!isPasskey && !signer) return
 
     if (!isCorrectNetwork) {
       try {
@@ -1459,7 +1488,10 @@ function MarketDetailView({
     setWithdrawError(null)
 
     try {
-      const result = await cancelOpenTx.run(market.wagerId ?? market.id)
+      const wagerId = market.wagerId ?? market.id
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'cancelOpen', [wagerId])
+        : await cancelOpenTx.run(wagerId)
       if (result?.error) throw result.error
       if (result?.txHash) {
         setWithdrawTxHash(result.txHash)
@@ -1495,7 +1527,7 @@ function MarketDetailView({
   const isParticipant = market.participants?.some(
     p => p.toLowerCase() === account?.toLowerCase()
   )
-  const showRefundButton = isParticipant && signer &&
+  const showRefundButton = isParticipant && (signer || isPasskey) &&
     status === MarketStatus.PENDING_RESOLUTION && !refundSuccess
 
   // Gasless claimRefund (spec 035/036): relayed where available, transparent self-submit otherwise.
@@ -1514,7 +1546,7 @@ function MarketDetailView({
   })
 
   const handleClaimRefund = async () => {
-    if (!signer) return
+    if (!isPasskey && !signer) return
 
     if (!isCorrectNetwork) {
       try {
@@ -1529,7 +1561,10 @@ function MarketDetailView({
     setRefundError(null)
 
     try {
-      const result = await claimRefundTx.run(market.wagerId ?? market.id)
+      const wagerId = market.wagerId ?? market.id
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'claimRefund', [wagerId])
+        : await claimRefundTx.run(wagerId)
       if (result?.error) throw result.error
       if (result?.txHash) {
         setRefundTxHash(result.txHash)
@@ -1907,7 +1942,8 @@ function ResolutionModal({
   // counterparty); the second SETTLES. Detected from the WagerDrawn event below.
   const [drawSettled, setDrawSettled] = useState(false)
   // Chain-aware explorer link for the payout receipt (avoids a hardcoded testnet host).
-  const { chainId } = useWeb3()
+  const { chainId, sendCalls, loginMethod, provider } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
 
   // Canonical outcome keys preserve the on-chain mapping:
   //   outcomes[0] => creator wins, outcomes[1] => opponent wins.
@@ -2033,7 +2069,7 @@ function ResolutionModal({
       return
     }
 
-    if (!signer) {
+    if (!isPasskey && !signer) {
       setError('Please connect your wallet to resolve this wager.')
       return
     }
@@ -2048,10 +2084,12 @@ function ResolutionModal({
     setError(null)
 
     const registryAddress = getContractAddressForChain('wagerRegistry', chainId)
+    // Reads (getWager for the winner address) use the signer when present, else the session read
+    // provider — a passkey session has no signer but WalletContext exposes an RPC reader.
     const registry = new ethers.Contract(
       registryAddress,
       WAGER_REGISTRY_ABI,
-      signer
+      signer || provider
     )
 
     try {
@@ -2059,7 +2097,9 @@ function ResolutionModal({
       // first call only proposes (awaiting the counterparty); the second settles.
       // The self-submit closure inspects the WagerDrawn event to set drawSettled.
       if (isDrawSelected) {
-        const result = await declareDrawTx.run(market.id)
+        const result = isPasskey
+          ? await sendRegistryCall(sendCalls, chainId, 'declareDraw', [market.id])
+          : await declareDrawTx.run(market.id)
         if (result?.error) throw result.error
         if (result?.txHash) setTxHash(result.txHash)
         setStep('success')
@@ -2079,7 +2119,9 @@ function ResolutionModal({
         notes: resolutionNotes,
       })
 
-      const result = await declareWinnerTx.run(market.id, winner)
+      const result = isPasskey
+        ? await sendRegistryCall(sendCalls, chainId, 'declareWinner', [market.id, winner])
+        : await declareWinnerTx.run(market.id, winner)
       if (result?.error) throw result.error
       if (result?.txHash) setTxHash(result.txHash)
 

@@ -111,7 +111,8 @@ export const clearPendingTransaction = () => {
  *    reverts, the UI surfaces a buy-tier prompt.
  */
 export function useFriendMarketCreation({ onMarketCreated } = {}) {
-  const { signer } = useWeb3()
+  const { signer, sendCalls, loginMethod, provider, address, chainId } = useWeb3()
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3): when operating as a vault, wager creation becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
 
@@ -143,7 +144,10 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
   const createFriendMarket = useCallback(async (data, modalSigner) => {
     const activeSigner = modalSigner || signer
-    if (!activeSigner) throw new Error('Please connect your wallet to create a wager')
+    if (!isPasskey && !activeSigner) throw new Error('Please connect your wallet to create a wager')
+    // Passkey sessions have no signer: reads and calldata encoding run over the session read provider,
+    // the write goes out as one sponsored UserOp (approve+create) via sendCalls further below.
+    const readRunner = activeSigner || provider
 
     const onProgress = data.data?.onProgress || (() => {})
     savePendingTransaction({
@@ -165,9 +169,11 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       // signer can't report its network.
       let executionChainId
       try {
-        executionChainId = Number((await activeSigner.provider.getNetwork()).chainId)
+        executionChainId = activeSigner
+          ? Number((await activeSigner.provider.getNetwork()).chainId)
+          : chainId
       } catch {
-        executionChainId = undefined
+        executionChainId = chainId
       }
       const resolve = (name) =>
         executionChainId != null ? getContractAddressForChain(name, executionChainId) : getContractAddress(name)
@@ -186,9 +192,9 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         throw new Error('A stake token (USDC or WMATIC) is required. Native MATIC is not supported.')
       }
 
-      const userAddress = await activeSigner.getAddress()
-      const registry = new ethers.Contract(wagerRegistryAddress, WAGER_REGISTRY_ABI, activeSigner)
-      const stakeToken = new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
+      const userAddress = activeSigner ? await activeSigner.getAddress() : address
+      const registry = new ethers.Contract(wagerRegistryAddress, WAGER_REGISTRY_ABI, readRunner)
+      const stakeToken = new ethers.Contract(stakeTokenAddress, ERC20_ABI, readRunner)
       const tokenDecimals = Number(await stakeToken.decimals())
       const tokenSymbol = await stakeToken.symbol().catch(() => 'tokens')
 
@@ -478,16 +484,49 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         return minedReceipt
       }
 
-      // Gasless-or-self-submit send (spec 035/036). Params mirror the CreateWagerIntent struct; the
-      // creator is auto-filled from the signer. The relayer only serves EIP-3009 chains — everywhere
-      // else this transparently self-submits with identical on-chain effect.
-      const runResult = await createWagerTx.run({
-        opponent, arbitrator, stakeTokenAddress, creatorStakeWei, opponentStakeWei,
-        acceptDeadline, resolveDeadline, resolutionType, polymarketConditionId,
-        creatorIsYes, metadataHash, metadataReference,
-        termsVersionHash: termsBytes32 || ethers.ZeroHash,
-        performSelfSubmit,
-      })
+      // Passkey rail (spec 041/050): batch [approve?(exact stake), createWager] into ONE sponsored
+      // UserOp via sendCalls. Mirrors the vault batch above but self-executed (not a Safe proposal).
+      // Flows into the shared receipt/WagerCreated parsing below via a txHash-only runResult.
+      let runResult
+      if (isPasskey) {
+        if (typeof sendCalls !== 'function') {
+          throw new Error('This wallet cannot create a wager on the current transaction rail.')
+        }
+        const calls = []
+        const currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+        if (currentAllowance < creatorStakeWei) {
+          calls.push({
+            target: stakeTokenAddress,
+            data: stakeToken.interface.encodeFunctionData('approve', [wagerRegistryAddress, creatorStakeWei]),
+            value: 0n,
+          })
+        }
+        try {
+          onProgress({ step: 'create', message: 'Validating transaction...' })
+          await registry[createMethod].staticCall(...createArgs, { from: userAddress })
+        } catch (simError) {
+          throw new Error(translateRevert(simError.reason || simError.shortMessage || simError.message || ''))
+        }
+        calls.push({
+          target: wagerRegistryAddress,
+          data: registry.interface.encodeFunctionData(createMethod, createArgs),
+          value: 0n,
+        })
+        onProgress({ step: 'create', message: 'Confirm with your passkey…' })
+        const sent = await sendCalls(calls)
+        runResult = { txHash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId, via: 'userop' }
+      } else {
+        // Gasless-or-self-submit send (spec 035/036). Params mirror the CreateWagerIntent struct; the
+        // creator is auto-filled from the signer. The relayer only serves EIP-3009 chains — everywhere
+        // else this transparently self-submits with identical on-chain effect.
+        runResult = await createWagerTx.run({
+          opponent, arbitrator, stakeTokenAddress, creatorStakeWei, opponentStakeWei,
+          acceptDeadline, resolveDeadline, resolutionType, polymarketConditionId,
+          creatorIsYes, metadataHash, metadataReference,
+          termsVersionHash: termsBytes32 || ethers.ZeroHash,
+          performSelfSubmit,
+        })
+      }
       if (runResult?.error) throw runResult.error
 
       // Only the self-submit leg guarantees a mined receipt in hand; treat a missing/failed one as a
@@ -504,8 +543,8 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       let receipt = minedReceipt
       if (!receipt && runResult?.txHash) {
         try {
-          receipt = await activeSigner.provider.getTransactionReceipt(runResult.txHash)
-        } catch { /* relayer still landing it; wager id resolves once mined */ }
+          receipt = await (activeSigner?.provider || provider).getTransactionReceipt(runResult.txHash)
+        } catch { /* relayer/bundler still landing it; wager id resolves once mined */ }
       }
 
       // Parse WagerCreated event
@@ -568,7 +607,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       throw error
     }
-  }, [signer, onMarketCreated, createWagerTx, operatingAsVault, canActAsVault, submitAsActive])
+  }, [signer, isPasskey, sendCalls, provider, address, chainId, onMarketCreated, createWagerTx, operatingAsVault, canActAsVault, submitAsActive])
 
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
