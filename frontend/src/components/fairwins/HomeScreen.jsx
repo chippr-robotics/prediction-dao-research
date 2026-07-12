@@ -40,6 +40,9 @@ function HomeScreen() {
   const [unifiedAutoResolve, setUnifiedAutoResolve] = useState(false)
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [initialWagerId, setInitialWagerId] = useState(null)
+  // While the create panel is on its oracle path, hide the secondary actions so the
+  // taller oracle form (market + side picker) fits without scrolling (design feedback).
+  const [oracleMode, setOracleMode] = useState(false)
 
   // Feed → wager navigation (spec 012): open My Wagers on a specific wager, then clear state.
   useEffect(() => {
@@ -85,35 +88,34 @@ function HomeScreen() {
 
   return (
     <div className="dashboard-container home-screen">
-      {!isConnected && (
-        <div className="home-connect-cta" role="note">
-          <span>Connect your wallet to create a challenge.</span>
-          <button type="button" className="fm-btn-primary home-connect-btn" onClick={() => connectWallet()}>
-            Connect wallet
-          </button>
-        </div>
-      )}
-
-      {/* Primary content: the inline open-challenge create view. */}
+      {/* Primary content: the inline open-challenge create view. No disconnected banner —
+          tapping the panel's primary button opens the connect panel as part of the create
+          flow (spec 053 feedback), then continues once the wallet connects. */}
       <section className="home-create" aria-label="Create a challenge">
         <CreateChallengePanel
           key={createKey}
           embedded
+          isConnected={isConnected}
+          onConnect={connectWallet}
           initialResolutionType={oraclePreselect ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
           initialMarket={oracleMarket}
+          onOracleModeChange={setOracleMode}
           onDone={handleCreated}
         />
       </section>
 
-      {/* Secondary actions: take a challenge, and view winnings/rewards. */}
-      <section className="home-actions" aria-label="Other actions">
-        <button type="button" className="fm-btn-secondary home-action" onClick={openAccept}>
-          Accept a challenge
-        </button>
-        <button type="button" className="fm-btn-secondary home-action" onClick={() => setShowMyWagers(true)}>
-          My rewards
-        </button>
-      </section>
+      {/* Secondary actions: take a challenge, and view winnings. Hidden on the oracle
+          path so the taller oracle form fits without scrolling (design feedback). */}
+      {!oracleMode && (
+        <section className="home-actions" aria-label="Other actions">
+          <button type="button" className="fm-btn-secondary home-action" onClick={openAccept}>
+            Accept a challenge
+          </button>
+          <button type="button" className="fm-btn-secondary home-action" onClick={() => setShowMyWagers(true)}>
+            My Wagers
+          </button>
+        </section>
+      )}
 
       {/* Polymarket ticker — picks route into the create view's oracle path. */}
       <section className="dashboard-section home-ticker">

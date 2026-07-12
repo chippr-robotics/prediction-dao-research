@@ -11,7 +11,7 @@ const ACCOUNT = '0x3333333333333333333333333333333333333333'
 const STAKE = 10_000_000n // 10 USDC (6 decimals)
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '', acceptArgs: null },
+  state: { allowance: 0n, balance: 100_000_000n, wagerId: 0n, throwLookup: false, metadataUri: '', acceptArgs: null, staticCallReject: null },
   calls: [],
 }))
 const wallet = vi.hoisted(() => ({
@@ -59,7 +59,10 @@ vi.mock('ethers', async () => {
         state.acceptArgs = a
         return Promise.resolve({ wait: () => Promise.resolve({ status: 1, hash: '0xtxhash' }) })
       }
-      acceptOpenWager.staticCall = () => Promise.resolve()
+      acceptOpenWager.staticCall = () =>
+        state.staticCallReject
+          ? Promise.reject(Object.assign(new Error(state.staticCallReject), { reason: state.staticCallReject }))
+          : Promise.resolve()
       return {
         interface: { encodeFunctionData: vi.fn(() => '0xacceptcalldata') },
         openWagerIdForClaim: () => state.throwLookup
@@ -104,6 +107,7 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     state.allowance = 0n
     state.balance = 100_000_000n
     state.acceptArgs = null
+    state.staticCallReject = null
     wallet.signer = {
       getAddress: () => Promise.resolve(ACCOUNT),
       provider: { getNetwork: () => Promise.resolve({ chainId: 63n }) },
@@ -171,6 +175,39 @@ describe('useOpenChallengeAccept.accept (funding flow)', () => {
     expect(wallet.sendCalls.mock.calls[0][0]).toHaveLength(2) // approve + accept
     expect(calls).toEqual([]) // no direct signer contract write path used
     expect(steps).toEqual(expect.arrayContaining(['check', 'approve', 'sign', 'accept']))
+  })
+
+  it('does not let the isolated pre-flight block a passkey taker on a not-yet-granted allowance', async () => {
+    // Same deadlock as create: a fresh passkey taker has 0 allowance and the approve is batched
+    // with accept, so the isolated pre-flight staticCall reverts on the allowance. It must not be
+    // fatal, or the taker can never accept their first challenge.
+    wallet.loginMethod = 'passkey'
+    state.allowance = 0n
+    state.staticCallReject = 'ERC20: transfer amount exceeds allowance'
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let res
+    await act(async () => {
+      res = await result.current.accept('river tiger kite zoo', 4n)
+    })
+    expect(res.txHash).toBe('0xpasskeytx')
+    expect(wallet.sendCalls).toHaveBeenCalledTimes(1)
+    expect(wallet.sendCalls.mock.calls[0][0]).toHaveLength(2) // approve + accept still submitted
+  })
+
+  it('still surfaces a real pre-flight revert (e.g. expired challenge) before sending', async () => {
+    // The pre-flight staticCall lives on the passkey/sendCalls branch; the EOA path pre-flights
+    // inside its own gasless seam.
+    wallet.loginMethod = 'passkey'
+    state.allowance = 0n
+    state.staticCallReject = 'AcceptExpired()'
+    const { result } = renderHook(() => useOpenChallengeAccept())
+    let err
+    await act(async () => {
+      try { await result.current.accept('river tiger kite zoo', 4n) } catch (e) { err = e }
+    })
+    expect(err?.message).toMatch(/expired/i)
+    expect(calls).toEqual([])
+    expect(wallet.sendCalls).not.toHaveBeenCalled()
   })
 })
 

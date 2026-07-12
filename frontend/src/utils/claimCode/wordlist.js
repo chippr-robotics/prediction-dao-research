@@ -44,6 +44,49 @@ export function isValidCode(input) {
 }
 
 /**
+ * @param {string} word
+ * @returns {boolean} true iff `word` normalizes to a single word in the BIP-39 English list.
+ * Used for the per-word validity feedback in the phrase entry inputs.
+ */
+export function isValidWord(word) {
+  if (typeof word !== 'string') return false
+  const w = word.normalize('NFKC').toLowerCase().trim()
+  if (!w || /\s/.test(w)) return false
+  return WORDLIST.getWordIndex(w) >= 0
+}
+
+// The full 2048-word list, materialized once for prefix suggestions (BIP-39 is sorted).
+let cachedWords = null
+function allWords() {
+  if (!cachedWords) {
+    cachedWords = new Array(LIST_SIZE)
+    for (let i = 0; i < LIST_SIZE; i += 1) cachedWords[i] = WORDLIST.getWord(i)
+  }
+  return cachedWords
+}
+
+/**
+ * Up to `limit` wordlist words that start with `prefix` (case-insensitive), in list order.
+ * An empty/whitespace prefix returns nothing (so we never dump the whole list). Powers the
+ * type-ahead completion in the phrase inputs so a word is corrected before all four are entered.
+ * @param {string} prefix
+ * @param {number} [limit=6]
+ * @returns {string[]}
+ */
+export function suggestWords(prefix, limit = 6) {
+  const p = typeof prefix === 'string' ? prefix.normalize('NFKC').toLowerCase().trim() : ''
+  if (!p) return []
+  const out = []
+  for (const w of allWords()) {
+    if (w.startsWith(p)) {
+      out.push(w)
+      if (out.length >= limit) break
+    }
+  }
+  return out
+}
+
+/**
  * Generate a fresh four-word claim code using the platform CSPRNG.
  * Uses rejection sampling on 16-bit reads to map uniformly onto the 2048-word list (no modulo bias).
  * @returns {string} e.g. "river amber tiger kite"

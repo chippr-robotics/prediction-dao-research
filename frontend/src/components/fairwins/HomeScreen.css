@@ -11,25 +11,6 @@
   padding: 1rem;
 }
 
-/* Connect prompt (disconnected) — the create view still renders; this gates the action. */
-.home-connect-cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.6rem 0.9rem;
-  border: 1px solid var(--border-color, #23303D);
-  border-radius: var(--radius-md, 12px);
-  background: var(--bg-secondary, #141C24);
-  color: var(--text-secondary, #AAB6C2);
-  font-size: 0.85rem;
-}
-
-.home-connect-btn {
-  flex: 0 0 auto;
-}
-
 .home-create {
   /* The inline create panel provides its own spacing; keep the hero centered. */
   display: flex;
@@ -46,12 +27,10 @@
   width: 100%;
 }
 
+/* Dock the ticker to the bottom of the view: the auto top-margin absorbs any
+   spare vertical space in the full-height flex column, so the crawler stays
+   pinned at the bottom instead of floating mid-screen (design feedback). */
 .home-ticker {
-  margin-top: 0.25rem;
-}
-
-@media (max-width: 480px) {
-  .home-actions {
-    grid-template-columns: 1fr;
-  }
+  margin-top: auto;
+  padding-top: 0.5rem;
 }

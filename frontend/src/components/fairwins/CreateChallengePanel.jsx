@@ -10,21 +10,13 @@ import QRScanner from '../ui/QRScanner'
 import AmountKeypad from '../ui/AmountKeypad'
 import PolymarketBrowser from './PolymarketBrowser'
 import ClaimCodeResultPanel from './ClaimCodeResultPanel'
-import DeadlineTimeline from './DeadlineTimeline'
-import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
+import { toDatetimeLocal, fromDatetimeLocal, HOUR_MS } from './wagerTimeline'
 import { deriveOracleChallengeTimeline } from '../../lib/openChallenge/oracleTimeline'
 import PillSelect from '../ui/PillSelect'
 import InfoTip from '../ui/InfoTip'
 import { EitherSideIcon, ThirdPartyIcon, OracleIcon } from './resolutionIcons'
 import './FriendMarketsModal.css'
 import './OpenChallengeModal.css'
-
-// Deadline bounds (unchanged from the previous slider-based timeline):
-// acceptance window caps at the open-challenge contract's MAX_ACCEPT_WINDOW
-// (30 days); the resolve window caps comfortably under the 180-day contract
-// resolve window.
-const ACCEPT_MAX_MS = 30 * DAY_MS
-const RESOLVE_MAX_GAP_MS = 90 * DAY_MS
 
 const BackIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -47,7 +39,21 @@ const BackIcon = () => (
  *   - initialMarket: a Polymarket market to pre-select on the oracle path (e.g. a ticker click),
  *     skipping the market-search step.
  */
-function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolutionType, initialMarket = null }) {
+function CreateChallengePanel({
+  embedded = false,
+  onClose,
+  onDone,
+  onOracleModeChange,
+  // Connection is injected by the host so the panel stays presentational (and testable
+  // without a WalletProvider). Defaults to connected: hosts that only mount it post-connect
+  // (e.g. the modal opened from the dashboard) need no wiring. The home screen passes the
+  // live state + a connect handler so tapping the primary button opens the connect panel as
+  // part of the create flow (spec 053 feedback), then continues to create once connected.
+  isConnected = true,
+  onConnect,
+  initialResolutionType,
+  initialMarket = null,
+}) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const { capabilities } = useChainTokens()
   // Oracle settlement is only offered where the Polymarket CTF is reachable and
@@ -74,17 +80,28 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
   const [step, setStep] = useState(() =>
     Number(initialResolutionType) === OPEN_RESOLUTION_TYPES.Polymarket && polymarketAvailable ? 'market' : 'form'
   )
-  // Deadlines (feature 024): the maker sets the accept/resolve windows for the
-  // self/arbitrator paths. Stored as datetime-local strings, unix seconds on submit.
-  const [acceptBy, setAcceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * HOUR_MS))
-  const [resolveBy, setResolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * HOUR_MS))
+  // Deadlines (feature 024): fixed sensible defaults for the self/arbitrator paths — 48h to take,
+  // then +7d to settle. No longer edited in the create view (spec 053: the slider timeline was
+  // dropped to stop the sheet scrolling). Converted to unix seconds on submit.
+  const [acceptBy] = useState(() => toDatetimeLocal(Date.now() + 48 * HOUR_MS))
+  const [resolveBy] = useState(() => toDatetimeLocal(Date.now() + (48 + 24 * 7) * HOUR_MS))
   const [nowMs] = useState(() => Date.now())
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [result, setResult] = useState(null)
+  // Set when the user taps the primary button while disconnected: we open the connect panel,
+  // then auto-continue the create once the wallet connects (see the effect below).
+  const [pendingSubmit, setPendingSubmit] = useState(false)
 
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const isOracle = Number(resolutionType) === OPEN_RESOLUTION_TYPES.Polymarket
+
+  // Let an embedding host react to the oracle path (the home screen hides its
+  // secondary actions while an oracle challenge is being composed — the market +
+  // side picker need the room and the goal is a no-scroll view).
+  useEffect(() => {
+    onOracleModeChange?.(isOracle)
+  }, [isOracle, onOracleModeChange])
   const arbitratorAddr = arbitratorResolved || arbitrator
   const arbitratorValid = !isThirdParty || isAddress(arbitratorAddr)
   const acceptMs = fromDatetimeLocal(acceptBy)
@@ -109,40 +126,9 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
       : (description.trim().length > 0 && arbitratorValid && deadlinesValid)
   )
 
-  // Milestones for the shared DeadlineTimeline control (self/arbitrator paths only).
-  const timelineMilestones = [
-    {
-      key: 'accept',
-      label: 'Open for acceptance until',
-      tileHead: 'Open until',
-      value: Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS,
-      min: nowMs + HOUR_MS,
-      max: nowMs + ACCEPT_MAX_MS,
-      editable: true,
-      hint: 'After this, the challenge can no longer be taken and your stake is refundable.',
-      segmentColor: 'var(--timeline-accept)',
-      dotClass: 'is-accept',
-      tileClass: 'is-accept',
-    },
-    {
-      key: 'resolve',
-      label: 'Must be resolved by',
-      tileHead: 'Resolve by',
-      value: Number.isFinite(resolveMs) ? resolveMs : (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + 7 * DAY_MS,
-      min: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + HOUR_MS,
-      max: (Number.isFinite(acceptMs) ? acceptMs : nowMs + 48 * HOUR_MS) + RESOLVE_MAX_GAP_MS,
-      editable: true,
-      hint: 'The outcome must be submitted before this time.',
-      segmentColor: 'var(--timeline-active)',
-      dotClass: 'is-resolve',
-      tileClass: 'is-resolve',
-    },
-  ]
-  const handleTimelineChange = (key, ms) => {
-    const str = toDatetimeLocal(ms)
-    if (key === 'accept') setAcceptBy(str)
-    else if (key === 'resolve') setResolveBy(str)
-  }
+  // The accept/resolve windows use sensible defaults (48h to take · +7d to settle) and are no
+  // longer editable in the create view (spec 053 feedback: drop the slider timeline to stop the
+  // sheet scrolling). The default state above still flows to the submit call as valid deadlines.
 
   const handleResolutionChange = (value) => {
     setResolutionType(value)
@@ -183,6 +169,18 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()
     setError(null)
+    // Not signed in yet? Open the connect panel as part of this flow, then let the effect
+    // below resume the create once the wallet connects. If the host gave us no connect
+    // handler we fall through and let the create hook surface its own "connect" error.
+    if (!isConnected && onConnect) {
+      setPendingSubmit(true)
+      try {
+        await onConnect()
+      } catch {
+        setPendingSubmit(false)
+      }
+      return
+    }
     // Normalize the pad string (e.g. "10." → "10", "10.50" → "10.5").
     const cleanStake = Number(stake) > 0 ? String(Number(stake)) : stake
     try {
@@ -222,7 +220,15 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
     } finally {
       setProgress(null)
     }
-  }, [isOracle, composedDescription, stake, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isConnected, onConnect, isOracle, composedDescription, stake, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume a create that was waiting on the wallet: the moment the connection lands, continue.
+  useEffect(() => {
+    if (pendingSubmit && isConnected) {
+      setPendingSubmit(false)
+      handleCreate()
+    }
+  }, [pendingSubmit, isConnected, handleCreate])
 
   if (result) {
     return (
@@ -281,6 +287,33 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
           disabled={busy}
           ariaLabel="Stake amount, each side"
           id="oc-stake"
+        />
+      </div>
+
+      {/* Resolution selector — minimal icons, compact and inline right under the number pad
+          (spec 053 feedback). Short labels keep the three options on as few rows as possible. */}
+      <div className="fm-form-group fm-form-full fm-pay-resolution">
+        <PillSelect
+          label={<>How is it resolved? <span className="fm-required">*</span></>}
+          info={(
+            <InfoTip label="About: How is it resolved?">
+              Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
+            </InfoTip>
+          )}
+          options={[
+            { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side', icon: <EitherSideIcon /> },
+            { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'Arbitrator', icon: <ThirdPartyIcon /> },
+            {
+              value: String(OPEN_RESOLUTION_TYPES.Polymarket),
+              label: 'Oracle',
+              icon: <OracleIcon />,
+              disabled: !polymarketAvailable,
+              disabledReason: 'Requires a Polymarket-enabled network. Switch networks to settle from a market.',
+            },
+          ]}
+          value={resolutionType}
+          onChange={handleResolutionChange}
+          disabled={busy}
         />
       </div>
 
@@ -368,77 +401,29 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
         </div>
       )}
 
-      {/* Remaining controls grouped as compact "details" below the hero. */}
-      <div className="fm-pay-details">
-        <div className="fm-form-group fm-form-full">
-          <PillSelect
-            label={<>How is it resolved? <span className="fm-required">*</span></>}
-            info={(
-              <InfoTip label="About: How is it resolved?">
-                Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
-              </InfoTip>
-            )}
-            options={[
-              { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side submits the outcome', icon: <EitherSideIcon /> },
-              { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'A named third-party arbitrator decides', icon: <ThirdPartyIcon /> },
-              {
-                value: String(OPEN_RESOLUTION_TYPES.Polymarket),
-                label: 'An oracle settles it (Polymarket)',
-                icon: <OracleIcon />,
-                disabled: !polymarketAvailable,
-                disabledReason: 'Requires a Polymarket-enabled network. Switch networks to settle from a market.',
-              },
-            ]}
-            value={resolutionType}
-            onChange={handleResolutionChange}
-            disabled={busy}
-          />
-        </div>
+      {/* Arbitrator entry only when the third-party path is chosen. */}
+      {isThirdParty && (
+        <ArbitratorField
+          value={arbitrator}
+          onChange={setArbitrator}
+          onResolvedChange={setArbitratorResolved}
+          disabled={busy}
+        />
+      )}
 
-        {isThirdParty && (
-          <ArbitratorField
-            value={arbitrator}
-            onChange={setArbitrator}
-            onResolvedChange={setArbitratorResolved}
-            disabled={busy}
-          />
-        )}
-
-        {isOracle ? (
-          market && oracleTimeline?.eligible && (
-            <p className="fm-hint">
-              Takeable until the market closes (up to 30 days) · settles when Polymarket resolves it.
-            </p>
-          )
-        ) : (
-          <>
-            {/* Time constraints: the shared deadline timeline — drag a dot to pick each
-                time, or tap a tile to open the exact date & time modal. */}
-            <DeadlineTimeline
-              milestones={timelineMilestones}
-              onChange={handleTimelineChange}
-              disabled={busy}
-              idPrefix="oc"
-              summary={deadlinesValid
-                ? `Open ${formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · ` +
-                  `then up to ${formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle`
-                : null}
-            />
-            {!deadlinesValid && (acceptBy || resolveBy) && (
-              <p className="fm-hint oc-deadline-warn" role="alert">
-                Pick an acceptance time in the future and a resolve time after it.
-              </p>
-            )}
-          </>
-        )}
-      </div>
+      {/* Oracle timeline is set by the event, not edited here — one compact line. */}
+      {isOracle && market && oracleTimeline?.eligible && (
+        <p className="fm-hint fm-pay-oracle-hint">
+          Takeable until the market closes (up to 30 days) · settles when Polymarket resolves it.
+        </p>
+      )}
 
       {progress && <p className="fm-hint" role="status">{progress.message}</p>}
       {error && <div className="fm-error-banner" role="alert">{error}</div>}
 
       <div className="fm-success-actions">
         <button type="submit" className="fm-btn-primary" disabled={!canCreate}>
-          {busy ? 'Creating…' : 'Create & generate code'}
+          {busy ? 'Opening…' : 'Open wager'}
         </button>
       </div>
     </form>

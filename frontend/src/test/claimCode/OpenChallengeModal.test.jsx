@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // Mock the create flow so the modal renders deterministically (no chain/IPFS).
 const createOpenChallenge = vi.fn()
@@ -37,7 +37,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
   it('Maker: gates create until description + stake, then shows the generated code + a scannable QR', async () => {
     createOpenChallenge.mockResolvedValue({ code: 'river tiger kite zoo', wagerId: 9n, txHash: '0xabc' })
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const createBtn = screen.getByRole('button', { name: /create & generate code/i })
+    const createBtn = screen.getByRole('button', { name: /open wager/i })
     expect(createBtn).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     // Description alone isn't enough — a positive stake is still required (FR-016).
@@ -63,7 +63,7 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open wager/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     const form = createOpenChallenge.mock.calls[0][0]
     expect(typeof form.acceptDeadline).toBe('number')
@@ -72,44 +72,11 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     expect(form.acceptDeadline).toBeGreaterThan(Math.floor(Date.now() / 1000))
   })
 
-  it('Maker: deadlines use the shared timeline element — draggable dots plus tap-to-set modal', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    const acceptDot = screen.getByRole('slider', { name: /open for acceptance until/i })
-    const resolveDot = screen.getByRole('slider', { name: /must be resolved by/i })
-    expect(acceptDot).toBeInTheDocument()
-    expect(resolveDot).toBeInTheDocument()
-    // No native picker field or "type a date" link anywhere in the form (FR-005).
-    expect(document.querySelector('input[type="datetime-local"]')).toBeNull()
-    expect(screen.queryByText(/tap to type a date/i)).toBeNull()
-
-    // Stepping the accept dot's keyboard control drags the resolve deadline
-    // with it, keeping the original gap (legacy slider behavior, preserved).
-    const before = resolveDot.getAttribute('aria-valuenow')
-    fireEvent.keyDown(acceptDot, { key: 'ArrowRight', shiftKey: true })
-    expect(Number(resolveDot.getAttribute('aria-valuenow'))).toBe(Number(before) + 60 * 60 * 1000)
-
-    // Tapping a tile opens the shared set-time modal, not an inline input.
-    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
-    expect(screen.getByRole('dialog', { name: /set date and time/i })).toBeInTheDocument()
-  })
-
-  it('Maker: the set-time modal rejects a resolve time outside the allowed range', () => {
-    render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
-    tapAmount('10')
-    const createBtn = screen.getByRole('button', { name: /create & generate code/i })
-    expect(createBtn).toBeEnabled()
-
-    // Tap the Resolve-by tile and try to type a time before the allowed window.
-    fireEvent.click(screen.getByRole('button', { name: /resolve by:/i }))
-    const dialog = screen.getByRole('dialog', { name: /set date and time/i })
-    const input = within(dialog).getByLabelText(/must be resolved by/i)
-    fireEvent.change(input, { target: { value: '2000-01-01T00:00' } })
-    expect(within(dialog).getByRole('alert')).toHaveTextContent(/pick a time between/i)
-    expect(within(dialog).getByRole('button', { name: 'Set' })).toBeDisabled()
-    // Out-of-range input never reaches form state, so create stays enabled.
-    expect(createBtn).toBeEnabled()
-  })
+  // The editable deadline timeline (draggable dots + tap-to-set modal) was removed
+  // in the round-4 home redesign to reach the no-scroll goal; deadlines now submit
+  // from fixed sensible defaults (still asserted by the "passes the chosen
+  // accept/resolve deadlines" test above). The former timeline UI tests were
+  // dropped along with the control.
 
   it('Maker: the stake is entered on the payments-style number pad (hero amount + USDC token, spec 052)', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
@@ -159,7 +126,7 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open wager/i }))
     await waitFor(() => expect(createOpenChallenge).toHaveBeenCalled())
     await screen.findByText('river tiger kite zoo')
 
