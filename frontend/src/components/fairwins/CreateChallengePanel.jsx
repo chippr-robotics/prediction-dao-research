@@ -295,11 +295,6 @@ function CreateChallengePanel({
       <div className="fm-form-group fm-form-full fm-pay-resolution">
         <PillSelect
           label={<>How is it resolved? <span className="fm-required">*</span></>}
-          info={(
-            <InfoTip label="About: How is it resolved?">
-              Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
-            </InfoTip>
-          )}
           options={[
             { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side', icon: <EitherSideIcon /> },
             { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'Arbitrator', icon: <ThirdPartyIcon /> },
