@@ -235,14 +235,22 @@ export async function detectTreasuryFunding() {
 }
 
 // Spec 043 (US3, FR-022a): encode a management action's calldata (to the governor) so it can be proposed as a
-// vault transaction when operating as a Safe. Bravo queue/execute take only the proposal id. Returns {to,data}.
+// vault transaction when operating as a Safe. Spec 041/050 reuses the same encoding for the passkey smart-account
+// rail (sendCalls). Bravo queue/execute take only the proposal id; Bravo `propose` carries the extra
+// `signatures` array (defaulted to empty strings, mirroring the signer `propose()` above). Returns {to,data}.
 export function encodeManagementAction(governor, action, args) {
   const iface = new ethers.Interface(BRAVO_WRITE_ABI)
   let data
   if (action === 'castVote') data = iface.encodeFunctionData('castVote', [args.proposalId, args.support])
   else if (action === 'queue') data = iface.encodeFunctionData('queue', [args.p.id])
   else if (action === 'execute') data = iface.encodeFunctionData('execute', [args.p.id])
-  else throw new Error(`Unsupported vault governance action: ${action}`)
+  else if (action === 'propose') {
+    const sigs =
+      Array.isArray(args.signatures) && args.signatures.length === args.targets.length
+        ? args.signatures
+        : args.targets.map(() => '')
+    data = iface.encodeFunctionData('propose', [args.targets, args.values, sigs, args.calldatas, args.description])
+  } else throw new Error(`Unsupported vault governance action: ${action}`)
   return { to: governor, data }
 }
 

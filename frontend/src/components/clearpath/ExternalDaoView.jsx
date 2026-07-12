@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
+import { useWallet } from '../../hooks/useWalletManagement'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from '../../abis/externalDAORegistry'
@@ -108,6 +109,10 @@ function CopyableId({ id }) {
 export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
   const { showNotification } = useNotification()
   const { screenOne } = useAddressScreening()
+  // Spec 041/050: a passkey smart-account session has no ethers signer — its writes go through `sendCalls`
+  // (one sponsored ERC-4337 UserOp) instead of `signer`. `loginMethod` picks the rail.
+  const { sendCalls, loginMethod } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   // Spec 043 (US3, FR-022a): acting on a DAO while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const net = getNetwork(chainId)
@@ -228,7 +233,8 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   // confirmed, so callers can gate success-only UI (e.g. the proposal builder must not reset/close on a reverted
   // propose — that would imply a success the chain didn't give).
   async function run(label, makeTx) {
-    if (!signer) {
+    // A passkey session has no `signer` but can still act via `sendCalls`; only block when neither rail exists.
+    if (!isPasskey && !signer) {
       showNotification('Connect a wallet to act on this DAO.', 'warning')
       return false
     }
@@ -283,6 +289,16 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       }
       const { to, data } = connector.encode(record.dao, action, encodeArgs)
       return submitAsActive({ to, value: 0n, data })
+    }
+    // Spec 041/050 passkey rail: reuse the connector's exact calldata encoding (castVote/queue/execute), then
+    // send it as one sponsored UserOp via `sendCalls` instead of the signer. `sendCalls` already awaits
+    // inclusion, so the returned `wait` is a no-op that keeps `run()`'s `tx.wait(...)` from crashing.
+    if (isPasskey) {
+      if (typeof connector.encode !== 'function') throw new Error('This DAO framework does not support passkey accounts yet.')
+      if (typeof sendCalls !== 'function') throw new Error('This wallet cannot act on the current transaction rail.')
+      const { to, data } = connector.encode(record.dao, action, encodeArgs)
+      const sent = await sendCalls([{ target: to, data, value: 0n }])
+      return { hash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId, wait: async () => {} }
     }
     return personalFn()
   }

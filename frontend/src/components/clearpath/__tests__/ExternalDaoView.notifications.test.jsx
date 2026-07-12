@@ -18,6 +18,11 @@ const h = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: h.showNotification }) }))
+// The view now reads sendCalls/loginMethod from useWallet (passkey rail); these tests drive the
+// classic signer-prop path, so return a non-passkey session.
+vi.mock('../../../hooks/useWalletManagement', () => ({
+  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
+}))
 vi.mock('../governorConnector', () => ({
   readGovernorSummary: (...a) => h.readGovernorSummary(...a),
   readTreasuries: (...a) => h.readTreasuries(...a),

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
+import { useWallet } from '../../hooks/useWalletManagement'
 import { ERC20_BALANCE_ABI } from '../../abis/externalDAORegistry'
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from './proposalEncoding'
 import CpAddressField from './CpAddressField'
@@ -16,6 +17,10 @@ const EXECUTE_TREASURY_SELECTOR = EXECUTE_TREASURY_IFACE.getFunction('executeTre
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—')
 
 export default function ProposalBuilder({ record, connector, signer, reader, account, usdcAddress, nativeSymbol, treasuries = [], fundingSources = [], proposals = [], run, busy, onSubmitted }) {
+  // Spec 041/050: a passkey smart-account session has no ethers signer — propose goes through `sendCalls`
+  // (one sponsored ERC-4337 UserOp) instead of `connector.propose(signer, ...)`. `loginMethod` picks the rail.
+  const { sendCalls, loginMethod } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -132,9 +137,20 @@ export default function ProposalBuilder({ record, connector, signer, reader, acc
     // Route through the DAO's own connector so the framework-correct propose() is used (OZ:
     // targets/values/calldatas/description; Bravo: adds the parallel `signatures` array). Only reset/close/reload
     // on a CONFIRMED tx — a reverted propose must not look like success (US5 #9).
-    run('Propose', () =>
-      connector.propose(signer, record.dao, { targets: A.targets, values: A.values, calldatas: A.calldatas, description: A.description })
-    ).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
+    const proposal = { targets: A.targets, values: A.values, calldatas: A.calldatas, description: A.description }
+    // Spec 041/050 passkey rail: `connector.encode` yields the SAME framework-correct propose calldata as the
+    // signer path (the connector owns the OZ vs Bravo signature), sent as one sponsored UserOp via `sendCalls`.
+    // `sendCalls` already awaits inclusion, so the returned `wait` is a no-op that keeps `run()`'s wait happy.
+    const makeTx = isPasskey
+      ? async () => {
+          if (typeof connector.encode !== 'function') throw new Error('This DAO framework does not support passkey accounts yet.')
+          if (typeof sendCalls !== 'function') throw new Error('This wallet cannot act on the current transaction rail.')
+          const { to, data } = connector.encode(record.dao, 'propose', proposal)
+          const sent = await sendCalls([{ target: to, data, value: 0n }])
+          return { hash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId, wait: async () => {} }
+        }
+      : () => connector.propose(signer, record.dao, proposal)
+    run('Propose', makeTx).then((ok) => { if (ok) { reset(); setOpen(false); onSubmitted?.() } })
   }
 
   // "Fund from treasury" is offered FIRST when the DAO has a governable (executor-gated) vault; the generic
@@ -224,7 +240,7 @@ ${dupId ? `proposalId: ${dupId}` : ''}`}
         </details>
 
         <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
-          {signer ? (
+          {(signer || isPasskey) ? (
             <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy || isDuplicate} aria-disabled={!valid || busy || isDuplicate} onClick={submit}>Submit proposal</button>
           ) : (
             <span className="cp-notice">Connect a wallet to propose.</span>

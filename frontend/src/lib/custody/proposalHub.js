@@ -29,6 +29,35 @@ export async function cancelProposal({ hubAddress, safe, safeTxHash, signer }) {
   return hub.cancel(getAddress(safe), safeTxHash)
 }
 
+/**
+ * Pure calldata for `hub.propose(...)` — a `{target,data,value}` call for the passkey rail (sendCalls).
+ * Byte-identical to what `emitProposal` sends, minus the signer/broadcast.
+ */
+export function emitProposalCall({ hubAddress, safe, safeTx, safeTxHash }) {
+  return {
+    target: getAddress(hubAddress),
+    data: hubIface.encodeFunctionData('propose', [
+      getAddress(safe),
+      safeTx.to,
+      safeTx.value,
+      safeTx.data,
+      safeTx.operation,
+      safeTx.nonce,
+      safeTxHash,
+    ]),
+    value: 0n,
+  }
+}
+
+/** Pure calldata for `hub.cancel(...)` — a `{target,data,value}` call for the passkey rail (sendCalls). */
+export function cancelProposalCall({ hubAddress, safe, safeTxHash }) {
+  return {
+    target: getAddress(hubAddress),
+    data: hubIface.encodeFunctionData('cancel', [getAddress(safe), safeTxHash]),
+    value: 0n,
+  }
+}
+
 /** Reconstruct a full SafeTx + metadata from decoded `Proposed` event args. Pure. */
 export function reconstructProposal(args) {
   const safeTx = buildSafeTx({
