@@ -78,11 +78,32 @@ Roles: `REGISTRY_CURATOR_ROLE`, `MODERATOR_ROLE`, `VERIFIER_ROLE`, plus the inhe
 | Address entry (`%tag` → owner + confirm) | `frontend/src/components/ui/AddressInput.jsx` |
 | Display-name priority | `frontend/src/hooks/useOpponentName.js` — **address book > wager tag > ENS > generated** |
 | Verification badge + abuse report | `AddressInput` preview + `frontend/src/components/tags/ReportTagButton.jsx` |
+| Operator admin (moderation/policy/roles/metrics) | `frontend/src/components/admin/TagRegistryAdmin.jsx` (AdminPanel → "Wager Tags" tab) + `frontend/src/hooks/useTagRegistryMetrics.js` |
 | Hand-maintained ABI | `frontend/src/abis/wagerTagRegistry.js` |
 
 Only an `ACTIVE` tag is committable in address entry; every other status surfaces an honest,
 non-committable message. FairWins runs no app backend, so abuse reports route to the operator
 moderation inbox via a pre-filled `mailto:` (no on-chain report path exists).
+
+## Operator admin
+
+The **Wager Tags** tab in the platform AdminPanel (`/admin`) is the operator console. The registry has
+its **own** AccessControl (separate from the main registry), so the tab reads `hasRole` directly from the
+tag contract and gates each control on the caller's role there:
+
+- **Metrics** — registry-wide counts + current suspended/verified/reserved lists + a recent-activity feed,
+  derived from a bounded client-side event scan (`useTagRegistryMetrics`, reusing `getLogsRange`). There are
+  no on-chain counters and no subgraph, so the scan is a MAX_SPAN backward lookback with an explicit Refresh,
+  a TTL cache, and an honest "recent window only" banner when truncated. A future subgraph `Tag` entity is
+  the path to complete historical totals.
+- **Moderation** — look up a `%tag`, then `setSuspended` (MODERATOR), `setVerified` (VERIFIER), or
+  `setReserved` (CURATOR). None of these ever reassigns a tag or moves funds.
+- **Policy** (DEFAULT_ADMIN) — `setPolicyParams` within the on-chain bounds + `setMembershipGate`
+  (hard-floored at Gold).
+- **Roles** (DEFAULT_ADMIN) — grant/revoke CURATOR/MODERATOR/VERIFIER by address.
+
+All writes use the AdminPanel's plain-signer `runTx` (admin actions are not gasless). Until the registry is
+deployed and synced (`wagerTagRegistry` address in `contracts.js`), the tab shows a "not configured" notice.
 
 ## Gasless intents (three-way sync)
 
