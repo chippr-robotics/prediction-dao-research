@@ -97,6 +97,40 @@ export function useTransfer() {
     [stableGasless, passkeySponsored]
   )
 
+  // Whether a given portfolio asset is the connected network's configured stablecoin (the only token
+  // that has an EIP-3009 gasless rail). Compared by address on the connected chain.
+  const isNetworkStableAsset = useCallback(
+    (asset) => {
+      if (!asset || asset.kind === 'native' || !asset.address || !tokens.stableAddress) return false
+      return asset.address.toLowerCase() === tokens.stableAddress.toLowerCase()
+    },
+    [tokens.stableAddress]
+  )
+
+  /**
+   * Per-asset gasless quote for the flexible asset picker (drives the UI badge honestly, FR "gasless only
+   * on networks configured for it"). This reflects the asset's OWN network capability — independent of the
+   * currently-connected chain — so the badge is truthful for every row in a cross-network portfolio: a
+   * passkey session is gasless where that network runs a sponsor paymaster (any asset); a classic wallet is
+   * gasless only for that network's stablecoin (EIP-3009) when a relayer is configured. (Actual routing at
+   * send time still requires being connected to the asset's chain; the form gates that with a switch.)
+   */
+  const quoteGaslessForAsset = useCallback(
+    (asset) => {
+      if (!asset) return false
+      const net = getNetwork(asset.chainId ?? chainId)
+      if (!net) return false
+      if (isPasskey) return Boolean(net.passkey?.sponsorPaymasterUrl)
+      const isStable =
+        asset.kind !== 'native' &&
+        asset.address &&
+        net.stablecoin?.address &&
+        asset.address.toLowerCase() === net.stablecoin.address.toLowerCase()
+      return Boolean(isStable && net.stablecoin?.domainVersion != null && hasRelayer)
+    },
+    [chainId, isPasskey, hasRelayer]
+  )
+
   const meta = useCallback(
     (kind) =>
       kind === TRANSFER_KIND.STABLE
@@ -152,29 +186,66 @@ export function useTransfer() {
    * Returns { txHash?, route } on success and records the attempt to the Activity log with truthful status.
    */
   const send = useCallback(
-    async ({ kind, to, amount }) => {
+    async ({ kind, asset, to, amount }) => {
       if (!signer && !isPasskey) throw new Error('Wallet not connected.')
       if (!ethers.isAddress(to)) throw new Error('Enter a valid recipient address.')
-      const m = meta(kind)
+
+      // Normalize either a legacy `kind` (native/stable) or an explicit portfolio `asset` descriptor into a
+      // single token shape the routing table below understands. Arbitrary ERC-20s from the portfolio picker
+      // are self-submit transfers on the connected chain; only the network stablecoin keeps the EIP-3009
+      // gasless rail. `recordKind` stays 'stable' ONLY for that token so the ledger values it at par — any
+      // other ERC-20 records as 'token' and is honestly left unvalued (transferLedgerSource).
+      const a = (() => {
+        if (asset) {
+          const isNative = asset.kind === 'native' || !asset.address
+          const isNetworkStable = isNetworkStableAsset(asset)
+          return {
+            isNative,
+            address: isNative ? null : asset.address,
+            symbol: asset.symbol,
+            name: asset.name || (isNetworkStable ? tokens.stableName : asset.symbol) || 'Token',
+            decimals: asset.decimals ?? (isNative ? tokens.nativeDecimals : 18),
+            isNetworkStable,
+            recordKind: isNative ? TRANSFER_KIND.NATIVE : isNetworkStable ? TRANSFER_KIND.STABLE : 'token',
+          }
+        }
+        const m = meta(kind)
+        const isNative = kind !== TRANSFER_KIND.STABLE
+        return {
+          isNative,
+          address: isNative ? null : m.address,
+          symbol: m.symbol,
+          name: m.name,
+          decimals: m.decimals,
+          isNetworkStable: !isNative,
+          recordKind: isNative ? TRANSFER_KIND.NATIVE : TRANSFER_KIND.STABLE,
+        }
+      })()
+
+      // A selected asset must live on the connected chain — the transfer is signed there. The UI gates this
+      // with a network switch, but guard here too so a stale selection can never sign against the wrong chain.
+      if (asset?.chainId != null && Number(asset.chainId) !== Number(chainId)) {
+        throw new Error(`Switch to this asset's network before sending.`)
+      }
+
       let value
       try {
-        value = ethers.parseUnits(String(amount), m.decimals)
+        value = ethers.parseUnits(String(amount), a.decimals)
       } catch {
         throw new Error('Enter a valid amount.')
       }
       if (value <= 0n) throw new Error('Enter an amount greater than zero.')
-      if (kind === TRANSFER_KIND.STABLE && !m.address) {
-        throw new Error(`No ${m.symbol || 'stablecoin'} is configured on this network.`)
+      if (!a.isNative && !a.address) {
+        throw new Error(`No ${a.symbol || 'token'} is configured on this network.`)
       }
 
       // Spec 043 (US3, FR-022): when operating as a vault, a transfer becomes a threshold-gated vault
       // proposal instead of an immediate send. It surfaces only in the vault queue (FR-022b) until executed.
       if (operatingAsVault) {
         if (!canActAsVault) throw new Error("Switch to the vault's network to send from it.")
-        const payload =
-          kind === TRANSFER_KIND.STABLE
-            ? { to: m.address, value: 0n, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]) }
-            : { to, value, data: '0x' }
+        const payload = a.isNative
+          ? { to, value, data: '0x' }
+          : { to: a.address, value: 0n, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]) }
         setError(null)
         setStatus('submitting')
         try {
@@ -191,16 +262,16 @@ export function useTransfer() {
         }
       }
 
-      const gasless = quoteGasless(kind)
+      const gasless = passkeySponsored || (a.isNetworkStable && stableDomainVersion != null && hasRelayer)
       const entry = recordTransfer(address, {
         chainId,
-        kind,
-        symbol: m.symbol,
-        decimals: m.decimals,
+        kind: a.recordKind,
+        symbol: a.symbol,
+        decimals: a.decimals,
         amount: String(amount),
         from: address,
         to,
-        route: gasless ? 'gasless' : kind === TRANSFER_KIND.STABLE ? 'self' : 'direct',
+        route: gasless ? 'gasless' : a.isNative ? 'direct' : 'self',
       })
       mirrorToLedger(address, entry)
 
@@ -211,11 +282,10 @@ export function useTransfer() {
         let route = entry.route
 
         if (isPasskey) {
-          // One ceremony via the smart-account batch. Native = value move; stable = ERC-20 transfer call.
-          const calls =
-            kind === TRANSFER_KIND.STABLE
-              ? [{ target: m.address, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]), value: 0n }]
-              : [{ target: to, data: '0x', value }]
+          // One ceremony via the smart-account batch. Native = value move; token = ERC-20 transfer call.
+          const calls = a.isNative
+            ? [{ target: to, data: '0x', value }]
+            : [{ target: a.address, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]), value: 0n }]
           setStatus('submitting')
           // Reflect the honest lifecycle while the batch is tracked to inclusion (spec 041 FR-017):
           // a passkey UserOp is "submitted" for up to ~90s before it is "included", so flip the button
@@ -253,12 +323,12 @@ export function useTransfer() {
           }
           // Included: use the REAL on-chain transaction hash only.
           txHash = res?.txHash ?? null
-        } else if (kind === TRANSFER_KIND.STABLE && stableDomainVersion != null && hasRelayer) {
+        } else if (!a.isNative && a.isNetworkStable && stableDomainVersion != null && hasRelayer) {
           // Classic EOA, gasless: sign an EIP-3009 authorization; a relayer submits + pays gas.
           const auth = await signTransferAuthorization({
             signer,
-            token: m.address,
-            tokenName: m.name || 'USD Coin',
+            token: a.address,
+            tokenName: a.name || 'USD Coin',
             tokenVersion: stableDomainVersion,
             chainId,
             to,
@@ -266,22 +336,23 @@ export function useTransfer() {
           })
           setStatus('submitting')
           try {
-            const relayed = await relayGaslessTransfer(getTransferRelayer(), auth, { token: m.address, chainId })
+            const relayed = await relayGaslessTransfer(getTransferRelayer(), auth, { token: a.address, chainId })
             txHash = relayed.txHash
             route = 'gasless'
           } catch (relayErr) {
             // Never stranded: fall back to a self-submitted transfer (sender pays gas).
             console.warn('[useTransfer] relayer failed, self-submitting:', relayErr?.message)
-            const erc20 = new ethers.Contract(m.address, TRANSFER_ABI, signer)
+            const erc20 = new ethers.Contract(a.address, TRANSFER_ABI, signer)
             const tx = await erc20.transfer(to, value)
             const receipt = await tx.wait()
             txHash = receipt?.hash ?? tx.hash
             route = 'self'
           }
-        } else if (kind === TRANSFER_KIND.STABLE) {
-          // Classic EOA, no gasless rail on this chain: plain ERC-20 transfer.
+        } else if (!a.isNative) {
+          // Classic EOA ERC-20 (network stablecoin without a rail, or any other portfolio token):
+          // a plain token transfer where the sender pays gas.
           setStatus('submitting')
-          const erc20 = new ethers.Contract(m.address, TRANSFER_ABI, signer)
+          const erc20 = new ethers.Contract(a.address, TRANSFER_ABI, signer)
           const tx = await erc20.transfer(to, value)
           const receipt = await tx.wait()
           txHash = receipt?.hash ?? tx.hash
@@ -311,7 +382,7 @@ export function useTransfer() {
         throw err
       }
     },
-    [signer, isPasskey, meta, quoteGasless, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, submitAsActive]
+    [signer, isPasskey, meta, isNetworkStableAsset, tokens.stableName, tokens.nativeDecimals, passkeySponsored, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, submitAsActive]
   )
 
   return useMemo(
@@ -322,6 +393,7 @@ export function useTransfer() {
       send,
       reset,
       quoteGasless,
+      quoteGaslessForAsset,
       meta,
       balanceOf,
       refreshBalances,
@@ -330,7 +402,7 @@ export function useTransfer() {
       tokens,
       isPasskey,
     }),
-    [status, error, lastResult, send, reset, quoteGasless, meta, balanceOf, refreshBalances, nativeBalance, stableBalance, tokens, isPasskey]
+    [status, error, lastResult, send, reset, quoteGasless, quoteGaslessForAsset, meta, balanceOf, refreshBalances, nativeBalance, stableBalance, tokens, isPasskey]
   )
 }
 
