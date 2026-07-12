@@ -50,15 +50,17 @@ function Glyph({ spec }) {
       )
     case 'poly':
       return (
-        <path
-          d="M21.5 12.7l-3.4-2a1.6 1.6 0 0 0-1.6 0l-3.9 2.3-2.6 1.5-3.9 2.2a1.6 1.6 0 0 0-1.6 0l-3 1.8"
-          transform="translate(6.2 5.5) scale(0.82)"
-          fill="none"
-          stroke={spec.fg}
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <g fill="none" stroke={spec.fg} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 12 L9 20 M16 12 L16 20 M23 12 L23 20" />
+          <path d="M9 12 L13 9 L16 12 L19 9 L23 12" />
+          <path d="M9 20 L13 23 L16 20 L19 23 L23 20" />
+          <g fill={spec.fg} stroke="none">
+            <circle cx="9" cy="12" r="1.3" />
+            <circle cx="23" cy="12" r="1.3" />
+            <circle cx="9" cy="20" r="1.3" />
+            <circle cx="23" cy="20" r="1.3" />
+          </g>
+        </g>
       )
     case 'hex':
       return (
