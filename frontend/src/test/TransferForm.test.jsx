@@ -34,15 +34,22 @@ vi.mock('wagmi', () => ({
 vi.mock('../hooks/useWalletManagement', () => ({
   useWallet: () => ({ address: '0xAaAa000000000000000000000000000000000001', chainId: 137 }),
 }))
+const VAULT_ADDR = '0xVaULt000000000000000000000000000000dEaD'
+let isVaultMode = false
+let vaultList = []
+let vaultHoldings = []
+const operateAsVault = vi.fn()
+const operateAsPersonal = vi.fn()
 vi.mock('../hooks/useActiveAccount', () => ({
   useActiveAccount: () => ({
-    identity: { mode: 'personal' },
-    isVault: false,
-    operateAsPersonal: vi.fn(),
-    operateAsVault: vi.fn(),
+    identity: isVaultMode ? { mode: 'vault', vaultAddress: VAULT_ADDR, chainId: 137 } : { mode: 'personal' },
+    isVault: isVaultMode,
+    operateAsPersonal,
+    operateAsVault,
   }),
 }))
-vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: () => ({ vaults: [] }) }))
+vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: () => ({ vaults: vaultList }) }))
+vi.mock('../hooks/useAccountAssets', () => ({ useAccountAssets: () => ({ holdings: vaultHoldings, refresh: vi.fn() }) }))
 let holdings = []
 vi.mock('../hooks/usePortfolio', () => ({ default: () => ({ holdings, status: 'ready' }) }))
 vi.mock('../hooks/useAddressScreening', () => ({
@@ -76,7 +83,8 @@ import TransferForm from '../components/wallet/TransferForm'
 describe('TransferForm', () => {
   beforeEach(() => {
     send.mockClear(); showNotification.mockClear(); screenOne.mockClear(); switchChainAsync.mockClear()
-    holdings = []
+    operateAsVault.mockClear(); operateAsPersonal.mockClear()
+    holdings = []; isVaultMode = false; vaultList = []; vaultHoldings = []
   })
 
   it('defaults to the network stablecoin, shows a gasless badge, then previews + sends the asset descriptor', async () => {
@@ -132,6 +140,52 @@ describe('TransferForm', () => {
 
     await user.click(switchBtn)
     await waitFor(() => expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 1 }))
+  })
+
+  it('funds from a Protect vault: shows the vault balance, gates on it, and sends a proposal', async () => {
+    isVaultMode = true
+    vaultList = [{ address: VAULT_ADDR, chainId: 137, label: 'Ops Vault', isSafe: true }]
+    // The vault holds 50 USDC (vs the personal wallet's 100 balanceOf) — the form must use the vault's.
+    vaultHoldings = [
+      {
+        asset: { id: '0xtoken', chainId: 137, kind: 'erc20', symbol: 'USDC', name: 'USD Coin', decimals: 6, address: '0xtoken' },
+        balance: 50,
+        network: 'Polygon',
+      },
+    ]
+    send.mockResolvedValueOnce({ proposed: true, safeTxHash: '0xsafe', route: 'vault', id: null })
+    const user = userEvent.setup()
+    render(<TransferForm />)
+
+    // The From dropdown surfaces the vault and it is the active identity.
+    expect(screen.getByLabelText('Sending account')).toHaveTextContent('Ops Vault')
+    // Balance reflects the vault's holdings (50), not the connected wallet's (100 from balanceOf).
+    expect(screen.getByText(/Balance:/, { selector: '#pt-amount-hint' })).toHaveTextContent('50')
+
+    // Over-balance gating is live against the vault balance (50), so 60 is blocked.
+    await user.type(screen.getByLabelText('To'), '0xBbBb000000000000000000000000000000000002')
+    await user.type(screen.getByLabelText('Amount'), '60')
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+    expect(screen.getByText(/exceeds balance/i)).toBeInTheDocument()
+
+    // Within balance: preview → propose.
+    await user.clear(screen.getByLabelText('Amount'))
+    await user.type(screen.getByLabelText('Amount'), '20')
+    const preview = screen.getByRole('button', { name: 'Preview' })
+    await waitFor(() => expect(preview).toBeEnabled())
+    await user.click(preview)
+    expect(screen.getByText('Vault proposal')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Propose' }))
+
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+    expect(send).toHaveBeenCalledWith({
+      asset: expect.objectContaining({ symbol: 'USDC', chainId: 137 }),
+      to: '0xBbBb000000000000000000000000000000000002',
+      amount: '20',
+    })
+    const [message, type] = showNotification.mock.calls.at(-1)
+    expect(type).toBe('info')
+    expect(message).toMatch(/proposed sending/i)
   })
 
   it('reports a stalled (pending) passkey transfer honestly — info notice, not a "success"', async () => {

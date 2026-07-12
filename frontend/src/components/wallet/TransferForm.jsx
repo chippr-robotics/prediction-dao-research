@@ -10,6 +10,7 @@ import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
+import { useAccountAssets } from '../../hooks/useAccountAssets'
 import usePortfolio from '../../hooks/usePortfolio'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
@@ -35,6 +36,10 @@ export default function TransferForm({ onSent }) {
   const { identity, isVault, operateAsPersonal, operateAsVault } = useActiveAccount()
   const { vaults } = useCustodyVaults()
   const portfolio = usePortfolio()
+  // When operating as a vault, source the asset list + balances from the vault's own on-chain holdings
+  // (it lives on the connected chain and isn't part of the personal wallet's portfolio scan).
+  const vaultAddress = isVault && identity?.vaultAddress ? identity.vaultAddress : null
+  const vaultAssets = useAccountAssets(vaultAddress)
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
@@ -53,9 +58,17 @@ export default function TransferForm({ onSent }) {
 
   useEffect(() => { refreshBalances() }, [refreshBalances])
 
-  // Compose the asset dropdown: every held portfolio asset across networks, plus the connected chain's
-  // native + stablecoin (always present so the form is usable before the portfolio loads / at zero balance).
-  // Keyed by `${chainId}:${registryId}` so the synthesized defaults merge with their portfolio row.
+  const isConnectedStableAddr = useCallback(
+    (addr) => Boolean(addr && tokens.stableAddress && addr.toLowerCase() === tokens.stableAddress.toLowerCase()),
+    [tokens.stableAddress],
+  )
+
+  // Compose the asset dropdown. The connected chain's native + stablecoin are always present (so the form is
+  // usable before balances load / at zero balance); balances and the rest of the list come from the active
+  // funding source. Keyed by `${chainId}:${registryId}` so the synthesized defaults merge with their row.
+  //
+  // Personal → the whole cross-network portfolio (usePortfolio). Vault → the vault's own connected-chain
+  // holdings (useAccountAssets); a vault can only move funds on its own chain, so no cross-chain rows.
   const assetOptions = useMemo(() => {
     const byKey = new Map()
     const put = (opt) => byKey.set(opt.key, { ...(byKey.get(opt.key) || {}), ...opt })
@@ -70,7 +83,7 @@ export default function TransferForm({ onSent }) {
         name: tokens.nativeName,
         decimals: tokens.nativeDecimals,
         networkName: tokens.networkName,
-        balance: toNum(balanceOf(TRANSFER_KIND.NATIVE)),
+        balance: isVault ? null : toNum(balanceOf(TRANSFER_KIND.NATIVE)),
       })
     }
     if (tokens.stableAddress) {
@@ -83,12 +96,15 @@ export default function TransferForm({ onSent }) {
         name: tokens.stableName,
         decimals: tokens.stableDecimals,
         networkName: tokens.networkName,
-        balance: toNum(balanceOf(TRANSFER_KIND.STABLE)),
+        balance: isVault ? null : toNum(balanceOf(TRANSFER_KIND.STABLE)),
       })
     }
-    for (const h of portfolio.holdings || []) {
+
+    const source = isVault ? vaultAssets.holdings : portfolio.holdings
+    for (const h of source || []) {
       if (h.asset.kind !== 'native' && h.asset.kind !== 'erc20') continue // no NFTs in a value transfer
-      if (!(h.balance > 0)) continue
+      const keepZero = h.asset.kind === 'native' || isConnectedStableAddr(h.asset.address)
+      if (!(h.balance > 0) && !keepZero) continue
       put({
         key: `${Number(h.asset.chainId)}:${String(h.asset.id).toLowerCase()}`,
         chainId: Number(h.asset.chainId),
@@ -108,7 +124,7 @@ export default function TransferForm({ onSent }) {
       if (ac !== bc) return ac - bc
       return (b.balance ?? 0) - (a.balance ?? 0)
     })
-  }, [portfolio.holdings, tokens, connectedChainId, balanceOf])
+  }, [isVault, vaultAssets.holdings, portfolio.holdings, tokens, connectedChainId, balanceOf, isConnectedStableAddr])
 
   // Default to the connected chain's stablecoin, then its native coin, then whatever's first.
   const defaultKey = useMemo(() => {
@@ -149,6 +165,8 @@ export default function TransferForm({ onSent }) {
 
   const handleFromChange = useCallback(
     (account) => {
+      setPreviewing(false)
+      setFormError(null)
       if (account.kind === 'vault') {
         operateAsVault({ address: account.address, chainId: account.chainId, label: account.label })
       } else {
@@ -174,19 +192,20 @@ export default function TransferForm({ onSent }) {
     return Number.isFinite(n) && n > 0
   }, [amount])
 
-  // A vault send is a proposal validated by its signers later, so the connected wallet's balance doesn't gate it.
+  // Gate on the active funding source's balance (the vault's own holdings when operating as a vault, so a
+  // proposal is never drafted for more than the vault holds). A still-loading balance (null) doesn't gate.
   const overBalance = useMemo(() => {
-    if (isVault || bal == null || !amountValid) return false
+    if (bal == null || !amountValid) return false
     return Number(amount) > Number(bal)
-  }, [isVault, bal, amount, amountValid])
+  }, [bal, amount, amountValid])
 
   const canPreview =
     Boolean(selectedAsset) && onConnectedChain && Boolean(toResolved) && amountValid && !overBalance &&
     screening !== 'restricted' && !busy
 
   const handleMax = useCallback(() => {
-    if (!isVault && bal != null) setAmount(String(bal))
-  }, [isVault, bal])
+    if (bal != null) setAmount(String(bal))
+  }, [bal])
 
   const resetForm = useCallback(() => {
     setToRaw(''); setToResolved(''); setAmount(''); setPreviewing(false); setScreening(null); setFormError(null)
@@ -279,8 +298,8 @@ export default function TransferForm({ onSent }) {
             />
             {isVault && (
               <span className="pt-hint">
-                Sending from a vault creates a proposal for its signers to approve. Balances shown are your
-                connected wallet&apos;s.
+                Balances and assets are the vault&apos;s. Sending creates a proposal its signers must approve
+                before it executes.
               </span>
             )}
           </div>
