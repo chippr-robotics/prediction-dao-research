@@ -46,7 +46,7 @@ describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)'
     // Create the challenge.
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
     tapAmount('10')
-    fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open wager/i }))
     await screen.findByText('river tiger kite zoo')
 
     // The encrypted backup saves automatically — no button press (testing feedback).
