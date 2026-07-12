@@ -19,7 +19,8 @@
   border-radius: 0.4rem;
   max-height: 220px;
   overflow: auto;
-  background: var(--card-bg, #fff);
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  color: var(--text-primary, #1F2933);
 }
 
 .ab-picker-list li + li {
@@ -43,7 +44,7 @@
 
 .ab-picker-option:hover,
 .ab-picker-option:focus-visible {
-  background: var(--chip-bg, #f1f5f9);
+  background: var(--bg-primary, var(--chip-bg, #f1f5f9));
 }
 
 .ab-picker-nick {
@@ -75,8 +76,8 @@
   right: 0;
   z-index: 1100;
   width: min(320px, 80vw);
-  background: var(--card-bg, #fff);
-  color: inherit;
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  color: var(--text-primary, #1F2933);
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 0.5rem;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
@@ -97,6 +98,12 @@
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 0.375rem;
   font: inherit;
+  background: var(--bg-primary, var(--bg-secondary, #fff));
+  color: var(--text-primary, #1F2933);
+}
+
+.ab-book-search::placeholder {
+  color: var(--text-muted, #8A959E);
 }
 
 /* Inline screening notice under an address field. */
