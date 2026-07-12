@@ -31,7 +31,7 @@ const ADMIN_TAB_ICONS = {
   treasury: 'bank',
   'oracle-adapters': 'broadcast',
   'deny-list': 'ban',
-  'wager-tags': 'tag',
+  'wager-tags': 'ticket',
 }
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
