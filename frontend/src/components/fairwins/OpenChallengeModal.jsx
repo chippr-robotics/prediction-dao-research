@@ -16,7 +16,7 @@ const CloseIcon = () => (
  * on the home screen. Oracle settlement (spec 041/052) is a resolution path within that panel.
  * Taking a challenge moved to the unified phrase lookup (spec 037).
  */
-function OpenChallengeModal({ isOpen, onClose, initialResolutionType }) {
+function OpenChallengeModal({ isOpen, onClose, initialResolutionType, initialMarket }) {
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -55,7 +55,7 @@ function OpenChallengeModal({ isOpen, onClose, initialResolutionType }) {
         <div className="fm-content">
           <div className="fm-panel">
             {/* Taking a challenge moved to the unified phrase lookup (spec 037). */}
-            <CreateChallengePanel onClose={onClose} onDone={onClose} initialResolutionType={initialResolutionType} />
+            <CreateChallengePanel onClose={onClose} onDone={onClose} initialResolutionType={initialResolutionType} initialMarket={initialMarket} />
           </div>
         </div>
       </div>

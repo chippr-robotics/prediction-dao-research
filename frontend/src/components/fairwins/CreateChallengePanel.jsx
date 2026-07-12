@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { isAddress } from 'ethers'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useWeb3 } from '../../hooks/useWeb3'
@@ -44,8 +44,10 @@ const BackIcon = () => (
  *   - onClose: dismiss (modal mode).
  *   - onDone: called after a successful create (defaults to onClose).
  *   - initialResolutionType: preselect a resolution path (e.g. oracle from the ticker).
+ *   - initialMarket: a Polymarket market to pre-select on the oracle path (e.g. a ticker click),
+ *     skipping the market-search step.
  */
-function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolutionType }) {
+function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolutionType, initialMarket = null }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const { capabilities } = useChainTokens()
   // Oracle settlement is only offered where the Polymarket CTF is reachable and
@@ -166,6 +168,17 @@ function CreateChallengePanel({ embedded = false, onClose, onDone, initialResolu
     // Backing out of the initial oracle pick (no market chosen) reverts to self-resolution.
     if (!market) setResolutionType(String(OPEN_RESOLUTION_TYPES.Either))
   }, [market])
+
+  // Pre-select a market handed in from the ticker crawler (main #877): open the oracle path
+  // with it already chosen, skipping the market-search step. Seed once, and only while the
+  // picker is still empty, so re-picks and the Change affordance aren't clobbered.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (seededRef.current || !initialMarket || !polymarketAvailable) return
+    seededRef.current = true
+    setResolutionType(String(OPEN_RESOLUTION_TYPES.Polymarket))
+    handleSelectMarket(initialMarket)
+  }, [initialMarket, polymarketAvailable, handleSelectMarket])
 
   const handleCreate = useCallback(async (e) => {
     e?.preventDefault?.()

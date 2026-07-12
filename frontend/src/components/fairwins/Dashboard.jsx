@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
@@ -69,6 +70,12 @@ function QuickActionCard({ action, onAction }) {
 
 function QuickActions({ onAction, actionNeededCount = 0 }) {
   const navigate = useNavigate()
+  // Oracle features (Open Oracle Challenge + the Polymarket ticker) only make
+  // sense on chains with an on-chain oracle. On chains without one, hide the
+  // Open Oracle Challenge card entirely (the plain Open Challenge stays) — the
+  // ticker self-hides on the same capability.
+  const { capabilities } = useChainTokens()
+  const oracleAvailable = Boolean(capabilities?.polymarketSidebets)
   // Quick access card visibility (spec 038 US5) — re-render when the
   // Preferences panel changes it, even from a different mounted instance.
   const [, forceRender] = useState(0)
@@ -253,7 +260,15 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
 
   // Filter by the user's quick access card preference (spec 038 US5); a
   // group header only renders when it still has a visible card under it.
-  const visibleCreateActions = createActions.filter((a) => isCardVisible(a.id))
+  // Networks without an on-chain oracle can't settle from Polymarket, so the
+  // oracle-open-challenge card is hidden there and the plain Open Challenge
+  // takes its place as the default create-challenge entry point (even though it
+  // is otherwise default-hidden).
+  const visibleCreateActions = createActions.filter((a) => {
+    if (a.id === 'oracle-open-challenge') return isCardVisible(a.id) && oracleAvailable
+    if (a.id === 'open-challenge') return isCardVisible(a.id) || !oracleAvailable
+    return isCardVisible(a.id)
+  })
   const visibleUtilityActions = utilityActions.filter((a) => isCardVisible(a.id))
 
   if (visibleCreateActions.length === 0 && visibleUtilityActions.length === 0) {
@@ -484,9 +499,12 @@ function Dashboard() {
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
-  // Oracle settlement is now a resolution path inside Open Challenge (spec 052);
+  // Oracle settlement is now a resolution path inside Open Challenge (spec 052/053);
   // this preselects it when the sheet is opened from a Polymarket entry point.
   const [openChallengeOracle, setOpenChallengeOracle] = useState(false)
+  // A Polymarket market pre-selected via the ticker crawler (main #877) — null when the
+  // flow is opened from the quick-action card and the picker starts empty.
+  const [oracleInitialMarket, setOracleInitialMarket] = useState(null)
   const [showGroupPool, setShowGroupPool] = useState(false)
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
@@ -559,7 +577,8 @@ function Dashboard() {
         setShowOpenChallenge(true)
         break
       case 'oracle-open-challenge':
-        // Consolidated (spec 052): opens the Open Challenge sheet on its oracle path.
+        // Consolidated (spec 052/053): opens the Open Challenge sheet on its oracle path.
+        setOracleInitialMarket(null)
         setOpenChallengeOracle(true)
         setShowOpenChallenge(true)
         break
@@ -585,8 +604,10 @@ function Dashboard() {
     }
   }, [navigate])
 
-  const handlePolymarketTickerClick = useCallback(() => {
-    // Open the consolidated sheet straight into its oracle (Polymarket) path.
+  const handlePolymarketTickerClick = useCallback((market) => {
+    // Open the consolidated sheet on its oracle (Polymarket) path, with the clicked
+    // market pre-selected (main #877).
+    setOracleInitialMarket(market || null)
     setOpenChallengeOracle(true)
     setShowOpenChallenge(true)
   }, [])
@@ -696,12 +717,14 @@ function Dashboard() {
       />
 
       {/* Open Challenge (feature 024) — create-only (taking moved to the unified phrase lookup, spec 037).
-          Oracle (Polymarket) settlement is a resolution path within it (spec 052). */}
+          Oracle (Polymarket) settlement is a resolution path within it (spec 052/053); a ticker pick
+          pre-selects that market (main #877). */}
       <OpenChallengeModal
         key={showOpenChallenge ? 'oc-open' : 'oc-closed'}
         isOpen={showOpenChallenge}
         initialResolutionType={openChallengeOracle ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
-        onClose={() => { setShowOpenChallenge(false); setOpenChallengeOracle(false) }}
+        initialMarket={oracleInitialMarket}
+        onClose={() => { setShowOpenChallenge(false); setOpenChallengeOracle(false); setOracleInitialMarket(null) }}
         onBuyMembership={() => {
           setShowOpenChallenge(false)
           showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })

@@ -32,6 +32,7 @@ function HomeScreen() {
   // Preselect the oracle path (from the ticker) and force-remount the panel so a fresh
   // create starts cleanly after a success or a ticker pick.
   const [oraclePreselect, setOraclePreselect] = useState(false)
+  const [oracleMarket, setOracleMarket] = useState(null)
   const [createKey, setCreateKey] = useState(0)
 
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
@@ -67,15 +68,18 @@ function HomeScreen() {
     setShowUnifiedLookup(true)
   }, [])
 
-  // Ticker pick → open the create view straight on its oracle (Polymarket) path.
-  const handleTicker = useCallback(() => {
+  // Ticker pick → open the create view straight on its oracle (Polymarket) path, with the
+  // clicked market pre-selected (main #877).
+  const handleTicker = useCallback((market) => {
     setOraclePreselect(true)
+    setOracleMarket(market || null)
     setCreateKey((k) => k + 1)
   }, [])
 
   // After a successful create, reset the inline panel for another challenge.
   const handleCreated = useCallback(() => {
     setOraclePreselect(false)
+    setOracleMarket(null)
     setCreateKey((k) => k + 1)
   }, [])
 
@@ -96,6 +100,7 @@ function HomeScreen() {
           key={createKey}
           embedded
           initialResolutionType={oraclePreselect ? OPEN_RESOLUTION_TYPES.Polymarket : undefined}
+          initialMarket={oracleMarket}
           onDone={handleCreated}
         />
       </section>
