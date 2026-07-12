@@ -40,8 +40,10 @@ is undeployed or unreachable.
   former owner) can re-register it.
 - **Repoint** (move a tag to a fresh wallet) — `requestRepoint` → `REPOINTING` for `repointDelay` →
   `finalizeRepoint` (permissionless after the delay) or `cancelRepoint`. During `REPOINTING` the tag is
-  **not usable for value**. Repointing is tier-exempt (a downgraded owner can still migrate), and
-  `finalizeRepoint` resets the lapse anchor so a fresh, un-membered wallet is not instantly reclaimable.
+  **not usable for value**. Requesting is tier-exempt (a downgraded owner isn't stranded), but
+  `finalizeRepoint` requires the **incoming** owner to be Gold-eligible before the tag moves (so a
+  non-member can't ring-repoint to reset the lapse anchor and hoard names — FR-021), re-stamps the lapse
+  anchor, and **clears the `verified` marker** so verification never rides along to a new owner.
 - **Lapse** — `reclaimLapsed(tagHash)` is permissionless but only succeeds when the owner's coverage is
   below Gold **and** `now > expiresAt + lapseGrace`. An active-but-downgraded membership keeps the tag
   `ACTIVE` until its term ends (honest, observable state — constitution III).

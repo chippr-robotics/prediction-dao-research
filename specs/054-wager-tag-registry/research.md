@@ -52,7 +52,11 @@ than `maxCommitmentAge` (24 h). Both steps have gasless `…WithSig` twins.
 **Rationale**: This is the industry-standard (ENS .eth registrar) answer to FR-006: the
 mempool observer sees only an opaque commitment, and by the time the reveal is visible the
 claimant's priority is already locked. The min age defeats same-block front-running; the max
-age stops commitment squatting.
+age stops commitment squatting. `commit` also refuses to overwrite an *unexpired* commitment
+(ENS pattern): the commitment bytes are public calldata, so allowing a free timestamp refresh
+would let anyone replay a victim's commitment to reset its age and grief the reveal
+(`CommitmentTooNew` forever). Re-commit is allowed only after the prior commitment expires
+(T048 hardening).
 
 **Alternatives considered**: First-come registration relying on the private relayer path
 (rejected: self-submit fallback is mandatory — the never-stranded rule — so the public
@@ -72,7 +76,11 @@ reports status `REPOINTING` during the delay and resolvers MUST refuse value-bea
 exactly the payout-redirect fraud the spec guards against, and the platform's passkey smart
 accounts already keep their address across credential recovery — repoint exists for wallet
 migration, which is a whole-identity move. One address keeps the reverse mapping unique and
-the mental model honest.
+the mental model honest. `finalizeRepoint` requires the **incoming** owner to be Gold-eligible
+(so migration lands on a real membership, not a lapse-evasion shell) and clears the `verified`
+marker (a verification is granted to a reviewed identity and MUST NOT ride along to a new owner —
+mirrors `changeTag`). Suspension deliberately persists across repoint so moderation can't be shed
+(T048 hardening).
 
 **Alternatives considered**: Separate owner/target fields (rejected: doubles the takeover
 surface, complicates reverse-resolution integrity FR-008); instant repoint or permanent
@@ -92,8 +100,14 @@ this gate only fires when a user *chooses* to register/change — no non-holder 
 Lapse-then-release is enforced lazily and from **observable state only**. The contract can
 read the current `getActiveTier(user, membershipRole)` and the membership's `expiresAt`, but
 NOT a historical "dropped below Gold" timestamp. So the reclaim condition is:
-`getActiveTier(owner, membershipRole) < minTier` AND `now > membership.expiresAt + lapseGrace`.
+`getActiveTier(owner, membershipRole) < minTier` AND `now > max(membership.expiresAt, registeredAt) + lapseGrace`.
 When that holds, anyone may call `reclaimLapsed(tag)`, releasing it into the 90-day quarantine.
+The grace anchor is `max(expiresAt, registeredAt)` rather than `expiresAt` alone so a freshly-migrated
+owner — whose per-address membership may report `expiresAt == 0` in the same block — isn't instantly
+reclaimable; the ownership `registeredAt` gives the honest floor. To keep this from becoming a
+hoarding loophole (a non-member ring-repointing to reset `registeredAt` every year), `finalizeRepoint`
+requires the **incoming** owner to be Gold-eligible before the tag moves and re-stamps `registeredAt`.
+So a name can only be re-anchored under a real, current Gold membership — never for free (T048 hardening).
 This means the practical lapse is **expiry** — a Gold membership expires (`getActiveTier` → None),
 and the 12-month grace runs from its `expiresAt`. An account that is admin-**downgraded** below
 Gold while its membership is still unexpired is *honored until `expiresAt`* (the member paid for

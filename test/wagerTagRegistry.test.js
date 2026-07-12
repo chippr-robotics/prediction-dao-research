@@ -214,22 +214,47 @@ describe("WagerTagRegistry — lifecycle & takeover protection (US4)", () => {
     await expect(reg.connect(gold).changeTag("changed2", SALT)).to.be.revertedWithCustomError(reg, "ChangeCooldownActive");
   });
 
-  it("repoint: REPOINTING during delay, cancellable, finalizable by anyone, reverse index moves", async () => {
-    const { reg, gold, target, other } = await fixture();
+  it("repoint: REPOINTING during delay, cancellable, finalizable by anyone once target is Gold; reverse index moves and verified is cleared", async () => {
+    const { reg, membership, admin, gold, target, other } = await fixture();
     await claim(reg, gold, "movable");
+    const h = ethers.keccak256(ethers.toUtf8Bytes("movable"));
+    // Verify the tag first so we can prove verification does NOT ride along to the new owner.
+    await reg.connect(admin).grantRole(await reg.VERIFIER_ROLE(), admin.address);
+    await reg.connect(admin).setVerified(h, true);
+
     await reg.connect(gold).requestRepoint(target.address);
     expect((await reg.resolve("movable")).status).to.equal(Status.REPOINTING);
     // cancel
     await reg.connect(gold).cancelRepoint();
     expect((await reg.resolve("movable")).status).to.equal(Status.ACTIVE);
-    // request again + finalize after delay by an unrelated caller
+    // request again
     await reg.connect(gold).requestRepoint(target.address);
     await time.increase(48 * 60 * 60 + 60);
-    const h = ethers.keccak256(ethers.toUtf8Bytes("movable"));
+
+    // Anti-hoarding: finalize cannot complete until the INCOMING owner is Gold-eligible (FR-021).
+    await expect(reg.connect(other).finalizeRepoint(h)).to.be.revertedWithCustomError(reg, "InsufficientMembershipTier");
+
+    // Target becomes Gold → finalize succeeds, permissionlessly.
+    await membership.connect(admin).grantMembership(target.address, WAGER_PARTICIPANT_ROLE, Tier.Gold, 365);
     await reg.connect(other).finalizeRepoint(h);
     expect(await reg.tagOf(target.address)).to.equal("movable");
     expect(await reg.tagOf(gold.address)).to.equal("");
-    expect((await reg.resolve("movable")).owner).to.equal(target.address);
+    const info = await reg.resolve("movable");
+    expect(info.owner).to.equal(target.address);
+    expect(info.verified).to.equal(false); // verification does not transfer with the tag
+  });
+
+  it("commit cannot be griefed: replaying an unexpired commitment reverts (reveal-DoS defense)", async () => {
+    const { reg, gold, other } = await fixture();
+    // Victim (gold) commits their tag.
+    const commitment = await reg.makeCommitment("victimco", gold.address, SALT);
+    await reg.connect(gold).commit(commitment);
+    // Attacker replays the SAME public commitment bytes to try to reset its age → must revert.
+    await expect(reg.connect(other).commit(commitment)).to.be.revertedWithCustomError(reg, "CommitmentPending");
+    // Victim can still reveal normally after the age window (grief failed).
+    await time.increase(120);
+    await reg.connect(gold).register("victimco", SALT);
+    expect(await reg.tagOf(gold.address)).to.equal("victimco");
   });
 
   it("reclaimLapsed only after Gold coverage ends past grace; honored through the grace window", async () => {

@@ -54,13 +54,13 @@ Keyed by `tagHash = keccak256(bytes(canonicalTag))`.
 | `REPOINTING` | `pendingOwner != 0` and `now < repointEffectiveAt`… and until finalized | ✗ ("address changing", FR-022) |
 | `QUARANTINED` | `now < quarantinedUntil[tagHash]` | ✗ ("tag no longer active", FR-019) |
 | `SUSPENDED` | `suspended == true` | ✗ (FR-026) |
-| `LAPSED_RECLAIMABLE` | `getActiveTier(owner, membershipRole) < minTier` AND `now > membership.expiresAt + lapseGrace`, not yet reclaimed. (Computed from observable state only: practical trigger is Gold **expiry**; an active-but-downgraded membership is honored until its `expiresAt`, then grace runs — research R5.) | ✗ for new value-bearing use; `reclaimLapsed` callable by anyone (FR-021) |
+| `LAPSED_RECLAIMABLE` | `getActiveTier(owner, membershipRole) < minTier` AND `now > max(membership.expiresAt, registeredAt) + lapseGrace`, not yet reclaimed. (Observable state only. The grace anchor is `max(expiresAt, registeredAt)`: an active-but-downgraded membership is honored until its `expiresAt`, then grace runs; the ownership `registeredAt` anchor covers the fresh-owner case where per-address membership has `expiresAt == 0`. Because `finalizeRepoint` requires the incoming owner to be Gold-eligible and re-stamps `registeredAt`, this cannot be abused to hoard a name across wallets without a real Gold membership — research R5, FR-021.) | ✗ for new value-bearing use; `reclaimLapsed` callable by anyone (FR-021) |
 
 ## State transitions
 
 ```
 (unregistered) --commit + register--> ACTIVE
-ACTIVE --requestRepoint--> REPOINTING --finalizeRepoint (after delay)--> ACTIVE (new owner addr)
+ACTIVE --requestRepoint--> REPOINTING --finalizeRepoint (after delay, new owner must be Gold; clears verified)--> ACTIVE (new owner addr)
                              |--cancelRepoint (owner)--> ACTIVE (unchanged)
 ACTIVE --release / change--> QUARANTINED --(quarantinePeriod elapses)--> (unregistered)
 ACTIVE --(membership lapse + grace elapses)--> LAPSED_RECLAIMABLE --reclaimLapsed--> QUARANTINED

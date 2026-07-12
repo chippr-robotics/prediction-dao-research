@@ -103,6 +103,7 @@ interface IWagerTagRegistry {
     error NoCommitment();
     error CommitmentTooNew();
     error CommitmentExpired();
+    error CommitmentPending();
     error ChangeCooldownActive(uint64 nextAllowedAt);
     error BadRepointTarget();
     error TargetHasTag();

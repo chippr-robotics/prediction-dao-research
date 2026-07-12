@@ -16,6 +16,14 @@ import {ISanctionsGuard} from "../interfaces/ISanctionsGuard.sol";
 ///         `__gap`; registered in `npm run check:storage-layout`. EthTrust-SL2 target: no fund custody;
 ///         highest-risk surfaces are the Gold-tier gate, commit–reveal anti-snipe, the delayed repoint
 ///         (payout-redirect defense), and moderation that can NEVER reassign a tag to a different owner.
+/// @dev    Security review (spec 054, T048) hardened two MEDIUM findings and is otherwise SL2-clean:
+///         (1) `finalizeRepoint` now requires the INCOMING owner to be Gold-eligible so a non-member can't
+///         ring-repoint to reset the lapse anchor and hoard names for free (FR-021); it also clears the
+///         `verified` marker so verification never rides along to a new owner. (2) `_commit` rejects
+///         re-committing an unexpired (public) commitment, closing a reveal-griefing DoS. All external
+///         calls to membership/sanctions are view (staticcall) → reentrancy-immune; access control is
+///         role-gated on every privileged entrypoint; the forward==reverse and single-owner/one-tag
+///         invariants hold across register/change/release/repoint/reclaim.
 contract WagerTagRegistry is IWagerTagRegistry, UUPSManaged, SignerIntentBase {
     // ---- Roles (least privilege — none can reassign a tag) ----
     bytes32 public constant REGISTRY_CURATOR_ROLE = keccak256("REGISTRY_CURATOR_ROLE");
@@ -97,7 +105,10 @@ contract WagerTagRegistry is IWagerTagRegistry, UUPSManaged, SignerIntentBase {
         address sanctionsGuard_,
         bytes32 membershipRole_
     ) external initializer {
-        if (admin_ == address(0) || membershipManager_ == address(0)) revert ZeroAddress();
+        // membershipRole_ zero would brick eligibility (everyone below Gold) — reject the misconfig.
+        if (admin_ == address(0) || membershipManager_ == address(0) || membershipRole_ == bytes32(0)) {
+            revert ZeroAddress();
+        }
         __UUPSManaged_init(admin_);
         __EIP712_init("FairWins WagerTagRegistry", "1"); // signer-attributed intents (spec 035)
 
@@ -146,7 +157,12 @@ contract WagerTagRegistry is IWagerTagRegistry, UUPSManaged, SignerIntentBase {
     }
 
     function _commit(bytes32 commitment) internal {
-        // Overwriting refreshes the timestamp; harmless (the commitment already binds tag+owner+salt).
+        // The commitment value is public calldata, so a free timestamp refresh would let ANYONE replay a
+        // victim's commitment to reset its age and grief their reveal (CommitmentTooNew forever). Reject
+        // re-committing a still-unexpired commitment — re-commit is allowed only once the prior one has
+        // expired (ENS anti-snipe pattern, research R3).
+        uint64 existing = commitments[commitment];
+        if (existing != 0 && block.timestamp <= uint256(existing) + maxCommitmentAge) revert CommitmentPending();
         commitments[commitment] = uint64(block.timestamp);
         emit TagCommitted(commitment, uint64(block.timestamp));
     }
@@ -212,15 +228,24 @@ contract WagerTagRegistry is IWagerTagRegistry, UUPSManaged, SignerIntentBase {
         if (to == address(0)) revert NoPendingRepoint();
         if (block.timestamp < r.repointEffectiveAt) revert RepointNotReady();
         if (tagHashOf[to] != bytes32(0)) revert TargetHasTag();
+        // The incoming owner must itself be an eligible (Gold+, unsanctioned) identity BEFORE the tag
+        // moves. Repointing is tier-exempt for the OUTGOING owner (a lapsed owner isn't stranded) but the
+        // destination must meet the standard — otherwise a non-member could repoint in a ring to reset the
+        // lapse anchor indefinitely and hoard premium names for free, defeating FR-021. Finalize stays
+        // permissionless; it simply cannot complete until `to` holds Gold.
+        _requireEligible(to);
 
         delete tagHashOf[from];
         r.owner = to;
         r.pendingOwner = address(0);
         r.repointEffectiveAt = 0;
-        // Reset the lapse-grace anchor: a migrated owner gets a full grace window to establish Gold
-        // at the new address (membership is per-address). Without this, repointing to a fresh wallet
-        // would flip the tag to LAPSED_RECLAIMABLE immediately — hostile to the migration use case.
+        // Fresh ownership anchor for the now-Gold destination (belt-and-suspenders alongside its own
+        // membership `expiresAt` in the grace calculation).
         r.registeredAt = uint64(block.timestamp);
+        // A verification marker is granted to a specific reviewed identity — it must NOT ride along to a
+        // different owner. Force re-verification after any owner change (mirrors changeTag, which also
+        // resets `verified`). Suspension deliberately persists so moderation can't be shed by repointing.
+        r.verified = false;
         tagHashOf[to] = tagHash;
         emit TagRepointFinalized(tagHash, from, to);
     }
