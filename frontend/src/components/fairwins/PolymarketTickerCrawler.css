@@ -1,9 +1,18 @@
+/* Polymarket ticker crawler. Colors are driven by the shared theme variables
+   (which flip with .theme-light / .theme-dark) so the row stays legible in both
+   modes — the earlier hard-coded near-white values were invisible on the light
+   porcelain background. */
+.pm-ticker-root {
+  position: relative;
+  width: 100%;
+}
+
 .pm-ticker {
   overflow: hidden;
   width: 100%;
   padding: 0.35rem 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
 }
@@ -15,7 +24,8 @@
 }
 
 .pm-ticker:hover .pm-ticker-track,
-.pm-ticker:focus-within .pm-ticker-track {
+.pm-ticker:focus-within .pm-ticker-track,
+.pm-ticker--paused .pm-ticker-track {
   animation-play-state: paused;
 }
 
@@ -32,7 +42,7 @@
 }
 
 .pm-ticker-label {
-  color: rgba(123, 220, 181, 0.75);
+  color: var(--brand-primary);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -40,9 +50,12 @@
 }
 
 .pm-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: transparent;
   border: none;
-  color: rgba(230, 237, 243, 0.72);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 0.82rem;
   padding: 0;
@@ -54,7 +67,86 @@
 
 .pm-ticker-item:hover,
 .pm-ticker-item:focus-visible {
-  color: rgba(230, 237, 243, 0.98);
+  color: var(--text-primary);
+}
+
+/* Group entries carry a count pill and don't select directly — no underline so
+   they read as "expand" rather than "pick". */
+.pm-ticker-item--group {
+  text-decoration: none;
+}
+
+.pm-ticker-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-full);
+  background: rgba(var(--brand-primary-rgb), 0.16);
+  color: var(--brand-primary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+/* Sub-market panel — a small card floating above the ticker row. */
+.pm-ticker-submarkets {
+  position: absolute;
+  bottom: 100%;
+  left: 0.5rem;
+  z-index: 20;
+  max-width: min(28rem, calc(100% - 1rem));
+  margin-bottom: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--surface-color);
+  box-shadow: var(--shadow-lg);
+}
+
+.pm-ticker-submarket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.pm-ticker-submarket {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  white-space: normal;
+}
+
+.pm-ticker-submarket:hover,
+.pm-ticker-submarket:focus-visible {
+  background: rgba(var(--brand-primary-rgb), 0.12);
+  color: var(--brand-primary);
+}
+
+/* The group title sits beneath the sub-market list (spec: "submarkets as a list
+   above the market title"). */
+.pm-ticker-submarkets-title {
+  margin: 0.4rem 0.15rem 0.1rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 @keyframes pm-ticker-crawl {

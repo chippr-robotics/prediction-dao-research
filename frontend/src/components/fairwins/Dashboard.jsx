@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
@@ -69,6 +70,12 @@ function QuickActionCard({ action, onAction }) {
 
 function QuickActions({ onAction, actionNeededCount = 0 }) {
   const navigate = useNavigate()
+  // Oracle features (Open Oracle Challenge + the Polymarket ticker) only make
+  // sense on chains with an on-chain oracle. On chains without one, hide the
+  // Open Oracle Challenge card entirely (the plain Open Challenge stays) — the
+  // ticker self-hides on the same capability.
+  const { capabilities } = useChainTokens()
+  const oracleAvailable = Boolean(capabilities?.polymarketSidebets)
   // Quick access card visibility (spec 038 US5) — re-render when the
   // Preferences panel changes it, even from a different mounted instance.
   const [, forceRender] = useState(0)
@@ -253,7 +260,15 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
 
   // Filter by the user's quick access card preference (spec 038 US5); a
   // group header only renders when it still has a visible card under it.
-  const visibleCreateActions = createActions.filter((a) => isCardVisible(a.id))
+  // Networks without an on-chain oracle can't settle from Polymarket, so the
+  // oracle-open-challenge card is hidden there and the plain Open Challenge
+  // takes its place as the default create-challenge entry point (even though it
+  // is otherwise default-hidden).
+  const visibleCreateActions = createActions.filter((a) => {
+    if (a.id === 'oracle-open-challenge') return isCardVisible(a.id) && oracleAvailable
+    if (a.id === 'open-challenge') return isCardVisible(a.id) || !oracleAvailable
+    return isCardVisible(a.id)
+  })
   const visibleUtilityActions = utilityActions.filter((a) => isCardVisible(a.id))
 
   if (visibleCreateActions.length === 0 && visibleUtilityActions.length === 0) {
@@ -485,6 +500,9 @@ function Dashboard() {
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
   const [showOracleOpenChallenge, setShowOracleOpenChallenge] = useState(false)
+  // A Polymarket market pre-selected via the ticker crawler (null when the flow
+  // is opened from the quick-action card and the picker starts empty).
+  const [oracleInitialMarket, setOracleInitialMarket] = useState(null)
   const [showGroupPool, setShowGroupPool] = useState(false)
   // Unified phrase lookup (spec 037): one entry point for taking a challenge or joining a pool.
   const [showUnifiedLookup, setShowUnifiedLookup] = useState(false)
@@ -556,6 +574,7 @@ function Dashboard() {
         setShowOpenChallenge(true)
         break
       case 'oracle-open-challenge':
+        setOracleInitialMarket(null)
         setShowOracleOpenChallenge(true)
         break
       case 'create-pool':
@@ -580,7 +599,8 @@ function Dashboard() {
     }
   }, [navigate])
 
-  const handlePolymarketTickerClick = useCallback(() => {
+  const handlePolymarketTickerClick = useCallback((market) => {
+    setOracleInitialMarket(market || null)
     setShowOracleOpenChallenge(true)
   }, [])
 
@@ -703,7 +723,11 @@ function Dashboard() {
       <OracleOpenChallengeModal
         key={showOracleOpenChallenge ? 'ooc-open' : 'ooc-closed'}
         isOpen={showOracleOpenChallenge}
-        onClose={() => setShowOracleOpenChallenge(false)}
+        initialMarket={oracleInitialMarket}
+        onClose={() => {
+          setShowOracleOpenChallenge(false)
+          setOracleInitialMarket(null)
+        }}
       />
 
       {/* Unified phrase lookup (spec 037) — one entry point: enter four words to take a challenge or join a pool. */}

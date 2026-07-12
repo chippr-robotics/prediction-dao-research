@@ -59,6 +59,24 @@ describe('OracleOpenChallengeModal (spec 041, US1)', () => {
     expect(screen.getByRole('button', { name: /create & generate code/i })).toBeDisabled()
   })
 
+  it('pre-selects a market handed in via initialMarket (ticker crawler entry), skipping the picker', () => {
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} initialMarket={eligibleMarket} />)
+    // The picker is bypassed: the selected-market summary + side picker show immediately.
+    expect(screen.queryByTestId('pm-browser')).toBeNull()
+    expect(screen.getByText('Will ETH flip BTC?')).toBeInTheDocument()
+    expect(screen.getByText(/your side of the bet/i)).toBeInTheDocument()
+    // Change goes back to the picker.
+    fireEvent.click(screen.getByRole('button', { name: /change/i }))
+    expect(screen.getByTestId('pm-browser')).toBeInTheDocument()
+  })
+
+  it('an ineligible (too-soon) initialMarket falls back to the picker with a reason', () => {
+    render(<OracleOpenChallengeModal isOpen onClose={() => {}} initialMarket={soonMarket} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/too soon/i)
+    expect(screen.getByTestId('pm-browser')).toBeInTheDocument()
+    expect(screen.queryByText(/your side of the bet/i)).toBeNull()
+  })
+
   it('shows a locked explanation (not a silent blank) on chains without Polymarket support (FR-004)', () => {
     capsHolder.capabilities = { polymarketSidebets: false }
     render(<OracleOpenChallengeModal isOpen onClose={() => {}} />)
