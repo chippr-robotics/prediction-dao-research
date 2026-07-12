@@ -29,9 +29,9 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **Purpose**: Scaffold the new shared control's files and export.
 
-- [ ] T001 [P] Create component skeleton `frontend/src/components/ui/AmountKeypad.jsx` — default-export function component with the prop signature from `specs/052-payments-style-wager-create/contracts/amount-keypad.md` (`value`, `onChange`, `prefix='$'`, `token`, `disabled`, `maxFractionDigits=2`, `id`, `ariaLabel`, `autoFocus`); render a placeholder for now.
-- [ ] T002 [P] Create stylesheet scaffold `frontend/src/components/ui/AmountKeypad.css` — empty rule blocks for hero, pad grid, and keys; import nothing (global CSS, consumes `theme.css` tokens).
-- [ ] T003 Export `AmountKeypad` from `frontend/src/components/ui/index.js` (depends on T001).
+- [X] T001 [P] Create component skeleton `frontend/src/components/ui/AmountKeypad.jsx` — default-export function component with the prop signature from `specs/052-payments-style-wager-create/contracts/amount-keypad.md` (`value`, `onChange`, `prefix='$'`, `token`, `disabled`, `maxFractionDigits=2`, `id`, `ariaLabel`, `autoFocus`); render a placeholder for now.
+- [X] T002 [P] Create stylesheet scaffold `frontend/src/components/ui/AmountKeypad.css` — empty rule blocks for hero, pad grid, and keys; import nothing (global CSS, consumes `theme.css` tokens).
+- [X] T003 Export `AmountKeypad` from `frontend/src/components/ui/index.js` (depends on T001).
 
 ---
 
@@ -41,14 +41,14 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **⚠️ CRITICAL**: No user-story surface work should be considered done until this phase is complete and its tests pass.
 
-- [ ] T004 [P] Write failing unit tests in `frontend/src/components/ui/__tests__/AmountKeypad.test.jsx` covering the contract: digit entry updates hero; single decimal only (2nd `.` no-op); precision capped at 2 fractional digits (3rd frac no-op); backspace removes right-most char and reaches zero-state `$0`; `onChange` emits the normalized string; keys are role-queryable buttons (`getByRole('button',{name:'7'})`, decimal, delete); `prefix`/`token` render; `disabled` blocks activation. Use the `vi.mock`/render conventions from `frontend/src/components/fairwins/__tests__/JoinPoolPanel.test.jsx`.
-- [ ] T005 Implement controlled amount-edit logic in `frontend/src/components/ui/AmountKeypad.jsx` — append digit, allow one decimal separator, cap fractional digits at `maxFractionDigits`, backspace-to-empty; emit normalized string via `onChange`; keep no independent canonical state (per data-model.md state transitions).
-- [ ] T006 Implement hero read-out in `frontend/src/components/ui/AmountKeypad.jsx` — render `prefix` + `value` + compact `token`; zero-state shows `$0` (de-emphasized) when value is `''`/`'0'`/`'0.00'`; ensure large values stay legible (clamp/scale).
-- [ ] T007 Implement the on-screen pad in `frontend/src/components/ui/AmountKeypad.jsx` — 3-column grid of `<button type="button">` keys (1-9, then decimal / 0 / backspace) wired to the edit logic.
-- [ ] T008 Implement hardware-keyboard input and `disabled` in `frontend/src/components/ui/AmountKeypad.jsx` — while focused, `0-9`/`.`/`Backspace` apply the same edits (pad stays visible); `disabled` blocks pad + key handling.
-- [ ] T009 Implement accessibility in `frontend/src/components/ui/AmountKeypad.jsx` — `aria-live="polite"` (or `role="status"`) amount read-out announcing `prefix+value+token`; `aria-label` on decimal (`"Decimal point"`) and backspace (`"Delete"`) keys; group `aria-label` from `ariaLabel`; honor `prefers-reduced-motion`.
-- [ ] T010 Style `frontend/src/components/ui/AmountKeypad.css` using `theme.css` tokens (`--bg-primary`/`--bg-secondary`, `--text-primary`/`--text-muted`, `--brand-primary`(+rgb), `--border-color`, `--danger-color`, `--radius-md`/`--radius-lg`/`--radius-full`, `--transition-fast`) — hero typography, pad grid, key press/focus states, zero-state emphasis; match `.fm-stake-input-wrapper` / `.fm-odds-presets` look; no new tokens (FR-014).
-- [ ] T011 Make T004 pass — run `npm run test:frontend -- AmountKeypad`, fix until green; confirm hero value always equals the string passed to `onChange` (SC-004).
+- [X] T004 [P] Write failing unit tests in `frontend/src/components/ui/__tests__/AmountKeypad.test.jsx` covering the contract: digit entry updates hero; single decimal only (2nd `.` no-op); precision capped at 2 fractional digits (3rd frac no-op); backspace removes right-most char and reaches zero-state `$0`; `onChange` emits the normalized string; keys are role-queryable buttons (`getByRole('button',{name:'7'})`, decimal, delete); `prefix`/`token` render; `disabled` blocks activation. Use the `vi.mock`/render conventions from `frontend/src/components/fairwins/__tests__/JoinPoolPanel.test.jsx`.
+- [X] T005 Implement controlled amount-edit logic in `frontend/src/components/ui/AmountKeypad.jsx` — append digit, allow one decimal separator, cap fractional digits at `maxFractionDigits`, backspace-to-empty; emit normalized string via `onChange`; keep no independent canonical state (per data-model.md state transitions).
+- [X] T006 Implement hero read-out in `frontend/src/components/ui/AmountKeypad.jsx` — render `prefix` + `value` + compact `token`; zero-state shows `$0` (de-emphasized) when value is `''`/`'0'`/`'0.00'`; ensure large values stay legible (clamp/scale).
+- [X] T007 Implement the on-screen pad in `frontend/src/components/ui/AmountKeypad.jsx` — 3-column grid of `<button type="button">` keys (1-9, then decimal / 0 / backspace) wired to the edit logic.
+- [X] T008 Implement hardware-keyboard input and `disabled` in `frontend/src/components/ui/AmountKeypad.jsx` — while focused, `0-9`/`.`/`Backspace` apply the same edits (pad stays visible); `disabled` blocks pad + key handling.
+- [X] T009 Implement accessibility in `frontend/src/components/ui/AmountKeypad.jsx` — `aria-live="polite"` (or `role="status"`) amount read-out announcing `prefix+value+token`; `aria-label` on decimal (`"Decimal point"`) and backspace (`"Delete"`) keys; group `aria-label` from `ariaLabel`; honor `prefers-reduced-motion`.
+- [X] T010 Style `frontend/src/components/ui/AmountKeypad.css` using `theme.css` tokens (`--bg-primary`/`--bg-secondary`, `--text-primary`/`--text-muted`, `--brand-primary`(+rgb), `--border-color`, `--danger-color`, `--radius-md`/`--radius-lg`/`--radius-full`, `--transition-fast`) — hero typography, pad grid, key press/focus states, zero-state emphasis; match `.fm-stake-input-wrapper` / `.fm-odds-presets` look; no new tokens (FR-014).
+- [X] T011 Make T004 pass — run `npm run test:frontend -- AmountKeypad`, fix until green; confirm hero value always equals the string passed to `onChange` (SC-004).
 
 **Checkpoint**: `AmountKeypad` is complete, unit-tested, and exported — surfaces can now adopt it.
 
