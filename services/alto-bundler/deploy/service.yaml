@@ -63,7 +63,15 @@ spec:
             - name: ALTO_ENTRYPOINTS
               value: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
             - name: ALTO_RPC_URL
-              value: "https://polygon-bor-rpc.publicnode.com"
+              # Switched off publicnode 2026-07-12: its free tier began 403-ing archive requests
+              # ("Archive requests require a personal token"), which broke ERC-4337 receipt
+              # resolution (eth_getLogs for UserOperationEvent) — ops mined but confirmations never
+              # surfaced, and the receipt-poll 403 flood degraded the send path (bundles stopped
+              # broadcasting; executor nonce froze). QuickNode's public Polygon endpoint serves
+              # archive getLogs without a token. Applied live via `gcloud run services update
+              # --container=alto --update-env-vars` (revision 00072). If broadcasts still stall on a
+              # gas spike, add an alto gas-price multiplier / move to a keyed archive RPC.
+              value: "https://rpc-mainnet.matic.quiknode.pro"
             - name: ALTO_SAFE_MODE
               value: "false"
             - name: ALTO_PORT
