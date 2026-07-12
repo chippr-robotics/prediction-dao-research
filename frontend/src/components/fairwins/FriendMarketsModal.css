@@ -489,6 +489,71 @@
   cursor: not-allowed;
 }
 
+/* ── Payments-style layout (spec 052) ───────────────────────────────────
+   Shared helpers so every wager-create sheet presents the same amount-first
+   hierarchy: an oversized amount hero, a demoted memo, then a compact details
+   region. Consumes existing tokens only. */
+.fm-pay-form {
+  gap: 1rem;
+}
+
+.fm-pay-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fm-pay-hero-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #7A8590);
+}
+
+/* Memo — the wager description, demoted below the amount like a Venmo note. */
+.fm-pay-memo .fm-pay-memo-input {
+  width: 100%;
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color, #23303D);
+  border-radius: 0;
+  padding: 0.5rem 0.25rem;
+  font-size: 0.95rem;
+  color: var(--text-primary, #E6EDF3);
+  transition: border-color 0.15s ease;
+}
+
+.fm-pay-memo .fm-pay-memo-input::placeholder {
+  color: var(--text-muted, #7A8590);
+}
+
+.fm-pay-memo .fm-pay-memo-input:focus {
+  outline: none;
+  border-bottom-color: var(--brand-primary, #36B37E);
+  box-shadow: none;
+}
+
+.fm-pay-memo > .fm-label-row {
+  justify-content: center;
+}
+
+/* Details region — the secondary controls (resolution, arbitrator, deadlines)
+   sit below the hero/memo, visually subordinate to the amount. */
+.fm-pay-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, #23303D);
+}
+
 /* Input with Action Button (QR Scan, Lookup) */
 .fm-input-with-action {
   display: flex;

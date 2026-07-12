@@ -5,6 +5,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
+import AmountKeypad from '../ui/AmountKeypad'
 import ClaimCodeResultPanel from './ClaimCodeResultPanel'
 import DeadlineTimeline from './DeadlineTimeline'
 import { toDatetimeLocal, fromDatetimeLocal, formatTimelineSpan, HOUR_MS, DAY_MS } from './wagerTimeline'
@@ -88,7 +89,10 @@ function OpenChallengeModal({ isOpen, onClose }) {
 function MakerPanel({ onClose }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
   const [description, setDescription] = useState('')
-  const [stake, setStake] = useState('10.00')
+  // Payments-style entry (spec 052): start from the zero state ($0) so the
+  // number pad drives entry, rather than pre-filling an amount the user would
+  // have to clear. Submission stays gated until a positive amount is entered.
+  const [stake, setStake] = useState('')
   const [resolutionType, setResolutionType] = useState(String(OPEN_RESOLUTION_TYPES.Either))
   const [arbitrator, setArbitrator] = useState('')
   const [arbitratorResolved, setArbitratorResolved] = useState('')
@@ -156,7 +160,9 @@ function MakerPanel({ onClose }) {
       const res = await createOpenChallenge(
         {
           description: description.trim(),
-          stake,
+          // Normalize the pad string (e.g. "10." → "10", "10.50" → "10.5") so the
+          // stake is a clean decimal for on-chain parsing.
+          stake: Number(stake) > 0 ? String(Number(stake)) : stake,
           resolutionType: Number(resolutionType),
           arbitrator: isThirdParty ? arbitratorAddr : undefined,
           acceptDeadline: Number.isFinite(acceptMs) ? Math.floor(acceptMs / 1000) : undefined,
@@ -183,8 +189,29 @@ function MakerPanel({ onClose }) {
   }
 
   return (
-    <form className="fm-form" onSubmit={handleCreate}>
-      <div className="fm-form-group fm-form-full">
+    <form className="fm-form fm-pay-form" onSubmit={handleCreate}>
+      {/* Payments-style hero (spec 052): the stake amount is the centerpiece,
+          entered with the on-screen number pad. Token is USDC-locked here. */}
+      <div className="fm-pay-hero">
+        <AmountKeypad
+          value={stake}
+          onChange={setStake}
+          prefix="$"
+          token="USDC"
+          disabled={busy}
+          ariaLabel="Stake amount, each side"
+          id="oc-stake"
+        />
+        <p className="fm-pay-hero-caption">
+          Stake — each side
+          <InfoTip label="About: Stake — each side">
+            Enter the amount in USD. Only USDC is supported for open challenges on this network.
+          </InfoTip>
+        </p>
+      </div>
+
+      {/* Wager description demoted to a Venmo/Cash-App-style memo below the amount. */}
+      <div className="fm-form-group fm-form-full fm-pay-memo">
         <span className="fm-label-row">
           <label htmlFor="oc-desc">What&apos;s the wager? <span className="fm-required">*</span></label>
           <InfoTip label="About: What's the wager?">
@@ -192,84 +219,59 @@ function MakerPanel({ onClose }) {
           </InfoTip>
         </span>
         <input
-          id="oc-desc" type="text" maxLength={200}
-          placeholder="e.g. I'm betting NO that it rains in Denver tomorrow"
+          id="oc-desc" type="text" maxLength={200} className="fm-pay-memo-input"
+          placeholder="Add a note — e.g. I'm betting NO that it rains in Denver tomorrow"
           value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy}
         />
       </div>
 
-      <div className="fm-form-group fm-form-full">
-        <span className="fm-label-row">
-          <label htmlFor="oc-stake">Stake — each side <span className="fm-required">*</span></label>
-          <InfoTip label="About: Stake — each side">
-            Enter the amount in USD. Only USDC is supported for open challenges on this network.
-          </InfoTip>
-        </span>
-        <div className="fm-stake-input-wrapper fm-stake-row">
-          <span className="fm-stake-prefix">$</span>
-          <input
-            id="oc-stake" type="number" inputMode="decimal" min="0" step="0.01"
-            placeholder="10.00" className="fm-stake-usd"
-            value={stake}
-            onChange={(e) => setStake(e.target.value)}
-            onBlur={() => {
-              const n = Number(stake)
-              if (stake !== '' && Number.isFinite(n) && n > 0) setStake(n.toFixed(2))
-            }}
+      {/* Remaining controls grouped as compact "details" below the hero + memo. */}
+      <div className="fm-pay-details">
+        <div className="fm-form-group fm-form-full">
+          <PillSelect
+            label={<>How is it resolved? <span className="fm-required">*</span></>}
+            info={(
+              <InfoTip label="About: How is it resolved?">
+                Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
+              </InfoTip>
+            )}
+            options={[
+              { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side submits the outcome' },
+              { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'A named third-party arbitrator decides' },
+            ]}
+            value={resolutionType}
+            onChange={setResolutionType}
             disabled={busy}
           />
-          {/* Stake token control is always interactive (spec 038 FR-011), even
-              though open challenges only support the chain stablecoin today. */}
-          <select id="oc-stake-token" aria-label="Stake Token" className="fm-token-select fm-stake-token-inline" disabled={busy} value="USDC" onChange={() => {}}>
-            <option value="USDC">💵 USDC</option>
-          </select>
         </div>
-      </div>
 
-      <div className="fm-form-group fm-form-full">
-        <PillSelect
-          label={<>How is it resolved? <span className="fm-required">*</span></>}
-          info={(
-            <InfoTip label="About: How is it resolved?">
-              Single-party self-resolution isn&apos;t available for open challenges — the taker is unknown when you post it.
-            </InfoTip>
-          )}
-          options={[
-            { value: String(OPEN_RESOLUTION_TYPES.Either), label: 'Either side submits the outcome' },
-            { value: String(OPEN_RESOLUTION_TYPES.ThirdParty), label: 'A named third-party arbitrator decides' },
-          ]}
-          value={resolutionType}
-          onChange={setResolutionType}
+        {isThirdParty && (
+          <ArbitratorField
+            value={arbitrator}
+            onChange={setArbitrator}
+            onResolvedChange={setArbitratorResolved}
+            disabled={busy}
+          />
+        )}
+
+        {/* Time constraints (testing feedback): the shared deadline timeline — drag a dot to
+            pick each time, or tap a tile to open the exact date & time modal. */}
+        <DeadlineTimeline
+          milestones={timelineMilestones}
+          onChange={handleTimelineChange}
           disabled={busy}
+          idPrefix="oc"
+          summary={deadlinesValid
+            ? `Open ${formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · ` +
+              `then up to ${formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle`
+            : null}
         />
+        {!deadlinesValid && (acceptBy || resolveBy) && (
+          <p className="fm-hint oc-deadline-warn" role="alert">
+            Pick an acceptance time in the future and a resolve time after it.
+          </p>
+        )}
       </div>
-
-      {isThirdParty && (
-        <ArbitratorField
-          value={arbitrator}
-          onChange={setArbitrator}
-          onResolvedChange={setArbitratorResolved}
-          disabled={busy}
-        />
-      )}
-
-      {/* Time constraints (testing feedback): the shared deadline timeline — drag a dot to
-          pick each time, or tap a tile to open the exact date & time modal. */}
-      <DeadlineTimeline
-        milestones={timelineMilestones}
-        onChange={handleTimelineChange}
-        disabled={busy}
-        idPrefix="oc"
-        summary={deadlinesValid
-          ? `Open ${formatTimelineSpan(new Date(nowMs), new Date(acceptMs))} for a taker · ` +
-            `then up to ${formatTimelineSpan(new Date(acceptMs), new Date(resolveMs))} to settle`
-          : null}
-      />
-      {!deadlinesValid && (acceptBy || resolveBy) && (
-        <p className="fm-hint oc-deadline-warn" role="alert">
-          Pick an acceptance time in the future and a resolve time after it.
-        </p>
-      )}
 
       {progress && <p className="fm-hint" role="status">{progress.message}</p>}
       {error && <div className="fm-error-banner" role="alert">{error}</div>}

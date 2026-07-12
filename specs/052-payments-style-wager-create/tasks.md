@@ -60,10 +60,10 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **Independent Test**: Open the Open Challenge sheet; the amount is the largest element; tap pad keys (incl. decimal + backspace) and the hero updates; resize to desktop width and the pad is still present and usable.
 
-- [ ] T012 [US1] In `frontend/src/components/fairwins/OpenChallengeModal.jsx` (`MakerPanel`), replace the `fm-stake-input-wrapper` block (lines ~208–226) with `<AmountKeypad value={stake} onChange={setStake} prefix="$" token="USDC" disabled={busy} />`; preserve the existing `onBlur` `toFixed(2)` normalization behavior (apply on submit/blur equivalent).
-- [ ] T013 [US1] Reflow `MakerPanel`'s form in `frontend/src/components/fairwins/OpenChallengeModal.jsx` so the amount hero renders at the top of the sheet, above the description and details.
-- [ ] T014 [P] [US1] Add shared payments-layout helper classes (hero region wrapper, details region) in `frontend/src/components/fairwins/FriendMarketsModal.css` (and any Open-Challenge-specific bits in `frontend/src/components/fairwins/OpenChallengeModal.css`) using existing tokens.
-- [ ] T015 [US1] Add/extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — assert `AmountKeypad` renders on the Open Challenge sheet and that entering via the pad then submitting passes the hero value as `stake` to the mocked `createOpenChallenge`. Also assert the zero-state keeps the primary action disabled (FR-016) and that the membership gate + claim-code result path (`ClaimCodeResultPanel`) are unchanged (FR-012).
+- [X] T012 [US1] In `frontend/src/components/fairwins/OpenChallengeModal.jsx` (`MakerPanel`), replace the `fm-stake-input-wrapper` block (lines ~208–226) with `<AmountKeypad value={stake} onChange={setStake} prefix="$" token="USDC" disabled={busy} />`; preserve the existing `onBlur` `toFixed(2)` normalization behavior (apply on submit/blur equivalent).
+- [X] T013 [US1] Reflow `MakerPanel`'s form in `frontend/src/components/fairwins/OpenChallengeModal.jsx` so the amount hero renders at the top of the sheet, above the description and details.
+- [X] T014 [P] [US1] Add shared payments-layout helper classes (hero region wrapper, details region) in `frontend/src/components/fairwins/FriendMarketsModal.css` (and any Open-Challenge-specific bits in `frontend/src/components/fairwins/OpenChallengeModal.css`) using existing tokens.
+- [X] T015 [US1] Add/extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — assert `AmountKeypad` renders on the Open Challenge sheet and that entering via the pad then submitting passes the hero value as `stake` to the mocked `createOpenChallenge`. Also assert the zero-state keeps the primary action disabled (FR-016) and that the membership gate + claim-code result path (`ClaimCodeResultPanel`) are unchanged (FR-012).
 
 **Checkpoint**: A user can enter a stake on Open Challenge using only the pad, amount is the hero (SC-001, SC-002 for this surface).
 
@@ -75,9 +75,9 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **Independent Test**: Open Challenge shows the description below the amount with clearly lower visual weight; empty description still blocks submit; typed text reaches the create action unchanged.
 
-- [ ] T016 [US2] In `frontend/src/components/fairwins/OpenChallengeModal.jsx`, move the `oc-desc` description input directly beneath the hero and mark it up as a secondary memo field (placeholder/label styled as a note, reduced prominence).
-- [ ] T017 [P] [US2] Add memo-style CSS (lower visual weight, memo affordance, matches theme) in `frontend/src/components/fairwins/OpenChallengeModal.css`.
-- [ ] T018 [US2] Extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — empty memo keeps submit disabled; a typed memo is passed (trimmed) to `createOpenChallenge`.
+- [X] T016 [US2] In `frontend/src/components/fairwins/OpenChallengeModal.jsx`, move the `oc-desc` description input directly beneath the hero and mark it up as a secondary memo field (placeholder/label styled as a note, reduced prominence).
+- [X] T017 [P] [US2] Add memo-style CSS (lower visual weight, memo affordance, matches theme) in `frontend/src/components/fairwins/OpenChallengeModal.css`.
+- [X] T018 [US2] Extend `frontend/src/components/fairwins/__tests__/OpenChallengeModal.keypad.test.jsx` — empty memo keeps submit disabled; a typed memo is passed (trimmed) to `createOpenChallenge`.
 
 **Checkpoint**: Open Challenge has hero amount + memo description (US1 + US2 both hold on the reference surface).
 
@@ -89,8 +89,8 @@ Web app — frontend only. All source under `frontend/src/`. New shared control 
 
 **Independent Test**: On the redesigned Open Challenge sheet, exercise resolution `PillSelect`, the third-party `ArbitratorField` (address book + QR), and the accept/resolve `DeadlineTimeline` — each collects and submits the same values with the same gating as before.
 
-- [ ] T019 [US3] In `frontend/src/components/fairwins/OpenChallengeModal.jsx`, move the resolution `PillSelect`, conditional `ArbitratorField`, and `DeadlineTimeline` into the details region below hero/memo without changing their props, values, or the `canCreate` gating.
-- [ ] T020 [US3] Extend the Open Challenge test to verify the third-party arbitrator path still validates/submits and deadline values are collected unchanged (no capability regression, SC-003 for this surface).
+- [X] T019 [US3] In `frontend/src/components/fairwins/OpenChallengeModal.jsx`, move the resolution `PillSelect`, conditional `ArbitratorField`, and `DeadlineTimeline` into the details region below hero/memo without changing their props, values, or the `canCreate` gating.
+- [X] T020 [US3] Extend the Open Challenge test to verify the third-party arbitrator path still validates/submits and deadline values are collected unchanged (no capability regression, SC-003 for this surface).
 
 **Checkpoint**: The Open Challenge reference surface is fully redesigned, parity-complete, and shippable.
 

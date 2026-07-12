@@ -17,6 +17,13 @@ import { WalletContext } from '../../contexts/WalletContext'
 
 const ACCOUNT = '0x9999999999999999999999999999999999999999'
 
+// Enter a stake on the payments-style number pad (spec 052).
+const tapAmount = (amount) => {
+  for (const ch of String(amount)) {
+    fireEvent.click(screen.getByRole('button', { name: ch === '.' ? 'Decimal point' : ch }))
+  }
+}
+
 function withWallet(ui) {
   const value = {
     account: ACCOUNT,
@@ -38,6 +45,7 @@ describe('OpenChallengeModal — encrypted code backup & recovery (feature 024)'
 
     // Create the challenge.
     fireEvent.change(screen.getByLabelText(/what's the wager/i, { selector: 'input' }), { target: { value: 'Will it rain?' } })
+    tapAmount('10')
     fireEvent.click(screen.getByRole('button', { name: /create & generate code/i }))
     await screen.findByText('river tiger kite zoo')
 

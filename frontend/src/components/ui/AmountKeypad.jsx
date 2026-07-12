@@ -24,7 +24,7 @@ const PAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back']
  * Apply one keypad edit to the current amount string. Pure — returns the next
  * canonical string (may equal the input for ignored keystrokes).
  */
-export function applyAmountKey(value, key, maxFractionDigits = 2) {
+function applyAmountKey(value, key, maxFractionDigits = 2) {
   const str = value == null ? '' : String(value)
 
   if (key === 'back') return str.slice(0, -1)
