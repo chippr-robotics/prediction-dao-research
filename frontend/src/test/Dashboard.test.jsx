@@ -5,6 +5,7 @@ import { useChainId } from 'wagmi'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
 import { setCardVisible } from '../utils/quickAccessPreference'
+import { OPEN_RESOLUTION_TYPES } from '../hooks/useOpenChallengeCreate'
 
 // Stub the create modal to record the props each QuickActions card opens it with,
 // so we can assert the button → flow wiring (participant / oracle / all) without
@@ -19,14 +20,15 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
   ) : null,
 }))
 
-// Stub the unified phrase lookup (spec 037) so we assert the Dashboard wiring — the "Enter a Phrase"
-// quick action and the ?oc=take&code= deep-link reroute — without its resolver/hook internals.
-// Stub the oracle open challenge modal (spec 041) to assert the Dashboard card wiring
-// without the picker/create internals (covered by OracleOpenChallengeModal.test.jsx).
-vi.mock('../components/fairwins/OracleOpenChallengeModal', () => ({
-  default: ({ isOpen, initialMarket }) => isOpen ? (
+// Stub the consolidated Open Challenge modal (spec 052/053 folds oracle settlement into it) so we can
+// assert the Dashboard card wiring — which resolution path it opens on, and which market a ticker
+// pick pre-selects — without the picker/create internals (covered by the CreateChallengePanel /
+// OpenChallengeModal tests).
+vi.mock('../components/fairwins/OpenChallengeModal', () => ({
+  default: ({ isOpen, initialResolutionType, initialMarket }) => isOpen ? (
     <div
-      data-testid="oracle-open-challenge-modal"
+      data-testid="open-challenge-modal"
+      data-initial-resolution={initialResolutionType ?? ''}
       data-initial-market={initialMarket?.conditionId || ''}
     />
   ) : null,
@@ -393,30 +395,32 @@ describe('Dashboard Component', () => {
     })
   })
 
-  describe('Oracle Open Challenge entry (spec 041)', () => {
+  describe('Oracle Open Challenge entry (spec 041 → 052/053 consolidation)', () => {
     it('renders the card with its oracle-settles description', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.getByText('Open Oracle Challenge')).toBeInTheDocument()
       expect(screen.getByText(/share a code — Polymarket settles it automatically/i)).toBeInTheDocument()
     })
 
-    it('clicking the card opens the oracle open challenge modal (not the 1v1 flow) with an empty picker', () => {
+    it('clicking the card opens the consolidated Open Challenge modal on its oracle path, empty picker (not the 1v1 flow)', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
+      expect(screen.queryByTestId('open-challenge-modal')).toBeNull()
       fireEvent.click(screen.getByText('Open Oracle Challenge'))
-      const modal = screen.getByTestId('oracle-open-challenge-modal')
+      const modal = screen.getByTestId('open-challenge-modal')
       expect(modal).toBeInTheDocument()
-      // Opened from the card → no market pre-selected.
+      // Preselects the oracle (Polymarket) resolution path; opened from the card → no market.
+      expect(modal).toHaveAttribute('data-initial-resolution', String(OPEN_RESOLUTION_TYPES.Polymarket))
       expect(modal).toHaveAttribute('data-initial-market', '')
       expect(screen.queryByTestId('friend-modal')).toBeNull()
     })
 
-    it('clicking a ticker market opens the oracle open challenge modal with that market pre-selected', () => {
+    it('clicking a ticker market opens the consolidated modal on its oracle path with that market pre-selected', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
+      expect(screen.queryByTestId('open-challenge-modal')).toBeNull()
       fireEvent.click(screen.getByText('Ticker: Will event happen?'))
-      const modal = screen.getByTestId('oracle-open-challenge-modal')
+      const modal = screen.getByTestId('open-challenge-modal')
       expect(modal).toBeInTheDocument()
+      expect(modal).toHaveAttribute('data-initial-resolution', String(OPEN_RESOLUTION_TYPES.Polymarket))
       // The ticker forwards the picked market's conditionId into the modal.
       expect(modal).toHaveAttribute('data-initial-market', '0xticker')
     })
@@ -428,14 +432,14 @@ describe('Dashboard Component', () => {
       setCardVisible('oracle-open-challenge', true)
     })
 
-    it('the user-defined Open Challenge card still opens its own modal unchanged (FR-018)', () => {
+    it('the plain Open Challenge card opens the same modal on its default (non-oracle) path', () => {
       setCardVisible('open-challenge', true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Open Challenge'))
-      // The user-defined modal renders its own dialog header (not the oracle stub);
-      // the card itself is an h4, the modal title an h2.
-      expect(screen.queryByTestId('oracle-open-challenge-modal')).toBeNull()
-      expect(screen.getByRole('heading', { level: 2, name: 'Open Challenge' })).toBeInTheDocument()
+      const modal = screen.getByTestId('open-challenge-modal')
+      expect(modal).toBeInTheDocument()
+      // No oracle preselect for the plain card.
+      expect(modal).toHaveAttribute('data-initial-resolution', '')
     })
   })
 

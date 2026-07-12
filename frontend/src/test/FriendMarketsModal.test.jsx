@@ -338,9 +338,9 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByText('Wagers')).toBeInTheDocument()
     })
 
-    it('should display subtitle', () => {
+    it('omits the header subtitle sentence (removed to conserve space, spec 052 feedback)', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.getByText('Private wagers with friends')).toBeInTheDocument()
+      expect(screen.queryByText('Private wagers with friends')).not.toBeInTheDocument()
     })
 
     it('should have a close button', () => {

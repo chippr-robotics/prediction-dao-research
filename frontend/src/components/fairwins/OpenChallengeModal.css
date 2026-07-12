@@ -309,3 +309,36 @@
 .oc-recover-code {
   margin: 0;
 }
+
+/* ── Oracle path (consolidated from the former Open Oracle Challenge modal,
+   spec 052) — the market-search step + refused-market notice. ─────────── */
+
+/* Refused-market notice sits above the picker so the reason is read before re-picking. */
+.ooc-ineligible {
+  margin-bottom: 10px;
+}
+
+/* Back affordance at the top of the market-search step. */
+.oc-market-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  align-self: flex-start;
+}
+
+/* Keep the inline picker usable inside the modal: the feed scrolls within its own
+   region instead of stretching the whole sheet (US3). */
+#ooc-market-picker {
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  border-radius: 12px;
+}
+
+/* Phones present this modal as a bottom sheet — let the picker claim most of the
+   viewport so the markets, not empty space, fill the market-search step. */
+@media (max-width: 640px) {
+  #ooc-market-picker {
+    max-height: 72vh;
+  }
+}

@@ -132,17 +132,14 @@ describe('GroupPoolModal', () => {
       usePools.mockReturnValue(pools())
       renderModal()
       expect(screen.queryByText(/everyone pays the same buy-in/i)).not.toBeInTheDocument()
-      expect(screen.queryByText(/only USDC is supported/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/joining closes automatically/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/take their buy-in back/i)).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'About group pools' }))
       expect(screen.getByRole('note')).toHaveTextContent(/everyone pays the same buy-in/i)
 
-      fireEvent.click(screen.getByRole('button', { name: 'About: Buy-in — each member' }))
-      expect(screen.getAllByRole('note')).toHaveLength(1)
-      expect(screen.getByRole('note')).toHaveTextContent(/only USDC is supported/i)
-
+      // The buy-in caption + its InfoTip were removed to conserve space (spec 052);
+      // the remaining field explainers still reveal one at a time.
       fireEvent.click(screen.getByRole('button', { name: 'About: Maximum members' }))
       expect(screen.getByRole('note')).toHaveTextContent(/joining closes automatically/i)
 

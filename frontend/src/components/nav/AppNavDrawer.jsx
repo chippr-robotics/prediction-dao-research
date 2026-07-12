@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 import PortalNav from '../ui/PortalNav'
 import Footer from '../Footer'
-import { HOME_ITEM, NAV_GROUPS, pathForNavItem } from '../../config/appNav'
+import { HOME_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem } from '../../config/appNav'
 import './AppNavDrawer.css'
 
 // Deep-link alias parity with WalletPage (the Swap tab is now "Trade").
@@ -11,7 +11,7 @@ const TAB_ALIASES = { swap: 'trade' }
 
 // The drawer list = a top "Quick Access" group (Home) + the section groups.
 const DRAWER_GROUPS = [
-  { label: 'Quick Access', items: [HOME_ITEM] },
+  { label: 'Quick Access', items: [HOME_ITEM, WAGERS_ITEM] },
   ...NAV_GROUPS,
 ]
 
@@ -24,6 +24,9 @@ function resolveActiveId(location) {
   }
   if (pathname === '/app' || pathname === '/main' || pathname === '/fairwins') {
     return HOME_ITEM.id
+  }
+  if (pathname === '/wagers') {
+    return WAGERS_ITEM.id
   }
   return null
 }
