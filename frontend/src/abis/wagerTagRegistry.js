@@ -41,16 +41,56 @@ export const WAGER_TAG_REGISTRY_ABI = [
   'function requestRepointWithSig(address owner, bytes32 tagHash, address newOwner, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
   'function cancelRepointWithSig(address owner, bytes32 tagHash, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
 
-  // Config views
+  // Config + policy views (operator screen)
   'function membershipRole() view returns (bytes32)',
   'function minTier() view returns (uint8)',
+  'function membershipManager() view returns (address)',
+  'function sanctionsGuard() view returns (address)',
+  'function minCommitmentAge() view returns (uint64)',
+  'function maxCommitmentAge() view returns (uint64)',
+  'function quarantinePeriod() view returns (uint64)',
+  'function changeCooldown() view returns (uint64)',
+  'function repointDelay() view returns (uint64)',
+  'function lapseGrace() view returns (uint64)',
+  'function reserved(bytes32 tagHash) view returns (bool)',
+  'function quarantinedUntil(bytes32 tagHash) view returns (uint64)',
+  'function tagHashOf(address account) view returns (bytes32)',
 
-  // Events
+  // Roles (AccessControl) — operator gating + role admin
+  'function REGISTRY_CURATOR_ROLE() view returns (bytes32)',
+  'function MODERATOR_ROLE() view returns (bytes32)',
+  'function VERIFIER_ROLE() view returns (bytes32)',
+  'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function getRoleAdmin(bytes32 role) view returns (bytes32)',
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+
+  // Moderation / curation / verification (role-gated writes)
+  'function setReserved(bytes32[] tagHashes, bool isReserved)',
+  'function setSuspended(bytes32 tagHash, bool isSuspended)',
+  'function setVerified(bytes32 tagHash, bool isVerified)',
+
+  // Admin policy (DEFAULT_ADMIN_ROLE)
+  'function setPolicyParams(uint64 minCommitmentAge, uint64 maxCommitmentAge, uint64 quarantinePeriod, uint64 changeCooldown, uint64 repointDelay, uint64 lapseGrace)',
+  'function setMembershipGate(bytes32 role, uint8 tier)',
+  'function setMembershipManager(address manager)',
+  'function setSanctionsGuard(address guard)',
+
+  // Events (registration + lifecycle + moderation + policy — the operator metrics scan reads these)
+  'event TagCommitted(bytes32 indexed commitment, uint64 committedAt)',
   'event TagRegistered(bytes32 indexed tagHash, string tag, address indexed owner)',
   'event TagReleased(bytes32 indexed tagHash, address indexed owner, uint64 quarantinedUntil)',
   'event TagChanged(bytes32 indexed oldTagHash, bytes32 indexed newTagHash, address indexed owner)',
   'event TagRepointRequested(bytes32 indexed tagHash, address indexed from, address indexed to, uint64 effectiveAt)',
+  'event TagRepointCancelled(bytes32 indexed tagHash)',
   'event TagRepointFinalized(bytes32 indexed tagHash, address indexed from, address indexed to)',
+  'event TagReclaimed(bytes32 indexed tagHash, address indexed formerOwner)',
+  'event TagSuspended(bytes32 indexed tagHash, bool suspended)',
+  'event TagVerificationSet(bytes32 indexed tagHash, bool verified)',
+  'event TagReserved(bytes32 indexed tagHash, bool reserved)',
+  'event PolicyParamsSet(uint64 minCommitmentAge, uint64 maxCommitmentAge, uint64 quarantinePeriod, uint64 changeCooldown, uint64 repointDelay, uint64 lapseGrace)',
+  'event MembershipGateSet(bytes32 role, uint8 minTier)',
 
   // Errors (surfaced to the user; note the Gold-specific message must NOT reuse the Silver wording)
   'error InsufficientMembershipTier()',
