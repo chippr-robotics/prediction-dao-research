@@ -8,6 +8,14 @@
 
 **Input**: User description: "Make the wager-creation experience the app's home screen — a payments-app home (Cash App / Venmo feel) where the first thing a user sees is the create-a-challenge view itself, not a dashboard of buttons. Oracle settlement becomes a network-gated resolution option in that view. Add Accept-a-challenge and My-rewards entry points near it, and move the multi-button quick-action grid into a 'Wagers' app section. Front-end IA/presentation only; wager/take/rewards logic reused."
 
+## Clarifications
+
+### Session 2026-07-12
+
+- Q: What should the home "My Rewards" entry point open? → A: The existing **My Wagers** view (which already lists claimable payouts and has a "Claim Winnings" action) — no new rewards surface.
+- Q: Where should the relocated "Wagers" section live? → A: A **dedicated top-level route** (a "Wagers" page) added as an item in the app's existing primary navigation (the nav drawer).
+- Q: What does the inline home create view create? → A: **Open challenge only** (self / third-party / oracle resolution). Other create types (1v1, Make-an-Offer, Group Pool) are created from the Wagers section.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The app opens straight into "create a challenge" (Priority: P1)
@@ -156,9 +164,10 @@ longer shows that multi-button grid.
 
 ### Functional Requirements
 
-- **FR-001**: The home destination MUST render the create-a-challenge view inline (not in a modal or
-  bottom sheet) as its primary content: the amount hero, on-screen number pad, wager memo, and
-  resolution selector.
+- **FR-001**: The home destination MUST render the **open-challenge** create view inline (not in a
+  modal or bottom sheet) as its primary content: the amount hero, on-screen number pad, wager memo,
+  and resolution selector. Other create types (1v1, Make-an-Offer, Group Pool) are NOT inlined on
+  home — they are created from the Wagers section (FR-010).
 - **FR-002**: The home create view MUST reuse the existing payments-style components and layout — the
   amount keypad, memo field, and resolution pills with their icons — and the compacted, non-scrolling
   arrangement, with no new visual system.
@@ -177,11 +186,13 @@ longer shows that multi-button grid.
   phrase / code entry to take a challenge) and "My Rewards" (winnings / rewards), positioned near the
   create view.
 - **FR-009**: The "Accept a challenge" entry MUST open the existing take-a-challenge / phrase-entry
-  flow, and "My Rewards" MUST open the existing winnings / rewards surface — both with unchanged
-  underlying behavior.
+  flow, and "My Rewards" MUST open the existing **My Wagers** view (which already lists claimable
+  payouts and provides the "Claim Winnings" action) — both with unchanged underlying behavior. No new
+  rewards/winnings surface is introduced.
 - **FR-010**: The full set of create types and actions previously on the home quick-action grid (1v1
   friends-decide, 1v1 oracle, make an offer, open challenge, group pool, enter phrase, my wagers, scan
-  QR, share account) MUST be accessible from an app section/destination labeled "Wagers".
+  QR, share account) MUST be accessible from a **dedicated top-level "Wagers" route/page**, reachable
+  from an item added to the app's existing primary navigation (the nav drawer).
 - **FR-011**: The multi-button quick-action grid MUST no longer appear on the home screen; it MUST live
   in the "Wagers" section instead.
 - **FR-012**: Every item relocated to the "Wagers" section MUST launch the same flow with the same
@@ -231,16 +242,19 @@ longer shows that multi-button grid.
 
 ## Assumptions
 
-- The app has (or gains) a navigable "Wagers" destination/section reachable from the primary
-  navigation; the exact navigation mechanism reuses the app's existing pattern.
-- "My Rewards" maps to the user's existing winnings / claimable-payouts surface (e.g. the existing
-  wager rewards/claim view); no new rewards computation is introduced.
+- The "Wagers" destination is a dedicated top-level route/page added to the app's existing nav
+  drawer (resolved in Clarifications) — it reuses the app's current navigation pattern rather than
+  introducing a new global bottom tab bar.
+- "My Rewards" opens the existing My Wagers view, which already surfaces claimable payouts and the
+  "Claim Winnings" action (resolved in Clarifications); no new rewards computation or surface is
+  introduced. (This is distinct from the Finance → Earn "Rewards" area, which covers DeFi lending
+  rewards, not wager winnings.)
 - "Accept a challenge" reuses the existing unified phrase-lookup / take-a-challenge flow (today's
   "Enter Words").
 - The home create view defaults to self-resolution (either side submits), matching the current
   create default, with oracle offered only where available.
-- The home create view is create-only for open challenges; other create types (1v1, offer, pool)
-  are created from the Wagers section, not inlined on home.
+- The home inline create view is open-challenge-only (resolved in Clarifications); other create
+  types (1v1, offer, pool) are created from the Wagers section, not inlined on home.
 - The Polymarket ticker crawler, if retained, routes into the home create view's oracle path rather
   than a separate modal.
 - The existing payments-style keypad, memo, resolution pills (with new SVG icons), and compacted
