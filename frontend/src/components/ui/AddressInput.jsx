@@ -1,5 +1,8 @@
 import { forwardRef, useEffect, useCallback } from 'react'
 import { useEnsResolution, useEnsReverseLookup } from '../../hooks/useEnsResolution'
+import { useTagResolution } from '../../hooks/useTagResolution'
+import { formatTag, isValidTag } from '../../lib/tags/normalizeTag'
+import { TagStatus } from '../../lib/tags/resolveTag'
 import AddressInputBookAddon from './AddressInputBookAddon'
 import styles from './AddressInput.module.css'
 
@@ -61,12 +64,19 @@ const AddressInput = forwardRef(({
     isLoading: isLookingUp
   } = useEnsReverseLookup(isAddress ? value?.trim() : null)
 
-  // Notify parent of resolved address changes
+  // Wager tag forward-resolution (spec 054). Additive: only engages for tag-shaped input that is
+  // neither an address nor an ENS name. A resolved ACTIVE tag becomes the effective resolved address;
+  // any other status is surfaced as a non-committable message (FR-011/022). Registry unreachable → soft
+  // no-op, raw-address entry unaffected (FR-013).
+  const tagRes = useTagResolution(value, { chainId })
+  const effectiveResolvedAddress = (tagRes.isTag && tagRes.address) ? tagRes.address : resolvedAddress
+
+  // Notify parent of resolved address changes (tag-resolved address included)
   useEffect(() => {
     if (onResolvedChange) {
-      onResolvedChange(resolvedAddress)
+      onResolvedChange(effectiveResolvedAddress)
     }
-  }, [resolvedAddress, onResolvedChange])
+  }, [effectiveResolvedAddress, onResolvedChange])
 
   const handleChange = useCallback((e) => {
     if (onChange) {
@@ -80,14 +90,17 @@ const AddressInput = forwardRef(({
     if (onResolvedChange) onResolvedChange(addr)
   }, [onChange, onResolvedChange])
 
-  // Determine error state
-  const hasError = externalError || (value && !isLoading && resolutionError)
-  const displayError = externalErrorMessage || resolutionError
+  // Determine error state. A tag-shaped input suppresses the ENS "invalid address/name" error and
+  // instead surfaces the tag's own status ("No such tag", "address changing", etc.) when non-ACTIVE.
+  const tagError = tagRes.isTag && !tagRes.isLoading && !!tagRes.message && tagRes.status !== TagStatus.ACTIVE
+  const hasError = externalError || tagError || (value && !isLoading && !tagRes.isTag && resolutionError)
+  const displayError = externalErrorMessage || (tagError ? tagRes.message : (!tagRes.isTag ? resolutionError : undefined))
 
   // Determine status indicator
-  const showLoading = isLoading || isLookingUp
-  const showSuccess = resolvedAddress && !hasError && !showLoading
+  const showLoading = isLoading || isLookingUp || tagRes.isLoading
+  const showSuccess = effectiveResolvedAddress && !hasError && !showLoading
   const showEnsLabel = isEns && !isLoading
+  const showTagResolved = tagRes.isTag && !!tagRes.address && !showLoading && !hasError
 
   // Format address for display
   const formatAddress = (addr) => {
@@ -175,6 +188,20 @@ const AddressInput = forwardRef(({
       {showResolvedAddress && isAddress && ensName && !isLookingUp && (
         <div id={ensNameHintId} className={styles.resolvedHint}>
           <span className={styles.ensNameLabel}>{ensName}</span>
+        </div>
+      )}
+
+      {/* Wager tag resolved preview (spec 054): show the tag + full resolved address for confirmation
+          before any value-bearing action (FR-011), with the verification marker for verified tags. */}
+      {showResolvedAddress && showTagResolved && (
+        <div className={styles.resolvedHint}>
+          <span className={styles.resolvedLabel}>
+            {isValidTag(value) ? formatTag(value.trim().replace(/^%/, '').toLowerCase()) : 'Tag'} resolves to:
+          </span>
+          <code className={styles.resolvedAddress}>{formatAddress(tagRes.address)}</code>
+          {tagRes.verified && (
+            <span className={styles.ensLabel} aria-label="Verified business tag" title="Verified">✓</span>
+          )}
         </div>
       )}
 

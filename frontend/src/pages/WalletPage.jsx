@@ -25,6 +25,7 @@ import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPr
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
 import AddressBookPanel from '../components/account/AddressBookPanel'
+import WagerTagPanel from '../components/account/WagerTagPanel'
 import BackupPanel from '../components/account/BackupPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import NetworkSettings from '../components/wallet/NetworkSettings'
@@ -295,6 +296,7 @@ function WalletPage() {
 
                 {activeTab === 'membership' && (
                   <div className="membership-section" role="tabpanel">
+                    <WagerTagPanel />
                     <div className="section">
                       <h3>Your Roles</h3>
                       {roles.length > 0 ? (
