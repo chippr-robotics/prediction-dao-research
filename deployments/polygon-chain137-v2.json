@@ -37,7 +37,9 @@
     "backupPointerRegistry": "0x664ACAd4d604c626A6160948Df9C10FE38010E11",
     "safePolicyGuard": "0xa0F188776a65794cc06777412432e47dcB0d0c4B",
     "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
-    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7"
+    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
+    "wagerTagRegistry": "0xF7370780F13eCEb2f65c21d38b7bd53f25509a9F",
+    "wagerTagRegistryImpl": "0x72BC0c361Ea54720F25Dc8E519f70a4d7F6a41A0"
   },
   "mocks": null,
   "constructorArgs": {
@@ -80,7 +82,8 @@
     "backupPointerRegistry": [],
     "safePolicyGuard": [],
     "policyGuardSetup": [],
-    "safeProposalHub": []
+    "safeProposalHub": [],
+    "wagerTagRegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
@@ -99,5 +102,6 @@
     "safePolicyGuard": 90120723,
     "policyGuardSetup": 90120725,
     "safeProposalHub": 90120743
-  }
+  },
+  "wagerTagRegistryDeployedAt": "2026-07-13T03:02:00.347Z"
 }
