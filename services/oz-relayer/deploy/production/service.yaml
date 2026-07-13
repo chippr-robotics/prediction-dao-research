@@ -57,7 +57,7 @@ spec:
             # collectibles_unconfigured) and the SPA hides the Collectibles tab.
             - name: OPENSEA_API_KEY
               valueFrom:
-                secretKeyRef: { name: opensea-api-key, key: latest }
+                secretKeyRef: { name: OPENSEA_API_KEY, key: latest }
           resources:
             limits: { cpu: "1", memory: 512Mi }
         # ---- sidecar: OZ Relayer engine (localhost:8080) ----
