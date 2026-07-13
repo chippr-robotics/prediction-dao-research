@@ -46,6 +46,11 @@ const TESTNET_CHAIN_ID = 80002
 // derived from user input or API responses.
 // See specs/050-earn-lending-rewards/contracts/earn-config.md.
 const MERKL_DISTRIBUTOR = '0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae'
+// Collectibles (spec 055): the read-only, OpenSea-backed NFT portfolio is available ONLY on
+// chains OpenSea serves AND we ship (Ethereum mainnet + Polygon). Everywhere else the capability
+// is false and the Collectibles tab + portfolio line hide entirely (FR-007 soft-fail).
+const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
+
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
   merklDistributor: MERKL_DISTRIBUTOR,
@@ -138,6 +143,7 @@ const NETWORKS = {
     ),
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -216,6 +222,7 @@ const NETWORKS = {
     passkey: null,
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -283,6 +290,7 @@ const NETWORKS = {
     passkey: null,
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -348,6 +356,7 @@ const NETWORKS = {
     ),
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -399,6 +408,7 @@ const NETWORKS = {
     passkey: null,
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -437,6 +447,7 @@ const NETWORKS = {
     passkey: null,
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -474,6 +485,7 @@ const NETWORKS = {
     passkey: null,
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -504,6 +516,7 @@ const NETWORKS = {
     passkey: passkeyConfig(import.meta.env?.VITE_BUNDLER_URLS_LOCAL, null),
     get capabilities() {
       return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),

@@ -153,6 +153,33 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
+  # Relay-gateway service tests (specs 035/036/050 + the spec-055 OpenSea proxy).
+  # Gating like every other test job — no continue-on-error (Constitution IV).
+  relay-gateway-tests:
+    name: Relay Gateway Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/relay-gateway
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'services/relay-gateway/package-lock.json'
+
+      - name: Install gateway dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
   frontend-tests:
     name: Frontend Unit Tests
     runs-on: ubuntu-latest

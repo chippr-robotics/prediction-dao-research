@@ -1,10 +1,13 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import usePortfolio from '../../hooks/usePortfolio'
 import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
 import AssetDetailSheet from './AssetDetailSheet'
 import { formatAssetAmount } from '../../lib/portfolio/aggregate'
 import SensitiveValue from '../common/SensitiveValue'
+import { useCollectiblesValuation } from '../../hooks/useCollectibles'
+import { computeCollectiblesValuation } from '../../lib/collectibles/valuation'
 import './Portfolio.css'
 
 // Full-precision USD for a compliance-flavored view — deliberately not the
@@ -101,6 +104,70 @@ function CategorySection({ group, collapsed, onToggle, onOpen }) {
 }
 
 /**
+ * Collectibles estimate line (spec 055 US3 / FR-006) — a SEPARATE, labeled row
+ * beside the token holdings. Honest-state rules (research D8): the floor-price
+ * estimate is NEVER merged into the verifiable totalUsd headline; unpriced items
+ * are counted, not silently valued; upstream outages degrade this line without
+ * touching token rendering; hidden entirely where the feature is unavailable.
+ */
+function CollectiblesEstimateSection({ priceMap }) {
+  const navigate = useNavigate()
+  const { supported, status, items, statsBySlug, bounds, stale } = useCollectiblesValuation()
+
+  if (!supported || status === 'disconnected' || status === 'empty' || status === 'loading') return null
+
+  const valuation = computeCollectiblesValuation(
+    items,
+    statsBySlug,
+    (symbol) => priceMap.get(symbol)?.usd ?? null,
+    bounds,
+  )
+
+  return (
+    <section className="portfolio-category portfolio-collectibles" aria-label="Collectibles estimate">
+      <ul className="portfolio-rows">
+        <li className="portfolio-row">
+          <button
+            type="button"
+            className="portfolio-row-button"
+            onClick={() => navigate('/wallet?tab=collectibles')}
+            aria-label="Collectibles, floor-price estimate — open the Collectibles tab"
+          >
+            <span className="portfolio-row-asset">
+              <span className="portfolio-row-name">Collectibles</span>
+              <span className="portfolio-row-meta">
+                {status === 'degraded'
+                  ? 'temporarily unavailable'
+                  : `floor-price estimate, priced items only (${valuation.pricedItems} priced` +
+                    `${valuation.unpricedItems > 0 ? `, ${valuation.unpricedItems} unpriced` : ''})` +
+                    `${valuation.truncated ? ' — partial' : ''}${stale || valuation.stale ? ' — cached data' : ''}`}
+              </span>
+            </span>
+            <span className="portfolio-row-values">
+              {status === 'degraded' || valuation.estimatedUsd == null ? (
+                <span className="portfolio-row-usd portfolio-row-usd-unavailable">
+                  <span aria-hidden="true">—</span>
+                  <span className="portfolio-visually-hidden">
+                    {status === 'degraded' ? 'collectibles data unavailable' : 'estimate unavailable'}
+                  </span>
+                </span>
+              ) : (
+                <SensitiveValue className="portfolio-row-usd">
+                  {`≈ ${formatUsdFull(valuation.estimatedUsd)}`}
+                </SensitiveValue>
+              )}
+            </span>
+          </button>
+        </li>
+      </ul>
+      <p className="portfolio-category-empty">
+        Estimates use collection floor prices and are not included in the total above.
+      </p>
+    </section>
+  )
+}
+
+/**
  * Connected Account Portfolio (spec 044 v1.2) — the member's holdings across
  * every supported network, grouped by the SEC/CFTC asset taxonomy with
  * wrapped forms combined into their underlying asset. Tapping a row opens
@@ -184,6 +251,8 @@ export default function PortfolioPanel() {
           onOpen={(aggregate) => setOpenAggregateId(aggregate.id)}
         />
       ))}
+
+      <CollectiblesEstimateSection priceMap={portfolio.priceMap} />
 
       <footer className="portfolio-disclosures">
         {!portfolio.showTestnetAssets && (
