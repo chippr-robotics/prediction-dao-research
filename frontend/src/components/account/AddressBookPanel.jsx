@@ -156,7 +156,6 @@ export default function AddressBookPanel({ address }) {
               networkName={networkName}
               onEdit={(c) => setEditing({ contact: c })}
               onDeleteContact={deleteContact}
-              onDeleteAddress={removeAddress}
             />
           ))}
         </div>
