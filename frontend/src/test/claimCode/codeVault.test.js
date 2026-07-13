@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   deriveVaultKey,
+  deriveVaultKeyFromSeed,
   addEntry,
   readEntries,
   removeEntry,
@@ -63,5 +64,18 @@ describe('open-challenge code vault', () => {
     const ADDR2 = '0x2222222222222222222222222222222222222222'
     addEntry(ADDR, key, { code: 'aaa bbb ccc ddd', wagerId: '1' })
     expect(readEntries(ADDR2, key)).toEqual([])
+  })
+
+  it('derives a deterministic key from a passkey master seed (spec 041) that round-trips', () => {
+    const seedKey = deriveVaultKeyFromSeed(new Uint8Array(32).fill(5))
+    expect(seedKey).toBeInstanceOf(Uint8Array)
+    expect(seedKey.length).toBe(32)
+    expect(deriveVaultKeyFromSeed(new Uint8Array(32).fill(5))).toEqual(seedKey) // same seed → same key
+    expect(deriveVaultKeyFromSeed(new Uint8Array(32).fill(6))).not.toEqual(seedKey)
+    // A passkey-derived key encrypts and decrypts its own vault just like the wallet path.
+    addEntry(ADDR, seedKey, { code: 'passkey word word word', wagerId: '3' })
+    expect(readEntries(ADDR, seedKey)[0]).toMatchObject({ code: 'passkey word word word', wagerId: '3' })
+    // ...and the wallet-signature key cannot open the passkey-encrypted vault.
+    expect(() => readEntries(ADDR, key)).toThrow(/different wallet/i)
   })
 })

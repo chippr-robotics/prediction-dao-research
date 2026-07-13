@@ -76,7 +76,8 @@ const POLYMARKET_CATEGORY_OPTIONS = [
 ]
 
 function WalletPage() {
-  const { address, isConnected, provider, signer, openConnectModal } = useWallet()
+  const { address, isConnected, provider, signer, loginMethod, openConnectModal } = useWallet()
+  const isPasskey = loginMethod === 'passkey'
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
@@ -135,8 +136,11 @@ function WalletPage() {
   }, [address, provider])
 
   const handleRegisterKey = useCallback(async () => {
-    if (!signer || !address) {
-      setKeyError('Wallet not connected. Please reconnect.')
+    // Passkey sessions have no ethers signer — keys derive from the WebAuthn PRF master seed and the
+    // on-chain registration is submitted through the smart account (sendCalls), all inside
+    // ensureInitialized(). Classic wallets keep the signer path (sign the derivation message → register tx).
+    if (!address || (!signer && !isPasskey)) {
+      setKeyError('Not connected. Please sign in again.')
       return
     }
     setKeyRegisterLoading(true)
@@ -145,6 +149,21 @@ function WalletPage() {
       const result = await ensureInitialized()
       if (!result?.publicKey) {
         throw new Error('Failed to derive encryption keys')
+      }
+      if (isPasskey) {
+        // ensureInitialized() already kicked off the on-chain registration (non-blocking, via sendCalls).
+        // Reflect it honestly: poll the registry briefly so the UI flips to "Registered" once it lands,
+        // and otherwise tell the user it's finishing rather than claiming failure.
+        let registered = await hasRegisteredKey(address, provider)
+        for (let i = 0; !registered && i < 5; i++) {
+          await new Promise((r) => setTimeout(r, 2000))
+          registered = await hasRegisteredKey(address, provider)
+        }
+        setKeyRegistered(registered)
+        if (!registered) {
+          setKeyError('Encryption key setup submitted — it can take a moment to finish. Use “Check Status” shortly.')
+        }
+        return
       }
       // ensureKeyRegistered checks on-chain first, only registers if needed
       const wasNewlyRegistered = await ensureKeyRegistered(signer, address, result.publicKey)
@@ -165,7 +184,7 @@ function WalletPage() {
     } finally {
       setKeyRegisterLoading(false)
     }
-  }, [ensureInitialized, signer, address])
+  }, [ensureInitialized, signer, address, isPasskey, provider])
 
   // Auto-check key status when Security tab is shown
   useEffect(() => {
@@ -354,7 +373,8 @@ function WalletPage() {
                     <div className="section">
                       <h3>Encryption Key</h3>
                       <p className="section-description">
-                        Your encryption key allows you to send and receive encrypted wagers. It is derived from your wallet signature and registered on-chain.
+                        Your encryption key allows you to send and receive encrypted wagers. It is derived from
+                        {isPasskey ? ' your passkey' : ' your wallet signature'} and registered on-chain.
                       </p>
 
                       <div className="key-status-card">

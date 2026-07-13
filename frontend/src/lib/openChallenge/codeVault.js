@@ -11,7 +11,7 @@
  * (the same approach as the address-book backup, lib/addressBook/addressBookCrypto.js).
  */
 
-import { keccak256, toUtf8Bytes, getBytes } from 'ethers'
+import { keccak256, toUtf8Bytes, getBytes, concat } from 'ethers'
 import { encryptJson, decryptJson, utf8ToBytes } from '../../utils/crypto/primitives'
 
 const STORAGE_PREFIX = 'fairwins.ocCodeVault.'
@@ -30,6 +30,17 @@ export const CODE_VAULT_SIGN_MESSAGE =
 export function deriveVaultKey(signature) {
   if (!signature) throw new Error('deriveVaultKey: signature required')
   return getBytes(keccak256(toUtf8Bytes(VAULT_KEY_DOMAIN + signature)))
+}
+
+/**
+ * Derive the 32-byte vault key from a passkey account's PRF master seed (spec 041) — the login-method-agnostic
+ * twin of {@link deriveVaultKey}. Same domain tag keeps it independent from other seed-derived keys, and the
+ * seed is deterministic per account so the same passkey account always unlocks the same on-device vault.
+ * @param {Uint8Array} seed - 32-byte master seed
+ */
+export function deriveVaultKeyFromSeed(seed) {
+  if (!seed) throw new Error('deriveVaultKeyFromSeed: seed required')
+  return getBytes(keccak256(concat([toUtf8Bytes(VAULT_KEY_DOMAIN), seed])))
 }
 
 function storageKey(address) {

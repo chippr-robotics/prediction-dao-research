@@ -42,3 +42,14 @@ export async function writePointer(signer, cid) {
   const tx = await c.setPointer(cid)
   return tx.wait()
 }
+
+/**
+ * Encode the `setPointer(cid)` call for passkey (smart-account) sessions, which write through `sendCalls`
+ * rather than an ethers signer. Returns a `{ target, data }` call the caller batches into one ceremony.
+ * `cid` "" clears the pointer, mirroring {@link writePointer}.
+ */
+export function buildSetPointerCall(cid) {
+  if (!isBackupAvailable()) throw new Error('Backup registry is not available on the canonical network yet')
+  const iface = new ethers.Interface(BACKUP_POINTER_REGISTRY_ABI)
+  return { target: registryAddress(), data: iface.encodeFunctionData('setPointer', [cid]) }
+}
