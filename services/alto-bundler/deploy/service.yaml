@@ -89,6 +89,14 @@ spec:
               # bundles land (confirmed: handleOps 0x95ca0cc0…, block 90119266). Do NOT set false: an
               # earlier `services replace` applying a stale false silently re-broke the bundler.
               value: "true"
+            - name: ALTO_GAS_PRICE_MULTIPLIERS
+              # slow,standard,fast multipliers (%) on the computed gas price (default 100,100,100).
+              # Polygon public RPCs report a stale ~25-30 gwei eth_maxPriorityFeePerGas even under heavy
+              # congestion (real p50 has hit 110-135 gwei), so alto underprices ops/bundles and the
+              # executor can't get them included. These multipliers lift the suggestion to ~100/125/150
+              # gwei priority so bundles land during spikes. Revisit if Polygon fees normalize or we move
+              # to an RPC with an accurate fee oracle. Added 2026-07-13.
+              value: "400,500,600"
             - name: ALTO_EXECUTOR_PRIVATE_KEYS
               valueFrom:
                 secretKeyRef:
