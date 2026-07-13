@@ -46,21 +46,21 @@ const WALLET_TABS = [
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
   { id: 'preferences', label: 'Preferences' },
-  { id: 'security', label: 'Security' },
+  { id: 'security', label: 'Backup & Security' },
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
   { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
-  { id: 'backup', label: 'Backup' },
   { id: 'reports', label: 'Reporting' },
   { id: 'clearpath', label: 'ClearPath' },
   { id: 'tokens', label: 'Token Mint' },
 ]
 
-// Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade").
-const TAB_ALIASES = { swap: 'trade' }
+// Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
+// old standalone Backup tab is now part of the combined "Backup & Security" panel).
+const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
@@ -288,12 +288,6 @@ function WalletPage() {
                   </div>
                 )}
 
-                {activeTab === 'backup' && (
-                  <div className="backup-section" role="tabpanel">
-                    <BackupPanel />
-                  </div>
-                )}
-
                 {activeTab === 'membership' && (
                   <div className="membership-section" role="tabpanel">
                     <CallsignPanel />
@@ -347,6 +341,9 @@ function WalletPage() {
 
                 {activeTab === 'security' && (
                   <div className="security-section" role="tabpanel">
+                    {/* Backup + Security combined into one panel: the data-backup
+                        controls sit above the account-security controls. */}
+                    <BackupPanel />
                     {/* Spec 045 US5/US6 — account controllers & recovery.
                         ControllersPanel renders for passkey sessions (add a
                         passkey / link a wallet as recovery); the recovery

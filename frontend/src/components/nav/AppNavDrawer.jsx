@@ -6,13 +6,19 @@ import Footer from '../Footer'
 import { HOME_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem } from '../../config/appNav'
 import './AppNavDrawer.css'
 
-// Deep-link alias parity with WalletPage (the Swap tab is now "Trade").
-const TAB_ALIASES = { swap: 'trade' }
+// Deep-link alias parity with WalletPage (the Swap tab is now "Trade"; the
+// old standalone Backup tab now lives inside the combined Security panel).
+const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
-// The drawer list = a top "Quick Access" group (Home) + the section groups.
+// The drawer list = a top "Quick Access" group (Home) + the section groups,
+// with Wagers moved down into the Apps group (it keeps its absolute /wagers route).
 const DRAWER_GROUPS = [
-  { label: 'Quick Access', items: [HOME_ITEM, WAGERS_ITEM] },
-  ...NAV_GROUPS,
+  { label: 'Quick Access', items: [HOME_ITEM] },
+  ...NAV_GROUPS.map((group) =>
+    group.label === 'Apps'
+      ? { ...group, items: [WAGERS_ITEM, ...group.items] }
+      : group,
+  ),
 ]
 
 // Which drawer entry reflects the current route, so the open menu highlights it.
