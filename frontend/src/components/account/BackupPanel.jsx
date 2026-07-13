@@ -28,8 +28,9 @@ function BackupPanel() {
       <h3 id="backup-heading" className="backup-title">Data backup</h3>
       <p className="backup-intro">
         Back up your address book, preferences, and activity history as a single <strong>encrypted</strong> file
-        on IPFS, located by a trustless on-chain pointer. Only your wallet can read it — restore on any device
-        with the same wallet. This is an explicit step; nothing leaves your device until you back up.
+        on IPFS, located by a trustless on-chain pointer. Only your account can read it — restore on any device
+        where you sign in to the same account (wallet or passkey). This is an explicit step; nothing leaves your
+        device until you back up.
       </p>
 
       {!available ? (

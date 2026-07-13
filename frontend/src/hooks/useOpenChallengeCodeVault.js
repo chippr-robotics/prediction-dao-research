@@ -3,11 +3,14 @@ import { WalletContext } from '../contexts/WalletContext'
 import {
   CODE_VAULT_SIGN_MESSAGE,
   deriveVaultKey,
+  deriveVaultKeyFromSeed,
   addEntry,
   readEntries,
   removeEntry,
   hasVault,
 } from '../lib/openChallenge/codeVault'
+import { resolveMasterSeed } from '../lib/passkey/encryption'
+import { readSession } from '../connectors/passkey'
 
 /**
  * Recover-an-open-challenge-code vault (feature 024 follow-up).
@@ -23,18 +26,30 @@ export function useOpenChallengeCodeVault() {
   const account = ctx?.account || null
   const signer = ctx?.signer || null
   const chainId = ctx?.chainId ?? null
+  const loginMethod = ctx?.loginMethod || null
   const keyRef = useRef(null)
   const [busy, setBusy] = useState(false)
 
-  // Derive (and cache) the vault key, prompting one signature the first time.
+  // Derive (and cache) the vault key with one ceremony the first time, login-method agnostic:
+  //  - classic wallet: a signature over the fixed unlock message;
+  //  - passkey account: one WebAuthn PRF ceremony → the account's master seed.
+  // Both are deterministic per account, so the same account always unlocks the same on-device vault.
   const getKey = useCallback(async () => {
     if (keyRef.current) return keyRef.current
-    if (!signer) throw new Error('Connect your wallet to use code backups.')
-    const sig = await signer.signMessage(CODE_VAULT_SIGN_MESSAGE)
-    const key = deriveVaultKey(sig)
+    let key
+    if (loginMethod === 'passkey') {
+      if (!account) throw new Error('Connect your account to use code backups.')
+      const credentialId = readSession()?.credentialId
+      const seed = await resolveMasterSeed({ account, credentialId })
+      key = deriveVaultKeyFromSeed(seed)
+    } else {
+      if (!signer) throw new Error('Connect your wallet to use code backups.')
+      const sig = await signer.signMessage(CODE_VAULT_SIGN_MESSAGE)
+      key = deriveVaultKey(sig)
+    }
     keyRef.current = key
     return key
-  }, [signer])
+  }, [loginMethod, account, signer])
 
   // Save (or refresh) one code backup. `entry` carries the code + light metadata for the recovery list.
   const saveCode = useCallback(async (entry) => {

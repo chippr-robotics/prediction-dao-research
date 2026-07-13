@@ -3,7 +3,7 @@
 // message is DISTINCT from the wager/address-book messages so the backup key can never coincide with another
 // key the wallet derives. The envelope mirrors the address-book backup shape; header is bound via AEAD AAD.
 
-import { getBytes, keccak256, toUtf8Bytes } from 'ethers'
+import { concat, getBytes, keccak256, toUtf8Bytes } from 'ethers'
 import { encryptJson, decryptJson, utf8ToBytes } from '../../utils/crypto/primitives'
 
 export const DATA_BACKUP_MESSAGE_V1 = 'FairWins Data Backup v1'
@@ -21,6 +21,18 @@ export function deriveKeyFromSignature(signature) {
 export async function deriveKey(signer) {
   const signature = await signer.signMessage(DATA_BACKUP_MESSAGE_V1)
   return deriveKeyFromSignature(signature)
+}
+
+/**
+ * Derive the 32-byte backup key from a passkey account's PRF master seed (spec 041) — the login-method-
+ * agnostic twin of {@link deriveKey}. The seed is deterministic per account (same seed on every controller
+ * with key material), and domain-separating with the fixed backup message keeps this key independent from the
+ * X25519/X-Wing keys the same seed derives. Pure + deterministic (no ceremony here; the caller resolves the
+ * seed once via one WebAuthn assertion).
+ * @param {Uint8Array} seed - 32-byte master seed
+ */
+export function deriveKeyFromSeed(seed) {
+  return getBytes(keccak256(concat([seed, toUtf8Bytes(DATA_BACKUP_MESSAGE_V1)])))
 }
 
 /** Encrypt a bundle object into the storable envelope. */

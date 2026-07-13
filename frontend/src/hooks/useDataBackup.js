@@ -16,32 +16,61 @@ import { useNotification } from './useUI'
 import { getNetwork } from '../config/networks'
 import { uploadJson, fetchByCid } from '../utils/ipfsService'
 import { getUserPreference, saveUserPreference, removeUserPreference } from '../utils/userStorage'
-import { deriveKey, encryptBundle, decryptBundle } from '../lib/backup/backupCrypto'
+import { deriveKey, deriveKeyFromSeed, encryptBundle, decryptBundle } from '../lib/backup/backupCrypto'
 import { buildBundle, parseBundle, applyBundle } from '../lib/backup/backupBundle'
-import { readPointer, writePointer, isBackupAvailable, CANONICAL_CHAIN_ID } from '../lib/backup/backupRegistry'
+import { readPointer, writePointer, buildSetPointerCall, isBackupAvailable, CANONICAL_CHAIN_ID } from '../lib/backup/backupRegistry'
+import { resolveMasterSeed } from '../lib/passkey/encryption'
+import { readSession } from '../connectors/passkey'
 
 const SIZE_WARN_BYTES = 1024 * 1024 // ~1 MB soft cap (FR-021)
 const LAST_BACKUP_KEY = 'data_backup_last_at'
 
 // Session-only key cache (in-memory; cleared on reload or account change) so a backup+restore in one session
-// doesn't double-prompt for the signature. Never persisted to disk.
+// doesn't double-prompt for the signature/ceremony. Never persisted to disk.
 let keyCache = { account: null, key: null }
 function cachedKey(account) {
   const a = account ? String(account).toLowerCase() : null
   return keyCache.account === a ? keyCache.key : null
 }
-async function keyFor(signer, account) {
+
+// Derive (and cache) the backup key for the active session, login-method agnostic:
+//  - classic wallet: one signature over the fixed domain message (deriveKey);
+//  - passkey account: one WebAuthn PRF ceremony → the account's master seed → deriveKeyFromSeed.
+// Both are deterministic per account, so a backup made under either controller restores under any controller
+// that holds the same account's key material.
+async function keyFor({ signer, account, loginMethod }) {
   const a = account ? String(account).toLowerCase() : null
   const hit = cachedKey(a)
   if (hit) return hit
-  const key = await deriveKey(signer)
+  let key
+  if (loginMethod === 'passkey') {
+    const credentialId = readSession()?.credentialId
+    const seed = await resolveMasterSeed({ account, credentialId })
+    key = deriveKeyFromSeed(seed)
+  } else {
+    key = await deriveKey(signer) // wallet signature prompt
+  }
   keyCache = { account: a, key }
   return key
 }
 
 export function useDataBackup() {
-  const { account, signer, chainId, isConnected, switchNetwork } = useWallet()
+  const { account, signer, chainId, isConnected, switchNetwork, loginMethod, sendCalls } = useWallet()
   const { showNotification } = useNotification()
+
+  // A passkey account signs through sendCalls / a PRF ceremony, not an ethers signer — so "can we write?"
+  // is "is an account connected with a usable signing path", never "is there a signer object".
+  const isPasskey = loginMethod === 'passkey'
+  const canSign = Boolean(account) && (Boolean(signer) || isPasskey)
+
+  // Persist the pointer on the canonical network, using the session's signing path.
+  const persistPointer = useCallback(async (cid) => {
+    if (isPasskey) {
+      await sendCalls([buildSetPointerCall(cid)])
+    } else {
+      await writePointer(signer, cid)
+    }
+  }, [isPasskey, sendCalls, signer])
 
   const [status, setStatus] = useState('idle') // 'idle' | 'backing-up' | 'restoring' | 'error'
   const [lastBackupAt, setLastBackupAt] = useState(null)
@@ -91,21 +120,21 @@ export function useDataBackup() {
   }, [onCanonical, switchNetwork, showNotification, canonicalName])
 
   const backup = useCallback(async () => {
-    if (!signer || !account) { showNotification('Connect a wallet to back up.', 'warning'); return false }
+    if (!canSign) { showNotification('Connect your account to back up.', 'warning'); return false }
     if (!available) { showNotification('Backup is not available on this network yet.', 'warning'); return false }
     if (!requireCanonical()) return false
     setStatus('backing-up')
     try {
-      const key = await keyFor(signer, account) // wallet signature prompt (cached for the session)
+      const key = await keyFor({ signer, account, loginMethod }) // signature / PRF ceremony (cached for the session)
       const bundle = buildBundle(account, Date.now())
       const envelope = encryptBundle(key, bundle)
       const size = new TextEncoder().encode(JSON.stringify(envelope)).length
       if (size > SIZE_WARN_BYTES) {
         showNotification('Your backup is over 1 MB — it may take longer to store, but will still proceed.', 'warning')
       }
-      showNotification('Storing your encrypted backup, then recording the pointer — confirm the prompts in your wallet…', 'info', 0)
+      showNotification('Storing your encrypted backup, then recording the pointer — confirm the prompts on your device…', 'info', 0)
       const { cid } = await uploadJson(envelope, { namePrefix: 'data-backup' }) // pin (await)
-      await writePointer(signer, cid) // pointer tx (await confirm)
+      await persistPointer(cid) // pointer tx (await confirm)
       const now = Date.now()
       saveUserPreference(account, LAST_BACKUP_KEY, now, true)
       setLastBackupAt(now)
@@ -118,11 +147,11 @@ export function useDataBackup() {
       showNotification(e?.shortMessage || e?.reason || e?.message || 'Backup failed — your local data is unchanged.', 'error')
       return false // local data never written during backup
     }
-  }, [signer, account, available, requireCanonical, showNotification])
+  }, [canSign, signer, account, loginMethod, available, requireCanonical, persistPointer, showNotification])
 
   // mode: 'merge' (additive, default, non-destructive) | 'replace'
   const restore = useCallback(async (mode = 'merge') => {
-    if (!signer || !account) { showNotification('Connect a wallet to restore.', 'warning'); return { restored: false, reason: 'no-wallet' } }
+    if (!canSign) { showNotification('Connect your account to restore.', 'warning'); return { restored: false, reason: 'no-wallet' } }
     if (!available) { showNotification('Backup is not available on this network yet.', 'warning'); return { restored: false, reason: 'unavailable' } }
     setStatus('restoring')
     try {
@@ -143,7 +172,7 @@ export function useDataBackup() {
       }
       let bundle
       try {
-        const key = await keyFor(signer, account)
+        const key = await keyFor({ signer, account, loginMethod })
         bundle = parseBundle(decryptBundle(key, envelope))
       } catch {
         setStatus('idle')
@@ -167,15 +196,15 @@ export function useDataBackup() {
       showNotification(e?.shortMessage || e?.message || 'Restore failed — your local data is unchanged.', 'error')
       return { restored: false, reason: 'error' }
     }
-  }, [signer, account, available, showNotification])
+  }, [canSign, signer, account, loginMethod, available, showNotification])
 
   const remove = useCallback(async () => {
-    if (!signer || !account) { showNotification('Connect a wallet.', 'warning'); return false }
+    if (!canSign) { showNotification('Connect your account.', 'warning'); return false }
     if (!available) return false
     if (!requireCanonical()) return false
     setStatus('backing-up')
     try {
-      await writePointer(signer, '') // clear the pointer
+      await persistPointer('') // clear the pointer
       removeUserPreference(account, LAST_BACKUP_KEY)
       setLastBackupAt(null)
       setHasRemote(false)
@@ -187,7 +216,7 @@ export function useDataBackup() {
       showNotification(e?.shortMessage || e?.message || 'Could not remove your backup.', 'error')
       return false
     }
-  }, [signer, account, available, requireCanonical, showNotification])
+  }, [canSign, account, available, requireCanonical, persistPointer, showNotification])
 
   return {
     available,

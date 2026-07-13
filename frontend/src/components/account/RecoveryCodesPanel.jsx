@@ -38,13 +38,13 @@ export default function RecoveryCodesPanel() {
   let body
   if (!canUse) {
     body = (
-      <p className="fm-hint">Connect your wallet to recover the open-challenge codes you saved on this device.</p>
+      <p className="fm-hint">Sign in to recover the open-challenge codes you saved on this device.</p>
     )
   } else if (entries == null) {
     body = (
       <>
         <p className="fm-hint">
-          Codes you chose to back up are stored encrypted on this device, readable only with this wallet.
+          Codes you chose to back up are stored encrypted on this device, readable only by this account.
           Unlock to recover a forgotten code. (Codes saved on other devices won&apos;t appear here.)
         </p>
         {error && <div className="fm-error-banner" role="alert">{error}</div>}

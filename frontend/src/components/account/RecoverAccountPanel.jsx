@@ -30,6 +30,9 @@ const RECOVERY_ABI = [
 
 const isHexAddress = (s) => /^0x[0-9a-fA-F]{40}$/.test(s.trim())
 
+// User-facing guide for how passkey account recovery via a linked wallet works.
+const RECOVERY_DOCS_URL = 'https://docs.FairWins.app/user-guide/account-recovery/'
+
 function RecoverAccountPanel({ deps = {} }) {
   const { address: walletAddress, signer, provider, loginMethod, isConnected } = useWallet()
   const [accountAddress, setAccountAddress] = useState('')
@@ -113,7 +116,10 @@ function RecoverAccountPanel({ deps = {} }) {
       <h3>Recover a passkey account</h3>
       <p className="section-description">
         Lost your passkeys? If this wallet was linked to your passkey account as a controller, it can
-        authorize a new passkey — no FairWins involvement required.
+        authorize a new passkey — no FairWins involvement required.{' '}
+        <a href={RECOVERY_DOCS_URL} target="_blank" rel="noopener noreferrer">
+          Learn how account recovery works →
+        </a>
       </p>
 
       <label htmlFor="recover-account-address">Passkey account address</label>

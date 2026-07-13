@@ -22,10 +22,10 @@ describe('RecoveryCodesPanel (recovery codes in Security)', () => {
     expect(screen.getByRole('heading', { name: /recovery codes/i })).toBeInTheDocument()
   })
 
-  it('prompts to connect a wallet when the vault is unavailable', () => {
+  it('prompts to sign in when the vault is unavailable', () => {
     vault = { ...vault, canUse: false }
     render(<RecoveryCodesPanel />)
-    expect(screen.getByText(/connect your wallet to recover/i)).toBeInTheDocument()
+    expect(screen.getByText(/sign in to recover/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /unlock/i })).toBeNull()
   })
 

@@ -29,6 +29,9 @@ import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
+// User-facing guide for how losing/replacing passkeys and recovery via a linked wallet work.
+const RECOVERY_DOCS_URL = 'https://docs.FairWins.app/user-guide/account-recovery/'
+
 function ControllersPanel({ deps = {} }) {
   const { address, sendCalls, provider, chainId } = useWallet()
   const account = usePasskeyAccount(deps)
@@ -141,6 +144,13 @@ function ControllersPanel({ deps = {} }) {
   return (
     <section className="controllers-panel" aria-label="Account controllers">
       <h3>Devices &amp; controllers</h3>
+      <p className="controllers-panel__intro">
+        Passkeys and linked wallets that can control this account. Keep at least two so losing one device never
+        locks you out.{' '}
+        <a href={RECOVERY_DOCS_URL} target="_blank" rel="noopener noreferrer">
+          Learn how account recovery works →
+        </a>
+      </p>
       {!account.deployed && (
         <p className="controllers-panel__counterfactual" role="note">
           Your account is ready to receive funds and activates on-chain with your first action.
@@ -157,14 +167,22 @@ function ControllersPanel({ deps = {} }) {
 
       <ul className="controllers-panel__list">
         {account.controllers.map((c) => (
-          <li key={String(c.index)} data-testid={`controller-${c.index}`}>
-            <span>{c.label}</span>
-            <span className="controllers-panel__kind">{c.kind}</span>
-            {c.kind === 'wallet' && <code>{c.address}</code>}
-            {c.isThisDevice && <em> (this device)</em>}
+          <li key={String(c.index)} data-testid={`controller-${c.index}`} className="controllers-panel__item">
+            <div className="controllers-panel__item-info">
+              <div className="controllers-panel__item-head">
+                <span className="controllers-panel__label">{c.label}</span>
+                <span className="controllers-panel__kind" data-kind={c.kind}>
+                  {c.kind === 'wallet' ? 'Wallet' : 'Passkey'}
+                </span>
+                {c.isThisDevice && <span className="controllers-panel__badge">(this device)</span>}
+              </div>
+              {c.kind === 'wallet' && c.address && (
+                <code className="controllers-panel__address">{c.address}</code>
+              )}
+            </div>
             <button
               type="button"
-              className="btn btn-small"
+              className="btn btn-small controllers-panel__remove"
               disabled={busy || account.controllerCount <= 1}
               onClick={() => removeController(c)}
               aria-label={`Remove ${c.label}`}

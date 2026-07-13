@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveKeyFromSignature, encryptBundle, decryptBundle, DATA_BACKUP_MESSAGE_V1 } from '../../lib/backup/backupCrypto'
+import { deriveKeyFromSignature, deriveKeyFromSeed, encryptBundle, decryptBundle, DATA_BACKUP_MESSAGE_V1 } from '../../lib/backup/backupCrypto'
 
 // Spec 032 — backup encryption: deterministic signature-derived key, encrypt/decrypt round-trip, and honest
 // failure (wrong key / tampered / foreign envelope throws → "no usable backup", local never overwritten).
@@ -42,5 +42,22 @@ describe('backupCrypto', () => {
 
   it('uses a distinct domain message', () => {
     expect(DATA_BACKUP_MESSAGE_V1).toBe('FairWins Data Backup v1')
+  })
+
+  it('derives a deterministic 32-byte key from a passkey master seed (spec 041)', () => {
+    const seed = new Uint8Array(32).fill(7)
+    const seedKey = deriveKeyFromSeed(seed)
+    expect(seedKey).toBeInstanceOf(Uint8Array)
+    expect(seedKey.length).toBe(32)
+    expect(deriveKeyFromSeed(new Uint8Array(32).fill(7))).toEqual(seedKey) // same seed → same key
+    expect(deriveKeyFromSeed(new Uint8Array(32).fill(8))).not.toEqual(seedKey) // different seed → different key
+  })
+
+  it('round-trips a bundle encrypted under a seed-derived key', () => {
+    const seedKey = deriveKeyFromSeed(new Uint8Array(32).fill(7))
+    const env = encryptBundle(seedKey, bundle)
+    expect(decryptBundle(seedKey, env)).toEqual(bundle)
+    // A signature-derived key (even numerically identical seed bytes as a string) must NOT open it.
+    expect(() => decryptBundle(deriveKeyFromSignature('0xsignature-aaaa'), env)).toThrow()
   })
 })
