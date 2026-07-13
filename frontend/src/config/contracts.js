@@ -115,7 +115,7 @@ const POLYGON_CONTRACTS = {
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
-  wagerTagRegistry: '', // spec 054 — %tag naming registry (synced after deploy)
+  wagerTagRegistry: '0xF7370780F13eCEb2f65c21d38b7bd53f25509a9F', // spec 054 — %tag naming registry (synced after deploy)
 }
 
 const NETWORK_CONTRACTS = {
