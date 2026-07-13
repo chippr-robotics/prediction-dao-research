@@ -63,7 +63,15 @@ spec:
             - name: ALTO_ENTRYPOINTS
               value: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"   # EntryPoint v0.6
             - name: ALTO_RPC_URL
-              value: "https://polygon-bor-rpc.publicnode.com"
+              # Switched off publicnode 2026-07-12: its free tier began 403-ing archive requests
+              # ("Archive requests require a personal token"), which broke ERC-4337 receipt
+              # resolution (eth_getLogs for UserOperationEvent) — ops mined but confirmations never
+              # surfaced, and the receipt-poll 403 flood degraded the send path (bundles stopped
+              # broadcasting; executor nonce froze). QuickNode's public Polygon endpoint serves
+              # archive getLogs without a token. Applied live via `gcloud run services update
+              # --container=alto --update-env-vars` (revision 00072). If broadcasts still stall on a
+              # gas spike, add an alto gas-price multiplier / move to a keyed archive RPC.
+              value: "https://rpc-mainnet.matic.quiknode.pro"
             - name: ALTO_SAFE_MODE
               value: "false"
             - name: ALTO_PORT
@@ -73,7 +81,22 @@ spec:
             - name: ALTO_NETWORK_NAME
               value: "polygon"
             - name: ALTO_DEPLOY_SIMULATIONS_CONTRACT
-              value: "false"   # v0.6 has built-in simulation; the sim contract fails EIP-170 on Polygon
+              # MUST be true on Polygon (verified 2026-07-12). With false, alto v1.2.7's bundle-build
+              # (filterOps) references a simulations contract that isn't deployed and throws a swallowed
+              # error BEFORE any broadcast — ops pass validation/estimation (v0.6 built-in sim) but the
+              # executor never sends the bundle, so its nonce freezes and every UserOp times out. With
+              # true, alto deploys its own version-matched sim contract via the funded utility wallet and
+              # bundles land (confirmed: handleOps 0x95ca0cc0…, block 90119266). Do NOT set false: an
+              # earlier `services replace` applying a stale false silently re-broke the bundler.
+              value: "true"
+            - name: ALTO_GAS_PRICE_MULTIPLIERS
+              # slow,standard,fast multipliers (%) on the computed gas price (default 100,100,100).
+              # Polygon public RPCs report a stale ~25-30 gwei eth_maxPriorityFeePerGas even under heavy
+              # congestion (real p50 has hit 110-135 gwei), so alto underprices ops/bundles and the
+              # executor can't get them included. These multipliers lift the suggestion to ~100/125/150
+              # gwei priority so bundles land during spikes. Revisit if Polygon fees normalize or we move
+              # to an RPC with an accurate fee oracle. Added 2026-07-13.
+              value: "400,500,600"
             - name: ALTO_EXECUTOR_PRIVATE_KEYS
               valueFrom:
                 secretKeyRef:
