@@ -81,7 +81,14 @@ spec:
             - name: ALTO_NETWORK_NAME
               value: "polygon"
             - name: ALTO_DEPLOY_SIMULATIONS_CONTRACT
-              value: "false"   # v0.6 has built-in simulation; the sim contract fails EIP-170 on Polygon
+              # MUST be true on Polygon (verified 2026-07-12). With false, alto v1.2.7's bundle-build
+              # (filterOps) references a simulations contract that isn't deployed and throws a swallowed
+              # error BEFORE any broadcast — ops pass validation/estimation (v0.6 built-in sim) but the
+              # executor never sends the bundle, so its nonce freezes and every UserOp times out. With
+              # true, alto deploys its own version-matched sim contract via the funded utility wallet and
+              # bundles land (confirmed: handleOps 0x95ca0cc0…, block 90119266). Do NOT set false: an
+              # earlier `services replace` applying a stale false silently re-broke the bundler.
+              value: "true"
             - name: ALTO_EXECUTOR_PRIVATE_KEYS
               valueFrom:
                 secretKeyRef:
