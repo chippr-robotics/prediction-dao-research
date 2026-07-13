@@ -4,7 +4,7 @@
 
 All routes are **GET**, read-only, and inherit the gateway's standard middleware:
 CORS allow-list, `X-Origin-Auth` origin-lock (403 `origin_denied` without it),
-and the JSON error envelope `{ "error": { "code", "message" } }`.
+and the gateway's JSON error envelope `{ "error": { "code", "reason" } }`.
 
 Common behavior:
 
@@ -139,13 +139,15 @@ re-fetching item details. Cache key: `stats:{slug}` — TTL
 
 | HTTP | `error.code` | Meaning |
 |---|---|---|
-| 400 | `invalid_address` / `invalid_identifier` / `invalid_slug` | parameter validation |
+| 400 | `invalid_address` / `invalid_identifier` / `invalid_slug` / `invalid_cursor` | parameter validation |
 | 403 | `origin_denied` | missing/wrong `X-Origin-Auth` |
 | 404 | `unsupported_chain` | chainId not 1/137 |
+| 404 | `not_found` | OpenSea definitively does not know this item |
 | 429 | `quota_exceeded` | per-address or global quota (with `Retry-After`) |
+| 502 | `upstream_rejected` | OpenSea returned a definitive non-404 4xx |
 | 503 | `collectibles_unconfigured` | `OPENSEA_API_KEY` unset |
 | 503 | `killswitch_active` | gateway killswitch engaged |
-| 503 | `upstream_unavailable` | OpenSea unreachable and no cached value |
+| 503 | `upstream_unavailable` | OpenSea unreachable/throttled and no cached value |
 
 ## Frontend client contract
 
