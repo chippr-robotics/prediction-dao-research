@@ -4,6 +4,7 @@ import { usePolymarketMarket } from '../../hooks/usePolymarketMarket'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { ResolutionType } from '../../constants/wagerDefaults'
 import { UIContext } from '../../contexts/UIContext'
+import { WalletContext } from '../../contexts/WalletContext'
 import InfoTip from '../ui/InfoTip'
 import SensitiveValue from '../common/SensitiveValue'
 import './FriendMarketsModal.css'
@@ -22,6 +23,14 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
   // Access the notification system directly (optional) so this panel still renders in tests without a
   // UIProvider, while routing the take-success event into the app's notification toasts (spec 037).
   const ui = useContext(UIContext)
+  // Wallet connection surface (spec 045). Read directly (optional) so the panel still renders in
+  // tests without a WalletProvider. A passkey/EOA session is "connected" once it has an address; if
+  // there's no connected account we show a Connect affordance instead of dead-ending the accept with
+  // "Connect your wallet to accept." — the exact error passkey takers hit opening a shared link.
+  const wallet = useContext(WalletContext)
+  const connectedAddress = wallet?.address || wallet?.account || null
+  const isConnected = Boolean(connectedAddress)
+  const openConnectModal = wallet?.openConnectModal
   const [phase, setPhase] = useState('found')
   const [progress, setProgress] = useState(null)
   const [txHash, setTxHash] = useState(null)
@@ -76,14 +85,14 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
   return (
     <div className="fm-form">
       <div className="fm-form-group fm-form-full">
-        <label>Challenge terms</label>
+        <label>The challenge</label>
         {found.termsUnavailable ? (
           <div className="oc-notice oc-notice--warn" role="alert">
             Terms unavailable — the encrypted details couldn&apos;t be retrieved. You can still accept; the
             on-chain wager is unaffected. Keep your code to read the terms later.
           </div>
         ) : (
-          <pre className="oc-terms-body">{formatTerms(found.terms)}</pre>
+          <ChallengeText terms={found.terms} />
         )}
       </div>
 
@@ -129,7 +138,11 @@ export default function TakeChallengePanel({ code, match, onClose, onBuyMembersh
           )}
           <div className="fm-success-actions">
             <span className="fm-label-row">
-              <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy || blockedResolved}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Accepting…') : 'Accept challenge'}</button>
+              {isConnected ? (
+                <button type="button" className="fm-btn-primary" onClick={handleAccept} disabled={busy || blockedResolved}>{busy ? (progress ? `${stepLabel(progress.step)}…` : 'Locking in…') : 'Lock In!'}</button>
+              ) : (
+                <button type="button" className="fm-btn-primary" onClick={() => openConnectModal?.()} disabled={blockedResolved}>Connect wallet to Lock In</button>
+              )}
               <InfoTip label="About accepting">
                 Accepting binds you as the opponent and escrows your equal stake. Save your code to re-read the terms later.
               </InfoTip>
@@ -359,10 +372,28 @@ function formatDeadline(value) {
   }
 }
 
-function formatTerms(terms) {
+/**
+ * Render the challenge as readable prose, never raw JSON. The sealed terms are a small object
+ * ({ description, createdAt, oracle? }); the taker only cares about the human description. Anything
+ * that isn't a plain description (legacy shapes, missing text) degrades to a neutral note rather than
+ * dumping the object — the on-chain bet summary below already carries the authoritative details.
+ */
+function ChallengeText({ terms }) {
+  const text = challengeText(terms)
+  if (!text) {
+    return <p className="tc-terms-text tc-terms-text--empty">No description was included with this challenge.</p>
+  }
+  return <p className="tc-terms-text">{text}</p>
+}
+
+function challengeText(terms) {
   if (terms == null) return ''
-  if (typeof terms === 'string') return terms
-  try { return JSON.stringify(terms, null, 2) } catch { return String(terms) }
+  if (typeof terms === 'string') return terms.trim()
+  if (typeof terms === 'object') {
+    const desc = terms.description ?? terms.text ?? terms.title
+    if (typeof desc === 'string') return desc.trim()
+  }
+  return ''
 }
 
 function shorten(hash) {
