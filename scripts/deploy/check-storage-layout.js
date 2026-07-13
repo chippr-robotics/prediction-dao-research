@@ -23,6 +23,7 @@ const UPGRADEABLE_CONTRACTS = [
   { name: "TokenFactory", deploymentsKey: "tokenFactory" }, // spec 028 — token-issuance authority/registry
   { name: "ExternalDAORegistry", deploymentsKey: "externalDAORegistry" }, // spec 030 — ClearPath external-DAO registry
   { name: "WagerPoolFactory", deploymentsKey: "wagerPoolFactory" }, // spec 034 — WagerPools factory (address-based)
+  { name: "WagerTagRegistry", deploymentsKey: "wagerTagRegistry" }, // spec 054 — in-house %tag naming registry
 ];
 
 function loadDeployedImpl(deploymentsKey) {

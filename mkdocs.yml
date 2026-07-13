@@ -95,6 +95,7 @@ nav:
     - Resolving a Wager: user-guide/resolve-wager.md
     - Private Wager Encryption: user-guide/private-market-encryption.md
     - Address Book & Screening: user-guide/address-book.md
+    - Wager Tags: user-guide/wager-tags.md
     - FAQ: user-guide/faq.md
   - Developer Guide:
     - Setup: developer-guide/setup.md

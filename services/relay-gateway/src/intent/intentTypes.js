@@ -32,6 +32,9 @@ export const CONTRACT_DOMAINS = {
   // address as verifyingContract (the domain/target split — see ACTIONS + verify.js).
   wagerPool: { name: 'FairWins WagerPool', version: '1' },
   wagerPoolFactory: { name: 'FairWins WagerPoolFactory', version: '1' },
+  // Wager tag registry (spec 054) — its own domain; register/change/requestRepoint execute only while
+  // the signer holds Gold+ (revert otherwise), so the gateway SHOULD pre-screen tier before relaying.
+  wagerTagRegistry: { name: 'FairWins WagerTagRegistry', version: '1' },
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +178,14 @@ export const INTENT_TYPES = {
     { name: 'resolveDeadline', type: 'uint64' },
     ...TAIL,
   ],
+
+  // ---- Wager tag registry (spec 054) — signer-attributed, no payment leg ----
+  CommitTagIntent: [{ name: 'owner', type: 'address' }, { name: 'commitment', type: 'bytes32' }, ...TAIL],
+  RegisterTagIntent: [{ name: 'owner', type: 'address' }, { name: 'tag', type: 'string' }, { name: 'salt', type: 'bytes32' }, ...TAIL],
+  ChangeTagIntent: [{ name: 'owner', type: 'address' }, { name: 'newTag', type: 'string' }, { name: 'salt', type: 'bytes32' }, ...TAIL],
+  ReleaseTagIntent: [{ name: 'owner', type: 'address' }, { name: 'tagHash', type: 'bytes32' }, ...TAIL],
+  RequestRepointIntent: [{ name: 'owner', type: 'address' }, { name: 'tagHash', type: 'bytes32' }, { name: 'newOwner', type: 'address' }, ...TAIL],
+  CancelRepointIntent: [{ name: 'owner', type: 'address' }, { name: 'tagHash', type: 'bytes32' }, ...TAIL],
 }
 
 // EIP-3009 payment-leg typed data (token's own domain — native USDC version "2").
@@ -229,6 +240,13 @@ export const ENTRYPOINT_ABI = [
   'function approveWithSigFor(address pool, bytes32 proposalId, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
   `function claimWithSigFor(address pool, ${POOL_ENTRIES_TUPLE} entries, uint256 index, address recipient, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)`,
   'function refundWithSigFor(address pool, address signer, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  // WagerTagRegistry (spec 054) — signer-attributed twins (owner == signer)
+  'function commitWithSig(address owner, bytes32 commitment, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function registerWithSig(address owner, string tag, bytes32 salt, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function changeTagWithSig(address owner, string newTag, bytes32 salt, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function releaseWithSig(address owner, bytes32 tagHash, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function requestRepointWithSig(address owner, bytes32 tagHash, address newOwner, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
+  'function cancelRepointWithSig(address owner, bytes32 tagHash, bytes32 nonce, uint256 validAfter, uint256 validBefore, bytes sig)',
 ]
 
 export const entrypointInterface = new ethers.Interface(ENTRYPOINT_ABI)
@@ -556,6 +574,38 @@ export const ACTIONS = {
       ])
     },
   },
+
+  // ---- Wager tag registry (spec 054) — signer-attributed; owner == recovered signer ----
+  tagCommit: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'CommitTagIntent', actorField: 'owner',
+    fn: 'commitWithSig', paramNames: ['commitment'],
+    buildArgs: (p, signer, intent) => [signer, p.commitment, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
+  tagRegister: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'RegisterTagIntent', actorField: 'owner',
+    fn: 'registerWithSig', paramNames: ['tag', 'salt'],
+    buildArgs: (p, signer, intent) => [signer, p.tag, p.salt, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
+  tagChange: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'ChangeTagIntent', actorField: 'owner',
+    fn: 'changeTagWithSig', paramNames: ['newTag', 'salt'],
+    buildArgs: (p, signer, intent) => [signer, p.newTag, p.salt, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
+  tagRelease: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'ReleaseTagIntent', actorField: 'owner',
+    fn: 'releaseWithSig', paramNames: ['tagHash'],
+    buildArgs: (p, signer, intent) => [signer, p.tagHash, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
+  tagRequestRepoint: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'RequestRepointIntent', actorField: 'owner',
+    fn: 'requestRepointWithSig', paramNames: ['tagHash', 'newOwner'],
+    buildArgs: (p, signer, intent) => [signer, p.tagHash, p.newOwner, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
+  tagCancelRepoint: withSigAction({
+    contract: 'wagerTagRegistry', typeName: 'CancelRepointIntent', actorField: 'owner',
+    fn: 'cancelRepointWithSig', paramNames: ['tagHash'],
+    buildArgs: (p, signer, intent) => [signer, p.tagHash, intent.uniquenessMarker, intent.validAfter, intent.validBefore, intent.signature],
+  }),
 }
 
 /** Allowed action names per target contract key — the version-pinned allow-list (FR-025). */

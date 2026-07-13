@@ -177,6 +177,20 @@
   font-weight: 500;
 }
 
+/* Abuse-report link on a resolved counterparty tag (spec 054, FR-025) */
+.reportLink {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.reportLink:hover,
+.reportLink:focus-visible {
+  color: #ef4444;
+}
+
 /* Error message */
 .errorMessage {
   font-size: 0.75rem;

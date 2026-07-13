@@ -156,6 +156,42 @@ export const INTENT_TYPES = {
     { name: 'resolveDeadline', type: 'uint64' },
     ...TRAILING,
   ],
+
+  // ---- Wager tag registry (spec 054) — signer-attributed, no payment leg (free with Gold membership).
+  //      Byte-identical to WagerTagRegistry.sol typehashes + services/relay-gateway/src/intent/intentTypes.js.
+  CommitTagIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'commitment', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  RegisterTagIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'tag', type: 'string' },
+    { name: 'salt', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  ChangeTagIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'newTag', type: 'string' },
+    { name: 'salt', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  ReleaseTagIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'tagHash', type: 'bytes32' },
+    ...TRAILING,
+  ],
+  RequestRepointIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'tagHash', type: 'bytes32' },
+    { name: 'newOwner', type: 'address' },
+    ...TRAILING,
+  ],
+  CancelRepointIntent: [
+    { name: 'owner', type: 'address' },
+    { name: 'tagHash', type: 'bytes32' },
+    ...TRAILING,
+  ],
 }
 
 /**
@@ -200,6 +236,26 @@ export const INTENT_ACTIONS = {
   poolClaim: { primaryType: 'ClaimShare', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPool', verifyingContractParam: 'pool', intentClass: 'signer-attributed', actorField: 'winner' },
   poolCreate: { primaryType: 'CreatePool', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPoolFactory', intentClass: 'signer-attributed', actorField: 'creator' },
   poolJoin: { verifier: 'wagerPoolFactory', intentClass: 'payment', authOnly: true, authToParam: 'pool' },
+
+  // ---- Wager tag registry (spec 054) — target + domain both the registry; owner == recovered signer.
+  //      register/change/requestRepoint execute only while the signer holds Gold+ (else revert on-chain);
+  //      the gateway SHOULD pre-screen tier. requestRepoint is itself tier-exempt on-chain (recovery safety).
+  tagCommit: { primaryType: 'CommitTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  tagRegister: { primaryType: 'RegisterTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  tagChange: { primaryType: 'ChangeTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  tagRelease: { primaryType: 'ReleaseTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  tagRequestRepoint: { primaryType: 'RequestRepointIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  tagCancelRepoint: { primaryType: 'CancelRepointIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+}
+
+/**
+ * EIP-712 domain for WagerTagRegistry intents (spec 054). Its own per-contract domain (name/version set in
+ * WagerTagRegistry.initialize) gives network + contract isolation.
+ * @param {number} chainId
+ * @param {string} verifyingContract - the wagerTagRegistry PROXY address for this chain
+ */
+export function wagerTagRegistryDomain(chainId, verifyingContract) {
+  return { name: 'FairWins WagerTagRegistry', version: '1', chainId: Number(chainId), verifyingContract }
 }
 
 /**
