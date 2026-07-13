@@ -96,7 +96,7 @@
 
 - [x] T029 [P] Add OpenSea key provisioning/rotation + quota/killswitch notes for the new route group to `docs/runbooks/relayer-operations.md`
 - [x] T030 [P] Verify CI runs `services/relay-gateway` tests; if not, wire them into the existing test workflow in `.github/workflows/` without any `continue-on-error` (constitution IV)
-- [ ] T031 Run quickstart §1 + §5 gates: full `services/relay-gateway` suite, full `frontend` suite, `npm run lint` (frontend) — all green; fix fallout
+- [x] T031 Run quickstart §1 + §5 gates: full `services/relay-gateway` suite, full `frontend` suite, `npm run lint` (frontend) — all green; fix fallout
 - [x] T032 Grep-audit per quickstart §4: no `OPENSEA_API_KEY` outside `.env.example`/specs/docs, no OpenSea key material reachable from `frontend/` source or build
 
 ## Dependencies & Execution Order
