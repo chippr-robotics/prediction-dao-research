@@ -135,34 +135,34 @@ recipient redeem it on the wallet they'll wager with.
 No — you must **redeem** it first. Redeeming burns the voucher and grants the
 soulbound membership that unlocks wagering.
 
-## Wager tags
+## Callsigns
 
-### What is a wager tag?
+### What is a callsign?
 
 A short, memorable handle for your wallet, shown with a `%` — like `%chipprbots`.
-Instead of a long `0x…` address, people can find you by your tag when they create a
+Instead of a long `0x…` address, people can find you by your callsign when they create a
 wager, send a transfer, or add you to their address book. See
-[Wager Tags](wager-tags.md) for the full guide.
+[Callsigns](callsigns.md) for the full guide.
 
 ### Do I need one?
 
-No. Wager tags are **optional** — you can always wager with a raw address. They're a
+No. Callsigns are **optional** — you can always wager with a raw address. They're a
 convenience perk of **Gold membership and above**.
 
-### Can someone steal my tag or point it at their own wallet?
+### Can someone steal my callsign or point it at their own wallet?
 
 No. Only you — with the same wallet authorization as your other account actions — can
-change, release, or move your tag. **Not even platform operators** can move it to a
-different wallet. Operators can suspend an abusive tag from resolving, but suspension
+change, release, or move your callsign. **Not even platform operators** can move it to a
+different wallet. Operators can suspend an abusive callsign from resolving, but suspension
 never reassigns it or touches any funds.
 
-### Is my tag private?
+### Is my callsign private?
 
-No — unlike your on-device address book, the tag ↔ address mapping is **public and
-on-chain**. Anyone can look up the address behind a tag, so choose a handle you're
+No — unlike your on-device address book, the callsign ↔ address mapping is **public and
+on-chain**. Anyone can look up the address behind a callsign, so choose a handle you're
 comfortable being public.
 
-### What happens to my tag if my membership lapses?
+### What happens to my callsign if my membership lapses?
 
 It keeps working through a **12-month grace period**. Renew Gold before that ends to
 keep it; otherwise it eventually becomes reclaimable by others.

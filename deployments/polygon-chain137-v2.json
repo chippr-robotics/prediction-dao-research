@@ -38,8 +38,8 @@
     "safePolicyGuard": "0xa0F188776a65794cc06777412432e47dcB0d0c4B",
     "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
     "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
-    "wagerTagRegistry": "0xF7370780F13eCEb2f65c21d38b7bd53f25509a9F",
-    "wagerTagRegistryImpl": "0x72BC0c361Ea54720F25Dc8E519f70a4d7F6a41A0"
+    "callsignRegistry": "0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2",
+    "callsignRegistryImpl": "0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49"
   },
   "mocks": null,
   "constructorArgs": {
@@ -83,7 +83,7 @@
     "safePolicyGuard": [],
     "policyGuardSetup": [],
     "safeProposalHub": [],
-    "wagerTagRegistryImpl": []
+    "callsignRegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
@@ -103,5 +103,5 @@
     "policyGuardSetup": 90120725,
     "safeProposalHub": 90120743
   },
-  "wagerTagRegistryDeployedAt": "2026-07-13T03:02:00.347Z"
+  "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z"
 }

@@ -24,6 +24,11 @@
       "address": "0xF7370780F13eCEb2f65c21d38b7bd53f25509a9F",
       "txHash": "0xee4ee61c10890b1af713f24b0b5fdbc1a0fc74d14ec7cc35ae56f9fc03984c19",
       "kind": "uups"
+    },
+    {
+      "address": "0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2",
+      "txHash": "0xd5e4c2e362d310eb5bee1990020fa22c5aecbf211b5fa3cad23f29081733a77e",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -2666,6 +2671,456 @@
               },
               {
                 "label": "tag",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "registeredAt",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "pendingOwner",
+                "type": "t_address",
+                "offset": 8,
+                "slot": "2"
+              },
+              {
+                "label": "repointEffectiveAt",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "suspended",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "3"
+              },
+              {
+                "label": "verified",
+                "type": "t_bool",
+                "offset": 9,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:fairwins.storage.SignerIntentBase": [
+            {
+              "contract": "SignerIntentBase",
+              "label": "used",
+              "type": "t_mapping(t_address,t_mapping(t_bytes32,t_bool))",
+              "src": "contracts/upgradeable/SignerIntentBase.sol:33",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.EIP712": [
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedName",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:38",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedVersion",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:40",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_name",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:42",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_version",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:43",
+              "offset": 0,
+              "slot": "3"
+            }
+          ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "2b7d7d503047414590c92e638c5781cb33aee7e25bce4733109cf224db6faf18": {
+      "address": "0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49",
+      "txHash": "0xa89c82cfdde368c0a3655cb525adea5cca9ec7e73df44c8e0c5e8f6d7e19708a",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSManaged",
+            "src": "contracts/upgradeable/UUPSManaged.sol:46"
+          },
+          {
+            "label": "membershipManager",
+            "offset": 0,
+            "slot": "50",
+            "type": "t_contract(IMembershipManager)31978",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:71"
+          },
+          {
+            "label": "sanctionsGuard",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_contract(ISanctionsGuard)32135",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:72"
+          },
+          {
+            "label": "membershipRole",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_bytes32",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:73"
+          },
+          {
+            "label": "minTier",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_enum(Tier)31831",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:74"
+          },
+          {
+            "label": "minCommitmentAge",
+            "offset": 1,
+            "slot": "53",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:76"
+          },
+          {
+            "label": "maxCommitmentAge",
+            "offset": 9,
+            "slot": "53",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:77"
+          },
+          {
+            "label": "quarantinePeriod",
+            "offset": 17,
+            "slot": "53",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:78"
+          },
+          {
+            "label": "changeCooldown",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:79"
+          },
+          {
+            "label": "repointDelay",
+            "offset": 8,
+            "slot": "54",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:80"
+          },
+          {
+            "label": "lapseGrace",
+            "offset": 16,
+            "slot": "54",
+            "type": "t_uint64",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:81"
+          },
+          {
+            "label": "_records",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_mapping(t_bytes32,t_struct(CallsignRecord)34248_storage)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:83"
+          },
+          {
+            "label": "callsignHashOf",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_mapping(t_address,t_bytes32)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:84"
+          },
+          {
+            "label": "quarantinedUntil",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_mapping(t_bytes32,t_uint64)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:85"
+          },
+          {
+            "label": "reserved",
+            "offset": 0,
+            "slot": "58",
+            "type": "t_mapping(t_bytes32,t_bool)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:86"
+          },
+          {
+            "label": "commitments",
+            "offset": 0,
+            "slot": "59",
+            "type": "t_mapping(t_bytes32,t_uint64)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:87"
+          },
+          {
+            "label": "lastChangeAt",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_mapping(t_address,t_uint64)",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:88"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_array(t_uint256)43_storage",
+            "contract": "CallsignRegistry",
+            "src": "contracts/naming/CallsignRegistry.sol:90"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_bytes32,t_bool))": {
+            "label": "mapping(address => mapping(bytes32 => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_bool)": {
+            "label": "mapping(bytes32 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)973_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)983_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(EIP712Storage)2321_storage": {
+            "label": "struct EIP712Upgradeable.EIP712Storage",
+            "members": [
+              {
+                "label": "_hashedName",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_hashedVersion",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_version",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(InitializableStorage)1258_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)973_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SignerIntentStorage)17745_storage": {
+            "label": "struct SignerIntentBase.SignerIntentStorage",
+            "members": [
+              {
+                "label": "used",
+                "type": "t_mapping(t_address,t_mapping(t_bytes32,t_bool))",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)43_storage": {
+            "label": "uint256[43]",
+            "numberOfBytes": "1376"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_contract(IMembershipManager)31978": {
+            "label": "contract IMembershipManager",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISanctionsGuard)32135": {
+            "label": "contract ISanctionsGuard",
+            "numberOfBytes": "20"
+          },
+          "t_enum(Tier)31831": {
+            "label": "enum IMembershipManager.Tier",
+            "members": [
+              "None",
+              "Bronze",
+              "Silver",
+              "Gold",
+              "Platinum"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bytes32)": {
+            "label": "mapping(address => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint64)": {
+            "label": "mapping(address => uint64)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(CallsignRecord)34248_storage)": {
+            "label": "mapping(bytes32 => struct CallsignRegistry.CallsignRecord)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint64)": {
+            "label": "mapping(bytes32 => uint64)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(CallsignRecord)34248_storage": {
+            "label": "struct CallsignRegistry.CallsignRecord",
+            "members": [
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "callsign",
                 "type": "t_string_storage",
                 "offset": 0,
                 "slot": "1"

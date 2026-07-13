@@ -1,9 +1,9 @@
 import { forwardRef, useEffect, useCallback } from 'react'
 import { useEnsResolution, useEnsReverseLookup } from '../../hooks/useEnsResolution'
-import { useTagResolution } from '../../hooks/useTagResolution'
-import { formatTag, isValidTag, normalizeTag } from '../../lib/tags/normalizeTag'
-import { TagStatus } from '../../lib/tags/resolveTag'
-import ReportTagButton from '../tags/ReportTagButton'
+import { useCallsignResolution } from '../../hooks/useCallsignResolution'
+import { formatCallsign, isValidCallsign, normalizeCallsign } from '../../lib/callsigns/normalizeCallsign'
+import { CallsignStatus } from '../../lib/callsigns/resolveCallsign'
+import ReportCallsignButton from '../callsigns/ReportCallsignButton'
 import AddressInputBookAddon from './AddressInputBookAddon'
 import styles from './AddressInput.module.css'
 
@@ -65,14 +65,14 @@ const AddressInput = forwardRef(({
     isLoading: isLookingUp
   } = useEnsReverseLookup(isAddress ? value?.trim() : null)
 
-  // Wager tag forward-resolution (spec 054). Additive: only engages for tag-shaped input that is
-  // neither an address nor an ENS name. A resolved ACTIVE tag becomes the effective resolved address;
+  // Callsign forward-resolution (spec 054). Additive: only engages for callsign-shaped input that is
+  // neither an address nor an ENS name. A resolved ACTIVE callsign becomes the effective resolved address;
   // any other status is surfaced as a non-committable message (FR-011/022). Registry unreachable → soft
   // no-op, raw-address entry unaffected (FR-013).
-  const tagRes = useTagResolution(value, { chainId })
-  const effectiveResolvedAddress = (tagRes.isTag && tagRes.address) ? tagRes.address : resolvedAddress
+  const callsignRes = useCallsignResolution(value, { chainId })
+  const effectiveResolvedAddress = (callsignRes.isCallsign && callsignRes.address) ? callsignRes.address : resolvedAddress
 
-  // Notify parent of resolved address changes (tag-resolved address included)
+  // Notify parent of resolved address changes (callsign-resolved address included)
   useEffect(() => {
     if (onResolvedChange) {
       onResolvedChange(effectiveResolvedAddress)
@@ -91,25 +91,25 @@ const AddressInput = forwardRef(({
     if (onResolvedChange) onResolvedChange(addr)
   }, [onChange, onResolvedChange])
 
-  // Determine error state. A tag-shaped input suppresses the ENS "invalid address/name" error and
-  // instead surfaces the tag's own status ("No such tag", "address changing", etc.) when non-ACTIVE.
-  const tagError = tagRes.isTag && !tagRes.isLoading && !!tagRes.message && tagRes.status !== TagStatus.ACTIVE
-  const hasError = externalError || tagError || (value && !isLoading && !tagRes.isTag && resolutionError)
-  const displayError = externalErrorMessage || (tagError ? tagRes.message : (!tagRes.isTag ? resolutionError : undefined))
+  // Determine error state. A callsign-shaped input suppresses the ENS "invalid address/name" error and
+  // instead surfaces the callsign's own status ("No such callsign", "address changing", etc.) when non-ACTIVE.
+  const callsignError = callsignRes.isCallsign && !callsignRes.isLoading && !!callsignRes.message && callsignRes.status !== CallsignStatus.ACTIVE
+  const hasError = externalError || callsignError || (value && !isLoading && !callsignRes.isCallsign && resolutionError)
+  const displayError = externalErrorMessage || (callsignError ? callsignRes.message : (!callsignRes.isCallsign ? resolutionError : undefined))
 
   // Determine status indicator
-  const showLoading = isLoading || isLookingUp || tagRes.isLoading
+  const showLoading = isLoading || isLookingUp || callsignRes.isLoading
   const showSuccess = effectiveResolvedAddress && !hasError && !showLoading
   const showEnsLabel = isEns && !isLoading
-  const showTagResolved = tagRes.isTag && !!tagRes.address && !showLoading && !hasError
+  const showCallsignResolved = callsignRes.isCallsign && !!callsignRes.address && !showLoading && !hasError
 
-  // Canonical form of a resolved tag (no `%`), for display + the abuse-report affordance.
-  let canonicalTag = ''
-  if (showTagResolved) {
+  // Canonical form of a resolved callsign (no `%`), for display + the abuse-report affordance.
+  let canonicalCallsign = ''
+  if (showCallsignResolved) {
     try {
-      canonicalTag = normalizeTag(value)
+      canonicalCallsign = normalizeCallsign(value)
     } catch {
-      canonicalTag = ''
+      canonicalCallsign = ''
     }
   }
 
@@ -202,21 +202,21 @@ const AddressInput = forwardRef(({
         </div>
       )}
 
-      {/* Wager tag resolved preview (spec 054): show the tag + full resolved address for confirmation
-          before any value-bearing action (FR-011), with the verification marker for verified tags. */}
-      {showResolvedAddress && showTagResolved && (
+      {/* Callsign resolved preview (spec 054): show the callsign + full resolved address for confirmation
+          before any value-bearing action (FR-011), with the verification marker for verified callsigns. */}
+      {showResolvedAddress && showCallsignResolved && (
         <div className={styles.resolvedHint}>
           <span className={styles.resolvedLabel}>
-            {isValidTag(value) ? formatTag(value.trim().replace(/^%/, '').toLowerCase()) : 'Tag'} resolves to:
+            {isValidCallsign(value) ? formatCallsign(value.trim().replace(/^%/, '').toLowerCase()) : 'Callsign'} resolves to:
           </span>
-          <code className={styles.resolvedAddress}>{formatAddress(tagRes.address)}</code>
-          {tagRes.verified && (
-            <span className={styles.ensLabel} role="img" aria-label="Verified business tag" title="Verified">✓</span>
+          <code className={styles.resolvedAddress}>{formatAddress(callsignRes.address)}</code>
+          {callsignRes.verified && (
+            <span className={styles.ensLabel} role="img" aria-label="Verified business callsign" title="Verified">✓</span>
           )}
-          {canonicalTag && (
-            <ReportTagButton
-              tag={canonicalTag}
-              address={tagRes.address}
+          {canonicalCallsign && (
+            <ReportCallsignButton
+              callsign={canonicalCallsign}
+              address={callsignRes.address}
               chainId={chainId}
               className={styles.reportLink}
             />
