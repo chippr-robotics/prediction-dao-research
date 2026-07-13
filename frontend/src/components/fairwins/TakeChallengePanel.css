@@ -1,6 +1,24 @@
 /* Take-a-challenge bet summary additions (spec 041). Meaning is carried by text +
    icon, never color alone (WCAG); layered over FriendMarketsModal/OpenChallengeModal css. */
 
+/* The challenge, rendered as plain readable prose (not a JSON code block). */
+.tc-terms-text {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tc-terms-text--empty {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 .tc-stake {
   padding: 10px 12px;
   border-radius: 10px;

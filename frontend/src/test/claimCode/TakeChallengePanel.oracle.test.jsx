@@ -19,8 +19,12 @@ vi.mock('../../hooks/useChainTokens', () => ({
 }))
 
 import TakeChallengePanel from '../../components/fairwins/TakeChallengePanel'
+import { WalletContext } from '../../contexts/WalletContext'
 
 const CONDITION = '0xc0ffee00000000000000000000000000000000000000000000000000000000ab'
+
+// A connected taker — the "Lock In!" accept button only renders with a wallet address.
+const connectedWallet = { address: '0xTaker', account: '0xTaker', openConnectModal: () => {} }
 
 const oracleWager = (over = {}) => ({
   resolutionType: 4n, // Polymarket
@@ -62,11 +66,13 @@ const liveMarket = (over = {}) => ({
 
 function renderPanel({ wager = oracleWager(), terms = sealedTerms(), termsUnavailable = false, needsMembership = false } = {}) {
   return render(
-    <TakeChallengePanel
-      code="river tiger kite zoo"
-      match={{ wagerId: 1n, wager, terms, termsUnavailable, needsMembership }}
-      onClose={() => {}}
-    />
+    <WalletContext.Provider value={connectedWallet}>
+      <TakeChallengePanel
+        code="river tiger kite zoo"
+        match={{ wagerId: 1n, wager, terms, termsUnavailable, needsMembership }}
+        onClose={() => {}}
+      />
+    </WalletContext.Provider>
   )
 }
 
@@ -117,7 +123,7 @@ describe('TakeChallengePanel — oracle bet summary (spec 041, US2)', () => {
 
     expect(screen.getByText('Will ETH flip BTC?')).toBeInTheDocument()
     expect(screen.getByText(/live market info unavailable/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /accept challenge/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /lock in/i })).toBeEnabled()
   })
 
   it('side labels follow on-chain creatorIsYes in both directions (D6)', () => {
@@ -147,13 +153,13 @@ describe('TakeChallengePanel — oracle bet summary (spec 041, US2)', () => {
     liveHolder.market = liveMarket({ closed: true, outcomes: [{ name: 'Yes', price: 0.7 }, { name: 'No', price: 0.3 }] })
     renderPanel()
     expect(screen.getByText(/already closed/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /accept challenge/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /lock in/i })).toBeEnabled()
   })
 
   it('blocks acceptance with an explanation when the outcome is already public (FR-015/D8)', () => {
     liveHolder.market = liveMarket({ closed: true, outcomes: [{ name: 'Yes', price: 1 }, { name: 'No', price: 0 }] })
     renderPanel()
-    const btn = screen.getByRole('button', { name: /accept challenge/i })
+    const btn = screen.getByRole('button', { name: /lock in/i })
     expect(btn).toBeDisabled()
     expect(screen.getByText(/can no longer be taken fairly/i)).toBeInTheDocument()
     expect(screen.getByText(/can no longer be taken fairly/i).parentElement).toHaveTextContent(/Yes/)
@@ -167,6 +173,6 @@ describe('TakeChallengePanel — oracle bet summary (spec 041, US2)', () => {
     expect(screen.queryByText(/settled automatically by/i)).toBeNull()
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.getByLabelText(/stake and payout/i)).toHaveTextContent(/10 USDC/)
-    expect(screen.getByRole('button', { name: /accept challenge/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /lock in/i })).toBeEnabled()
   })
 })
