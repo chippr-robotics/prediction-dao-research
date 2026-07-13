@@ -52,6 +52,14 @@ spec:
             - name: ENGINE_API_KEY
               valueFrom:
                 secretKeyRef: { name: relay-engine-api-key, key: "2" }
+            # Sponsored paymaster (spec 050) — MUST stay in sync with live; omitting these
+            # disables Polygon sponsorship on a 'services replace'. (Full manifest<->live
+            # reconciliation is tracked by #895; the collectibles deploy used a targeted
+            # 'gcloud run services update --container gateway' to avoid clobbering these.)
+            - name: PAYMASTER_ADDRESS_137
+              value: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
+            - name: PM_SIGNER_KMS_KEY
+              value: "projects/chippr-bots-site-wp/locations/us-central1/keyRings/fairwins-relayer/cryptoKeys/paymaster-signer-polygon/cryptoKeyVersions/1"
             # Collectibles read proxy (spec 055): OpenSea API v2 key for /v1/opensea/*.
             # Optional — if the secret is absent the routes fail closed (503
             # collectibles_unconfigured) and the SPA hides the Collectibles tab.
