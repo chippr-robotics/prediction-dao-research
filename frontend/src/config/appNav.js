@@ -17,7 +17,8 @@
 export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 
 // Wagers (spec 053) — the relocated create-types + actions grid. Like Home, it is an absolute
-// top-level route (not a `/wallet?tab=` section), pinned near the top of the drawer.
+// top-level route (not a `/wallet?tab=` section); it lives in the drawer's Apps group
+// (see AppNavDrawer's DRAWER_GROUPS).
 export const WAGERS_ITEM = { id: 'wagers', label: 'Wagers', icon: 'ticket', to: '/wagers' }
 
 // Grouped section rail. `id` matches the WalletPage tab id; `icon` drives both
@@ -40,10 +41,10 @@ export const NAV_GROUPS = [
     label: 'Tools',
     items: [
       { id: 'addressbook', label: 'Address Book', icon: 'addressbook' },
-      { id: 'backup', label: 'Backup', icon: 'backup' },
+      // Backup + Security combined into one panel (tab id 'security'); the old
+      // 'backup' tab id is kept as a deep-link alias (see WalletPage TAB_ALIASES).
+      { id: 'security', label: 'Backup & Security', icon: 'lock' },
       { id: 'reports', label: 'Reporting', icon: 'reports' },
-      // Security relocated here from the former Admin group.
-      { id: 'security', label: 'Security', icon: 'lock' },
       { id: 'network', label: 'Network', icon: 'globe' },
     ],
   },
