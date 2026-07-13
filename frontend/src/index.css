@@ -13,6 +13,30 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 80px; /* Offset for sticky header */
+
+  /* Stop mobile browsers from auto-inflating text on orientation change, which
+     shifts the layout and pushes content outside its expected area. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Suppress double-tap-to-zoom on touch devices (the meta viewport already blocks
+   pinch-zoom). `manipulation` keeps normal panning/scrolling gestures intact. */
+body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari zooms the whole page in when a focused form control has a font
+   smaller than 16px. Floor interactive controls at 16px on touch/coarse
+   pointers so focusing an input never triggers an unwanted zoom, while leaving
+   the tighter desktop typography untouched. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* Respect user's motion preferences */
