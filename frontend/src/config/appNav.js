@@ -32,6 +32,10 @@ export const NAV_GROUPS = [
       // self-discloses per-network availability.
       { id: 'earn', label: 'Earn', icon: 'sprout' },
       { id: 'trade', label: 'Trade', icon: 'trade' },
+      // Collectibles (spec 055) — read-only NFT display. Unlike Earn, this item HIDES
+      // entirely on networks without the capability (FR-007); consumers filter via
+      // visibleNavGroups with { collectibles: collectiblesAvailable(chainId) }.
+      { id: 'collectibles', label: 'Collectibles', icon: 'gem' },
       { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
       { id: 'custody', label: 'Protect', icon: 'shield' },
@@ -68,4 +72,14 @@ export function pathForNavItem(id) {
 // Returns null for tabs that are not part of the menu (account/membership/etc.).
 export function groupForTab(tabId) {
   return NAV_GROUPS.find((group) => group.items.some((item) => item.id === tabId)) || null
+}
+
+// Chain-aware menu: drop items whose feature is absent on the active network
+// (spec 055 FR-007 — a dead tab must not render anywhere, drawer or bottom bar).
+// `visibility` maps item id -> boolean; ids not listed stay visible. Groups that
+// end up empty disappear with their label.
+export function visibleNavGroups(visibility = {}, groups = NAV_GROUPS) {
+  return groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => visibility[item.id] !== false) }))
+    .filter((group) => group.items.length > 0)
 }

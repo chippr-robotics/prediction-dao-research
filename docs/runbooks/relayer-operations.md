@@ -40,6 +40,27 @@ curl -s localhost:8788/healthz | jq
 - Per-chain stop: pause the chain's relayer in the engine config (`"paused": true`).
 - Full contract stop remains `pause()` on the registry (GUARDIAN_ROLE) — independent of the relayer.
 
+## Collectibles read proxy (spec 055, `/v1/opensea/*`)
+
+- **Key provisioning**: `OPENSEA_API_KEY` lives in **Secret Manager** and is injected as a Cloud Run
+  env var (`--update-secrets`), same pattern as `ORIGIN_AUTH_SECRET`. Never in env files, the repo,
+  or the SPA bundle — the gateway is the only holder (spec 055 FR-009). Production keys come from
+  `opensea.io/settings/developer`; the instant free-tier key expires after 30 days and is for dev only.
+- **Rotation**: add the new Secret Manager version → redeploy the gateway → verify with an
+  origin-authed `GET /v1/opensea/137/account/<addr>/nfts` → disable the old key in the OpenSea portal.
+  Unset/invalid key ⇒ routes return `503 collectibles_unconfigured` and the SPA hides the
+  Collectibles tab (soft-fail; wagers/pools/payments unaffected — FR-011).
+- **Quotas**: `OPENSEA_QUOTA_PER_ADDRESS` (60/min per requested address) + `OPENSEA_QUOTA_GLOBAL`
+  (300/min backstop for the shared key). Persistent upstream 429s from OpenSea ⇒ lower the global
+  cap or raise the cache TTLs (`OPENSEA_CACHE_TTL_MS`, `OPENSEA_STATS_CACHE_TTL_MS`) before asking
+  OpenSea for more throughput.
+- **Kill switch**: the gateway-wide `KILL_SWITCH` / `SIGUSR2` toggle also stops these routes
+  (`503 killswitch_active`); to stop ONLY collectibles, remove the `OPENSEA_API_KEY` secret binding
+  and redeploy (fail-closed by config).
+- **Outage behavior**: cached responses are served with `stale: true` (the SPA labels them);
+  with no cache the routes return `503 upstream_unavailable` and the SPA shows its degraded state.
+  No action needed beyond watching OpenSea status — nothing on the value path depends on this group.
+
 ## Common incidents
 
 | Symptom | Check | Action |

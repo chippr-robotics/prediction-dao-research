@@ -13,6 +13,7 @@ import TradePanel from '../components/fairwins/TradePanel'
 import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import PortfolioPanel from '../components/wallet/PortfolioPanel'
+import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
@@ -32,6 +33,7 @@ import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
+import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import './WalletPage.css'
 
@@ -50,6 +52,7 @@ const WALLET_TABS = [
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
+  { id: 'collectibles', label: 'Collectibles' },
   { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
@@ -84,6 +87,9 @@ function WalletPage() {
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
+  // Collectibles (spec 055): tab exists only where OpenSea serves the chain AND a gateway
+  // proxy is configured — everywhere else it hides and deep links fall back (FR-007).
+  const collectiblesEnabled = Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== ''
   const {
     isStandalone: pwaStandalone,
     canPrompt: pwaCanPrompt,
@@ -101,6 +107,7 @@ function WalletPage() {
   const [activeTab, setActiveTab] = useState(() => {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
+    if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -200,8 +207,10 @@ function WalletPage() {
   useEffect(() => {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
-    setActiveTab(WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account')
-  }, [searchParams])
+    const known = WALLET_TABS.some((t) => t.id === resolved)
+    const available = resolved !== 'collectibles' || collectiblesEnabled
+    setActiveTab(known && available ? resolved : 'account')
+  }, [searchParams, collectiblesEnabled])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -238,7 +247,9 @@ function WalletPage() {
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
   // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
   const currentSectionGroup = groupForTab(activeTab)
-  const sectionNavItems = currentSectionGroup?.items || []
+  const sectionNavItems = (currentSectionGroup?.items || []).filter(
+    (item) => item.id !== 'collectibles' || collectiblesEnabled,
+  )
 
   return (
     <div className="wallet-page-wrapper">
@@ -286,6 +297,12 @@ function WalletPage() {
                 {activeTab === 'portfolio' && (
                   <div className="portfolio-section" role="tabpanel">
                     <PortfolioPanel />
+                  </div>
+                )}
+
+                {activeTab === 'collectibles' && collectiblesEnabled && (
+                  <div className="collectibles-section" role="tabpanel">
+                    <CollectiblesPanel />
                   </div>
                 )}
 

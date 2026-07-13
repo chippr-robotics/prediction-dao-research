@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 import PortalNav from '../ui/PortalNav'
 import Footer from '../Footer'
-import { HOME_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem } from '../../config/appNav'
+import { HOME_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem, visibleNavGroups } from '../../config/appNav'
+import { useChainTokens } from '../../hooks/useChainTokens'
+import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
 import './AppNavDrawer.css'
 
 // Deep-link alias parity with WalletPage (the Swap tab is now "Trade"; the
@@ -12,14 +14,18 @@ const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 // The drawer list = a top "Quick Access" group (Home) + the section groups,
 // with Wagers moved down into the Apps group (it keeps its absolute /wagers route).
-const DRAWER_GROUPS = [
-  { label: 'Quick Access', items: [HOME_ITEM] },
-  ...NAV_GROUPS.map((group) =>
-    group.label === 'Apps'
-      ? { ...group, items: [WAGERS_ITEM, ...group.items] }
-      : group,
-  ),
-]
+// Built per render because item visibility is chain-aware (spec 055: Collectibles
+// hides entirely on networks OpenSea doesn't serve or with no gateway configured).
+function buildDrawerGroups(visibility) {
+  return [
+    { label: 'Quick Access', items: [HOME_ITEM] },
+    ...visibleNavGroups(visibility, NAV_GROUPS).map((group) =>
+      group.label === 'Apps'
+        ? { ...group, items: [WAGERS_ITEM, ...group.items] }
+        : group,
+    ),
+  ]
+}
 
 // Which drawer entry reflects the current route, so the open menu highlights it.
 function resolveActiveId(location) {
@@ -48,6 +54,11 @@ export default function AppNavDrawer() {
   const navigate = useNavigate()
   const location = useLocation()
   const activeId = resolveActiveId(location)
+  const { capabilities } = useChainTokens()
+  const drawerGroups = useMemo(
+    () => buildDrawerGroups({ collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '' }),
+    [capabilities],
+  )
 
   // Close on Escape while open.
   useEffect(() => {
@@ -94,7 +105,7 @@ export default function AppNavDrawer() {
 
         <PortalNav
           variant="nav"
-          groups={DRAWER_GROUPS}
+          groups={drawerGroups}
           activeId={activeId}
           onSelect={handleSelect}
           ariaLabel="Site sections"

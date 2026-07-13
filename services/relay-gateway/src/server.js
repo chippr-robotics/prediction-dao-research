@@ -11,6 +11,7 @@
  *   GET  /v1/intents/:id      honest status                    (origin-locked)
  *   POST /v1/engine/webhook   engine status callback           (shared-secret)
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
+ *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
  */
 import crypto from 'node:crypto'
 import express from 'express'
@@ -26,6 +27,9 @@ import { createBackpressure } from './policy/backpressure.js'
 import { createKillSwitch } from './policy/killswitch.js'
 import { createEngineClient } from './engine/client.js'
 import { applyEngineEvent } from './engine/webhook.js'
+import { createOpenSeaClient } from './opensea/client.js'
+import { createTtlCache } from './opensea/cache.js'
+import { createOpenSeaRouter } from './opensea/routes.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -520,6 +524,26 @@ export function createApp(config, deps = {}) {
       return rpcError(res, id, 'internal', 'internal error')
     }
   })
+
+  // ---- GET /v1/opensea/* (spec 055 collectibles; read-only, origin-locked via middleware) ----
+  // Third quota instance: reads are keyed by the REQUESTED address/contract/slug (no signature to
+  // recover on a GET — research D4); the global window is the real backstop for the shared key.
+  const osQuotas = createQuotas({
+    signerPerWindow: config.opensea.quotaPerAddress,
+    globalPerWindow: config.opensea.quotaGlobal,
+    windowMs: config.opensea.quotaWindowMs,
+    now: nowMs,
+  })
+  const openseaClient =
+    deps.openseaClient ?? createOpenSeaClient({ ...config.opensea, ...(deps.openseaFetch ? { fetchImpl: deps.openseaFetch } : {}) })
+  app.use(
+    createOpenSeaRouter(config, {
+      client: openseaClient,
+      cache: deps.openseaCache ?? createTtlCache({ now: nowMs }),
+      quotas: osQuotas,
+      killSwitch,
+    })
+  )
 
   // ---- POST /v1/engine/webhook ----------------------------------------------------------------
   app.post('/v1/engine/webhook', (req, res) => {

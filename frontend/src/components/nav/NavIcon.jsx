@@ -41,6 +41,8 @@ const ICON_PATHS = {
   check: <><path d="m5 12.5 4.5 4.5L19 6.5" /></>,
   user: <><circle cx="12" cy="8" r="3.5" /><path d="M5.5 20c.8-4.2 12.2-4.2 13 0" /></>,
   trending: <><path d="M4 15.5 9.5 10l3.5 3.5L20 6" /><path d="M15.5 6H20v4.5" /></>,
+  // Collectibles (spec 055) — a faceted gem: unique, collectible, display-worthy.
+  gem: <><path d="M7 4h10l4 6-9 10L3 10l4-6Z" /><path d="M3 10h18" /><path d="M9.5 10 12 4l2.5 6L12 20l-2.5-10Z" /></>,
   // Earn (spec 050) — a sprouting seedling: assets at rest, growing.
   sprout: <><path d="M12 20v-7" /><path d="M12 13c0-3.3-2.7-6-6-6H4.5v.5c0 3.3 2.7 6 6 6H12" /><path d="M12 11c0-2.8 2.2-5 5-5h2.5v.5c0 2.8-2.2 5-5 5H12" /><path d="M7.5 20h9" /></>,
   // Share address as QR (spec 011 quick-share entry point) — the three QR

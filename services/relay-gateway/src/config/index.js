@@ -27,6 +27,17 @@
  *   GAS_WALLET_<id>            hot gas wallet address (healthz runway only; the KEY lives in the engine)
  *   PEAK_BURN_WEI_PER_HR_<id>  runway divisor for healthz gasWalletRunwayHrs (default 0.05 native/hr)
  *   PORT                       HTTP port (default 8788)
+ *   OPENSEA_API_KEY            OpenSea API v2 key for the read-only /v1/opensea/* proxy (spec 055).
+ *                              Unset => those routes fail CLOSED with 503 collectibles_unconfigured
+ *                              (the collectibles feature hides; nothing else is affected)
+ *   OPENSEA_BASE_URL           OpenSea API base (default https://api.opensea.io)
+ *   OPENSEA_TIMEOUT_MS         upstream request timeout (default 5000)
+ *   OPENSEA_RETRIES            upstream retries on 5xx/transport (default 1)
+ *   OPENSEA_CACHE_TTL_MS       list/detail response cache TTL (default 60000)
+ *   OPENSEA_STATS_CACHE_TTL_MS collection-stats cache TTL (default 300000)
+ *   OPENSEA_QUOTA_PER_ADDRESS  reads/min counted per requested address|contract|slug (default 60)
+ *   OPENSEA_QUOTA_GLOBAL       reads/min across all callers (default 300)
+ *   OPENSEA_QUOTA_WINDOW_MS    quota window (default 60000)
  *
  * The gateway NEVER holds the gas key — that is the engine's (Secret-Manager-held) concern.
  */
@@ -242,6 +253,20 @@ export function loadConfig(env = process.env, opts = {}) {
       globalPerWindow: int(env, 'PM_GLOBAL_QUOTA_PER_MIN', 60),
       windowMs: int(env, 'PM_QUOTA_WINDOW_MS', 60_000),
       runwayWarnHrs: int(env, 'PM_RUNWAY_WARN_HRS', 48),
+    },
+    // Read-only OpenSea proxy (spec 055 collectibles): optional like the paymaster — no key means
+    // the /v1/opensea/* routes 503 fail-closed and the SPA hides the feature; boot is unaffected
+    // (FR-011: the collectibles surface must never couple to the value paths).
+    opensea: {
+      apiKey: opt(env, 'OPENSEA_API_KEY', null),
+      baseUrl: opt(env, 'OPENSEA_BASE_URL', 'https://api.opensea.io'),
+      timeoutMs: int(env, 'OPENSEA_TIMEOUT_MS', 5000),
+      retries: int(env, 'OPENSEA_RETRIES', 1),
+      cacheTtlMs: int(env, 'OPENSEA_CACHE_TTL_MS', 60_000),
+      statsCacheTtlMs: int(env, 'OPENSEA_STATS_CACHE_TTL_MS', 300_000),
+      quotaPerAddress: int(env, 'OPENSEA_QUOTA_PER_ADDRESS', 60),
+      quotaGlobal: int(env, 'OPENSEA_QUOTA_GLOBAL', 300),
+      quotaWindowMs: int(env, 'OPENSEA_QUOTA_WINDOW_MS', 60_000),
     },
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),
