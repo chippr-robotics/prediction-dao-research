@@ -30,7 +30,7 @@
   min-width: 42px;
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 0.375rem;
-  background: var(--btn-bg, #f8fafc);
+  background: var(--bg-primary, #f8fafc);
   color: inherit;
   cursor: pointer;
 }
@@ -43,8 +43,8 @@
 
 .ab-scan-btn:hover,
 .ab-scan-btn:focus-visible {
-  border-color: var(--accent, #2563eb);
-  color: var(--accent, #2563eb);
+  border-color: var(--brand-primary, #2563eb);
+  color: var(--brand-primary, #2563eb);
 }
 
 .ab-panel-head {
@@ -79,8 +79,8 @@
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 0.375rem;
-  background: var(--input-bg, #fff);
-  color: inherit;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #0f172a);
   font: inherit;
 }
 
@@ -98,7 +98,8 @@
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 0.5rem;
   padding: 0.75rem;
-  background: var(--card-bg, #fff);
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #0f172a);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -159,7 +160,7 @@
 .ab-address-network {
   font-size: 0.75rem;
   color: var(--text-muted, #64748b);
-  background: var(--chip-bg, #f1f5f9);
+  background: var(--bg-primary, #f1f5f9);
   padding: 0.1rem 0.4rem;
   border-radius: 0.375rem;
 }
@@ -204,8 +205,8 @@
 
 .ab-btn:hover,
 .ab-btn:focus-visible {
-  color: var(--text, #0f172a);
-  background: var(--btn-hover-bg, rgba(0, 0, 0, 0.06));
+  color: var(--text-primary, #0f172a);
+  background: var(--btn-hover-bg, rgba(127, 127, 127, 0.14));
   outline: none;
 }
 
@@ -244,25 +245,25 @@
 }
 
 .ab-btn-primary {
-  background: var(--accent, #2563eb);
+  background: var(--brand-primary, #2563eb);
   color: #fff;
   padding: 0.4rem 0.75rem;
 }
 
 .ab-btn-primary:hover,
 .ab-btn-primary:focus-visible {
-  background: var(--accent-hover, #1d4ed8);
+  background: var(--primary-button-hover, #1d4ed8);
   color: #fff;
 }
 
 .ab-btn-danger {
-  color: #b91c1c;
+  color: var(--danger-color, #b91c1c);
 }
 
 .ab-btn-danger:hover,
 .ab-btn-danger:focus-visible {
-  background: rgba(185, 28, 28, 0.07);
-  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.12);
+  color: var(--danger-color, #b91c1c);
 }
 
 .ab-copy-btn {
@@ -270,13 +271,13 @@
 }
 
 .ab-copy-btn--copied {
-  color: #15803d;
+  color: var(--success-color, #15803d);
 }
 
 .ab-copy-btn--copied:hover,
 .ab-copy-btn--copied:focus-visible {
-  background: rgba(21, 128, 61, 0.07);
-  color: #15803d;
+  background: rgba(21, 128, 61, 0.12);
+  color: var(--success-color, #15803d);
 }
 
 .ab-modal-backdrop {
@@ -287,12 +288,15 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  z-index: 1000;
+  /* Modal tier: render above the header (1000/1001), bottom icon nav (1200),
+     and nav drawer (1401) so the contact form and its Save/Cancel actions are
+     never covered by the navigation. */
+  z-index: 2000;
 }
 
 .ab-modal {
-  background: var(--card-bg, #fff);
-  color: inherit;
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #0f172a);
   border-radius: 0.6rem;
   padding: 1.25rem;
   width: min(560px, 100%);
@@ -323,13 +327,13 @@
 }
 
 .ab-error {
-  color: #b91c1c;
+  color: var(--danger-color, #b91c1c);
   font-size: 0.85rem;
   margin: 0;
 }
 
 .ab-warn {
-  color: #b45309;
+  color: var(--warning-color, #b45309);
   font-size: 0.78rem;
 }
 

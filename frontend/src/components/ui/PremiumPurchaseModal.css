@@ -21,7 +21,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1200;
+  /* Modal tier: render in front of the header (1000/1001), the bottom icon nav
+     (1200), and the nav drawer (1401). At the previous 1200 it tied with the
+     icon nav, so the purchase flow rendered partly behind the navigation. */
+  z-index: 2000;
   padding: 1rem;
   animation: ppm-fade-in 0.2s ease;
 }
@@ -1225,8 +1228,13 @@
 
 .ppm-current-tier-info {
   margin-bottom: 1rem;
-  background: var(--bg-info, #ebf4ff);
-  border-color: var(--border-info, #3b82f6);
+  /* Theme-aware: a translucent info tint reads correctly over both the light
+     and dark modal surfaces. The old opaque `--bg-info, #ebf4ff` fallback (both
+     vars were undefined) forced a light box, leaving the light dark-theme text
+     illegible. Text colour keeps flowing from the theme-aware `.ppm-info-card`
+     rules. */
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--info-color, #3b82f6);
 }
 
 .ppm-current-tier-info .ppm-tier-badge {
