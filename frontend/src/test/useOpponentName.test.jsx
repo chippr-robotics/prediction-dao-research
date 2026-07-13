@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { WalletContext } from '../contexts'
+import { WalletContext } from '../contexts/WalletContext.js'
 
 const findByAddress = vi.fn()
 const ensState = { ensName: null, isLoading: false }
+const tagState = { tag: null, verified: false, isLoading: false }
 
 vi.mock('../lib/addressBook/addressBookStore', () => ({
   loadAddressBook: () => ({ contacts: [] }),
@@ -11,6 +12,9 @@ vi.mock('../lib/addressBook/addressBookStore', () => ({
 }))
 vi.mock('../hooks/useEnsResolution', () => ({
   useEnsReverseLookup: () => ensState,
+}))
+vi.mock('../hooks/useWagerTag', () => ({
+  useWagerTag: () => tagState,
 }))
 
 import { useOpponentName } from '../hooks/useOpponentName'
@@ -28,17 +32,31 @@ describe('useOpponentName', () => {
     findByAddress.mockReset()
     ensState.ensName = null
     ensState.isLoading = false
+    tagState.tag = null
+    tagState.verified = false
   })
 
-  it('prefers the address-book nickname', () => {
+  it('prefers the address-book nickname over tag and ENS', () => {
     findByAddress.mockReturnValue({ contact: { nickname: 'Alice' } })
+    tagState.tag = 'alicetag'
     ensState.ensName = 'alice.eth'
     const { result } = renderHook(() => useOpponentName(ADDR), { wrapper })
     expect(result.current.displayName).toBe('Alice')
     expect(result.current.source).toBe('addressBook')
   })
 
-  it('falls back to ENS when no address-book entry exists', () => {
+  it('prefers the wager tag over ENS when no address-book entry exists', () => {
+    findByAddress.mockReturnValue(undefined)
+    tagState.tag = 'chipprbots'
+    tagState.verified = true
+    ensState.ensName = 'bob.eth'
+    const { result } = renderHook(() => useOpponentName(ADDR), { wrapper })
+    expect(result.current.displayName).toBe('%chipprbots')
+    expect(result.current.source).toBe('wagerTag')
+    expect(result.current.verified).toBe(true)
+  })
+
+  it('falls back to ENS when there is no address-book entry and no tag', () => {
     findByAddress.mockReturnValue(undefined)
     ensState.ensName = 'bob.eth'
     const { result } = renderHook(() => useOpponentName(ADDR), { wrapper })

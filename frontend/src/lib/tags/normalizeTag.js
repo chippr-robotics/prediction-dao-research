@@ -1,0 +1,79 @@
+/**
+ * Wager tag normalization + formatting (spec 054). Mirrors the on-chain canonical rules in
+ * WagerTagRegistry._validate byte-for-byte so the client never submits a tag the contract will
+ * reject: 3–20 chars, lowercase `a-z` + digits `0-9` + single NON-leading/trailing/consecutive
+ * hyphens. The `%` prefix is a display/entry convention only and is never part of the stored tag.
+ *
+ * Tags are OPTIONAL and this module is pure — it powers entry-field detection and display, and never
+ * blocks a flow: callers treat a throw / falsey as "not a tag, fall back to a raw address".
+ */
+
+export class TagFormatError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'TagFormatError'
+  }
+}
+
+/** Min/max tag length (matches the contract). */
+export const TAG_MIN = 3
+export const TAG_MAX = 20
+
+/** Loose detector: does this input LOOK like a tag (with or without the `%`)? Case-insensitive. */
+export function isTagLike(input) {
+  if (typeof input !== 'string') return false
+  const s = input.trim()
+  return /^%?[a-z0-9-]{3,20}$/i.test(s)
+}
+
+/**
+ * Normalize user input to the canonical stored form. Strips a leading `%`, trims, lowercases, and
+ * validates against the on-chain rules. Throws {TagFormatError} on any violation.
+ * @param {string} input e.g. "%ChipprBots" or "chippr-bots"
+ * @returns {string} canonical tag, e.g. "chipprbots"
+ */
+export function normalizeTag(input) {
+  if (typeof input !== 'string') throw new TagFormatError('Tag must be a string')
+  let s = input.trim()
+  if (s.startsWith('%')) s = s.slice(1)
+  s = s.toLowerCase()
+
+  if (s.length < TAG_MIN || s.length > TAG_MAX) {
+    throw new TagFormatError(`Tag must be ${TAG_MIN}–${TAG_MAX} characters`)
+  }
+  let prevHyphen = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    const isLower = c >= 0x61 && c <= 0x7a // a-z
+    const isDigit = c >= 0x30 && c <= 0x39 // 0-9
+    const isHyphen = c === 0x2d // '-'
+    if (isHyphen) {
+      if (i === 0 || i === s.length - 1 || prevHyphen) {
+        throw new TagFormatError('Hyphens must be between letters or digits (no leading, trailing, or repeated)')
+      }
+      prevHyphen = true
+    } else {
+      if (!isLower && !isDigit) {
+        throw new TagFormatError('Only lowercase letters, digits, and single hyphens are allowed')
+      }
+      prevHyphen = false
+    }
+  }
+  return s
+}
+
+/** True if `input` is a valid tag after normalization (never throws). */
+export function isValidTag(input) {
+  try {
+    normalizeTag(input)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Display form: `%<tag>` (FR-015). Accepts raw or already-%-prefixed input. */
+export function formatTag(tag) {
+  if (typeof tag !== 'string' || tag.length === 0) return ''
+  return tag.startsWith('%') ? tag : `%${tag}`
+}

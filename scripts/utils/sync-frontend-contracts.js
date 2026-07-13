@@ -191,6 +191,7 @@ function main() {
         externalDAORegistry: deployed.externalDAORegistry, // spec 030 — ClearPath external-DAO registry
         backupPointerRegistry: deployed.backupPointerRegistry, // spec 032 — encrypted-backup pointer registry
         wagerPoolFactory: deployed.wagerPoolFactory, // spec 034 — WagerPools factory, address-based (only where deployed)
+        wagerTagRegistry: deployed.wagerTagRegistry, // spec 054 — %tag naming registry (only where deployed)
         safeProposalHub: deployed.safeProposalHub, // spec 043 — Safe custody proposal broadcaster (only where deployed)
         safePolicyGuard: deployed.safePolicyGuard, // spec 049 — multisig policy engine guard (only where deployed)
         policyGuardSetup: deployed.policyGuardSetup, // spec 049 — Safe.setup policy attach helper (only where deployed)

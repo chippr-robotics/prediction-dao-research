@@ -13,6 +13,7 @@ import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
+import TagRegistryAdmin from './admin/TagRegistryAdmin'
 import PortalNav from './ui/PortalNav'
 import SectionIconNav from './nav/SectionIconNav'
 import './AdminPanel.css'
@@ -30,6 +31,7 @@ const ADMIN_TAB_ICONS = {
   treasury: 'bank',
   'oracle-adapters': 'broadcast',
   'deny-list': 'ban',
+  'wager-tags': 'ticket',
 }
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -312,6 +314,7 @@ function AdminPanel() {
     isAdmin && { id: 'treasury', label: 'Treasury' },
     isAdmin && { id: 'oracle-adapters', label: 'Oracle Adapters' },
     isAdmin && { id: 'deny-list', label: 'Deny-list' },
+    isAdmin && { id: 'wager-tags', label: 'Wager Tags' },
   ].filter(Boolean)
 
   if (!hasAdminAccess) {
@@ -707,6 +710,17 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'wager-tags' && isAdmin && (
+          <TagRegistryAdmin
+            signer={signer}
+            account={account}
+            contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
           />
