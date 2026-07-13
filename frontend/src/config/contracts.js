@@ -41,9 +41,9 @@ const MORDOR_CONTRACTS = {
   // deploy; populated by `npm run sync:frontend-contracts` after `deploy-wager-pool-factory.js`.
   // The prior Semaphore-based factory (0x33cD…) is abandoned and intentionally NOT wired here.
   wagerPoolFactory: '0xac78B4EdeF96e74a2653028dF93A26acFCfC613F',
-  // Wager Tags (spec 054) — %tag naming registry. Empty until `deploy-wager-tag-registry.js` runs;
+  // Callsigns (spec 054) — %callsign naming registry. Empty until `deploy-callsign-registry.js` runs;
   // populated by `npm run sync:frontend-contracts`.
-  wagerTagRegistry: '',
+  callsignRegistry: '',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -60,7 +60,7 @@ const HARDHAT_CONTRACTS = {
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
-  wagerTagRegistry: '', // spec 054 — %tag naming registry (synced after deploy)
+  callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
@@ -83,7 +83,7 @@ const AMOY_CONTRACTS = {
   umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
-  wagerTagRegistry: '', // spec 054 — %tag naming registry (synced after deploy)
+  callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -115,7 +115,7 @@ const POLYGON_CONTRACTS = {
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
-  wagerTagRegistry: '0xF7370780F13eCEb2f65c21d38b7bd53f25509a9F', // spec 054 — %tag naming registry (synced after deploy)
+  callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
 }
 
 const NETWORK_CONTRACTS = {

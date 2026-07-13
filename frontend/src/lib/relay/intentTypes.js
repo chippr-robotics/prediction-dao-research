@@ -157,39 +157,39 @@ export const INTENT_TYPES = {
     ...TRAILING,
   ],
 
-  // ---- Wager tag registry (spec 054) — signer-attributed, no payment leg (free with Gold membership).
-  //      Byte-identical to WagerTagRegistry.sol typehashes + services/relay-gateway/src/intent/intentTypes.js.
-  CommitTagIntent: [
+  // ---- Callsign registry (spec 054) — signer-attributed, no payment leg (free with Gold membership).
+  //      Byte-identical to CallsignRegistry.sol typehashes + services/relay-gateway/src/intent/intentTypes.js.
+  CommitCallsignIntent: [
     { name: 'owner', type: 'address' },
     { name: 'commitment', type: 'bytes32' },
     ...TRAILING,
   ],
-  RegisterTagIntent: [
+  RegisterCallsignIntent: [
     { name: 'owner', type: 'address' },
-    { name: 'tag', type: 'string' },
+    { name: 'callsign', type: 'string' },
     { name: 'salt', type: 'bytes32' },
     ...TRAILING,
   ],
-  ChangeTagIntent: [
+  ChangeCallsignIntent: [
     { name: 'owner', type: 'address' },
-    { name: 'newTag', type: 'string' },
+    { name: 'newCallsign', type: 'string' },
     { name: 'salt', type: 'bytes32' },
     ...TRAILING,
   ],
-  ReleaseTagIntent: [
+  ReleaseCallsignIntent: [
     { name: 'owner', type: 'address' },
-    { name: 'tagHash', type: 'bytes32' },
+    { name: 'callsignHash', type: 'bytes32' },
     ...TRAILING,
   ],
   RequestRepointIntent: [
     { name: 'owner', type: 'address' },
-    { name: 'tagHash', type: 'bytes32' },
+    { name: 'callsignHash', type: 'bytes32' },
     { name: 'newOwner', type: 'address' },
     ...TRAILING,
   ],
   CancelRepointIntent: [
     { name: 'owner', type: 'address' },
-    { name: 'tagHash', type: 'bytes32' },
+    { name: 'callsignHash', type: 'bytes32' },
     ...TRAILING,
   ],
 }
@@ -237,25 +237,25 @@ export const INTENT_ACTIONS = {
   poolCreate: { primaryType: 'CreatePool', verifier: 'wagerPoolFactory', domainVerifier: 'wagerPoolFactory', intentClass: 'signer-attributed', actorField: 'creator' },
   poolJoin: { verifier: 'wagerPoolFactory', intentClass: 'payment', authOnly: true, authToParam: 'pool' },
 
-  // ---- Wager tag registry (spec 054) — target + domain both the registry; owner == recovered signer.
+  // ---- Callsign registry (spec 054) — target + domain both the registry; owner == recovered signer.
   //      register/change/requestRepoint execute only while the signer holds Gold+ (else revert on-chain);
   //      the gateway SHOULD pre-screen tier. requestRepoint is itself tier-exempt on-chain (recovery safety).
-  tagCommit: { primaryType: 'CommitTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
-  tagRegister: { primaryType: 'RegisterTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
-  tagChange: { primaryType: 'ChangeTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
-  tagRelease: { primaryType: 'ReleaseTagIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
-  tagRequestRepoint: { primaryType: 'RequestRepointIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
-  tagCancelRepoint: { primaryType: 'CancelRepointIntent', verifier: 'wagerTagRegistry', domainVerifier: 'wagerTagRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignCommit: { primaryType: 'CommitCallsignIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignRegister: { primaryType: 'RegisterCallsignIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignChange: { primaryType: 'ChangeCallsignIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignRelease: { primaryType: 'ReleaseCallsignIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignRequestRepoint: { primaryType: 'RequestRepointIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
+  callsignCancelRepoint: { primaryType: 'CancelRepointIntent', verifier: 'callsignRegistry', domainVerifier: 'callsignRegistry', intentClass: 'signer-attributed', actorField: 'owner' },
 }
 
 /**
- * EIP-712 domain for WagerTagRegistry intents (spec 054). Its own per-contract domain (name/version set in
- * WagerTagRegistry.initialize) gives network + contract isolation.
+ * EIP-712 domain for CallsignRegistry intents (spec 054). Its own per-contract domain (name/version set in
+ * CallsignRegistry.initialize) gives network + contract isolation.
  * @param {number} chainId
- * @param {string} verifyingContract - the wagerTagRegistry PROXY address for this chain
+ * @param {string} verifyingContract - the callsignRegistry PROXY address for this chain
  */
-export function wagerTagRegistryDomain(chainId, verifyingContract) {
-  return { name: 'FairWins WagerTagRegistry', version: '1', chainId: Number(chainId), verifyingContract }
+export function callsignRegistryDomain(chainId, verifyingContract) {
+  return { name: 'FairWins CallsignRegistry', version: '1', chainId: Number(chainId), verifyingContract }
 }
 
 /**

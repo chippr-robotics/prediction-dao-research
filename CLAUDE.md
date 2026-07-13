@@ -110,22 +110,22 @@ artifacts live under `specs/<feature>/`.
   `getContractAddressForChain('wagerPoolFactory', chainId)`. Two-word nicknames are
   **client-side only, never on-chain**. Launch targets **Mordor (ETC testnet) → Polygon**
   (removing Semaphore unblocks ETC/Mordor; no Amoy in the sequence). See `specs/034-zk-wager-pools/`.
-- **Wager tags (spec 054) are an OPTIONAL, Gold-tier-and-above identity primitive.** The
-  `WagerTagRegistry` (UUPS proxy, deployment keys `wagerTagRegistry` / `wagerTagRegistryImpl`)
-  is an in-house naming registry: a member may OPTIONALLY register a `%tag` (e.g. `%chipprbots`)
+- **Callsigns (spec 054) are an OPTIONAL, Gold-tier-and-above identity primitive.** The
+  `CallsignRegistry` (UUPS proxy, deployment keys `callsignRegistry` / `callsignRegistryImpl`)
+  is an in-house naming registry: a member may OPTIONALLY register a `%callsign` (e.g. `%chipprbots`)
   gated on `getActiveTier(user, WAGER_PARTICIPANT_ROLE) >= Gold` (`minTier` hard-floored at Gold).
-  Nothing on the value path requires a tag — never gate a wager/pool/transfer on tag ownership.
+  Nothing on the value path requires a callsign — never gate a wager/pool/transfer on callsign ownership.
   Registration is ENS-style commit→reveal; the registry is **standalone** (not routed through
   `wagerRegistry`), holds no funds, and resolves identity for display/address-entry with the
-  priority **address book > wager tag > ENS > generated**. Resolve via
-  `getContractAddressForChain('wagerTagRegistry', chainId)`; frontend soft-fails to raw
+  priority **address book > callsign > ENS > generated**. Resolve via
+  `getContractAddressForChain('callsignRegistry', chainId)`; frontend soft-fails to raw
   addresses/ENS when it is undeployed/unreachable. Every actor action has an EIP-712 `…WithSig`
   twin (three-way struct sync: contract typehashes + `frontend/src/lib/relay/intentTypes.js` +
-  `services/relay-gateway/src/intent/intentTypes.js`; domain `"FairWins WagerTagRegistry"`/`"1"`).
-  See `docs/developer-guide/wager-tags.md` + `specs/054-wager-tag-registry/`.
+  `services/relay-gateway/src/intent/intentTypes.js`; domain `"FairWins CallsignRegistry"`/`"1"`).
+  See `docs/developer-guide/callsigns.md` + `specs/054-callsign-registry/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/054-wager-tag-registry/plan.md
+at specs/054-callsign-registry/plan.md
 <!-- SPECKIT END -->
