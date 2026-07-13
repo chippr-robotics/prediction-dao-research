@@ -684,6 +684,13 @@
     border-radius: 20px 20px 0 0;
     animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     transform: none;
+    /* Sit above the fixed bottom icon nav (z-index 1200) and nav drawer
+       (1401); otherwise the nav covers the bottom of the sheet and hides the
+       Disconnect action, leaving users unable to disconnect. */
+    z-index: 1500;
+    /* Reserve room at the bottom so the last actions (Purchase Membership,
+       Disconnect) clear the icon nav and stay visible/tappable. */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
   .wallet-dropdown-extended {
