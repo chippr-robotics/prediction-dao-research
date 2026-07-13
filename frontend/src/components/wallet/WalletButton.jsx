@@ -267,14 +267,28 @@ function WalletButton({ className = '' }) {
                   <span className="action-icon" aria-hidden="true"><NavIcon name="user" size={16} /></span>
                   <span>Account</span>
                 </button>
-                <button
-                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=membership') }}
-                  className="action-button"
-                  role="menuitem"
-                >
-                  <span className="action-icon" aria-hidden="true"><NavIcon name="ticket" size={16} /></span>
-                  <span>Membership</span>
-                </button>
+                {/* Membership entry is mutually exclusive with the purchase
+                    upsell: members manage their membership, non-members buy in.
+                    Never show both at once. */}
+                {hasRole(ROLES.WAGER_PARTICIPANT) ? (
+                  <button
+                    onClick={() => { setIsOpen(false); navigate('/wallet?tab=membership') }}
+                    className="action-button"
+                    role="menuitem"
+                  >
+                    <span className="action-icon" aria-hidden="true"><NavIcon name="ticket" size={16} /></span>
+                    <span>Membership</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleOpenPurchaseModal()}
+                    className="action-button"
+                    role="menuitem"
+                  >
+                    <span className="action-icon" aria-hidden="true"><NavIcon name="star" size={16} /></span>
+                    <span>Purchase Membership</span>
+                  </button>
+                )}
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=preferences') }}
                   className="action-button"
@@ -282,14 +296,6 @@ function WalletButton({ className = '' }) {
                 >
                   <span className="action-icon" aria-hidden="true"><NavIcon name="sliders" size={16} /></span>
                   <span>Preferences</span>
-                </button>
-                <button
-                  onClick={() => handleOpenPurchaseModal()}
-                  className="action-button"
-                  role="menuitem"
-                >
-                  <span className="action-icon" aria-hidden="true"><NavIcon name="star" size={16} /></span>
-                  <span>Purchase Membership</span>
                 </button>
                 {hasRole(ROLES.ADMIN) && (
                   <button

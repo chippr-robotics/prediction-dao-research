@@ -276,6 +276,33 @@ describe('WalletButton Component - Wagers', () => {
       expect(mockShowModal).toHaveBeenCalled()
     })
 
+    it('shows Membership (not Purchase Membership) for members, and vice versa', async () => {
+      const user = userEvent.setup()
+
+      // Member: manage-membership entry only, no purchase upsell action.
+      useWalletRoles.mockReturnValue({
+        roles: [ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT)
+      })
+      const { unmount } = renderWithProviders(<WalletButton />)
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+      await screen.findByRole('menu')
+      expect(screen.getByText('Membership')).toBeInTheDocument()
+      expect(screen.queryByText('Purchase Membership')).not.toBeInTheDocument()
+      unmount()
+
+      // Non-member: purchase upsell only, no manage-membership entry.
+      useWalletRoles.mockReturnValue({
+        roles: [],
+        hasRole: vi.fn(() => false)
+      })
+      renderWithProviders(<WalletButton />)
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+      await screen.findByRole('menu')
+      expect(screen.getByText('Purchase Membership')).toBeInTheDocument()
+      expect(screen.queryByText('Membership')).not.toBeInTheDocument()
+    })
+
     it('no longer shows the Get USDC action in the dropdown', async () => {
       const user = userEvent.setup()
       renderWithProviders(<WalletButton />)
