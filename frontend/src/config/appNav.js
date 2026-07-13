@@ -35,7 +35,7 @@ export const NAV_GROUPS = [
       // Collectibles (spec 055) — read-only NFT display. Unlike Earn, this item HIDES
       // entirely on networks without the capability (FR-007); consumers filter via
       // visibleNavGroups with { collectibles: collectiblesAvailable(chainId) }.
-      { id: 'collectibles', label: 'Collectibles', icon: 'gem' },
+      { id: 'collectibles', label: 'Collect', icon: 'gem' },
       { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
       { id: 'custody', label: 'Protect', icon: 'shield' },

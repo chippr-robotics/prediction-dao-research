@@ -1,7 +1,8 @@
 /**
- * Portfolio collectibles estimate line (spec 055 US3 / FR-006, research D8) — a separate,
- * labeled floor-price estimate beside token balances that NEVER joins the totalUsd headline,
- * hides where the feature is unavailable, and degrades without blocking token rendering.
+ * Portfolio collectibles estimate row (spec 055 US3 / FR-006, research D8) — a labeled
+ * floor-price estimate rendered inside the Digital Collectibles taxonomy section that NEVER
+ * joins the totalUsd headline or category subtotal, hides where the feature is unavailable,
+ * and degrades without blocking token rendering.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -27,7 +28,17 @@ const portfolioState = (overrides = {}) => ({
   error: null,
   holdings: [],
   aggregates: [],
-  categories: [],
+  categories: [
+    {
+      category: {
+        id: 'digital-collectibles',
+        label: 'Digital Collectibles',
+        description: 'Unique digital items (NFTs).',
+      },
+      aggregates: [],
+      subtotalUsd: 0,
+    },
+  ],
   totalUsd: 1234.56,
   failedAssets: [],
   priceMap: new Map([['ETH', { usd: 4000 }]]),
@@ -63,11 +74,16 @@ beforeEach(() => {
 })
 
 describe('Portfolio — collectibles estimate line', () => {
-  it('shows a labeled floor-price estimate beside token balances (FR-006)', () => {
+  it('shows a labeled floor-price estimate inside the Digital Collectibles section (FR-006)', () => {
     renderPanel()
     // 0.5 WETH -> ETH @ 4000 × quantity 2 = $4,000.00, marked as approximate.
     expect(screen.getByText('≈ $4,000.00')).toBeInTheDocument()
     expect(screen.getByText(/floor-price estimate, priced items only/i)).toBeInTheDocument()
+    // The row lives in the taxonomy section's region, not a standalone section.
+    const region = screen.getByRole('region', { name: 'Digital Collectibles' })
+    expect(region.querySelector('.portfolio-collectibles')).toBeTruthy()
+    // With the row present, the empty-category message is replaced by the row.
+    expect(region).not.toHaveTextContent('No assets in this category.')
   })
 
   it('NEVER merges the estimate into the verifiable headline total (research D8)', () => {
@@ -75,7 +91,7 @@ describe('Portfolio — collectibles estimate line', () => {
     // Headline stays exactly the token total; the disclosure says so explicitly.
     expect(screen.getByText('$1,234.56')).toBeInTheDocument()
     expect(screen.queryByText('$5,234.56')).not.toBeInTheDocument()
-    expect(screen.getByText(/not included in the total above/i)).toBeInTheDocument()
+    expect(screen.getByText(/not included in the totals above/i)).toBeInTheDocument()
   })
 
   it('counts unpriced items instead of silently valuing them', () => {
@@ -95,10 +111,13 @@ describe('Portfolio — collectibles estimate line', () => {
     expect(screen.queryByText(/≈ \$/)).not.toBeInTheDocument()
   })
 
-  it('is absent on unsupported networks and for empty wallets (FR-007)', () => {
+  it('is absent on unsupported networks and for empty wallets, restoring the empty-category message (FR-007)', () => {
     useCollectiblesValuation.mockReturnValue(valuationState({ supported: false, status: 'unsupported' }))
     renderPanel()
-    expect(screen.queryByText(/collectibles/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/floor-price estimate/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Digital Collectibles' })
+    ).toHaveTextContent('No assets in this category.')
 
     useCollectiblesValuation.mockReturnValue(valuationState({ status: 'empty', items: [] }))
     renderPanel()
