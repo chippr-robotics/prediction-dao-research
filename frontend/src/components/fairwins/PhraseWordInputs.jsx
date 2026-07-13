@@ -116,7 +116,7 @@ export default function PhraseWordInputs({ words, onChange, disabled = false, id
               aria-invalid={showInvalid || undefined}
               value={w}
               disabled={disabled}
-              placeholder={String(i + 1)}
+              placeholder={`word #${i + 1}`}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={(e) => handlePaste(i, e)}

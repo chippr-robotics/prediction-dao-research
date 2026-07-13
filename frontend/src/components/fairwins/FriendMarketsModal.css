@@ -634,7 +634,9 @@
   z-index: 5;
   left: 0;
   right: auto;
-  top: calc(100% + 3px);
+  /* Open ABOVE the input: on mobile the on-screen keyboard covers the area below the
+     box, hiding a downward list. Anchoring to the input's top keeps suggestions visible. */
+  bottom: calc(100% + 3px);
   margin: 0;
   padding: 0.25rem;
   list-style: none;
