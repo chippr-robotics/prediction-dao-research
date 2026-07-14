@@ -61,6 +61,25 @@ curl -s localhost:8788/healthz | jq
   with no cache the routes return `503 upstream_unavailable` and the SPA shows its degraded state.
   No action needed beyond watching OpenSea status — nothing on the value path depends on this group.
 
+### Sell-side write routes (spec 056)
+
+The same `/v1/opensea/*` group gained write routes so members can list, accept offers, and cancel
+through OpenSea's orderbook. The gateway forwards a **client-signed** Seaport order — it holds **no
+signing key** on this path; the wallet is the only signer, and OpenSea's shared protocol settles.
+
+- **Write quotas**: `OPENSEA_WRITE_QUOTA_PER_ADDRESS` (20/min per seller) + `OPENSEA_WRITE_QUOTA_GLOBAL`
+  (100/min) — a **separate** quota instance from reads, so publishing can't drain the read budget.
+  Persistent write 429s ⇒ raise deliberately or leave it; sellers can always act on OpenSea directly.
+- **Not retried**: order-publish POSTs are never retried on 5xx (publishing is not idempotent), so a
+  transient upstream 5xx surfaces as `503` — the seller retries, no duplicate listing.
+- **Referral beneficiary**: `OPENSEA_REFERRAL_ADDRESS` (+ optional `OPENSEA_REFERRAL_ADDRESS_<chainId>`)
+  is a **public** address (inline `value:` in the manifest, not a secret) that records FairWins as the
+  beneficiary of OpenSea's own referral/affiliate reward. **Empty ⇒ attribution off** (safe default).
+  It is **never a surcharge** — it does not change what the buyer pays or the seller nets. To turn it
+  on: set the address in `services/oz-relayer/deploy/production/service.yaml` and redeploy; to rotate,
+  change the value and redeploy (no key rotation — it's not a secret).
+- **Killswitch** also stops the write routes (`503 killswitch_active`), same as reads.
+
 ## Common incidents
 
 | Symptom | Check | Action |

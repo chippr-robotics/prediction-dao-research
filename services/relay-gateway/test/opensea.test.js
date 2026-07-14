@@ -93,7 +93,8 @@ const COLLECTION_BODY = {
 
 const STATS_BODY = { total: { floor_price: 0.85, floor_price_symbol: 'ETH' } }
 
-const BEST_OFFER_BODY = { order_hash: '0xabc', price: { currency: 'WETH', decimals: 18, value: '790000000000000000' } }
+const BEST_OFFER_BODY = { order_hash: '0x' + 'cd'.repeat(32), price: { currency: 'WETH', decimals: 18, value: '790000000000000000' } }
+const BEST_LISTING_BODY = { orders: [{ order_hash: '0x' + 'ef'.repeat(32), maker: { address: OWNER }, price: { current: { currency: 'ETH', decimals: 18, value: '1000000000000000000' } } }] }
 
 const ORDER_HASH = '0x' + 'ab'.repeat(32)
 const LISTING_POST_RESPONSE = { order: { order_hash: ORDER_HASH, protocol_data: {} } }
@@ -144,6 +145,7 @@ function mockOpenSeaFetch(overrides = {}) {
       if (url.includes(needle)) return typeof resp === 'function' ? resp(url) : jsonRes(resp)
     }
     // Write endpoints (spec 056) — check the most specific first.
+    if (url.includes('/listings/collection/')) return jsonRes(BEST_LISTING_BODY)
     if (url.includes('/fulfillment_data')) return jsonRes(FULFILLMENT_RESPONSE)
     if (url.includes('/listings') && url.includes('/orders/')) return jsonRes(LISTING_POST_RESPONSE)
     if (url.includes('/cancel')) return jsonRes({ success: true })
@@ -485,9 +487,9 @@ describe('GET /v1/opensea/:chainId/contract/:contract/nfts/:identifier', () => {
   it('caches the composed result as one entry', async () => {
     const { app, openseaFetch } = build()
     await get(app, DETAIL_PATH)
-    expect(openseaFetch.calls.length).toBe(4) // item + collection + stats + offer
+    expect(openseaFetch.calls.length).toBe(5) // item + collection + stats + offer + listing
     await get(app, DETAIL_PATH)
-    expect(openseaFetch.calls.length).toBe(4)
+    expect(openseaFetch.calls.length).toBe(5)
   })
 })
 

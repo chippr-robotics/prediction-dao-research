@@ -157,14 +157,16 @@ export function createOpenSeaRouter(config, { client, cache, quotas, writeQuotas
           const nftBody = await client.get(`/api/v2/chain/${slug}/contract/${contract}/nfts/${identifier}`)
           const collectionSlug = typeof nftBody?.nft?.collection === 'string' ? nftBody.nft.collection : null
           const soft = (p) => p.catch(() => null) // degraded leg -> null field, not a failed sheet
-          const [collectionBody, statsBody, offerBody] = collectionSlug
+          const [collectionBody, statsBody, offerBody, listingBody] = collectionSlug
             ? await Promise.all([
                 soft(client.get(`/api/v2/collections/${collectionSlug}`)),
                 soft(client.get(`/api/v2/collections/${collectionSlug}/stats`)),
                 soft(client.get(`/api/v2/offers/collection/${collectionSlug}/nfts/${identifier}/best`)),
+                // Best listing for the item (spec 056) — drives the Cancel affordance; degrades to null.
+                soft(client.get(`/api/v2/listings/collection/${collectionSlug}/nfts/${identifier}/best`)),
               ])
-            : [null, null, null]
-          const detail = normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody }, chainId)
+            : [null, null, null, null]
+          const detail = normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody, listingBody }, chainId)
           if (!detail) throw new OpenSeaRequestError(404, 'item not present upstream')
           return detail
         }

@@ -105,8 +105,21 @@ export function normalizeCollection(slug, collectionBody, statsBody) {
   }
 }
 
+/** Best listing for an item -> {orderHash, maker, price} or null (spec 056: drives Cancel state). */
+export function normalizeListing(listingBody) {
+  const order = listingBody?.orders?.[0] ?? listingBody
+  const orderHash = order?.order_hash
+  if (!isOrderHash(orderHash)) return null
+  const maker = order?.maker?.address ?? order?.protocol_data?.parameters?.offerer ?? null
+  return {
+    orderHash,
+    maker: isAddress(maker) ? maker : null,
+    price: priceQuoteFromUnits(order?.current_price ? { value: order.current_price, decimals: 18, currency: 'ETH' } : order?.price?.current) ?? null,
+  }
+}
+
 /** Composed detail legs -> CollectibleItemDetail (without the envelope timestamps). */
-export function normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody }, chainId) {
+export function normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody, listingBody }, chainId) {
   const nft = nftBody?.nft
   const item = normalizeItem(nft, chainId)
   if (!item) return null
@@ -120,6 +133,8 @@ export function normalizeItemDetail({ nftBody, collectionBody, statsBody, offerB
     owner: isAddress(nft.owners?.[0]?.address) ? nft.owners[0].address : null,
     collection: slug ? normalizeCollection(slug, collectionBody, statsBody) : null,
     bestOffer: priceQuoteFromUnits(offerBody?.price) ?? null,
+    bestOfferHash: isOrderHash(offerBody?.order_hash) ? offerBody.order_hash : null,
+    listing: normalizeListing(listingBody),
   }
 }
 

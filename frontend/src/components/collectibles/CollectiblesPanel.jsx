@@ -42,7 +42,7 @@ function CollectibleCard({ item, onOpen }) {
  * Soft-fail + honest state: hidden entirely on unsupported networks (the tab never renders this
  * panel there, FR-007); degraded upstream shows an explicit unavailable state with the OpenSea
  * link still offered (FR-008); stale cached data is labeled (FR-013); provider-flagged items sit
- * behind an off-by-default toggle (FR-012). No trading affordances exist here (FR-005).
+ * behind an off-by-default toggle (FR-012). Sell-side actions live in the item detail sheet (spec 056).
  */
 export default function CollectiblesPanel() {
   const { isConnected, openConnectModal } = useWallet() || {}
@@ -61,8 +61,8 @@ export default function CollectiblesPanel() {
         <div>
           <h3>Collect</h3>
           <p className="collectibles-panel-subtitle">
-            Digital collectibles owned by your connected wallet on this network. Display only — trading happens on
-            OpenSea.
+            Digital collectibles owned by your connected wallet on this network. Open one to list it for sale,
+            accept an offer, or view it on OpenSea.
           </p>
         </div>
         {status === 'ready' || status === 'empty' ? (

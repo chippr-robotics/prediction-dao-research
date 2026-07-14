@@ -186,3 +186,76 @@
   margin: 0;
   text-align: center;
 }
+
+/* Sell-side actions (spec 056) */
+.collectible-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.collectible-sheet-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.collectible-sheet-sell,
+.collectible-sheet-accept,
+.collectible-sheet-cancel-listing {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 8rem;
+  padding: 0.55rem 0.9rem;
+}
+.collectible-sheet-sell {
+  background: var(--brand-primary, #36b37e);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.collectible-sheet-accept {
+  background: transparent;
+  color: var(--text-primary, #111827);
+}
+.collectible-sheet-cancel-listing {
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+}
+.collectible-sheet-sell:disabled,
+.collectible-sheet-accept:disabled,
+.collectible-sheet-cancel-listing:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.collectible-sheet-confirm {
+  background: var(--bg-tertiary, #f3f4f6);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.collectible-sheet-confirm p {
+  margin: 0 0 0.5rem;
+}
+.collectible-sheet-confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.collectible-sheet-confirm-actions button {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0.4rem 0.9rem;
+}
+.collectible-sheet-sell-unavailable,
+.collectible-sheet-sell-error,
+.collectible-sheet-sell-done {
+  font-size: 0.85rem;
+  margin: 0;
+}
+.collectible-sheet-sell-unavailable {
+  color: var(--text-secondary, #6b7280);
+}
+.collectible-sheet-sell-error {
+  color: var(--danger-text, #b91c1c);
+}
