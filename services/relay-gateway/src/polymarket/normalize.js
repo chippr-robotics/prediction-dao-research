@@ -75,6 +75,7 @@ export function normalizeMarket(raw) {
     outcomes,
     volume: usdcQuote(raw.volume ?? raw.volume_num ?? null),
     endDate: typeof raw.end_date_iso === 'string' ? raw.end_date_iso : (typeof raw.endDate === 'string' ? raw.endDate : null),
+    negRisk: Boolean(raw.neg_risk ?? raw.negRisk),
     // Non-tradable markets show an honest state instead of a buy/sell affordance that would fail.
     tradable: !closed && outcomes.length > 0,
     polymarketUrl: polymarketMarketUrl(slug),
@@ -86,6 +87,66 @@ export function normalizeMarketPage(body) {
   const list = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : []
   const markets = list.map(normalizeMarket).filter(Boolean)
   const next = typeof body?.next_cursor === 'string' && body.next_cursor !== '' && body.next_cursor !== 'LTE=' ? body.next_cursor : null
+  return { markets, next }
+}
+
+/** Parse a Gamma stringified-JSON array field (outcomes/outcomePrices/clobTokenIds) -> array, or []. */
+function parseJsonArray(v) {
+  if (Array.isArray(v)) return v
+  if (typeof v !== 'string') return []
+  try {
+    const parsed = JSON.parse(v)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * One Gamma API market -> Market DTO (the discovery/browse source; live tradable markets by volume,
+ * with search). Gamma encodes outcomes/prices/token-ids as stringified JSON arrays that we zip
+ * together; field names are camelCase. Returns null when unusable.
+ */
+export function normalizeGammaMarket(raw) {
+  if (!raw) return null
+  const conditionId = raw.conditionId ?? raw.condition_id
+  if (typeof conditionId !== 'string' || conditionId === '') return null
+  const names = parseJsonArray(raw.outcomes)
+  const tokenIds = parseJsonArray(raw.clobTokenIds)
+  const prices = parseJsonArray(raw.outcomePrices)
+  const outcomes = names
+    .map((name, i) => {
+      const tokenId = String(tokenIds[i] ?? '')
+      if (!isTokenId(tokenId)) return null
+      return { name: typeof name === 'string' ? name : `Outcome ${i + 1}`, tokenId, price: normalizePrice(prices[i]) }
+    })
+    .filter(Boolean)
+  const closed = Boolean(raw.closed) || raw.active === false
+  const slug = typeof raw.slug === 'string' ? raw.slug : null
+  return {
+    conditionId,
+    question: typeof raw.question === 'string' && raw.question !== '' ? raw.question : (raw.title ?? conditionId),
+    category: typeof raw.category === 'string' ? raw.category : null,
+    slug,
+    outcomes,
+    volume: usdcQuote(raw.volumeNum ?? raw.volume ?? null),
+    endDate: typeof raw.endDate === 'string' ? raw.endDate : null,
+    negRisk: Boolean(raw.negRisk),
+    tradable: !closed && outcomes.length > 0,
+    polymarketUrl: polymarketMarketUrl(slug),
+  }
+}
+
+/**
+ * Assemble a Gamma market page. `q` filters by question text (Gamma /markets has no free-text param, so
+ * we filter the volume-ranked page server-side); `next` is the next offset when the page was full.
+ */
+export function normalizeGammaPage(body, { q = '', offset = 0, limit = 100 } = {}) {
+  const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : []
+  let markets = list.map(normalizeGammaMarket).filter(Boolean).filter((m) => m.tradable)
+  const needle = q.trim().toLowerCase()
+  if (needle) markets = markets.filter((m) => m.question.toLowerCase().includes(needle))
+  const next = list.length >= limit ? String(offset + limit) : null
   return { markets, next }
 }
 
@@ -106,7 +167,7 @@ export function normalizeFeeRate(body, tokenId) {
   }
 }
 
-/** One position -> {tokenId, conditionId, outcome, size, value}, or null. */
+/** One Data-API position -> {tokenId, conditionId, outcome, size, value, bestBid, negRisk}, or null. */
 export function normalizePosition(raw) {
   if (!raw) return null
   const tokenId = String(raw.asset ?? raw.token_id ?? raw.tokenId ?? '')
@@ -118,8 +179,10 @@ export function normalizePosition(raw) {
     conditionId: typeof raw.conditionId === 'string' ? raw.conditionId : (raw.condition_id ?? null),
     outcome: typeof raw.outcome === 'string' ? raw.outcome : null,
     size: String(size),
-    value: usdcQuote(raw.current_value ?? raw.value ?? null),
+    // Data-API uses camelCase currentValue + curPrice (the current mark, our sell-price proxy).
+    value: usdcQuote(raw.currentValue ?? raw.current_value ?? raw.value ?? null),
     bestBid: usdcQuote(raw.curPrice ?? raw.price ?? null),
+    negRisk: Boolean(raw.negativeRisk ?? raw.negRisk),
   }
 }
 

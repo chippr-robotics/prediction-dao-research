@@ -18,7 +18,8 @@ import {
   isTokenId,
   isCursor,
   normalizeMarket,
-  normalizeMarketPage,
+  normalizeGammaMarket,
+  normalizeGammaPage,
   normalizeFeeRate,
   normalizePositionsList,
   normalizeOpenOrdersList,
@@ -36,9 +37,13 @@ import {
  *   killSwitch: {isActive: () => boolean},
  * }} deps
  */
-export function createPolymarketRouter(config, { client, cache, quotas, writeQuotas, killSwitch }) {
+export function createPolymarketRouter(config, { client, gammaClient, dataClient, cache, quotas, writeQuotas, killSwitch }) {
   const pm = config.polymarket
+  const gamma = gammaClient ?? client // browse/search host (public)
+  const data = dataClient ?? client // positions host (public)
   const router = express.Router()
+
+  const GAMMA_PAGE = 100 // markets fetched per Gamma page (volume-ranked; q filters this set)
 
   /** Killswitch + fail-closed key (shared by reads and writes). */
   function requireLive() {
@@ -96,26 +101,32 @@ export function createPolymarketRouter(config, { client, cache, quotas, writeQuo
       .json({ error: { code: 'upstream_unavailable', reason: 'prediction-market data is temporarily unavailable; try again later' } })
   }
 
-  // ---- GET /v1/polymarket/:chainId/markets (list/search) --------------------------------------
+  // ---- GET /v1/polymarket/:chainId/markets (browse/search via Gamma) --------------------------
+  // Live, tradable markets ranked by volume (the CLOB /markets endpoint returns mostly closed
+  // historical markets). `q` filters the volume-ranked page by question text; `next` is an offset.
   router.get('/v1/polymarket/:chainId/markets', async (req, res) => {
     try {
       requirePolygon(req.params.chainId)
       const next = req.query.next ?? null
       const search = typeof req.query.q === 'string' ? req.query.q.slice(0, 128) : ''
-      const category = typeof req.query.category === 'string' ? req.query.category.slice(0, 64) : ''
       if (!isCursor(next)) throw new GatewayError(400, 'invalid_cursor', 'malformed pagination cursor')
-      guard(`markets:${search}:${category}`)
+      const offset = Number.parseInt(next ?? '0', 10) || 0
+      guard(`markets:${search}:${offset}`)
 
-      const result = await cache.fetchThrough(
-        `markets:${search}:${category}:${next ?? ''}`,
-        pm.cacheTtlMs,
-        async () => {
-          const body = await client.get('/markets', {
-            query: { ...(next ? { next_cursor: next } : {}), ...(search ? { q: search } : {}), ...(category ? { category } : {}) },
-          })
-          return normalizeMarketPage(body)
-        }
-      )
+      const result = await cache.fetchThrough(`markets:${search}:${offset}`, pm.cacheTtlMs, async () => {
+        const body = await gamma.get('/markets', {
+          query: {
+            active: 'true',
+            closed: 'false',
+            archived: 'false',
+            limit: String(GAMMA_PAGE),
+            offset: String(offset),
+            order: 'volumeNum',
+            ascending: 'false',
+          },
+        })
+        return normalizeGammaPage(body, { q: search, offset, limit: GAMMA_PAGE })
+      })
       respond(res, result)
     } catch (err) {
       handleError(res, err)
@@ -133,8 +144,9 @@ export function createPolymarketRouter(config, { client, cache, quotas, writeQuo
       guard(`market:${conditionId}`)
 
       const result = await cache.fetchThrough(`market:${conditionId}`, pm.cacheTtlMs, async () => {
-        const body = await client.get(`/markets/${conditionId}`)
-        const market = normalizeMarket(body?.market ?? body)
+        const body = await gamma.get('/markets', { query: { condition_ids: conditionId } })
+        const raw = Array.isArray(body) ? body[0] : (body?.data?.[0] ?? body?.market ?? body)
+        const market = normalizeGammaMarket(raw) ?? normalizeMarket(raw)
         if (!market) throw new PolymarketRequestError(404, 'market not present upstream')
         return market
       })
@@ -155,16 +167,20 @@ export function createPolymarketRouter(config, { client, cache, quotas, writeQuo
       guard(`fee:${tokenId}`)
 
       const result = await cache.fetchThrough(`fee:${tokenId}`, pm.cacheTtlMs, async () => {
-        const body = await client.get('/fee-rate', { query: { token_id: tokenId } })
-        const fee = normalizeFeeRate(body, tokenId)
-        // No confirmable schedule -> block signing with a retryable state, never a guessed/hardcoded
-        // fee (FR-010). 503 (try again) rather than 404 (not_found) because the market itself exists.
-        if (!fee) throw new GatewayError(503, 'fee_unavailable', 'could not confirm the fee schedule; try again')
-        // Echo the configured builder fee + code so the client shows the honest additive total
-        // (FR-012) and embeds the code in the order it signs (the gateway re-validates it on submit).
+        // The builder code + fee are OUR config and are ALWAYS known — trading must never be blocked
+        // by a CLOB fee-rate quirk (FR-015). Polymarket's own taker fee (base_fee → the order's
+        // feeRateBps) is best-effort: fetched for the signed order, null if the CLOB has none.
         const builder = attachBuilderCode(config, { chainId: 137 })
+        let platform = null
+        try {
+          platform = normalizeFeeRate(await client.get('/fee-rate', { query: { token_id: tokenId } }), tokenId)
+        } catch {
+          platform = null
+        }
         return {
-          ...fee,
+          tokenId,
+          // Platform fee rate the order must carry (bps); null when the CLOB reports none.
+          feeRateBps: platform?.feeRateBps ?? null,
           builderCode: builder.builderCode,
           builderTakerFeeBps: builder.takerFeeBps,
           builderMakerFeeBps: builder.makerFeeBps,
@@ -185,7 +201,8 @@ export function createPolymarketRouter(config, { client, cache, quotas, writeQuo
       guard(address.toLowerCase())
 
       const result = await cache.fetchThrough(`positions:${address.toLowerCase()}`, pm.cacheTtlMs, async () => {
-        const body = await client.get('/positions', { query: { user: address }, auth: true })
+        // Positions live on the public Data API (not the CLOB), keyed by the wallet — no L2 auth.
+        const body = await data.get('/positions', { query: { user: address, sizeThreshold: '0.1', limit: '100' } })
         return normalizePositionsList(body)
       })
       respond(res, result)

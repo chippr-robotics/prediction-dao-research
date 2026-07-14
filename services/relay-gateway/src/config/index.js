@@ -328,6 +328,11 @@ export function loadConfig(env = process.env, opts = {}) {
         return a
       })(),
       baseUrl: opt(env, 'POLYMARKET_BASE_URL', 'https://clob.polymarket.com'),
+      // Polymarket splits across three public hosts: the CLOB (orders/fees/auth), the Gamma API
+      // (market discovery + search), and the Data API (positions). Browse hits Gamma, positions hit
+      // Data — both public (no L2 creds); only the CLOB path is authed.
+      gammaBaseUrl: opt(env, 'POLYMARKET_GAMMA_URL', 'https://gamma-api.polymarket.com'),
+      dataBaseUrl: opt(env, 'POLYMARKET_DATA_URL', 'https://data-api.polymarket.com'),
       timeoutMs: int(env, 'POLYMARKET_TIMEOUT_MS', 5000),
       retries: int(env, 'POLYMARKET_RETRIES', 1),
       cacheTtlMs: int(env, 'POLYMARKET_CACHE_TTL_MS', 15_000),

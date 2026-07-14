@@ -35,6 +35,27 @@ in the confirm UI, never hidden and never described as free (`TradeConfirm.jsx`)
 | State machine | `frontend/src/hooks/usePredictTrade.js` (fee → build → sign → submit) |
 | Browse / positions / orders | `usePredictMarkets.js`, `usePredictPortfolio.js` + `components/predict/*` |
 
+### Upstream hosts
+
+Polymarket splits across three public hosts, and the gateway routes each read to the right one:
+
+- **Gamma API** (`gamma-api.polymarket.com`) — market **discovery/browse + search**, volume-ranked live
+  markets (the CLOB `/markets` endpoint returns mostly closed historical markets, so it is not used for
+  browse). Outcomes/prices/token-ids arrive as stringified JSON arrays that the normalizer zips.
+- **Data API** (`data-api.polymarket.com`) — the wallet's **positions** (public, no auth).
+- **CLOB** (`clob.polymarket.com`) — fee rate (`base_fee`), open orders (L2-authed), and order
+  submit/cancel. This is the only host that uses the operator L2 credentials.
+
+Hosts are configurable via `POLYMARKET_GAMMA_URL` / `POLYMARKET_DATA_URL` / `POLYMARKET_BASE_URL`.
+
+### Fees, honestly
+
+We control and state the **builder fee** exactly. Polymarket's **own taker fee** is computed by their
+engine at execution (a curve over price/size); `base_fee` is carried on the signed order's `feeRateBps`
+for validity, but we do **not** fabricate a dollar estimate for it — the confirm UI discloses it as a
+separate note ("Polymarket also charges its own taker fee, applied at execution"). This keeps
+"shown == charged" honest for the one fee we own.
+
 ### Signing
 
 The member's wallet signs the CLOB V2 order struct as EIP-712 typed data (domain

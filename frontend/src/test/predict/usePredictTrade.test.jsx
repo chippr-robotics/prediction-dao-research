@@ -57,7 +57,7 @@ describe('usePredictTrade', () => {
     const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
     await act(async () => { await result.current.loadFee(TOKEN) })
     const p = result.current.preview(BUY)
-    expect(p.totalCostUnits).toBe(50_750000n)
+    expect(p.totalCostUnits).toBe(50_250000n)
     expect(p.feeLines.map((l) => l.label)).toContain('FairWins builder fee')
   })
 

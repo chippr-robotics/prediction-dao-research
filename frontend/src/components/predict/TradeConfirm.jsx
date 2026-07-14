@@ -115,7 +115,7 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
                   </div>
                 ))}
                 <div className="trade-confirm-total">
-                  <dt>{isBuy ? 'Total cost' : 'You receive'}</dt>
+                  <dt>{isBuy ? 'Subtotal (incl. builder fee)' : 'You receive (before Polymarket fee)'}</dt>
                   <dd data-testid="trade-total">
                     {formatUnits(isBuy ? quote.totalCostUnits : quote.netProceedsUnits, 6)} USDC
                   </dd>
@@ -123,10 +123,11 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
               </dl>
             )}
 
-            {/* Honest builder-fee disclosure — states it IS a cost (the divergence from Collect). */}
+            {/* Honest disclosure — the builder fee IS a cost (the divergence from Collect), and
+                Polymarket's own taker fee is separate and charged at execution (not fabricated here). */}
             <p className="trade-confirm-fee-note">
-              FairWins charges a {bpsToPct(builderBps)} builder fee on this trade, added on top of
-              Polymarket&apos;s own fee. It&apos;s included in the total above.
+              FairWins charges a {bpsToPct(builderBps)} builder fee on this trade, included above.
+              Polymarket also charges its own taker fee, set by the market and applied at execution.
             </p>
 
             <div className="trade-confirm-actions">
@@ -137,7 +138,7 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
                 type="button"
                 className="trade-confirm-submit"
                 disabled={!canSign || busy}
-                onClick={() => trade.submit(params, { builder: trade.fee?.builderCode })}
+                onClick={() => trade.submit(params, { builder: trade.fee?.builderCode, negRisk: Boolean(market?.negRisk) })}
               >
                 {busy ? 'Submitting…' : `Sign ${isBuy ? 'buy' : 'sell'} (no gas)`}
               </button>
