@@ -43,6 +43,22 @@
  *   OPENSEA_REFERRAL_ADDRESS   FairWins beneficiary of OpenSea's referral/affiliate reward (spec 056,
  *                              public address; unset => attribution off, a safe default). Never a surcharge.
  *   OPENSEA_REFERRAL_ADDRESS_<chainId>  per-network referral beneficiary override
+ *   POLYMARKET_API_KEY         Polymarket CLOB API key for the /v1/polymarket/* Predict proxy (spec 057).
+ *                              Unset => those routes fail CLOSED with 503 predict_unconfigured
+ *                              (the Predict feature hides; nothing else is affected)
+ *   POLYMARKET_BASE_URL        Polymarket CLOB base (default https://clob.polymarket.com)
+ *   POLYMARKET_TIMEOUT_MS      upstream request timeout (default 5000)
+ *   POLYMARKET_RETRIES         upstream retries on 5xx/transport for reads (default 1; writes never retry)
+ *   POLYMARKET_CACHE_TTL_MS    market/fee read cache TTL (default 15000 — prices move fast)
+ *   POLYMARKET_QUOTA_PER_ADDRESS reads/min counted per requested address (default 60)
+ *   POLYMARKET_QUOTA_GLOBAL    reads/min across all callers (default 300)
+ *   POLYMARKET_QUOTA_WINDOW_MS quota window (default 60000)
+ *   POLYMARKET_WRITE_QUOTA_PER_ADDRESS order/cancel writes/min per trader address (default 20)
+ *   POLYMARKET_WRITE_QUOTA_GLOBAL      order/cancel writes/min across all callers (default 100)
+ *   POLYMARKET_BUILDER_CODE    FairWins bytes32 builder code (spec 057, public; unset => unattributed,
+ *                              orders still post — never stranded). Attaches to every order for fee + rewards.
+ *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over)
+ *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over)
  *
  * The gateway NEVER holds the gas key — that is the engine's (Secret-Manager-held) concern.
  */
@@ -53,6 +69,7 @@ import { CHAIN_DEFS } from './chains.js'
 import { actionsForContract } from '../intent/intentTypes.js'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_DEPLOYMENTS_DIR = path.resolve(__dirname, '../../../../deployments')
 
@@ -292,6 +309,54 @@ export function loadConfig(env = process.env, opts = {}) {
           if (a) map[chainId] = a
         }
         return map
+      })(),
+    },
+    // Polymarket / Predict proxy (spec 057): optional like the OpenSea proxy — no key means the
+    // /v1/polymarket/* routes 503 fail-closed and the SPA hides the Predict tab; boot is unaffected
+    // (Predict must never couple to the value paths). Polygon-only (Polymarket runs only on 137).
+    polymarket: {
+      apiKey: opt(env, 'POLYMARKET_API_KEY', null),
+      // L2 HMAC credentials, derived once offline via L1 (POST /auth/api-key) during provisioning and
+      // held as secrets — so the gateway never holds an order-signing key. Reads of public market data
+      // work without them; user-specific reads + order/cancel writes attach L2 headers when present.
+      apiSecret: opt(env, 'POLYMARKET_API_SECRET', null),
+      apiPassphrase: opt(env, 'POLYMARKET_API_PASSPHRASE', null),
+      // The operator wallet the API creds belong to (POLY_ADDRESS header); validated if set.
+      apiAddress: (() => {
+        const a = opt(env, 'POLYMARKET_API_ADDRESS', null)
+        if (a && !ADDRESS_RE.test(a)) throw new Error(`[relay-gateway] POLYMARKET_API_ADDRESS is not an address`)
+        return a
+      })(),
+      baseUrl: opt(env, 'POLYMARKET_BASE_URL', 'https://clob.polymarket.com'),
+      timeoutMs: int(env, 'POLYMARKET_TIMEOUT_MS', 5000),
+      retries: int(env, 'POLYMARKET_RETRIES', 1),
+      cacheTtlMs: int(env, 'POLYMARKET_CACHE_TTL_MS', 15_000),
+      quotaPerAddress: int(env, 'POLYMARKET_QUOTA_PER_ADDRESS', 60),
+      quotaGlobal: int(env, 'POLYMARKET_QUOTA_GLOBAL', 300),
+      quotaWindowMs: int(env, 'POLYMARKET_QUOTA_WINDOW_MS', 60_000),
+      // Order/cancel writes: tighter, separate quota keyed by the trader's address so submitting an
+      // order can't drain the shared key's read budget.
+      writeQuotaPerAddress: int(env, 'POLYMARKET_WRITE_QUOTA_PER_ADDRESS', 20),
+      writeQuotaGlobal: int(env, 'POLYMARKET_WRITE_QUOTA_GLOBAL', 100),
+      // FairWins builder code (spec 057). Public bytes32 (validated if set); unset => attribution off
+      // and orders post UNATTRIBUTED rather than being blocked (never-stranded, FR-015).
+      builderCode: (() => {
+        const c = opt(env, 'POLYMARKET_BUILDER_CODE', null)
+        if (c && !BYTES32_RE.test(c)) throw new Error(`[relay-gateway] POLYMARKET_BUILDER_CODE must be a 32-byte hex (bytes32)`)
+        return c
+      })(),
+      // Builder fee, additive on top of Polymarket's platform taker fee (a REAL user cost, unlike the
+      // OpenSea referral). Config, never hardcoded in the client. Hard-capped at Polymarket's limits
+      // (100 bps taker / 50 bps maker) — an out-of-range value fails boot loudly (FR-014/SC-010).
+      takerFeeBps: (() => {
+        const bps = int(env, 'POLYMARKET_BUILDER_TAKER_FEE_BPS', 50)
+        if (bps > 100) throw new Error(`[relay-gateway] POLYMARKET_BUILDER_TAKER_FEE_BPS=${bps} exceeds the 100 bps cap`)
+        return bps
+      })(),
+      makerFeeBps: (() => {
+        const bps = int(env, 'POLYMARKET_BUILDER_MAKER_FEE_BPS', 0)
+        if (bps > 50) throw new Error(`[relay-gateway] POLYMARKET_BUILDER_MAKER_FEE_BPS=${bps} exceeds the 50 bps cap`)
+        return bps
       })(),
     },
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
