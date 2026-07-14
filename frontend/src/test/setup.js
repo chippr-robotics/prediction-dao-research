@@ -239,9 +239,11 @@ vi.mock('wagmi/connectors', () => ({
   walletConnect: vi.fn(() => ({ id: 'walletConnect', name: 'WalletConnect' }))
 }))
 
-// Predict (spec 057): stub the heavy Polymarket SDKs. The real @polymarket/clob-client bundles viem+axios
-// and OOMs jsdom workers on import. Unit tests drive the trade hooks through injected clobSession/geoblock
-// deps, so the real SDK is never needed here (it is validated live in Node instead).
+// Predict (spec 057): stub the heavy @polymarket/clob-client. The real one bundles viem+axios and OOMs
+// jsdom workers on import. Unit tests drive the trade hooks through injected clobSession/geoblock deps, so
+// the real SDK is never needed here (it is validated live in Node instead). Note: builder attribution is a
+// self-contained gateway-fetch shim in clobSession.js (no @polymarket/builder-signing-sdk in the frontend —
+// that SDK statically imports node:crypto and can't be bundled for the browser; it is server-only).
 vi.mock('@polymarket/clob-client', () => ({
   ClobClient: class {
     async createOrDeriveApiKey() { return { key: 'k', secret: 's', passphrase: 'p' } }
@@ -251,13 +253,6 @@ vi.mock('@polymarket/clob-client', () => ({
   },
   Side: { BUY: 0, SELL: 1 },
   OrderType: { GTC: 'GTC', GTD: 'GTD', FOK: 'FOK', FAK: 'FAK' }
-}))
-vi.mock('@polymarket/builder-signing-sdk', () => ({
-  BuilderConfig: class {
-    constructor() {}
-    isValid() { return true }
-    async generateBuilderHeaders() { return { POLY_BUILDER_API_KEY: 'k', POLY_BUILDER_PASSPHRASE: 'p', POLY_BUILDER_SIGNATURE: 's', POLY_BUILDER_TIMESTAMP: '1' } }
-  }
 }))
 
 // Mock window.ethereum for Web3 tests

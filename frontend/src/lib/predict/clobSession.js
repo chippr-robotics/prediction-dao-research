@@ -22,7 +22,6 @@
  * must be confirmed end-to-end first (see tradeSigner.js).
  */
 import { ClobClient, Side, OrderType } from '@polymarket/clob-client'
-import { BuilderConfig } from '@polymarket/builder-signing-sdk'
 
 export const CLOB_HOST = 'https://clob.polymarket.com'
 export const POLYGON = 137
@@ -71,19 +70,40 @@ export async function ensureClobCreds(walletClient, { address, storage = safeSto
 
 /**
  * Builder attribution config for FairWins revenue (POLY_BUILDER_* headers). The builder creds are a
- * SHARED secret, so they stay server-side: we point the SDK at the gateway's remote builder-sign endpoint
- * (it holds the creds and returns the four headers). Returns undefined when no gateway is configured —
- * trades then post UNATTRIBUTED rather than being blocked (never-stranded, FR-015).
+ * SHARED secret, so they stay server-side: this returns a light client the CLOB SDK calls to fetch the
+ * four headers from the gateway's remote builder-sign endpoint (the gateway holds the creds and does the
+ * HMAC). We deliberately do NOT import `@polymarket/builder-signing-sdk` here — it statically pulls in
+ * `node:crypto` (`createHmac`) and cannot be bundled for the browser; it is a server-only SDK. The CLOB
+ * client duck-types this object: it only calls `isValid()` and `generateBuilderHeaders(method, path, body)`
+ * (see `@polymarket/clob-client` `_generateBuilderHeaders`). The gateway generates + bakes the timestamp
+ * into `POLY_BUILDER_TIMESTAMP` and signs over the same body, so the shim just forwards {method,path,body}.
+ * Returns undefined when no gateway is configured — trades then post UNATTRIBUTED (never-stranded, FR-015).
  * @param {string} gatewayBaseUrl  e.g. VITE_RELAYER_URL (no trailing slash); '' => no attribution
  * @param {number} [chainId]
  */
-export function makeBuilderConfig(gatewayBaseUrl, chainId = POLYGON, { BuilderConfigImpl = BuilderConfig } = {}) {
+export function makeBuilderConfig(gatewayBaseUrl, chainId = POLYGON, { fetchImpl } = {}) {
   const base = String(gatewayBaseUrl || '').trim().replace(/\/$/, '')
   if (!base) return undefined
-  try {
-    return new BuilderConfigImpl({ remoteBuilderConfig: { url: `${base}/v1/polymarket/${chainId}/builder-sign` } })
-  } catch {
-    return undefined
+  const doFetch = fetchImpl ?? ((...args) => globalThis.fetch(...args))
+  const url = `${base}/v1/polymarket/${chainId}/builder-sign`
+  return {
+    isValid: () => true,
+    // Attribution is best-effort: any failure returns undefined so the SDK posts the order UNATTRIBUTED
+    // rather than blocking it (never-stranded, FR-015).
+    async generateBuilderHeaders(method, path, body) {
+      try {
+        const res = await doFetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ method, path, body: body ?? null }),
+        })
+        if (!res?.ok) return undefined
+        const h = await res.json()
+        return h?.POLY_BUILDER_API_KEY && h?.POLY_BUILDER_SIGNATURE ? h : undefined
+      } catch {
+        return undefined
+      }
+    },
   }
 }
 
