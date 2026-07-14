@@ -91,8 +91,14 @@ signer and Polymarket's protocol settles. A total outage never touches any value
 - **Credentials (secrets)**: `POLYMARKET_API_KEY` + `POLYMARKET_API_SECRET` + `POLYMARKET_API_PASSPHRASE`
   are the L2 HMAC creds, **derived once offline via L1** (`POST /auth/api-key` signed by the operator
   wallet) and stored in Secret Manager — so no signing key lives in the gateway. `POLYMARKET_API_ADDRESS`
-  is the operator wallet (public). Any missing secret ⇒ routes fail closed (`503 predict_unconfigured`)
-  and the tab hides. To rotate: re-derive the L2 creds offline, update the three secrets, redeploy.
+  is the operator wallet (public, wired from a same-named secret for consistency). Any missing secret ⇒
+  routes fail closed (`503 predict_unconfigured`) and the tab hides. To rotate: re-derive the L2 creds
+  offline, update the secrets, redeploy.
+  - **One-time IAM prerequisite:** the gateway runtime SA
+    (`fairwins-relay-engine@chippr-bots-site-wp.iam.gserviceaccount.com`) needs
+    `roles/secretmanager.secretAccessor` on all four `POLYMARKET_*` secrets, or the new revision
+    boot-fails to mount them. Grant once per secret with
+    `gcloud secrets add-iam-policy-binding <SECRET> --member="serviceAccount:<SA>" --role=roles/secretmanager.secretAccessor`.
 - **Builder code + fee** (public config, inline `value:` in the manifest — not secrets):
   `POLYMARKET_BUILDER_CODE` (bytes32), `POLYMARKET_BUILDER_TAKER_FEE_BPS` (default `50`),
   `POLYMARKET_BUILDER_MAKER_FEE_BPS` (default `0`). The builder fee is **additive** on Polymarket's
