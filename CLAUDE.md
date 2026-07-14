@@ -123,6 +123,16 @@ artifacts live under `specs/<feature>/`.
   twin (three-way struct sync: contract typehashes + `frontend/src/lib/relay/intentTypes.js` +
   `services/relay-gateway/src/intent/intentTypes.js`; domain `"FairWins CallsignRegistry"`/`"1"`).
   See `docs/developer-guide/callsigns.md` + `specs/054-callsign-registry/`.
+- **Predict (spec 057) is Polymarket trading, structured exactly like Collect (055/056):** a frontend
+  section + relay-gateway proxy (`services/relay-gateway/src/polymarket/`), **no contract changes**, no
+  custody — the member's wallet is the only order signer. Revenue is Polymarket's **builder-code**
+  program: FairWins' `bytes32` code (`0x6e03…93a3`) attaches to every order for a builder fee (default
+  **50 bps taker / 0 maker**, config, capped at 100/50) + weekly rewards. **Polygon-only** (Polymarket
+  runs nowhere else; the tab hides off 137). Unlike Collect's no-cost OpenSea referral, the builder fee
+  is **additive** (a real taker cost) and MUST be disclosed honestly as its own line in the confirm UI —
+  never hidden, never "free". Resolve nothing through `wagerRegistry`. Builder code + fee are public
+  config; the CLOB API key + L2 creds are gateway-only secrets. Boot fails loudly if the fee exceeds the
+  caps. See `docs/developer-guide/predict-polymarket.md` + `specs/057-predict-polymarket/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

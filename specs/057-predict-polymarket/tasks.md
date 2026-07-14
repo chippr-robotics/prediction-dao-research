@@ -172,14 +172,14 @@ builder fee for takers) before a gas-free signature; proceeds settle to their wa
 **Independent Test**: quickstart rows Sell / Net=signed / No-bid state / Stale-price
 re-confirm — with a wallet holding a position, sell, confirm net matches, fill, verify USDC
 
-- [ ] T020 [US2] Extend the hook `usePredictTrade.js` (or a sibling) with the SELL path
+- [x] T020 [US2] Extend the hook `usePredictTrade.js` (or a sibling) with the SELL path
   (best-bid fetch, taker/maker fee application, stale-price detection ⇒ re-confirm FR-008)
   and MarketDetailSheet's Sell affordance + positions view; tests for sell sign+post,
   no-bid honest state, stale-price re-confirm
-- [ ] T021 [US2] Gateway: reuse `POST …/order` for sells; add tests for a SELL order body
+- [x] T021 [US2] Gateway: reuse `POST …/order` for sells; add tests for a SELL order body
   (side flip, builder code attached, taker fee applied, maker sell shows 0) in
   `polymarket.test.js`
-- [ ] T022 [US2] TradeConfirm sell mode + tests: net proceeds = best bid − platform fee −
+- [x] T022 [US2] TradeConfirm sell mode + tests: net proceeds = best bid − platform fee −
   builder fee (taker), shown == signed (FR-007/FR-011), no-bid/illiquid honest state, axe
 
 **Checkpoint**: buy + sell round-trip complete, both attributed
@@ -192,9 +192,9 @@ re-confirm — with a wallet holding a position, sell, confirm net matches, fill
 
 **Independent Test**: place a resting limit order, view it, cancel, verify removed, no gas
 
-- [ ] T023 [US3] Implement `POST /v1/polymarket/:chainId/order/cancel` in `routes.js`
+- [x] T023 [US3] Implement `POST /v1/polymarket/:chainId/order/cancel` in `routes.js`
   (validate body, forward to CLOB cancel, no 5xx retry) + gateway tests
-- [ ] T024 [US3] Create `frontend/src/components/predict/OpenOrdersList.jsx` + CSS (list open
+- [x] T024 [US3] Create `frontend/src/components/predict/OpenOrdersList.jsx` + CSS (list open
   orders from `fetchOpenOrders`, Cancel action wired through the hook's cancel path) + tests
   (cancel removes the order, gas-free, accessible, axe)
 
@@ -202,19 +202,19 @@ re-confirm — with a wallet holding a position, sell, confirm net matches, fill
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T025 [P] Update `services/oz-relayer/deploy/production/service.yaml`: add
+- [x] T025 [P] Update `services/oz-relayer/deploy/production/service.yaml`: add
   `POLYMARKET_API_KEY` (Secret Manager ref) and `POLYMARKET_BUILDER_CODE` +
   `POLYMARKET_BUILDER_TAKER_FEE_BPS`/`_MAKER_FEE_BPS` (inline public values), bump the image tag
-- [ ] T026 [P] Update `docs/runbooks/relayer-operations.md` with the Predict proxy routes,
+- [x] T026 [P] Update `docs/runbooks/relayer-operations.md` with the Predict proxy routes,
   builder-code provisioning/rotation, the L1→L2 credential lifecycle, and Polymarket's
   fee-change policy (1 change / 7 days, 3-day notice) so rate tuning is done deliberately
-- [ ] T027 [P] Create `docs/developer-guide/predict-polymarket.md`: builder codes, the
+- [x] T027 [P] Create `docs/developer-guide/predict-polymarket.md`: builder codes, the
   additive fee model + honesty rule, the CLOB signing seam, and the competitive analysis
   from research.md
-- [ ] T028 Update `CLAUDE.md` Guardrails with a short Predict entry (Polymarket builder-code
+- [x] T028 Update `CLAUDE.md` Guardrails with a short Predict entry (Polymarket builder-code
   trading, Polygon-only, additive builder fee disclosed honestly, no custody/no contracts,
   resolve nothing through `wagerRegistry`)
-- [ ] T029 Run the full validation gate (quickstart): `npm run test:frontend`, the gateway
+- [x] T029 Run the full validation gate (quickstart): `npm run test:frontend`, the gateway
   Vitest suite, lint, and an axe pass on all new Predict surfaces; confirm no Polymarket
   credential appears in any client bundle (SC-006)
 

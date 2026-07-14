@@ -80,6 +80,37 @@ signing key** on this path; the wallet is the only signer, and OpenSea's shared 
   change the value and redeploy (no key rotation — it's not a secret).
 - **Killswitch** also stops the write routes (`503 killswitch_active`), same as reads.
 
+## Predict / Polymarket proxy (spec 057, `/v1/polymarket/*`)
+
+Browse Polymarket markets and buy/sell outcome shares, routed through FairWins' **builder code** so
+attributed volume earns a builder fee plus Polymarket's weekly USDC rewards. **Polygon-only** — any
+other `:chainId` returns `404 unsupported_chain` and the SPA hides the Predict tab. The gateway
+forwards a **client-signed** CLOB order — it holds **no order-signing key**; the wallet is the only
+signer and Polymarket's protocol settles. A total outage never touches any value path.
+
+- **Credentials (secrets)**: `POLYMARKET_API_KEY` + `POLYMARKET_API_SECRET` + `POLYMARKET_API_PASSPHRASE`
+  are the L2 HMAC creds, **derived once offline via L1** (`POST /auth/api-key` signed by the operator
+  wallet) and stored in Secret Manager — so no signing key lives in the gateway. `POLYMARKET_API_ADDRESS`
+  is the operator wallet (public). Any missing secret ⇒ routes fail closed (`503 predict_unconfigured`)
+  and the tab hides. To rotate: re-derive the L2 creds offline, update the three secrets, redeploy.
+- **Builder code + fee** (public config, inline `value:` in the manifest — not secrets):
+  `POLYMARKET_BUILDER_CODE` (bytes32), `POLYMARKET_BUILDER_TAKER_FEE_BPS` (default `50`),
+  `POLYMARKET_BUILDER_MAKER_FEE_BPS` (default `0`). The builder fee is **additive** on Polymarket's
+  platform fee (a real user cost) and is **disclosed honestly** in the confirm UI — unlike the OpenSea
+  referral. Empty builder code ⇒ orders post **unattributed** (never stranded), no fee.
+- **Fee-change policy**: Polymarket rate-limits builder-fee changes to **one per 7 days with 3-day
+  advance notice**. Change the rate deliberately (edit the manifest value + register the new rate at
+  `polymarket.com/settings?tab=builder`), not reactively. **Boot fails loudly** if the configured rate
+  exceeds the caps (100 bps taker / 50 bps maker).
+- **Quotas**: reads `POLYMARKET_QUOTA_PER_ADDRESS`/`_GLOBAL` (60/300 per min); writes
+  `POLYMARKET_WRITE_QUOTA_PER_ADDRESS`/`_GLOBAL` (20/100 per min) on a **separate** instance keyed by the
+  trader. Order POSTs are **not retried** on 5xx (submission is not idempotent) → surface as `503`.
+- **Killswitch** stops order/cancel writes (`503 killswitch_active`); members can always trade on
+  Polymarket directly.
+- **Pre-mainnet checklist** (see `specs/057-predict-polymarket/checklists/requirements.md`): confirm the
+  V2 order typehash + exchange addresses (`clobOrder.js` constants) against the live contract, and
+  Polymarket's ERC-1271 validation of passkey accounts before flipping `PASSKEY_PREDICT_ENABLED`.
+
 ## Common incidents
 
 | Symptom | Check | Action |

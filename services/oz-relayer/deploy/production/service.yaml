@@ -18,8 +18,8 @@ spec:
       containers:
         # ---- ingress: FairWins policy gateway (public, port 8788) ----
         - name: gateway
-          # sell-side-056: adds the /v1/opensea/* sell-side write routes (spec 056) on top of the 055 reads
-          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:sell-side-056
+          # predict-057: adds the /v1/polymarket/* Predict proxy (spec 057) on top of the 055/056 OpenSea routes
+          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:predict-057
           ports:
             - name: http1
               containerPort: 8788
@@ -71,6 +71,29 @@ spec:
             # a surcharge — it only records FairWins with OpenSea's own referral program.
             - name: OPENSEA_REFERRAL_ADDRESS
               value: ""
+            # Predict / Polymarket proxy (spec 057): CLOB API key + L2 creds for /v1/polymarket/*.
+            # Optional — absent secrets fail closed (503 predict_unconfigured) and the SPA hides the
+            # Predict tab. The L2 creds are derived once offline via L1, so no order-signing key here.
+            - name: POLYMARKET_API_KEY
+              valueFrom:
+                secretKeyRef: { name: POLYMARKET_API_KEY, key: latest }
+            - name: POLYMARKET_API_SECRET
+              valueFrom:
+                secretKeyRef: { name: POLYMARKET_API_SECRET, key: latest }
+            - name: POLYMARKET_API_PASSPHRASE
+              valueFrom:
+                secretKeyRef: { name: POLYMARKET_API_PASSPHRASE, key: latest }
+            # The operator wallet the API creds belong to (POLY_ADDRESS header). PUBLIC address.
+            - name: POLYMARKET_API_ADDRESS
+              value: ""
+            # FairWins builder code (spec 057). PUBLIC bytes32, not a secret. Empty => orders post
+            # unattributed (never stranded). The builder fee is additive and disclosed honestly in the UI.
+            - name: POLYMARKET_BUILDER_CODE
+              value: "0x6e0316783960e149b53466f0f2c5fdbaf5ce11ba15669491de980f6dedc493a3"
+            - name: POLYMARKET_BUILDER_TAKER_FEE_BPS
+              value: "50"
+            - name: POLYMARKET_BUILDER_MAKER_FEE_BPS
+              value: "0"
           resources:
             limits: { cpu: "1", memory: 512Mi }
         # ---- sidecar: OZ Relayer engine (localhost:8080) ----
