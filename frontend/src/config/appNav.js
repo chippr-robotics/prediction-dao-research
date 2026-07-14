@@ -16,6 +16,11 @@
 // name (see components/nav/NavIcon.jsx) — flat line glyphs, not emoji.
 export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 
+// Portfolio — pinned into Quick Access alongside Home (not a Finance section
+// item), so it keeps its 'portfolio' tab id / `/wallet?tab=portfolio` route but
+// is absent from the Finance group's bottom icon nav (see groupForTab).
+export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'trending' }
+
 // Wagers (spec 053) — the relocated create-types + actions grid. Like Home, it is an absolute
 // top-level route (not a `/wallet?tab=` section); it lives in the drawer's Apps group
 // (see AppNavDrawer's DRAWER_GROUPS).
@@ -27,7 +32,6 @@ export const NAV_GROUPS = [
   {
     label: 'Finance',
     items: [
-      { id: 'portfolio', label: 'Portfolio', icon: 'trending' },
       // Earn — lending & rewards (spec 050). Always present; the panel
       // self-discloses per-network availability.
       { id: 'earn', label: 'Earn', icon: 'sprout' },
