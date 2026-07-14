@@ -83,9 +83,13 @@ spec:
             - name: POLYMARKET_API_PASSPHRASE
               valueFrom:
                 secretKeyRef: { name: POLYMARKET_API_PASSPHRASE, key: latest }
-            # The operator wallet the API creds belong to (POLY_ADDRESS header). PUBLIC address.
+            # The operator wallet the API creds belong to (POLY_ADDRESS header). PUBLIC address,
+            # stored as a secret for operational consistency with the other three L2 creds. Required
+            # for the authed order/cancel path (empty => Polymarket 401s the signed requests); the
+            # public read feed (markets/detail/positions/fee-rate) works without it.
             - name: POLYMARKET_API_ADDRESS
-              value: ""
+              valueFrom:
+                secretKeyRef: { name: POLYMARKET_API_ADDRESS, key: latest }
             # FairWins builder code (spec 057). PUBLIC bytes32, not a secret. Empty => orders post
             # unattributed (never stranded). The builder fee is additive and disclosed honestly in the UI.
             - name: POLYMARKET_BUILDER_CODE
