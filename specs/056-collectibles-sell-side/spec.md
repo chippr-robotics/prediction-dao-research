@@ -8,6 +8,14 @@
 
 **Input**: User description: "Phase 2 sell-side NFT trading for the Collect section (builds on spec 055 read-only collectibles). Let a member with a connected wallet list an owned collectible for sale, cancel a listing they created, and accept the best offer on an owned collectible — all through OpenSea's orderbook, app never custodies the asset or funds, the user's own wallet signs each order, honest fee disclosure before signing, and FairWins configured as the beneficiary of OpenSea's own referral/affiliate reward without increasing what the user pays. Same guardrails as the MVP; passkey sellers supported or honestly disclosed unavailable. Out of scope: buying, offers/bids, auctions, bundles, any FairWins surcharge."
 
+## Clarifications
+
+### Session 2026-07-14
+
+- Q: How should FairWins earn from sell-side trades — referral reward only, or add a FairWins surcharge? → A: Referral/affiliate reward only; **no FairWins surcharge** (confirms FR-013/FR-015 — the reward comes solely from OpenSea's own fee).
+- Q: Are passkey smart-account sellers in scope for this phase? → A: **Yes, in scope now** — passkey members sell via contract-based (ERC-1271) order signatures; the honest-"unavailable" state is a per-account fallback only where the marketplace cannot validate a given account's signature, not a blanket passkey exclusion.
+- Q: Who can use sell-side trading, and how does gating apply? → A: **Any connected wallet** (no membership-tier gate on selling); membership-tier gating applies only to **gasless/sponsored gas** for a sell-side step (if offered), matching how the app already gates gasless transactions — the user-pays-gas path stays open to all.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - List an owned collectible for sale (Priority: P1)
@@ -76,7 +84,7 @@ FairWins is configured as the beneficiary of OpenSea's own referral / affiliate 
 ### Edge Cases
 
 - **Unsupported network active (e.g. Mordor/ETC)**: no Sell / Accept / Cancel affordances appear — consistent with the Collect tab being hidden there entirely.
-- **Passkey smart-account seller**: if the account type cannot produce a marketplace-valid order signature, the Sell / Accept / Cancel actions are shown as unavailable with an honest one-line reason (e.g. "not available for passkey accounts yet"), never as dead buttons that fail on tap.
+- **Passkey smart-account seller**: passkey accounts CAN sell in this phase via contract-based order signatures. The honest-unavailable disclosure is a per-account fallback ONLY where the marketplace cannot validate a specific account's signature (e.g. an unverified account implementation), never a dead button that fails on tap.
 - **Marketplace data source unavailable / rate-limited**: sell actions degrade gracefully — the user is told trading is temporarily unavailable and no partial or ambiguous order is created; existing listings still display from cache where possible.
 - **Killswitch engaged**: order publication is paused with an honest message; the member can still reach the external marketplace to act directly (never stranded).
 - **Fee data cannot be fetched**: the app does NOT let the user sign a listing/acceptance without a fee breakdown — it blocks with an explicit "couldn't confirm fees, try again" rather than guessing or showing a hardcoded number.
@@ -125,10 +133,11 @@ FairWins is configured as the beneficiary of OpenSea's own referral / affiliate 
 - **FR-016**: The credentials for the marketplace MUST remain server-side only; no marketplace API key may reach client devices. Order publication and fee/offer reads MUST flow through the FairWins-operated server-side proxy with request quotas and a killswitch.
 - **FR-017**: When the killswitch is engaged or the marketplace is unavailable, order publication MUST pause with an honest message; the app MUST always leave the member a path to act directly on the external marketplace (never stranded).
 - **FR-018**: On networks where the feature is unsupported, no Sell / Accept / Cancel affordances may appear.
-- **FR-019**: For account types that cannot produce a marketplace-valid order signature (e.g. passkey smart accounts, pending support), the Sell / Accept / Cancel actions MUST be shown as unavailable with an honest reason, never as dead buttons.
+- **FR-019**: Passkey smart-account members MUST be able to list, cancel, and accept offers in this phase using contract-based order signatures. Where the marketplace cannot validate a specific account's signature, the affected action MUST be shown as unavailable with an honest reason (never a dead button) — this fallback applies per-account, not as a blanket passkey exclusion.
 - **FR-020**: No wager, pool, payment, or transfer flow may depend on this feature; its complete absence or outage MUST NOT affect any value-path functionality.
 - **FR-021**: The app MUST NOT sign an order bound to a network other than the connected wallet's active network; it MUST prompt the member to switch networks first.
 - **FR-022**: All new sell-side surfaces MUST meet WCAG 2.1 AA (keyboard-operable price entry and confirmations, accessible names, sufficient contrast, and clear disclosure text).
+- **FR-023**: Sell, cancel, and accept-offer MUST be available to any connected wallet with no membership-tier gate. If the app offers to sponsor gas for any sell-side step (e.g. a one-time approval or an offer acceptance), that sponsorship MUST follow the app's existing membership-tier gating for gasless/sponsored transactions; the non-sponsored (user-pays-gas) path MUST remain open to all.
 
 ### Key Entities
 
@@ -151,6 +160,7 @@ FairWins is configured as the beneficiary of OpenSea's own referral / affiliate 
 - **SC-006**: No marketplace credential appears in any client-delivered asset or repository file (verifiable by inspection), and a single member cannot exhaust shared marketplace capacity for others.
 - **SC-007**: FairWins is recorded as the marketplace reward beneficiary on at least 95% of eligible orders created or fulfilled through the app on supported networks (the remainder being cases where attribution would have cost the user and was correctly forgone).
 - **SC-008**: The app blocks signing in 100% of cases where the fee breakdown could not be confirmed, rather than showing a guessed or hardcoded fee.
+- **SC-009**: A passkey smart-account member can complete a listing and an offer acceptance on a supported network; only where the marketplace cannot validate their account's signature do they instead see an honest unavailable state — never a failed action.
 
 ## Assumptions
 
@@ -161,7 +171,8 @@ FairWins is configured as the beneficiary of OpenSea's own referral / affiliate 
 - **Reward mechanism**: OpenSea's own programs are the source of the reward — the referrer credit paid from OpenSea's fee on fulfillments (the member is the fulfiller when accepting an offer) and affiliate attribution on listings where OpenSea's affiliate program permits it. The reward comes out of OpenSea's fee share, not the user's proceeds. The exact affiliate-program terms and whether attaching FairWins as affiliate on API-created listings requires a formal OpenSea agreement are a dependency to confirm during planning; the requirement holds regardless: attribute at no cost to the user, or forgo it.
 - **Reward beneficiary**: a single FairWins-controlled beneficiary reference (per network as needed) is configured server-side; the app holds no reward funds and makes no on-chain claim in this phase — attribution is what OpenSea's program records.
 - **Currencies**: the currency picker is limited to currencies OpenSea accepts for the item's network (e.g. the network's native/wrapped token and USDC); the app does not invent currency support.
-- **Passkey support**: passkey smart accounts use contract-based signatures; if OpenSea's orderbook validates them for our account implementation the sell actions are enabled, otherwise they are honestly disclosed unavailable (FR-019). Which of these is true is verified during planning.
+- **Passkey support (in scope this phase)**: passkey smart accounts sell via contract-based (ERC-1271) order signatures. Planning MUST verify OpenSea's orderbook validates our account implementation's signatures; the honest-unavailable fallback (FR-019) covers only account/network combinations where validation cannot be confirmed, so the feature never ships a dead button.
+- **Access & gating**: selling is open to any connected wallet with no membership-tier gate, consistent with the read-only MVP. Membership-tier gating applies only to gasless/sponsored gas for a sell-side step (if the app offers to sponsor it), matching how the app already gates gasless transactions; the user-pays-gas path is always available to everyone.
 - **No custody, no surcharge, read-only-plus**: the app never holds the asset or funds and never adds its own fee (FR-015). Its economic interest is solely the marketplace's referral/affiliate reward.
 - **ToS**: publishing to OpenSea's orderbook and participating in its referral/affiliate program are governed by OpenSea's terms; a terms review of the reward configuration happens before launch.
 - **Out of scope (deliberately excluded)**: buying/fulfilling arbitrary listings (Phase 3), creating offers/bids or collection offers, auctions, Dutch auctions, bundles, cross-listing to other marketplaces, any FairWins surcharge, and any on-chain FairWins contract changes — this phase is frontend + the existing server-side proxy only.
