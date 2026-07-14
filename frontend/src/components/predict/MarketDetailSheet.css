@@ -1,0 +1,122 @@
+/* MarketDetailSheet (spec 057) — market outcome picker, modal tier. */
+
+.market-detail-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 2000;
+}
+.market-detail-scrim {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+}
+.market-detail {
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 14px;
+  color: var(--text-primary, #111827);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-width: 30rem;
+  padding: 1rem 1.1rem 1.2rem;
+  position: relative;
+  width: 100%;
+}
+.market-detail:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: -2px;
+}
+.market-detail-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.market-detail-header h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.market-detail-close {
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+}
+.market-detail-category {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.market-detail-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.market-detail-outcome {
+  align-items: center;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: space-between;
+  padding: 0.55rem 0.7rem;
+}
+.market-detail-outcome-name {
+  font-weight: 600;
+}
+.market-detail-outcome-price {
+  color: var(--text-secondary, #6b7280);
+  margin-left: auto;
+}
+.market-detail-outcome-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.market-detail-buy,
+.market-detail-sell {
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+}
+.market-detail-buy {
+  background: var(--brand-primary, #36b37e);
+  border: 0;
+  color: #fff;
+}
+.market-detail-sell {
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-primary, #111827);
+}
+.market-detail-buy:disabled,
+.market-detail-sell:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.market-detail-closed {
+  background: var(--bg-tertiary, #f3f4f6);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+.market-detail-closed p {
+  margin: 0 0 0.4rem;
+}

@@ -160,9 +160,15 @@ export function createPolymarketRouter(config, { client, cache, quotas, writeQuo
         // No confirmable schedule -> block signing with a retryable state, never a guessed/hardcoded
         // fee (FR-010). 503 (try again) rather than 404 (not_found) because the market itself exists.
         if (!fee) throw new GatewayError(503, 'fee_unavailable', 'could not confirm the fee schedule; try again')
-        // Echo the configured builder fee so the client shows the honest, additive total (FR-012).
+        // Echo the configured builder fee + code so the client shows the honest additive total
+        // (FR-012) and embeds the code in the order it signs (the gateway re-validates it on submit).
         const builder = attachBuilderCode(config, { chainId: 137 })
-        return { ...fee, builderTakerFeeBps: builder.takerFeeBps, builderMakerFeeBps: builder.makerFeeBps }
+        return {
+          ...fee,
+          builderCode: builder.builderCode,
+          builderTakerFeeBps: builder.takerFeeBps,
+          builderMakerFeeBps: builder.makerFeeBps,
+        }
       })
       respond(res, result)
     } catch (err) {
