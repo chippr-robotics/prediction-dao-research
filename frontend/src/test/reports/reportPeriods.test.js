@@ -21,6 +21,13 @@ describe('reportPeriods presets (UTC boundaries)', () => {
     ])
   })
 
+  it('current_month resolves to the 1st of the current UTC month through now', () => {
+    const r = resolvePreset(PERIOD_KINDS.CURRENT_MONTH, NOW)
+    expect(new Date(r.from).toISOString()).toBe('2026-06-01T00:00:00.000Z')
+    expect(r.to).toBe(NOW)
+    expect(r.label).toBe('Current month (Jun 2026)')
+  })
+
   it('last_month resolves to the previous calendar month in UTC', () => {
     const r = resolvePreset(PERIOD_KINDS.LAST_MONTH, NOW)
     expect(new Date(r.from).toISOString()).toBe('2026-05-01T00:00:00.000Z')

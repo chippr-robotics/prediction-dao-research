@@ -159,6 +159,21 @@ describe('report ↔ Account tab parity (spec 051 US2)', () => {
     for (const cls of ['wager', 'transfer', 'earn', 'membership']) expect(csv).toContain(cls)
   })
 
+  it('collates settled activity by class for the multi-use ledger export', async () => {
+    const report = await build()
+    const byClass = report.totals.byClass
+    // Every settled class is represented; the failed transfer is not counted.
+    expect(byClass.wager.count).toBe(2)
+    expect(byClass.transfer.count).toBe(1) // the failed send is excluded (FR-003)
+    expect(byClass.earn.count).toBe(1)
+    expect(byClass.membership.count).toBe(1)
+    // Wager payout (190) is inbound; deposit (100) is outbound.
+    expect(byClass.wager.inUsd).toBeCloseTo(190)
+    expect(byClass.wager.outUsd).toBeCloseTo(100)
+    // The CSV surfaces the collated breakdown.
+    expect(renderCsv(report)).toContain('Totals by activity type')
+  })
+
   it('entries outside the period are excluded from both surfaces identically', async () => {
     const ledger = makeLedger()
     const narrow = { fromMs: T0 + 90 * 60_000, toMs: T0 + 150 * 60_000 } // only the settled send

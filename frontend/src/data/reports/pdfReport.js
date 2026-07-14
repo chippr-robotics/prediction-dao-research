@@ -22,13 +22,14 @@ export function render(report) {
   let y = 40
 
   doc.setFontSize(16)
-  doc.text('Wager Activity / Tax Report', marginX, y)
+  // The ledger export spans every activity class; the legacy path is wager-only.
+  doc.text(report.source === 'ledger' ? 'FairWins Activity Report' : 'Wager Activity / Tax Report', marginX, y)
   y += 20
 
   doc.setFontSize(9)
   const headerLines = [
     `Account: ${report.account}`,
-    `Network: ${report.networkName}${report.isTestnet ? ' (testnet)' : ''}`,
+    `Network: ${report.networkName}${report.isTestnet ? ' (testnet)' : ''} · chain ${report.chainId}`,
     `Period: ${report.period.label}`,
     `Generated: ${new Date(report.generatedAt).toISOString()}`,
   ]
@@ -58,7 +59,7 @@ export function render(report) {
 
   let afterTableY = (doc.lastAutoTable?.finalY || y) + 18
   doc.setFontSize(9)
-  doc.text('Totals by stablecoin', marginX, afterTableY)
+  doc.text('Totals by token', marginX, afterTableY)
   afterTableY += 13
   doc.setFontSize(8)
   for (const t of Object.values(report.totals.byTicker)) {
@@ -69,6 +70,25 @@ export function render(report) {
     )
     afterTableY += 12
   }
+
+  // Collated per-activity breakdown for the multi-use ledger export.
+  const byClass = report.totals?.byClass
+  if (report.source === 'ledger' && byClass && Object.keys(byClass).length) {
+    afterTableY += 6
+    doc.setFontSize(9)
+    doc.text('Totals by activity type', marginX, afterTableY)
+    afterTableY += 13
+    doc.setFontSize(8)
+    for (const c of Object.values(byClass)) {
+      doc.text(
+        `${c.class}: ${c.count} entr${c.count === 1 ? 'y' : 'ies'}, in USD ${c.inUsd.toFixed(2)}, out USD ${c.outUsd.toFixed(2)}, USD ${c.usdValue.toFixed(2)}`,
+        marginX,
+        afterTableY,
+      )
+      afterTableY += 12
+    }
+  }
+
   const o = report.totals.overall
   doc.text(`Overall: USD ${o.usdValue.toFixed(2)}, fees ${o.feesNative} ${o.feesNativeSymbol}`, marginX, afterTableY)
   afterTableY += 18
@@ -84,9 +104,11 @@ export function render(report) {
   return doc.output('blob')
 }
 
-/** Suggested download file name (FR-007). */
+/** Suggested download file name (FR-007), mirroring the CSV naming split. */
 export function fileName(report) {
   const from = new Date(report.period.from).toISOString().slice(0, 10)
   const to = new Date(report.period.to).toISOString().slice(0, 10)
-  return `wager-report_${report.networkName.replace(/\s+/g, '-')}_${from}_${to}.pdf`
+  const net = report.networkName.replace(/\s+/g, '-')
+  const stem = report.source === 'ledger' ? 'fairwins-activity' : 'wager-report'
+  return `${stem}_${net}_${from}_${to}.pdf`
 }
