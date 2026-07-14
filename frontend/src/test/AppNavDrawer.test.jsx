@@ -60,6 +60,29 @@ describe('AppNavDrawer (global nav drawer)', () => {
     expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument()
   })
 
+  it('lists Portfolio under Quick Access with Home, not under Finance', () => {
+    const { container } = renderDrawer()
+
+    expect(screen.getByRole('button', { name: 'Portfolio' })).toBeInTheDocument()
+
+    // Portfolio sits between the Quick Access and Finance group labels, i.e.
+    // it belongs to Quick Access rather than Finance's item list.
+    const labels = Array.from(
+      container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
+    ).map((el) => el.textContent)
+    const quickAccessIdx = labels.indexOf('Quick Access')
+    const financeIdx = labels.indexOf('Finance')
+    const portfolioIdx = labels.indexOf('Portfolio')
+    expect(portfolioIdx).toBeGreaterThan(quickAccessIdx)
+    expect(portfolioIdx).toBeLessThan(financeIdx)
+  })
+
+  it('routes Portfolio to its wallet tab', () => {
+    renderDrawer()
+    fireEvent.click(screen.getByRole('button', { name: 'Portfolio' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=portfolio')
+  })
+
   it('routes Home to the dashboard', () => {
     renderDrawer('/wallet?tab=trade')
     fireEvent.click(screen.getByRole('button', { name: /home/i }))
