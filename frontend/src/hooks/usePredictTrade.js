@@ -1,49 +1,68 @@
 /**
- * usePredictTrade (spec 057) — orchestrates a buy/sell CLOB trade for one market outcome: fetch the
- * live fee schedule → verify network (Polygon) + account can sign → confirm (honest total incl. the
- * additive builder fee) → sign (EOA or passkey) → submit through the builder-code-attaching gateway.
- * The state machine mirrors useCollectibleSell.
+ * usePredictTrade (spec 057) — orchestrates a buy/sell CLOB trade for one market outcome via the official
+ * viem-native @polymarket/clob-client, CLIENT-DIRECT to clob.polymarket.com (CLOB V2 binds every order to
+ * its signer, so a shared gateway key can't relay orders — each member trades with their OWN derived creds).
  *
- * Honest-state guarantees: signing is BLOCKED when the fee schedule can't be confirmed (FR-010) or the
- * account type can't sign (FR-019, honest reason — never a dead button); the previewed total EQUALS
- * the submitted order's cost (FR-011, both from buildOrder); the builder fee is always a visible line
- * (FR-012); on any error the member still has the "trade on Polymarket" path (never stranded, FR-017).
- * All external calls are injectable for tests.
+ * Flow: check the region (Polymarket geoblock) → verify the account can sign → load the honest fee schedule
+ * → enable trading (derive the member's CLOB creds, one gasless signature, cached per session) → submit
+ * (the SDK builds/signs/posts the order and stacks FairWins' POLY_BUILDER_* attribution via the gateway).
+ *
+ * Honest-state guarantees: restricted regions get an honest notice + a deep link OUT to Polymarket (we
+ * respect Polymarket's regional policy, never bypass it, FR-019); signing is blocked when the fee schedule
+ * can't be confirmed (FR-010) or the account can't sign (FR-019); the previewed builder fee is always a
+ * visible line (FR-012); on any error the member still has the "trade on Polymarket" path (FR-017). All
+ * external calls are injectable for tests.
  */
 import { useCallback, useContext, useMemo, useRef, useState } from 'react'
-import { useChainId } from 'wagmi'
+import { useChainId, useWalletClient } from 'wagmi'
 import { WalletContext } from '../contexts/WalletContext.js'
 import { getCurrentChainId } from '../config/networks'
-import { buildOrder as defaultBuildOrder, computeCost as defaultComputeCost, ZERO_BYTES32 } from '../lib/predict/clobOrder'
+import { computeCost as defaultComputeCost } from '../lib/predict/clobOrder'
 import { resolveTradeSigner as defaultResolveTradeSigner } from '../lib/predict/tradeSigner'
+import { fetchFeeRate as defaultFetchFeeRate, predictGatewayUrl } from '../lib/predict/predictClient'
+import { checkGeoblock as defaultCheckGeoblock } from '../lib/predict/geoblock'
 import {
-  fetchFeeRate as defaultFetchFeeRate,
+  ensureClobCreds as defaultEnsureCreds,
+  makeClobClient as defaultMakeClient,
+  makeBuilderConfig as defaultMakeBuilderConfig,
   submitOrder as defaultSubmitOrder,
   cancelOrder as defaultCancelOrder,
-} from '../lib/predict/predictClient'
+  loadCachedCreds as defaultLoadCachedCreds,
+} from '../lib/predict/clobSession'
 
 const POLYGON = 137
+const isRegionError = (e) =>
+  e?.raw?.status === 403 || e?.status === 403 || /geoblock|restricted in your region|region/i.test(String(e?.message ?? e?.raw?.error ?? ''))
+const isPriceMove = (e) => /price|tick|marketable|not enough|match/i.test(String(e?.message ?? e?.raw?.error ?? ''))
 
 export function usePredictTrade(options = {}) {
   const optionDeps = options.deps
   const deps = useMemo(
     () => ({
+      checkGeoblock: defaultCheckGeoblock,
       fetchFeeRate: defaultFetchFeeRate,
+      ensureCreds: defaultEnsureCreds,
+      makeClient: defaultMakeClient,
+      makeBuilderConfig: defaultMakeBuilderConfig,
       submitOrder: defaultSubmitOrder,
       cancelOrder: defaultCancelOrder,
-      buildOrder: defaultBuildOrder,
       computeCost: defaultComputeCost,
       resolveTradeSigner: defaultResolveTradeSigner,
+      loadCachedCreds: defaultLoadCachedCreds,
+      gatewayUrl: predictGatewayUrl,
       ...optionDeps,
     }),
     [optionDeps]
   )
   const walletCtx = useContext(WalletContext)
   const wallet = useMemo(() => walletCtx || {}, [walletCtx])
+  const { data: hookWalletClient } = useWalletClient()
+  const walletClient = options.walletClient ?? hookWalletClient
   const activeChainId = useChainId() || getCurrentChainId()
 
-  const [status, setStatus] = useState('idle') // idle|checking|ready|blocked|signing|submitting|done|error
+  const [status, setStatus] = useState('idle') // idle|checking|geoblocked|blocked|ready|enabling|signing|submitting|done|error
   const [reason, setReason] = useState(null)
+  const [geoInfo, setGeoInfo] = useState(null)
   const [fee, setFee] = useState(null)
   const [result, setResult] = useState(null)
   const reqRef = useRef(0)
@@ -54,16 +73,18 @@ export function usePredictTrade(options = {}) {
     () =>
       deps.resolveTradeSigner({
         loginMethod: wallet.loginMethod,
-        signer: wallet.signer,
+        walletClient,
         address: wallet.address,
-        chainId: POLYGON,
-        passkey: options.passkey,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wallet.loginMethod, wallet.signer, wallet.address, options.passkey]
+    [wallet.loginMethod, wallet.address, walletClient, deps]
   )
 
-  /** Ensure the wallet is on Polygon before signing an order bound to it (FR-021). */
+  const tradingEnabled = useMemo(
+    () => Boolean(wallet.address && deps.loadCachedCreds(wallet.address)),
+    [wallet.address, deps]
+  )
+
+  /** Ensure the wallet is on Polygon before an order bound to it is signed (FR-021). */
   const ensureNetwork = useCallback(async () => {
     if (!onWrongNetwork) return true
     try {
@@ -76,7 +97,7 @@ export function usePredictTrade(options = {}) {
     }
   }, [onWrongNetwork, wallet])
 
-  /** Load the live fee schedule for the outcome token. Fee failure BLOCKS signing (FR-010). */
+  /** Region check + live fee schedule. Restricted region -> 'geoblocked' (link out); fee failure -> blocked. */
   const loadFee = useCallback(
     async (tokenId) => {
       if (!signer.canSign) {
@@ -87,7 +108,15 @@ export function usePredictTrade(options = {}) {
       const req = ++reqRef.current
       setStatus('checking')
       setReason(null)
+      setGeoInfo(null)
       try {
+        const geo = await deps.checkGeoblock()
+        if (req !== reqRef.current) return null
+        if (geo?.blocked) {
+          setGeoInfo({ country: geo.country, region: geo.region })
+          setStatus('geoblocked')
+          return null
+        }
         const f = await deps.fetchFeeRate(POLYGON, tokenId)
         if (req !== reqRef.current) return null
         setFee(f)
@@ -104,18 +133,36 @@ export function usePredictTrade(options = {}) {
   )
 
   /** Pure preview of the honest total/net (incl. the additive builder fee) — nothing signed. */
-  const preview = useCallback(
-    (params) => {
-      if (!fee) return null
-      // Buys surface totalCostUnits; sells surface netProceedsUnits — both carried on the result.
-      return deps.computeCost(params, fee)
-    },
-    [fee, deps]
-  )
+  const preview = useCallback((params) => (fee ? deps.computeCost(params, fee) : null), [fee, deps])
 
-  /** Build + sign + submit an order carrying the builder code. */
+  /** Derive (or reuse) the member's own CLOB creds — one gasless wallet signature, cached per session. */
+  const ensureCreds = useCallback(async () => {
+    return deps.ensureCreds(walletClient, { address: wallet.address })
+  }, [deps, walletClient, wallet.address])
+
+  /** Explicit "enable trading" step (derive creds up front). Optional — submit() does it lazily too. */
+  const enableTrading = useCallback(async () => {
+    if (!signer.canSign) {
+      setStatus('blocked')
+      setReason(signer.reason)
+      return false
+    }
+    setStatus('enabling')
+    setReason(null)
+    try {
+      await ensureCreds()
+      setStatus('ready')
+      return true
+    } catch (e) {
+      setStatus('error')
+      setReason(e?.message || 'Could not enable trading. You can still trade on Polymarket directly.')
+      return false
+    }
+  }, [signer, ensureCreds])
+
+  /** Build + sign + submit an order (the SDK does all three; attribution rides on the builder config). */
   const submit = useCallback(
-    async (params, { builder, negRisk = false } = {}) => {
+    async (params, { negRisk = false } = {}) => {
       if (!fee || !signer.canSign) {
         setStatus('blocked')
         setReason(signer.reason || "Couldn't confirm the fees.")
@@ -130,19 +177,34 @@ export function usePredictTrade(options = {}) {
       setStatus('signing')
       setReason(null)
       try {
-        const built = deps.buildOrder(params, fee, builder || ZERO_BYTES32, { maker: wallet.address, negRisk })
-        const signature = await signer.sign(built.domain, built.types, built.message)
+        const creds = await ensureCreds()
         if (req !== reqRef.current) return null
+        const builderConfig = deps.makeBuilderConfig(deps.gatewayUrl(), POLYGON)
+        const client = deps.makeClient(walletClient, creds, { builderConfig })
         setStatus('submitting')
-        const submitted = await deps.submitOrder(POLYGON, { order: built.message, signature })
+        const submitted = await deps.submitOrder(client, {
+          tokenId: params.tokenId,
+          side: params.side,
+          price: params.price,
+          size: params.size,
+          negRisk,
+        })
         if (req !== reqRef.current) return null
-        setResult({ kind: 'submitted', ...submitted, total: built.totalCost, net: built.netProceeds })
+        if (isRegionError(submitted)) {
+          setGeoInfo(null)
+          setStatus('geoblocked')
+          return null
+        }
+        setResult({ kind: 'submitted', ...submitted })
         setStatus('done')
         return submitted
       } catch (e) {
         if (req !== reqRef.current) return null
-        // A price move isn't a failure — ask the member to re-confirm the current price (FR-008).
-        if (e?.code === 'price_changed') {
+        if (isRegionError(e)) {
+          setStatus('geoblocked')
+          return null
+        }
+        if (isPriceMove(e)) {
           setStatus('error')
           setReason('The market moved — review the current price before trading.')
           return { priceChanged: true }
@@ -152,10 +214,10 @@ export function usePredictTrade(options = {}) {
         return null
       }
     },
-    [fee, signer, ensureNetwork, wallet, deps]
+    [fee, signer, ensureNetwork, ensureCreds, walletClient, deps]
   )
 
-  /** Cancel an open order (gas-free CLOB cancel). */
+  /** Cancel an open order (gas-free CLOB cancel) with the member's own creds. */
   const cancel = useCallback(
     async (order) => {
       if (!signer.canSign) {
@@ -167,13 +229,9 @@ export function usePredictTrade(options = {}) {
       setStatus('submitting')
       setReason(null)
       try {
-        let signature
-        try {
-          signature = wallet.signer?.signMessage ? await wallet.signer.signMessage(`cancel:${order.orderId}`) : undefined
-        } catch {
-          signature = undefined
-        }
-        const res = await deps.cancelOrder(POLYGON, { orderId: order.orderId, address: wallet.address, signature })
+        const creds = await ensureCreds()
+        const client = deps.makeClient(walletClient, creds, {})
+        const res = await deps.cancelOrder(client, order.orderId ?? order.id)
         if (req !== reqRef.current) return null
         setResult({ kind: 'cancelled', ...res })
         setStatus('done')
@@ -185,7 +243,7 @@ export function usePredictTrade(options = {}) {
         return null
       }
     },
-    [signer, wallet, deps]
+    [signer, ensureCreds, walletClient, deps]
   )
 
   const reset = useCallback(() => {
@@ -193,18 +251,22 @@ export function usePredictTrade(options = {}) {
     setStatus('idle')
     setReason(null)
     setResult(null)
+    setGeoInfo(null)
   }, [])
 
   return {
     status,
     reason,
+    geoInfo,
     fee,
     result,
     canTrade: signer.canSign,
     unsupportedReason: signer.canSign ? null : signer.reason,
     onWrongNetwork,
+    tradingEnabled,
     loadFee,
     preview,
+    enableTrading,
     submit,
     cancel,
     reset,

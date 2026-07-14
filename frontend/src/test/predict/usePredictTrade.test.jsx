@@ -1,7 +1,8 @@
 /**
- * usePredictTrade (spec 057) — the state machine: fee-blocks-signing (FR-010), EOA sign+submit with
- * the builder code, network-switch prompt (FR-021), price-changed re-confirm (FR-008), unsupported
- * account honest reason (FR-019). All external calls are injected.
+ * usePredictTrade (spec 057) — the state machine over the SDK client-direct trade flow: region gate
+ * (geoblock -> link out, FR-019), fee-blocks-signing (FR-010), derive-creds + submit via the SDK,
+ * network-switch prompt (FR-021), price-move re-confirm (FR-008), unsupported account honest reason
+ * (FR-019). All external calls (clobSession + geoblock) are injected.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
@@ -11,22 +12,27 @@ import { usePredictTrade } from '../../hooks/usePredictTrade'
 
 const TRADER = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 const TOKEN = '71321045679252212594626385532706912750332728571942532289631379312455583992563'
-const BUILDER = '0x6e0316783960e149b53466f0f2c5fdbaf5ce11ba15669491de980f6dedc493a3'
 const FEE = { feeRateBps: 100, builderTakerFeeBps: 50, builderMakerFeeBps: 0 }
 const BUY = { tokenId: TOKEN, side: 'BUY', price: '0.5', size: '100', isMaker: false }
 
 function makeDeps(over = {}) {
   return {
+    checkGeoblock: vi.fn().mockResolvedValue({ blocked: false, ok: true }),
     fetchFeeRate: vi.fn().mockResolvedValue(FEE),
-    submitOrder: vi.fn().mockResolvedValue({ orderId: '0xneworder', status: 'matched', builder: { source: 'attributed', feeBps: 50 } }),
+    ensureCreds: vi.fn().mockResolvedValue({ key: 'k', secret: 's', passphrase: 'p' }),
+    makeClient: vi.fn(() => ({ id: 'clob-client' })),
+    makeBuilderConfig: vi.fn(() => undefined),
+    submitOrder: vi.fn().mockResolvedValue({ orderId: '0xneworder', status: 'matched' }),
     cancelOrder: vi.fn().mockResolvedValue({ cancelled: true }),
-    resolveTradeSigner: vi.fn(() => ({ canSign: true, kind: 'eoa', address: TRADER, sign: vi.fn().mockResolvedValue('0xsig') })),
+    resolveTradeSigner: vi.fn(() => ({ canSign: true, kind: 'eoa', address: TRADER })),
+    loadCachedCreds: vi.fn(() => null),
+    gatewayUrl: vi.fn(() => ''),
     ...over,
   }
 }
 
 function wrapperFor(walletOver = {}) {
-  const wallet = { address: TRADER, loginMethod: 'wallet', signer: { signTypedData: vi.fn() }, switchChain: vi.fn().mockResolvedValue(), ...walletOver }
+  const wallet = { address: TRADER, loginMethod: 'wallet', switchChain: vi.fn().mockResolvedValue(), ...walletOver }
   return ({ children }) => <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>
 }
 
@@ -36,12 +42,23 @@ beforeEach(() => {
 })
 
 describe('usePredictTrade', () => {
-  it('loads the fee then becomes ready', async () => {
+  it('checks the region then loads the fee and becomes ready', async () => {
     const deps = makeDeps()
     const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
     await act(async () => { await result.current.loadFee(TOKEN) })
+    expect(deps.checkGeoblock).toHaveBeenCalled()
     expect(result.current.status).toBe('ready')
     expect(result.current.fee).toBe(FEE)
+  })
+
+  it('shows the region link-out when geoblocked — never signs (FR-019)', async () => {
+    const deps = makeDeps({ checkGeoblock: vi.fn().mockResolvedValue({ blocked: true, country: 'US', region: 'TX', ok: true }) })
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    expect(result.current.status).toBe('geoblocked')
+    expect(result.current.geoInfo).toMatchObject({ country: 'US', region: 'TX' })
+    expect(deps.fetchFeeRate).not.toHaveBeenCalled()
+    expect(deps.submitOrder).not.toHaveBeenCalled()
   })
 
   it('BLOCKS when the fee cannot be confirmed — never signs (FR-010)', async () => {
@@ -61,15 +78,18 @@ describe('usePredictTrade', () => {
     expect(p.feeLines.map((l) => l.label)).toContain('FairWins builder fee')
   })
 
-  it('signs and submits an order carrying the builder code', async () => {
+  it('derives creds then submits the order via the SDK (attribution rides on the builder config)', async () => {
     const deps = makeDeps()
     const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
     await act(async () => { await result.current.loadFee(TOKEN) })
-    await act(async () => { await result.current.submit(BUY, { builder: BUILDER }) })
+    await act(async () => { await result.current.submit(BUY, { negRisk: true }) })
     expect(result.current.status).toBe('done')
+    expect(deps.ensureCreds).toHaveBeenCalled()
+    expect(deps.makeBuilderConfig).toHaveBeenCalled()
     expect(deps.submitOrder).toHaveBeenCalledOnce()
-    const submittedOrder = deps.submitOrder.mock.calls[0][1].order
-    expect(submittedOrder.builder).toBe(BUILDER)
+    const [client, order] = deps.submitOrder.mock.calls[0]
+    expect(client).toEqual({ id: 'clob-client' })
+    expect(order).toMatchObject({ tokenId: TOKEN, side: 'BUY', price: '0.5', size: '100', negRisk: true })
   })
 
   it('prompts a network switch when off Polygon (FR-021)', async () => {
@@ -79,21 +99,29 @@ describe('usePredictTrade', () => {
     const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor({ switchChain }) })
     expect(result.current.onWrongNetwork).toBe(true)
     await act(async () => { await result.current.loadFee(TOKEN) })
-    await act(async () => { await result.current.submit(BUY, { builder: BUILDER }) })
+    await act(async () => { await result.current.submit(BUY, {}) })
     expect(result.current.status).toBe('error')
     expect(result.current.reason).toMatch(/Polygon/)
     expect(deps.submitOrder).not.toHaveBeenCalled()
   })
 
   it('re-confirms on a price move (FR-008)', async () => {
-    const err = Object.assign(new Error('moved'), { code: 'price_changed' })
-    const deps = makeDeps({ submitOrder: vi.fn().mockRejectedValue(err) })
+    const deps = makeDeps({ submitOrder: vi.fn().mockRejectedValue(new Error('order not marketable at price')) })
     const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
     await act(async () => { await result.current.loadFee(TOKEN) })
     let res
-    await act(async () => { res = await result.current.submit(BUY, { builder: BUILDER }) })
+    await act(async () => { res = await result.current.submit(BUY, {}) })
     expect(res).toEqual({ priceChanged: true })
     expect(result.current.reason).toMatch(/moved/)
+  })
+
+  it('surfaces a submit-time geoblock (403) as the region state, not an error', async () => {
+    const err = Object.assign(new Error('Trading restricted in your region'), { raw: { status: 403 } })
+    const deps = makeDeps({ submitOrder: vi.fn().mockRejectedValue(err) })
+    const { result } = renderHook(() => usePredictTrade({ deps }), { wrapper: wrapperFor() })
+    await act(async () => { await result.current.loadFee(TOKEN) })
+    await act(async () => { await result.current.submit(BUY, {}) })
+    expect(result.current.status).toBe('geoblocked')
   })
 
   it('shows an honest reason when the account cannot sign (FR-019) — never a dead button', async () => {

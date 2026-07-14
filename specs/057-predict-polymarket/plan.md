@@ -21,6 +21,40 @@ server-side, mirroring the `opensea/` proxy, with its own write quota and killsw
 taker cost, unlike OpenSea's no-cost referral), so it is disclosed as a distinct fee line
 before every signature. No smart-contract changes. Decision log: [research.md](research.md).
 
+## Design revision — Option A (per-user CLOB creds, client-direct)
+
+> **Supersedes the "hand-built order struct + shared operator L2 key relayed through the gateway"
+> design in the Summary and Technical Context below.** Discovered during implementation and verified
+> against live CLOB.
+
+**Why the original design fails.** CLOB V2 binds every order to its signer and rejects any order whose
+`signer` != the address its API key was registered under (401 "Invalid api key"). One shared operator
+key therefore **cannot** submit trades for other members' wallets. The hand-built struct was also wrong
+(the real order is 12 fields, domain `"Polymarket CTF Exchange"` v`1`, with **no** `builder` field).
+
+**What shipped instead:**
+
+- **Per-user credentials.** Each member derives their **own** CLOB API creds via
+  `createOrDeriveApiKey()` — one gasless L1 wallet signature, deterministic per wallet, cached in
+  `sessionStorage`. Foundation: `frontend/src/lib/predict/clobSession.js`.
+- **Client-direct trading.** Order submit/cancel/open-orders go **straight from the browser** to
+  `clob.polymarket.com` (CORS `*`) via the official `@polymarket/clob-client` (**new frontend dep** —
+  the plan's "no new dep / hand-built struct" no longer holds). The SDK owns struct + EIP-712 signing.
+  Member L2 creds never transit the gateway (still no-backend).
+- **Gateway = public reads + attribution only.** The `/orders`, `/order`, `/order/cancel` write routes
+  are **removed**. The gateway keeps markets/positions/fee-rate reads and gains
+  `POST /v1/polymarket/:chainId/builder-sign`, which signs the four `POLY_BUILDER_*` attribution headers
+  with the shared builder creds (server-side) via `@polymarket/builder-signing-sdk` (**new gateway
+  dep**). The SDK's `BuilderConfig({ remoteBuilderConfig })` calls it. `POLYMARKET_API_*` are **builder**
+  creds, not per-user order creds.
+- **Region gate.** `frontend/src/lib/predict/geoblock.js` checks Polymarket's geoblock before fee/submit;
+  restricted members get an honest notice + a **Polymarket link-out** (never bypassed, never a dead
+  button).
+- **`clobOrder.js`** is now **only** `computeCost` (honest fee lines); the struct/`buildOrder`/exchange
+  address are gone. **`tradeSigner.js`** reports signer capability (EOA yes; passkey deferred) — it no
+  longer signs. **`usePredictTrade.js`** state machine is region → fee → derive creds → submit-via-SDK.
+- Open dep resolved: the exact V2 typehash / exchange address are the SDK's concern now, not ours.
+
 ## Technical Context
 
 **Language/Version**: JavaScript ESM — Node ≥20 (gateway), Node ≥22 + React 19 (frontend)

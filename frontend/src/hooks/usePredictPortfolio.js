@@ -1,25 +1,36 @@
 /**
- * usePredictPositions / usePredictOpenOrders (spec 057, US2 + US3) — the connected wallet's Polymarket
- * positions and open (unfilled) orders on the ACTIVE network, via the relay-gateway proxy.
+ * usePredictPositions / usePredictOpenOrders (spec 057) — the connected wallet's Polymarket positions and
+ * open (unfilled) orders on the ACTIVE network.
  *
- * Mirror useCollectibles: tolerant WalletContext read (soft-fail to "disconnected" outside a provider),
- * race-safe request ids, full reset on account/chain switch. Off Polygon or with no gateway configured
- * they report {supported:false} and perform NO fetches (FR-018).
+ * Positions are PUBLIC (Data API via the relay-gateway proxy). Open orders are per-user and require the
+ * member's OWN CLOB creds, so they are read CLIENT-DIRECT via @polymarket/clob-client — and ONLY when creds
+ * are already derived (cached this session), so viewing the portfolio never triggers a wallet prompt. Until
+ * the member enables trading, open orders report status 'locked' (an honest "enable trading to see these").
+ *
+ * Mirror useCollectibles: tolerant WalletContext read, race-safe request ids, full reset on account/chain
+ * switch. Off Polygon / no gateway / passkey session → {supported:false} and NO fetches (FR-018).
  */
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useChainId } from 'wagmi'
+import { useChainId, useWalletClient } from 'wagmi'
 import { WalletContext } from '../contexts/WalletContext.js'
 import { getCurrentChainId } from '../config/networks'
-import { predictAvailable, fetchPositions, fetchOpenOrders } from '../lib/predict/predictClient'
+import { predictAvailable, fetchPositions } from '../lib/predict/predictClient'
+import {
+  loadCachedCreds as defaultLoadCachedCreds,
+  makeClobClient as defaultMakeClient,
+  fetchOpenOrders as defaultFetchOpenOrders,
+} from '../lib/predict/clobSession'
 
-/** Shared machine for a per-address read that returns a keyed list ({<key>: [...]}). */
-function useAddressList(fetchFn, listKey) {
+const POLYGON = 137
+
+/** The connected wallet's outcome positions — public Data API via the gateway. */
+export function usePredictPositions() {
   const wallet = useContext(WalletContext) || {}
   const { address, isConnected } = wallet
   const chainId = useChainId() || getCurrentChainId()
   const supported = predictAvailable(chainId)
 
-  const [items, setItems] = useState([])
+  const [positions, setPositions] = useState([])
   const [phase, setPhase] = useState('idle') // idle | loading | ready | degraded
   const reqIdRef = useRef(0)
 
@@ -28,20 +39,20 @@ function useAddressList(fetchFn, listKey) {
     const reqId = ++reqIdRef.current
     setPhase('loading')
     try {
-      const res = await fetchFn(chainId, address)
+      const res = await fetchPositions(chainId, address)
       if (reqId !== reqIdRef.current) return
-      setItems(Array.isArray(res?.[listKey]) ? res[listKey] : [])
+      setPositions(Array.isArray(res?.positions) ? res.positions : [])
       setPhase('ready')
     } catch {
       if (reqId !== reqIdRef.current) return
-      setItems([])
+      setPositions([])
       setPhase('degraded')
     }
-  }, [supported, isConnected, address, chainId, fetchFn, listKey])
+  }, [supported, isConnected, address, chainId])
 
   useEffect(() => {
     reqIdRef.current++
-    setItems([])
+    setPositions([])
     setPhase('idle')
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,19 +64,73 @@ function useAddressList(fetchFn, listKey) {
     else if (!isConnected || !address) status = 'disconnected'
     else if (phase === 'idle' || phase === 'loading') status = 'loading'
     else if (phase === 'degraded') status = 'degraded'
-    else if (items.length === 0) status = 'empty'
-    return { supported, status, chainId, address, items, refresh: load }
-  }, [supported, isConnected, address, chainId, items, phase, load])
+    else if (positions.length === 0) status = 'empty'
+    return { positions, supported, status, chainId, address, refresh: load }
+  }, [supported, isConnected, address, chainId, positions, phase, load])
 }
 
-/** The connected wallet's outcome positions (US2). */
-export function usePredictPositions() {
-  const { items, ...rest } = useAddressList(fetchPositions, 'positions')
-  return { positions: items, ...rest }
-}
+/** The connected wallet's open (unfilled) orders — client-direct via the SDK, only when creds are cached. */
+export function usePredictOpenOrders(options = {}) {
+  const wallet = useContext(WalletContext) || {}
+  const { address, isConnected, loginMethod } = wallet
+  const chainId = useChainId() || getCurrentChainId()
+  const { data: hookWalletClient } = useWalletClient()
+  const walletClient = options.walletClient ?? hookWalletClient
+  const deps = useMemo(
+    () => ({
+      loadCachedCreds: defaultLoadCachedCreds,
+      makeClient: defaultMakeClient,
+      fetchOpenOrders: defaultFetchOpenOrders,
+      ...options.deps,
+    }),
+    [options.deps]
+  )
+  // Open orders need per-user creds + an EOA wallet client; passkey trading is deferred.
+  const supported = predictAvailable(chainId) && Number(chainId) === POLYGON && loginMethod !== 'passkey'
 
-/** The connected wallet's open (unfilled) orders (US3). */
-export function usePredictOpenOrders() {
-  const { items, ...rest } = useAddressList(fetchOpenOrders, 'orders')
-  return { orders: items, ...rest }
+  const [orders, setOrders] = useState([])
+  const [phase, setPhase] = useState('idle') // idle | loading | ready | degraded | locked
+  const reqIdRef = useRef(0)
+
+  const load = useCallback(async () => {
+    if (!supported || !isConnected || !address || !walletClient) return
+    const creds = deps.loadCachedCreds(address)
+    if (!creds) {
+      setOrders([])
+      setPhase('locked') // creds not derived yet — don't prompt just to read the portfolio
+      return
+    }
+    const reqId = ++reqIdRef.current
+    setPhase('loading')
+    try {
+      const client = deps.makeClient(walletClient, creds, {})
+      const list = await deps.fetchOpenOrders(client, {})
+      if (reqId !== reqIdRef.current) return
+      setOrders(Array.isArray(list) ? list : [])
+      setPhase('ready')
+    } catch {
+      if (reqId !== reqIdRef.current) return
+      setOrders([])
+      setPhase('degraded')
+    }
+  }, [supported, isConnected, address, walletClient, deps])
+
+  useEffect(() => {
+    reqIdRef.current++
+    setOrders([])
+    setPhase('idle')
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, chainId, supported, walletClient])
+
+  return useMemo(() => {
+    let status = 'ready'
+    if (!supported) status = 'unsupported'
+    else if (!isConnected || !address) status = 'disconnected'
+    else if (phase === 'locked') status = 'locked'
+    else if (phase === 'idle' || phase === 'loading') status = 'loading'
+    else if (phase === 'degraded') status = 'degraded'
+    else if (orders.length === 0) status = 'empty'
+    return { orders, supported, status, chainId, address, refresh: load }
+  }, [supported, isConnected, address, chainId, orders, phase, load])
 }

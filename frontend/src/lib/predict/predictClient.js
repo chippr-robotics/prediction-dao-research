@@ -1,14 +1,12 @@
 /**
- * Predict gateway client (spec 057) — the SPA side of the relay-gateway's /v1/polymarket/* proxy
- * (specs/057-predict-polymarket/contracts/gateway-predict-api.md).
+ * Predict gateway client (spec 057) — the SPA side of the relay-gateway's /v1/polymarket/* proxy for the
+ * PUBLIC read surface only: market browse/search, market detail, the fee schedule, and positions (all
+ * public Polymarket data — no per-user auth). Soft-fail by design: with VITE_RELAYER_URL unset the feature
+ * reports unavailable and every Predict surface hides (FR-018) — mirroring the collectibles gateway client.
  *
- * The Polymarket API key + L2 credentials live ONLY in the gateway (FR-016); this client sends no
- * auth material of its own (the Cloudflare edge injects X-Origin-Auth in transit). Soft-fail by
- * design: with VITE_RELAYER_URL unset the feature reports unavailable and every Predict surface hides
- * (FR-018) — mirroring the collectibles gateway client.
- *
- * A `409 price_changed` is surfaced as its own code so the trade flow re-confirms the current price
- * rather than filling stale (FR-008).
+ * AUTHED trading (submit / cancel / open-orders) does NOT go through here — CLOB V2 binds every order to
+ * its signer, so each member calls clob.polymarket.com DIRECTLY with their OWN derived L2 creds. See
+ * lib/predict/clobSession.js. The gateway only signs the builder attribution headers (/builder-sign).
  */
 import { getNetwork } from '../../config/networks'
 
@@ -96,26 +94,7 @@ export function fetchFeeRate(chainId, tokenId) {
   return request(`/v1/polymarket/${chainId}/fee-rate?token_id=${encodeURIComponent(tokenId)}`)
 }
 
-/** The connected address's positions → { positions }. */
+/** The connected address's positions → { positions } (public Data API; no auth). */
 export function fetchPositions(chainId, address) {
   return request(`/v1/polymarket/${chainId}/positions?address=${encodeURIComponent(address)}`)
-}
-
-/** The connected address's open (unfilled) orders → { orders }. */
-export function fetchOpenOrders(chainId, address) {
-  return request(`/v1/polymarket/${chainId}/orders?address=${encodeURIComponent(address)}`)
-}
-
-/**
- * Submit a client-signed CLOB order carrying the builder code → { orderId, status, builder }.
- * A `409 price_changed` becomes a PredictUnavailable with code `price_changed` so the caller
- * re-confirms the current price (FR-008).
- */
-export function submitOrder(chainId, { order, signature }) {
-  return request(`/v1/polymarket/${chainId}/order`, { method: 'POST', body: { order, signature } })
-}
-
-/** Cancel an open order → { cancelled }. */
-export function cancelOrder(chainId, { orderId, address, signature }) {
-  return request(`/v1/polymarket/${chainId}/order/cancel`, { method: 'POST', body: { orderId, address, signature } })
 }

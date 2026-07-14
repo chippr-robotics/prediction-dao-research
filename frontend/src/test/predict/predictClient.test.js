@@ -1,6 +1,7 @@
 /**
- * predictClient (spec 057) — the SPA side of the /v1/polymarket/* proxy. Verifies gateway-unset
- * soft-fail, success mapping, fee-fetch failure, and the 409 price_changed re-confirm signal.
+ * predictClient (spec 057) — the SPA side of the /v1/polymarket/* proxy for the PUBLIC read surface.
+ * Verifies gateway-unset soft-fail, success mapping, and fee-fetch failure. (Authed trading is
+ * client-direct via clobSession — not this module.)
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
@@ -8,7 +9,6 @@ import {
   predictAvailable,
   fetchMarkets,
   fetchFeeRate,
-  submitOrder,
   PredictUnavailable,
 } from '../../lib/predict/predictClient'
 
@@ -50,11 +50,6 @@ describe('reads/writes', () => {
   it('throws PredictUnavailable when the fee schedule cannot be confirmed', async () => {
     fetch.mockResolvedValueOnce(jsonRes({ error: { code: 'fee_unavailable', reason: 'try again' } }, 503))
     await expect(fetchFeeRate(137, '123')).rejects.toMatchObject({ name: 'PredictUnavailable', code: 'fee_unavailable' })
-  })
-
-  it('surfaces 409 price_changed as its own code for re-confirm', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ error: { code: 'price_changed', reason: 'moved' } }, 409))
-    await expect(submitOrder(137, { order: {}, signature: '0x1' })).rejects.toMatchObject({ code: 'price_changed', status: 409 })
   })
 
   it('soft-fails when the gateway is unconfigured', async () => {

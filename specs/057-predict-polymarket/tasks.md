@@ -230,6 +230,13 @@ re-confirm — with a wallet holding a position, sell, confirm net matches, fill
 
 ## Notes
 
+- **Design revision (Option A) — see `plan.md#design-revision`.** Tasks below were authored against the
+  original "hand-built order struct relayed through a shared operator key" design, which live CLOB proved
+  unworkable (V2 binds each order to its signer). As shipped: each member derives their **own** CLOB creds
+  and trades **client-direct** via `@polymarket/clob-client`; the gateway keeps public reads and gains a
+  `builder-sign` attribution endpoint. So T014/T024's "gateway order/cancel routes" and T0xx's "hand-built
+  EIP-712 struct" are superseded — the outcome (browse, trade with disclosed builder fee, cancel, no
+  custody) is unchanged; the mechanism is client-direct + per-user creds + geoblock link-out.
 - `[P]` tasks touch distinct files with no incomplete-task dependency and may run in parallel.
 - Every behavior task ships with its test task in the same phase (constitution II).
 - Builder code (`0x6e03…93a3`) and fee rates are server-side config only; the client never
