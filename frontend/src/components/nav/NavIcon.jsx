@@ -45,8 +45,8 @@ const ICON_PATHS = {
   gem: <><path d="M7 4h10l4 6-9 10L3 10l4-6Z" /><path d="M3 10h18" /><path d="M9.5 10 12 4l2.5 6L12 20l-2.5-10Z" /></>,
   // Earn (spec 050) — a sprouting seedling: assets at rest, growing.
   sprout: <><path d="M12 20v-7" /><path d="M12 13c0-3.3-2.7-6-6-6H4.5v.5c0 3.3 2.7 6 6 6H12" /><path d="M12 11c0-2.8 2.2-5 5-5h2.5v.5c0 2.8-2.2 5-5 5H12" /><path d="M7.5 20h9" /></>,
-  // Predict (spec 057) — a target/bullseye: forecasting an outcome.
-  predict: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.3" /><circle cx="12" cy="12" r="0.9" /></>,
+  // Predict (spec 057) — a crystal ball on a stand: forecasting an outcome. Sphere + pedestal + glint.
+  predict: <><circle cx="12" cy="9.5" r="6.5" /><path d="M8.2 15.4 7 20h10l-1.2-4.6" /><path d="M5.5 20h13" /><path d="M9.4 7a3.2 3.2 0 0 0-1.2 2.5" /></>,
   // Share address as QR (spec 011 quick-share entry point) — the three QR
   // finder-pattern corners plus scattered data pixels, universally read as "QR".
   qrcode: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h3v3" /><path d="M20 14v.01" /><path d="M14 20v.01" /><path d="M20 20v.01" /><path d="M17 17v.01" /></>,

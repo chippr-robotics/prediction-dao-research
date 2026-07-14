@@ -13,6 +13,7 @@ import {
   isSupportedChain,
   isTokenId,
   normalizeMarket,
+  normalizeGammaMarket,
   normalizeFeeRate,
   normalizePosition,
   validateOrderBody,
@@ -26,6 +27,7 @@ const CONDITION = '0x' + 'ab'.repeat(32)
 
 // ---- upstream fixtures (Polymarket CLOB shapes) -------------------------------------------------
 
+// CLOB /markets shape (used by the normalizeMarket unit test).
 const MARKETS_BODY = {
   data: [
     {
@@ -35,6 +37,7 @@ const MARKETS_BODY = {
       market_slug: 'will-it-rain-tomorrow',
       closed: false,
       volume: '12345.67',
+      neg_risk: false,
       tokens: [
         { token_id: TOKEN, outcome: 'Yes', price: '0.55' },
         { token_id: '1', outcome: 'No', price: '0.45' },
@@ -44,11 +47,28 @@ const MARKETS_BODY = {
   ],
   next_cursor: 'cursor-2',
 }
-const MARKET_DETAIL_BODY = { market: MARKETS_BODY.data[0] }
-const FEE_BODY = { fd: { r: 100, e: 2, to: true } }
-const POSITIONS_BODY = {
-  data: [{ asset: TOKEN, size: '10', outcome: 'Yes', current_value: '5.5', curPrice: '0.55', conditionId: CONDITION }],
-}
+// Gamma /markets shape (the browse/detail source): outcomes/prices/token-ids are stringified arrays.
+const GAMMA_MARKETS = [
+  {
+    conditionId: CONDITION,
+    question: 'Will it rain tomorrow?',
+    slug: 'will-it-rain-tomorrow',
+    category: 'Weather',
+    active: true,
+    closed: false,
+    negRisk: false,
+    volumeNum: 12345.67,
+    outcomes: JSON.stringify(['Yes', 'No']),
+    clobTokenIds: JSON.stringify([TOKEN, '1']),
+    outcomePrices: JSON.stringify(['0.55', '0.45']),
+  },
+  { foo: 'junk' }, // unusable -> dropped
+]
+const FEE_BODY = { base_fee: 1000 } // real CLOB /fee-rate shape
+// Data-API positions shape (public; camelCase currentValue/curPrice/negativeRisk).
+const POSITIONS_BODY = [
+  { asset: TOKEN, size: 10, outcome: 'Yes', currentValue: 5.5, curPrice: 0.55, conditionId: CONDITION, negativeRisk: false },
+]
 const OPEN_ORDERS_BODY = {
   data: [{ id: '0xorder1', asset_id: TOKEN, side: 'BUY', price: '0.5', original_size: '10', size_remaining: '4' }],
 }
@@ -94,13 +114,13 @@ function mockPolymarketFetch(overrides = {}) {
     for (const [needle, resp] of Object.entries(overrides)) {
       if (url.includes(needle)) return typeof resp === 'function' ? resp(url) : jsonRes(resp)
     }
+    // Host-routed: Gamma (discovery), Data-API (positions), CLOB (everything else).
+    if (url.includes('gamma-api')) return jsonRes(GAMMA_MARKETS)
+    if (url.includes('data-api')) return jsonRes(POSITIONS_BODY)
     if (url.includes('/order/cancel')) return jsonRes(CANCEL_RESPONSE)
     if (url.includes('/order')) return jsonRes(ORDER_POST_RESPONSE)
     if (url.includes('/data/orders')) return jsonRes(OPEN_ORDERS_BODY)
-    if (url.includes('/positions')) return jsonRes(POSITIONS_BODY)
     if (url.includes('/fee-rate')) return jsonRes(FEE_BODY)
-    if (url.includes('/markets/')) return jsonRes(MARKET_DETAIL_BODY)
-    if (url.includes('/markets')) return jsonRes(MARKETS_BODY)
     return jsonRes({ error: 'not found' }, 404)
   }
   impl.calls = calls
@@ -166,14 +186,33 @@ describe('polymarket normalize', () => {
     expect(normalizeMarket({ junk: true })).toBeNull()
   })
 
-  it('reads the platform fee live (never hardcoded) and returns null when absent', () => {
-    expect(normalizeFeeRate(FEE_BODY, TOKEN)).toMatchObject({ tokenId: TOKEN, feeRateBps: 100, takerOnly: true })
+  it('reads the platform fee live (base_fee) and returns null when absent', () => {
+    expect(normalizeFeeRate(FEE_BODY, TOKEN)).toMatchObject({ tokenId: TOKEN, feeRateBps: 1000 })
     expect(normalizeFeeRate({}, TOKEN)).toBeNull()
   })
 
-  it('maps a position, dropping zero-size records', () => {
-    expect(normalizePosition(POSITIONS_BODY.data[0])).toMatchObject({ tokenId: TOKEN, size: '10', outcome: 'Yes' })
+  it('maps a Data-API position, dropping zero-size records', () => {
+    expect(normalizePosition(POSITIONS_BODY[0])).toMatchObject({
+      tokenId: TOKEN,
+      size: '10',
+      outcome: 'Yes',
+      value: { amount: '5.5', currency: 'USDC' },
+      bestBid: { amount: '0.55', currency: 'USDC' },
+    })
     expect(normalizePosition({ asset: TOKEN, size: '0' })).toBeNull()
+  })
+
+  it('maps a Gamma market, zipping outcomes/token-ids/prices and dropping untradable', () => {
+    const m = normalizeGammaMarket(GAMMA_MARKETS[0])
+    expect(m.conditionId).toBe(CONDITION)
+    expect(m.outcomes).toEqual([
+      { name: 'Yes', tokenId: TOKEN, price: '0.55' },
+      { name: 'No', tokenId: '1', price: '0.45' },
+    ])
+    expect(m.tradable).toBe(true)
+    expect(m.negRisk).toBe(false)
+    expect(normalizeGammaMarket({ foo: 'junk' })).toBeNull()
+    expect(normalizeGammaMarket({ conditionId: CONDITION, closed: true, outcomes: '[]', clobTokenIds: '[]' }).tradable).toBe(false)
   })
 
   it('rejects a malformed order and a stripped/altered builder code', () => {
@@ -270,39 +309,47 @@ describe('predict proxy cross-cutting', () => {
 // ---- reads --------------------------------------------------------------------------------------
 
 describe('predict reads', () => {
-  it('lists markets, dropping unusable records', async () => {
-    const { app } = build()
+  it('lists live tradable markets from Gamma, dropping unusable records', async () => {
+    const { app, polymarketFetch } = build()
     const res = await get(app, MARKETS_PATH).expect(200)
     expect(res.body.markets).toHaveLength(1)
     expect(res.body.markets[0].conditionId).toBe(CONDITION)
-    expect(res.body.next).toBe('cursor-2')
+    expect(res.body.markets[0].outcomes[0]).toMatchObject({ name: 'Yes', tokenId: TOKEN })
     expect(res.body.stale).toBe(false)
+    // Browse hits the Gamma host, not the CLOB.
+    expect(polymarketFetch.calls.some((c) => c.url.includes('gamma-api') && c.url.includes('/markets'))).toBe(true)
   })
 
-  it('returns a market detail', async () => {
+  it('returns a market detail from Gamma', async () => {
     const { app } = build()
     const res = await get(app, MARKET_PATH).expect(200)
     expect(res.body.question).toBe('Will it rain tomorrow?')
   })
 
-  it('returns the live fee rate plus the configured builder fee (honest additive total)', async () => {
+  it('returns the configured builder fee + code with the live platform rate', async () => {
     const { app } = build()
     const res = await get(app, FEE_PATH).expect(200)
-    expect(res.body).toMatchObject({ feeRateBps: 100, builderTakerFeeBps: 50, builderMakerFeeBps: 0 })
+    expect(res.body).toMatchObject({ feeRateBps: 1000, builderTakerFeeBps: 50, builderMakerFeeBps: 0, builderCode: BUILDER_CODE })
   })
 
-  it('blocks (503) when the fee schedule is unavailable rather than guessing', async () => {
+  it('still returns builder info (no block) when the CLOB fee rate is unavailable — trading not stranded', async () => {
     const { app } = build({ polymarketFetch: mockPolymarketFetch({ '/fee-rate': {} }) })
-    await get(app, FEE_PATH).expect(503)
+    const res = await get(app, FEE_PATH).expect(200)
+    expect(res.body).toMatchObject({ feeRateBps: null, builderTakerFeeBps: 50, builderCode: BUILDER_CODE })
   })
 
-  it('reads positions and open orders with L2 auth headers', async () => {
+  it('reads positions from the public Data API (no auth) and open orders from the CLOB (L2 auth)', async () => {
     const { app, polymarketFetch } = build()
-    await get(app, POSITIONS_PATH).expect(200)
+    const posRes = await get(app, POSITIONS_PATH).expect(200)
+    expect(posRes.body.positions[0]).toMatchObject({ tokenId: TOKEN, outcome: 'Yes' })
     await get(app, ORDERS_PATH).expect(200)
-    const authed = polymarketFetch.calls.find((c) => c.url.includes('/positions'))
-    expect(authed.headers.POLY_API_KEY).toBe('test-pm-key')
-    expect(authed.headers.POLY_SIGNATURE).toBeDefined()
+    // Positions: public Data API, no POLY auth headers.
+    const posCall = polymarketFetch.calls.find((c) => c.url.includes('data-api') && c.url.includes('/positions'))
+    expect(posCall.headers.POLY_API_KEY).toBeUndefined()
+    // Open orders: CLOB, L2-authed.
+    const ordersCall = polymarketFetch.calls.find((c) => c.url.includes('/data/orders'))
+    expect(ordersCall.headers.POLY_API_KEY).toBe('test-pm-key')
+    expect(ordersCall.headers.POLY_SIGNATURE).toBeDefined()
   })
 })
 

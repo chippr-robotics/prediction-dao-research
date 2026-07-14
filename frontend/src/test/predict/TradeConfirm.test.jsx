@@ -19,18 +19,16 @@ const MARKET = { question: 'Will it rain tomorrow?', polymarketUrl: 'https://pol
 const OUTCOME = { name: 'Yes', tokenId: '123456789', price: '0.5' }
 const FEE = { feeRateBps: 100, builderTakerFeeBps: 50, builderMakerFeeBps: 0, builderCode: '0x6e03' }
 
-// A preview matching computeCost for 100 shares @ 0.50: notional 50, platform 0.5, builder 0.25.
+// A preview matching computeCost for 100 shares @ 0.50: notional 50, builder 0.25 (platform fee is
+// Polymarket's, disclosed as a note — not a fabricated dollar line).
 const QUOTE = {
   notionalUnits: 50_000000n,
-  platformFeeUnits: 500000n,
   builderFeeUnits: 250000n,
-  totalCostUnits: 50_750000n,
-  netProceedsUnits: 49_250000n,
+  platformFeeRateBps: 100,
+  totalCostUnits: 50_250000n,
+  netProceedsUnits: 49_750000n,
   currency: 'USDC',
-  feeLines: [
-    { label: 'Polymarket fee', amount: '0.5', currency: 'USDC', estimated: true },
-    { label: 'FairWins builder fee', amount: '0.25', currency: 'USDC' },
-  ],
+  feeLines: [{ label: 'FairWins builder fee', amount: '0.25', currency: 'USDC' }],
 }
 
 function makeHook(over = {}) {
@@ -60,15 +58,16 @@ describe('TradeConfirm', () => {
     render(<TradeConfirm market={MARKET} outcome={OUTCOME} side="BUY" onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText(/shares to buy/i), { target: { value: '100' } })
     expect(screen.getByText('FairWins builder fee')).toBeInTheDocument()
-    // Total cost includes the additive builder fee (50 + 0.5 + 0.25 = 50.75).
-    expect(screen.getByTestId('trade-total')).toHaveTextContent('50.75 USDC')
+    // Subtotal includes the exact builder fee (50 + 0.25 = 50.25).
+    expect(screen.getByTestId('trade-total')).toHaveTextContent('50.25 USDC')
   })
 
-  it('discloses the builder fee as a real cost — not free', () => {
+  it('discloses the builder fee as a real cost and Polymarket fee as separate — not free', () => {
     render(<TradeConfirm market={MARKET} outcome={OUTCOME} side="BUY" onClose={() => {}} />)
-    const note = screen.getByText(/builder fee on this trade/i)
+    const note = screen.getByText(/builder fee/i)
     expect(note).toHaveTextContent(/0\.50%/)
-    expect(note).toHaveTextContent(/added on top of/i)
+    // Discloses Polymarket's own taker fee is separate.
+    expect(note).toHaveTextContent(/Polymarket also charges/i)
     // It must NOT claim to be free (the Collect divergence).
     expect(note.textContent).not.toMatch(/costs you nothing|free/i)
   })

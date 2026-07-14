@@ -571,12 +571,21 @@ export function createApp(config, deps = {}) {
     windowMs: config.polymarket.quotaWindowMs,
     now: nowMs,
   })
+  const pmFetch = deps.polymarketFetch ? { fetchImpl: deps.polymarketFetch } : {}
   const polymarketClient =
-    deps.polymarketClient ??
-    createPolymarketClient({ ...config.polymarket, now: nowMs, ...(deps.polymarketFetch ? { fetchImpl: deps.polymarketFetch } : {}) })
+    deps.polymarketClient ?? createPolymarketClient({ ...config.polymarket, now: nowMs, ...pmFetch })
+  // Discovery (Gamma) + positions (Data API) hosts — both PUBLIC, so no creds (no L2 auth headers).
+  const polymarketGammaClient =
+    deps.polymarketGammaClient ??
+    createPolymarketClient({ baseUrl: config.polymarket.gammaBaseUrl, timeoutMs: config.polymarket.timeoutMs, retries: config.polymarket.retries, now: nowMs, ...pmFetch })
+  const polymarketDataClient =
+    deps.polymarketDataClient ??
+    createPolymarketClient({ baseUrl: config.polymarket.dataBaseUrl, timeoutMs: config.polymarket.timeoutMs, retries: config.polymarket.retries, now: nowMs, ...pmFetch })
   app.use(
     createPolymarketRouter(config, {
       client: polymarketClient,
+      gammaClient: polymarketGammaClient,
+      dataClient: polymarketDataClient,
       cache: deps.polymarketCache ?? createTtlCache({ now: nowMs }),
       quotas: pmReadQuotas,
       writeQuotas: pmWriteQuotas,

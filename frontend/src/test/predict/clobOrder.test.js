@@ -13,29 +13,28 @@ const MAKER = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 const FEE = { feeRateBps: 100, builderTakerFeeBps: 50, builderMakerFeeBps: 0 }
 
 describe('computeCost', () => {
-  it('includes the additive builder fee in a taker BUY total (shown == charged)', () => {
-    // 100 shares @ 0.50 = 50 USDC notional. Platform 1% = 0.5, builder 0.5% = 0.25.
+  it('includes the exact builder fee in a taker BUY total (shown == charged)', () => {
+    // 100 shares @ 0.50 = 50 USDC notional. Builder 0.5% = 0.25. Polymarket's own fee is separate.
     const c = computeCost({ price: '0.5', size: '100', side: 'BUY', isMaker: false }, FEE)
     expect(c.notionalUnits).toBe(50_000000n)
-    expect(c.platformFeeUnits).toBe(500000n) // 0.50 USDC
     expect(c.builderFeeUnits).toBe(250000n) // 0.25 USDC
-    expect(c.totalCostUnits).toBe(50_750000n) // 50.75 USDC
-    // Both fees appear as their own labelled lines; the builder fee is never hidden.
+    expect(c.totalCostUnits).toBe(50_250000n) // 50.25 USDC (notional + our builder fee)
+    expect(c.platformFeeRateBps).toBe(100) // carried on the order, not fabricated as a dollar line
+    // The builder fee is its own labelled line; we never fabricate a platform-fee dollar amount.
     const labels = c.feeLines.map((l) => l.label)
-    expect(labels).toContain('FairWins builder fee')
-    expect(labels).toContain('Polymarket fee')
-    expect(c.feeLines.find((l) => l.label === 'FairWins builder fee').amount).toBe('0.25')
+    expect(labels).toEqual(['FairWins builder fee'])
+    expect(c.feeLines[0].amount).toBe('0.25')
   })
 
-  it('charges a taker SELL its fees against net proceeds', () => {
+  it('charges a taker SELL the builder fee against net proceeds', () => {
     const c = computeCost({ price: '0.5', size: '100', side: 'SELL', isMaker: false }, FEE)
-    expect(c.netProceedsUnits).toBe(49_250000n) // 50 - 0.5 - 0.25
+    expect(c.netProceedsUnits).toBe(49_750000n) // 50 - 0.25
   })
 
-  it('charges makers NO platform fee and NO builder fee', () => {
+  it('charges makers NO builder fee (and no platform rate on the order)', () => {
     const c = computeCost({ price: '0.5', size: '100', side: 'BUY', isMaker: true }, FEE)
-    expect(c.platformFeeUnits).toBe(0n)
     expect(c.builderFeeUnits).toBe(0n)
+    expect(c.platformFeeRateBps).toBe(0)
     expect(c.totalCostUnits).toBe(50_000000n)
     expect(c.feeLines).toHaveLength(0) // no fee lines to show
   })
@@ -51,7 +50,8 @@ describe('buildOrder', () => {
     expect(built.message.maker).toBe(MAKER)
     expect(built.message.tokenId).toBe(TOKEN)
     expect(built.message.side).toBe(0) // BUY
-    expect(built.totalCost).toBe('50.75')
+    expect(built.message.feeRateBps).toBe('100') // platform rate carried on the order
+    expect(built.totalCost).toBe('50.25')
     expect(built.domain).toMatchObject({ name: 'Polymarket CTF Exchange', version: '2', chainId: 137 })
     expect(built.types).toBe(CLOB_ORDER_TYPES)
     // BUY: maker gives USDC notional, takes shares.

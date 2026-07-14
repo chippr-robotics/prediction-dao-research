@@ -53,11 +53,14 @@ export function polymarketExchange(negRisk = false) {
 }
 
 /**
- * Notional (USDC base units) for a price∈[0,1] and a share size, plus fee split and the honest total.
- * Floor division in bigint — no float drift. Platform fee is the venue's (estimated live from
- * feeRateBps); the builder fee is FairWins' exact, additive amount.
+ * Notional (USDC base units) for a price∈[0,1] and a share size, plus the FairWins builder fee — the
+ * one fee we control and can state exactly. Floor division in bigint — no float drift.
  *
- * @returns {{ notionalUnits: bigint, platformFeeUnits: bigint, builderFeeUnits: bigint,
+ * Polymarket's OWN taker fee is charged by their engine at execution (a curve over price/size); we
+ * carry its rate on the signed order (`feeRateBps`) for validity but do NOT fabricate a dollar estimate
+ * for it here — it is disclosed honestly as a separate note in the confirm UI. Makers pay no builder fee.
+ *
+ * @returns {{ notionalUnits: bigint, builderFeeUnits: bigint, platformFeeRateBps: number,
  *   totalCostUnits: bigint, netProceedsUnits: bigint, feeLines: Array, currency: 'USDC' }}
  */
 export function computeCost({ price, size, side, isMaker = false }, feeBreakdown) {
@@ -66,26 +69,24 @@ export function computeCost({ price, size, side, isMaker = false }, feeBreakdown
   // notional = price × size, both 6-dec → divide out one scale factor.
   const notionalUnits = (priceUnits * sizeUnits) / 10n ** BigInt(USDC_DECIMALS)
 
-  // Makers pay neither the platform fee (Polymarket makers are fee-free) nor the builder fee.
-  const platformBps = isMaker ? 0 : Number(feeBreakdown?.feeRateBps ?? 0)
+  // Makers pay no builder fee (Polymarket keeps makers whole).
   const builderBps = isMaker ? Number(feeBreakdown?.builderMakerFeeBps ?? 0) : Number(feeBreakdown?.builderTakerFeeBps ?? 0)
-  const platformFeeUnits = feeUnits(notionalUnits, platformBps)
   const builderFeeUnits = feeUnits(notionalUnits, builderBps)
 
-  const totalCostUnits = notionalUnits + platformFeeUnits + builderFeeUnits
-  const netProceedsUnits = notionalUnits - platformFeeUnits - builderFeeUnits
+  // Our guaranteed side of the math: notional ± our builder fee. Polymarket's fee is additional and
+  // charged at execution (disclosed, not fabricated).
+  const totalCostUnits = notionalUnits + builderFeeUnits
+  const netProceedsUnits = notionalUnits - builderFeeUnits
 
   const feeLines = [
-    // Platform fee is the venue's, labelled as an estimate (Polymarket computes the exact curve at match).
-    feeLine("Polymarket fee", platformFeeUnits, { estimated: true }),
     // FairWins' builder fee — always its own honest line when it applies (never hidden, FR-012).
     feeLine('FairWins builder fee', builderFeeUnits),
   ].filter(Boolean)
 
   return {
     notionalUnits,
-    platformFeeUnits,
     builderFeeUnits,
+    platformFeeRateBps: isMaker ? 0 : Number(feeBreakdown?.feeRateBps ?? 0),
     totalCostUnits,
     netProceedsUnits: netProceedsUnits < 0n ? 0n : netProceedsUnits,
     feeLines,
