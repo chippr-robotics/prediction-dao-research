@@ -534,6 +534,14 @@ export function createApp(config, deps = {}) {
     windowMs: config.opensea.quotaWindowMs,
     now: nowMs,
   })
+  // Sell-side writes (spec 056): a separate, tighter quota keyed by the seller's account address, so
+  // publishing a listing can't drain the shared key's read budget.
+  const osWriteQuotas = createQuotas({
+    signerPerWindow: config.opensea.writeQuotaPerAddress,
+    globalPerWindow: config.opensea.writeQuotaGlobal,
+    windowMs: config.opensea.quotaWindowMs,
+    now: nowMs,
+  })
   const openseaClient =
     deps.openseaClient ?? createOpenSeaClient({ ...config.opensea, ...(deps.openseaFetch ? { fetchImpl: deps.openseaFetch } : {}) })
   app.use(
@@ -541,6 +549,7 @@ export function createApp(config, deps = {}) {
       client: openseaClient,
       cache: deps.openseaCache ?? createTtlCache({ now: nowMs }),
       quotas: osQuotas,
+      writeQuotas: osWriteQuotas,
       killSwitch,
     })
   )

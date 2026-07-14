@@ -18,8 +18,8 @@ spec:
       containers:
         # ---- ingress: FairWins policy gateway (public, port 8788) ----
         - name: gateway
-          # collectibles-055: adds the read-only /v1/opensea/* proxy (spec 055)
-          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:collectibles-055
+          # sell-side-056: adds the /v1/opensea/* sell-side write routes (spec 056) on top of the 055 reads
+          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:sell-side-056
           ports:
             - name: http1
               containerPort: 8788
@@ -60,12 +60,17 @@ spec:
               value: "0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105"
             - name: PM_SIGNER_KMS_KEY
               value: "projects/chippr-bots-site-wp/locations/us-central1/keyRings/fairwins-relayer/cryptoKeys/paymaster-signer-polygon/cryptoKeyVersions/1"
-            # Collectibles read proxy (spec 055): OpenSea API v2 key for /v1/opensea/*.
+            # Collectibles proxy (spec 055 read + spec 056 sell): OpenSea API v2 key for /v1/opensea/*.
             # Optional — if the secret is absent the routes fail closed (503
-            # collectibles_unconfigured) and the SPA hides the Collectibles tab.
+            # collectibles_unconfigured) and the SPA hides the Collect tab.
             - name: OPENSEA_API_KEY
               valueFrom:
                 secretKeyRef: { name: OPENSEA_API_KEY, key: latest }
+            # FairWins referral/affiliate beneficiary of OpenSea's OWN reward (spec 056). PUBLIC address,
+            # not a secret. Empty => attribution off (safe default); set the address to turn it on. Never
+            # a surcharge — it only records FairWins with OpenSea's own referral program.
+            - name: OPENSEA_REFERRAL_ADDRESS
+              value: ""
           resources:
             limits: { cpu: "1", memory: 512Mi }
         # ---- sidecar: OZ Relayer engine (localhost:8080) ----

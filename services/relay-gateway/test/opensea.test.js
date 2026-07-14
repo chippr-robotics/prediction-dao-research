@@ -76,16 +76,49 @@ const NFT_DETAIL_BODY = {
   },
 }
 
+const OPENSEA_FEE_RECIPIENT = '0x0000a26b00c1F0DF003000390027140000fAa719'
+const ROYALTY_RECIPIENT = '0x1111111111111111111111111111111111111111'
+
 const COLLECTION_BODY = {
   collection: 'cool-cats',
   name: 'Cool Cats',
   image_url: 'https://img.example/cc.png',
   opensea_url: 'https://opensea.io/collection/cool-cats',
+  // Sell-side fee basis (spec 056): OpenSea marketplace fee (2.5% required) + a 5% required royalty.
+  fees: [
+    { fee: 2.5, recipient: OPENSEA_FEE_RECIPIENT, required: true },
+    { fee: 5, recipient: ROYALTY_RECIPIENT, required: true },
+  ],
 }
 
 const STATS_BODY = { total: { floor_price: 0.85, floor_price_symbol: 'ETH' } }
 
-const BEST_OFFER_BODY = { order_hash: '0xabc', price: { currency: 'WETH', decimals: 18, value: '790000000000000000' } }
+const BEST_OFFER_BODY = { order_hash: '0x' + 'cd'.repeat(32), price: { currency: 'WETH', decimals: 18, value: '790000000000000000' } }
+const BEST_LISTING_BODY = { orders: [{ order_hash: '0x' + 'ef'.repeat(32), maker: { address: OWNER }, price: { current: { currency: 'ETH', decimals: 18, value: '1000000000000000000' } } }] }
+
+const ORDER_HASH = '0x' + 'ab'.repeat(32)
+const LISTING_POST_RESPONSE = { order: { order_hash: ORDER_HASH, protocol_data: {} } }
+const FULFILLMENT_RESPONSE = {
+  fulfillment_data: { transaction: { to: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789', data: '0xdeadbeef', value: '0' } },
+}
+// A structurally-valid Seaport listing body the client would POST.
+const SIGNED_LISTING = {
+  order: {
+    offerer: OWNER,
+    offer: [{ itemType: 2, token: CONTRACT, identifierOrCriteria: '1234', startAmount: '1', endAmount: '1' }],
+    consideration: [{ itemType: 0, token: '0x0', identifierOrCriteria: '0', startAmount: '1', endAmount: '1', recipient: OWNER }],
+    startTime: '0',
+    endTime: '9999999999',
+    orderType: 0,
+    zone: '0x0000000000000000000000000000000000000000',
+    zoneHash: '0x' + '00'.repeat(32),
+    salt: '0x123',
+    conduitKey: '0x' + '00'.repeat(32),
+    counter: '0',
+  },
+  signature: '0x' + '11'.repeat(65),
+  protocolAddress: '0x0000000000000068F116a894984e2DB1123eB395',
+}
 
 // ---- test scaffolding ---------------------------------------------------------------------------
 
@@ -96,15 +129,26 @@ const jsonRes = (body, status = 200) => ({
   text: async () => JSON.stringify(body),
 })
 
-/** URL-routed upstream mock; `calls` records every hit, `failWith` forces a status for all routes. */
+/** URL-routed upstream mock; `calls` records every hit (with method+body), `failWith` forces a status. */
 function mockOpenSeaFetch(overrides = {}) {
   const calls = []
   const impl = async (url, opts) => {
-    calls.push({ url, headers: opts?.headers ?? {} })
-    if (impl.failWith) return jsonRes({ errors: ['down'] }, impl.failWith)
-    for (const [needle, body] of Object.entries(overrides)) {
-      if (url.includes(needle)) return typeof body === 'function' ? body(url) : jsonRes(body)
+    let body
+    try {
+      body = opts?.body ? JSON.parse(opts.body) : null
+    } catch {
+      body = opts?.body ?? null
     }
+    calls.push({ url, method: opts?.method ?? 'GET', headers: opts?.headers ?? {}, body })
+    if (impl.failWith) return jsonRes({ errors: ['down'] }, impl.failWith)
+    for (const [needle, resp] of Object.entries(overrides)) {
+      if (url.includes(needle)) return typeof resp === 'function' ? resp(url) : jsonRes(resp)
+    }
+    // Write endpoints (spec 056) — check the most specific first.
+    if (url.includes('/listings/collection/')) return jsonRes(BEST_LISTING_BODY)
+    if (url.includes('/fulfillment_data')) return jsonRes(FULFILLMENT_RESPONSE)
+    if (url.includes('/listings') && url.includes('/orders/')) return jsonRes(LISTING_POST_RESPONSE)
+    if (url.includes('/cancel')) return jsonRes({ success: true })
     if (url.includes('/account/')) return jsonRes(NFT_LIST_BODY)
     if (url.includes('/contract/')) return jsonRes(NFT_DETAIL_BODY)
     if (url.includes('/stats')) return jsonRes(STATS_BODY)
@@ -132,9 +176,14 @@ function build({ env = {}, openseaFetch = mockOpenSeaFetch(), killSwitch = creat
 }
 
 const get = (app, path) => request(app).get(path).set('X-Origin-Auth', ORIGIN_SECRET)
+const post = (app, path, body) => request(app).post(path).set('X-Origin-Auth', ORIGIN_SECRET).send(body)
 
 const LIST_PATH = `/v1/opensea/137/account/${OWNER}/nfts`
 const DETAIL_PATH = `/v1/opensea/137/contract/${CONTRACT}/nfts/1234`
+const FEES_PATH = `/v1/opensea/137/collections/cool-cats/required-fees`
+const PUBLISH_PATH = `/v1/opensea/137/listings`
+const FULFILL_PATH = `/v1/opensea/137/offers/fulfillment`
+const CANCEL_PATH = `/v1/opensea/137/listings/cancel`
 
 // ---- unit: normalize ----------------------------------------------------------------------------
 
@@ -438,9 +487,9 @@ describe('GET /v1/opensea/:chainId/contract/:contract/nfts/:identifier', () => {
   it('caches the composed result as one entry', async () => {
     const { app, openseaFetch } = build()
     await get(app, DETAIL_PATH)
-    expect(openseaFetch.calls.length).toBe(4) // item + collection + stats + offer
+    expect(openseaFetch.calls.length).toBe(5) // item + collection + stats + offer + listing
     await get(app, DETAIL_PATH)
-    expect(openseaFetch.calls.length).toBe(4)
+    expect(openseaFetch.calls.length).toBe(5)
   })
 })
 
@@ -483,5 +532,201 @@ describe('GET /v1/opensea/collections/:slug/stats', () => {
     clock.t += Math.ceil(config.opensea.statsCacheTtlMs / 1000) + 1
     await get(app, '/v1/opensea/collections/cool-cats/stats')
     expect(openseaFetch.calls.length).toBe(2)
+  })
+})
+
+// ===== sell-side write routes (spec 056) =========================================================
+
+describe('opensea client.post (sell-side)', () => {
+  it('sends X-API-KEY + JSON body and does NOT retry on 5xx (publishing is not idempotent)', async () => {
+    const failing = mockOpenSeaFetch()
+    failing.failWith = 500
+    const client = createOpenSeaClient({ baseUrl: 'https://api.opensea.io', apiKey: 'k', fetchImpl: failing })
+    await expect(client.post('/api/v2/orders/matic/seaport/listings', { a: 1 })).rejects.toBeInstanceOf(OpenSeaUnavailableError)
+    expect(failing.calls.length).toBe(1) // single attempt, never retried
+    expect(failing.calls[0].method).toBe('POST')
+    expect(failing.calls[0].headers['x-api-key']).toBe('k')
+    expect(failing.calls[0].body).toEqual({ a: 1 })
+  })
+
+  it('maps a definitive 4xx to OpenSeaRequestError (not retried)', async () => {
+    const rejecting = mockOpenSeaFetch()
+    rejecting.failWith = 400
+    const client = createOpenSeaClient({ baseUrl: 'https://x.invalid', apiKey: 'k', fetchImpl: rejecting })
+    await expect(client.post('/api/v2/anything', {})).rejects.toBeInstanceOf(OpenSeaRequestError)
+    expect(rejecting.calls.length).toBe(1)
+  })
+})
+
+describe('opensea sell-side write routes — cross-cutting', () => {
+  it('are origin-locked', async () => {
+    const { app } = build()
+    expect((await request(app).post(PUBLISH_PATH).send(SIGNED_LISTING)).status).toBe(403)
+  })
+
+  it('refuse when the killswitch is active', async () => {
+    const { app } = build({ killSwitch: createKillSwitch(true) })
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(503)
+    expect(res.body.error.code).toBe('killswitch_active')
+  })
+
+  it('fail closed with 503 collectibles_unconfigured when no API key is set', async () => {
+    const { app, openseaFetch } = build({ env: { OPENSEA_API_KEY: '' } })
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(503)
+    expect(res.body.error.code).toBe('collectibles_unconfigured')
+    expect(openseaFetch.calls.length).toBe(0)
+  })
+
+  it('enforce a SEPARATE write quota, keyed by the seller address (reads unaffected)', async () => {
+    const { app } = build({ env: { OPENSEA_WRITE_QUOTA_PER_ADDRESS: '1', OPENSEA_WRITE_QUOTA_GLOBAL: '50', OPENSEA_QUOTA_PER_ADDRESS: '50' } })
+    expect((await post(app, PUBLISH_PATH, SIGNED_LISTING)).status).toBe(200)
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(429)
+    expect(res.body.error.code).toBe('quota_exceeded')
+    expect(Number(res.headers['retry-after'])).toBeGreaterThan(0)
+    // Reads still work — separate quota instance.
+    expect((await get(app, FEES_PATH)).status).toBe(200)
+  })
+
+  it('soft-fail unsupported chains with 404', async () => {
+    const { app } = build()
+    expect((await post(app, `/v1/opensea/63/listings`, SIGNED_LISTING)).body.error.code).toBe('unsupported_chain')
+  })
+})
+
+describe('GET /v1/opensea/:chainId/collections/:slug/required-fees', () => {
+  it('returns the fee breakdown (marketplace vs royalty), total required bps, and Seaport protocol', async () => {
+    const { app } = build()
+    const res = await get(app, FEES_PATH)
+    expect(res.status).toBe(200)
+    expect(res.body.marketplaceFee).toEqual({ recipient: OPENSEA_FEE_RECIPIENT, basisPoints: 250 })
+    expect(res.body.creatorRoyalty).toEqual({ recipient: ROYALTY_RECIPIENT, basisPoints: 500, required: true })
+    expect(res.body.totalRequiredBasisPoints).toBe(750)
+    expect(res.body.protocolAddress).toBe('0x0000000000000068F116a894984e2DB1123eB395')
+    expect(res.body.conduitKey).toMatch(/^0x[0-9a-f]{64}$/i)
+  })
+
+  it('blocks with 503 when the collection has no usable fee data (client blocks signing, FR-009)', async () => {
+    const openseaFetch = mockOpenSeaFetch({ '/collections/cool-cats': { collection: 'cool-cats', fees: [] } })
+    const { app } = build({ openseaFetch })
+    const res = await get(app, FEES_PATH)
+    expect(res.status).toBe(404) // no fee data -> not_found (client blocks signing)
+  })
+})
+
+describe('POST /v1/opensea/:chainId/listings (publish)', () => {
+  it('forwards the signed order to OpenSea and returns the order hash + referral status', async () => {
+    const { app, openseaFetch } = build()
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(200)
+    expect(res.body.orderHash).toBe(ORDER_HASH)
+    const call = openseaFetch.calls.find((c) => c.url.includes('/listings') && c.method === 'POST')
+    expect(call.body.parameters.offerer).toBe(OWNER)
+    expect(call.body.signature).toBe(SIGNED_LISTING.signature)
+    expect(res.body.referral.appliedAtNoUserCost).toBe(true)
+  })
+
+  it('attaches FairWins as referral beneficiary when configured (no user cost)', async () => {
+    const beneficiary = '0x2222222222222222222222222222222222222222'
+    const { app } = build({ env: { OPENSEA_REFERRAL_ADDRESS: beneficiary } })
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.body.referral.source).toBe('affiliate-listing')
+    expect(res.body.referral.appliedAtNoUserCost).toBe(true)
+  })
+
+  it('rejects a malformed order body before touching the upstream', async () => {
+    const { app, openseaFetch } = build()
+    const res = await post(app, PUBLISH_PATH, { order: { offerer: 'nope' }, signature: '0x11' })
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('invalid_order')
+    expect(openseaFetch.calls.length).toBe(0)
+  })
+
+  it('surfaces the marketplace rejection reason on 4xx (e.g. fee mismatch) as 502', async () => {
+    const openseaFetch = mockOpenSeaFetch({
+      '/listings': () => jsonRes({ errors: ['required consideration items are missing'] }, 400),
+    })
+    const { app } = build({ openseaFetch })
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(502)
+    expect(res.body.error.code).toBe('upstream_rejected')
+    expect(res.body.error.reason).toContain('required consideration')
+  })
+
+  it('does not double-post on a 5xx (no retry)', async () => {
+    const openseaFetch = mockOpenSeaFetch({ '/listings': () => jsonRes({ errors: ['down'] }, 503) })
+    const { app } = build({ openseaFetch })
+    const res = await post(app, PUBLISH_PATH, SIGNED_LISTING)
+    expect(res.status).toBe(503)
+    const posts = openseaFetch.calls.filter((c) => c.url.includes('/listings') && c.method === 'POST')
+    expect(posts.length).toBe(1)
+  })
+})
+
+describe('POST /v1/opensea/:chainId/offers/fulfillment (accept)', () => {
+  it('returns the fulfillment transaction the wallet submits', async () => {
+    const { app } = build()
+    const res = await post(app, FULFILL_PATH, { orderHash: ORDER_HASH, fulfiller: OWNER })
+    expect(res.status).toBe(200)
+    expect(res.body.to).toBe('0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789')
+    expect(res.body.data).toBe('0xdeadbeef')
+    expect(res.body.value).toBe('0')
+    expect(res.body.orderHash).toBe(ORDER_HASH)
+  })
+
+  it('maps a gone/changed offer (upstream 4xx) to 409 offer_changed (FR-007)', async () => {
+    const openseaFetch = mockOpenSeaFetch({ '/fulfillment_data': () => jsonRes({ errors: ['not found'] }, 404) })
+    const { app } = build({ openseaFetch })
+    const res = await post(app, FULFILL_PATH, { orderHash: ORDER_HASH, fulfiller: OWNER })
+    expect(res.status).toBe(409)
+    expect(res.body.error.code).toBe('offer_changed')
+  })
+
+  it('rejects a malformed orderHash', async () => {
+    const { app } = build()
+    const res = await post(app, FULFILL_PATH, { orderHash: '0x123', fulfiller: OWNER })
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('invalid_order')
+  })
+})
+
+describe('POST /v1/opensea/:chainId/listings/cancel', () => {
+  it('uses the gas-free off-chain cancel when the marketplace accepts it', async () => {
+    const { app } = build()
+    const res = await post(app, CANCEL_PATH, { orderHash: ORDER_HASH, offerer: OWNER, signature: '0x11' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ cancelled: true, method: 'offchain' })
+  })
+
+  it('falls back to on-chain (client pays gas) when off-chain cancel is unavailable', async () => {
+    const openseaFetch = mockOpenSeaFetch({ '/cancel': () => jsonRes({ errors: ['cannot cancel offchain'] }, 400) })
+    const { app } = build({ openseaFetch })
+    const res = await post(app, CANCEL_PATH, { orderHash: ORDER_HASH, offerer: OWNER })
+    expect(res.status).toBe(200)
+    expect(res.body.method).toBe('onchain')
+    expect(res.body.protocolAddress).toBe('0x0000000000000068F116a894984e2DB1123eB395')
+  })
+})
+
+describe('attachReferral seam', () => {
+  it('is a no-op (source none) when unconfigured, and never claims a user cost', async () => {
+    const { attachReferral } = await import('../src/opensea/referral.js')
+    const cfg = { opensea: { referralAddress: null, referralAddressByChain: {} } }
+    expect(attachReferral(cfg, { chainId: 137, kind: 'listing' })).toEqual({
+      beneficiary: null,
+      source: 'none',
+      appliedAtNoUserCost: true,
+    })
+  })
+
+  it('prefers a per-chain beneficiary over the global one', async () => {
+    const { attachReferral } = await import('../src/opensea/referral.js')
+    const cfg = {
+      opensea: { referralAddress: '0xaaa', referralAddressByChain: { 137: '0xbbb' } },
+    }
+    expect(attachReferral(cfg, { chainId: 137, kind: 'fulfillment' }).beneficiary).toBe('0xbbb')
+    expect(attachReferral(cfg, { chainId: 1, kind: 'fulfillment' }).beneficiary).toBe('0xaaa')
   })
 })

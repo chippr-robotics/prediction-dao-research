@@ -38,6 +38,11 @@
  *   OPENSEA_QUOTA_PER_ADDRESS  reads/min counted per requested address|contract|slug (default 60)
  *   OPENSEA_QUOTA_GLOBAL       reads/min across all callers (default 300)
  *   OPENSEA_QUOTA_WINDOW_MS    quota window (default 60000)
+ *   OPENSEA_WRITE_QUOTA_PER_ADDRESS  sell-side writes/min per seller address (spec 056; default 20)
+ *   OPENSEA_WRITE_QUOTA_GLOBAL       sell-side writes/min across all callers (default 100)
+ *   OPENSEA_REFERRAL_ADDRESS   FairWins beneficiary of OpenSea's referral/affiliate reward (spec 056,
+ *                              public address; unset => attribution off, a safe default). Never a surcharge.
+ *   OPENSEA_REFERRAL_ADDRESS_<chainId>  per-network referral beneficiary override
  *
  * The gateway NEVER holds the gas key — that is the engine's (Secret-Manager-held) concern.
  */
@@ -254,9 +259,9 @@ export function loadConfig(env = process.env, opts = {}) {
       windowMs: int(env, 'PM_QUOTA_WINDOW_MS', 60_000),
       runwayWarnHrs: int(env, 'PM_RUNWAY_WARN_HRS', 48),
     },
-    // Read-only OpenSea proxy (spec 055 collectibles): optional like the paymaster — no key means
-    // the /v1/opensea/* routes 503 fail-closed and the SPA hides the feature; boot is unaffected
-    // (FR-011: the collectibles surface must never couple to the value paths).
+    // OpenSea proxy (spec 055 read-only + spec 056 sell-side): optional like the paymaster — no key
+    // means the /v1/opensea/* routes 503 fail-closed and the SPA hides the feature; boot is unaffected
+    // (the collectibles surface must never couple to the value paths).
     opensea: {
       apiKey: opt(env, 'OPENSEA_API_KEY', null),
       baseUrl: opt(env, 'OPENSEA_BASE_URL', 'https://api.opensea.io'),
@@ -267,6 +272,27 @@ export function loadConfig(env = process.env, opts = {}) {
       quotaPerAddress: int(env, 'OPENSEA_QUOTA_PER_ADDRESS', 60),
       quotaGlobal: int(env, 'OPENSEA_QUOTA_GLOBAL', 300),
       quotaWindowMs: int(env, 'OPENSEA_QUOTA_WINDOW_MS', 60_000),
+      // Sell-side writes (spec 056): tighter, separate quota so publishing a listing can't drain the
+      // shared key's read budget; keyed by the seller's account address.
+      writeQuotaPerAddress: int(env, 'OPENSEA_WRITE_QUOTA_PER_ADDRESS', 20),
+      writeQuotaGlobal: int(env, 'OPENSEA_WRITE_QUOTA_GLOBAL', 100),
+      // FairWins referral/affiliate beneficiary (spec 056). Public address (validated if set); a
+      // per-chain override wins over the global. Unset => attribution disabled (safe default). This is
+      // OpenSea's own reward, never a FairWins surcharge (FR-013/FR-015).
+      referralAddress: (() => {
+        const a = opt(env, 'OPENSEA_REFERRAL_ADDRESS', null)
+        if (a && !ADDRESS_RE.test(a)) throw new Error(`[relay-gateway] OPENSEA_REFERRAL_ADDRESS is not an address`)
+        return a
+      })(),
+      referralAddressByChain: (() => {
+        const map = {}
+        for (const chainId of [1, 137]) {
+          const a = opt(env, `OPENSEA_REFERRAL_ADDRESS_${chainId}`, null)
+          if (a && !ADDRESS_RE.test(a)) throw new Error(`[relay-gateway] OPENSEA_REFERRAL_ADDRESS_${chainId} is not an address`)
+          if (a) map[chainId] = a
+        }
+        return map
+      })(),
     },
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),

@@ -127,5 +127,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/055-collectibles-portfolio/plan.md
+at specs/056-collectibles-sell-side/plan.md
 <!-- SPECKIT END -->

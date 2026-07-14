@@ -11,43 +11,64 @@
 import express from 'express'
 import { GatewayError } from '../errors.js'
 import { OpenSeaRequestError } from './client.js'
+import { attachReferral } from './referral.js'
+import { seaportProtocol } from './seaport.js'
 import {
   chainSlug,
   isAddress,
   isIdentifier,
   isSlug,
   isCursor,
+  isOrderHash,
   normalizeAccountPage,
   normalizeItemDetail,
   normalizeCollection,
+  normalizeFeeBreakdown,
+  normalizeFulfillment,
+  validateListingBody,
 } from './normalize.js'
 
 /**
+ * @param {object} config          full gateway config (only .opensea is read)
  * @param {{
- *   opensea: {apiKey: string|null, cacheTtlMs: number, statsCacheTtlMs: number},
- * }} config          full gateway config (only .opensea is read)
- * @param {{
- *   client: {get: Function},
+ *   client: {get: Function, post: Function},
  *   cache: {fetchThrough: Function},
  *   quotas: {hit: Function},
+ *   writeQuotas: {hit: Function},   // spec 056 sell-side (separate from read quotas)
  *   killSwitch: {isActive: () => boolean},
  * }} deps
  */
-export function createOpenSeaRouter(config, { client, cache, quotas, killSwitch }) {
+export function createOpenSeaRouter(config, { client, cache, quotas, writeQuotas, killSwitch }) {
   const os = config.opensea
   const router = express.Router()
 
-  /** Shared pre-flight: killswitch, fail-closed key, quota (keyed per contract doc). */
-  function guard(quotaKey) {
+  /** Killswitch + fail-closed key (shared by reads and writes). */
+  function requireLive() {
     if (killSwitch.isActive()) {
       throw new GatewayError(503, 'killswitch_active', 'the gateway is temporarily disabled; try again later')
     }
     if (!os.apiKey) {
       throw new GatewayError(503, 'collectibles_unconfigured', 'collectible data is not configured on this gateway')
     }
+  }
+
+  /** Read pre-flight: live check + read quota (keyed per contract doc). */
+  function guard(quotaKey) {
+    requireLive()
     const q = quotas.hit(quotaKey)
     if (!q.allowed) {
       throw new GatewayError(429, 'quota_exceeded', `${q.scope} collectibles read quota exceeded`, {
+        retryAfterSec: q.retryAfterSec,
+      })
+    }
+  }
+
+  /** Write pre-flight (spec 056): live check + the tighter write quota, keyed by the seller address. */
+  function guardWrite(quotaKey) {
+    requireLive()
+    const q = (writeQuotas ?? quotas).hit(quotaKey)
+    if (!q.allowed) {
+      throw new GatewayError(429, 'quota_exceeded', `${q.scope} collectibles write quota exceeded`, {
         retryAfterSec: q.retryAfterSec,
       })
     }
@@ -75,7 +96,12 @@ export function createOpenSeaRouter(config, { client, cache, quotas, killSwitch 
       if (err.status === 404) {
         return res.status(404).json({ error: { code: 'not_found', reason: 'the marketplace does not know this item' } })
       }
-      return res.status(502).json({ error: { code: 'upstream_rejected', reason: 'the marketplace rejected this request' } })
+      // Surface the marketplace's own rejection reason (e.g. fee mismatch) so the seller can act
+      // (FR-002/FR-010). This is OpenSea's message, not gateway internals.
+      const reason = typeof err.message === 'string' ? err.message.replace(/^opensea rejected request \(\d+\): /, '').slice(0, 200) : ''
+      return res.status(502).json({
+        error: { code: 'upstream_rejected', reason: reason || 'the marketplace rejected this request' },
+      })
     }
     // OpenSeaUnavailableError and anything unexpected: degraded, cache had nothing to serve.
     return res
@@ -131,14 +157,16 @@ export function createOpenSeaRouter(config, { client, cache, quotas, killSwitch 
           const nftBody = await client.get(`/api/v2/chain/${slug}/contract/${contract}/nfts/${identifier}`)
           const collectionSlug = typeof nftBody?.nft?.collection === 'string' ? nftBody.nft.collection : null
           const soft = (p) => p.catch(() => null) // degraded leg -> null field, not a failed sheet
-          const [collectionBody, statsBody, offerBody] = collectionSlug
+          const [collectionBody, statsBody, offerBody, listingBody] = collectionSlug
             ? await Promise.all([
                 soft(client.get(`/api/v2/collections/${collectionSlug}`)),
                 soft(client.get(`/api/v2/collections/${collectionSlug}/stats`)),
                 soft(client.get(`/api/v2/offers/collection/${collectionSlug}/nfts/${identifier}/best`)),
+                // Best listing for the item (spec 056) — drives the Cancel affordance; degrades to null.
+                soft(client.get(`/api/v2/listings/collection/${collectionSlug}/nfts/${identifier}/best`)),
               ])
-            : [null, null, null]
-          const detail = normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody }, chainId)
+            : [null, null, null, null]
+          const detail = normalizeItemDetail({ nftBody, collectionBody, statsBody, offerBody, listingBody }, chainId)
           if (!detail) throw new OpenSeaRequestError(404, 'item not present upstream')
           return detail
         }
@@ -163,6 +191,132 @@ export function createOpenSeaRouter(config, { client, cache, quotas, killSwitch 
         return { slug, floorPrice }
       })
       respond(res, result)
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // ===== sell-side write routes (spec 056) =====================================================
+
+  // ---- GET /v1/opensea/:chainId/collections/:slug/required-fees --------------------------------
+  // The live fee basis (marketplace fee + creator royalty + protocol/conduit) the client bakes into
+  // the order consideration AND shows as net proceeds. Read semantics (cached briefly). A null fee
+  // breakdown -> 503 so the client blocks signing rather than guessing (FR-009).
+  router.get('/v1/opensea/:chainId/collections/:slug/required-fees', async (req, res) => {
+    try {
+      const { slug } = req.params
+      const chainId = Number(req.params.chainId)
+      if (!seaportProtocol(chainId)) throw new GatewayError(404, 'unsupported_chain', 'selling is not available on this network')
+      if (!isSlug(slug)) throw new GatewayError(400, 'invalid_slug', 'collection slug must be lowercase alphanumeric/hyphen')
+      guard(slug)
+
+      const result = await cache.fetchThrough(`fees:${chainId}:${slug}`, os.cacheTtlMs, async () => {
+        const collectionBody = await client.get(`/api/v2/collections/${slug}`)
+        const fees = normalizeFeeBreakdown(collectionBody, chainId, slug)
+        if (!fees) throw new OpenSeaRequestError(404, 'no fee data for collection')
+        return fees
+      })
+      respond(res, result)
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // ---- POST /v1/opensea/:chainId/listings -----------------------------------------------------
+  // Publish a client-signed Seaport listing. Write quota keyed by the seller (offerer). attachReferral
+  // records FairWins as OpenSea's referral beneficiary at no user cost (never a surcharge). NOT retried
+  // on 5xx (client.post) — publishing is not idempotent.
+  router.post('/v1/opensea/:chainId/listings', async (req, res) => {
+    try {
+      const chainId = Number(req.params.chainId)
+      const proto = seaportProtocol(chainId)
+      if (!proto) throw new GatewayError(404, 'unsupported_chain', 'selling is not available on this network')
+      const invalid = validateListingBody(req.body)
+      if (invalid) throw new GatewayError(400, invalid, 'the listing order is malformed')
+      const offerer = req.body.order.offerer
+      guardWrite(offerer.toLowerCase())
+
+      const slug = chainSlug(chainId)
+      const referral = attachReferral(config, { chainId, kind: 'listing' })
+      const upstream = await client.post(`/api/v2/orders/${slug}/seaport/listings`, {
+        parameters: req.body.order,
+        signature: req.body.signature,
+        protocol_address: req.body.protocolAddress || proto.protocolAddress,
+      })
+      res.json({
+        orderHash: upstream?.order?.order_hash ?? upstream?.order_hash ?? null,
+        listing: upstream?.order ?? null,
+        referral: { source: referral.source, appliedAtNoUserCost: referral.appliedAtNoUserCost },
+      })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // ---- POST /v1/opensea/:chainId/offers/fulfillment -------------------------------------------
+  // Return the transaction the seller submits to accept an offer. A best offer that no longer exists
+  // (upstream 4xx) surfaces as 409 offer_changed so the client re-confirms (FR-007).
+  router.post('/v1/opensea/:chainId/offers/fulfillment', async (req, res) => {
+    try {
+      const chainId = Number(req.params.chainId)
+      const proto = seaportProtocol(chainId)
+      if (!proto) throw new GatewayError(404, 'unsupported_chain', 'selling is not available on this network')
+      const { orderHash, fulfiller } = req.body ?? {}
+      if (!isOrderHash(orderHash)) throw new GatewayError(400, 'invalid_order', 'orderHash must be a 32-byte hex hash')
+      if (!isAddress(fulfiller)) throw new GatewayError(400, 'invalid_address', 'fulfiller must be a 0x address')
+      guardWrite(fulfiller.toLowerCase())
+
+      const slug = chainSlug(chainId)
+      let upstream
+      try {
+        upstream = await client.post('/api/v2/offers/fulfillment_data', {
+          offer: { hash: orderHash, chain: slug, protocol_address: proto.protocolAddress },
+          fulfiller: { address: fulfiller },
+        })
+      } catch (e) {
+        // A gone/changed offer is not an outage — ask the client to re-confirm the current best offer.
+        if (e instanceof OpenSeaRequestError) {
+          throw new GatewayError(409, 'offer_changed', 'this offer is no longer available; review the current best offer')
+        }
+        throw e
+      }
+      const fulfillment = normalizeFulfillment(upstream, orderHash)
+      if (!fulfillment) throw new GatewayError(502, 'upstream_rejected', 'the marketplace returned no fulfillment transaction')
+      const referral = attachReferral(config, { chainId, kind: 'fulfillment' })
+      res.json({ ...fulfillment, referral: { source: referral.source, appliedAtNoUserCost: referral.appliedAtNoUserCost } })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // ---- POST /v1/opensea/:chainId/listings/cancel ----------------------------------------------
+  // Prefer OpenSea's gas-free off-chain cancel; if the marketplace can't cancel off-chain, tell the
+  // client to submit an on-chain Seaport cancel (gas disclosed there) — FR-008.
+  router.post('/v1/opensea/:chainId/listings/cancel', async (req, res) => {
+    try {
+      const chainId = Number(req.params.chainId)
+      const proto = seaportProtocol(chainId)
+      if (!proto) throw new GatewayError(404, 'unsupported_chain', 'selling is not available on this network')
+      const { orderHash, offerer } = req.body ?? {}
+      if (!isOrderHash(orderHash)) throw new GatewayError(400, 'invalid_order', 'orderHash must be a 32-byte hex hash')
+      if (!isAddress(offerer)) throw new GatewayError(400, 'invalid_address', 'offerer must be a 0x address')
+      guardWrite(offerer.toLowerCase())
+
+      const slug = chainSlug(chainId)
+      try {
+        await client.post(`/api/v2/orders/chain/${slug}/${proto.protocolAddress}/${orderHash}/cancel`, {
+          offerer,
+          ...(req.body.signature ? { signature: req.body.signature } : {}),
+        })
+        res.json({ cancelled: true, method: 'offchain' })
+      } catch (e) {
+        // Off-chain cancel unavailable for this order -> the client falls back to an on-chain cancel.
+        if (e instanceof OpenSeaRequestError) {
+          res.json({ cancelled: false, method: 'onchain', protocolAddress: proto.protocolAddress })
+          return
+        }
+        throw e
+      }
     } catch (err) {
       handleError(res, err)
     }

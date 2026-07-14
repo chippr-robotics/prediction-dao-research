@@ -7,11 +7,39 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import CollectibleDetailSheet from '../../components/collectibles/CollectibleDetailSheet'
 import { fetchCollectibleDetail } from '../../lib/collectibles/gatewayClient'
+import { useCollectibleSell } from '../../hooks/useCollectibleSell'
+
+const SELLER = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
 vi.mock('../../lib/collectibles/gatewayClient', () => ({
   fetchCollectibleDetail: vi.fn(),
   CollectiblesUnavailable: class CollectiblesUnavailable extends Error {},
 }))
+vi.mock('../../hooks/useWalletManagement', () => ({ useWallet: () => ({ address: SELLER }) }))
+vi.mock('../../hooks/useCollectibleSell', () => ({ useCollectibleSell: vi.fn() }))
+vi.mock('../../components/collectibles/SellConfirm', () => ({
+  default: ({ onClose }) => (
+    <div data-testid="sell-confirm">
+      <button onClick={onClose}>close-sell</button>
+    </div>
+  ),
+}))
+
+const sellState = (over = {}) => ({
+  status: 'ready',
+  reason: null,
+  result: null,
+  canSell: true,
+  unsupportedReason: null,
+  onWrongNetwork: false,
+  loadFees: vi.fn(),
+  preview: vi.fn(),
+  submitListing: vi.fn(),
+  acceptOffer: vi.fn(),
+  cancel: vi.fn(),
+  reset: vi.fn(),
+  ...over,
+})
 
 const ITEM = {
   chainId: 137,
@@ -38,6 +66,8 @@ const DETAIL = {
     floorPrice: { amount: '0.85', currency: 'ETH' },
   },
   bestOffer: { amount: '0.79', currency: 'WETH' },
+  bestOfferHash: '0x' + 'cd'.repeat(32),
+  listing: { orderHash: '0x' + 'ef'.repeat(32), maker: SELLER, price: { amount: '1', currency: 'ETH' } },
   fetchedAt: '2026-07-13T20:00:00Z',
   stale: false,
 }
@@ -45,6 +75,7 @@ const DETAIL = {
 beforeEach(() => {
   vi.clearAllMocks()
   fetchCollectibleDetail.mockResolvedValue(DETAIL)
+  useCollectibleSell.mockReturnValue(sellState())
 })
 
 describe('CollectibleDetailSheet', () => {
@@ -100,13 +131,47 @@ describe('CollectibleDetailSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
-  it('offers no in-app trading affordances — the deep link is the only action (FR-005)', async () => {
+  it('opens the Sell confirmation from the detail sheet (spec 056 US1)', async () => {
+    render(<CollectibleDetailSheet item={ITEM} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /^sell$/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /^sell$/i }))
+    expect(screen.getByTestId('sell-confirm')).toBeInTheDocument()
+  })
+
+  it('accepting the best offer discloses on-chain gas before confirming (FR-006)', async () => {
+    const state = sellState()
+    useCollectibleSell.mockReturnValue(state)
+    render(<CollectibleDetailSheet item={ITEM} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /accept best offer/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /accept best offer/i }))
+    expect(screen.getByText(/you pay gas/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /accept & pay gas/i }))
+    expect(state.acceptOffer).toHaveBeenCalledWith({ orderHash: DETAIL.bestOfferHash })
+  })
+
+  it('shows Cancel only for a listing this wallet owns, and cancels on confirm (spec 056 US3)', async () => {
+    const state = sellState()
+    useCollectibleSell.mockReturnValue(state)
+    render(<CollectibleDetailSheet item={ITEM} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /cancel listing/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /cancel listing/i }))
+    fireEvent.click(screen.getByRole('button', { name: /confirm cancellation/i }))
+    expect(state.cancel).toHaveBeenCalledWith(DETAIL.listing)
+  })
+
+  it('shows an honest reason (never a dead button) when the account type cannot sell (FR-019)', async () => {
+    useCollectibleSell.mockReturnValue(sellState({ canSell: false, unsupportedReason: "Selling isn't available for passkey accounts yet." }))
+    render(<CollectibleDetailSheet item={ITEM} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('note')).toHaveTextContent(/passkey accounts yet/i))
+    expect(screen.queryByRole('button', { name: /^sell$/i })).not.toBeInTheDocument()
+    // The always-available fallback remains.
+    expect(screen.getByRole('link', { name: /view on opensea/i })).toBeInTheDocument()
+  })
+
+  it('never offers a Buy affordance (sell-side only this phase)', async () => {
     render(<CollectibleDetailSheet item={ITEM} onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('0.85 ETH')).toBeInTheDocument())
-    for (const label of [/buy/i, /sell/i, /accept/i, /transfer/i, /make offer/i, /^list/i]) {
-      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
-    }
-    expect(screen.getByText(/happen on OpenSea/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /buy/i })).not.toBeInTheDocument()
   })
 
   it('has no axe violations (FR-014)', async () => {
