@@ -47,6 +47,7 @@ result (FR-002 / SC-004).
 | `POST /v1/engine/webhook` | Engine status callback (shared-secret; maps engine → intent status). |
 | `GET /healthz` | `{status, chains:{<id>:{rpc, gasWalletRunwayHrs}}, killSwitch}` — drives the client's self-submit fallback probe. |
 | `GET /v1/opensea/…` | Read-only collectibles proxy (spec 055; `specs/055-collectibles-portfolio/contracts/gateway-opensea-api.md`): account NFTs, composed item detail, collection floor stats. Origin-locked, killswitch-aware, per-key + global quotas, TTL/single-flight cache with serve-stale (`fetchedAt`/`stale` on every 200). Fails closed (`503 collectibles_unconfigured`) without `OPENSEA_API_KEY`. |
+| `GET /v1/opensea/:chainId/collections/:slug/required-fees`, `POST /v1/opensea/:chainId/{listings, offers/fulfillment, listings/cancel}` | Sell-side write routes (spec 056; `specs/056-collectibles-sell-side/contracts/gateway-sell-api.md`): fetch the live fee basis, publish a client-signed listing, get accept-offer fulfillment data, cancel. Same origin-lock/killswitch/fail-closed; a **separate write quota** keyed by the seller address; writes bypass the cache and are **not retried on 5xx**. Records FairWins as OpenSea's referral beneficiary at no user cost (`OPENSEA_REFERRAL_ADDRESS`) — never a surcharge. |
 
 Validation pipeline (data-model.md): kill switch → parse → chain active → payment-class support
 → target/action allow-list → signer recovery (EIP-712 for `signer-attributed`, EIP-3009
@@ -94,6 +95,8 @@ The intents file is a JSON array of pre-signed bodies (k6 cannot sign; generate 
 | `OPENSEA_BASE_URL` / `OPENSEA_TIMEOUT_MS` / `OPENSEA_RETRIES` | `https://api.opensea.io` / `5000` / `1` | Upstream endpoint + per-request bounds. |
 | `OPENSEA_CACHE_TTL_MS` / `OPENSEA_STATS_CACHE_TTL_MS` | `60000` / `300000` | List/detail vs collection-floor cache TTLs (serve-stale on upstream failure). |
 | `OPENSEA_QUOTA_PER_ADDRESS` / `OPENSEA_QUOTA_GLOBAL` | `60` / `300` | Reads/min per requested address\|contract\|slug, and the global backstop for the shared key. |
+| `OPENSEA_WRITE_QUOTA_PER_ADDRESS` / `OPENSEA_WRITE_QUOTA_GLOBAL` | `20` / `100` | Sell-side writes/min per seller address, and the global backstop (spec 056). |
+| `OPENSEA_REFERRAL_ADDRESS` / `OPENSEA_REFERRAL_ADDRESS_<chainId>` | *(unset = attribution off)* | Public FairWins beneficiary of OpenSea's own referral/affiliate reward (spec 056). Never a surcharge; per-chain override wins. |
 
 ## Phase 1 vs Phase 2 (research.md §3)
 

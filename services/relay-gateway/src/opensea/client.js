@@ -3,8 +3,9 @@
  *
  * Mirrors src/engine/client.js: thin fetch adapter with a bounded timeout, retries on
  * 5xx/transport errors, and an injectable fetchImpl for tests. Auth is OpenSea's
- * X-API-KEY header — the key never leaves this process (FR-009). GET-only by design:
- * this client cannot express a mutation.
+ * X-API-KEY header — the key never leaves this process (FR-009). Reads (`get`) retry on 5xx;
+ * writes (`post`, spec 056) do NOT — publishing an order is not idempotent, so a retry could
+ * double-post a listing.
  */
 
 /** OpenSea unreachable / persistent 5xx / upstream 429 — routes serve stale or 503 upstream_unavailable. */
@@ -72,6 +73,44 @@ export function createOpenSeaClient({ baseUrl, apiKey = null, timeoutMs = 5000, 
       throw lastErr instanceof OpenSeaUnavailableError
         ? lastErr
         : new OpenSeaUnavailableError(`opensea unreachable after ${retries + 1} attempts`, lastErr)
+    },
+
+    /**
+     * POST a JSON body to a v2 path (sell-side; spec 056). NOT retried on 5xx — order publication is
+     * not idempotent, so a single 5xx surfaces as OpenSeaUnavailableError rather than risking a
+     * duplicate order. Definitive 4xx (bad order, fee mismatch) -> OpenSeaRequestError with the reason.
+     * @param {string} path
+     * @param {object} body
+     * @returns {Promise<object>} parsed JSON body
+     */
+    async post(path, body) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        const res = await fetchImpl(`${base}${path}`, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            ...(apiKey ? { 'x-api-key': apiKey } : {}),
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        })
+        if (res.status >= 500 || res.status === 429) {
+          throw new OpenSeaUnavailableError(`opensea returned ${res.status}`)
+        }
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          throw new OpenSeaRequestError(res.status, `opensea rejected request (${res.status}): ${text.slice(0, 200)}`)
+        }
+        return await res.json()
+      } catch (e) {
+        if (e instanceof OpenSeaRequestError || e instanceof OpenSeaUnavailableError) throw e
+        throw new OpenSeaUnavailableError(`opensea unreachable: ${e?.message || e}`, e)
+      } finally {
+        clearTimeout(timer)
+      }
     },
   }
 }
