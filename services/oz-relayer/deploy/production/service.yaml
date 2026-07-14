@@ -18,8 +18,9 @@ spec:
       containers:
         # ---- ingress: FairWins policy gateway (public, port 8788) ----
         - name: gateway
-          # predict-057: adds the /v1/polymarket/* Predict proxy (spec 057) on top of the 055/056 OpenSea routes
-          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:predict-057
+          # predict-058 (main 0c697064, PR #912): adds POST /v1/polymarket/:chainId/builder-sign
+          # (Option A builder attribution) on top of the predict-057 /v1/polymarket/* read proxy.
+          image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway:predict-058
           ports:
             - name: http1
               containerPort: 8788
