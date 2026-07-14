@@ -11,6 +11,8 @@ import { useState } from 'react'
 import EmptyState from '../account/EmptyState'
 import { usePredictMarkets } from '../../hooks/usePredictMarkets'
 import MarketDetailSheet from './MarketDetailSheet'
+import PositionsList from './PositionsList'
+import OpenOrdersList from './OpenOrdersList'
 import './PredictPanel.css'
 
 const POLYMARKET_URL = 'https://polymarket.com'
@@ -118,6 +120,10 @@ export default function PredictPanel() {
           )}
         </>
       )}
+
+      {/* Your positions (US2) + open orders (US3) — each self-hides when disconnected/unsupported/empty. */}
+      <PositionsList />
+      <OpenOrdersList />
 
       <MarketDetailSheet
         key={openMarket ? openMarket.conditionId : 'closed'}

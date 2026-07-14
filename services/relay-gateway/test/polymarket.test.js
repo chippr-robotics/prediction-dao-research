@@ -348,6 +348,15 @@ describe('predict writes', () => {
     expect(res.body.error.code).toBe('price_changed')
   })
 
+  it('submits a SELL order carrying the builder code (US2)', async () => {
+    const { app, polymarketFetch } = build()
+    const res = await post(app, ORDER_PATH, signedOrder({ side: 'SELL' })).expect(200)
+    expect(res.body.builder).toMatchObject({ source: 'attributed', feeBps: 50 })
+    const posted = polymarketFetch.calls.find((c) => c.method === 'POST' && c.url.includes('/order'))
+    expect(posted.body.order.side).toBe('SELL')
+    expect(posted.body.order.builder).toBe(BUILDER_CODE)
+  })
+
   it('cancels an open order', async () => {
     const { app } = build()
     const res = await post(app, CANCEL_PATH, { orderId: '0xorder1', address: TRADER }).expect(200)
