@@ -1,7 +1,12 @@
-# Wager tax/activity report module (spec 016-wager-tax-report)
+# Reporting module (spec 016-wager-tax-report, extended by spec 051)
 
-Frontend-only generation of a user's wager activity / tax report. No backend,
-no contract or subgraph changes. See `specs/016-wager-tax-report/`.
+Frontend-only generation of a user's **FairWins activity report** — a
+downloadable, multichain, multi-use record of on-chain activity across every
+ledger class (wager, transfer, earn, pool, membership). The primary path reads
+the unified activity ledger (spec 051) so the report and the Account tab can
+never disagree; a legacy wager-only path is kept for older callers/tests. No
+backend, no contract or subgraph changes. See `specs/016-wager-tax-report/` and
+`specs/051-unified-activity-ledger/`.
 
 ## Why on-chain receipts (not the subgraph)
 

@@ -44,6 +44,18 @@ describe('TaxReportsPanel (Story 1 + Story 2)', () => {
     await waitFor(() => expect(screen.getByText(/saved reports/i)).toBeInTheDocument())
   })
 
+  it('exports the current month in one click (generates + downloads a PDF)', async () => {
+    const saveAs = vi.fn()
+    render(<TaxReportsPanel hookOptions={hookOptions(saveAs)} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /export current month/i }))
+
+    // The current month-to-date (Jun 2026) covers the fixture activity, so a
+    // report is generated on screen and a single PDF download is triggered.
+    await waitFor(() => expect(saveAs).toHaveBeenCalledTimes(1))
+    expect(screen.getByText(/current month \(jun 2026\)/i)).toBeInTheDocument()
+  })
+
   it('shows a "no activity" empty state for an empty period', async () => {
     render(<TaxReportsPanel hookOptions={hookOptions(vi.fn())} />)
     fireEvent.click(screen.getByLabelText('Last calendar year'))

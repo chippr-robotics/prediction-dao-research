@@ -1,22 +1,26 @@
 /**
- * TaxReportsPanel — the "Tax Reports" tab content in My Account
- * (spec 016-wager-tax-report; contracts/reports-ui.md). Wires the period
- * selector, generation state machine, result/empty/error states, downloads,
- * and the saved-report history together.
+ * TaxReportsPanel — the "Reporting" tab content in My Account
+ * (spec 016-wager-tax-report, extended by spec 051; contracts/reports-ui.md).
+ * Wires the "export current month" quick action, the period selector, the
+ * generation state machine, result/empty/error states, downloads, and the
+ * saved-report history together. Reports cover every activity class the unified
+ * ledger tracks (wager/transfer/earn/pool/membership) on the connected network.
  */
 
 import { useTaxReport, REPORT_STATUS } from '../../hooks/useTaxReport'
+import { PERIOD_KINDS } from '../../utils/reportPeriods'
 import ReportPeriodSelector from './ReportPeriodSelector'
 import ReportHistoryList from './ReportHistoryList'
 
-function Totals({ totals }) {
+function Totals({ totals, showByClass = false }) {
+  const byClass = showByClass && totals.byClass ? Object.values(totals.byClass) : []
   return (
     <div className="report-totals">
-      <h4>Totals</h4>
+      <h4>Totals by token</h4>
       <ul>
         {Object.values(totals.byTicker).map((t) => (
           <li key={t.ticker}>
-            {t.ticker}: net {t.net} ({t.count} transfers) — USD {t.usdValue.toFixed(2)}
+            {t.ticker}: net {t.net} ({t.count} entries) — USD {t.usdValue.toFixed(2)}
           </li>
         ))}
         <li>
@@ -24,6 +28,18 @@ function Totals({ totals }) {
           {totals.overall.feesNativeSymbol}
         </li>
       </ul>
+      {byClass.length > 0 && (
+        <>
+          <h4>Totals by activity type</h4>
+          <ul>
+            {byClass.map((c) => (
+              <li key={c.class}>
+                {c.class}: {c.count} entr{c.count === 1 ? 'y' : 'ies'} — USD {c.usdValue.toFixed(2)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   )
 }
@@ -36,21 +52,34 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
 
   const generating = status === REPORT_STATUS.GENERATING
 
+  // One-click: build the current month-to-date report and download it as a PDF.
+  const exportCurrentMonth = async () => {
+    const built = await generate({ kind: PERIOD_KINDS.CURRENT_MONTH })
+    if (built) downloadPdf(built)
+  }
+
   if (!account) {
     return (
       <div className="tax-reports-section">
-        <p>Connect your wallet to generate a wager activity / tax report.</p>
+        <p>Connect your wallet to generate an activity report.</p>
       </div>
     )
   }
 
   return (
     <div className="tax-reports-section">
-      <h3>Wager activity / tax report</h3>
+      <h3>Reporting</h3>
       <p className="tax-reports-intro">
-        Generate a downloadable record of every wager-related stablecoin transfer for a chosen
-        period. This is an informational record, not tax advice.
+        Generate a downloadable record of your on-chain activity — wagers, transfers, pools, earn,
+        and membership — for a chosen period on the connected network. This is an informational
+        record, not tax advice.
       </p>
+
+      <div className="report-quick-actions">
+        <button type="button" className="report-quick-btn" onClick={exportCurrentMonth} disabled={generating}>
+          Export current month (PDF)
+        </button>
+      </div>
 
       <ReportPeriodSelector onGenerate={generate} disabled={generating} />
 
@@ -90,7 +119,7 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
                   {`Could not refresh: ${report.staleClasses.join(', ')} — entries for these classes may be missing.`}
                 </p>
               )}
-              <Totals totals={report.totals} />
+              <Totals totals={report.totals} showByClass={report.source === 'ledger'} />
             </>
           )}
           <div className="report-download-actions">

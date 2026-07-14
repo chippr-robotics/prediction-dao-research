@@ -25,8 +25,9 @@ import { valueTransfer, PAR_VALUATION_NOTE } from './valuation'
 import { resolveTokenMeta } from './tokenMeta'
 
 export const REPORT_DISCLAIMER =
-  'This is an informational record of your on-chain wager activity, not tax advice. ' +
-  'The platform does not compute tax owed. Consult a qualified professional.'
+  'This is an informational record of your on-chain FairWins activity — wagers, ' +
+  'transfers, pools, earn, and membership — not tax advice. The platform does not ' +
+  'compute tax owed. Consult a qualified professional.'
 
 function eq(a, b) {
   return String(a).toLowerCase() === String(b).toLowerCase()
@@ -41,6 +42,9 @@ function isParty(wager, account) {
  *  Failed entries are listed but NEVER totaled (spec 051 FR-003). */
 function computeTotals(lineItems, nativeSymbol) {
   const byTicker = {}
+  // Collate settled activity by class (wager/transfer/earn/pool/membership) so
+  // the multi-use ledger reads as a per-activity breakdown, not one flat list.
+  const byClass = {}
   let overallUsd = 0
   let overallFees = 0
   let failedCount = 0
@@ -57,6 +61,17 @@ function computeTotals(lineItems, nativeSymbol) {
     else if (it.direction === 'refund') t.refunds += it.amountNumber
     t.usdValue += it.usdValue
     t.count += 1
+
+    const clsKey = it.class || 'wager'
+    const c = (byClass[clsKey] ||= { class: clsKey, count: 0, inUsd: 0, outUsd: 0, usdValue: 0 })
+    c.count += 1
+    c.usdValue += it.usdValue
+    // Ledger entries carry a value direction; wager kinds map onto it so the
+    // in/out split stays meaningful across every class.
+    const inward = it.direction === 'in' || it.direction === 'payout' || it.direction === 'refund'
+    if (inward) c.inUsd += it.usdValue
+    else c.outUsd += it.usdValue
+
     overallUsd += it.usdValue
     if (typeof it.feeNative === 'number') overallFees += it.feeNative
   }
@@ -65,6 +80,7 @@ function computeTotals(lineItems, nativeSymbol) {
   }
   return {
     byTicker,
+    byClass,
     overall: {
       usdValue: overallUsd,
       feesNative: overallFees,

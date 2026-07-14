@@ -118,9 +118,10 @@ export function lineItemToRow(item, report) {
  */
 export function render(report) {
   const preamble = [
-    ['Activity / Tax Report'],
+    ['FairWins Activity Report'],
     ['Account', report.account],
     ['Network', `${report.networkName}${report.isTestnet ? ' (testnet)' : ''}`],
+    ['Chain ID', String(report.chainId ?? '')],
     ['Period', report.period.label],
     ['Generated', new Date(report.generatedAt).toISOString()],
     ['Valuation', report.valuationNote],
@@ -150,6 +151,23 @@ export function render(report) {
       `USD ${t.usdValue.toFixed(2)}`,
     ])
   }
+
+  // Collated per-activity breakdown — the multi-use view the flat table cannot
+  // give (spec 051 classes). Only the ledger path carries real class labels.
+  const byClass = report.totals?.byClass
+  if (report.source === 'ledger' && byClass && Object.keys(byClass).length) {
+    totals.push([], ['Totals by activity type (settled activity only)'])
+    for (const c of Object.values(byClass)) {
+      totals.push([
+        c.class,
+        `entries ${c.count}`,
+        `in USD ${c.inUsd.toFixed(2)}`,
+        `out USD ${c.outUsd.toFixed(2)}`,
+        `USD ${c.usdValue.toFixed(2)}`,
+      ])
+    }
+  }
+
   totals.push([
     'Overall',
     `USD ${report.totals.overall.usdValue.toFixed(2)}`,
@@ -159,9 +177,15 @@ export function render(report) {
   return Papa.unparse([...preamble, ...table, ...totals])
 }
 
-/** Suggested download file name (FR-007). */
+/**
+ * Suggested download file name (FR-007). The unified ledger export is
+ * multi-use, so it names itself by activity, not "wager"; the legacy
+ * wager-only path keeps its historical name for stable tooling.
+ */
 export function fileName(report) {
   const from = new Date(report.period.from).toISOString().slice(0, 10)
   const to = new Date(report.period.to).toISOString().slice(0, 10)
-  return `wager-report_${report.networkName.replace(/\s+/g, '-')}_${from}_${to}.csv`
+  const net = report.networkName.replace(/\s+/g, '-')
+  const stem = report.source === 'ledger' ? 'fairwins-activity' : 'wager-report'
+  return `${stem}_${net}_${from}_${to}.csv`
 }

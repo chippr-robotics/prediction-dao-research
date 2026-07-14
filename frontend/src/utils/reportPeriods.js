@@ -13,6 +13,7 @@
 
 export const PERIOD_KINDS = Object.freeze({
   CUSTOM: 'custom',
+  CURRENT_MONTH: 'current_month',
   LAST_MONTH: 'last_month',
   LAST_QUARTER: 'last_quarter',
   LAST_YEAR: 'last_year',
@@ -55,6 +56,18 @@ export function resolvePreset(kind, nowMs) {
   const m = now.getUTCMonth() // 0-11
 
   switch (kind) {
+    case PERIOD_KINDS.CURRENT_MONTH: {
+      // Month-to-date: the 1st of the current UTC month through "now" (FR-002).
+      // Powers the one-click "Export current month" quick action.
+      const from = Date.UTC(y, m, 1)
+      const to = nowMs
+      return {
+        kind,
+        from,
+        to,
+        label: `Current month (${MONTH_NAMES[m]} ${y})`,
+      }
+    }
     case PERIOD_KINDS.LAST_MONTH: {
       const from = Date.UTC(y, m - 1, 1)
       const to = endOfRange(Date.UTC(y, m, 1))
