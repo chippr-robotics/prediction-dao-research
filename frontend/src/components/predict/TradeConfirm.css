@@ -1,0 +1,166 @@
+/* TradeConfirm (spec 057) — Predict buy/sell confirmation, modal tier (mirrors SellConfirm). */
+
+.trade-confirm-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 2100;
+}
+.trade-confirm-scrim {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+}
+.trade-confirm {
+  background: var(--surface-color, var(--bg-secondary, #fff));
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 14px;
+  color: var(--text-primary, #111827);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 28rem;
+  padding: 1rem 1.1rem 1.2rem;
+  position: relative;
+  width: 100%;
+}
+.trade-confirm:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: -2px;
+}
+.trade-confirm-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.trade-confirm-header h3 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+.trade-confirm-close {
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+}
+
+.trade-confirm-status,
+.trade-confirm-done {
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+.trade-confirm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+.trade-confirm-amount-row {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+.trade-confirm-amount-row input {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  flex: 1;
+  font-size: 1rem;
+  padding: 0.5rem 0.6rem;
+}
+.trade-confirm-price {
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.trade-confirm-breakdown {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding-top: 0.6rem;
+}
+.trade-confirm-breakdown > div {
+  color: var(--text-secondary, #6b7280);
+  display: flex;
+  justify-content: space-between;
+}
+.trade-confirm-breakdown dt,
+.trade-confirm-breakdown dd {
+  margin: 0;
+}
+/* The FairWins builder fee is emphasised, never buried — it is a real cost the member pays. */
+.trade-confirm-builder-line {
+  color: var(--text-primary, #111827) !important;
+  font-weight: 600;
+}
+.trade-confirm-total {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-primary, #111827) !important;
+  font-weight: 700;
+  margin-top: 0.3rem;
+  padding-top: 0.4rem;
+}
+
+.trade-confirm-warn {
+  background: var(--warning-bg, #fef3c7);
+  border-radius: 8px;
+  color: var(--warning-text, #78350f);
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+}
+.trade-confirm-fee-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.trade-confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+.trade-confirm-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+.trade-confirm-submit {
+  background: var(--brand-primary, #36b37e);
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+}
+.trade-confirm-submit:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.trade-confirm-blocked,
+.trade-confirm-error {
+  background: var(--bg-tertiary, #f3f4f6);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+.trade-confirm-blocked p,
+.trade-confirm-error p {
+  margin: 0 0 0.5rem;
+}

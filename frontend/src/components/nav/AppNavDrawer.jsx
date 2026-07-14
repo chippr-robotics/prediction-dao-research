@@ -6,6 +6,7 @@ import Footer from '../Footer'
 import { HOME_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem, visibleNavGroups } from '../../config/appNav'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
+import { predictGatewayUrl } from '../../lib/predict/predictClient'
 import './AppNavDrawer.css'
 
 // Deep-link alias parity with WalletPage (the Swap tab is now "Trade"; the
@@ -56,7 +57,11 @@ export default function AppNavDrawer() {
   const activeId = resolveActiveId(location)
   const { capabilities } = useChainTokens()
   const drawerGroups = useMemo(
-    () => buildDrawerGroups({ collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '' }),
+    () =>
+      buildDrawerGroups({
+        collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '',
+        predict: Boolean(capabilities?.predict) && predictGatewayUrl() !== '',
+      }),
     [capabilities],
   )
 

@@ -36,6 +36,10 @@ export const NAV_GROUPS = [
       // entirely on networks without the capability (FR-007); consumers filter via
       // visibleNavGroups with { collectibles: collectiblesAvailable(chainId) }.
       { id: 'collectibles', label: 'Collect', icon: 'gem' },
+      // Predict (spec 057) — Polymarket prediction-market trading. Like Collect, it HIDES entirely on
+      // networks without the capability (Polygon-only, FR-018); consumers filter via visibleNavGroups
+      // with { predict: capabilities.predict && predictGatewayUrl() !== '' }.
+      { id: 'predict', label: 'Predict', icon: 'predict' },
       { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
       { id: 'custody', label: 'Protect', icon: 'shield' },

@@ -50,6 +50,10 @@ const MERKL_DISTRIBUTOR = '0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae'
 // chains OpenSea serves AND we ship (Ethereum mainnet + Polygon). Everywhere else the capability
 // is false and the Collectibles tab + portfolio line hide entirely (FR-007 soft-fail).
 const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
+// Predict (spec 057): Polymarket prediction-market trading is available ONLY on Polygon (137) —
+// Polymarket runs nowhere else. Everywhere else the capability is false and the Predict tab hides
+// entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
+const PREDICT_CHAIN_IDS = new Set([137])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
@@ -144,6 +148,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -223,6 +228,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -291,6 +297,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -357,6 +364,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -409,6 +417,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -448,6 +457,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -486,6 +496,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -517,6 +528,7 @@ const NETWORKS = {
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),

@@ -30,6 +30,8 @@ import { applyEngineEvent } from './engine/webhook.js'
 import { createOpenSeaClient } from './opensea/client.js'
 import { createTtlCache } from './opensea/cache.js'
 import { createOpenSeaRouter } from './opensea/routes.js'
+import { createPolymarketClient } from './polymarket/client.js'
+import { createPolymarketRouter } from './polymarket/routes.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -550,6 +552,34 @@ export function createApp(config, deps = {}) {
       cache: deps.openseaCache ?? createTtlCache({ now: nowMs }),
       quotas: osQuotas,
       writeQuotas: osWriteQuotas,
+      killSwitch,
+    })
+  )
+
+  // ---- GET/POST /v1/polymarket/* (spec 057 Predict; origin-locked via middleware) -------------
+  // Reads keyed by requested market/address; a separate tighter write quota keyed by the trader
+  // address so submitting an order can't drain the shared Polymarket key's read budget.
+  const pmReadQuotas = createQuotas({
+    signerPerWindow: config.polymarket.quotaPerAddress,
+    globalPerWindow: config.polymarket.quotaGlobal,
+    windowMs: config.polymarket.quotaWindowMs,
+    now: nowMs,
+  })
+  const pmWriteQuotas = createQuotas({
+    signerPerWindow: config.polymarket.writeQuotaPerAddress,
+    globalPerWindow: config.polymarket.writeQuotaGlobal,
+    windowMs: config.polymarket.quotaWindowMs,
+    now: nowMs,
+  })
+  const polymarketClient =
+    deps.polymarketClient ??
+    createPolymarketClient({ ...config.polymarket, now: nowMs, ...(deps.polymarketFetch ? { fetchImpl: deps.polymarketFetch } : {}) })
+  app.use(
+    createPolymarketRouter(config, {
+      client: polymarketClient,
+      cache: deps.polymarketCache ?? createTtlCache({ now: nowMs }),
+      quotas: pmReadQuotas,
+      writeQuotas: pmWriteQuotas,
       killSwitch,
     })
   )

@@ -14,6 +14,7 @@ import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
 import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
+import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
@@ -34,6 +35,7 @@ import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
+import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import './WalletPage.css'
 
@@ -53,6 +55,7 @@ const WALLET_TABS = [
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
   { id: 'collectibles', label: 'Collect' },
+  { id: 'predict', label: 'Predict' },
   { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
@@ -90,6 +93,9 @@ function WalletPage() {
   // Collectibles (spec 055): tab exists only where OpenSea serves the chain AND a gateway
   // proxy is configured — everywhere else it hides and deep links fall back (FR-007).
   const collectiblesEnabled = Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== ''
+  // Predict (spec 057): tab exists only on Polygon (capability) AND with a gateway proxy configured —
+  // everywhere else it hides and deep links fall back (FR-018).
+  const predictEnabled = Boolean(capabilities?.predict) && predictGatewayUrl() !== ''
   const {
     isStandalone: pwaStandalone,
     canPrompt: pwaCanPrompt,
@@ -108,6 +114,7 @@ function WalletPage() {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
     if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
+    if (resolved === 'predict' && !predictEnabled) return 'account'
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -208,9 +215,10 @@ function WalletPage() {
     const requested = searchParams.get('tab')
     const resolved = TAB_ALIASES[requested] || requested
     const known = WALLET_TABS.some((t) => t.id === resolved)
-    const available = resolved !== 'collectibles' || collectiblesEnabled
+    const available =
+      (resolved !== 'collectibles' || collectiblesEnabled) && (resolved !== 'predict' || predictEnabled)
     setActiveTab(known && available ? resolved : 'account')
-  }, [searchParams, collectiblesEnabled])
+  }, [searchParams, collectiblesEnabled, predictEnabled])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -248,7 +256,8 @@ function WalletPage() {
   // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
   const currentSectionGroup = groupForTab(activeTab)
   const sectionNavItems = (currentSectionGroup?.items || []).filter(
-    (item) => item.id !== 'collectibles' || collectiblesEnabled,
+    (item) =>
+      (item.id !== 'collectibles' || collectiblesEnabled) && (item.id !== 'predict' || predictEnabled),
   )
 
   return (
@@ -303,6 +312,12 @@ function WalletPage() {
                 {activeTab === 'collectibles' && collectiblesEnabled && (
                   <div className="collectibles-section" role="tabpanel">
                     <CollectiblesPanel />
+                  </div>
+                )}
+
+                {activeTab === 'predict' && predictEnabled && (
+                  <div className="predict-section" role="tabpanel">
+                    <PredictPanel />
                   </div>
                 )}
 
