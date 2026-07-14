@@ -22,6 +22,7 @@
  * must be confirmed end-to-end first (see tradeSigner.js).
  */
 import { ClobClient, Side, OrderType } from '@polymarket/clob-client'
+import { BuilderConfig } from '@polymarket/builder-signing-sdk'
 
 export const CLOB_HOST = 'https://clob.polymarket.com'
 export const POLYGON = 137
@@ -66,6 +67,24 @@ export async function ensureClobCreds(walletClient, { address, storage = safeSto
   const creds = await boot.createOrDeriveApiKey()
   if (creds?.key && creds?.secret && creds?.passphrase) cacheCreds(addr, creds, storage)
   return creds
+}
+
+/**
+ * Builder attribution config for FairWins revenue (POLY_BUILDER_* headers). The builder creds are a
+ * SHARED secret, so they stay server-side: we point the SDK at the gateway's remote builder-sign endpoint
+ * (it holds the creds and returns the four headers). Returns undefined when no gateway is configured —
+ * trades then post UNATTRIBUTED rather than being blocked (never-stranded, FR-015).
+ * @param {string} gatewayBaseUrl  e.g. VITE_RELAYER_URL (no trailing slash); '' => no attribution
+ * @param {number} [chainId]
+ */
+export function makeBuilderConfig(gatewayBaseUrl, chainId = POLYGON, { BuilderConfigImpl = BuilderConfig } = {}) {
+  const base = String(gatewayBaseUrl || '').trim().replace(/\/$/, '')
+  if (!base) return undefined
+  try {
+    return new BuilderConfigImpl({ remoteBuilderConfig: { url: `${base}/v1/polymarket/${chainId}/builder-sign` } })
+  } catch {
+    return undefined
+  }
 }
 
 /**
