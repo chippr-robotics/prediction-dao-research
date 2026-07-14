@@ -94,7 +94,7 @@
 - [x] T026 [P] [US2] [US3] Passkey ERC-1271 signing coverage in `frontend/src/test/collectibles/sellPasskey.test.jsx`: a passkey seller signs a listing over `replaySafeHash(orderHash)` via the injected `passkeyIntentSigner` deps (mock `readContract`/`replaySafeHash` + assertion), and where the account signature can't be validated the action resolves to the honest-unavailable state (FR-019 / SC-009) — never a failed submit
 - [x] T027 [P] Add the `OPENSEA_REFERRAL_ADDRESS` inline env entry to the gateway container in `services/oz-relayer/deploy/production/service.yaml` (public value, not a secret; alongside `PAYMASTER_ADDRESS_137`) and bump the gateway image tag past `collectibles-055`
 - [x] T028 [P] Update `docs/runbooks/relayer-operations.md`: document the `/v1/opensea/*` write routes, the referral beneficiary provisioning/rotation (public address), write quotas, and the "attribution off when unset" safe default
-- [ ] T029 Run quickstart §1 + §5 gates: full `services/relay-gateway` suite, full `frontend` suite (`--maxWorkers=2` to avoid OOM), and `npm run lint` (frontend) — all green; fix fallout
+- [x] T029 Run quickstart §1 + §5 gates: full `services/relay-gateway` suite, full `frontend` suite (`--maxWorkers=2` to avoid OOM), and `npm run lint` (frontend) — all green; fix fallout
 - [x] T030 Grep-audit per quickstart §4: no marketplace credential in `frontend/` source or `dist/`; the wallet is the only signer on the sell path (no gateway signing key in the write routes); `OPENSEA_REFERRAL_ADDRESS` only in config/manifest, never a secret
 
 ## Dependencies & Execution Order
