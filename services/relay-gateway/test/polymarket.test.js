@@ -156,9 +156,7 @@ const MARKETS_PATH = '/v1/polymarket/137/markets'
 const MARKET_PATH = `/v1/polymarket/137/markets/${CONDITION}`
 const FEE_PATH = `/v1/polymarket/137/fee-rate?token_id=${TOKEN}`
 const POSITIONS_PATH = `/v1/polymarket/137/positions?address=${TRADER}`
-const ORDERS_PATH = `/v1/polymarket/137/orders?address=${TRADER}`
-const ORDER_PATH = '/v1/polymarket/137/order'
-const CANCEL_PATH = '/v1/polymarket/137/order/cancel'
+const BUILDER_SIGN_PATH = '/v1/polymarket/137/builder-sign'
 
 // ---- unit: normalize ----------------------------------------------------------------------------
 
@@ -297,10 +295,11 @@ describe('predict proxy cross-cutting', () => {
     expect(res.body.error.code).toBe('unsupported_chain')
   })
 
-  it('enforces the write quota keyed by trader with Retry-After', async () => {
+  it('enforces the write quota on builder-sign with Retry-After', async () => {
     const { app } = build({ env: { POLYMARKET_WRITE_QUOTA_PER_ADDRESS: '1', POLYMARKET_WRITE_QUOTA_GLOBAL: '100' } })
-    await post(app, ORDER_PATH, signedOrder()).expect(200)
-    const res = await post(app, ORDER_PATH, signedOrder()).expect(429)
+    const sign = () => post(app, BUILDER_SIGN_PATH, { method: 'POST', path: '/order', body: '{}' })
+    await sign().expect(200)
+    const res = await sign().expect(429)
     expect(res.body.error.code).toBe('quota_exceeded')
     expect(res.headers['retry-after']).toBeDefined()
   })
@@ -338,75 +337,47 @@ describe('predict reads', () => {
     expect(res.body).toMatchObject({ feeRateBps: null, builderTakerFeeBps: 50, builderCode: BUILDER_CODE })
   })
 
-  it('reads positions from the public Data API (no auth) and open orders from the CLOB (L2 auth)', async () => {
+  it('reads positions from the public Data API (no auth — the gateway holds no per-user creds)', async () => {
     const { app, polymarketFetch } = build()
     const posRes = await get(app, POSITIONS_PATH).expect(200)
     expect(posRes.body.positions[0]).toMatchObject({ tokenId: TOKEN, outcome: 'Yes' })
-    await get(app, ORDERS_PATH).expect(200)
-    // Positions: public Data API, no POLY auth headers.
+    // Positions: public Data API, no POLY auth headers. (Open orders now run browser->CLOB directly with
+    // each member's OWN L2 creds — no gateway route.)
     const posCall = polymarketFetch.calls.find((c) => c.url.includes('data-api') && c.url.includes('/positions'))
     expect(posCall.headers.POLY_API_KEY).toBeUndefined()
-    // Open orders: CLOB, L2-authed.
-    const ordersCall = polymarketFetch.calls.find((c) => c.url.includes('/data/orders'))
-    expect(ordersCall.headers.POLY_API_KEY).toBe('test-pm-key')
-    expect(ordersCall.headers.POLY_SIGNATURE).toBeDefined()
   })
 })
 
-// ---- writes: order + cancel ---------------------------------------------------------------------
+// ---- builder attribution (POLY_BUILDER_* remote signing) ---------------------------------------
+// Order submit/cancel/open-orders run browser->CLOB directly with each member's OWN derived L2 creds
+// (CLOB V2 binds every order to its signer, so a shared key can't relay other wallets' orders). The
+// gateway only signs the four POLY_BUILDER_* attribution headers from the shared builder creds.
 
-describe('predict writes', () => {
-  it('submits a signed order carrying the builder code and reports the fee', async () => {
-    const { app, polymarketFetch } = build()
-    const res = await post(app, ORDER_PATH, signedOrder()).expect(200)
-    expect(res.body).toMatchObject({ orderId: '0xneworder', builder: { source: 'attributed', feeBps: 50 } })
-    const posted = polymarketFetch.calls.find((c) => c.method === 'POST' && c.url.includes('/order'))
-    expect(posted.body.order.builder).toBe(BUILDER_CODE)
-    expect(posted.headers.POLY_SIGNATURE).toBeDefined()
-  })
+describe('predict builder-sign (attribution)', () => {
+  const signReq = { method: 'POST', path: '/order', body: '{"orderType":"GTC"}' }
 
-  it('still posts (unattributed) when no builder code is configured — never stranded', async () => {
-    const { app } = build({ env: { POLYMARKET_BUILDER_CODE: '' } })
-    const res = await post(app, ORDER_PATH, signedOrder({ builder: ZERO_BYTES32 })).expect(200)
-    expect(res.body.builder).toMatchObject({ source: 'none', feeBps: 0 })
-  })
-
-  it('rejects an order whose builder code was altered', async () => {
+  it('returns the four POLY_BUILDER_* headers for an order request', async () => {
     const { app } = build()
-    const res = await post(app, ORDER_PATH, signedOrder({ builder: ZERO_BYTES32 })).expect(400)
-    expect(res.body.error.code).toBe('builder_mismatch')
+    const res = await post(app, BUILDER_SIGN_PATH, signReq).expect(200)
+    expect(res.body).toMatchObject({ POLY_BUILDER_API_KEY: 'test-pm-key', POLY_BUILDER_PASSPHRASE: 'test-pass' })
+    expect(res.body.POLY_BUILDER_SIGNATURE).toEqual(expect.any(String))
+    expect(res.body.POLY_BUILDER_TIMESTAMP).toEqual(expect.any(String))
   })
 
-  it('does NOT retry a write on 5xx (no double-post)', async () => {
-    const fetchImpl = mockPolymarketFetch()
-    fetchImpl.failWith = 502
-    const { app } = build({ polymarketFetch: fetchImpl })
-    await post(app, ORDER_PATH, signedOrder()).expect(503)
-    const posts = fetchImpl.calls.filter((c) => c.method === 'POST')
-    expect(posts).toHaveLength(1)
-  })
-
-  it('surfaces a price move as 409 price_changed', async () => {
-    const fetchImpl = mockPolymarketFetch({
-      '/order': () => jsonRes({ error: 'order not marketable at price' }, 400),
-    })
-    const { app } = build({ polymarketFetch: fetchImpl })
-    const res = await post(app, ORDER_PATH, signedOrder()).expect(409)
-    expect(res.body.error.code).toBe('price_changed')
-  })
-
-  it('submits a SELL order carrying the builder code (US2)', async () => {
-    const { app, polymarketFetch } = build()
-    const res = await post(app, ORDER_PATH, signedOrder({ side: 'SELL' })).expect(200)
-    expect(res.body.builder).toMatchObject({ source: 'attributed', feeBps: 50 })
-    const posted = polymarketFetch.calls.find((c) => c.method === 'POST' && c.url.includes('/order'))
-    expect(posted.body.order.side).toBe('SELL')
-    expect(posted.body.order.builder).toBe(BUILDER_CODE)
-  })
-
-  it('cancels an open order', async () => {
+  it('rejects a malformed builder-sign request (missing method/path)', async () => {
     const { app } = build()
-    const res = await post(app, CANCEL_PATH, { orderId: '0xorder1', address: TRADER }).expect(200)
-    expect(res.body.cancelled).toBe(true)
+    const res = await post(app, BUILDER_SIGN_PATH, { path: '/order' }).expect(400)
+    expect(res.body.error.code).toBe('invalid_builder_sign')
+  })
+
+  it('503s builder_unconfigured when builder creds are absent — the SPA posts unattributed (never stranded)', async () => {
+    const { app } = build({ env: { POLYMARKET_API_KEY: '', POLYMARKET_API_SECRET: '', POLYMARKET_API_PASSPHRASE: '' } })
+    const res = await post(app, BUILDER_SIGN_PATH, signReq).expect(503)
+    expect(res.body.error.code).toBe('builder_unconfigured')
+  })
+
+  it('honors the killswitch', async () => {
+    const { app } = build({ killSwitch: createKillSwitch(true) })
+    await post(app, BUILDER_SIGN_PATH, signReq).expect(503)
   })
 })

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits } from 'ethers'
 import { usePredictTrade } from '../../hooks/usePredictTrade'
 import { bpsToPct } from '../../lib/predict/builderFee'
+import { polymarketMarketUrl } from '../../lib/predict/geoblock'
 import './TradeConfirm.css'
 
 const POLYMARKET_URL = 'https://polymarket.com'
@@ -34,7 +35,7 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
 
   const sizeValid = Number(amount) > 0 && Number(outcome?.price) > 0
   const canSign = trade.status === 'ready' && sizeValid && quote
-  const busy = trade.status === 'signing' || trade.status === 'submitting'
+  const busy = trade.status === 'signing' || trade.status === 'submitting' || trade.status === 'enabling'
   const builderBps = trade.fee?.builderTakerFeeBps ?? 0
   const isBuy = side === 'BUY'
 
@@ -66,6 +67,24 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
                 Try again
               </button>
             )}
+          </div>
+        )}
+
+        {trade.status === 'geoblocked' && (
+          <div className="trade-confirm-blocked" role="alert">
+            <p>
+              Prediction-market trading isn&apos;t available in your region
+              {trade.geoInfo?.country ? ` (${trade.geoInfo.country})` : ''}. Polymarket sets this restriction,
+              and FairWins respects it. You can still view this market and trade it directly on Polymarket.
+            </p>
+            <a
+              className="trade-confirm-polymarket-link"
+              href={polymarketMarketUrl(market)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Trade on Polymarket ↗
+            </a>
           </div>
         )}
 
@@ -130,6 +149,12 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
               Polymarket also charges its own taker fee, set by the market and applied at execution.
             </p>
 
+            {!trade.tradingEnabled && !busy && (
+              <p className="trade-confirm-fee-note">
+                First trade only: you&apos;ll sign once (no gas) to enable trading on this device, then confirm the order.
+              </p>
+            )}
+
             <div className="trade-confirm-actions">
               <button type="button" className="trade-confirm-cancel" onClick={onClose} disabled={busy}>
                 Cancel
@@ -138,9 +163,13 @@ export default function TradeConfirm({ market, outcome, side = 'BUY', onClose })
                 type="button"
                 className="trade-confirm-submit"
                 disabled={!canSign || busy}
-                onClick={() => trade.submit(params, { builder: trade.fee?.builderCode, negRisk: Boolean(market?.negRisk) })}
+                onClick={() => trade.submit(params, { negRisk: Boolean(market?.negRisk) })}
               >
-                {busy ? 'Submitting…' : `Sign ${isBuy ? 'buy' : 'sell'} (no gas)`}
+                {trade.status === 'enabling'
+                  ? 'Enabling…'
+                  : busy
+                    ? 'Submitting…'
+                    : `Sign ${isBuy ? 'buy' : 'sell'} (no gas)`}
               </button>
             </div>
           </>

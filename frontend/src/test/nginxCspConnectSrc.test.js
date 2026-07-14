@@ -60,6 +60,14 @@ const REQUIRED_EARN_HOSTS = [
   'https://api.merkl.xyz', // Merkl REST — reward balances + claim proofs
 ]
 
+// Predict (spec 057). Authed trading runs CLIENT-DIRECT to the CLOB (CLOB V2 binds each order to its
+// signer, so a shared gateway key can't relay orders), and the region gate hits Polymarket's geoblock API.
+// Without these, order submit/cancel/open-orders and the geoblock check are blocked by CSP.
+const REQUIRED_PREDICT_HOSTS = [
+  'https://clob.polymarket.com', // CLOB — derive creds, submit/cancel orders, open orders
+  'https://polymarket.com', // geoblock API (/api/geoblock) + market deep links
+]
+
 describe('nginx CSP connect-src blockchain RPC allowlist', () => {
   it.each(CONFIGS)('%s allowlists every production RPC endpoint', (path) => {
     const conf = readFileSync(path, 'utf8')
@@ -91,6 +99,13 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
       expect(
         connectSrc,
         `${path} connect-src is missing ${host} — the Earn section's data fetch will be blocked by CSP`,
+      ).toContain(host)
+    }
+
+    for (const host of REQUIRED_PREDICT_HOSTS) {
+      expect(
+        connectSrc,
+        `${path} connect-src is missing ${host} — Predict trading / the region check will be blocked by CSP`,
       ).toContain(host)
     }
 

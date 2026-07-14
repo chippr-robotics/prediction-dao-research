@@ -11,6 +11,7 @@
 import express from 'express'
 import { GatewayError } from '../errors.js'
 import { PolymarketRequestError } from './client.js'
+import { BuilderConfig } from '@polymarket/builder-signing-sdk'
 import { attachBuilderCode } from './builderCode.js'
 import {
   isSupportedChain,
@@ -22,9 +23,6 @@ import {
   normalizeGammaPage,
   normalizeFeeRate,
   normalizePositionsList,
-  normalizeOpenOrdersList,
-  validateOrderBody,
-  validateCancelBody,
 } from './normalize.js'
 
 /**
@@ -44,6 +42,16 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
   const router = express.Router()
 
   const GAMMA_PAGE = 100 // markets fetched per Gamma page (volume-ranked; q filters this set)
+
+  // Builder attribution (spec 057): the shared BUILDER creds (POLYMARKET_API_* — verified valid *builder*
+  // creds, NOT user L2 creds) sign the POLY_BUILDER_* headers server-side so they never reach the browser.
+  // Order submit/cancel/open-orders run browser->CLOB directly with each member's OWN derived L2 creds; the
+  // gateway only signs the attribution headers here. Absent creds => the /builder-sign route 503s and the SPA
+  // posts orders UNATTRIBUTED rather than being blocked (never-stranded, FR-015).
+  const builderConfig =
+    pm.apiKey && pm.apiSecret && pm.apiPassphrase
+      ? new BuilderConfig({ localBuilderCreds: { key: pm.apiKey, secret: pm.apiSecret, passphrase: pm.apiPassphrase } })
+      : null
 
   /** Killswitch + fail-closed key (shared by reads and writes). */
   function requireLive() {
@@ -211,68 +219,31 @@ export function createPolymarketRouter(config, { client, gammaClient, dataClient
     }
   })
 
-  // ---- GET /v1/polymarket/:chainId/orders?address= (open orders) ------------------------------
-  router.get('/v1/polymarket/:chainId/orders', async (req, res) => {
+  // ---- POST /v1/polymarket/:chainId/builder-sign (remote builder-header signing) --------------
+  // Attribution ONLY. Order submit/cancel/open-orders are NOT proxied here — CLOB V2 binds every order to
+  // its signer, so each member submits browser->CLOB directly with their OWN derived L2 creds (the gateway
+  // never sees those). This route just returns the four POLY_BUILDER_* headers the SDK stacks on top for
+  // FairWins attribution, computed from the shared builder creds held only here. Origin-locked (global
+  // middleware) + killswitch + write-quota gated. Contract (SDK remote signer): POST {method,path,body,
+  // timestamp?} -> { POLY_BUILDER_API_KEY, POLY_BUILDER_PASSPHRASE, POLY_BUILDER_SIGNATURE, POLY_BUILDER_TIMESTAMP }.
+  router.post('/v1/polymarket/:chainId/builder-sign', async (req, res) => {
     try {
       requirePolygon(req.params.chainId)
-      const address = typeof req.query.address === 'string' ? req.query.address : ''
-      if (!isAddress(address)) throw new GatewayError(400, 'invalid_address', 'address must be a 0x-prefixed 20-byte hex address')
-      guard(address.toLowerCase())
-
-      const result = await cache.fetchThrough(`orders:${address.toLowerCase()}`, pm.cacheTtlMs, async () => {
-        const body = await client.get('/data/orders', { query: { maker: address }, auth: true })
-        return normalizeOpenOrdersList(body)
-      })
-      respond(res, result)
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // ---- POST /v1/polymarket/:chainId/order -----------------------------------------------------
-  // Submit a client-signed CLOB order. Write quota keyed by the trader (maker). attachBuilderCode
-  // asserts the order carries FairWins' code (or the zero code when unattributed — never stranded,
-  // FR-015). NOT retried on 5xx (client.post) — order submission is not idempotent.
-  router.post('/v1/polymarket/:chainId/order', async (req, res) => {
-    try {
-      requirePolygon(req.params.chainId)
-      const isMaker = Boolean(req.body?.order?.isMaker)
-      const builder = attachBuilderCode(config, { chainId: 137, isMaker })
-      const invalid = validateOrderBody(req.body, builder.source === 'attributed' ? builder.builderCode : null)
-      if (invalid) throw new GatewayError(400, invalid, 'the order is malformed or attribution was altered')
-      const maker = req.body.order.maker
-      guardWrite(maker.toLowerCase())
-
-      let upstream
-      try {
-        upstream = await client.post('/order', { order: req.body.order, signature: req.body.signature })
-      } catch (e) {
-        // A market that moved (price/tick) is not an outage — ask the client to re-confirm (FR-008).
-        if (e instanceof PolymarketRequestError && /price|tick|marketable/i.test(e.message)) {
-          throw new GatewayError(409, 'price_changed', 'the market moved; review the current price and try again')
-        }
-        throw e
+      // Absent builder creds => let the SPA post the order unattributed rather than blocking it (FR-015).
+      if (!builderConfig) throw new GatewayError(503, 'builder_unconfigured', 'builder attribution is not configured on this gateway')
+      guardWrite('builder-sign') // killswitch + fail-closed key + tighter write quota
+      const { method, path, body, timestamp } = req.body || {}
+      if (typeof method !== 'string' || typeof path !== 'string') {
+        throw new GatewayError(400, 'invalid_builder_sign', 'method and path are required')
       }
-      res.json({
-        orderId: upstream?.orderID ?? upstream?.orderId ?? upstream?.id ?? null,
-        status: upstream?.status ?? (upstream?.success ? 'accepted' : null),
-        builder: { source: builder.source, feeBps: builder.feeBps },
-      })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // ---- POST /v1/polymarket/:chainId/order/cancel ----------------------------------------------
-  router.post('/v1/polymarket/:chainId/order/cancel', async (req, res) => {
-    try {
-      requirePolygon(req.params.chainId)
-      const invalid = validateCancelBody(req.body)
-      if (invalid) throw new GatewayError(400, invalid, 'the cancel request is malformed')
-      guardWrite(req.body.address.toLowerCase())
-
-      const upstream = await client.post('/order/cancel', { orderID: req.body.orderId })
-      res.json({ cancelled: upstream?.canceled != null ? Boolean(upstream.canceled) : Boolean(upstream?.success ?? true) })
+      const headers = await builderConfig.generateBuilderHeaders(
+        method,
+        path,
+        typeof body === 'string' ? body : undefined,
+        typeof timestamp === 'number' ? timestamp : undefined,
+      )
+      if (!headers) throw new GatewayError(503, 'builder_unconfigured', 'builder attribution is not available')
+      res.json(headers)
     } catch (err) {
       handleError(res, err)
     }

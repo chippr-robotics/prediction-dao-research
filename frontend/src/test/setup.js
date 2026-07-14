@@ -215,13 +215,19 @@ vi.mock('wagmi', () => ({
   // address fields render without a WagmiProvider/QueryClient in unit tests.
   useEnsAddress: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
   useEnsName: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
-  useWalletClient: vi.fn(() => ({
-    data: {
-      account: { address: '0x1234567890123456789012345678901234567890' },
-      chain: { id: 61 },
-      transport: {}
+  // Real wagmi memoizes `data` (react-query), so the ref is STABLE across renders.
+  // Return a singleton — a fresh object each call would make effects that depend on
+  // walletClient re-fire every render (infinite loop / OOM in hooks like usePredictOpenOrders).
+  useWalletClient: (() => {
+    const result = {
+      data: {
+        account: { address: '0x1234567890123456789012345678901234567890' },
+        chain: { id: 61 },
+        transport: {}
+      }
     }
-  })),
+    return vi.fn(() => result)
+  })(),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
   http: vi.fn(() => ({}))
@@ -231,6 +237,22 @@ vi.mock('wagmi', () => ({
 vi.mock('wagmi/connectors', () => ({
   injected: vi.fn(() => ({ id: 'injected', name: 'MetaMask' })),
   walletConnect: vi.fn(() => ({ id: 'walletConnect', name: 'WalletConnect' }))
+}))
+
+// Predict (spec 057): stub the heavy @polymarket/clob-client. The real one bundles viem+axios and OOMs
+// jsdom workers on import. Unit tests drive the trade hooks through injected clobSession/geoblock deps, so
+// the real SDK is never needed here (it is validated live in Node instead). Note: builder attribution is a
+// self-contained gateway-fetch shim in clobSession.js (no @polymarket/builder-signing-sdk in the frontend —
+// that SDK statically imports node:crypto and can't be bundled for the browser; it is server-only).
+vi.mock('@polymarket/clob-client', () => ({
+  ClobClient: class {
+    async createOrDeriveApiKey() { return { key: 'k', secret: 's', passphrase: 'p' } }
+    async createAndPostOrder() { return { orderID: '0xstub', status: 'matched' } }
+    async cancelOrder() { return { canceled: true } }
+    async getOpenOrders() { return [] }
+  },
+  Side: { BUY: 0, SELL: 1 },
+  OrderType: { GTC: 'GTC', GTD: 'GTD', FOK: 'FOK', FAK: 'FAK' }
 }))
 
 // Mock window.ethereum for Web3 tests

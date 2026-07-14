@@ -316,12 +316,15 @@ export function loadConfig(env = process.env, opts = {}) {
     // (Predict must never couple to the value paths). Polygon-only (Polymarket runs only on 137).
     polymarket: {
       apiKey: opt(env, 'POLYMARKET_API_KEY', null),
-      // L2 HMAC credentials, derived once offline via L1 (POST /auth/api-key) during provisioning and
-      // held as secrets — so the gateway never holds an order-signing key. Reads of public market data
-      // work without them; user-specific reads + order/cancel writes attach L2 headers when present.
+      // FairWins BUILDER credentials (key/secret/passphrase) from the Polymarket builder page — NOT
+      // per-user trading creds. They sign the POLY_BUILDER_* attribution headers at /builder-sign so
+      // orders routed through FairWins credit our builder profile. They CANNOT place orders: CLOB V2
+      // binds every order to its signer, so each member submits browser->CLOB with their OWN derived L2
+      // creds (the gateway never sees those). Absent => /builder-sign 503s and orders post unattributed.
       apiSecret: opt(env, 'POLYMARKET_API_SECRET', null),
       apiPassphrase: opt(env, 'POLYMARKET_API_PASSPHRASE', null),
-      // The operator wallet the API creds belong to (POLY_ADDRESS header); validated if set.
+      // The builder wallet the creds belong to (public); validated if set. Informational only — the
+      // builder HMAC uses key/secret/passphrase, not this address.
       apiAddress: (() => {
         const a = opt(env, 'POLYMARKET_API_ADDRESS', null)
         if (a && !ADDRESS_RE.test(a)) throw new Error(`[relay-gateway] POLYMARKET_API_ADDRESS is not an address`)
