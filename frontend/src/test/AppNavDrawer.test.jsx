@@ -47,7 +47,7 @@ describe('AppNavDrawer (global nav drawer)', () => {
     expect(screen.getByRole('button', { name: 'Trade' })).toBeInTheDocument()
     // Custody is surfaced as "Protect"; Security relocated into Tools.
     expect(screen.getByRole('button', { name: 'Protect' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Security' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Backup & Security' })).toBeInTheDocument()
     // Not a tablist.
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
 
@@ -74,7 +74,7 @@ describe('AppNavDrawer (global nav drawer)', () => {
 
   it('highlights the active section from the URL with aria-current', () => {
     renderDrawer('/wallet?tab=security')
-    expect(screen.getByRole('button', { name: 'Security' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Backup & Security' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Trade' })).not.toHaveAttribute('aria-current')
   })
 

@@ -7,9 +7,9 @@
  * never render while another is active (FR-010). Soft-fail: on unsupported chains or with no
  * gateway configured the hook reports {supported:false} and performs NO fetches (FR-007).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useChainId } from 'wagmi'
-import { useWallet } from './useWalletManagement'
+import { WalletContext } from '../contexts/WalletContext.js'
 import { getCurrentChainId } from '../config/networks'
 import {
   collectiblesAvailable,
@@ -19,7 +19,10 @@ import {
 import { collectionSlugsForValuation } from '../lib/collectibles/valuation'
 
 export function useCollectibles() {
-  const wallet = useWallet() || {}
+  // Tolerant context read (not useWallet, which throws outside a WalletProvider):
+  // this hook runs inside Portfolio for the estimate row and must soft-fail to
+  // "disconnected" wherever no wallet context exists, never take the page down.
+  const wallet = useContext(WalletContext) || {}
   const { address, isConnected } = wallet
   const chainId = useChainId() || getCurrentChainId()
   const supported = collectiblesAvailable(chainId)

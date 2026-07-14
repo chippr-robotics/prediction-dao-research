@@ -62,7 +62,7 @@ function AggregateRow({ aggregate, onOpen }) {
   )
 }
 
-function CategorySection({ group, collapsed, onToggle, onOpen }) {
+function CategorySection({ group, collapsed, onToggle, onOpen, extra }) {
   const { category, aggregates, subtotalUsd } = group
   const regionId = `portfolio-category-${category.id}`
   const expanded = !collapsed
@@ -89,14 +89,19 @@ function CategorySection({ group, collapsed, onToggle, onOpen }) {
         </InfoTip>
       </div>
       <div id={regionId} role="region" aria-label={category.label} hidden={!expanded}>
-        {aggregates.length === 0 ? (
+        {aggregates.length === 0 && !extra ? (
           <p className="portfolio-category-empty">No assets in this category.</p>
         ) : (
-          <ul className="portfolio-rows">
-            {aggregates.map((aggregate) => (
-              <AggregateRow key={aggregate.id} aggregate={aggregate} onOpen={onOpen} />
-            ))}
-          </ul>
+          <>
+            {aggregates.length > 0 && (
+              <ul className="portfolio-rows">
+                {aggregates.map((aggregate) => (
+                  <AggregateRow key={aggregate.id} aggregate={aggregate} onOpen={onOpen} />
+                ))}
+              </ul>
+            )}
+            {extra}
+          </>
         )}
       </div>
     </section>
@@ -104,17 +109,17 @@ function CategorySection({ group, collapsed, onToggle, onOpen }) {
 }
 
 /**
- * Collectibles estimate line (spec 055 US3 / FR-006) — a SEPARATE, labeled row
- * beside the token holdings. Honest-state rules (research D8): the floor-price
- * estimate is NEVER merged into the verifiable totalUsd headline; unpriced items
- * are counted, not silently valued; upstream outages degrade this line without
- * touching token rendering; hidden entirely where the feature is unavailable.
+ * Collectibles estimate row (spec 055 US3 / FR-006) — rendered INSIDE the
+ * "Digital Collectibles" taxonomy section, beside any registry-tracked NFT
+ * holdings. Honest-state rules (research D8): the floor-price estimate is
+ * NEVER merged into the verifiable totalUsd headline or the category
+ * subtotal; unpriced items are counted, not silently valued; upstream outages
+ * degrade this row without touching token rendering; absent entirely where
+ * the feature is unavailable.
  */
-function CollectiblesEstimateSection({ priceMap }) {
+function CollectiblesEstimateRow({ valuationState, priceMap }) {
   const navigate = useNavigate()
-  const { supported, status, items, statsBySlug, bounds, stale } = useCollectiblesValuation()
-
-  if (!supported || status === 'disconnected' || status === 'empty' || status === 'loading') return null
+  const { status, items, statsBySlug, bounds, stale } = valuationState
 
   const valuation = computeCollectiblesValuation(
     items,
@@ -124,7 +129,7 @@ function CollectiblesEstimateSection({ priceMap }) {
   )
 
   return (
-    <section className="portfolio-category portfolio-collectibles" aria-label="Collectibles estimate">
+    <div className="portfolio-collectibles">
       <ul className="portfolio-rows">
         <li className="portfolio-row">
           <button
@@ -161,9 +166,9 @@ function CollectiblesEstimateSection({ priceMap }) {
         </li>
       </ul>
       <p className="portfolio-category-empty">
-        Estimates use collection floor prices and are not included in the total above.
+        Estimates use collection floor prices and are not included in the totals above.
       </p>
-    </section>
+    </div>
   )
 }
 
@@ -177,6 +182,12 @@ function CollectiblesEstimateSection({ priceMap }) {
  */
 export default function PortfolioPanel() {
   const portfolio = usePortfolio()
+  // Decided HERE (not inside the row) so the Digital Collectibles section keeps
+  // its honest "No assets in this category." message when the row is absent.
+  const collectiblesValuation = useCollectiblesValuation()
+  const showCollectiblesRow =
+    collectiblesValuation.supported &&
+    !['disconnected', 'empty', 'loading'].includes(collectiblesValuation.status)
   const [collapsedIds, setCollapsedIds] = useState(() => new Set())
   const [openAggregateId, setOpenAggregateId] = useState(null)
 
@@ -249,10 +260,15 @@ export default function PortfolioPanel() {
           collapsed={collapsedIds.has(group.category.id)}
           onToggle={toggleCategory}
           onOpen={(aggregate) => setOpenAggregateId(aggregate.id)}
+          extra={
+            // OpenSea-tracked collectibles live in the Digital Collectibles
+            // section beside registry-tracked NFT holdings (spec 055 US3).
+            group.category.id === 'digital-collectibles' && showCollectiblesRow ? (
+              <CollectiblesEstimateRow valuationState={collectiblesValuation} priceMap={portfolio.priceMap} />
+            ) : null
+          }
         />
       ))}
-
-      <CollectiblesEstimateSection priceMap={portfolio.priceMap} />
 
       <footer className="portfolio-disclosures">
         {!portfolio.showTestnetAssets && (

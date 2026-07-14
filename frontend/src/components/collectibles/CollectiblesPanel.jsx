@@ -56,10 +56,10 @@ export default function CollectiblesPanel() {
   }, [items, showFlagged])
 
   return (
-    <section className="collectibles-panel" aria-label="Collectibles">
+    <section className="collectibles-panel" aria-label="Collect">
       <div className="collectibles-panel-header">
         <div>
-          <h3>Collectibles</h3>
+          <h3>Collect</h3>
           <p className="collectibles-panel-subtitle">
             Digital collectibles owned by your connected wallet on this network. Display only — trading happens on
             OpenSea.

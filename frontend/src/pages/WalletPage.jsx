@@ -52,7 +52,7 @@ const WALLET_TABS = [
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
-  { id: 'collectibles', label: 'Collectibles' },
+  { id: 'collectibles', label: 'Collect' },
   { id: 'paytransfer', label: 'Pay & Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },

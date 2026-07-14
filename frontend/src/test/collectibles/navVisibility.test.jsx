@@ -9,7 +9,7 @@ describe('appNav — collectibles item', () => {
   it('lives in the Finance group with the shared icon set', () => {
     const finance = NAV_GROUPS.find((g) => g.label === 'Finance')
     const item = finance.items.find((i) => i.id === 'collectibles')
-    expect(item).toMatchObject({ id: 'collectibles', label: 'Collectibles', icon: 'gem' })
+    expect(item).toMatchObject({ id: 'collectibles', label: 'Collect', icon: 'gem' })
     expect(groupForTab('collectibles')?.label).toBe('Finance')
   })
 })
