@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ethers } from 'ethers'
+import { useSwitchChain } from 'wagmi'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
 import { useWallet } from '../../hooks/useWalletManagement'
@@ -111,12 +112,25 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   const { screenOne } = useAddressScreening()
   // Spec 041/050: a passkey smart-account session has no ethers signer — its writes go through `sendCalls`
   // (one sponsored ERC-4337 UserOp) instead of `signer`. `loginMethod` picks the rail.
-  const { sendCalls, loginMethod } = useWallet()
+  // `chainId` here is the CONNECTED wallet's chain — `chainId` (the prop) is the DAO's own network, which may
+  // differ now that ClearPath lists DAOs across every network at once (network-agnostic). A write can only be
+  // signed on the connected chain, so every action below is gated on the two matching.
+  const { chainId: connectedChainId, sendCalls, loginMethod } = useWallet()
   const isPasskey = loginMethod === 'passkey'
+  const { switchChainAsync, isPending: switching } = useSwitchChain()
+  const onConnectedChain = Number(chainId) === Number(connectedChainId)
   // Spec 043 (US3, FR-022a): acting on a DAO while operating as a vault becomes a threshold-gated vault proposal.
   const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
   const net = getNetwork(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
+
+  const handleSwitch = useCallback(async () => {
+    try {
+      await switchChainAsync({ chainId })
+    } catch (e) {
+      showNotification(e?.shortMessage || e?.message || 'Could not switch network.', 'error')
+    }
+  }, [switchChainAsync, chainId, showNotification])
 
   // Resolve the per-framework connector. A registry entry may carry a coarse framework and a device-local entry
   // the detected one; if it's absent/unknown, detect it live. Fall back to the OZ connector (framework 0) while
@@ -238,6 +252,13 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
       showNotification('Connect a wallet to act on this DAO.', 'warning')
       return false
     }
+    // A write can only be signed on the DAO's own chain — the UI already gates the buttons behind a "Switch to
+    // X" prompt, but a passkey session's `sendCalls` targets the wallet's account on whatever chain it's on, so
+    // this is checked again here as the last line of defense (never send a signed action to the wrong network).
+    if (!onConnectedChain) {
+      showNotification(`Switch your wallet to ${net?.name || 'this DAO’s network'} to act on this DAO.`, 'warning')
+      return false
+    }
     // Sanctions posture (FR-013, spec 042): screen the connected signer where a platform sanctions source exists.
     // A confirmed `restricted` result (only possible where a SanctionsGuard is deployed) blocks the action,
     // fail-closed. `uncertain` (no source on this network, e.g. Ethereum mainnet, or an unreadable guard) does
@@ -317,6 +338,14 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
           Tracked on {net?.name || 'this network'}. ClearPath holds no authority over this DAO — it reads its
           on-chain state and (where your wallet is authorized by the DAO's own rules) lets you act on it, signed by you.
         </p>
+        {!onConnectedChain && (
+          <div className="cp-notice" role="status" style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span>Your wallet is on a different network — switch to {net?.name || 'this DAO’s network'} to vote, queue, execute, or propose.</span>
+            <button type="button" className="cp-btn cp-btn-primary" onClick={handleSwitch} disabled={switching}>
+              {switching ? 'Switching…' : `Switch to ${net?.name || 'this network'}`}
+            </button>
+          </div>
+        )}
       </div>
 
       {sumLoading && <div className="cp-notice" role="status">Reading live DAO state…</div>}
@@ -373,23 +402,31 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
           Actions are signed by your wallet and gated by the DAO's own rules.
         </p>
 
-        <ProposalBuilder
-          record={record}
-          connector={connector}
-          signer={signer}
-          reader={reader}
-          account={account}
-          usdcAddress={usdcAddress}
-          nativeSymbol={net?.nativeCurrency?.symbol}
-          treasuries={treasuries}
-          fundingSources={treasuries
-            .filter((t) => t.funding)
-            .map((t) => ({ executor: t.funding.executor, label: t.label, address: t.address, native: t.native }))}
-          proposals={props.proposals}
-          run={run}
-          busy={busy}
-          onSubmitted={loadProposals}
-        />
+        {onConnectedChain ? (
+          <ProposalBuilder
+            record={record}
+            connector={connector}
+            signer={signer}
+            reader={reader}
+            account={account}
+            usdcAddress={usdcAddress}
+            nativeSymbol={net?.nativeCurrency?.symbol}
+            treasuries={treasuries}
+            fundingSources={treasuries
+              .filter((t) => t.funding)
+              .map((t) => ({ executor: t.funding.executor, label: t.label, address: t.address, native: t.native }))}
+            proposals={props.proposals}
+            run={run}
+            busy={busy}
+            onSubmitted={loadProposals}
+          />
+        ) : (
+          <div style={{ marginBottom: '0.8rem' }}>
+            <button type="button" className="cp-btn cp-btn-primary" onClick={handleSwitch} disabled={switching}>
+              {switching ? 'Switching…' : `Switch to ${net?.name || 'this network'} to propose`}
+            </button>
+          </div>
+        )}
 
         {propsLoading && <div className="cp-notice" role="status">Indexing proposals on-chain…</div>}
         {!propsLoading && !props.ok && (
@@ -457,19 +494,19 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
               <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
                 {canVote && (
                   <>
-                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Vote For', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.For }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For)))}>Vote For</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Against', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Against }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against)))}>Against</button>
-                    <button type="button" className="cp-btn" disabled={busy} onClick={() => run('Vote Abstain', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Abstain }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain)))}>Abstain</button>
+                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote For', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.For }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For)))}>Vote For</button>
+                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Against', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Against }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against)))}>Against</button>
+                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Abstain', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Abstain }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain)))}>Abstain</button>
                   </>
                 )}
-                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy} onClick={() => run('Queue', managedTx('queue', { p }, () => connector.queue(signer, record.dao, p)))}>Queue</button>}
+                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to queue`} onClick={() => run('Queue', managedTx('queue', { p }, () => connector.queue(signer, record.dao, p)))}>Queue</button>}
                 {p.state === 5 && (
                   <button
                     type="button"
                     className="cp-btn cp-btn-primary"
-                    disabled={busy || !executeReady}
-                    aria-disabled={busy || !executeReady}
-                    title={executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
+                    disabled={busy || !executeReady || !onConnectedChain}
+                    aria-disabled={busy || !executeReady || !onConnectedChain}
+                    title={!onConnectedChain ? `Switch to ${net?.name || 'this network'} to execute` : executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
                     onClick={() => run('Execute', managedTx('execute', { p }, () => connector.execute(signer, record.dao, p)))}
                   >
                     Execute

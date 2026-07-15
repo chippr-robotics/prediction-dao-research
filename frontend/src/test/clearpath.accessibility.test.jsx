@@ -6,14 +6,23 @@ import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 // Spec 030 (T057) — axe accessibility (WCAG 2.1 AA) over the ClearPath module surfaces. Picked up by the gating
 // CI step `npm test -- --run accessibility.test`.
 
+const STABLE_READER = {} // must be referentially stable across renders — see useClearPath's cachedReadProvider
 const cp = {
   isSupported: true,
   chainId: 63,
-  reader: {},
+  chainIds: [63],
+  hasRegistryFor: () => true,
+  reader: STABLE_READER,
+  readerFor: () => STABLE_READER,
+  signer: {},
   account: '0xabc',
   isConnected: true,
+  readRoute: 'public',
+  setReadRoute: vi.fn(),
   listExternalDAOs: vi.fn(),
   registerExternalDAO: vi.fn(),
+  trackDAO: vi.fn(),
+  untrackDAO: vi.fn(),
 }
 vi.mock('../components/clearpath/useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
@@ -46,7 +55,7 @@ describe('ClearPath accessibility (WCAG 2.1 AA)', () => {
     vi.clearAllMocks()
     cp.isSupported = true
     cp.listExternalDAOs.mockResolvedValue([
-      { id: 1, dao: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000 },
+      { id: 1, dao: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000, chainId: 63, networkName: 'Ethereum Classic Mordor' },
     ])
   })
 

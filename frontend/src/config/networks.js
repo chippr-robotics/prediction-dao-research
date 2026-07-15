@@ -646,6 +646,21 @@ export function getSelectableNetworks() {
 }
 
 /**
+ * Every network where ClearPath (DAO governance) is available, mainnets first — mirrors
+ * `getPortfolioChainIds()` so the ClearPath panel can list known/tracked DAOs across every
+ * capable network in parallel (network-agnostic), independent of which chain the wallet is
+ * currently connected to. Only WRITE actions (register/vote/queue/execute) require the wallet
+ * to actually be on a given DAO's chain.
+ */
+export function getClearPathChainIds() {
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net?.capabilities?.clearpath)
+    .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
+    .map((net) => net.chainId)
+}
+
+/**
  * Pair of (testnet, mainnet) chain IDs used by the Testnet/Mainnet toggle.
  * Surfaced as a helper so UI code doesn't have to know the numeric values.
  */

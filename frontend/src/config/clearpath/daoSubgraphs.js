@@ -17,6 +17,16 @@ export function gatewayUrl(subgraphId) {
   return `https://gateway.thegraph.com/api/${GRAPH_KEY}/subgraphs/id/${subgraphId}`
 }
 
+// Researched for the two seeded mainnet DAOs (knownDaos.js) — deliberately left EMPTY, not guessed:
+//  - ENS Governor (0x323A76393544d5ecca80cd6ef2A560C6a395b7E3): Messari published an OZ-Governor-schema
+//    subgraph ("ens-governance") announced at https://discuss.ens.domains/t/new-ens-governance-subgraph-live/13898,
+//    but only ever on the now-deprecated hosted service (api.thegraph.com/subgraphs/name/...) — that host no
+//    longer serves live queries and no decentralized-network (gateway) subgraph id for it could be confirmed.
+//  - Uniswap Governor Bravo (0x408ED6354d4973f66138C91495F2f2FCbd8724C3): community subgraphs found
+//    (messari/uniswap-governance, arr00/uniswap-governance-v2) are unmaintained/hosted-service-only, and most
+//    target the older GovernorAlpha contract rather than this Bravo deployment.
+// Re-check https://thegraph.com/explorer for a live, actively-synced entry before adding an id here — a wrong
+// id is worse than no id (the router falls back to the on-chain live scan either way, never fabricates rows).
 /** @type {Record<number, Record<string, {subgraphId: string, idKind?: string}>>} */
 export const DAO_SUBGRAPHS = {
   // 1: { '0x…ens governor': { subgraphId: '…' }, '0x…uniswap governor': { subgraphId: '…' } },

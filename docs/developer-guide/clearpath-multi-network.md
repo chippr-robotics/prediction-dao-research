@@ -1,10 +1,15 @@
 # ClearPath: network-agnostic multi-network DAOs
 
 ClearPath (spec 030) is the platform's DAO governance module — a registry, dashboard, and
-action-router embedded as a My Account tab. Spec **042** made it **network-agnostic**: it can
-discover, track, and (where authorized) act on governance DAOs on chains beyond the app's wager
-networks — starting with **Ethereum mainnet** (ENS, Uniswap), with Base/Arbitrum/Optimism as
-config-only follow-ons.
+action-router embedded as a My Account tab. Spec **042** opened it to chains beyond the app's
+wager networks — starting with **Ethereum mainnet** (ENS, Uniswap), with Base/Arbitrum/Optimism
+as config-only follow-ons. A network-agnostic-listing follow-up (mirroring the cross-chain
+Portfolio pattern, `usePortfolio.js`) then made the **panel itself** network-agnostic: it lists
+known/tracked DAOs from **every** `clearpath`-capable network **at once**, over each network's own
+read provider, independent of the wallet's currently connected chain. A member only needs to
+switch networks when they take a **write** action (register, track-on-a-registry-network, vote,
+queue, execute, propose) — the same "Switch to X" pattern `TransferForm.jsx` uses for portfolio
+assets on another chain.
 
 This is a **frontend-only** capability: there is **no new or changed on-chain contract**. The
 existing `ExternalDAORegistry` remains deployed only where it already is (Mordor); everywhere
@@ -22,20 +27,33 @@ self-disclose as unavailable (`networkCapabilities.js` exposes a `clearpath` fea
 **Adding a network is pure config** — declare the entry (RPC, USDC, explorer) and set
 `clearpath: true`.
 
-### 2. Registry-optional tracking
+### 2. Registry-optional tracking, aggregated across every network
 
 ClearPath availability is **capability-driven, not registry-gated**:
-`useClearPath().isSupported = capabilities.clearpath && !!reader`. The on-chain
-`ExternalDAORegistry` is an **optional shared-discovery overlay** used where deployed. On a
-registry-less network a member tracks a DAO by address into a **device-local** store
-(`trackedDaoStore.js`, `localStorage` keyed by `chainId + wallet` — no backend, no cross-device
-sync in this cut). `listExternalDAOs()` merges, de-duplicated and strictly network-scoped:
+`useClearPath().isSupported = capabilities.clearpath && !!reader` (this reflects the *connected*
+chain — it gates write actions, not what's listed). The on-chain `ExternalDAORegistry` is an
+**optional shared-discovery overlay** used where deployed. On a registry-less network a member
+tracks a DAO by address into a **device-local** store (`trackedDaoStore.js`, `localStorage` keyed
+by `chainId + wallet` — no backend, no cross-device sync in this cut).
+
+`useClearPath().listExternalDAOs()` scans **every** `clearpath`-capable chain in parallel
+(`getClearPathChainIds()` in `config/networks.js`, mirroring `getPortfolioChainIds()`) via
+`Promise.allSettled` — an unreachable RPC on one chain degrades that chain honestly without
+blanking the others. For each chain it merges, de-duplicated and still strictly scoped to that one
+chain:
 
 ```
-on-chain registry entries  (iff a registry is deployed)
-+ device-local tracked DAOs (per chainId + wallet)
-+ curated known DAOs        (config/clearpath/knownDaos.js — ENS, Uniswap on mainnet)
+on-chain registry entries  (iff a registry is deployed on THAT chain)
++ device-local tracked DAOs (per chainId + wallet, on THAT chain)
++ curated known DAOs        (config/clearpath/knownDaos.js, on THAT chain)
 ```
+
+Every returned row carries its own `chainId`/`networkName`, badged in `ClearPathPanel.jsx`.
+Tracking (device-local) works on any chain regardless of the connected one — no tx, no switch.
+**Registering** on a registry network, and every **Governor action** (vote/queue/execute/propose in
+`ExternalDaoView.jsx`), can only be signed on that DAO's own chain: those surfaces compare
+`chainId` (the DAO's) against the connected chain and show a **"Switch to X"** button
+(`wagmi`'s `useSwitchChain().switchChainAsync`) in place of the action when they differ.
 
 ### 3. Pluggable per-framework connectors
 
@@ -65,8 +83,10 @@ is always signed by the connected wallet.
 
 ## Honesty, scoping & sanctions (unchanged invariants)
 
-- **Network-scoped**: every store, list, and read is keyed by `chainId` (tracked list also by
-  wallet) — nothing crosses networks.
+- **Network-scoped data, network-agnostic view**: every store and read is still keyed by `chainId`
+  (tracked list also by wallet) — a DAO tracked on one chain never leaks into another's scope. The
+  panel aggregates those per-chain scopes into one list for browsing; it never merges DAOs or
+  balances *across* chains the way a token portfolio would.
 - **Non-custodial**: ClearPath constructs actions the member signs against the DAO's own
   contract; it holds no keys, roles, or funds.
 - **Sanctions (FR-013)**: the action path screens the connected signer; a confirmed `restricted`
@@ -80,7 +100,12 @@ is always signed by the connected wallet.
   and a usable `rpcUrl` (+ USDC for treasury reads). Optionally seed known DAOs and subgraphs.
 - **New known DAO**: add `{ address, framework, label }` to `config/clearpath/knownDaos.js` —
   **verify the address on-chain first** (probe `COUNTING_MODE` for OZ, or
-  `proposalCount`+`quorumVotes` for Bravo); never guess.
+  `proposalCount`+`quorumVotes` for Bravo); never guess. Optionally add its governance subgraph id
+  to `daoSubgraphs.js` — but only a **verified, currently-synced** entry on The Graph's
+  decentralized-network gateway (`thegraph.com/explorer`); the ENS/Uniswap entries are
+  deliberately left empty today because no such live id could be confirmed (see the comment in
+  that file) — a wrong id is worse than none, since the router just falls back to the on-chain
+  live scan either way.
 - **New framework**: add `connectors/<framework>.js` implementing the interface and register it
   in `connectors/index.js#ORDERED`.
 
