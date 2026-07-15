@@ -34,6 +34,8 @@
   cursor: pointer;
   flex: none;
   height: 24px;
+  min-height: 24px;
+  min-width: 44px;
   padding: 0;
   position: relative;
   transition: background 0.15s ease;
