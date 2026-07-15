@@ -18,11 +18,13 @@ const h = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: h.showNotification }) }))
-// The view now reads sendCalls/loginMethod from useWallet (passkey rail); these tests drive the
-// classic signer-prop path, so return a non-passkey session.
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
-}))
+// The view now reads sendCalls/loginMethod/chainId from useWallet (passkey rail + switch-to-act gating); these
+// tests drive the classic signer-prop path on the SAME chain as the DAO (63, matching renderView below) by
+// default — a `mockReturnValue` override lets one test move the wallet to a different chain.
+const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
+vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: (...a) => useWalletMock(...a) }))
+const switchChainAsync = vi.fn().mockResolvedValue({})
+vi.mock('wagmi', () => ({ useSwitchChain: () => ({ switchChainAsync, isPending: false }) }))
 vi.mock('../governorConnector', () => ({
   readGovernorSummary: (...a) => h.readGovernorSummary(...a),
   readTreasuries: (...a) => h.readTreasuries(...a),
@@ -96,6 +98,7 @@ function renderView(signer, account = '0x0000000000000000000000000000000000000Ac
 describe('ExternalDaoView notifications (spec 030 / US5)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 })
     h.screenStatus = 'clear'
     h.readGovernorSummary.mockResolvedValue({
       name: 'OlympiaGovernor', tokenAddr: '0x0000000000000000000000000000000000000111', tokenName: 'Olympia Member',
@@ -163,5 +166,24 @@ describe('ExternalDaoView notifications (spec 030 / US5)', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /vote for/i })).not.toBeDisabled())
     expect(h.showNotification).not.toHaveBeenCalledWith(expect.stringContaining('confirmed'), 'success')
     expect(h.showNotification).not.toHaveBeenCalledWith(expect.stringContaining('failed'), 'error')
+  })
+
+  it('network-agnostic follow-up: disables voting and offers a switch prompt when the wallet is on a different chain than the DAO', async () => {
+    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 }) // DAO is on 63 (renderView)
+    const user = userEvent.setup()
+    renderView({})
+    const voteFor = await screen.findByRole('button', { name: /vote for/i })
+    expect(voteFor).toBeDisabled()
+    expect(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i })).toBeInTheDocument()
+    await user.click(voteFor)
+    expect(h.castVote).not.toHaveBeenCalled()
+  })
+
+  it('network-agnostic follow-up: the switch button calls switchChainAsync with the DAO’s own chain', async () => {
+    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 })
+    const user = userEvent.setup()
+    renderView({})
+    await user.click(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i }))
+    expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 63 })
   })
 })

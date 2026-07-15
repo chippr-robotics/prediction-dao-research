@@ -3,15 +3,26 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ClearPathPanel from '../ClearPathPanel'
 
-// Spec 030 (US3) — the ClearPath panel: lists external DAOs from the on-chain registry, opens a live tracking
-// view (Olympia), registers a new DAO, and self-disables truthfully on unsupported networks. No mock data in
-// the product — the tests mock the hook/connector to drive the components deterministically.
+// Spec 030/042 + network-agnostic follow-up — the ClearPath panel: lists external DAOs across every supported
+// network at once, opens a live tracking view (Olympia), registers/tracks a new DAO on a chosen network, and
+// shows a non-blocking switch prompt when the wallet isn't on a ClearPath-capable network (the list itself
+// never disables). No mock data in the product — the tests mock the hook/connector to drive the components
+// deterministically.
 
+const switchChainAsync = vi.fn().mockResolvedValue({})
+vi.mock('wagmi', () => ({ useSwitchChain: () => ({ switchChainAsync, isPending: false }) }))
+
+// A stable reader instance — `readerFor` must return the SAME reference across renders (like the real hook's
+// cached provider), or an effect keyed on `reader` identity re-fires every render and loops forever.
+const STABLE_READER = {}
 const cp = {
   isSupported: true,
-  hasRegistry: true,
   chainId: 63,
-  reader: {},
+  chainIds: [63],
+  hasRegistryFor: (id) => Number(id) === 63,
+  reader: STABLE_READER,
+  readerFor: () => STABLE_READER,
+  signer: {},
   account: '0xabc',
   isConnected: true,
   readRoute: 'public',
@@ -23,11 +34,11 @@ const cp = {
 }
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
-// ExternalDaoView (rendered within) now reads sendCalls/loginMethod from useWallet (passkey rail);
-// these tests drive the classic signer-prop path, so return a non-passkey session.
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
-}))
+// ExternalDaoView (rendered within) now reads sendCalls/loginMethod/chainId from useWallet (passkey rail +
+// switch-to-act gating); these tests drive the classic signer-prop path on the SAME chain as the DAO (63) by
+// default — a `mockReturnValue` override lets one test move the wallet to a different chain.
+const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
+vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: (...a) => useWalletMock(...a) }))
 
 const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn(), detectTreasuryFunding: vi.fn() }
 vi.mock('../governorConnector', () => ({
@@ -87,6 +98,7 @@ vi.mock('../../../config/networks', () => ({
     nativeCurrency: { symbol: 'ETC' },
   }),
 }))
+vi.mock('../../../config/contracts', () => ({ getContractAddressForChain: () => null }))
 
 // CpAddressField (governor/recipient inputs) pulls in AddressBookButton → useWallet, which throws without a
 // WalletProvider. Stub the wallet-scoped hooks so register + tracking views render the real fields in tests.
@@ -94,12 +106,15 @@ vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ searc
 vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve('clear') }) }))
 
 const OLYMPIA = '0xB85dbc899472756470EF4033b9637ff8fa2FD23D'
-const olympiaRecord = { id: 1, dao: OLYMPIA, framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000 }
+const olympiaRecord = { id: 1, dao: OLYMPIA, framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000, chainId: 63, networkName: 'Ethereum Classic Mordor' }
 
-describe('ClearPathPanel (spec 030 / US3)', () => {
+describe('ClearPathPanel (spec 030/042, network-agnostic)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     cp.isSupported = true
+    cp.chainId = 63
+    cp.chainIds = [63]
+    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 })
     cp.listExternalDAOs.mockResolvedValue([olympiaRecord])
     conn.readGovernorSummary.mockResolvedValue({ clockMode: 'mode=blocknumber' })
     conn.fetchGovernorProposals.mockResolvedValue({ ok: true, proposals: [], scannedFrom: 16000000, scannedTo: 16500000, partial: false })
@@ -109,16 +124,18 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     conn.detectTreasuryFunding.mockResolvedValue(null)
   })
 
-  it('self-disables truthfully on an unsupported network', async () => {
+  it('shows a non-blocking switch notice on an unsupported network, but still lists DAOs from every network', async () => {
     cp.isSupported = false
     render(<ClearPathPanel />)
-    expect(screen.getByText(/ClearPath isn’t available/i)).toBeInTheDocument()
+    expect(screen.getByText(/doesn't run ClearPath/i)).toBeInTheDocument()
+    expect(await screen.findByText('Olympia DAO')).toBeInTheDocument()
   })
 
-  it('lists external DAOs from the on-chain registry', async () => {
+  it('lists external DAOs with a network badge', async () => {
     render(<ClearPathPanel />)
     expect(await screen.findByText('Olympia DAO')).toBeInTheDocument()
     expect(screen.getByText('OpenZeppelin Governor')).toBeInTheDocument()
+    expect(screen.getByText('Ethereum Classic Mordor')).toBeInTheDocument()
   })
 
   it('opens a live tracking view for a registered DAO', async () => {
@@ -168,8 +185,28 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     expect(screen.getByText('Active', { selector: '.cp-badge' })).toBeInTheDocument()
     // the proposal timeline surfaces the voting window position
     expect(screen.getByLabelText('Proposal timeline')).toBeInTheDocument()
-    // US5: an Active proposal offers vote actions
-    expect(screen.getByRole('button', { name: /vote for/i })).toBeInTheDocument()
+    // US5: an Active proposal offers vote actions, enabled since the wallet is on the DAO's own chain
+    const voteFor = screen.getByRole('button', { name: /vote for/i })
+    expect(voteFor).toBeInTheDocument()
+    expect(voteFor).not.toBeDisabled()
+  })
+
+  it('disables vote actions and offers a switch prompt when the wallet is on a different network', async () => {
+    conn.fetchGovernorProposals.mockResolvedValue({
+      ok: true, partial: false, scannedFrom: 16000000, scannedTo: 16500000,
+      proposals: [
+        { id: '42', proposer: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', description: 'Fund core dev', targets: [], values: [], calldatas: [], descriptionHash: '0x', voteStart: '1', voteEnd: '2', state: 1, votes: { for: '3', against: '1', abstain: '0' } },
+      ],
+    })
+    // Two networks in scope; the wallet is connected to the OTHER one (137, not the DAO's own 63).
+    cp.chainId = 137
+    cp.chainIds = [63, 137]
+    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 })
+    const user = userEvent.setup()
+    render(<ClearPathPanel />)
+    await user.click(await screen.findByText('Olympia DAO'))
+    expect(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /vote for/i })).toBeDisabled()
   })
 
   it('shows the user vote receipt and hides vote buttons once they have voted', async () => {
@@ -218,9 +255,10 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     expect(await navigator.clipboard.readText()).toBe('123456789012345678')
   })
 
-  it('validates then registers a new external DAO', async () => {
+  it('validates then registers a new external DAO on the selected network', async () => {
     conn.validateGovernor.mockResolvedValue({ ok: true, name: 'OlympiaGovernor', reason: '' })
     cp.registerExternalDAO.mockResolvedValue({})
+    cp.trackDAO.mockResolvedValue({})
     const user = userEvent.setup()
     render(<ClearPathPanel />)
     await user.click(screen.getByRole('tab', { name: /register/i }))
@@ -229,8 +267,8 @@ describe('ClearPathPanel (spec 030 / US3)', () => {
     expect(await screen.findByText(/Recognized governance contract/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /register dao/i }))
     await waitFor(() =>
-      expect(cp.registerExternalDAO).toHaveBeenCalledWith(
-        expect.objectContaining({ dao: OLYMPIA, framework: 0 })
+      expect(cp.trackDAO).toHaveBeenCalledWith(
+        expect.objectContaining({ address: OLYMPIA, framework: 0, chainId: 63 })
       )
     )
   })
