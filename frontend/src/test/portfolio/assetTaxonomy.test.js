@@ -142,6 +142,44 @@ describe('getPortfolioRegistry', () => {
     expect(bySymbol.USDT.source).toBe('curated-registry')
   })
 
+  it('includes the newly curated tokens on mainnet, each with a valid address/decimals', () => {
+    const registry = getPortfolioRegistry(1)
+    const bySymbol = Object.fromEntries(registry.map((e) => [e.symbol, e]))
+    const expected = {
+      MORPHO: 'digital-securities',
+      GRT: 'digital-tools',
+      UNI: 'digital-securities',
+      AAVE: 'digital-securities',
+      LINK: 'digital-tools',
+      ENS: 'digital-tools',
+      BAT: 'digital-tools',
+      WBTC: 'digital-commodities',
+      PYUSD: 'payment-stablecoins',
+      FIDD: 'payment-stablecoins',
+    }
+    for (const [symbol, categoryId] of Object.entries(expected)) {
+      expect(bySymbol[symbol], `${symbol} missing from mainnet registry`).toBeTruthy()
+      expect(bySymbol[symbol].categoryId).toBe(categoryId)
+      expect(bySymbol[symbol].address).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(bySymbol[symbol].decimals).toBeGreaterThan(0)
+    }
+    // WBTC wraps the SEC-baseline BTC commodity, so baseline precedence wins.
+    expect(bySymbol.WBTC.source).toBe('sec-baseline')
+  })
+
+  it('includes the newly curated tokens on Polygon that have an established bridged deployment', () => {
+    const registry = getPortfolioRegistry(137)
+    const bySymbol = Object.fromEntries(registry.map((e) => [e.symbol, e]))
+    for (const symbol of ['GRT', 'BAT', 'UNI', 'AAVE']) {
+      expect(bySymbol[symbol], `${symbol} missing from Polygon registry`).toBeTruthy()
+      expect(bySymbol[symbol].address).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    }
+    // No official Polygon deployment of the MORPHO governance token, ENS, PYUSD, or FIDD.
+    for (const symbol of ['MORPHO', 'ENS', 'PYUSD', 'FIDD']) {
+      expect(bySymbol[symbol]).toBeUndefined()
+    }
+  })
+
   it('covers Sepolia: baseline-commodity native ETH plus Circle USDC', () => {
     const registry = getPortfolioRegistry(11155111)
     const native = registry.find((e) => e.kind === 'native')

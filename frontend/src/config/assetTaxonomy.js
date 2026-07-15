@@ -119,6 +119,14 @@ export const UNDERLYING_META = {
   DAI: { name: 'Dai Stablecoin', homeChainId: null },
   USC: { name: 'Classic USD', homeChainId: null },
   FWMV: { name: 'FairWins Membership Voucher', homeChainId: null },
+  GRT: { name: 'The Graph', homeChainId: null },
+  ENS: { name: 'Ethereum Name Service', homeChainId: null },
+  BAT: { name: 'Basic Attention Token', homeChainId: null },
+  UNI: { name: 'Uniswap', homeChainId: null },
+  AAVE: { name: 'Aave', homeChainId: null },
+  MORPHO: { name: 'Morpho', homeChainId: null },
+  PYUSD: { name: 'PayPal USD', homeChainId: null },
+  FIDD: { name: 'Fidelity Digital Dollar', homeChainId: null },
 }
 
 export function getUnderlyingMeta(symbol) {
@@ -160,6 +168,99 @@ const CURATED_REGISTRY = {
       decimals: 18,
       categoryId: 'payment-stablecoins',
     },
+    {
+      // Wrapped Bitcoin on Ethereum mainnet — canonical custodial-wrapped BTC.
+      address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+      symbol: 'WBTC',
+      name: 'Wrapped BTC',
+      decimals: 8,
+      categoryId: 'digital-commodities',
+      baselineSymbol: 'BTC',
+    },
+    {
+      // Chainlink token on Ethereum mainnet — protocol utility (oracle payment),
+      // no yield/capital-raising function.
+      address: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+      symbol: 'LINK',
+      name: 'ChainLink Token',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // The Graph — indexing-protocol utility token (query fees/curation), no
+      // capital-raising function.
+      address: '0xc944E90C64B2c07662A292be6244BDf05Cda44a7',
+      symbol: 'GRT',
+      name: 'Graph Token',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // ENS DAO governance token — ties to name-service domain identity, the
+      // Digital Tools category's textbook case.
+      address: '0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72',
+      symbol: 'ENS',
+      name: 'Ethereum Name Service',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // Basic Attention Token — Brave browser attention/ad utility token.
+      address: '0x0D8775F648430679A709E98d2b0Cb6250d2887EF',
+      symbol: 'BAT',
+      name: 'Basic Attention Token',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // Uniswap governance token — vote-weight/fee-switch characteristics of
+      // an investment contract.
+      address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
+      symbol: 'UNI',
+      name: 'Uniswap',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // Aave governance token — vote-weight plus a Safety Module staking
+      // program; investment-contract characteristics.
+      address: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9',
+      symbol: 'AAVE',
+      name: 'Aave Token',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // Morpho governance token — vote-weight over protocol/fee parameters;
+      // investment-contract characteristics. No Polygon deployment of the
+      // governance token exists (Morpho's multichain "infrastructure mode"
+      // deploys the lending stack, not this token) — mainnet only.
+      address: '0x58D97B57BB95320F9a05dC918Aef65434969c2B2',
+      symbol: 'MORPHO',
+      name: 'Morpho Token',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // PayPal USD — transactional stablecoin by known issuer (PayPal/Paxos).
+      // Ethereum only; not deployed on Polygon.
+      address: '0x6c3ea9036406852006290770BEdFcAbA0e23A0e8',
+      symbol: 'PYUSD',
+      name: 'PayPal USD',
+      decimals: 6,
+      categoryId: 'payment-stablecoins',
+    },
+    {
+      // Fidelity Digital Dollar — transactional stablecoin by known issuer
+      // (Fidelity Digital Assets, launched Feb 2026). Address sourced from
+      // Etherscan at add-time; re-verify on-chain before relying on it, the
+      // same convention as networks.js's Mordor-address caveat.
+      address: '0x7C135549504245B5eAe64fc0E99Fa5ebabb8e35D',
+      symbol: 'FIDD',
+      name: 'Fidelity Digital Dollar',
+      decimals: 18,
+      categoryId: 'payment-stablecoins',
+    },
   ],
   137: [
     {
@@ -196,6 +297,38 @@ const CURATED_REGISTRY = {
       name: 'Tether USD',
       decimals: 6,
       categoryId: 'payment-stablecoins',
+    },
+    {
+      // The Graph on Polygon PoS (official PoS-bridge child token).
+      address: '0xaa35915966E20B94Fb131b8fFfd8799518827c32',
+      symbol: 'GRT',
+      name: 'Graph Token',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // Basic Attention Token on Polygon PoS.
+      address: '0x3Cef98bb43d732E2F285eE605a8158cDE967D219',
+      symbol: 'BAT',
+      name: 'Basic Attention Token',
+      decimals: 18,
+      categoryId: 'digital-tools',
+    },
+    {
+      // Uniswap governance token on Polygon PoS (bridged).
+      address: '0xb33eaad8d922b1083446dc23f610c2567fb5180f',
+      symbol: 'UNI',
+      name: 'Uniswap',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // Aave governance token on Polygon PoS (bridged).
+      address: '0xD6DF932A45C0f255f85145f286eA0b292B21C90B',
+      symbol: 'AAVE',
+      name: 'Aave Token',
+      decimals: 18,
+      categoryId: 'digital-securities',
     },
   ],
 }

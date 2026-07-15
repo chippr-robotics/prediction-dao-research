@@ -26,6 +26,14 @@ const ASSET_GLYPHS = {
   USDT: { bg: '#26A17B', glyph: 'T', fg: '#ffffff' },
   USC: { bg: '#0F8A5F', glyph: '$', fg: '#ffffff' },
   FWMV: { bg: '#36B37E', glyph: 'clover', fg: '#ffffff' },
+  GRT: { bg: '#6747ED', glyph: 'G', fg: '#ffffff' },
+  ENS: { bg: '#5284FF', glyph: 'E', fg: '#ffffff' },
+  BAT: { bg: '#FF5000', glyph: 'B', fg: '#ffffff' },
+  UNI: { bg: '#FF007A', glyph: 'U', fg: '#ffffff' },
+  AAVE: { bg: '#B6509E', glyph: 'A', fg: '#ffffff' },
+  MORPHO: { bg: '#5A5FF0', glyph: 'M', fg: '#ffffff' },
+  PYUSD: { bg: '#0070E0', glyph: '$', fg: '#ffffff' },
+  FIDD: { bg: '#00754A', glyph: '$', fg: '#ffffff' },
 }
 
 // Per-network badge colors (chainId → fill). Testnets get a dashed ring so

@@ -21,10 +21,16 @@ export const CHAINLINK_FEEDS = {
     // Canonical Ethereum mainnet feeds (spec 048). Ethereum mainnet has no in-app
     // `dex` config, so the DEX-spot fallback cannot run there — these feeds are the
     // required price source for native ETH and WETH (WETH resolves via the ETH
-    // underlying). Stablecoins (USDC/USDT/DAI) value at par $1 and are not listed.
+    // underlying; WBTC resolves via the BTC underlying). Stablecoins (USDC/USDT/DAI/
+    // PYUSD/FIDD) value at par $1 and are not listed. GRT and MORPHO have no
+    // established mainnet USD feed at add-time and stay honestly unpriced there.
     ETH: import.meta.env?.VITE_FEED_MAINNET_ETH_USD || '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
     BTC: import.meta.env?.VITE_FEED_MAINNET_BTC_USD || '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c',
     LINK: import.meta.env?.VITE_FEED_MAINNET_LINK_USD || '0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c',
+    UNI: import.meta.env?.VITE_FEED_MAINNET_UNI_USD || '0x553303d460EE0afB37EdFf9be42922D8FF63220e',
+    AAVE: import.meta.env?.VITE_FEED_MAINNET_AAVE_USD || '0x547a514d5e3769680Ce22B2361c10Ea13619e8a9',
+    BAT: import.meta.env?.VITE_FEED_MAINNET_BAT_USD || '0x9441D7556e7820B5cA42082cfa99487D56AcA958',
+    ENS: import.meta.env?.VITE_FEED_MAINNET_ENS_USD || '0x5C00128d4d1c2F4f652C267d7bcdD7aC99C16E16',
   },
   137: {
     MATIC: import.meta.env?.VITE_FEED_POLYGON_MATIC_USD || '0xAB594600376Ec9fD91F8e885dADF0CE036862dE0',
