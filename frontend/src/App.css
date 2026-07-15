@@ -705,7 +705,7 @@ svg {
   }
 
   /* Ensure touch targets are at least 44x44px on mobile */
-  button,
+  button:not([role="switch"]),
   .tab-button,
   .view-button,
   .trade-button,
