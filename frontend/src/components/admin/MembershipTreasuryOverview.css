@@ -1,0 +1,176 @@
+/* MembershipTreasuryOverview — app-wide membership stats + treasury growth on Admin → Overview.
+   Theme-aware via the shared CSS custom properties; single brand hue for the revenue sparkline. */
+
+.mto-muted {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.mto-muted code {
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+}
+
+.mto-error {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--danger-color);
+}
+
+.mto-note {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.mto-subhead {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ---- Stat tiles ---- */
+.mto-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.mto-tiles--dense {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.mto-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.mto-tile--accent {
+  border-color: var(--brand-primary);
+}
+
+.mto-tile__value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.mto-tile--accent .mto-tile__value {
+  color: var(--brand-primary);
+}
+
+.mto-tile__label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ---- Revenue sparkline (single-series, single hue) ---- */
+.mto-spark {
+  margin: 1.25rem 0 0;
+}
+
+.mto-spark__svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+
+.mto-spark__area {
+  fill: rgba(var(--brand-primary-rgb), 0.14);
+  stroke: none;
+}
+
+.mto-spark__line {
+  fill: none;
+  stroke: var(--brand-primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mto-spark__dot {
+  fill: var(--brand-primary);
+  stroke: var(--bg-secondary);
+  stroke-width: 2;
+}
+
+.mto-spark__caption {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.mto-spark__caption strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mto-spark__hint {
+  color: var(--text-muted);
+}
+
+/* ---- Horizontal breakdown bars ---- */
+.mto-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mto-bar-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mto-bar-label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.mto-bar-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-full, 999px);
+  overflow: hidden;
+}
+
+.mto-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  min-width: 2px;
+  background: var(--brand-primary);
+  border-radius: inherit;
+  transition: width var(--transition-fast, 0.15s) ease;
+}
+
+.mto-bar-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .mto-bar-row {
+    grid-template-columns: 4.5rem 1fr auto;
+    gap: 0.5rem;
+  }
+}
