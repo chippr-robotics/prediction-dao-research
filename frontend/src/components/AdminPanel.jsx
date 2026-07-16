@@ -14,6 +14,7 @@ import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
 import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
+import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import PortalNav from './ui/PortalNav'
 import SectionIconNav from './nav/SectionIconNav'
 import './AdminPanel.css'
@@ -433,6 +434,13 @@ function AdminPanel() {
                   </div>
                 </div>
               </div>
+
+              <MembershipTreasuryOverview
+                provider={provider || getProvider(chainId)}
+                chainId={chainId}
+                address={membershipManagerAddr}
+                accruedFees={contractState.accruedFees}
+              />
 
               <div className="admin-card full-width">
                 <div className="admin-card-header"><h3>Contract Addresses</h3></div>
