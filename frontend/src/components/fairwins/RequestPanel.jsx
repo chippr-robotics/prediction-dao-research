@@ -6,7 +6,7 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { useClipboard } from '../../hooks/useClipboard'
 import { getQRColorPreference, getQRColorEntry } from '../../utils/qrColorPreference'
 import { getDefaultCurrencyKind } from '../../utils/homePreference'
-import { buildPaymentRequestUri } from '../../lib/payments/paymentRequest'
+import { buildPaymentRequestUri, NOTE_MAX_LENGTH } from '../../lib/payments/paymentRequest'
 
 /**
  * RequestPanel (spec 058 US2) — ask someone for value: the same amount hero +
@@ -110,7 +110,7 @@ function RequestPanel() {
         <input
           id="request-note"
           type="text"
-          maxLength={200}
+          maxLength={NOTE_MAX_LENGTH}
           className="fm-pay-memo-input"
           placeholder="What's it for? — e.g. pizza night"
           value={note}

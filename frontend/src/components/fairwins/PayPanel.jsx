@@ -11,7 +11,7 @@ import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
 import { getDefaultCurrencyKind } from '../../utils/homePreference'
-import { parsePaymentRequest } from '../../lib/payments/paymentRequest'
+import { parsePaymentRequest, NOTE_MAX_LENGTH } from '../../lib/payments/paymentRequest'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
@@ -186,15 +186,15 @@ function PayPanel({ onSuccess }) {
     }
   }, [send, kind, toResolved, amount, symbol, showNotification, resetDraft, onSuccess])
 
+  // The restricted-screening case is NOT repeated here — it already renders
+  // as its own alert banner under the recipient field.
   const blockReason = !amountValid
     ? null // an untouched form needs no error banner; the disabled button is enough
     : overBalance
       ? `That's more ${symbol} than you have.`
-      : screening === 'restricted'
-        ? 'This address is flagged by sanctions screening. Transfers to it are blocked.'
-        : stableUnavailable
-          ? `No ${symbol} is configured on this network.`
-          : null
+      : stableUnavailable
+        ? `No ${symbol} is configured on this network.`
+        : null
 
   if (confirming) {
     return (
@@ -302,7 +302,7 @@ function PayPanel({ onSuccess }) {
         <input
           id="pay-note"
           type="text"
-          maxLength={200}
+          maxLength={NOTE_MAX_LENGTH}
           className="fm-pay-memo-input"
           placeholder="Add a note — e.g. lunch, rent, thanks!"
           value={note}
