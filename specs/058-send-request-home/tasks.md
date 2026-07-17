@@ -152,7 +152,7 @@ storage restores Pay/USDC without errors (quickstart scenario 11).
 - [X] T025 [P] Add axe accessibility coverage for the home surface in `frontend/src/test/home.axe.test.jsx` (pattern: `src/test/pools.axe.test.jsx`): each mode, both switchers, the request-QR view — no violations (FR-017, SC-008)
 - [X] T026 [P] Extend the Cypress fast E2E home smoke in `frontend/cypress/e2e/` (follow existing home spec naming): land on Pay, switch modes via both switchers, generate a request QR, confirm wager create still reachable
 - [X] T027 [P] Write `docs/developer-guide/home-pay-request.md`: the three-mode home, `fairwins_home_v1` schema, payment-request URI format + parser module, and the "no new value path — `useTransfer` only" rule
-- [ ] T028 Full verification: `npm run test:frontend`, frontend ESLint, and the quickstart.md manual scenarios (1–12); confirm the diff touches only `frontend/` and `docs/` (FR-018 — no `contracts/`, `deployments/`, or `services/` changes)
+- [X] T028 Full verification: `npm run test:frontend`, frontend ESLint, and the quickstart.md manual scenarios (1–12); confirm the diff touches only `frontend/` and `docs/` (FR-018 — no `contracts/`, `deployments/`, or `services/` changes)
 
 ---
 
