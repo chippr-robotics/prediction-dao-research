@@ -25,7 +25,7 @@ the HomeScreen mode-hosting skeleton every story plugs into.
 **Purpose**: Confirm a green baseline before touching the home surface (no project
 init or new dependencies needed — plan pins zero new runtime deps).
 
-- [ ] T001 Verify baseline: run `npm run test:frontend` and the frontend ESLint check; confirm both pass on the branch before changes (record any pre-existing failures so they aren't attributed to this feature)
+- [X] T001 Verify baseline: run `npm run test:frontend` and the frontend ESLint check; confirm both pass on the branch before changes (record any pre-existing failures so they aren't attributed to this feature)
 
 ---
 
@@ -36,13 +36,13 @@ the HomeScreen mode-hosting skeleton. Every user story depends on this phase.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Write failing unit tests for the home preference util in `frontend/src/utils/__tests__/homePreference.test.js` — cases from `contracts/home-preferences.md`: defaults (`pay`/`stable`), invalid value rejection, corrupt-JSON and unavailable-storage fallbacks (never throws), setter persistence, `subscribe` notification, unknown-field preservation
-- [ ] T003 [P] Write failing unit tests for the payment-request module in `frontend/src/lib/payments/__tests__/paymentRequest.test.js` — cases from `contracts/payment-request-uri.md`: build stable/native URI shapes, note URL-encoding + empty-note omission, build validation errors, parse of all four accepted inputs, `@chainId` decimal/hex, malformed numeric params degrade to address-only, junk input → null, **round-trip guarantee** (build → parse identity)
-- [ ] T004 [P] Implement `frontend/src/utils/homePreference.js` per `contracts/home-preferences.md` (key `fairwins_home_v1`, `HOME_MODES`, getters/setters, `subscribe`; mirror `frontend/src/utils/quickAccessPreference.js` style) — T002 tests go green
-- [ ] T005 [P] Implement `frontend/src/lib/payments/paymentRequest.js` per `contracts/payment-request-uri.md` (`buildPaymentRequestUri`, `parsePaymentRequest`; ethers `parseUnits`/`isAddress`; leave `lib/addressBook/scanAddress.js` untouched) — T003 tests go green
-- [ ] T006 Extend `frontend/src/test/HomeScreen.test.jsx` (existing child-mocking pattern) with failing tests for mode hosting: initial mode from `getDefaultHomeMode()`, all three panels mounted with inactive ones `hidden`, wager extras (`.home-actions`, `.home-ticker`) rendered only in wager mode, ticker `onSelectMarket` forcing wager mode, desktop `PillSelect` switcher wiring
-- [ ] T007 Refactor `frontend/src/components/fairwins/HomeScreen.jsx` to host modes per `contracts/home-mode-components.md`: `mode` state initialized from `getDefaultHomeMode()` + `subscribe` sync, three always-mounted panels with `hidden` on inactive (placeholder stubs for Pay/Request until US1/US2), desktop/tablet `PillSelect` switcher, wager-only extras gating, ticker→wager forcing; `CreateChallengePanel` usage unchanged — T006 tests go green
-- [ ] T008 Add mode-switcher and panel-visibility styles to `frontend/src/components/fairwins/HomeScreen.css` (switcher row placement, hidden-panel rules; keep the home non-scrolling at 320px)
+- [X] T002 [P] Write failing unit tests for the home preference util in `frontend/src/utils/__tests__/homePreference.test.js` — cases from `contracts/home-preferences.md`: defaults (`pay`/`stable`), invalid value rejection, corrupt-JSON and unavailable-storage fallbacks (never throws), setter persistence, `subscribe` notification, unknown-field preservation
+- [X] T003 [P] Write failing unit tests for the payment-request module in `frontend/src/lib/payments/__tests__/paymentRequest.test.js` — cases from `contracts/payment-request-uri.md`: build stable/native URI shapes, note URL-encoding + empty-note omission, build validation errors, parse of all four accepted inputs, `@chainId` decimal/hex, malformed numeric params degrade to address-only, junk input → null, **round-trip guarantee** (build → parse identity)
+- [X] T004 [P] Implement `frontend/src/utils/homePreference.js` per `contracts/home-preferences.md` (key `fairwins_home_v1`, `HOME_MODES`, getters/setters, `subscribe`; mirror `frontend/src/utils/quickAccessPreference.js` style) — T002 tests go green
+- [X] T005 [P] Implement `frontend/src/lib/payments/paymentRequest.js` per `contracts/payment-request-uri.md` (`buildPaymentRequestUri`, `parsePaymentRequest`; ethers `parseUnits`/`isAddress`; leave `lib/addressBook/scanAddress.js` untouched) — T003 tests go green
+- [X] T006 Extend `frontend/src/test/HomeScreen.test.jsx` (existing child-mocking pattern) with failing tests for mode hosting: initial mode from `getDefaultHomeMode()`, all three panels mounted with inactive ones `hidden`, wager extras (`.home-actions`, `.home-ticker`) rendered only in wager mode, ticker `onSelectMarket` forcing wager mode, desktop `PillSelect` switcher wiring
+- [X] T007 Refactor `frontend/src/components/fairwins/HomeScreen.jsx` to host modes per `contracts/home-mode-components.md`: `mode` state initialized from `getDefaultHomeMode()` + `subscribe` sync, three always-mounted panels with `hidden` on inactive (placeholder stubs for Pay/Request until US1/US2), desktop/tablet `PillSelect` switcher, wager-only extras gating, ticker→wager forcing; `CreateChallengePanel` usage unchanged — T006 tests go green
+- [X] T008 Add mode-switcher and panel-visibility styles to `frontend/src/components/fairwins/HomeScreen.css` (switcher row placement, hidden-panel rules; keep the home non-scrolling at 320px)
 
 **Checkpoint**: Home still ships wager behavior unchanged, now inside a mode shell —
 user story implementation can begin.
@@ -62,13 +62,13 @@ recipient via each entry method, press Pay → existing transfer flow completes
 
 ### Tests for User Story 1 (write first, must fail)
 
-- [ ] T009 [P] [US1] Write failing component tests in `frontend/src/test/PayPanel.test.jsx` (mock `useTransfer`, `useChainTokens`, `useAddressScreening`, `useWallet`, `useSwitchChain` — pattern: `src/test/CreateChallengePanel.test.jsx`): Pay disabled at zero amount / unresolved recipient / `restricted` screening / over balance; disconnected → connect prompt; chain mismatch → switch affordance instead of Pay; address-book pick and scan prefill recipient; scanned full payment request prefills amount+currency+note; wrong-token scan → error with **no partial prefill**; submit calls `useTransfer.send({asset, to, amount})`; success clears draft; currency pill toggles stable/native with honest symbols
+- [X] T009 [P] [US1] Write failing component tests in `frontend/src/test/PayPanel.test.jsx` (mock `useTransfer`, `useChainTokens`, `useAddressScreening`, `useWallet`, `useSwitchChain` — pattern: `src/test/CreateChallengePanel.test.jsx`): Pay disabled at zero amount / unresolved recipient / `restricted` screening / over balance; disconnected → connect prompt; chain mismatch → switch affordance instead of Pay; address-book pick and scan prefill recipient; scanned full payment request prefills amount+currency+note; wrong-token scan → error with **no partial prefill**; submit calls `useTransfer.send({asset, to, amount})`; success clears draft; currency pill toggles stable/native with honest symbols
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Implement `frontend/src/components/fairwins/PayPanel.jsx` per `contracts/home-mode-components.md`: `.fm-pay-*` layout with `AmountKeypad` (`prefix="$"`, symbol from `useChainTokens`), token pill (`.fm-pay-token-select`, default kind from `getDefaultCurrencyKind()`), `AddressInput` (`enableAddressBook`, `chainId`, `onResolvedChange`) + `AddressBookButton` + `AddressScreenNotice`, memo input, primary "Pay" button; gating + submit via `useTransfer` following `TransferForm.jsx` patterns (balance refresh, screening block, switch-chain gate, vault "proposed" outcome surfaced)
-- [ ] T011 [US1] Add scan handling to `frontend/src/components/fairwins/PayPanel.jsx`: scan button opens `components/ui/QRScanner.jsx`; decoded text goes through `parsePaymentRequest` with the consumer obligations from `contracts/payment-request-uri.md` (chainId mismatch → switch prompt before send; foreign token → error, no partial prefill; raw address → recipient-only prefill) — T009 scan cases go green
-- [ ] T012 [US1] Replace the Pay placeholder in `frontend/src/components/fairwins/HomeScreen.jsx` with `PayPanel` and extend `frontend/src/test/HomeScreen.test.jsx`: `pay` is the default mode on a fresh profile, Pay draft survives switching to wager and back, wager memo never leaks into the Pay note (FR-015)
+- [X] T010 [US1] Implement `frontend/src/components/fairwins/PayPanel.jsx` per `contracts/home-mode-components.md`: `.fm-pay-*` layout with `AmountKeypad` (`prefix="$"`, symbol from `useChainTokens`), token pill (`.fm-pay-token-select`, default kind from `getDefaultCurrencyKind()`), `AddressInput` (`enableAddressBook`, `chainId`, `onResolvedChange`) + `AddressBookButton` + `AddressScreenNotice`, memo input, primary "Pay" button; gating + submit via `useTransfer` following `TransferForm.jsx` patterns (balance refresh, screening block, switch-chain gate, vault "proposed" outcome surfaced)
+- [X] T011 [US1] Add scan handling to `frontend/src/components/fairwins/PayPanel.jsx`: scan button opens `components/ui/QRScanner.jsx`; decoded text goes through `parsePaymentRequest` with the consumer obligations from `contracts/payment-request-uri.md` (chainId mismatch → switch prompt before send; foreign token → error, no partial prefill; raw address → recipient-only prefill) — T009 scan cases go green
+- [X] T012 [US1] Replace the Pay placeholder in `frontend/src/components/fairwins/HomeScreen.jsx` with `PayPanel` and extend `frontend/src/test/HomeScreen.test.jsx`: `pay` is the default mode on a fresh profile, Pay draft survives switching to wager and back, wager memo never leaks into the Pay note (FR-015)
 
 **Checkpoint**: US1 fully functional — MVP: the app opens on a working Pay view;
 wager one switch away, unchanged.
@@ -87,13 +87,13 @@ note (quickstart scenarios 4–6).
 
 ### Tests for User Story 2 (write first, must fail)
 
-- [ ] T013 [P] [US2] Write failing component tests in `frontend/src/test/RequestPanel.test.jsx` (mock `useWallet`, `useChainTokens`): Request disabled at zero amount; disconnected → connect prompt before generation; press builds the expected URI via `buildPaymentRequestUri` (requester = `useWallet().address`, active chainId, selected currency kind) and renders the QR + the note as plain text; Copy writes the URI to clipboard; Share uses `navigator.share` with clipboard fallback; editing amount/note/currency clears the displayed code
+- [X] T013 [P] [US2] Write failing component tests in `frontend/src/test/RequestPanel.test.jsx` (mock `useWallet`, `useChainTokens`): Request disabled at zero amount; disconnected → connect prompt before generation; press builds the expected URI via `buildPaymentRequestUri` (requester = `useWallet().address`, active chainId, selected currency kind) and renders the QR + the note as plain text; Copy writes the URI to clipboard; Share uses `navigator.share` with clipboard fallback; editing amount/note/currency clears the displayed code
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Implement `frontend/src/components/fairwins/RequestPanel.jsx` per `contracts/home-mode-components.md`: amount hero (shared keypad + token pill), note input, primary "Request" button; QR via `qrcode.react` `QRCodeSVG` following `components/ui/AddressQRCode.jsx` (level "H", `utils/qrColorPreference.js` palette); copy/share chrome following `components/ui/AddressQRModal.jsx`; stale-QR clearing — T013 goes green
-- [ ] T015 [US2] Replace the Request placeholder in `frontend/src/components/fairwins/HomeScreen.jsx` with `RequestPanel` and extend `frontend/src/test/HomeScreen.test.jsx`: request mode renders the panel; Request draft survives mode switches (FR-015)
-- [ ] T016 [US2] Add a cross-panel round-trip test in `frontend/src/test/paymentRequestRoundTrip.test.jsx`: a URI generated with RequestPanel's inputs, fed through `parsePaymentRequest` into PayPanel's scan path, prefills recipient, amount, currency, and note ready to confirm (SC-003 logic-level guarantee)
+- [X] T014 [US2] Implement `frontend/src/components/fairwins/RequestPanel.jsx` per `contracts/home-mode-components.md`: amount hero (shared keypad + token pill), note input, primary "Request" button; QR via `qrcode.react` `QRCodeSVG` following `components/ui/AddressQRCode.jsx` (level "H", `utils/qrColorPreference.js` palette); copy/share chrome following `components/ui/AddressQRModal.jsx`; stale-QR clearing — T013 goes green
+- [X] T015 [US2] Replace the Request placeholder in `frontend/src/components/fairwins/HomeScreen.jsx` with `RequestPanel` and extend `frontend/src/test/HomeScreen.test.jsx`: request mode renders the panel; Request draft survives mode switches (FR-015)
+- [X] T016 [US2] Add a cross-panel round-trip test in `frontend/src/test/paymentRequestRoundTrip.test.jsx`: a URI generated with RequestPanel's inputs, fed through `parsePaymentRequest` into PayPanel's scan path, prefills recipient, amount, currency, and note ready to confirm (SC-003 logic-level guarantee)
 
 **Checkpoint**: US1 + US2 — the home is a complete peer-to-peer money surface.
 
@@ -111,13 +111,13 @@ names, switches modes without losing drafts, and appears only on the home surfac
 
 ### Tests for User Story 3 (write first, must fail)
 
-- [ ] T017 [P] [US3] Add the three glyphs — outgoing arrow (pay), incoming arrow (request), head-to-head (wager, visually consistent with `EitherSideIcon` in `components/fairwins/resolutionIcons.jsx`) — to `frontend/src/components/nav/NavIcon.jsx`, with rendering assertions in `frontend/src/components/nav/__tests__/NavIcon.test.jsx` (create or extend)
-- [ ] T018 [US3] Extend `frontend/src/test/HomeScreen.test.jsx` with failing mobile-nav tests (mock `hooks/useMediaQuery` `useIsMobile`): mobile renders `SectionIconNav` with exactly the three items in Pay/Request/Wager order, each with an accessible name; active item reflects the mode; `onSelect` switches modes and drafts survive; desktop renders the `PillSelect` switcher and no bottom bar
+- [X] T017 [P] [US3] Add the three glyphs — outgoing arrow (pay), incoming arrow (request), head-to-head (wager, visually consistent with `EitherSideIcon` in `components/fairwins/resolutionIcons.jsx`) — to `frontend/src/components/nav/NavIcon.jsx`, with rendering assertions in `frontend/src/components/nav/__tests__/NavIcon.test.jsx` (create or extend)
+- [X] T018 [US3] Extend `frontend/src/test/HomeScreen.test.jsx` with failing mobile-nav tests (mock `hooks/useMediaQuery` `useIsMobile`): mobile renders `SectionIconNav` with exactly the three items in Pay/Request/Wager order, each with an accessible name; active item reflects the mode; `onSelect` switches modes and drafts survive; desktop renders the `PillSelect` switcher and no bottom bar
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Wire `components/nav/SectionIconNav.jsx` (unmodified) into `frontend/src/components/fairwins/HomeScreen.jsx` per `contracts/home-mode-components.md`: items `pay`/`request`/`wager` with the T017 glyphs, `activeId` = mode, `onSelect` sets mode; render only for the home surface, mobile viewports (the component self-gates via `useIsMobile`) — T018 goes green
-- [ ] T020 [US3] Adjust `frontend/src/components/fairwins/HomeScreen.css` for the bottom bar: reserve safe-area/bottom spacing so no mode's content is obscured and each mode stays non-scrolling at 320px
+- [X] T019 [US3] Wire `components/nav/SectionIconNav.jsx` (unmodified) into `frontend/src/components/fairwins/HomeScreen.jsx` per `contracts/home-mode-components.md`: items `pay`/`request`/`wager` with the T017 glyphs, `activeId` = mode, `onSelect` sets mode; render only for the home surface, mobile viewports (the component self-gates via `useIsMobile`) — T018 goes green
+- [X] T020 [US3] Adjust `frontend/src/components/fairwins/HomeScreen.css` for the bottom bar: reserve safe-area/bottom spacing so no mode's content is obscured and each mode stays non-scrolling at 320px
 
 **Checkpoint**: All three activities switchable in one view on mobile and desktop.
 
@@ -135,13 +135,13 @@ storage restores Pay/USDC without errors (quickstart scenario 11).
 
 ### Tests for User Story 4 (write first, must fail)
 
-- [ ] T021 [P] [US4] Write failing component tests in `frontend/src/components/account/__tests__/HomePreferencesPanel.test.jsx`: two labeled radio groups with correct presets read from `utils/homePreference.js`; selections call the setters; currency options render the active network's symbols from a mocked `useChainTokens` while storing the network-agnostic kind
+- [X] T021 [P] [US4] Write failing component tests in `frontend/src/components/account/__tests__/HomePreferencesPanel.test.jsx`: two labeled radio groups with correct presets read from `utils/homePreference.js`; selections call the setters; currency options render the active network's symbols from a mocked `useChainTokens` while storing the network-agnostic kind
 
 ### Implementation for User Story 4
 
-- [ ] T022 [US4] Implement `frontend/src/components/account/HomePreferencesPanel.jsx` (+ `HomePreferencesPanel.css`) per `contracts/home-preferences.md`, following the panel pattern of `components/account/QuickAccessCardsPanel.jsx` — T021 goes green
-- [ ] T023 [US4] Register the panel in `frontend/src/components/account/AccountDashboard.jsx` (and `components/account/index.js` if panels are exported there), alongside the existing preference panels
-- [ ] T024 [US4] Extend `frontend/src/test/HomeScreen.test.jsx`: with `fairwins_home_v1` preset to `{defaultMode:'wager', defaultCurrencyKind:'native'}`, home opens in wager mode and the Pay/Request heroes default to the native symbol; live preference change propagates via `subscribe` (US4 acceptance scenarios 2–3)
+- [X] T022 [US4] Implement `frontend/src/components/account/HomePreferencesPanel.jsx` (+ `HomePreferencesPanel.css`) per `contracts/home-preferences.md`, following the panel pattern of `components/account/QuickAccessCardsPanel.jsx` — T021 goes green
+- [X] T023 [US4] Register the panel in `frontend/src/components/account/AccountDashboard.jsx` (and `components/account/index.js` if panels are exported there), alongside the existing preference panels
+- [X] T024 [US4] Extend `frontend/src/test/HomeScreen.test.jsx`: with `fairwins_home_v1` preset to `{defaultMode:'wager', defaultCurrencyKind:'native'}`, home opens in wager mode and the Pay/Request heroes default to the native symbol; live preference change propagates via `subscribe` (US4 acceptance scenarios 2–3)
 
 **Checkpoint**: All four stories functional and individually testable.
 
@@ -149,9 +149,9 @@ storage restores Pay/USDC without errors (quickstart scenario 11).
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Add axe accessibility coverage for the home surface in `frontend/src/test/home.axe.test.jsx` (pattern: `src/test/pools.axe.test.jsx`): each mode, both switchers, the request-QR view — no violations (FR-017, SC-008)
-- [ ] T026 [P] Extend the Cypress fast E2E home smoke in `frontend/cypress/e2e/` (follow existing home spec naming): land on Pay, switch modes via both switchers, generate a request QR, confirm wager create still reachable
-- [ ] T027 [P] Write `docs/developer-guide/home-pay-request.md`: the three-mode home, `fairwins_home_v1` schema, payment-request URI format + parser module, and the "no new value path — `useTransfer` only" rule
+- [X] T025 [P] Add axe accessibility coverage for the home surface in `frontend/src/test/home.axe.test.jsx` (pattern: `src/test/pools.axe.test.jsx`): each mode, both switchers, the request-QR view — no violations (FR-017, SC-008)
+- [X] T026 [P] Extend the Cypress fast E2E home smoke in `frontend/cypress/e2e/` (follow existing home spec naming): land on Pay, switch modes via both switchers, generate a request QR, confirm wager create still reachable
+- [X] T027 [P] Write `docs/developer-guide/home-pay-request.md`: the three-mode home, `fairwins_home_v1` schema, payment-request URI format + parser module, and the "no new value path — `useTransfer` only" rule
 - [ ] T028 Full verification: `npm run test:frontend`, frontend ESLint, and the quickstart.md manual scenarios (1–12); confirm the diff touches only `frontend/` and `docs/` (FR-018 — no `contracts/`, `deployments/`, or `services/` changes)
 
 ---

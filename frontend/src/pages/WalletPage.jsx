@@ -23,6 +23,7 @@ import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
 import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
 import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
+import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
 import PortfolioPreferencesPanel from '../components/account/PortfolioPreferencesPanel'
 import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPanel'
@@ -457,6 +458,11 @@ function WalletPage() {
 
                 {activeTab === 'preferences' && (
                   <div className="preferences-section" role="tabpanel">
+                    <h2 className="preferences-group-heading">Home</h2>
+                    <div className="section">
+                      <HomePreferencesPanel />
+                    </div>
+
                     <h2 className="preferences-group-heading">Display</h2>
                     <div className="section">
                       <QuickAccessCardsPanel />

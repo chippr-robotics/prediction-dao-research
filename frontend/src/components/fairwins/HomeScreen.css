@@ -34,3 +34,100 @@
   margin-top: auto;
   padding-top: 0.5rem;
 }
+
+/* ── Three-mode home (spec 058) ─────────────────────────────────────────── */
+
+/* Inactive mode panels stay mounted (draft retention, FR-015) but must not
+   occupy layout — the `hidden` attribute wins over the section's display. */
+.home-mode-panel[hidden] {
+  display: none;
+}
+
+/* Desktop/tablet segmented switcher above the active panel. */
+.home-mode-switcher {
+  display: flex;
+  justify-content: center;
+}
+
+.home-mode-switcher .pill-select {
+  gap: 0.4rem;
+}
+
+/* Reserve room for the mobile bottom bar (plus the device safe area) so no
+   mode's primary button is obscured; keeps each mode non-scrolling at 320px. */
+@media (max-width: 768px) {
+  .home-screen {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Pay confirm summary + Request QR result — compact, centered cards reusing
+   theme tokens only. */
+.pay-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 12px;
+}
+
+.pay-confirm-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pay-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.pay-confirm-row .k {
+  color: var(--text-muted, #7A8590);
+}
+
+.pay-confirm-actions,
+.request-result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.fm-pay-status {
+  text-align: center;
+}
+
+.request-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* White quiet-zone card behind the request QR (scannability contract from
+   the address-QR work: dark-on-white, no embedded imagery). */
+.request-qr-frame {
+  background: #ffffff;
+  padding: 0.75rem;
+  border-radius: 12px;
+  line-height: 0;
+}
+
+.request-note-text {
+  margin: 0;
+  font-size: 0.95rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.request-scan-hint {
+  text-align: center;
+}
+
+.request-result-actions {
+  width: 100%;
+  max-width: 320px;
+}
