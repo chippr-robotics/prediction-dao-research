@@ -22,6 +22,7 @@ function RequestQRModal({ isOpen, onClose, uri, amount, symbol, note }) {
   const { copied, error: copyError, copy } = useClipboard()
   const closeButtonRef = useRef(null)
   const triggerRef = useRef(null)
+  const dialogRef = useRef(null)
 
   const shareText = note
     ? `${note}\nPay me ${amount} ${symbol} with FairWins:\n${uri}`
@@ -51,10 +52,32 @@ function RequestQRModal({ isOpen, onClose, uri, amount, symbol, note }) {
     }
   }, [isOpen])
 
-  // Escape closes.
+  // Escape closes; Tab is trapped inside the dialog so keyboard users can't
+  // reach the amount/currency controls behind the modal and leave a stale QR.
   useEffect(() => {
     if (!isOpen) return undefined
-    const handleKeyDown = (e) => { if (e.key === 'Escape') onClose() }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const root = dialogRef.current
+      if (!root) return
+      const focusable = root.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      } else if (!root.contains(document.activeElement)) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
@@ -75,7 +98,7 @@ function RequestQRModal({ isOpen, onClose, uri, amount, symbol, note }) {
       aria-modal="true"
       aria-labelledby="request-qr-title"
     >
-      <div className="address-qr-modal">
+      <div className="address-qr-modal" ref={dialogRef}>
         <button
           ref={closeButtonRef}
           className="address-qr-close"

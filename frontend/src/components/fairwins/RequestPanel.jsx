@@ -21,15 +21,28 @@ function RequestPanel() {
   const { address, isConnected, openConnectModal } = useWallet()
   const tokens = useChainTokens()
 
-  const [kind, setKind] = useState(getDefaultCurrencyKind)
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
-  const [generated, setGenerated] = useState(null) // { uri, note, amount, symbol } | null
+  const [kind, setKindState] = useState(getDefaultCurrencyKind)
+  const [amount, setAmountState] = useState('')
+  const [note, setNoteState] = useState('')
+  const [generated, setGenerated] = useState(null) // { uri, note, amount, symbol, address, chainId } | null
   const [formError, setFormError] = useState(null)
 
   const symbol = kind === 'stable' ? tokens.stable : tokens.native
   const amountValid = Number.isFinite(Number(amount)) && Number(amount) > 0
   const stableUnavailable = kind === 'stable' && !tokens.stableAddress
+
+  // A generated request is only valid for the wallet + network it was built
+  // for: if the user switches account or chain while the modal is open, the
+  // guard nulls it out so the QR can never pay the previous address/network.
+  const safeGenerated = generated && generated.address === address && generated.chainId === tokens.chainId
+    ? generated
+    : null
+
+  // Any input change invalidates a displayed code (belt-and-braces alongside
+  // the modal's focus trap, so a stale QR is never shown after an edit).
+  const setKind = useCallback((v) => { setKindState(v); setGenerated(null); setFormError(null) }, [])
+  const setAmount = useCallback((v) => { setAmountState(v); setGenerated(null); setFormError(null) }, [])
+  const setNote = useCallback((v) => { setNoteState(v); setGenerated(null); setFormError(null) }, [])
 
   const handleRequest = useCallback(() => {
     setFormError(null)
@@ -43,7 +56,7 @@ function RequestPanel() {
         amount,
         note,
       })
-      setGenerated({ uri, note: note.trim(), amount, symbol })
+      setGenerated({ uri, note: note.trim(), amount, symbol, address, chainId: tokens.chainId })
     } catch (err) {
       setFormError(err?.message || 'Could not create the request.')
     }
@@ -114,12 +127,12 @@ function RequestPanel() {
       </div>
 
       <RequestQRModal
-        isOpen={Boolean(generated)}
+        isOpen={Boolean(safeGenerated)}
         onClose={() => setGenerated(null)}
-        uri={generated?.uri}
-        amount={generated?.amount}
-        symbol={generated?.symbol}
-        note={generated?.note}
+        uri={safeGenerated?.uri}
+        amount={safeGenerated?.amount}
+        symbol={safeGenerated?.symbol}
+        note={safeGenerated?.note}
       />
     </div>
   )

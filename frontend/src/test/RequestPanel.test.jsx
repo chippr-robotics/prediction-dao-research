@@ -119,6 +119,29 @@ describe('RequestPanel (spec 058 US2)', () => {
     expect(requestButton()).toBeInTheDocument()
   })
 
+  it('invalidates a generated request when the connected account changes (no stale payee)', () => {
+    const { rerender } = render(<RequestPanel />)
+    typeAmount(['5'])
+    fireEvent.click(requestButton())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    // The wallet switches to a different account: the modal must drop the
+    // now-stale request rather than keep paying the previous address.
+    walletHolder.address = ethers.getAddress('0x9999999999999999999999999999999999999999')
+    rerender(<RequestPanel />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByTestId('request-qr')).toBeNull()
+  })
+
+  it('invalidates a generated request when the network changes', () => {
+    const { rerender } = render(<RequestPanel />)
+    typeAmount(['5'])
+    fireEvent.click(requestButton())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    tokensHolder.chainId = 1
+    rerender(<RequestPanel />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('blocks a stablecoin request honestly when the network has none configured', () => {
     tokensHolder.stableAddress = null
     tokensHolder.stable = 'USC'
