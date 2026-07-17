@@ -5,7 +5,7 @@ import AmountKeypad from '../ui/AmountKeypad'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
-import { useWallet, useWalletConnection } from '../../hooks'
+import { useWallet } from '../../hooks'
 import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
@@ -33,8 +33,7 @@ function formatUnitsForKeypad(units, decimals) {
  * Contract: specs/058-send-request-home/contracts/home-mode-components.md
  */
 function PayPanel({ onSuccess }) {
-  const { isConnected, chainId } = useWallet()
-  const { connectWallet } = useWalletConnection()
+  const { isConnected, chainId, openConnectModal } = useWallet()
   const { send, status, error: sendError, quoteGasless, balanceOf, refreshBalances, tokens } = useTransfer()
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
@@ -228,30 +227,35 @@ function PayPanel({ onSuccess }) {
 
   return (
     <div className="fm-form fm-pay-form pay-panel">
-      {/* Amount hero — the shared payments-style keypad; the token pill under
-          the amount switches the currency kind, showing the network's REAL
-          symbols (honest state — no fake "USDC" on networks without it). */}
+      {/* Amount hero — the shared payments-style keypad; the currency dropdown
+          sits directly under the amount (in place of a static pill) and shows
+          the network's REAL symbols (honest state — no fake "USDC" on networks
+          without it). */}
       <div className="fm-pay-hero">
         <AmountKeypad
           value={amount}
           onChange={setAmount}
           prefix="$"
           token={symbol}
+          tokenSlot={(
+            <>
+              <label className="sr-only" htmlFor="pay-token">Currency</label>
+              <select
+                id="pay-token"
+                className="fm-token-select fm-pay-token-select"
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+                disabled={busy}
+              >
+                <option value={TRANSFER_KIND.STABLE}>{tokens.stable}</option>
+                <option value={TRANSFER_KIND.NATIVE}>{tokens.native}</option>
+              </select>
+            </>
+          )}
           disabled={busy}
           ariaLabel="Amount to pay"
           id="pay-amount"
         />
-        <label className="sr-only" htmlFor="pay-token">Currency</label>
-        <select
-          id="pay-token"
-          className="fm-token-select fm-pay-token-select"
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-          disabled={busy}
-        >
-          <option value={TRANSFER_KIND.STABLE}>{tokens.stable}</option>
-          <option value={TRANSFER_KIND.NATIVE}>{tokens.native}</option>
-        </select>
       </div>
 
       {/* Recipient — the standard address entry stack (typed/pasted + book + scan). */}
@@ -326,7 +330,7 @@ function PayPanel({ onSuccess }) {
 
       <div className="fm-success-actions">
         {!isConnected ? (
-          <button type="button" className="fm-btn-primary" onClick={connectWallet}>
+          <button type="button" className="fm-btn-primary" onClick={() => openConnectModal()}>
             Connect wallet
           </button>
         ) : chainMismatch ? (

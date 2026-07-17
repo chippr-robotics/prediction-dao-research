@@ -5,10 +5,14 @@ const USDC = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 const RECIPIENT = '0x2222222222222222222222222222222222222222'
 const BOOK_ADDR = '0x3333333333333333333333333333333333333333'
 
-const walletHolder = { isConnected: true, connectWallet: vi.fn() }
+const walletHolder = { isConnected: true, openConnectModal: vi.fn() }
 vi.mock('../hooks', () => ({
-  useWallet: () => ({ isConnected: walletHolder.isConnected, address: '0xabc', chainId: 137 }),
-  useWalletConnection: () => ({ connectWallet: walletHolder.connectWallet }),
+  useWallet: () => ({
+    isConnected: walletHolder.isConnected,
+    address: '0xabc',
+    chainId: 137,
+    openConnectModal: walletHolder.openConnectModal,
+  }),
 }))
 
 const transferHolder = {}
@@ -93,19 +97,19 @@ describe('PayPanel (spec 058 US1)', () => {
     localStorage.clear()
     resetTransferHolder()
     walletHolder.isConnected = true
-    walletHolder.connectWallet = vi.fn()
+    walletHolder.openConnectModal = vi.fn()
     screeningHolder.result = 'clear'
     notifyHolder.showNotification = vi.fn()
     switchHolder.switchChainAsync = vi.fn(async () => {})
   })
 
-  it('defaults the hero to the stablecoin (USDC) and shows honest symbols in the currency pill', () => {
-    const { container } = render(<PayPanel />)
-    expect(container.querySelector('.amount-keypad-token')).toHaveTextContent('USDC')
-    const pill = screen.getByLabelText('Currency')
-    expect(pill).toHaveValue('stable')
-    fireEvent.change(pill, { target: { value: 'native' } })
-    expect(container.querySelector('.amount-keypad-token')).toHaveTextContent('POL')
+  it('defaults the hero to the stablecoin (USDC) and shows honest symbols in the currency dropdown', () => {
+    render(<PayPanel />)
+    const select = screen.getByLabelText('Currency')
+    expect(select).toHaveValue('stable')
+    expect(screen.getByRole('option', { name: 'USDC' }).selected).toBe(true)
+    fireEvent.change(select, { target: { value: 'native' } })
+    expect(screen.getByRole('option', { name: 'POL' }).selected).toBe(true)
   })
 
   it('starts on the preferred currency kind from the device preference', async () => {
@@ -143,12 +147,12 @@ describe('PayPanel (spec 058 US1)', () => {
     expect(payButton()).toBeDisabled()
   })
 
-  it('shows a connect prompt instead of Pay when disconnected', () => {
+  it('opens the connect modal instead of Pay when disconnected', () => {
     walletHolder.isConnected = false
     render(<PayPanel />)
     const connect = screen.getByRole('button', { name: /connect wallet/i })
     fireEvent.click(connect)
-    expect(walletHolder.connectWallet).toHaveBeenCalled()
+    expect(walletHolder.openConnectModal).toHaveBeenCalled()
   })
 
   it('prefills the recipient from an address-book pick', () => {

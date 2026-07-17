@@ -17,8 +17,7 @@ const TOKENS = {
 }
 
 vi.mock('../hooks', () => ({
-  useWallet: () => ({ isConnected: true, address: REQUESTER, chainId: 137 }),
-  useWalletConnection: () => ({ connectWallet: vi.fn() }),
+  useWallet: () => ({ isConnected: true, address: REQUESTER, chainId: 137, openConnectModal: vi.fn() }),
 }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: () => TOKENS }))
 vi.mock('../hooks/useClipboard', () => ({ useClipboard: () => ({ copied: false, copy: vi.fn() }) }))
