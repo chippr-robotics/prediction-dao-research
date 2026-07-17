@@ -104,6 +104,19 @@ describe('NotificationProfilesPanel', () => {
     expect(screen.getByText(/No profiles yet/i)).toBeInTheDocument()
   })
 
+  it('embeds the base-layer delivery controls behind a "Delivery settings" disclosure', () => {
+    renderPanel()
+    const toggle = screen.getByRole('button', { name: /Delivery settings/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    // Collapsed: base-layer controls hidden; no duplicate standalone heading anywhere.
+    expect(screen.queryByText('Mobile push notifications')).toBeNull()
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Mobile push notifications')).toBeInTheDocument()
+    // Embedded mode drops the old panel's own "Notifications" heading.
+    expect(screen.queryByRole('heading', { name: 'Notifications' })).toBeNull()
+  })
+
   it('Save is blocked while the schedule is enabled with no days', () => {
     createProfile({ name: 'Work' })
     renderPanel()

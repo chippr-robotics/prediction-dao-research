@@ -61,7 +61,8 @@ npm run frontend   # Vite dev server
    status clears, base-layer behavior resumes.
 6. **Base parity (FR-011/016)** — in a fresh browser profile (no localStorage
    key): notification behavior identical to production today; the
-   Push/In-app/Silent grid and master push toggle work unchanged.
+   Push/In-app/Silent grid and master push toggle work unchanged, now under
+   the "Delivery settings" disclosure inside the profiles section.
 7. **Accessibility (FR-017)** — walk the wizard and quick access with
    keyboard only (Tab/Space/Enter/Escape); verify toggles announce state
    (`role="switch"`/`aria-pressed`), the wizard traps focus like existing

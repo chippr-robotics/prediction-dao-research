@@ -284,3 +284,41 @@
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
+
+/* Base-layer delivery controls disclosure (former standalone section) */
+.notif-profiles-delivery {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.notif-profiles-delivery-toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
+  padding: 0.75rem 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.notif-profiles-delivery-toggle:hover,
+.notif-profiles-delivery-toggle:focus-visible {
+  background: var(--border-color);
+  outline: none;
+}
+
+.notif-profiles-delivery-chevron {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.notif-profiles-delivery-body {
+  padding: 0.25rem 0.25rem 0.5rem;
+}

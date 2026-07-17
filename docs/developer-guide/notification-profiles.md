@@ -59,10 +59,14 @@ spans midnight and the window belongs to its start day.
 
 ## Surfaces
 
-- **Settings** — `components/account/NotificationProfilesPanel.jsx`, rendered
-  above the base-layer `NotificationPreferencesPanel` in Wallet → Preferences →
-  Notifications. Hosts the 4-step `ProfileWizard` (name+emoji presets →
-  allow-list+exceptions → schedule → confirmation) and the inline editor.
+- **Settings** — `components/account/NotificationProfilesPanel.jsx`, the
+  single Notifications section in Wallet → Preferences. Hosts the 4-step
+  `ProfileWizard` (name+emoji presets → allow-list+exceptions → schedule →
+  confirmation) and the inline editor. The base-layer
+  `NotificationPreferencesPanel` (master push toggle + per-category
+  push/app/silent grid) no longer stands alone — it renders inside this
+  panel's collapsed "Delivery settings" disclosure (`embedded` prop) so there
+  is one notifications surface, profiles-first.
   Deep links: `/wallet?tab=preferences#notification-profiles` (scroll) and
   `…#notification-profiles-new` (open wizard).
 - **Quick access** — `components/notifications/profiles/ProfileQuickAccess.jsx`,

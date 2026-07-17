@@ -11,6 +11,7 @@ import { NOTIFICATION_CATEGORIES } from '../../lib/notifications/deliveryPrefere
 import ProfileWizard from '../notifications/profiles/ProfileWizard'
 import ProfileScheduleFields from '../notifications/profiles/ProfileScheduleFields'
 import { profileStatusText } from '../notifications/profiles/statusText'
+import NotificationPreferencesPanel from './NotificationPreferencesPanel'
 import './NotificationProfilesPanel.css'
 
 /**
@@ -158,12 +159,13 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
 }
 
 /**
- * NotificationProfilesPanel — the "Notification profiles" area of the
+ * NotificationProfilesPanel — the single "Notifications" area of the
  * Preferences tab (spec 059). Lists this device's profiles with truthful
  * active state, offers per-profile on/off, editing, deletion, and hosts the
- * 4-step creation wizard. Renders above the base-layer
- * NotificationPreferencesPanel, which keeps deciding HOW allowed updates are
- * delivered.
+ * 4-step creation wizard. The base-layer NotificationPreferencesPanel (which
+ * keeps deciding HOW allowed updates are delivered) is embedded below in a
+ * "Delivery settings" disclosure so the tab has exactly one notifications
+ * section.
  */
 function NotificationProfilesPanel() {
   const {
@@ -177,6 +179,7 @@ function NotificationProfilesPanel() {
   const location = useLocation()
   const [wizardOpen, setWizardOpen] = useState(() => location.hash === '#notification-profiles-new')
   const [editingId, setEditingId] = useState(null)
+  const [deliveryOpen, setDeliveryOpen] = useState(false)
 
   // Deep links from the quick-access surface: #notification-profiles scrolls
   // here; #notification-profiles-new also opens the wizard (covers hash
@@ -272,6 +275,30 @@ function NotificationProfilesPanel() {
           <button type="button" className="notif-profiles-new" onClick={() => setWizardOpen(true)}>
             + New profile
           </button>
+
+          {/* Base-layer delivery controls (spec 059 consolidation): the former
+              standalone Notifications section lives here so the Preferences
+              tab has exactly one notifications surface. Profiles decide WHEN
+              you're interrupted; these decide HOW allowed updates arrive. */}
+          <div className="notif-profiles-delivery">
+            <button
+              type="button"
+              className="notif-profiles-delivery-toggle"
+              aria-expanded={deliveryOpen}
+              aria-controls="notif-profiles-delivery-body"
+              onClick={() => setDeliveryOpen((v) => !v)}
+            >
+              <span>Delivery settings</span>
+              <span className="notif-profiles-delivery-chevron" aria-hidden="true">
+                {deliveryOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {deliveryOpen && (
+              <div id="notif-profiles-delivery-body" className="notif-profiles-delivery-body">
+                <NotificationPreferencesPanel embedded />
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
