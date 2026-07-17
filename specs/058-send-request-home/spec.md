@@ -22,6 +22,14 @@ leaving the home surface. This is a frontend presentation and flow feature:
 sending value reuses the existing transfer flow, and no new on-chain behavior
 is introduced.
 
+## Clarifications
+
+### Session 2026-07-17
+
+- Q: What should the "default value" preference control for the home amount display? → A: Default **currency only** (preset USDC); the amount always starts at $0 — no default-amount preference.
+- Q: Where does the mobile bottom nav (Pay / Request / Wager glyphs) appear? → A: **Home surface only** — it switches the home modes in place; other app sections keep their existing navigation.
+- Q: What format does the Request QR encode? → A: A **standard payment URI first** (recipient, amount, asset, network — scannable by any wallet); the note rides as an extra parameter that FairWins reads and other wallets safely ignore. The note is also shown as text alongside the QR.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Pay someone from the home screen (Priority: P1)
@@ -238,7 +246,9 @@ hero defaults to the chosen currency.
 - **FR-006**: The Request mode MUST let the user enter an amount and a note
   and, on pressing "Request", generate a payment request encoding the
   requester's receiving address, amount, currency, and network in a standard,
-  widely scannable payment-request format.
+  widely scannable payment-URI format. The note MUST be carried as an
+  additional parameter that FairWins clients read and other wallets safely
+  ignore, and MUST also be displayed as plain text alongside the QR code.
 - **FR-007**: The generated request MUST be displayed as a QR code and MUST
   also be copyable/shareable as text or link for remote payers.
 - **FR-008**: Scanning a FairWins-generated request from the Pay mode's
@@ -250,7 +260,8 @@ hero defaults to the chosen currency.
   navigation bar with exactly three glyph items — Pay (outgoing-arrow
   iconography), Request (incoming-arrow iconography), and Wager
   (head-to-head iconography) — that switch the home mode in place, with the
-  active mode visibly indicated.
+  active mode visibly indicated. The bar is scoped to the home surface only;
+  it does not appear on other app sections, whose navigation is unchanged.
 - **FR-011**: On larger viewports, the same three modes MUST remain reachable
   via an equivalent switcher; no mode may be mobile-only.
 - **FR-012**: The Wager mode MUST be the existing create-a-challenge home
@@ -314,8 +325,8 @@ hero defaults to the chosen currency.
 ## Assumptions
 
 - "Default value in preferences" refers to the default **currency** shown in
-  the amount hero (USDC out of the box). A default *amount* is not included;
-  if desired later it is an additive preference.
+  the amount hero (USDC out of the box), per clarification. A default *amount*
+  preference is explicitly out of scope; the amount always starts at $0.
 - Sending value reuses the app's existing transfer capability (wallet
   transfer flow with its screening, fee disclosure, and — where available —
   gas sponsorship). This feature changes where that capability lives and how
