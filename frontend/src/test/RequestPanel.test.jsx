@@ -5,16 +5,19 @@ import { ethers } from 'ethers'
 const MY_ADDRESS = ethers.getAddress('0x5555555555555555555555555555555555555555')
 const USDC = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 
-const walletHolder = { isConnected: true, address: MY_ADDRESS, connectWallet: vi.fn() }
+const walletHolder = { isConnected: true, address: MY_ADDRESS, openConnectModal: vi.fn() }
 vi.mock('../hooks', () => ({
-  useWallet: () => ({ isConnected: walletHolder.isConnected, address: walletHolder.address }),
-  useWalletConnection: () => ({ connectWallet: walletHolder.connectWallet }),
+  useWallet: () => ({
+    isConnected: walletHolder.isConnected,
+    address: walletHolder.address,
+    openConnectModal: walletHolder.openConnectModal,
+  }),
 }))
 
 const tokensHolder = {}
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: () => tokensHolder }))
 
-const clipboardHolder = { copied: false, copy: vi.fn() }
+const clipboardHolder = { copied: false, error: null, copy: vi.fn() }
 vi.mock('../hooks/useClipboard', () => ({ useClipboard: () => clipboardHolder }))
 
 vi.mock('qrcode.react', () => ({
@@ -36,8 +39,9 @@ describe('RequestPanel (spec 058 US2)', () => {
     localStorage.clear()
     walletHolder.isConnected = true
     walletHolder.address = MY_ADDRESS
-    walletHolder.connectWallet = vi.fn()
+    walletHolder.openConnectModal = vi.fn()
     clipboardHolder.copied = false
+    clipboardHolder.error = null
     clipboardHolder.copy = vi.fn()
     Object.assign(tokensHolder, {
       chainId: 137, networkName: 'Polygon',
@@ -53,17 +57,16 @@ describe('RequestPanel (spec 058 US2)', () => {
     expect(requestButton()).toBeEnabled()
   })
 
-  it('prompts to connect before a code can be generated (US2 scenario 4)', () => {
+  it('opens the connect modal before a code can be generated (US2 scenario 4)', () => {
     walletHolder.isConnected = false
     walletHolder.address = null
     render(<RequestPanel />)
     typeAmount(['4'])
-    const connect = screen.getByRole('button', { name: /connect wallet/i })
-    fireEvent.click(connect)
-    expect(walletHolder.connectWallet).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /connect wallet/i }))
+    expect(walletHolder.openConnectModal).toHaveBeenCalled()
   })
 
-  it('generates a valid EIP-681 QR carrying address, amount, currency, network, and note (FR-006/FR-007)', () => {
+  it('generates a valid EIP-681 QR in a modal carrying address, amount, currency, network, and note (FR-006/FR-007)', () => {
     render(<RequestPanel />)
     typeAmount(['1', '2', '.', '5'])
     fireEvent.change(screen.getByLabelText(/what's it for/i), { target: { value: 'pizza night' } })
@@ -71,12 +74,14 @@ describe('RequestPanel (spec 058 US2)', () => {
     const expected = buildPaymentRequestUri({
       chainId: 137, to: MY_ADDRESS, kind: 'stable', tokenAddress: USDC, decimals: 6, amount: '12.5', note: 'pizza night',
     })
+    // The QR is presented in the shared branded dialog.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByTestId('request-qr')).toHaveAttribute('data-value', expected)
-    // The note is ALSO plain text beside the code (third-party wallets ignore the param).
+    // The note is ALSO plain text under the code (third-party wallets ignore the param).
     expect(screen.getByText('pizza night')).toBeInTheDocument()
   })
 
-  it('generates a native-coin request when the currency pill is on the native kind', () => {
+  it('generates a native-coin request when the currency dropdown is on the native kind', () => {
     render(<RequestPanel />)
     fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'native' } })
     typeAmount(['2'])
@@ -87,7 +92,7 @@ describe('RequestPanel (spec 058 US2)', () => {
     expect(screen.getByTestId('request-qr')).toHaveAttribute('data-value', expected)
   })
 
-  it('copies the request URI', () => {
+  it('copies the request URI from the modal', () => {
     render(<RequestPanel />)
     typeAmount(['3'])
     fireEvent.click(requestButton())
@@ -104,13 +109,14 @@ describe('RequestPanel (spec 058 US2)', () => {
     expect(clipboardHolder.copy).toHaveBeenCalledWith(expect.stringContaining('ethereum:'))
   })
 
-  it('clears a displayed code the moment any input changes (stale-QR prevention)', () => {
+  it('closes the QR modal, returning to the editable form', () => {
     render(<RequestPanel />)
     typeAmount(['3'])
     fireEvent.click(requestButton())
     expect(screen.getByTestId('request-qr')).toBeInTheDocument()
-    typeAmount(['0'])
+    fireEvent.click(screen.getByRole('button', { name: /close payment request/i }))
     expect(screen.queryByTestId('request-qr')).toBeNull()
+    expect(requestButton()).toBeInTheDocument()
   })
 
   it('blocks a stablecoin request honestly when the network has none configured', () => {

@@ -78,6 +78,13 @@
   text-transform: uppercase;
 }
 
+/* Host-provided currency control slotted under the amount, in place of the
+   static token pill (spec 058 feedback). Centers whatever the host renders. */
+.amount-keypad-token-slot {
+  display: flex;
+  justify-content: center;
+}
+
 /* ── Number pad ────────────────────────────────────────────────────── */
 .amount-keypad-pad {
   display: grid;

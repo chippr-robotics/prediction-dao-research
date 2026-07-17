@@ -117,6 +117,22 @@ describe('AmountKeypad', () => {
     expect(live).toHaveTextContent(/USDC/)
   })
 
+  it('renders a host-provided tokenSlot in place of the static token pill (spec 058)', () => {
+    const { container } = render(
+      <Harness
+        prefix="$"
+        token="USDC"
+        initial="5"
+        tokenSlot={<button type="button">pick currency</button>}
+      />,
+    )
+    // The interactive slot renders; the static pill does not.
+    expect(screen.getByRole('button', { name: 'pick currency' })).toBeInTheDocument()
+    expect(container.querySelector('.amount-keypad-token')).toBeNull()
+    // The token still drives the sr-only live announcement.
+    expect(screen.getByRole('status')).toHaveTextContent(/USDC/)
+  })
+
   it('accepts hardware keyboard digits, decimal and backspace', () => {
     render(<Harness />)
     const group = screen.getByRole('group')

@@ -18,7 +18,7 @@ vi.mock('../components/fairwins/PolymarketTickerCrawler', () => ({
 }))
 
 vi.mock('../hooks', () => ({
-  useWallet: () => ({ isConnected: true, address: '0x5555555555555555555555555555555555555555', chainId: 137 }),
+  useWallet: () => ({ isConnected: true, address: '0x5555555555555555555555555555555555555555', chainId: 137, openConnectModal: vi.fn() }),
   useWalletConnection: () => ({ connectWallet: vi.fn() }),
 }))
 vi.mock('../hooks/useUI', () => ({

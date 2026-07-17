@@ -63,6 +63,7 @@ function AmountKeypad({
   onChange,
   prefix = '$',
   token = null,
+  tokenSlot = null,
   disabled = false,
   maxFractionDigits = 2,
   id,
@@ -114,7 +115,12 @@ function AmountKeypad({
           {prefix && <span className="amount-keypad-prefix">{prefix}</span>}
           <span className="amount-keypad-value">{displayValue}</span>
         </div>
-        {token && <span className="amount-keypad-token">{token}</span>}
+        {/* A host can slot an interactive currency control (e.g. a token
+            dropdown) directly under the amount in place of the static pill;
+            the sr-only announcement still uses `token` for the live value. */}
+        {tokenSlot
+          ? <div className="amount-keypad-token-slot">{tokenSlot}</div>
+          : token && <span className="amount-keypad-token">{token}</span>}
         <span className="sr-only" role="status" aria-live="polite">{announced}</span>
       </div>
 
