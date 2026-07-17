@@ -85,6 +85,36 @@
   justify-content: center;
 }
 
+/* A currency <select> in the slot reads as a natural part of the hero — no
+   hard pill border or fill, just the muted symbol + caret, matching the old
+   token label. (The browser's default select border/background is removed
+   here since .fm-token-select only strips the native appearance/arrow.) */
+.amount-keypad .amount-keypad-token-slot select {
+  border: none;
+  background-color: transparent;
+  box-shadow: none;
+  min-width: 0;
+  width: auto;
+  padding: 0.1rem 1.35rem 0.1rem 0.5rem;
+  color: var(--text-secondary, #7A8590);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  text-align-last: center;
+}
+
+.amount-keypad .amount-keypad-token-slot select:hover:not(:disabled) {
+  color: var(--text-primary, #E6EDF3);
+}
+
+.amount-keypad .amount-keypad-token-slot select:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* ── Number pad ────────────────────────────────────────────────────── */
 .amount-keypad-pad {
   display: grid;
