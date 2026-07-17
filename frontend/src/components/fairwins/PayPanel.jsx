@@ -263,13 +263,14 @@ function PayPanel({ onSuccess }) {
         <label className="fm-label" htmlFor="pay-to">To</label>
         <div className="fm-input-with-action">
           <div className="fm-address-input-wrap">
+            {/* No inline address-book addon — the icon button beside the field
+                is the single address-book affordance (design feedback). */}
             <AddressInput
               id="pay-to"
               value={toRaw}
               onChange={(e) => setToRaw(e.target.value)}
               onResolvedChange={(addr) => setToResolved(addr || '')}
               chainId={connectedChainId}
-              enableAddressBook
               placeholder="0x…, %callsign, or ENS name"
               disabled={busy}
             />

@@ -383,15 +383,11 @@ function CreateChallengePanel({
         </>
       ) : (
         // Wager description demoted to a Venmo/Cash-App-style memo below the amount.
+        // No label/InfoTip — the placeholder itself explains the intent (design feedback).
         <div className="fm-form-group fm-form-full fm-pay-memo">
-          <span className="fm-label-row">
-            <label htmlFor="oc-desc">What&apos;s the wager? <span className="fm-required">*</span></label>
-            <InfoTip label="About: What's the wager?">
-              Phrase it so it&apos;s clear which side you&apos;re on; the taker takes the opposite.
-            </InfoTip>
-          </span>
+          <label htmlFor="oc-desc" className="sr-only">What&apos;s the wager?</label>
           <input
-            id="oc-desc" type="text" maxLength={200} className="fm-pay-memo-input"
+            id="oc-desc" type="text" maxLength={200} className="fm-pay-memo-input" required
             placeholder="Add a note — e.g. I'm betting NO that it rains in Denver tomorrow"
             value={description} onChange={(e) => setDescription(e.target.value)} disabled={busy}
           />
