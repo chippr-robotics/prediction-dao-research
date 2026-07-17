@@ -670,10 +670,6 @@
   color: var(--brand-primary, #36B37E);
 }
 
-.fm-pay-oracle-hint {
-  text-align: center;
-}
-
 /* Multi-token select under the amount hero (1v1 surface) — compact, centered,
    sits directly beneath the amount rather than inline with a text input. */
 .fm-pay-hero .fm-pay-token-select {

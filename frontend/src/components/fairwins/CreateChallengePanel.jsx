@@ -408,13 +408,6 @@ function CreateChallengePanel({
         />
       )}
 
-      {/* Oracle timeline is set by the event, not edited here — one compact line. */}
-      {isOracle && market && oracleTimeline?.eligible && (
-        <p className="fm-hint fm-pay-oracle-hint">
-          Takeable until the market closes (up to 30 days) · settles when Polymarket resolves it.
-        </p>
-      )}
-
       {progress && <p className="fm-hint" role="status">{progress.message}</p>}
       {error && <div className="fm-error-banner" role="alert">{error}</div>}
 
