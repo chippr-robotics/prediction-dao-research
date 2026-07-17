@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useActivity } from '../../hooks/useActivity'
 import { domainLabel } from '../../data/notifications/domains'
+import ProfileQuickAccess from './profiles/ProfileQuickAccess'
 import './ActivityFeed.css'
 
 const SEVERITY_ICONS = { success: '✓', warning: '⚠', error: '✗', info: 'ℹ' }
@@ -85,6 +86,9 @@ function ActivityFeed({ onClose }) {
           </button>
         )}
       </div>
+
+      {/* Signal-style notification profiles quick access (spec 059). */}
+      <ProfileQuickAccess onClose={onClose} />
 
       {domains.length > 1 && (
         <div className="activity-feed-filters" role="group" aria-label="Filter activity by domain">

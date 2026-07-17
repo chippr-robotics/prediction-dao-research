@@ -45,6 +45,11 @@ export const MAX_PROFILE_NAME_LENGTH = 32
 /** Signal's schedule defaults: 9 AM – 5 PM, no days preselected. */
 export const DEFAULT_SCHEDULE = Object.freeze({ enabled: false, start: '09:00', end: '17:00', days: [] })
 
+/** Whether a draft schedule may be saved: enabled requires at least one day (FR-005). */
+export function isScheduleDraftValid(schedule) {
+  return !schedule?.enabled || (schedule.days?.length || 0) > 0
+}
+
 const KNOWN_DOMAINS = NOTIFICATION_CATEGORIES.map((c) => c.domain)
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 const HOUR_MS = 3_600_000
