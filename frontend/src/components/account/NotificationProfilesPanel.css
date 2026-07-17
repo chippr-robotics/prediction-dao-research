@@ -1,0 +1,286 @@
+/* NotificationProfilesPanel — Signal-style notification profiles on the
+   Preferences tab (spec 059). Sits above NotificationPreferencesPanel and
+   reuses its switch look (.notif-pref-switch) for on/off controls. */
+
+.notif-profiles-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notif-profiles-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notif-profiles-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.notif-profiles-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+}
+
+.notif-profiles-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-profiles-row {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.6rem 0;
+}
+
+.notif-profiles-row:last-child {
+  border-bottom: none;
+}
+
+.notif-profiles-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.notif-profiles-emoji {
+  font-size: 1.3rem;
+  width: 1.75rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.notif-profiles-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-profiles-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notif-profiles-status {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.notif-profiles-edit {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.notif-profiles-edit:hover,
+.notif-profiles-edit:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  outline: none;
+}
+
+.notif-profiles-new {
+  appearance: none;
+  align-self: flex-start;
+  border: 1px dashed var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.notif-profiles-new:hover,
+.notif-profiles-new:focus-visible {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  outline: none;
+}
+
+/* Inline editor */
+.notif-profile-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.notif-profile-editor-name input[type='text'] {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.notif-profile-editor-name input[type='text']:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -1px;
+}
+
+.notif-profile-editor-emojis {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.notif-profile-emoji-btn {
+  appearance: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.notif-profile-emoji-btn.selected {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 1px var(--brand-primary);
+}
+
+.notif-profile-emoji-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.notif-profile-editor-heading {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
+.notif-profile-editor-domains {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.2rem;
+}
+
+.notif-profile-editor-domain {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  padding: 0.25rem 0;
+  cursor: pointer;
+}
+
+.notif-profile-editor-domain input[type='checkbox'] {
+  accent-color: var(--brand-primary);
+  width: 1rem;
+  height: 1rem;
+}
+
+.notif-profile-editor-exception {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  padding: 0.3rem 0;
+}
+
+.notif-profile-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.notif-profile-editor-spacer {
+  flex: 1;
+}
+
+.notif-profile-save-btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--brand-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
+.notif-profile-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.notif-profile-cancel-btn {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.notif-profile-delete-btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--color-error, #b91c1c);
+  cursor: pointer;
+}
+
+.notif-profile-delete-btn:hover,
+.notif-profile-delete-btn:focus-visible {
+  background: color-mix(in srgb, var(--color-error, #b91c1c) 10%, transparent);
+  outline: none;
+}
+
+.notif-profile-delete-confirm-text {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.notif-profile-save-btn:focus-visible,
+.notif-profile-cancel-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}

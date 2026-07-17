@@ -1,0 +1,348 @@
+/* ProfileWizard — 4-step notification-profile creation flow (spec 059).
+   Rendered inline inside the Preferences panel; visual language follows
+   NotificationPreferencesPanel.css. Shared schedule-field styles live here
+   because the wizard and the edit surface both mount ProfileScheduleFields. */
+
+.profile-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-secondary, transparent);
+}
+
+.profile-wizard-top {
+  display: flex;
+  justify-content: space-between;
+  min-height: 1.5rem;
+}
+
+.profile-wizard-back,
+.profile-wizard-close,
+.profile-wizard-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+}
+
+.profile-wizard-back:hover,
+.profile-wizard-close:hover,
+.profile-wizard-clear:hover {
+  color: var(--text-primary);
+  background: var(--border-color);
+}
+
+.profile-wizard-close {
+  margin-left: auto;
+}
+
+.profile-wizard-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.profile-wizard-title:focus {
+  outline: none;
+}
+
+.profile-wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.profile-wizard-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Step 1 — name + emoji */
+.profile-wizard-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-wizard-emoji {
+  font-size: 1.5rem;
+}
+
+.profile-wizard-name-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-wizard-name-row input[type='text'] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.profile-wizard-name-row input[type='text']:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -1px;
+}
+
+.profile-wizard-presets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-wizard-presets button {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  padding: 0.65rem 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.profile-wizard-presets li:last-child button {
+  border-bottom: none;
+}
+
+.profile-wizard-presets button:hover,
+.profile-wizard-presets button:focus-visible {
+  background: var(--border-color);
+  outline: none;
+}
+
+/* Step 2 — allow-list + exceptions */
+.profile-wizard-domains {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-wizard-domain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.25rem;
+  cursor: pointer;
+}
+
+.profile-wizard-domain input[type='checkbox'] {
+  margin-top: 0.2rem;
+  accent-color: var(--brand-primary);
+  width: 1rem;
+  height: 1rem;
+}
+
+.profile-wizard-domain-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.profile-wizard-domain-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.profile-wizard-domain-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.profile-wizard-subheading {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-wizard-exception {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-wizard-exception:last-of-type {
+  border-bottom: none;
+}
+
+.profile-wizard-exception-label {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.profile-wizard-warn {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-warning, #b45309);
+}
+
+/* Step 4 — confirmation */
+.profile-wizard-done {
+  align-items: center;
+  text-align: center;
+}
+
+.profile-wizard-done-emoji {
+  font-size: 2.5rem;
+}
+
+.profile-wizard-done-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Actions */
+.profile-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.profile-wizard-next {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--brand-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
+.profile-wizard-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-wizard-next:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Shared schedule fields (wizard + edit surface) */
+.profile-schedule-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.profile-schedule-master {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile-schedule-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-schedule-times {
+  display: flex;
+  gap: 1rem;
+}
+
+.profile-schedule-times.muted,
+.profile-schedule-days.muted {
+  opacity: 0.6;
+}
+
+.profile-schedule-time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.profile-schedule-time input[type='time'] {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.profile-schedule-time input[type='time']:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -1px;
+}
+
+.profile-schedule-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.profile-schedule-days {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.profile-schedule-day {
+  appearance: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.profile-schedule-day.selected {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.profile-schedule-day:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.profile-schedule-warn {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-warning, #b45309);
+}

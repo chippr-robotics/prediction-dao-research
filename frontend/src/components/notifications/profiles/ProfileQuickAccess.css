@@ -1,0 +1,159 @@
+/* ProfileQuickAccess — Signal-style profile sheet pinned atop the ActivityFeed
+   panel (spec 059). Follows ActivityFeed.css visual language. */
+
+.profile-qa {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+}
+
+.profile-qa-headline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.profile-qa-emoji {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.profile-qa-headline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-qa-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-qa-status {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.profile-qa-expand {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.profile-qa-expand:hover,
+.profile-qa-expand:focus-visible {
+  color: var(--text-primary);
+  background: var(--border-color);
+  outline: none;
+}
+
+.profile-qa-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+}
+
+.profile-qa-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.profile-qa-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-qa-row-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.profile-qa-row-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.profile-qa-action {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.profile-qa-action:hover,
+.profile-qa-action:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  outline: none;
+}
+
+.profile-qa-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.profile-qa-link,
+.profile-qa-new {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--brand-primary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.35rem 0.25rem;
+  border-radius: 6px;
+}
+
+.profile-qa-link:hover,
+.profile-qa-link:focus-visible,
+.profile-qa-new:hover,
+.profile-qa-new:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.profile-qa-new {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.profile-qa-new-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--border-color);
+  font-size: 0.9rem;
+}
