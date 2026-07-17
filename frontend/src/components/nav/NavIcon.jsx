@@ -50,6 +50,13 @@ const ICON_PATHS = {
   // Share address as QR (spec 011 quick-share entry point) — the three QR
   // finder-pattern corners plus scattered data pixels, universally read as "QR".
   qrcode: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h3v3" /><path d="M20 14v.01" /><path d="M14 20v.01" /><path d="M20 20v.01" /><path d="M17 17v.01" /></>,
+  // Home bottom bar (spec 058) — Pay: value leaving, an up-right outgoing arrow.
+  arrowOut: <><path d="M7 17 17 7" /><path d="M9.5 7H17v7.5" /></>,
+  // Home bottom bar (spec 058) — Request: value arriving, a down-left incoming arrow.
+  arrowIn: <><path d="M17 7 7 17" /><path d="M14.5 17H7V9.5" /></>,
+  // Home bottom bar (spec 058) — Wager: head-to-head, two parties facing off
+  // (visually consistent with the create view's EitherSideIcon).
+  headToHead: <><circle cx="7" cy="9" r="2.5" /><circle cx="17" cy="9" r="2.5" /><path d="M2.5 19v-.8a4 4 0 0 1 4-4h1" /><path d="M21.5 19v-.8a4 4 0 0 0-4-4h-1" /><path d="M10.5 12.5h3" /><path d="m12 11 1.5 1.5L12 14" /></>,
 }
 
 export default function NavIcon({ name, size = 18, className = '' }) {

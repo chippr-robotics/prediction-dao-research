@@ -1,26 +1,47 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useWallet, useWalletConnection } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import CreateChallengePanel from './CreateChallengePanel'
+import PayPanel from './PayPanel'
+import RequestPanel from './RequestPanel'
 import UnifiedLookupModal from './UnifiedLookupModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
+import SectionIconNav from '../nav/SectionIconNav'
+import NavIcon from '../nav/NavIcon'
+import PillSelect from '../ui/PillSelect'
 import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import { OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
+import { getDefaultHomeMode, subscribe as subscribeHomePreference } from '../../utils/homePreference'
 import './Dashboard.css'
 import './HomeScreen.css'
 
 /**
- * HomeScreen (spec 053) — the app's landing surface at /app. It opens directly on the
- * open-challenge create view (the shared CreateChallengePanel, rendered inline), the way a
- * payments app opens on its amount keypad. Two secondary entries sit beside it — "Accept a
- * challenge" (the unified phrase lookup) and "My rewards" (My Wagers, which surfaces claimable
- * winnings) — plus the Polymarket ticker, whose picks route into the create view's oracle path.
- * The full set of wager types/actions lives in the Wagers section (/wagers).
+ * HomeScreen (specs 053 + 058) — the app's landing surface at /app, now a
+ * three-mode money surface sharing one payments-style layout:
+ *
+ *   pay     — send value (default; spec 058 US1)
+ *   request — generate a payment-request QR (spec 058 US2)
+ *   wager   — the spec-053 create-a-challenge view, unchanged
+ *
+ * All three panels stay MOUNTED while the screen is open — the inactive two
+ * get the `hidden` attribute — so each mode's draft survives switching and
+ * never leaks into another mode (FR-015). The switcher is the SectionIconNav
+ * bottom bar on mobile (outgoing / incoming / head-to-head glyphs) and a
+ * PillSelect row on larger viewports; the wager-only extras (Accept a
+ * challenge, My Wagers, the Polymarket ticker) render only in wager mode.
  */
+
+const MODE_OPTIONS = [
+  { id: 'pay', label: 'Pay', icon: 'arrowOut' },
+  { id: 'request', label: 'Request', icon: 'arrowIn' },
+  { id: 'wager', label: 'Wager', icon: 'headToHead' },
+]
+
 function HomeScreen() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -28,6 +49,22 @@ function HomeScreen() {
   const { connectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
   const { friendMarkets } = useFriendMarkets()
+  const isMobile = useIsMobile()
+
+  // Which mode the surface is on. Initialized from the device preference
+  // (spec 058 US4); a preference change made elsewhere only moves the surface
+  // until the user has picked a mode themselves this visit.
+  const [mode, setMode] = useState(getDefaultHomeMode)
+  const userPickedRef = useRef(false)
+
+  useEffect(() => subscribeHomePreference(() => {
+    if (!userPickedRef.current) setMode(getDefaultHomeMode())
+  }), [])
+
+  const selectMode = useCallback((next) => {
+    userPickedRef.current = true
+    setMode(next)
+  }, [])
 
   // Preselect the oracle path (from the ticker) and force-remount the panel so a fresh
   // create starts cleanly after a success or a ticker pick.
@@ -50,6 +87,7 @@ function HomeScreen() {
     if (openWagerId == null) return
     setInitialWagerId(String(openWagerId))
     setShowMyWagers(true)
+    setMode('wager')
     navigate(location.pathname, { replace: true, state: {} })
   }, [location.state, location.pathname, navigate])
 
@@ -61,6 +99,7 @@ function HomeScreen() {
       setUnifiedInitialPhrase(code)
       setUnifiedAutoResolve(true)
       setShowUnifiedLookup(true)
+      setMode('wager')
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.search, location.pathname, navigate])
@@ -71,9 +110,11 @@ function HomeScreen() {
     setShowUnifiedLookup(true)
   }, [])
 
-  // Ticker pick → open the create view straight on its oracle (Polymarket) path, with the
-  // clicked market pre-selected (main #877).
+  // Ticker pick → the wager mode's create view, straight on its oracle (Polymarket)
+  // path with the clicked market pre-selected (main #877).
   const handleTicker = useCallback((market) => {
+    userPickedRef.current = true
+    setMode('wager')
     setOraclePreselect(true)
     setOracleMarket(market || null)
     setCreateKey((k) => k + 1)
@@ -86,12 +127,41 @@ function HomeScreen() {
     setCreateKey((k) => k + 1)
   }, [])
 
+  const wagerActive = mode === 'wager'
+
   return (
     <div className="dashboard-container home-screen">
-      {/* Primary content: the inline open-challenge create view. No disconnected banner —
-          tapping the panel's primary button opens the connect panel as part of the create
-          flow (spec 053 feedback), then continues once the wallet connects. */}
-      <section className="home-create" aria-label="Create a challenge">
+      {/* Desktop/tablet mode switcher; mobile uses the bottom SectionIconNav. */}
+      {!isMobile && (
+        <div className="home-mode-switcher">
+          <PillSelect
+            label="Home view"
+            hideLabel
+            options={MODE_OPTIONS.map((o) => ({
+              value: o.id,
+              label: o.label,
+              icon: <NavIcon name={o.icon} size={16} />,
+            }))}
+            value={mode}
+            onChange={selectMode}
+          />
+        </div>
+      )}
+
+      {/* Pay — the default mode (spec 058 US1). */}
+      <section className="home-create home-mode-panel" aria-label="Pay" hidden={mode !== 'pay'}>
+        <PayPanel />
+      </section>
+
+      {/* Request — payment-request QR (spec 058 US2). */}
+      <section className="home-create home-mode-panel" aria-label="Request" hidden={mode !== 'request'}>
+        <RequestPanel />
+      </section>
+
+      {/* Wager — the spec-053 inline open-challenge create view, unchanged. No disconnected
+          banner — tapping the panel's primary button opens the connect panel as part of the
+          create flow (spec 053 feedback), then continues once the wallet connects. */}
+      <section className="home-create home-mode-panel" aria-label="Create a challenge" hidden={!wagerActive}>
         <CreateChallengePanel
           key={createKey}
           embedded
@@ -104,9 +174,9 @@ function HomeScreen() {
         />
       </section>
 
-      {/* Secondary actions: take a challenge, and view winnings. Hidden on the oracle
-          path so the taller oracle form fits without scrolling (design feedback). */}
-      {!oracleMode && (
+      {/* Wager-only extras: take a challenge, winnings, and the ticker. Hidden in the other
+          modes (spec 058 research R8) and on the oracle path (design feedback). */}
+      {wagerActive && !oracleMode && (
         <section className="home-actions" aria-label="Other actions">
           <button type="button" className="fm-btn-secondary home-action" onClick={openAccept}>
             Accept a challenge
@@ -117,10 +187,20 @@ function HomeScreen() {
         </section>
       )}
 
-      {/* Polymarket ticker — picks route into the create view's oracle path. */}
-      <section className="dashboard-section home-ticker">
-        <PolymarketTickerCrawler onSelectMarket={handleTicker} />
-      </section>
+      {wagerActive && (
+        <section className="dashboard-section home-ticker">
+          <PolymarketTickerCrawler onSelectMarket={handleTicker} />
+        </section>
+      )}
+
+      {/* Mobile bottom bar — Pay / Request / Wager glyphs (spec 058 US3).
+          SectionIconNav self-gates to mobile viewports. */}
+      <SectionIconNav
+        items={MODE_OPTIONS}
+        activeId={mode}
+        onSelect={selectMode}
+        ariaLabel="Home mode"
+      />
 
       {/* Accept a challenge — the unified phrase lookup (spec 037). */}
       <UnifiedLookupModal
