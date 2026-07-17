@@ -19,14 +19,17 @@ const MODE_HINTS = {
 }
 
 /**
- * NotificationPreferencesPanel — the "Notifications" area of the Preferences tab
- * (My Account / Wallet). Lets a user (1) enable mobile push and (2) choose, per
- * notification category, whether it's pushed to the device, shown in-app only,
- * or kept silent (feed only). Device-scoped (a phone's push permission is
+ * NotificationPreferencesPanel — the base-layer delivery controls: (1) enable
+ * mobile push and (2) choose, per notification category, whether it's pushed
+ * to the device, shown in-app only, or kept silent (feed only). Since spec 059
+ * this no longer stands alone on the Preferences tab — it renders inside the
+ * NotificationProfilesPanel's "Delivery settings" disclosure (`embedded`),
+ * which suppresses the standalone heading/hint so the page has a single
+ * Notifications section. Device-scoped (a phone's push permission is
  * per-device), so no wallet is required. Persisted via
  * lib/notifications/deliveryPreferences.js.
  */
-function NotificationPreferencesPanel() {
+function NotificationPreferencesPanel({ embedded = false }) {
   const { prefs, permission, setMode, enablePush, disablePush } = useNotificationPreferences()
   const supported = isPushSupported()
   const blocked = permission === 'denied'
@@ -42,7 +45,7 @@ function NotificationPreferencesPanel() {
 
   return (
     <div className="notif-pref-panel">
-      <h3 className="notif-pref-title">Notifications</h3>
+      {!embedded && <h3 className="notif-pref-title">Notifications</h3>}
       <p className="notif-pref-hint">
         Choose how each kind of update reaches you. Turn on mobile push to get
         device notifications for new activity while FairWins is open.

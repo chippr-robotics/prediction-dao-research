@@ -295,10 +295,13 @@ was active, that delivery reverts to base behavior.
   feed panel MUST show the profiles, indicate the active one and when it turns
   off (e.g. "Off", "On until 6:00 PM"), offer the manual on/off choices of
   FR-007, and link to "View settings" and "New profile".
-- **FR-013**: The notification settings area MUST list all profiles with their
-  active state, allow editing every profile attribute (name, emoji, allow-list,
-  exceptions, schedule) and deleting profiles, and continue to expose the
-  base-layer master push toggle and per-category mode controls.
+- **FR-013**: The notification settings area MUST be a single section that
+  lists all profiles with their active state, allows editing every profile
+  attribute (name, emoji, allow-list, exceptions, schedule) and deleting
+  profiles, and continues to expose the base-layer master push toggle and
+  per-category mode controls — tucked behind a "Delivery settings" disclosure
+  within the same section rather than as a separate, potentially confusing
+  second notifications block.
 - **FR-014**: While a profile is active, the settings and quick-access surfaces
   MUST make the state visible (profile name/emoji and how it was activated —
   manual or scheduled — and when it will turn off, if known).
@@ -368,8 +371,10 @@ was active, that delivery reverts to base behavior.
   the product's "honest state" principle — nothing is ever dropped.
 - "Replace the current notification setting" means the settings surface is
   rebuilt around profiles as the headline concept; the per-category
-  Push / In-app / Silent grid and master push toggle are retained beneath as
-  the base delivery layer (per the feature description), not removed.
+  Push / In-app / Silent grid and master push toggle are retained as the base
+  delivery layer, folded into the profiles section behind a "Delivery
+  settings" disclosure — the old standalone Notifications block is removed to
+  avoid two competing notification sections.
 - Storage remains per-device (like today's delivery preferences), not synced
   per-account; Signal's cross-device profile sync is out of scope because
   FairWins has no notification backend to sync through.

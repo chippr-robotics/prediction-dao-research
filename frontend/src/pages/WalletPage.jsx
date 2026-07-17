@@ -21,7 +21,6 @@ import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
-import NotificationPreferencesPanel from '../components/account/NotificationPreferencesPanel'
 import NotificationProfilesPanel from '../components/account/NotificationProfilesPanel'
 import QuickAccessCardsPanel from '../components/account/QuickAccessCardsPanel'
 import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
@@ -487,9 +486,6 @@ function WalletPage() {
                     <h2 className="preferences-group-heading">Notifications</h2>
                     <div className="section">
                       <NotificationProfilesPanel />
-                    </div>
-                    <div className="section">
-                      <NotificationPreferencesPanel />
                     </div>
 
                     <h2 className="preferences-group-heading">Markets</h2>
