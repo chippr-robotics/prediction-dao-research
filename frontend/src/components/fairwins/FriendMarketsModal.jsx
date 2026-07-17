@@ -1485,6 +1485,22 @@ function FriendMarketsModal({
                         onChange={(v) => handleFormChange('stakeAmount', v)}
                         prefix={(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') ? '$' : ''}
                         token={selectedStakeToken?.symbol || ''}
+                        tokenSlot={(
+                          <select
+                            id="fm-stake-token"
+                            aria-label="Stake Token"
+                            value={formData.stakeTokenId}
+                            onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
+                            disabled={submitting}
+                            className="fm-token-select fm-pay-token-select"
+                          >
+                            {STAKE_TOKEN_OPTIONS.map(token => (
+                              <option key={token.id} value={token.id}>
+                                {token.icon} {token.symbol}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         disabled={submitting}
                         ariaLabel="Stake amount"
                         id="fm-stake"
@@ -1503,20 +1519,6 @@ function FriendMarketsModal({
                             : `${selectedStakeToken?.name} from the active chain`}
                         </InfoTip>
                       </span>
-                      <select
-                        id="fm-stake-token"
-                        aria-label="Stake Token"
-                        value={formData.stakeTokenId}
-                        onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
-                        disabled={submitting}
-                        className="fm-token-select fm-pay-token-select"
-                      >
-                        {STAKE_TOKEN_OPTIONS.map(token => (
-                          <option key={token.id} value={token.id}>
-                            {token.icon} {token.symbol}
-                          </option>
-                        ))}
-                      </select>
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 
