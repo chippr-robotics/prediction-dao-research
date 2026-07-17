@@ -208,44 +208,6 @@
   align-items: stretch;
 }
 
-/* All quick access cards hidden via Preferences (spec 038 US5) — a
-   recoverable empty state instead of a blank grid. */
-.quick-actions-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.5rem;
-  padding: 2.5rem 1.5rem;
-  border: 1px dashed var(--border-color);
-  border-radius: 12px;
-}
-
-.qa-empty-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.qa-empty-message {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  max-width: 32rem;
-}
-
-.qa-empty-cta {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  background: var(--brand-primary);
-  color: var(--primary-button-text, #fff);
-  border: none;
-  border-radius: var(--radius-md, 8px);
-  font-weight: 600;
-  cursor: pointer;
-}
-
 /* --- Group headers --- */
 
 .qa-group-header {

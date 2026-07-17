@@ -22,7 +22,7 @@ const MODE_LABELS = { pay: 'Pay', request: 'Request', wager: 'Wager' }
 
 function HomePreferencesPanel() {
   // Setters persist synchronously; a local bump re-reads storage so the
-  // checked states are always current (same pattern as QuickAccessCardsPanel).
+  // checked states are always current.
   const [, forceRender] = useState(0)
   const tokens = useChainTokens()
 
