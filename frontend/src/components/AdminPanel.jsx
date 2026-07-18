@@ -15,25 +15,14 @@ import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
 import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
 import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
+import ProtocolConfigTab from './admin/ProtocolConfigTab'
+import MaintenanceTab from './admin/MaintenanceTab'
+import ServiceHealthCard from './admin/ServiceHealthCard'
+import PaymasterOpsCard from './admin/PaymasterOpsCard'
+import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
 import PortalNav from './ui/PortalNav'
 import SectionIconNav from './nav/SectionIconNav'
 import './AdminPanel.css'
-
-// Icons for the mobile bottom quick-nav (SectionIconNav). Desktop uses the
-// text rail; mobile pins these so admins can hop between sections one-handed.
-// Values are NavIcon names (flat line glyphs), not emoji.
-const ADMIN_TAB_ICONS = {
-  overview: 'grid',
-  emergency: 'alert',
-  tiers: 'layers',
-  members: 'users',
-  moderation: 'shieldOff',
-  'admin-roles': 'key',
-  treasury: 'bank',
-  'oracle-adapters': 'broadcast',
-  'deny-list': 'ban',
-  'callsigns': 'ticket',
-}
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
 const USDC_DECIMALS = 6
@@ -43,6 +32,8 @@ const ROLE_HASHES = {
   GUARDIAN: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
   ACCOUNT_MODERATOR: ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
   ROLE_MANAGER: ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
+  SANCTIONS_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
+  TOKEN_ISSUER: ethers.keccak256(ethers.toUtf8Bytes('TOKEN_ISSUER_ROLE')),
   DEFAULT_ADMIN: ethers.ZeroHash,
 }
 
@@ -78,16 +69,14 @@ function shortAddr(address) {
 }
 
 /**
- * Admin Panel — gated per-tab by the on-chain role each action requires.
+ * Operations Control Plane — the grouped admin portal at /admin.
  *
- * Tabs:
- *   Overview          (any admin role)
- *   Emergency         (GUARDIAN_ROLE)
- *   Tiers             (DEFAULT_ADMIN_ROLE)
- *   Members           (ROLE_MANAGER_ROLE)
- *   Account Moderation (ACCOUNT_MODERATOR_ROLE)
- *   Admin Roles       (DEFAULT_ADMIN_ROLE)
- *   Treasury          (DEFAULT_ADMIN_ROLE)
+ * Views are organized into operator groups (Control Room, Incident Response,
+ * Compliance, Membership & Revenue, Protocol Config, Identity, Access
+ * Control, Infrastructure); see components/admin/adminNav.js for the
+ * grouping/gating model and docs/system-overview/control-surface-audit.md
+ * for the audit that produced it. Every view remains gated by the on-chain
+ * role its actions require.
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
@@ -99,6 +88,7 @@ function AdminPanel() {
   const isGuardian = hasRole(ROLES.GUARDIAN)
   const isAccountModerator = hasRole(ROLES.ACCOUNT_MODERATOR)
   const isRoleManager = hasRole(ROLES.ROLE_MANAGER)
+  const isSanctionsAdmin = hasRole(ROLES.SANCTIONS_ADMIN)
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
   const [activeTab, setActiveTab] = useState('overview')
@@ -147,6 +137,17 @@ function AdminPanel() {
 
   const wagerRegistryAddr = getContractAddressForChain('wagerRegistry', chainId)
   const membershipManagerAddr = getContractAddressForChain('membershipManager', chainId)
+  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', chainId)
+  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', chainId)
+
+  // Each grantable role lives on a specific contract; grants must be sent
+  // to the contract that defines the role, not blanket-sent to the registry.
+  const roleHomeContract = (role) => {
+    if (role === 'ROLE_MANAGER') return membershipManagerAddr
+    if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
+    if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
+    return wagerRegistryAddr
+  }
 
   const wagerRegistryRead = useMemo(() => {
     if (!wagerRegistryAddr) return null
@@ -273,8 +274,8 @@ function AdminPanel() {
     const target = adminRoleEns.resolvedAddress || adminRoleForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     const roleHash = ROLE_HASHES[adminRoleForm.role]
-    // ROLE_MANAGER lives on MembershipManager; everything else on WagerRegistry
-    const addr = adminRoleForm.role === 'ROLE_MANAGER' ? membershipManagerAddr : wagerRegistryAddr
+    const addr = roleHomeContract(adminRoleForm.role)
+    if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).grantRole(roleHash, target),
       `Granted ${adminRoleForm.role} to ${shortAddr(target)}`
@@ -285,7 +286,8 @@ function AdminPanel() {
     const target = adminRoleEns.resolvedAddress || adminRoleForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     const roleHash = ROLE_HASHES[adminRoleForm.role]
-    const addr = adminRoleForm.role === 'ROLE_MANAGER' ? membershipManagerAddr : wagerRegistryAddr
+    const addr = roleHomeContract(adminRoleForm.role)
+    if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).revokeRole(roleHash, target),
       `Revoked ${adminRoleForm.role} from ${shortAddr(target)}`
@@ -303,20 +305,17 @@ function AdminPanel() {
     )
   }
 
-  // Role-gated section list for the left sidebar. Mirrors the per-tab role
-  // checks below — a tab only appears if the connected account can use it.
-  const adminTabs = [
-    { id: 'overview', label: 'Overview' },
-    isGuardian && { id: 'emergency', label: 'Emergency' },
-    isAdmin && { id: 'tiers', label: 'Tiers' },
-    isRoleManager && { id: 'members', label: 'Members' },
-    isAccountModerator && { id: 'moderation', label: 'Account Moderation' },
-    isAdmin && { id: 'admin-roles', label: 'Admin Roles' },
-    isAdmin && { id: 'treasury', label: 'Treasury' },
-    isAdmin && { id: 'oracle-adapters', label: 'Oracle Adapters' },
-    isAdmin && { id: 'deny-list', label: 'Deny-list' },
-    isAdmin && { id: 'callsigns', label: 'Callsigns' },
-  ].filter(Boolean)
+  // Grouped, role-gated section rail (see admin/adminNav.js). Mirrors the
+  // per-tab role checks below — a view only appears if the connected account
+  // can use it, and a group only appears if it has at least one usable view.
+  const navGroups = buildAdminNavGroups({
+    isAdmin,
+    isGuardian,
+    isAccountModerator,
+    isRoleManager,
+    isSanctionsAdmin,
+  })
+  const adminTabs = flattenNavGroups(navGroups)
 
   if (!hasAdminAccess) {
     return (
@@ -324,9 +323,10 @@ function AdminPanel() {
         <div className="admin-unauthorized">
           <div className="unauthorized-icon" aria-hidden="true">🔒</div>
           <h2>Access Restricted</h2>
-          <p>This admin panel is only accessible to users with administrative privileges.</p>
+          <p>The operations control plane is only accessible to users with operator privileges.</p>
           <p className="unauthorized-hint">
-            Administrative roles include: Administrator, Emergency Guardian, Account Moderator, and Role Manager.
+            Operator roles include: Administrator, Emergency Guardian, Account Moderator, Role
+            Manager, and Compliance Officer.
           </p>
         </div>
       </div>
@@ -338,16 +338,18 @@ function AdminPanel() {
       <header className="admin-panel-header">
         <div className="admin-panel-header-content">
           <div className="admin-panel-title-section">
-            <h1>Admin Panel</h1>
+            <h1>Operations</h1>
             <span className="admin-badge">
               {isAdmin ? 'Administrator' :
                 isGuardian ? 'Guardian' :
                   isAccountModerator ? 'Moderator' :
-                    isRoleManager ? 'Role Manager' : 'Admin'}
+                    isRoleManager ? 'Role Manager' :
+                      isSanctionsAdmin ? 'Compliance Officer' : 'Admin'}
             </span>
           </div>
           <p className="admin-panel-subtitle">
-            On-chain controls for the P2P wager protocol. Each tab is gated by the role it requires.
+            Control plane for the P2P wager protocol — protocol controls, metrics, and service
+            health in one place. Each view is gated by the on-chain role it requires.
           </p>
         </div>
         <div className="admin-panel-status">
@@ -363,10 +365,10 @@ function AdminPanel() {
       <div className={`portal-shell admin-portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
         <aside className="portal-sidebar admin-portal-sidebar">
           <PortalNav
-            items={adminTabs}
+            groups={navGroups}
             activeId={activeTab}
             onSelect={setActiveTab}
-            ariaLabel="Admin sections"
+            ariaLabel="Operations sections"
           />
         </aside>
 
@@ -432,8 +434,14 @@ function AdminPanel() {
                     <span className="permission-icon">{isRoleManager ? '✓' : '×'}</span>
                     <span className="permission-name">Role Manager (grant / revoke memberships)</span>
                   </div>
+                  <div className={`permission-item ${isSanctionsAdmin ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isSanctionsAdmin ? '✓' : '×'}</span>
+                    <span className="permission-name">Compliance Officer (deny-list on SanctionsGuard)</span>
+                  </div>
                 </div>
               </div>
+
+              <ServiceHealthCard />
 
               <MembershipTreasuryOverview
                 provider={provider || getProvider(chainId)}
@@ -477,6 +485,10 @@ function AdminPanel() {
                 )}
               </div>
             </div>
+            {/* Incident commanders get the gasless-infra picture on the same
+                screen: the on-chain pause and the gateway killswitch are the
+                two halves of a full stop. */}
+            <ServiceHealthCard />
           </div>
         )}
 
@@ -647,6 +659,8 @@ function AdminPanel() {
                     <option value="GUARDIAN">Guardian — pause/unpause</option>
                     <option value="ACCOUNT_MODERATOR">Account Moderator — freeze/unfreeze</option>
                     <option value="ROLE_MANAGER">Role Manager — grant/revoke memberships</option>
+                    <option value="SANCTIONS_ADMIN">Compliance Officer — deny-list (SanctionsGuard)</option>
+                    <option value="TOKEN_ISSUER">Token Issuer — token creation (TokenFactory)</option>
                     <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
                   </select>
                 </label>
@@ -713,7 +727,7 @@ function AdminPanel() {
           />
         )}
 
-        {activeTab === 'deny-list' && isAdmin && (
+        {activeTab === 'deny-list' && (isSanctionsAdmin || isAdmin) && (
           <DenyListAdmin
             signer={signer}
             account={account}
@@ -733,14 +747,64 @@ function AdminPanel() {
             pendingTx={pendingTx}
           />
         )}
+
+        {activeTab === 'protocol-config' && isAdmin && (
+          <ProtocolConfigTab
+            signer={signer}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'maintenance' && (
+          <MaintenanceTab
+            signer={signer}
+            chainId={chainId}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'services' && (isAdmin || isGuardian) && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="overview-grid">
+              <ServiceHealthCard />
+              <PaymasterOpsCard
+                signer={signer}
+                account={account}
+                provider={provider || getProvider(chainId)}
+                chainId={chainId}
+                nativeSymbol={nativeSymbol}
+                runTx={runTx}
+                pendingTx={pendingTx}
+              />
+            </div>
+            <div className="admin-card">
+              <h3>Off-chain Controls (runbook-operated)</h3>
+              <p>
+                The relay gateway deliberately has no web admin API — it can censor, never steal,
+                and its worst failure mode is refusing gas. These controls are operated via
+                deploy config and signals, documented in the runbooks:
+              </p>
+              <ul>
+                <li><strong>Gateway killswitch</strong> — <code>KILL_SWITCH</code> env or <code>SIGUSR2</code>; halts relaying, sponsorship, and the OpenSea/Polymarket proxies (docs/runbooks/relayer-operations.md).</li>
+                <li><strong>Relayer per-chain pause / gas caps / receiver allowlist</strong> — <code>services/oz-relayer/config/config.json</code>.</li>
+                <li><strong>Quotas, spend caps, paymaster ceilings</strong> — gateway env (<code>SIGNER_QUOTA_PER_MIN</code>, <code>GAS_SPEND_CAP_WEI_*</code>, <code>PM_*</code>).</li>
+                <li><strong>Polymarket builder fee</strong> — gateway env, hard-capped at boot; changes rate-limited by Polymarket (docs/developer-guide/predict-polymarket.md).</li>
+              </ul>
+            </div>
+          </div>
+        )}
           </main>
 
           {/* Mobile-only bottom quick-nav between admin sections. */}
           <SectionIconNav
-            items={adminTabs.map((tab) => ({ ...tab, icon: ADMIN_TAB_ICONS[tab.id] || '•' }))}
+            items={adminTabs}
             activeId={activeTab}
             onSelect={setActiveTab}
-            ariaLabel="Admin sections"
+            ariaLabel="Operations sections"
           />
         </div>
       </div>

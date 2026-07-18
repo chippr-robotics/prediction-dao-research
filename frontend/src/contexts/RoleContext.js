@@ -20,6 +20,7 @@ export const ROLES = {
   GUARDIAN: 'GUARDIAN',                    // GUARDIAN_ROLE — pause/unpause
   ACCOUNT_MODERATOR: 'ACCOUNT_MODERATOR',  // ACCOUNT_MODERATOR_ROLE — freeze
   ROLE_MANAGER: 'ROLE_MANAGER',            // ROLE_MANAGER_ROLE — grant/revoke memberships
+  SANCTIONS_ADMIN: 'SANCTIONS_ADMIN',      // SANCTIONS_ADMIN_ROLE — deny-list (on SanctionsGuard)
 }
 
 export const ROLE_INFO = {
@@ -53,6 +54,12 @@ export const ROLE_INFO = {
     premium: false,
     isAdminRole: true
   },
+  [ROLES.SANCTIONS_ADMIN]: {
+    name: 'Compliance Officer',
+    description: 'Maintain the discretionary deny-list on SanctionsGuard (block/unblock addresses with an on-chain reason)',
+    premium: false,
+    isAdminRole: true
+  },
 }
 
 /**
@@ -64,6 +71,7 @@ export const ADMIN_ROLES = [
   ROLES.GUARDIAN,
   ROLES.ACCOUNT_MODERATOR,
   ROLES.ROLE_MANAGER,
+  ROLES.SANCTIONS_ADMIN,
 ]
 
 export function isAdminRole(role) {

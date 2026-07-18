@@ -253,9 +253,9 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
 
   it('has no axe violations with an info bubble open (spec 039 FR-007)', async () => {
     const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // The wager-field InfoTip was removed with the payments-sheet redesign (spec 053);
-    // the subtitle explainer is the modal's one surviving InfoTip — use it to exercise
-    // the info-bubble-open a11y state.
+    // The per-field InfoTips were removed one by one to conserve space (specs 052/054/058);
+    // the modal-title explainer is the surviving info icon, so use it to exercise the
+    // info-bubble-open a11y state.
     fireEvent.click(screen.getByRole('button', { name: 'About open challenges' }))
     expect(screen.getByRole('note')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
@@ -264,14 +264,13 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
   it('info icons are keyboard operable: focus, Enter opens, Escape closes and restores focus (spec 039 FR-007)', async () => {
     const user = userEvent.setup()
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // The wager-field InfoTip was removed with the payments-sheet redesign (spec 053);
-    // the subtitle explainer is the modal's one surviving InfoTip — use it to exercise
-    // keyboard operability of the info-icon pattern.
+    // The per-field InfoTips were removed to conserve space (specs 052/054/058); the
+    // modal-title explainer is the surviving info icon for keyboard-operability coverage.
     const icon = screen.getByRole('button', { name: 'About open challenges' })
     icon.focus()
     expect(icon).toHaveFocus()
     await user.keyboard('{Enter}')
-    expect(screen.getByRole('note')).toHaveTextContent(/anyone you share the code with can take the other side/i)
+    expect(screen.getByRole('note')).toHaveTextContent(/take the other side/i)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
     expect(icon).toHaveFocus()
