@@ -137,5 +137,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/059-notification-profiles/plan.md
+at specs/060-coinbase-onramp/plan.md
 <!-- SPECKIT END -->
