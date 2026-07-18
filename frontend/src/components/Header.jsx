@@ -96,10 +96,13 @@ function Header({ hideWalletButton = false, appMode = false }) {
           ) : (
             <>
               <button onClick={() => scrollToSection('features')} className="nav-link nav-button">
-                Why P2P
+                Features
               </button>
               <button onClick={() => scrollToSection('how-it-works')} className="nav-link nav-button">
                 How It Works
+              </button>
+              <button onClick={() => scrollToSection('custody')} className="nav-link nav-button">
+                Custody
               </button>
               <button onClick={() => scrollToSection('use-cases')} className="nav-link nav-button">
                 Use Cases
@@ -154,10 +157,13 @@ function Header({ hideWalletButton = false, appMode = false }) {
           aria-label="Mobile navigation"
         >
           <button onClick={() => scrollToSection('features')} className="mobile-nav-link">
-            Why P2P
+            Features
           </button>
           <button onClick={() => scrollToSection('how-it-works')} className="mobile-nav-link">
             How It Works
+          </button>
+          <button onClick={() => scrollToSection('custody')} className="mobile-nav-link">
+            Custody
           </button>
           <button onClick={() => scrollToSection('use-cases')} className="mobile-nav-link">
             Use Cases
