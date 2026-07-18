@@ -35,7 +35,6 @@ import AdminPanel from './components/AdminPanel'
 
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
-import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
@@ -92,9 +91,6 @@ function AppContent() {
     <>
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
-
-      {/* Development warning modal - shows once per session */}
-      <DevelopmentWarningModal />
 
       {/* Accessibility announcement region */}
       <AnnouncementRegion />

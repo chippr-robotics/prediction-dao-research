@@ -7,18 +7,12 @@
 // ARIA live regions, error boundary, timezone handling, and scrolling.
 // =============================================================================
 
-const DEV_WARNING_KEY = 'dev_warning_modal_seen_v2'
 const TEST_ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 
 describe('Accessibility', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
-    // Dismiss the onboarding tutorial so it doesn't interfere.
-    cy.window().then((win) => {
-      win.sessionStorage.setItem(DEV_WARNING_KEY, 'true')
-      win.localStorage.setItem(DEV_WARNING_KEY, 'true')
-    })
   })
 
   /**
@@ -78,12 +72,6 @@ describe('Accessibility', () => {
     cy.viewport(375, 667) // iPhone SE dimensions
     cy.mockWeb3Provider({ account: TEST_ACCOUNT })
 
-    // Dismiss tutorial.
-    cy.window().then((win) => {
-      win.sessionStorage.setItem(DEV_WARNING_KEY, 'true')
-      win.localStorage.setItem(DEV_WARNING_KEY, 'true')
-    })
-
     cy.visit('/fairwins')
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
@@ -110,11 +98,6 @@ describe('Accessibility', () => {
   it('[A11Y-03] Responsive layout tablet', () => {
     cy.viewport(768, 1024) // iPad dimensions
     cy.mockWeb3Provider({ account: TEST_ACCOUNT })
-
-    cy.window().then((win) => {
-      win.sessionStorage.setItem(DEV_WARNING_KEY, 'true')
-      win.localStorage.setItem(DEV_WARNING_KEY, 'true')
-    })
 
     cy.visit('/fairwins')
     cy.get('body', { timeout: 10000 }).should('be.visible')
