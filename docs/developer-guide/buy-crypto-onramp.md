@@ -36,10 +36,14 @@ WalletButton (Buy, gated)                      relay-gateway                    
   the sanctions list is address-based, chain-agnostic.
 - **Two-layer availability**: static capability (`capabilities.onramp` in
   `frontend/src/config/networks.js`, mirrored by
-  `services/relay-gateway/src/onramp/chains.js` — Polygon 137 + Ethereum 1,
-  never testnets) AND the live Buy Options catalog
-  (`GET /v1/onramp/options?chainId=`, cached ~5 min). The Buy button renders
-  only when both agree; mints re-check the catalog live.
+  `services/relay-gateway/src/onramp/chains.js` — mainnets Polygon 137,
+  Ethereum 1, Ethereum Classic 61; never testnets) AND the live Buy Options
+  catalog (`GET /v1/onramp/options?chainId=`, cached ~5 min). The Buy button
+  renders only when both agree; mints re-check the catalog live. **ETC is
+  "if possible"**: Coinbase doesn't currently document Onramp support for it,
+  so chain 61 shows Buy only if Coinbase's catalog lists the network — the
+  lookup is spelling-insensitive and mints echo Coinbase's own network name,
+  so ETC lights up automatically if/when they serve it, with no deploy.
 - **Honest settlement**: no synthetic pending/success state anywhere. Delivery
   is on Coinbase's timeline; the balance updates when the funds exist on-chain,
   through the normal portfolio path. The onramp code never touches balance

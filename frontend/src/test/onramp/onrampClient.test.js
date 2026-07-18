@@ -31,13 +31,15 @@ describe('onrampGatewayUrl / onrampAvailable', () => {
     expect(onrampGatewayUrl()).toBe(BASE)
   })
 
-  it('is available only on onramp-capable mainnets (137, 1) with a gateway configured', () => {
+  it('is available only on onramp-capable mainnets (137, 1, 61) with a gateway configured', () => {
     expect(onrampAvailable(137)).toBe(true)
     expect(onrampAvailable(1)).toBe(true)
+    // ETC passes the static gate; whether Buy actually shows is decided by the live catalog.
+    expect(onrampAvailable(61)).toBe(true)
   })
 
-  it('is unavailable on testnets and the ETC family even with a gateway (static capability)', () => {
-    for (const chainId of [80002, 61, 63, 11155111, 1337]) {
+  it('is unavailable on testnets even with a gateway (static capability)', () => {
+    for (const chainId of [80002, 63, 11155111, 560048, 1337]) {
       expect(onrampAvailable(chainId)).toBe(false)
     }
   })

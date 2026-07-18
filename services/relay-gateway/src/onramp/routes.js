@@ -12,7 +12,7 @@
 import express from 'express'
 import { GatewayError } from '../errors.js'
 import { OnrampRequestError } from './client.js'
-import { slugForChain } from './chains.js'
+import { slugForChain, normalizeNetworkKey } from './chains.js'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const ASSET_RE = /^[A-Z0-9]{2,12}$/
@@ -78,12 +78,17 @@ export function createOnrampRouter(config, { client, cache, quotas, killSwitch, 
   /** Cached Buy Options catalog (slug -> tickers). Serves stale on upstream failure. */
   const cachedOptions = () => cache.fetchThrough(OPTIONS_CACHE_KEY, onramp.optionsCacheTtlMs, () => client.fetchBuyOptions())
 
-  const availabilityFor = (bySlug, slug) => {
-    const assets = bySlug?.[slug] ?? []
+  // Catalog lookup is spelling-insensitive, and `networkName` is Coinbase's OWN reported name —
+  // echoed back verbatim in mint requests and hosted URLs so our canonical slug spelling can
+  // never desync from theirs (e.g. ETC as "ethereumclassic" vs "ethereum-classic").
+  const availabilityFor = (catalog, slug) => {
+    const entry = catalog?.[normalizeNetworkKey(slug)]
+    const assets = entry?.assets ?? []
     return {
       available: assets.length > 0,
       assets,
       defaultAsset: assets.includes(onramp.defaultAsset) ? onramp.defaultAsset : (assets[0] ?? null),
+      networkName: entry?.name ?? slug,
     }
   }
 
@@ -145,13 +150,14 @@ export function createOnrampRouter(config, { client, cache, quotas, killSwitch, 
       // sheet rendering and the tap is honored rather than minting a dead session (spec US2
       // edge case). Coinbase unreachable => fall back to the cached catalog (best-effort
       // freshness; Coinbase itself re-checks eligibility inside the hosted flow).
-      let bySlug
+      let catalog
       try {
-        bySlug = await client.fetchBuyOptions()
+        catalog = await client.fetchBuyOptions()
       } catch {
-        bySlug = (await cachedOptions()).value
+        catalog = (await cachedOptions()).value
       }
-      if (!availabilityFor(bySlug, slug).assets.includes(asset)) {
+      const live = availabilityFor(catalog, slug)
+      if (!live.assets.includes(asset)) {
         throw new GatewayError(400, 'unsupported_asset', 'coinbase cannot deliver this asset on this network right now')
       }
 
@@ -180,10 +186,10 @@ export function createOnrampRouter(config, { client, cache, quotas, killSwitch, 
         throw new GatewayError(429, 'quota_exceeded', `${q.scope} onramp quota exceeded`, { retryAfterSec: q.retryAfterSec })
       }
 
-      const token = await client.createSessionToken({ address, slug, asset })
+      const token = await client.createSessionToken({ address, slug: live.networkName, asset })
       const url =
         `${onramp.hostedBaseUrl}?sessionToken=${encodeURIComponent(token)}` +
-        `&defaultNetwork=${encodeURIComponent(slug)}&defaultAsset=${encodeURIComponent(asset)}`
+        `&defaultNetwork=${encodeURIComponent(live.networkName)}&defaultAsset=${encodeURIComponent(asset)}`
       res.json({ url })
     } catch (err) {
       handleError(res, err)

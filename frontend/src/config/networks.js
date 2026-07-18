@@ -55,10 +55,11 @@ const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
 // entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
 const PREDICT_CHAIN_IDS = new Set([137])
 // Buy crypto / Coinbase Onramp (spec 060): the wallet-sheet Buy button exists ONLY on mainnets
-// Coinbase Onramp can deliver to — never testnets or the ETC family. Static layer of the
-// two-layer gate (the relay-gateway's live Buy Options catalog is the dynamic layer); mirrors
-// services/relay-gateway/src/onramp/chains.js — keep the two in sync.
-const ONRAMP_CHAIN_IDS = new Set([1, 137])
+// that could plausibly be onramped — never testnets. Static layer of the two-layer gate: the
+// relay-gateway's live Buy Options catalog is the dynamic layer and remains the authority, so
+// a listed chain (incl. Ethereum Classic 61) shows Buy ONLY if Coinbase's catalog actually
+// serves it. Mirrors services/relay-gateway/src/onramp/chains.js — keep the two in sync.
+const ONRAMP_CHAIN_IDS = new Set([1, 61, 137])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },

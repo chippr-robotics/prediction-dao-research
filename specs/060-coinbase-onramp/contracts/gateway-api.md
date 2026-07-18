@@ -24,12 +24,19 @@ Availability + purchasable assets for a chain. Public read; cached server-side
   "available": true,
   "assets": ["USDC", "ETH", "MATIC"],
   "defaultAsset": "USDC",
+  "networkName": "polygon",
   "fetchedAt": 1789000000000
 }
 ```
 
 - `available: false` (with empty `assets`) when the chain is mapped but
-  Coinbase's Buy Options API does not currently list the network.
+  Coinbase's Buy Options API does not currently list the network — this is how
+  Ethereum Classic (61) behaves until Coinbase serves it.
+- `networkName` is **Coinbase's own reported name** for the network (catalog
+  lookups are spelling-insensitive against our canonical slug); mints and
+  hosted URLs echo it verbatim so naming can never desync.
+- `defaultAsset` falls back to the first deliverable asset when USDC is not
+  offered on the network (e.g. ETC).
 
 **Errors**:
 - `400 unsupported_chain` — chainId missing, unmapped (testnet/ETC family), or

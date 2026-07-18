@@ -17,6 +17,7 @@ FairWins — the on-chain inbound transfer is the record (spec assumption).
 | `apiKeySecret` | `CDP_API_KEY_SECRET` | `null` | CDP secret API key material. Server-only, never logged. |
 | `baseUrl` | `ONRAMP_API_BASE_URL` | `https://api.developer.coinbase.com` | CDP Onramp API host. |
 | `hostedBaseUrl` | `ONRAMP_HOSTED_BASE_URL` | `https://pay.coinbase.com/buy/select-asset` | Hosted experience base. |
+| `country` | `ONRAMP_COUNTRY` | `US` | Buy Options catalog country; Coinbase enforces the member's real eligibility in the hosted flow. |
 | `timeoutMs` | `ONRAMP_TIMEOUT_MS` | `5000` | Upstream request timeout. |
 | `retries` | `ONRAMP_RETRIES` | `1` | Reads only (options); session mints never retry (single-use tokens). |
 | `optionsCacheTtlMs` | `ONRAMP_OPTIONS_CACHE_TTL_MS` | `300000` | Buy-options cache (catalog moves slowly). |
@@ -27,11 +28,12 @@ FairWins — the on-chain inbound transfer is the record (spec assumption).
 
 ### ChainSlugMap (static, gateway + mirrored in frontend capability set)
 
-| chainId | Coinbase network slug | Onramp |
+| chainId | Canonical slug | Onramp |
 |---|---|---|
 | 137 (Polygon) | `polygon` | ✅ |
 | 1 (Ethereum) | `ethereum` | ✅ |
-| 61, 63, 80002, 11155111, 560048, 1337 | — | ❌ never (testnets / unserved networks) |
+| 61 (Ethereum Classic) | `ethereum-classic` | ⚠️ if Coinbase's live catalog serves it (spelling-insensitive match; mints echo Coinbase's own reported network name) |
+| 63, 80002, 11155111, 560048, 1337 | — | ❌ never (testnets) |
 
 ### OnrampAvailability (computed, cached; `GET /v1/onramp/options` response)
 

@@ -9,7 +9,7 @@ import request from 'supertest'
 import { createApp } from '../../src/server.js'
 import { createKillSwitch } from '../../src/policy/killswitch.js'
 import { createOnrampClient, normalizeBuyOptions, OnrampUnavailableError } from '../../src/onramp/client.js'
-import { slugForChain } from '../../src/onramp/chains.js'
+import { slugForChain, normalizeNetworkKey } from '../../src/onramp/chains.js'
 import { screeningChainFor } from '../../src/onramp/routes.js'
 import { testConfig, mockProviders, mockEngine, ORIGIN_SECRET } from '../helpers.js'
 
@@ -64,14 +64,21 @@ const get = (app, path) => request(app).get(path).set('X-Origin-Auth', ORIGIN_SE
 const post = (app, path, body) => request(app).post(path).set('X-Origin-Auth', ORIGIN_SECRET).send(body)
 
 describe('onramp unit pieces', () => {
-  it('slugForChain maps only onrampable mainnets', () => {
+  it('slugForChain maps only onrampable mainnets (incl. ETC 61)', () => {
     expect(slugForChain(137)).toBe('polygon')
     expect(slugForChain(1)).toBe('ethereum')
-    for (const id of [61, 63, 80002, 11155111, 560048, 1337, 0, NaN]) expect(slugForChain(id)).toBe(null)
+    expect(slugForChain(61)).toBe('ethereum-classic')
+    for (const id of [63, 80002, 11155111, 560048, 1337, 0, NaN]) expect(slugForChain(id)).toBe(null)
   })
 
-  it('normalizeBuyOptions groups tickers by slug, dedups, and drops junk', () => {
-    const bySlug = normalizeBuyOptions({
+  it('normalizeNetworkKey is spelling-insensitive', () => {
+    expect(normalizeNetworkKey('ethereum-classic')).toBe('ethereumclassic')
+    expect(normalizeNetworkKey('Ethereum Classic')).toBe('ethereumclassic')
+    expect(normalizeNetworkKey('ethereumclassic')).toBe('ethereumclassic')
+  })
+
+  it('normalizeBuyOptions groups tickers by network, keeps the upstream name, dedups, drops junk', () => {
+    const catalog = normalizeBuyOptions({
       purchase_currencies: [
         { symbol: 'usdc', networks: [{ name: 'Polygon' }, { name: 'polygon' }] },
         { symbol: 'ETH', networks: [{ name: 'ethereum' }] },
@@ -79,7 +86,10 @@ describe('onramp unit pieces', () => {
         { symbol: 'X', networks: 'junk' }, // bad networks -> dropped
       ],
     })
-    expect(bySlug).toEqual({ polygon: ['USDC'], ethereum: ['ETH'] })
+    expect(catalog).toEqual({
+      polygon: { name: 'polygon', assets: ['USDC'] },
+      ethereum: { name: 'ethereum', assets: ['ETH'] },
+    })
     expect(normalizeBuyOptions(null)).toEqual({})
   })
 
@@ -115,7 +125,7 @@ describe('GET /v1/onramp/options', () => {
 
   it('400 unsupported_chain for testnets, unmapped chains, and garbage', async () => {
     const { app } = onrampApp()
-    for (const chainId of ['80002', '63', '61', '999', 'abc', '']) {
+    for (const chainId of ['80002', '63', '999', 'abc', '']) {
       const res = await get(app, `/v1/onramp/options?chainId=${chainId}`)
       expect(res.status).toBe(400)
       expect(res.body.error.code).toBe('unsupported_chain')

@@ -76,6 +76,15 @@ independently implementable and testable.
 - [X] T022 [P] Add the CLAUDE.md guardrail bullet for spec 060 (optional wallet-sheet-only onramp, no Trade integration, config-off ⇒ zero UI, gateway-only secrets) in `CLAUDE.md`
 - [X] T023 Run full verification: `cd services/relay-gateway && npx vitest run`, `npm run test:frontend`, and frontend lint/build; fix any regressions (constitution IV — no skipped/continue-on-error)
 
+## Phase 7: Increment — ETC "if possible" (user request, 2026-07-18)
+
+**Goal**: Ethereum Classic (61) joins the static gate; Coinbase's live catalog stays the
+authority, so Buy shows on ETC only if/when Coinbase actually serves the network.
+
+- [X] T024 Map `61 → ethereum-classic` in `services/relay-gateway/src/onramp/chains.js` with a spelling-insensitive catalog key (`normalizeNetworkKey`); `normalizeBuyOptions` keeps Coinbase's own reported network name and routes echo it verbatim in mints/hosted URLs (naming can never desync)
+- [X] T025 Add 61 to `ONRAMP_CHAIN_IDS` in `frontend/src/config/networks.js`; `defaultAsset` falls back to the first deliverable asset where USDC is absent (ETC)
+- [X] T026 Tests + docs: gateway ETC listed/unlisted/spelling cases in `test/onramp/`, frontend capability updates in `src/test/onramp/`, and ETC notes in research.md, data-model.md, contracts/gateway-api.md, developer guide, CLAUDE.md
+
 ## Dependencies
 
 - Phase 1 → Phase 2 → Phase 3 (US1) → Phase 4 (US2) → Phase 5 (US3) → Phase 6

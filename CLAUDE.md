@@ -140,7 +140,8 @@ artifacts live under `specs/<feature>/`.
   The platform is DeFi-first and the onramp is transitional: it MUST NOT be integrated into
   Trade or any other surface, gets no nav entry, adds NO FairWins fee, and config-off
   (`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET` unset) leaves zero residual UI. Mainnets only
-  (capability `onramp`: 137 + 1, mirrored in `src/onramp/chains.js`); no contract changes; no
+  (capability `onramp`: 137 + 1 + 61, mirrored in `src/onramp/chains.js`; ETC 61 is
+  "if-possible" — Buy shows there only when Coinbase's live catalog serves the network); no contract changes; no
   synthetic pending/settled state — balances update only from chain reads. See
   `docs/developer-guide/buy-crypto-onramp.md` + `specs/060-coinbase-onramp/`.
 

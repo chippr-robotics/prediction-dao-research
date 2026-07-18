@@ -33,26 +33,33 @@ export class OnrampRequestError extends Error {
   }
 }
 
+import { normalizeNetworkKey } from './chains.js'
+
 /**
- * Normalize the Buy Options catalog to the per-slug shape the routes serve: for each mapped
- * network slug, the asset tickers Coinbase can deliver there. Tolerant of missing fields —
- * an unusable entry is dropped, never a 500.
+ * Normalize the Buy Options catalog to the per-network shape the routes serve: for each
+ * network, Coinbase's own reported name (echoed back verbatim in mint requests and hosted
+ * URLs) plus the asset tickers deliverable there. Keys are spelling-insensitive
+ * (normalizeNetworkKey) so our canonical slug matches whatever variant Coinbase uses
+ * ("ethereum-classic" vs "ethereumclassic"). Tolerant of missing fields — an unusable entry
+ * is dropped, never a 500.
  * @param {{purchase_currencies?: Array<{symbol?: string, networks?: Array<{name?: string}>}>}} body
- * @returns {Record<string, string[]>} slug -> uppercase tickers
+ * @returns {Record<string, {name: string, assets: string[]}>} normalized key -> network entry
  */
 export function normalizeBuyOptions(body) {
-  const bySlug = {}
+  const byKey = {}
   for (const cur of body?.purchase_currencies ?? []) {
     const symbol = typeof cur?.symbol === 'string' ? cur.symbol.toUpperCase() : null
     if (!symbol) continue
     for (const net of cur?.networks ?? []) {
-      const slug = typeof net?.name === 'string' ? net.name.toLowerCase() : null
-      if (!slug) continue
-      ;(bySlug[slug] ??= []).push(symbol)
+      const name = typeof net?.name === 'string' ? net.name.toLowerCase() : null
+      if (!name) continue
+      const key = normalizeNetworkKey(name)
+      if (!key) continue
+      ;(byKey[key] ??= { name, assets: [] }).assets.push(symbol)
     }
   }
-  for (const slug of Object.keys(bySlug)) bySlug[slug] = [...new Set(bySlug[slug])].sort()
-  return bySlug
+  for (const key of Object.keys(byKey)) byKey[key].assets = [...new Set(byKey[key].assets)].sort()
+  return byKey
 }
 
 /**

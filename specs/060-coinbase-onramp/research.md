@@ -95,9 +95,15 @@ SPA gains no new dependency.
 
 **Decision**: Availability is computed in two layers, both required:
 1. **Static capability**: `onramp: ONRAMP_CHAIN_IDS.has(chainId)` in
-   `frontend/src/config/networks.js` capabilities (Polygon 137 + Ethereum 1;
-   never testnets). The gateway holds the same chainId → Coinbase network-slug
-   map (`137 → polygon`, `1 → ethereum`) and rejects unmapped chains.
+   `frontend/src/config/networks.js` capabilities (mainnets Polygon 137,
+   Ethereum 1, Ethereum Classic 61; never testnets). The gateway holds the
+   same chainId → canonical-slug map (`137 → polygon`, `1 → ethereum`,
+   `61 → ethereum-classic`) and rejects unmapped chains. ETC is mapped on an
+   "if possible" basis: Coinbase's public docs don't list it as an Onramp
+   network, so the dynamic layer is the authority — catalog lookups are
+   spelling-insensitive and mints echo Coinbase's own reported network name,
+   so if/when Coinbase serves ETC it lights up without a deploy, and until
+   then chain 61 shows no Buy button.
 2. **Dynamic check**: the gateway's `/v1/onramp/options` consults Coinbase's
    Buy Options API (cached ~5 min) so temporarily delisted networks/assets
    drop out without a deploy (spec edge case "delisted between render and

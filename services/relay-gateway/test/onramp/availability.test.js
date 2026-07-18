@@ -88,6 +88,33 @@ describe('dynamic catalog gating', () => {
     expect(fetchCalls.options).toBeGreaterThanOrEqual(2) // cache-bypassing re-check happened
   })
 
+  it('ETC (61): available only when Coinbase lists it, matching ANY spelling, and mints echo Coinbase\'s own name', async () => {
+    // Coinbase's catalog spelling ("ethereumclassic") differs from our canonical slug
+    // ("ethereum-classic") — the normalized lookup must still match, and the mint must carry
+    // Coinbase's OWN name so the token request can never desync from their naming.
+    const { app, fetchCalls } = appWithCatalog({ current: [{ symbol: 'ETC', networks: [{ name: 'ethereumclassic' }] }] })
+    const res = await get(app, '/v1/onramp/options?chainId=61')
+    expect(res.status).toBe(200)
+    // No USDC on ETC -> the default falls back to the first deliverable asset.
+    expect(res.body).toMatchObject({ chainId: 61, available: true, assets: ['ETC'], defaultAsset: 'ETC' })
+
+    const mint = await post(app, '/v1/onramp/session', { address: DEST, chainId: 61, asset: 'ETC' })
+    expect(mint.status).toBe(200)
+    expect(mint.body.url).toContain('defaultNetwork=ethereumclassic')
+    expect(fetchCalls.token).toBe(1)
+  })
+
+  it('ETC (61): Coinbase not serving it => available:false and mints decline (the "if possible" gate)', async () => {
+    const { app, fetchCalls } = appWithCatalog({ current: [{ symbol: 'USDC', networks: [{ name: 'polygon' }] }] })
+    const res = await get(app, '/v1/onramp/options?chainId=61')
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ chainId: 61, available: false, assets: [] })
+    const mint = await post(app, '/v1/onramp/session', { address: DEST, chainId: 61, asset: 'ETC' })
+    expect(mint.status).toBe(400)
+    expect(mint.body.error.code).toBe('unsupported_asset')
+    expect(fetchCalls.token).toBe(0)
+  })
+
   it('a listing that APPEARS after the cache was primed is honored by the live re-check', async () => {
     const catalog = { current: [] }
     const { app } = appWithCatalog(catalog)

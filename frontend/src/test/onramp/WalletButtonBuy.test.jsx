@@ -125,9 +125,9 @@ describe('Buy button gating', () => {
     expect(fetchOnrampOptions).not.toHaveBeenCalled() // capability gate short-circuits, no traffic
   })
 
-  it('hidden on a testnet (80002) and on unsupported networks (61, 63)', async () => {
+  it('hidden on testnets (80002, 63, Sepolia) — the static gate short-circuits', async () => {
     const user = userEvent.setup()
-    for (const chainId of [80002, 61, 63]) {
+    for (const chainId of [80002, 63, 11155111]) {
       useChainId.mockReturnValue(chainId)
       const { unmount } = renderButton()
       await openSheet(user)
