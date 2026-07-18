@@ -16,6 +16,9 @@ import BlockiesAvatar from '../ui/BlockiesAvatar'
 import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
+import BuyCryptoModal from './BuyCryptoModal'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
+import { onrampAvailable, fetchOnrampOptions } from '../../lib/onramp/onrampClient'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
@@ -35,6 +38,12 @@ import './RoleDetailsCard.css'
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
+  const [showBuyCrypto, setShowBuyCrypto] = useState(false)
+  // Buy crypto (spec 060) two-layer gate: static capability + gateway (onrampAvailable), then the
+  // live catalog must CONFIRM the chain before the button renders — never a dead button (FR-006).
+  // Stored as {chainId, ok} so a stale confirmation for another chain never leaks through the
+  // derived flag below. Config-off leaves the sheet exactly as it is today.
+  const [onrampCatalog, setOnrampCatalog] = useState(null)
   const { address, isConnected } = useAccount()
   const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
@@ -51,6 +60,30 @@ function WalletButton({ className = '' }) {
   } = useRoleDetails()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
+  // Purchases are delivered to the ACTIVE acting identity: the vault when operating as one,
+  // else the connected wallet — funds land where the member is currently acting (spec 060).
+  const { identity, isVault } = useActiveAccount()
+  const buyDestination = isVault ? identity.vaultAddress : address
+
+  // Confirm the live onramp catalog when the sheet opens (lazily — no gateway traffic until the
+  // member actually opens their wallet sheet). Re-evaluated per chain; any failure keeps the
+  // button hidden rather than dead.
+  useEffect(() => {
+    if (!isOpen || !isConnected || !onrampAvailable(chainId)) return undefined
+    let cancelled = false
+    fetchOnrampOptions(chainId).then(
+      (opts) => {
+        if (!cancelled) setOnrampCatalog({ chainId, ok: Boolean(opts?.available && (opts.assets ?? []).length > 0) })
+      },
+      () => {
+        if (!cancelled) setOnrampCatalog({ chainId, ok: false })
+      }
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, isConnected, chainId])
+  const onrampConfirmed = onrampAvailable(chainId) && onrampCatalog?.chainId === chainId && onrampCatalog.ok
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -130,6 +163,11 @@ function WalletButton({ className = '' }) {
     setShowAddressQR(true)
   }
 
+  const handleOpenBuyCrypto = () => {
+    setIsOpen(false)
+    setShowBuyCrypto(true)
+  }
+
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
     navigate('/admin')
@@ -204,6 +242,20 @@ function WalletButton({ className = '' }) {
                     </span>
                     <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>
+                  {/* Buy crypto (spec 060): renders ONLY once the live catalog confirms the
+                      active network — config-off / testnet / unsupported leaves the sheet
+                      byte-identical to today. Beside the balance it tops up. */}
+                  {onrampConfirmed && (
+                    <button
+                      type="button"
+                      className="account-buy-btn"
+                      onClick={handleOpenBuyCrypto}
+                      aria-label="Buy crypto with Coinbase"
+                      title="Buy crypto — delivered to this wallet"
+                    >
+                      Buy
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="account-qr-btn"
@@ -331,6 +383,17 @@ function WalletButton({ className = '' }) {
           onClose={() => setShowAddressQR(false)}
           address={address}
           variant="quick"
+        />
+      )}
+
+      {/* Buy crypto pre-handoff disclosure (spec 060). chainId/destination stay live props so a
+          network switched after opening is re-validated before any handoff to Coinbase. */}
+      {showBuyCrypto && (
+        <BuyCryptoModal
+          isOpen
+          onClose={() => setShowBuyCrypto(false)}
+          address={buyDestination}
+          chainId={chainId}
         />
       )}
     </div>

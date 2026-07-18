@@ -54,6 +54,11 @@ const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
 // Polymarket runs nowhere else. Everywhere else the capability is false and the Predict tab hides
 // entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
 const PREDICT_CHAIN_IDS = new Set([137])
+// Buy crypto / Coinbase Onramp (spec 060): the wallet-sheet Buy button exists ONLY on mainnets
+// Coinbase Onramp can deliver to — never testnets or the ETC family. Static layer of the
+// two-layer gate (the relay-gateway's live Buy Options catalog is the dynamic layer); mirrors
+// services/relay-gateway/src/onramp/chains.js — keep the two in sync.
+const ONRAMP_CHAIN_IDS = new Set([1, 137])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
@@ -149,6 +154,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -229,6 +235,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -298,6 +305,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -365,6 +373,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
@@ -418,6 +427,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -458,6 +468,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -497,6 +508,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
@@ -529,6 +541,7 @@ const NETWORKS = {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        onramp: ONRAMP_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),

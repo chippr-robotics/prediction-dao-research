@@ -59,6 +59,21 @@
  *                              orders still post — never stranded). Attaches to every order for fee + rewards.
  *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over)
  *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over)
+ *   CDP_API_KEY_ID             Coinbase Developer Platform secret-API-key id for the /v1/onramp/* buy-crypto
+ *                              proxy (spec 060). Either CDP var unset => those routes fail CLOSED with 503
+ *                              onramp_unconfigured (the Buy button hides; nothing else is affected)
+ *   CDP_API_KEY_SECRET         CDP secret-API-key material (server-only; never logged, never sent to clients)
+ *   ONRAMP_API_BASE_URL        CDP Onramp API base (default https://api.developer.coinbase.com)
+ *   ONRAMP_HOSTED_BASE_URL     Coinbase hosted experience base (default https://pay.coinbase.com/buy/select-asset)
+ *   ONRAMP_COUNTRY             ISO-3166 country for the Buy Options catalog query (default US; Coinbase
+ *                              itself enforces the member's real regional eligibility in the hosted flow)
+ *   ONRAMP_TIMEOUT_MS          upstream request timeout (default 5000)
+ *   ONRAMP_RETRIES             upstream retries on 5xx/transport for reads (default 1; session mints never retry)
+ *   ONRAMP_OPTIONS_CACHE_TTL_MS buy-options catalog cache TTL (default 300000 — the catalog moves slowly)
+ *   ONRAMP_QUOTA_PER_ADDRESS   session mints/min per destination address (default 10)
+ *   ONRAMP_QUOTA_GLOBAL        session mints/min across all callers (default 60)
+ *   ONRAMP_QUOTA_WINDOW_MS     quota window (default 60000)
+ *   ONRAMP_DEFAULT_ASSET       preselected purchase asset (default USDC — the app's working currency)
  *
  * The gateway NEVER holds the gas key — that is the engine's (Secret-Manager-held) concern.
  */
@@ -366,6 +381,24 @@ export function loadConfig(env = process.env, opts = {}) {
         if (bps > 50) throw new Error(`[relay-gateway] POLYMARKET_BUILDER_MAKER_FEE_BPS=${bps} exceeds the 50 bps cap`)
         return bps
       })(),
+    },
+    // Coinbase Onramp proxy (spec 060 buy-crypto): optional like the OpenSea/Polymarket modules — either
+    // CDP credential absent means the /v1/onramp/* routes 503 fail-closed and the SPA hides the wallet-sheet
+    // Buy button; boot is unaffected (the onramp is a transitional convenience that must never couple to
+    // the value paths, and config-off must leave zero residual UI).
+    onramp: {
+      apiKeyId: opt(env, 'CDP_API_KEY_ID', null),
+      apiKeySecret: opt(env, 'CDP_API_KEY_SECRET', null),
+      baseUrl: opt(env, 'ONRAMP_API_BASE_URL', 'https://api.developer.coinbase.com'),
+      hostedBaseUrl: opt(env, 'ONRAMP_HOSTED_BASE_URL', 'https://pay.coinbase.com/buy/select-asset'),
+      country: opt(env, 'ONRAMP_COUNTRY', 'US'),
+      timeoutMs: int(env, 'ONRAMP_TIMEOUT_MS', 5000),
+      retries: int(env, 'ONRAMP_RETRIES', 1),
+      optionsCacheTtlMs: int(env, 'ONRAMP_OPTIONS_CACHE_TTL_MS', 300_000),
+      quotaPerAddress: int(env, 'ONRAMP_QUOTA_PER_ADDRESS', 10),
+      quotaGlobal: int(env, 'ONRAMP_QUOTA_GLOBAL', 60),
+      quotaWindowMs: int(env, 'ONRAMP_QUOTA_WINDOW_MS', 60_000),
+      defaultAsset: opt(env, 'ONRAMP_DEFAULT_ASSET', 'USDC'),
     },
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),

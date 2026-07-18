@@ -133,6 +133,16 @@ artifacts live under `specs/<feature>/`.
   never hidden, never "free". Resolve nothing through `wagerRegistry`. Builder code + fee are public
   config; the CLOB API key + L2 creds are gateway-only secrets. Boot fails loudly if the fee exceeds the
   caps. See `docs/developer-guide/predict-polymarket.md` + `specs/057-predict-polymarket/`.
+- **Buy crypto (spec 060) is a deliberately minimal, removable convenience — wallet-sheet ONLY.**
+  A single Buy button on the wallet bottom sheet (the avatar/account sheet) hands off to
+  **Coinbase's hosted Onramp** (session tokens minted by the relay-gateway's optional
+  `src/onramp/` module from gateway-only CDP creds; destination sanctions-screened, fail closed).
+  The platform is DeFi-first and the onramp is transitional: it MUST NOT be integrated into
+  Trade or any other surface, gets no nav entry, adds NO FairWins fee, and config-off
+  (`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET` unset) leaves zero residual UI. Mainnets only
+  (capability `onramp`: 137 + 1, mirrored in `src/onramp/chains.js`); no contract changes; no
+  synthetic pending/settled state — balances update only from chain reads. See
+  `docs/developer-guide/buy-crypto-onramp.md` + `specs/060-coinbase-onramp/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

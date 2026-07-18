@@ -17,6 +17,7 @@
     "lint": "echo 'no standalone linter wired; relies on repo-level review' && exit 0"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^1.53.0",
     "@google-cloud/kms": "^5.5.1",
     "@polymarket/builder-signing-sdk": "^1.0.0",
     "ethers": "^6.16.0",

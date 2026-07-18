@@ -12,6 +12,7 @@
  *   POST /v1/engine/webhook   engine status callback           (shared-secret)
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
+ *   GET+POST /v1/onramp/...   buy-crypto session mint proxy    (origin-locked; spec 060)
  */
 import crypto from 'node:crypto'
 import express from 'express'
@@ -32,6 +33,8 @@ import { createTtlCache } from './opensea/cache.js'
 import { createOpenSeaRouter } from './opensea/routes.js'
 import { createPolymarketClient } from './polymarket/client.js'
 import { createPolymarketRouter } from './polymarket/routes.js'
+import { createOnrampClient } from './onramp/client.js'
+import { createOnrampRouter } from './onramp/routes.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -590,6 +593,30 @@ export function createApp(config, deps = {}) {
       quotas: pmReadQuotas,
       writeQuotas: pmWriteQuotas,
       killSwitch,
+    })
+  )
+
+  // ---- GET/POST /v1/onramp/* (spec 060 buy-crypto; origin-locked via middleware) ---------------
+  // One quota instance for the module: options reads hit `options:<chainId>`, session mints hit
+  // the destination address — the tighter per-address mint budget is the real backstop for the
+  // shared CDP key. Destinations are screened through the shared sanctions screen before any
+  // mint (fail closed). Absent CDP creds => 503 onramp_unconfigured and the SPA hides Buy.
+  const onrampQuotas = createQuotas({
+    signerPerWindow: config.onramp.quotaPerAddress,
+    globalPerWindow: config.onramp.quotaGlobal,
+    windowMs: config.onramp.quotaWindowMs,
+    now: nowMs,
+  })
+  const onrampClient =
+    deps.onrampClient ??
+    createOnrampClient({ ...config.onramp, ...(deps.onrampFetch ? { fetchImpl: deps.onrampFetch } : {}) })
+  app.use(
+    createOnrampRouter(config, {
+      client: onrampClient,
+      cache: deps.onrampCache ?? createTtlCache({ now: nowMs }),
+      quotas: onrampQuotas,
+      killSwitch,
+      screen,
     })
   )
 
