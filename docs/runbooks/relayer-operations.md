@@ -39,6 +39,11 @@ curl -s localhost:8788/healthz | jq
   transactions still track to inclusion (no accepted intent is dropped).
 - Per-chain stop: pause the chain's relayer in the engine config (`"paused": true`).
 - Full contract stop remains `pause()` on the registry (GUARDIAN_ROLE) — independent of the relayer.
+- Visibility: killswitch state, per-chain RPC health, and gas-wallet / paymaster runway from
+  `GET /status` render read-only in the operations control plane (**Infrastructure → Services**,
+  and on the Guardian's Emergency screen) — see
+  [operations-control-plane.md](operations-control-plane.md). Toggling stays here in the runbook
+  by design; the gateway has no web admin API.
 
 ## Collectibles read proxy (spec 055, `/v1/opensea/*`)
 

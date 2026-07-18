@@ -129,6 +129,20 @@ nav:
     - Security Model: system-overview/security.md
     - Governance: system-overview/governance.md
     - Account Moderation Policy: system-overview/account-moderation.md
+    - Control-Surface Audit: system-overview/control-surface-audit.md
+  - Operations:
+    - Runbook Index: runbooks/README.md
+    - Operations Control Plane: runbooks/operations-control-plane.md
+    - Operator Onboarding: runbooks/operator-onboarding.md
+    - Relayer Operations: runbooks/relayer-operations.md
+    - Paymaster Operations: runbooks/paymaster-operations.md
+    - Callsign Operations: runbooks/callsigns-operations.md
+    - Contract Upgrades: runbooks/contract-upgrades.md
+    - Relayer Mordor Deploy: runbooks/relayer-mordor-deploy.md
+    - Wager Pools Deploy: runbooks/zk-wager-pools-deploy.md
+    - Safe Proposal Hub Deploy: runbooks/safe-proposal-hub-deploy.md
+    - Batch Operations: runbooks/batch-operations.md
+    - Passkey Account Recovery: runbooks/passkey-account-recovery.md
   - Architecture Decisions:
     - Overview: adr/README.md
     - ADR-001 Trail of Bits Toolchain: adr/001-trail-of-bits-toolchain.md

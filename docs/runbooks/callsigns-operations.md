@@ -86,9 +86,10 @@ operator roles gate the work:
 Grant them to your operators from the admin screen (below) or directly. Follow
 least-privilege: give moderators only `MODERATOR_ROLE`, not admin.
 
-## Operate: the AdminPanel "Callsigns" tab
+## Operate: the control plane's Callsigns view
 
-Everything below is a role-gated write from `/admin` → **Callsigns** (component
+Everything below is a role-gated write from `/admin` → **Identity →
+Callsigns** in the operations control plane (component
 `frontend/src/components/admin/CallsignRegistryAdmin.jsx`). Each control is enabled only if
 your connected wallet holds the matching role **on this contract** (read live via
 `hasRole`). Writes go through the standard admin `runTx` (plain signer — admin actions
@@ -175,7 +176,7 @@ on-chain with `setReserved` (CURATOR) — via the admin screen or directly.
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| Admin tab shows "not deployed / configured on this network" | Address not synced. Run `npm run sync:frontend-contracts` after deploy. |
+| Callsigns view shows "not deployed / configured on this network" | Address not synced. Run `npm run sync:frontend-contracts` after deploy. |
 | A moderation button is disabled | Your wallet lacks that role on this contract. Have an admin grant CURATOR/MODERATOR/VERIFIER. |
 | Deploy aborts "already recorded" | `callsignRegistry` is already in the record — use an upgrade, not this script. |
 | Deploy aborts "No membershipManager" | The network's `-v2.json` record has no `membershipManager`; deploy the core stack first. |

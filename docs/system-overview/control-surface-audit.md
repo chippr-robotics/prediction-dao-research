@@ -6,8 +6,11 @@ platform — on-chain contracts, off-chain services, and the frontend admin pane
 operations control plane.
 
 This document is the inventory of record. The panel itself lives at `/admin`
-(`frontend/src/components/AdminPanel.jsx`); per-procedure detail stays in
-`docs/runbooks/`.
+(`frontend/src/components/AdminPanel.jsx`); how to operate each view is in
+[the control plane runbook](../runbooks/operations-control-plane.md), operator
+personas and grants are in
+[operator onboarding](../runbooks/operator-onboarding.md), and per-system
+procedure detail stays in `docs/runbooks/`.
 
 ---
 
