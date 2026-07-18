@@ -22,7 +22,12 @@ function parseIdList(text) {
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .map((s) => BigInt(s))
+    .map((s) => {
+      // BigInt would happily parse "-1", which then fails uint256 ABI encoding
+      // downstream — reject anything but plain digits up front.
+      if (!/^\d+$/.test(s)) throw new Error(`invalid id: ${s}`)
+      return BigInt(s)
+    })
 }
 
 function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
@@ -50,14 +55,13 @@ function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
   }
 
   const handleAutoResolve = () => {
-    let id
-    try {
-      id = BigInt(resolveForm.id.trim())
-      setParseError('')
-    } catch {
-      setParseError('Wager ID must be an integer')
+    const raw = resolveForm.id.trim()
+    if (!/^\d+$/.test(raw)) {
+      setParseError('Wager ID must be a non-negative integer')
       return
     }
+    setParseError('')
+    const id = BigInt(raw)
     const fn = resolveForm.source === 'polymarket'
       ? () => write().autoResolveFromPolymarket(id)
       : () => write().autoResolveFromOracle(id)

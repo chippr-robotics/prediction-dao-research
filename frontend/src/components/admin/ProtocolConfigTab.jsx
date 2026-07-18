@@ -167,7 +167,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
   }
 
   const handleSetOracleAdapter = () => {
-    if (!isValidEthereumAddress(oracleForm.address)) return
+    if (!registryAddr || !isValidEthereumAddress(oracleForm.address)) return
     const typeLabel = ORACLE_TYPES.find((t) => t.value === oracleForm.type)?.label
     runTx(
       () => new ethers.Contract(registryAddr, REGISTRY_ABI, signer)
@@ -183,7 +183,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
   }
 
   const handleSetTokenAllowed = () => {
-    if (!isValidEthereumAddress(tokenForm.address)) return
+    if (!registryAddr || !isValidEthereumAddress(tokenForm.address)) return
     runTx(
       () => new ethers.Contract(registryAddr, REGISTRY_ABI, signer)
         .setTokenAllowed(tokenForm.address, tokenForm.allowed),
@@ -192,7 +192,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
   }
 
   const handleSetAuthorizedCaller = () => {
-    if (!isValidEthereumAddress(callerForm.address)) return
+    if (!membershipAddr || !isValidEthereumAddress(callerForm.address)) return
     runTx(
       () => new ethers.Contract(membershipAddr, MEMBERSHIP_ABI, signer)
         .setAuthorizedCaller(callerForm.address, callerForm.authorized),
@@ -276,7 +276,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
               onChange={(e) => setOracleForm({ ...oracleForm, address: e.target.value })} />
           </label>
           <button className="confirm-btn primary" onClick={handleSetOracleAdapter}
-            disabled={pendingTx || !signer || !oracleForm.address}>
+            disabled={pendingTx || !signer || !oracleForm.address || !registryAddr}>
             {pendingTx ? 'Processing...' : 'Set Adapter'}
           </button>
         </div>
@@ -305,7 +305,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
               Check Current
             </button>
             <button className="confirm-btn primary" onClick={handleSetTokenAllowed}
-              disabled={pendingTx || !signer || !tokenForm.address}>
+              disabled={pendingTx || !signer || !tokenForm.address || !registryAddr}>
               {pendingTx ? 'Processing...' : 'Apply'}
             </button>
           </div>
@@ -330,7 +330,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
             Authorized
           </label>
           <button className="confirm-btn danger" onClick={handleSetAuthorizedCaller}
-            disabled={pendingTx || !signer || !callerForm.address}>
+            disabled={pendingTx || !signer || !callerForm.address || !membershipAddr}>
             {pendingTx ? 'Processing...' : 'Apply'}
           </button>
         </div>

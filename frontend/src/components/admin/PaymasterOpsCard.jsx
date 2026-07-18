@@ -2,6 +2,19 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
 import { isValidEthereumAddress } from '../../utils/validation'
+import { useNotification } from '../../hooks/useUI'
+
+// parseEther throws on strings a number input can still produce (scientific
+// notation like "1e-6", trailing "."), and an uncaught throw would take down
+// the whole control plane — normalize to null and let callers surface it.
+function safeParseEther(value) {
+  try {
+    const parsed = ethers.parseEther(String(value || '0'))
+    return parsed > 0n ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * PaymasterOpsCard — FairWinsVerifyingPaymaster operations (spec 050).
@@ -28,6 +41,7 @@ function shortAddr(a) {
 
 function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, runTx, pendingTx }) {
   const paymasterAddr = getContractAddressForChain('verifyingPaymaster', chainId)
+  const { showNotification } = useNotification()
 
   const [info, setInfo] = useState({ deposit: null, verifyingSigner: '', owner: '' })
   const [depositAmount, setDepositAmount] = useState('')
@@ -73,8 +87,8 @@ function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, ru
   const write = () => new ethers.Contract(paymasterAddr, PAYMASTER_ABI, signer)
 
   const handleDeposit = () => {
-    const value = ethers.parseEther(String(depositAmount || '0'))
-    if (value === 0n) return
+    const value = safeParseEther(depositAmount)
+    if (value == null) return showNotification(`Enter a valid ${nativeSymbol} amount`, 'error')
     runTx(
       () => write().deposit({ value }),
       `Deposited ${depositAmount} ${nativeSymbol} to the paymaster's EntryPoint balance`
@@ -82,9 +96,9 @@ function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, ru
   }
 
   const handleWithdraw = () => {
-    if (!isValidEthereumAddress(withdrawForm.to)) return
-    const amount = ethers.parseEther(String(withdrawForm.amount || '0'))
-    if (amount === 0n) return
+    if (!isValidEthereumAddress(withdrawForm.to)) return showNotification('Invalid recipient address', 'error')
+    const amount = safeParseEther(withdrawForm.amount)
+    if (amount == null) return showNotification(`Enter a valid ${nativeSymbol} amount`, 'error')
     runTx(
       () => write().withdrawTo(withdrawForm.to, amount),
       `Withdrew ${withdrawForm.amount} ${nativeSymbol} from the paymaster deposit`
@@ -92,7 +106,7 @@ function PaymasterOpsCard({ signer, account, provider, chainId, nativeSymbol, ru
   }
 
   const handleRotateSigner = () => {
-    if (!isValidEthereumAddress(newSigner)) return
+    if (!isValidEthereumAddress(newSigner)) return showNotification('Invalid signer address', 'error')
     runTx(
       () => write().setVerifyingSigner(newSigner),
       `Verifying signer rotated to ${shortAddr(newSigner)}`
