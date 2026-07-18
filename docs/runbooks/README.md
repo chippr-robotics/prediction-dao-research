@@ -4,11 +4,26 @@ This directory contains step-by-step operational guides, integration procedures,
 
 ## Contents
 
-### Integration Guides
-- **[batch-operations.md](./batch-operations.md)** - Complete integration guide for batch processing APIs with examples in JavaScript, Python, and React
+### Operating the platform
+- **[operations-control-plane.md](./operations-control-plane.md)** - The operator console at `/admin`: every group and view, role gates, step-by-step how-tos, and troubleshooting
+- **[operator-onboarding.md](./operator-onboarding.md)** - Operator personas and responsibilities, role grant/verification procedure, offboarding
+- **[relayer-operations.md](./relayer-operations.md)** - Gasless intent relayer (spec 036): gateway/engine components, hot-key management, killswitch, OpenSea/Polymarket proxy ops, incident table
+- **[paymaster-operations.md](./paymaster-operations.md)** - Sponsored-gas paymaster (spec 050): deposit funding and runway, monitoring, killswitch, signer rotation, compromise response
+- **[callsigns-operations.md](./callsigns-operations.md)** - Deploy the `%callsign` naming registry, wire the frontend, grant operator roles, and moderate / tune / monitor it from the control plane (spec 054)
+- **[contract-upgrades.md](./contract-upgrades.md)** - UUPS proxy upgrade procedure: storage-layout gate, in-place upgrades, rollback
 
-### Deploy & Operations
-- **[callsigns-operations.md](./callsigns-operations.md)** - Deploy the `%callsign` naming registry, wire the frontend, grant operator roles, and moderate / tune / monitor it from the admin screen (spec 054)
+### Deploy
+- **[relayer-mordor-deploy.md](./relayer-mordor-deploy.md)** - First bring-up of the relayer stack on Mordor: GCP prerequisites, KMS keys, Cloud Run, origin lock, validation
+- **[zk-wager-pools-deploy.md](./zk-wager-pools-deploy.md)** - WagerPoolFactory (spec 034) append-only deploy, wiring matrix, subgraph publish
+- **[safe-proposal-hub-deploy.md](./safe-proposal-hub-deploy.md)** - SafeProposalHub (spec 043) events-only helper deploy
+
+### Integration & user-facing procedures
+- **[batch-operations.md](./batch-operations.md)** - Complete integration guide for batch processing APIs with examples in JavaScript, Python, and React
+- **[passkey-account-recovery.md](./passkey-account-recovery.md)** - End-user recovery paths for passkey smart-wallet accounts
+
+The full inventory of administrative control surfaces (on-chain, service, and
+frontend) and the gap analysis behind the control plane's structure live in
+[docs/system-overview/control-surface-audit.md](../system-overview/control-surface-audit.md).
 
 ## Purpose
 

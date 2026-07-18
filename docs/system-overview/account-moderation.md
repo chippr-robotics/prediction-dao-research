@@ -19,6 +19,10 @@ This page focuses on **account moderation**, which is the per-account
 freeze/unfreeze power. For protocol-wide pausing, see
 [Operator powers in security.md](security.md#operator-powers).
 
+Moderators act from the operations control plane: `/admin` → **Incident
+Response → Account Moderation** (see the
+[control plane runbook](../runbooks/operations-control-plane.md)).
+
 ## What an account freeze does
 
 When an `ACCOUNT_MODERATOR_ROLE` holder calls

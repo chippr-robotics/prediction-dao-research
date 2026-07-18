@@ -48,6 +48,10 @@ The deposit **is** the sponsorship pool and the hard loss cap.
 ```
 - `entryPoint.balanceOf(paymaster)` = current pool.
 - **Never** overfund beyond the accepted exposure cap — top up on the runway alert instead.
+- UI path: the control plane's **Infrastructure → Services → Sponsored-Gas Paymaster** card
+  shows the live deposit, verifying signer, and owner, and offers a top-up form
+  (`deposit()` is permissionless) — see
+  [operations-control-plane.md](operations-control-plane.md).
 
 ## Monitoring (add to the existing gas-wallet dashboards)
 
@@ -67,7 +71,8 @@ it. Use for incident response or runaway burn.
 ## Rotate the sponsorship signer
 
 1. Create a new KMS key; derive its Ethereum address.
-2. `owner` (floppy) calls `setVerifyingSigner(newAddr)` on the paymaster.
+2. `owner` (floppy) calls `setVerifyingSigner(newAddr)` on the paymaster — via CLI, or the
+   control plane's paymaster card (the button is owner-gated; the tx reverts for anyone else).
 3. Swap `PM_SIGNER_KMS_KEY` in the gateway; redeploy. Boot check re-validates the match.
 
 In-flight approvals signed by the old key remain valid until their short TTL expires — no need to
