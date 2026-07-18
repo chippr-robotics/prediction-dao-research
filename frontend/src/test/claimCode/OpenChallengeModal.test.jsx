@@ -109,14 +109,15 @@ describe('OpenChallengeModal explainers behind info icons (spec 039 US1)', () =>
 
   it('hides the static field explainers by default and reveals each from its icon, one at a time', () => {
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    expect(screen.queryByText(/the taker takes the opposite/i)).toBeNull()
+    expect(screen.queryByText(/take the other side/i)).toBeNull()
     expect(screen.queryByText(/single-party self-resolution/i)).toBeNull()
 
-    // The stake caption + its InfoTip, and the "How is it resolved?" InfoTip, were removed
-    // to conserve space (specs 052/054 feedback); the remaining field explainer still
-    // reveals from its icon.
-    fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
-    expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
+    // The stake caption + its InfoTip, the "How is it resolved?" InfoTip, and the wager
+    // memo's field explainer were all removed to conserve space (specs 052/054/058
+    // feedback — the memo's placeholder now explains itself); the modal-title explainer
+    // is the surviving info icon and still reveals from its icon.
+    fireEvent.click(screen.getByRole('button', { name: 'About open challenges' }))
+    expect(screen.getByRole('note')).toHaveTextContent(/take the other side/i)
   })
 
   it('keeps dynamic text inline on the success screen: security warning visible, backup explainer behind its icon', async () => {
