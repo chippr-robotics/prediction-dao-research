@@ -655,6 +655,7 @@ const ROLE_NAME_TO_HASH = {
   'GUARDIAN': ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
   'ACCOUNT_MODERATOR': ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
   'ROLE_MANAGER': ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
+  'SANCTIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
 }
 
 // Minimal ABI for role manager contract
@@ -1008,14 +1009,18 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
 
   // Admin roles use OpenZeppelin AccessControl.hasRole. ADMIN /
   // ACCOUNT_MODERATOR / GUARDIAN live on WagerRegistry; ROLE_MANAGER lives
-  // on MembershipManager. DEFAULT_ADMIN_ROLE (ADMIN) is set on both — we
-  // check WagerRegistry first because it's the canonical operator surface.
+  // on MembershipManager; SANCTIONS_ADMIN lives on SanctionsGuard.
+  // DEFAULT_ADMIN_ROLE (ADMIN) is set on both core contracts — we check
+  // WagerRegistry first because it's the canonical operator surface.
   const accessControlAbi = [
     'function hasRole(bytes32 role, address account) view returns (bool)'
   ]
   const candidates = []
   if (roleName === 'ROLE_MANAGER') {
     const addr = resolveAddress('membershipManager')
+    if (addr) candidates.push(addr)
+  } else if (roleName === 'SANCTIONS_ADMIN') {
+    const addr = resolveAddress('sanctionsGuard')
     if (addr) candidates.push(addr)
   } else {
     const wager = resolveAddress('wagerRegistry')

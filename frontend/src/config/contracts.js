@@ -110,6 +110,7 @@ const POLYGON_CONTRACTS = {
   tokenFactory: '0x5806e76cA3c838524E7cF43db7625bdFBA0783a0',
   wagerPoolFactory: '0x420aEC3c76859eB74ab21c769c16AcdAB221f723',
   entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  verifyingPaymaster: '0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105', // spec 050 — sponsored-gas paymaster (EntryPoint v0.6)
   accountFactory: '0xd519C25e9dEd0DAC586B764574100479CB318734',
   backupPointerRegistry: '0x664ACAd4d604c626A6160948Df9C10FE38010E11',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
