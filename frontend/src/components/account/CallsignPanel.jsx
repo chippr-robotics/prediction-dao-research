@@ -7,10 +7,12 @@
  * honest state). Membership below Gold sees an upgrade prompt, never a dead disabled control.
  *
  * All reads go straight to the on-chain CallsignRegistry (no subgraph, research R7); every write is a
- * plain self-submitted ethers v6 transaction against the connected wallet's signer — the same path the
- * sibling account panels use. Registration is a two-step commit -> reveal: the desired callsign + a random
- * salt are committed as a hash, then revealed after a short min-commit age so a pending pick can't be
- * front-run. The salt is persisted locally so a page reload between the two steps can still finish.
+ * self-call routed through the wallet's unified `sendCalls` (spec 041) — the same path the sibling account
+ * panels use — so it works identically for passkey smart-account sessions (which have no ethers signer and
+ * submit a UserOp) and classic injected wallets (a plain signer transaction). Registration is a two-step
+ * commit -> reveal: the desired callsign + a random salt are committed as a hash, then revealed after a
+ * short min-commit age so a pending pick can't be front-run. The salt is persisted locally so a page reload
+ * between the two steps can still finish.
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -139,7 +141,12 @@ function extractRevert(err, iface) {
 }
 
 function describeError(err, iface) {
-  if (err?.code === 'ACTION_REJECTED' || /reject|denied/i.test(err?.message || '')) {
+  // A dismissed passkey ceremony (spec 041) is a clean abort, not a failure.
+  if (
+    err?.name === 'CeremonyCancelled' ||
+    err?.code === 'ACTION_REJECTED' ||
+    /reject|denied/i.test(err?.message || '')
+  ) {
     return 'Transaction was rejected.'
   }
   const revert = extractRevert(err, iface)
@@ -188,7 +195,7 @@ function safeNormalize(input) {
 }
 
 export default function CallsignPanel() {
-  const { address: account, signer, provider, chainId, isConnected } = useWallet()
+  const { address: account, sendCalls, provider, chainId, isConnected } = useWallet()
   const navigate = useNavigate()
 
   // Current-user membership tier (read via the shared role-details hook).
@@ -339,20 +346,20 @@ export default function CallsignPanel() {
         setNotice({ kind: 'error', text: 'That callsign is not valid yet.' })
         return
       }
-      if (!registryAddress || !signer) {
+      if (!registryAddress || !account || !readRegistry) {
         setNotice({ kind: 'error', text: 'Connect a wallet to continue.' })
         return
       }
       setBusy(true)
       try {
         const salt = ethers.hexlify(ethers.randomBytes(32))
-        const write = new ethers.Contract(registryAddress, CALLSIGN_REGISTRY_ABI, signer)
-        const commitment = await write.makeCommitment(canonical, account, salt)
+        // makeCommitment is a pure view — resolve it over the read transport so passkey
+        // sessions (which have no signer) can compute it too.
+        const commitment = await readRegistry.makeCommitment(canonical, account, salt)
         // Persist BEFORE sending so a reload after signing can still reveal.
         const record = { mode, callsign: canonical, salt, commitment, committedAt: Date.now() }
         savePending(chainId, account, record)
-        const tx = await write.commit(commitment)
-        await tx.wait()
+        await sendCalls([{ target: registryAddress, data: iface.encodeFunctionData('commit', [commitment]) }])
         // Anchor the countdown to the mined moment.
         const mined = { ...record, committedAt: Date.now() }
         savePending(chainId, account, mined)
@@ -369,20 +376,19 @@ export default function CallsignPanel() {
         setBusy(false)
       }
     },
-    [desiredCallsign, registryAddress, signer, account, chainId, iface],
+    [desiredCallsign, registryAddress, account, readRegistry, sendCalls, chainId, iface],
   )
 
   const completeReveal = useCallback(async () => {
-    if (!pending || !registryAddress || !signer) return
+    if (!pending || !registryAddress || !account) return
     setNotice(null)
     setBusy(true)
     try {
-      const write = new ethers.Contract(registryAddress, CALLSIGN_REGISTRY_ABI, signer)
-      const tx =
+      const data =
         pending.mode === 'change'
-          ? await write.changeCallsign(pending.callsign, pending.salt)
-          : await write.register(pending.callsign, pending.salt)
-      await tx.wait()
+          ? iface.encodeFunctionData('changeCallsign', [pending.callsign, pending.salt])
+          : iface.encodeFunctionData('register', [pending.callsign, pending.salt])
+      await sendCalls([{ target: registryAddress, data }])
       clearPending(chainId, account)
       rememberOwned(chainId, account, pending.callsign)
       setPending(null)
@@ -397,7 +403,7 @@ export default function CallsignPanel() {
     } finally {
       setBusy(false)
     }
-  }, [pending, registryAddress, signer, account, chainId, iface, loadCallsign])
+  }, [pending, registryAddress, account, sendCalls, chainId, iface, loadCallsign])
 
   const discardPending = useCallback(() => {
     clearPending(chainId, account)
@@ -409,13 +415,11 @@ export default function CallsignPanel() {
   }, [chainId, account])
 
   const doRelease = useCallback(async () => {
-    if (!registryAddress || !signer) return
+    if (!registryAddress || !account) return
     setNotice(null)
     setBusy(true)
     try {
-      const write = new ethers.Contract(registryAddress, CALLSIGN_REGISTRY_ABI, signer)
-      const tx = await write.release()
-      await tx.wait()
+      await sendCalls([{ target: registryAddress, data: iface.encodeFunctionData('release', []) }])
       clearOwned(chainId, account)
       setOpenAction(null)
       setNotice({
@@ -428,7 +432,7 @@ export default function CallsignPanel() {
     } finally {
       setBusy(false)
     }
-  }, [registryAddress, signer, chainId, account, iface, loadCallsign])
+  }, [registryAddress, account, sendCalls, chainId, iface, loadCallsign])
 
   const requestRepoint = useCallback(async () => {
     const to = repointAddress.trim()
@@ -440,13 +444,13 @@ export default function CallsignPanel() {
       setNotice({ kind: 'error', text: 'That is already the callsign’s address.' })
       return
     }
-    if (!registryAddress || !signer) return
+    if (!registryAddress || !account) return
     setNotice(null)
     setBusy(true)
     try {
-      const write = new ethers.Contract(registryAddress, CALLSIGN_REGISTRY_ABI, signer)
-      const tx = await write.requestRepoint(to)
-      await tx.wait()
+      await sendCalls([
+        { target: registryAddress, data: iface.encodeFunctionData('requestRepoint', [to]) },
+      ])
       setOpenAction(null)
       setRepointAddress('')
       setNotice({
@@ -459,16 +463,16 @@ export default function CallsignPanel() {
     } finally {
       setBusy(false)
     }
-  }, [repointAddress, account, registryAddress, signer, iface, loadCallsign])
+  }, [repointAddress, account, registryAddress, sendCalls, iface, loadCallsign])
 
   const cancelRepoint = useCallback(async () => {
-    if (!registryAddress || !signer) return
+    if (!registryAddress || !account) return
     setNotice(null)
     setBusy(true)
     try {
-      const write = new ethers.Contract(registryAddress, CALLSIGN_REGISTRY_ABI, signer)
-      const tx = await write.cancelRepoint()
-      await tx.wait()
+      await sendCalls([
+        { target: registryAddress, data: iface.encodeFunctionData('cancelRepoint', []) },
+      ])
       setNotice({ kind: 'success', text: 'Address change cancelled. Your callsign stays put.' })
       await loadCallsign()
     } catch (e) {
@@ -476,7 +480,7 @@ export default function CallsignPanel() {
     } finally {
       setBusy(false)
     }
-  }, [registryAddress, signer, iface, loadCallsign])
+  }, [registryAddress, account, sendCalls, iface, loadCallsign])
 
   // ------------------------------------------------------------- derived UI
   const canonical = safeNormalize(desiredCallsign)
