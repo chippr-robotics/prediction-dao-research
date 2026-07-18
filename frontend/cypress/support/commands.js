@@ -23,10 +23,9 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const account = options.account || TEST_ACCOUNTS[0]
 
   cy.on('window:before:load', (win) => {
-    // Suppress the dev-warning modal/onboarding tutorial and the dev banner so
-    // their fixed-position overlays don't cover interactive elements in tests.
+    // Suppress the dev banner so its fixed-position overlay doesn't cover
+    // interactive elements in tests.
     try {
-      win.localStorage.setItem('dev_warning_modal_seen_v2', 'true')
       win.localStorage.setItem('dev_warning_banner_dismissed', 'true')
     } catch { /* localStorage may be unavailable; ignore */ }
 

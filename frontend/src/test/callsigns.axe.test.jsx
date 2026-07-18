@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 
 // ---- CallsignPanel dependencies (mocked so we can render each gate state without a live wallet) ----
-const walletState = { address: null, signer: null, provider: null, chainId: 137, isConnected: false }
+const walletState = { address: null, sendCalls: () => {}, provider: null, chainId: 137, isConnected: false }
 const membershipState = { isActive: false, tier: 0 }
 let registryAddress = '0x0000000000000000000000000000000000000abc'
 
@@ -43,7 +43,7 @@ function renderPanel() {
 
 describe('Callsign surfaces — accessibility (spec 054, WCAG 2.1 AA)', () => {
   beforeEach(() => {
-    Object.assign(walletState, { address: null, signer: null, provider: null, chainId: 137, isConnected: false })
+    Object.assign(walletState, { address: null, sendCalls: () => {}, provider: null, chainId: 137, isConnected: false })
     Object.assign(membershipState, { isActive: false, tier: 0 })
     Object.assign(ensState, { resolvedAddress: null, isLoading: false, error: null, isEns: false, isAddress: false })
     Object.assign(callsignState, { isCallsign: false, address: null, status: null, verified: false, isLoading: false, message: null })

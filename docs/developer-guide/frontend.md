@@ -45,7 +45,7 @@ frontend/src/
 | `/app` (aliases `/main`, `/fairwins`) | Dashboard | main workspace, inside `AppLayout` (Header + EntryGate + Footer) |
 | `/wallet` | WalletPage | Account Center: Account / Membership / Security / Preferences / Swap tabs |
 | `/friend-market/accept` | MarketAcceptancePage | QR / deep-link wager acceptance (`?marketId=N`) |
-| `/admin` | AdminPanel | role-gated (Guardian / Role Manager / Account Moderator / Admin) |
+| `/admin` | AdminPanel | the operations control plane, grouped by operator area; role-gated (Admin / Guardian / Account Moderator / Role Manager / Compliance Officer) — see `docs/runbooks/operations-control-plane.md` |
 | `*` | redirect to `/` | |
 
 ## Getting started

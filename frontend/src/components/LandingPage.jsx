@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
-import LiveStats from './fairwins/LiveStats'
 import Footer from './Footer'
 import { useChainTokens } from '../hooks/useChainTokens'
 import './LandingPage.css'
@@ -50,16 +49,21 @@ function LandingPage() {
         </div>
 
         <div className="hero-content">
+          <div className="hero-badge">
+            <span className="hero-badge-dot" />
+            Self-custody · Multi-chain
+          </div>
+
           <h1 className="hero-headline">
-            Your Wager.<br />
-            <span className="hero-headline-accent">Your Rules.</span><br />
-            Your Call.
+            Your Money.<br />
+            <span className="hero-headline-accent">Your Odds.</span><br />
+            Your Keys.
           </h1>
 
           <p className="hero-subtitle">
-            Create private, trustless bets with friends.
-            Smart contracts hold the stakes and enforce the rules.
-            No middlemen. No arguments.
+            Pay friends, wager head-to-head, trade prediction markets,
+            grow idle funds, swap tokens, and track your collectibles —
+            one app, and you hold the keys the whole time.
           </p>
 
           <div className="hero-actions">
@@ -71,10 +75,10 @@ function LandingPage() {
               </svg>
             </button>
             <button onClick={() => {
-              const el = document.getElementById('how-it-works')
+              const el = document.getElementById('features')
               if (el) el.scrollIntoView({ behavior: 'smooth' })
             }} className="hero-cta-secondary">
-              See How It Works
+              Explore the Platform
             </button>
           </div>
 
@@ -109,7 +113,7 @@ function LandingPage() {
               <div className="preview-status-live" />
               <span className="preview-label">Live Wager</span>
             </div>
-            <div className="preview-question">Will BTC close above $100k on March 1?</div>
+            <div className="preview-question">Will BTC close above $150k on New Year&apos;s Eve?</div>
             <div className="preview-stakes">
               <div className="preview-stake">
                 <span className="preview-stake-label">Your stake</span>
@@ -126,23 +130,22 @@ function LandingPage() {
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              Resolves by either party with challenge period
+              Escrowed on-chain · resolves with a challenge period
             </div>
           </div>
         </div>
       </section>
 
-      {/* Live on-chain stats band */}
-      <LiveStats />
-
-      {/* Why FairWins - Value Props */}
+      {/* The Platform - Feature Pillars */}
       <section className={`value-section ${isVisible('value-props') ? 'visible' : ''}`} id="features">
         <div className="container" id="value-props" data-animate>
           <div className="section-header">
-            <span className="section-tag">Why FairWins</span>
-            <h2 className="section-title">Betting between friends,<br />done right</h2>
+            <span className="section-tag">The Platform</span>
+            <h2 className="section-title">Everything your money can do,<br />in one place</h2>
             <p className="section-subtitle">
-              No bookmakers. No order books. Just you, your friend, and a smart contract that keeps everyone honest.
+              FairWins started as peer-to-peer wagering. It grew into a full self-custody
+              money app — send, bet, trade, collect, earn, and swap without ever handing
+              over your funds.
             </p>
           </div>
 
@@ -154,49 +157,84 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Trustless Escrow</h3>
-              <p>Both sides stake into a smart contract. Funds are locked until the outcome is decided. Nobody can run off with the money.</p>
+              <h3>Your portfolio, your keys</h3>
+              <p>
+                See every asset you actually hold on-chain — tokens, stablecoins, positions,
+                and collectibles — organized and priced in one portfolio, with your full
+                activity in a single ledger. Your wallet signs every action. FairWins never
+                takes custody of your funds.
+              </p>
             </div>
+
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
               </div>
-              <h3>Fair Resolution</h3>
-              <p>Choose who resolves: either party, the creator, or a trusted third party. Challenge periods prevent disputes.</p>
+              <h3>Transfer</h3>
+              <p>Pay and request money like a payments app — big numpad, QR codes, address book, and USDC by default. Gasless sends mean no gas token required to move your money.</p>
             </div>
+
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M8 6h13M8 12h13M8 18h13" />
+                  <path d="M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
                 </svg>
               </div>
-              <h3>Dispute Protection</h3>
-              <p>24-hour challenge period on manual resolutions. Escalate to neutral arbitration if needed.</p>
+              <h3>Wager</h3>
+              <p>Head-to-head bets, open challenges, and group pools. Smart contracts escrow the stakes; outcomes settle by oracle or by the people you choose, with challenge periods to keep it fair.</p>
             </div>
+
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
                 </svg>
               </div>
-              <h3>Private & Social</h3>
-              <p>Share wagers via QR code or deep link. Invite friends directly — no public order books.</p>
+              <h3>Predict</h3>
+              <p>Browse and trade real Polymarket prediction markets without leaving the app. Your own wallet signs every order, and every fee is disclosed before you commit.</p>
             </div>
+
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <line x1="12" y1="1" x2="12" y2="23" />
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
                 </svg>
               </div>
-              <h3>Flexible Stakes</h3>
-              <p>Wager with {nativeSymbol}, stablecoins, or custom tokens. Set your own amounts and deadlines.</p>
+              <h3>Collect</h3>
+              <p>Your NFTs, alongside the rest of your portfolio — with live floor prices and best offers. List and sell through OpenSea right from your collection.</p>
+            </div>
+
+            <div className="value-card">
+              <div className="value-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M7 20h10" />
+                  <path d="M12 20v-8" />
+                  <path d="M12 12c-3 0-5-2-5-5 3 0 5 2 5 5z" />
+                  <path d="M12 12c3 0 5-2 5-5-3 0-5 2-5 5z" />
+                </svg>
+              </div>
+              <h3>Earn</h3>
+              <p>Put idle assets to work in audited third-party lending vaults. Watch positions grow, claim rewards, and withdraw whenever you want — explained in plain language.</p>
+            </div>
+
+            <div className="value-card">
+              <div className="value-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <polyline points="17 1 21 5 17 9" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <polyline points="7 23 3 19 7 15" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+              </div>
+              <h3>Swap</h3>
+              <p>Exchange tokens through the right DEX for whichever chain you&apos;re on — Uniswap on Polygon and Ethereum networks, ETCswap on Ethereum Classic. Always labeled honestly.</p>
             </div>
           </div>
         </div>
@@ -218,10 +256,11 @@ function LandingPage() {
                 <span>1</span>
               </div>
               <div className="step-content">
-                <h3>Create</h3>
+                <h3>Connect</h3>
                 <p>
-                  Pick what you're betting on, set the stakes, and choose your resolution method.
-                  Choose who resolves: either party, the creator, or a trusted third party.
+                  Create a passkey account with just your fingerprint or face — no seed
+                  phrase, no gas token needed to start. Already have a wallet? Connect
+                  your browser or mobile wallet instead.
                 </p>
               </div>
             </div>
@@ -231,10 +270,11 @@ function LandingPage() {
                 <span>2</span>
               </div>
               <div className="step-content">
-                <h3>Share</h3>
+                <h3>Make your move</h3>
                 <p>
-                  Get a QR code or link. Send it to your friend.
-                  They review the terms, stake their side, and both deposits lock into escrow.
+                  Pay a friend, lock in a wager, take a position on a prediction market,
+                  lend idle funds, swap tokens, or list a collectible. Every action lives
+                  in the same minimalist app.
                 </p>
               </div>
             </div>
@@ -244,10 +284,11 @@ function LandingPage() {
                 <span>3</span>
               </div>
               <div className="step-content">
-                <h3>Settle</h3>
+                <h3>Stay in control</h3>
                 <p>
-                  The result is proposed and verified through a 24-hour challenge period.
-                  The winner claims the pot. Fair and final.
+                  Your wallet signs everything, stakes sit in smart-contract escrow, and
+                  winnings, positions, and rewards are yours to claim or withdraw at any
+                  time. No middlemen holding your money.
                 </p>
               </div>
             </div>
@@ -255,19 +296,46 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Resolution Methods - Distinct Visual */}
-      <section className={`resolution-section ${isVisible('resolution-area') ? 'visible' : ''}`}>
+      {/* Custody Options - Distinct Visual */}
+      <section className={`resolution-section ${isVisible('resolution-area') ? 'visible' : ''}`} id="custody">
         <div className="container" id="resolution-area" data-animate>
           <div className="section-header">
-            <span className="section-tag">Resolution Layer</span>
-            <h2 className="section-title">Choose how your wager settles</h2>
+            <span className="section-tag">Custody, Your Way</span>
+            <h2 className="section-title">You hold the keys. Always.</h2>
             <p className="section-subtitle">
-              Every wager needs a resolution method. Pick the one that fits your bet.
+              FairWins never custodies your funds. Choose how you want to control your
+              account — from a simple passkey to a shared multisig vault.
             </p>
           </div>
 
           <div className="resolution-grid">
             <div className="resolution-card resolution-either">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <h3>Passkey Accounts</h3>
+              <p>Your face or fingerprint creates an on-chain smart account — no seed phrase, no extensions. Everyday actions can run gas-free, with fees always disclosed when they&apos;re not.</p>
+              <span className="resolution-use-case">Best for: Getting started in seconds</span>
+            </div>
+
+            <div className="resolution-card resolution-initiator">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="2" y="6" width="20" height="12" rx="2" />
+                  <path d="M16 12h.01" />
+                </svg>
+              </div>
+              <h3>Your Own Wallet</h3>
+              <p>Bring the wallet you already trust — browser extension or any WalletConnect-compatible mobile wallet. FairWins is just an interface to your keys.</p>
+              <span className="resolution-use-case">Best for: Existing crypto users</span>
+            </div>
+
+            <div className="resolution-card resolution-receiver">
               <div className="resolution-accent" />
               <div className="resolution-icon-badge">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -277,50 +345,22 @@ function LandingPage() {
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3>Either Party</h3>
-              <p>Either side can propose the outcome. A 24-hour challenge period ensures fairness. Most flexible for casual bets.</p>
-              <span className="resolution-use-case">Best for: Casual bets with friends</span>
-            </div>
-
-            <div className="resolution-card resolution-initiator">
-              <div className="resolution-accent" />
-              <div className="resolution-icon-badge">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <h3>Initiator Resolves</h3>
-              <p>The wager creator reports the result. The opponent gets 24 hours to challenge if they disagree.</p>
-              <span className="resolution-use-case">Best for: Creator-led wagers</span>
-            </div>
-
-            <div className="resolution-card resolution-receiver">
-              <div className="resolution-accent" />
-              <div className="resolution-icon-badge">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="8.5" cy="7" r="4" />
-                  <polyline points="17 11 19 13 23 9" />
-                </svg>
-              </div>
-              <h3>Receiver Resolves</h3>
-              <p>The accepting party reports the result. The creator gets 24 hours to challenge if they disagree.</p>
-              <span className="resolution-use-case">Best for: Trust-balanced wagers</span>
+              <h3>Shared Vaults</h3>
+              <p>Hold funds together in a Safe multisig where moving money takes co-owner approval. Wager as the vault, pay from the vault — governed by your group, not by us.</p>
+              <span className="resolution-use-case">Best for: Groups, clubs & treasuries</span>
             </div>
 
             <div className="resolution-card resolution-thirdparty">
               <div className="resolution-accent" />
               <div className="resolution-icon-badge">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Third Party</h3>
-              <p>A mutually trusted address resolves the wager. Perfect for bets where a neutral arbiter is preferred.</p>
-              <span className="resolution-use-case">Best for: High-stakes or competitive bets</span>
+              <h3>Encrypted Backup</h3>
+              <p>Your address book, vault references, and settings sync end-to-end encrypted. Recover on any device with your phrase — we couldn&apos;t read your data if we wanted to.</p>
+              <span className="resolution-use-case">Best for: Peace of mind</span>
             </div>
           </div>
         </div>
@@ -331,7 +371,7 @@ function LandingPage() {
         <div className="container" id="scenarios-area" data-animate>
           <div className="section-header">
             <span className="section-tag">Use Cases</span>
-            <h2 className="section-title">What will you bet on?</h2>
+            <h2 className="section-title">What will you do first?</h2>
           </div>
 
           <div className="scenario-grid">
@@ -340,23 +380,47 @@ function LandingPage() {
               <h3>The Big Game</h3>
               <p className="scenario-setup">"I bet you $50 the Chiefs win the Super Bowl."</p>
               <p className="scenario-resolution">
-                Either party proposes the result. 24-hour challenge period. Winner claims the pot. One click.
+                Lock a head-to-head wager. Smart-contract escrow holds both stakes, a challenge period keeps it honest, and the winner claims the pot.
               </p>
             </div>
             <div className="scenario-card">
               <div className="scenario-emoji">&#128200;</div>
-              <h3>The Price Call</h3>
-              <p className="scenario-setup">"No way ETH hits $5k by June."</p>
+              <h3>The Market Call</h3>
+              <p className="scenario-setup">"The polls are wrong and I'd stake money on it."</p>
               <p className="scenario-resolution">
-                Assign a trusted third party to verify the price. When the deadline hits, the result speaks for itself.
+                Trade real prediction markets on elections, sports, and world events through Polymarket — signed by your wallet, fees shown up front.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#127922;</div>
-              <h3>The Anything Bet</h3>
-              <p className="scenario-setup">"If it snows on Christmas, you owe me dinner."</p>
+              <div className="scenario-emoji">&#127829;</div>
+              <h3>The Dinner Debt</h3>
+              <p className="scenario-setup">"Just send me your half whenever."</p>
               <p className="scenario-resolution">
-                Manual resolution with a 24-hour challenge window. Stakes stay locked until both sides agree.
+                Pay or request USDC with a QR code in seconds — payments-app simple, no gas token required, straight between wallets.
+              </p>
+            </div>
+            <div className="scenario-card">
+              <div className="scenario-emoji">&#127942;</div>
+              <h3>The Office Pool</h3>
+              <p className="scenario-setup">"Everyone in for the bracket. Winner takes all."</p>
+              <p className="scenario-resolution">
+                Spin up a group wager pool. Everyone joins with USDC, the group approves the payout, and claims go straight to the winners' wallets.
+              </p>
+            </div>
+            <div className="scenario-card">
+              <div className="scenario-emoji">&#128444;&#65039;</div>
+              <h3>The Collection</h3>
+              <p className="scenario-setup">"What's my collection actually worth?"</p>
+              <p className="scenario-resolution">
+                See your NFTs with live floor prices right beside your tokens — and list one for sale on OpenSea without leaving the app.
+              </p>
+            </div>
+            <div className="scenario-card">
+              <div className="scenario-emoji">&#127793;</div>
+              <h3>The Idle Stack</h3>
+              <p className="scenario-setup">"My USDC is just sitting there between bets."</p>
+              <p className="scenario-resolution">
+                Lend it into an audited vault and watch it earn. Withdraw any time, claim rewards when they land — your position, your call.
               </p>
             </div>
           </div>
@@ -370,8 +434,8 @@ function LandingPage() {
           <div className="cta-orb cta-orb-2" />
         </div>
         <div className="final-cta-content">
-          <h2>Ready to put your money<br />where your mouth is?</h2>
-          <p>Create your first wager in under a minute.</p>
+          <h2>Ready to take control<br />of your money?</h2>
+          <p>Connect with a passkey and make your first move in under a minute.</p>
           <button onClick={handleGetStarted} className="hero-cta-primary cta-large">
             <span>Get Started</span>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
