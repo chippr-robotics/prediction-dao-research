@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { useChainId } from 'wagmi'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
-import { setCardVisible } from '../utils/quickAccessPreference'
 import { OPEN_RESOLUTION_TYPES } from '../hooks/useOpenChallengeCreate'
 
 // Stub the create modal to record the props each QuickActions card opens it with,
@@ -171,31 +170,31 @@ describe('Dashboard Component', () => {
     // oracle card + ticker render; individual tests override for the
     // no-on-chain-oracle case.
     useChainId.mockReturnValue(137)
-    localStorage.removeItem('fairwins_quickaccess_v1')
   })
 
   describe('QuickActions button flows', () => {
-    const openVia = (cardText, cardId) => {
-      setCardVisible(cardId, true)
+    // Every card renders now (no per-device show/hide preference), so opening a
+    // flow is just render + click.
+    const openVia = (cardText) => {
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText(cardText))
       return screen.getByTestId('friend-modal')
     }
 
     it('"Friends Decide (1v1)" opens the participant flow', () => {
-      const modal = openVia('Friends Decide (1v1)', 'create-1v1-friends')
+      const modal = openVia('Friends Decide (1v1)')
       expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
       expect(modal).toHaveAttribute('data-resolution-category', 'participant')
     })
 
     it('"Oracle Settles (1v1)" opens the oracle flow (lands on Polymarket search)', () => {
-      const modal = openVia('Oracle Settles (1v1)', 'create-1v1-oracle')
+      const modal = openVia('Oracle Settles (1v1)')
       expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
       expect(modal).toHaveAttribute('data-resolution-category', 'oracle')
     })
 
     it('"Make an Offer" opens the all-resolution flow', () => {
-      const modal = openVia('Make an Offer', 'create-offer')
+      const modal = openVia('Make an Offer')
       expect(modal).toHaveAttribute('data-initial-type', 'offer')
       expect(modal).toHaveAttribute('data-resolution-category', 'all')
     })
@@ -210,7 +209,6 @@ describe('Dashboard Component', () => {
     // clean, minimally branded QR using the persisted color choice, with no
     // color options and no visible address text.
     it('"Share Account" opens the quick QR view for the connected address', () => {
-      setCardVisible('share-account', true)
       renderWithProviders(<Dashboard />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
@@ -232,7 +230,6 @@ describe('Dashboard Component', () => {
     })
 
     it('"Share Account" QR uses the color preference saved on the Account page', () => {
-      setCardVisible('share-account', true)
       localStorage.setItem('fairwins_qrcolor_v1', 'forest')
       const { container } = renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Share Account'))
@@ -243,7 +240,6 @@ describe('Dashboard Component', () => {
     })
 
     it('"Share Account" modal closes via its close button', () => {
-      setCardVisible('share-account', true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Share Account'))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -276,18 +272,18 @@ describe('Dashboard Component', () => {
   })
 
   describe('Quick Actions', () => {
-    it('shows only the default-visible quick action cards', () => {
+    it('shows every quick action card (no per-device show/hide preference)', () => {
       renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
+      expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
+      expect(screen.getByText('Make an Offer')).toBeInTheDocument()
+      expect(screen.getByText('Open Challenge')).toBeInTheDocument()
       expect(screen.getByText('Open Oracle Challenge')).toBeInTheDocument()
+      expect(screen.getByText('Group Pool')).toBeInTheDocument()
       expect(screen.getByText('Enter Words')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
-      expect(screen.queryByText('Friends Decide (1v1)')).not.toBeInTheDocument()
-      expect(screen.queryByText('Oracle Settles (1v1)')).not.toBeInTheDocument()
-      expect(screen.queryByText('Make an Offer')).not.toBeInTheDocument()
-      expect(screen.queryByText('Open Challenge')).not.toBeInTheDocument()
-      expect(screen.queryByText('Group Pool')).not.toBeInTheDocument()
-      expect(screen.queryByText('Scan QR Code')).not.toBeInTheDocument()
-      expect(screen.queryByText('Share Account')).not.toBeInTheDocument()
+      expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
+      expect(screen.getByText('Share Account')).toBeInTheDocument()
     })
 
     it('should have quick action descriptions', () => {
@@ -343,36 +339,14 @@ describe('Dashboard Component', () => {
     })
   })
 
-  describe('Quick access card visibility (spec 038 US5)', () => {
-    afterEach(() => {
-      localStorage.removeItem('fairwins_quickaccess_v1')
-    })
-
-    it('hides a card that has been turned off in Preferences and reflows the rest', () => {
-      setCardVisible('share-account', true)
-      setCardVisible('scan-qr', false)
-      renderWithProviders(<Dashboard />)
-      expect(screen.queryByText('Scan QR Code')).not.toBeInTheDocument()
-      // The rest of the grid is unaffected.
-      expect(screen.getByText('Share Account')).toBeInTheDocument()
-    })
-
-    it('a card left visible (the default) still renders', () => {
+  describe('Quick access cards (always shown)', () => {
+    it('renders all cards with no show/hide preference and never an empty state', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
-    })
-
-    it('shows a recoverable empty state pointing at Preferences when every card is hidden', () => {
-      const allCardIds = [
-        'create-1v1-friends', 'create-1v1-oracle', 'create-offer', 'open-challenge',
-        'oracle-open-challenge', 'create-pool',
-        'enter-phrase', 'my-wagers', 'scan-qr', 'share-account',
-      ]
-      allCardIds.forEach((id) => setCardVisible(id, false))
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText(/all quick access cards are hidden/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /open preferences/i })).toBeInTheDocument()
-      expect(screen.queryByText('Friends Decide (1v1)')).not.toBeInTheDocument()
+      expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
+      expect(screen.getByText('Share Account')).toBeInTheDocument()
+      // The legacy "all cards hidden" empty state is gone.
+      expect(screen.queryByText(/all quick access cards are hidden/i)).not.toBeInTheDocument()
     })
   })
 
@@ -425,15 +399,7 @@ describe('Dashboard Component', () => {
       expect(modal).toHaveAttribute('data-initial-market', '0xticker')
     })
 
-    it('the card is toggleable via quick-access preferences like any other (spec 038 US5)', () => {
-      setCardVisible('oracle-open-challenge', false)
-      renderWithProviders(<Dashboard />)
-      expect(screen.queryByText('Open Oracle Challenge')).toBeNull()
-      setCardVisible('oracle-open-challenge', true)
-    })
-
     it('the plain Open Challenge card opens the same modal on its default (non-oracle) path', () => {
-      setCardVisible('open-challenge', true)
       renderWithProviders(<Dashboard />)
       fireEvent.click(screen.getByText('Open Challenge'))
       const modal = screen.getByTestId('open-challenge-modal')
@@ -449,15 +415,12 @@ describe('Dashboard Component', () => {
   describe('Networks without an on-chain oracle', () => {
     it('hides the Open Oracle Challenge card', () => {
       useChainId.mockReturnValue(63) // Ethereum Classic Mordor — no Polymarket
-      setCardVisible('oracle-open-challenge', true)
       renderWithProviders(<Dashboard />)
       expect(screen.queryByText('Open Oracle Challenge')).toBeNull()
     })
 
-    it('surfaces the plain Open Challenge card by default (replacing the hidden oracle card)', () => {
+    it('surfaces the plain Open Challenge card (the oracle card is hidden here)', () => {
       useChainId.mockReturnValue(63)
-      // No setCardVisible: open-challenge is otherwise default-hidden, but a
-      // network without an on-chain oracle promotes it to the default entry.
       renderWithProviders(<Dashboard />)
       expect(screen.getByText('Open Challenge')).toBeInTheDocument()
       expect(screen.queryByText('Open Oracle Challenge')).toBeNull()

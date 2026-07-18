@@ -16,7 +16,7 @@
  * the browser notification permission (see pushDelivery.js). With it off, a
  * 'push' domain degrades to 'app' delivery (never silently dropped).
  *
- * Follows the qrColorPreference.js / quickAccessPreference.js device-scoped
+ * Follows the qrColorPreference.js device-scoped
  * pattern: plain-JSON localStorage, graceful fallbacks, never throws, in-memory
  * listeners so the Preferences UI and the delivery path stay in sync within a
  * session even when storage is unavailable (private browsing / quota).

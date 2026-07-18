@@ -7,7 +7,6 @@ import { useModal } from '../../hooks/useUI'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
-import { isCardVisible, subscribe as subscribeQuickAccess } from '../../utils/quickAccessPreference'
 import FriendMarketsModal from './FriendMarketsModal'
 import OpenChallengeModal from './OpenChallengeModal'
 import { OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
@@ -69,17 +68,12 @@ function QuickActionCard({ action, onAction }) {
 }
 
 function QuickActions({ onAction, actionNeededCount = 0 }) {
-  const navigate = useNavigate()
   // Oracle features (Open Oracle Challenge + the Polymarket ticker) only make
   // sense on chains with an on-chain oracle. On chains without one, hide the
   // Open Oracle Challenge card entirely (the plain Open Challenge stays) — the
   // ticker self-hides on the same capability.
   const { capabilities } = useChainTokens()
   const oracleAvailable = Boolean(capabilities?.polymarketSidebets)
-  // Quick access card visibility (spec 038 US5) — re-render when the
-  // Preferences panel changes it, even from a different mounted instance.
-  const [, forceRender] = useState(0)
-  useEffect(() => subscribeQuickAccess(() => forceRender((n) => n + 1)), [])
 
   // Spec 012 FR-007: the My Wagers entry point surfaces the watcher's
   // action-needed count. The full sentence goes into the button's aria-label
@@ -258,32 +252,15 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     }
   ]
 
-  // Filter by the user's quick access card preference (spec 038 US5); a
-  // group header only renders when it still has a visible card under it.
-  // Networks without an on-chain oracle can't settle from Polymarket, so the
-  // oracle-open-challenge card is hidden there and the plain Open Challenge
-  // takes its place as the default create-challenge entry point (even though it
-  // is otherwise default-hidden).
-  const visibleCreateActions = createActions.filter((a) => {
-    if (a.id === 'oracle-open-challenge') return isCardVisible(a.id) && oracleAvailable
-    if (a.id === 'open-challenge') return isCardVisible(a.id) || !oracleAvailable
-    return isCardVisible(a.id)
-  })
-  const visibleUtilityActions = utilityActions.filter((a) => isCardVisible(a.id))
-
-  if (visibleCreateActions.length === 0 && visibleUtilityActions.length === 0) {
-    return (
-      <div className="quick-actions-grid quick-actions-empty" role="note">
-        <p className="qa-empty-title">All quick access cards are hidden</p>
-        <p className="qa-empty-message">
-          Turn cards back on from Preferences in My Account to see them here again.
-        </p>
-        <button type="button" className="qa-empty-cta" onClick={() => navigate('/wallet')}>
-          Open Preferences
-        </button>
-      </div>
-    )
-  }
+  // Every quick access card renders. The only exception is capability-based,
+  // not a user preference: networks without an on-chain oracle can't settle
+  // from Polymarket, so the oracle-open-challenge card is hidden there (the
+  // plain Open Challenge remains). A group header only renders when it still
+  // has a card under it.
+  const visibleCreateActions = createActions.filter(
+    (a) => a.id !== 'oracle-open-challenge' || oracleAvailable
+  )
+  const visibleUtilityActions = utilityActions
 
   return (
     <div className="quick-actions-grid">

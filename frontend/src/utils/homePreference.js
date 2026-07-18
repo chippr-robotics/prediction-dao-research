@@ -1,7 +1,7 @@
 /**
  * Per-device persistence for the home surface's defaults (spec 058 US4):
  * which mode the home opens in (Pay / Request / Wager) and which currency
- * kind the amount hero starts on. Follows the quickAccessPreference.js
+ * kind the amount hero starts on. Follows the qrColorPreference.js
  * pattern: plain localStorage, graceful fallbacks, never throws — the
  * defaults must apply on first paint at /app, including while disconnected,
  * which is why this is device-scoped rather than wallet-keyed.
