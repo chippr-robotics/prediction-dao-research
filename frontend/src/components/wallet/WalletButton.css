@@ -164,6 +164,36 @@
   outline-offset: 1px;
 }
 
+/* Buy crypto (spec 060) — sits beside the balance it tops up, before the QR button. When it
+   renders it takes over the auto-margin that right-aligns the header's action cluster. */
+.account-buy-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 0.7rem;
+  margin-left: auto;
+  background: var(--brand-primary, #36B37E);
+  border: 1px solid var(--brand-primary, #36B37E);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-buy-btn:hover {
+  filter: brightness(1.08);
+}
+
+.account-buy-btn:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 1px;
+}
+
+.account-buy-btn + .account-qr-btn {
+  margin-left: 0.4rem;
+}
+
 .account-address-full {
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
