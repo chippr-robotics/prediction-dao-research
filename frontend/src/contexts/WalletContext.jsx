@@ -308,7 +308,7 @@ export function WalletProvider({ children }) {
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles, activeChainId) => {
     const premiumRoles = ['WAGER_PARTICIPANT']
-    const adminRoles = ['ADMIN', 'GUARDIAN', 'ACCOUNT_MODERATOR', 'ROLE_MANAGER']
+    const adminRoles = ['ADMIN', 'GUARDIAN', 'ACCOUNT_MODERATOR', 'ROLE_MANAGER', 'SANCTIONS_ADMIN']
     const allSyncedRoles = [...premiumRoles, ...adminRoles]
     const updatedRoles = []
     let hasChanges = false

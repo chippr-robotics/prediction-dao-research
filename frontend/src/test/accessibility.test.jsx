@@ -253,9 +253,10 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
 
   it('has no axe violations with an info bubble open (spec 039 FR-007)', async () => {
     const { container } = render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // The "How is it resolved?" InfoTip was removed (spec 054); use a surviving
-    // field explainer to exercise the info-bubble-open a11y state.
-    fireEvent.click(screen.getByRole('button', { name: "About: What's the wager?" }))
+    // The per-field InfoTips were removed one by one to conserve space (specs 052/054/058);
+    // the modal-title explainer is the surviving info icon, so use it to exercise the
+    // info-bubble-open a11y state.
+    fireEvent.click(screen.getByRole('button', { name: 'About open challenges' }))
     expect(screen.getByRole('note')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -263,13 +264,13 @@ describe('OpenChallengeModal Accessibility (feature 024, WCAG 2.1 AA)', () => {
   it('info icons are keyboard operable: focus, Enter opens, Escape closes and restores focus (spec 039 FR-007)', async () => {
     const user = userEvent.setup()
     render(<OpenChallengeModal isOpen onClose={() => {}} />)
-    // The stake caption + its InfoTip were removed to conserve space (spec 052); use a
-    // surviving field explainer to exercise keyboard operability of the info icons.
-    const icon = screen.getByRole('button', { name: "About: What's the wager?" })
+    // The per-field InfoTips were removed to conserve space (specs 052/054/058); the
+    // modal-title explainer is the surviving info icon for keyboard-operability coverage.
+    const icon = screen.getByRole('button', { name: 'About open challenges' })
     icon.focus()
     expect(icon).toHaveFocus()
     await user.keyboard('{Enter}')
-    expect(screen.getByRole('note')).toHaveTextContent(/the taker takes the opposite/i)
+    expect(screen.getByRole('note')).toHaveTextContent(/take the other side/i)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
     expect(icon).toHaveFocus()
