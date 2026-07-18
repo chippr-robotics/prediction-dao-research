@@ -18,7 +18,7 @@ const buildTutorialSteps = (stable) => [
   {
     id: 'welcome',
     title: 'Welcome to FairWins',
-    subtitle: 'Peer-to-peer wagers between friends',
+    subtitle: 'Your self-custody money app',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -29,9 +29,11 @@ const buildTutorialSteps = (stable) => [
     content: (
       <>
         <p>
-          FairWins lets you <strong>create private, peer-to-peer wagers with friends</strong> on any topic.
-          Stakes are locked in smart contract escrow and payouts are handled automatically
-          through built-in resolution methods with challenge periods.
+          FairWins lets you pay friends, wager, trade prediction markets, collect, earn,
+          and swap — all signed by your own wallet, never ours. This quick tour covers the
+          heart of it: <strong>private, peer-to-peer wagers with friends</strong>, with
+          stakes locked in smart contract escrow and payouts handled automatically through
+          built-in resolution methods with challenge periods.
         </p>
         <div className="tutorial-highlight-box">
           <span className="highlight-icon">&#128161;</span>
