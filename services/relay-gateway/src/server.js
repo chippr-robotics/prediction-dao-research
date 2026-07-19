@@ -18,6 +18,7 @@ import express from 'express'
 import helmet from 'helmet'
 import { loadConfig } from './config/index.js'
 import { buildProviders } from './config/providers.js'
+import { createFeeRouterReader } from './fees/onchain.js'
 import { parseIntent, verifyIntent } from './intent/verify.js'
 import { createIntentStore } from './intent/store.js'
 import { createSanctionsScreen } from './policy/sanctions.js'
@@ -110,6 +111,8 @@ export function createApp(config, deps = {}) {
   const now = deps.now ?? (() => Math.floor(Date.now() / 1000))
   const killSwitch = deps.killSwitch ?? createKillSwitch(config.killSwitch)
   const audit = createAuditLogger(deps.auditSink ? { sink: deps.auditSink } : {})
+  // Live platform-fee rates from the FeeRouter contract (spec 060); env bps are the fallback.
+  const feeRates = deps.feeRates ?? createFeeRouterReader(config, providers)
 
   const nowMs = () => now() * 1000
   const store = createIntentStore({ now: nowMs })
@@ -267,7 +270,25 @@ export function createApp(config, deps = {}) {
     for (const [id, c] of Object.entries(healthCache.chains || {})) {
       chains[id] = disclose ? c : { rpc: c.rpc }
     }
-    res.json({ status: 'ok', chains, killSwitch: killSwitch.isActive() })
+    // Platform-fee summary (spec 060): where each fee system's live rate comes from. Public,
+    // read-only telemetry — rates are already public on-chain and in every confirm UI; the
+    // Fees admin tab renders this for the gateway-enforced rows.
+    const liveBps = await feeRates.getPolymarketBps()
+    const fees = {
+      feeRouter: feeRates.address,
+      polymarket: {
+        takerBps: liveBps?.takerBps ?? config.polymarket.takerFeeBps,
+        makerBps: liveBps?.makerBps ?? config.polymarket.makerFeeBps,
+        source: liveBps ? 'chain' : 'env-fallback',
+      },
+      opensea: {
+        referralConfigured: Boolean(
+          config.opensea.referralAddress || Object.keys(config.opensea.referralAddressByChain || {}).length
+        ),
+        beneficiary: config.opensea.referralAddress ?? null,
+      },
+    }
+    res.json({ status: 'ok', chains, killSwitch: killSwitch.isActive(), fees })
   }
   app.get('/healthz', healthHandler)
   app.get('/status', healthHandler)
@@ -590,6 +611,7 @@ export function createApp(config, deps = {}) {
       quotas: pmReadQuotas,
       writeQuotas: pmWriteQuotas,
       killSwitch,
+      feeRates,
     })
   )
 

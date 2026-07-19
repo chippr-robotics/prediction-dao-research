@@ -57,8 +57,17 @@
  *   POLYMARKET_WRITE_QUOTA_GLOBAL      order/cancel writes/min across all callers (default 100)
  *   POLYMARKET_BUILDER_CODE    FairWins bytes32 builder code (spec 057, public; unset => unattributed,
  *                              orders still post — never stranded). Attaches to every order for fee + rewards.
- *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over)
- *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over)
+ *   POLYMARKET_BUILDER_TAKER_FEE_BPS  builder fee on taker orders (default 50; hard cap 100 — fails boot if over).
+ *                              Since spec 060 this is the FALLBACK served when the FeeRouter is
+ *                              unset/unreachable; the on-chain rate is the source of truth.
+ *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over).
+ *                              Fallback since spec 060, same as the taker fee.
+ *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
+ *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
+ *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
+ *                              in the record => env-fallback mode (pre-060 behavior).
+ *   FEE_ROUTER_CHAIN_ID        chain the FeeRouter is read on (default 137)
+ *   FEE_ROUTER_CACHE_TTL_MS    on-chain rate cache TTL (default 30000 — bounds admin-change latency)
  *
  * The gateway NEVER holds the gas key — that is the engine's (Secret-Manager-held) concern.
  */
@@ -367,6 +376,29 @@ export function loadConfig(env = process.env, opts = {}) {
         return bps
       })(),
     },
+    // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env
+    // takerFeeBps/makerFeeBps above become the FALLBACK when the router is unset or unreachable.
+    // The address defaults to the deployment record's feeRouter (same pinning philosophy as
+    // FR-025); an env override that CONTRADICTS the record fails boot loudly.
+    feeRouter: (() => {
+      const chainId = int(env, 'FEE_ROUTER_CHAIN_ID', 137)
+      const cacheTtlMs = int(env, 'FEE_ROUTER_CACHE_TTL_MS', 30_000)
+      const envAddress = opt(env, 'FEE_ROUTER_ADDRESS', null)
+      if (envAddress && !ADDRESS_RE.test(envAddress)) {
+        throw new Error('[relay-gateway] FEE_ROUTER_ADDRESS is not an address')
+      }
+      const deployment = loadDeployment(deploymentsDir, chainId)
+      const recorded = deployment?.contracts?.feeRouter && ADDRESS_RE.test(deployment.contracts.feeRouter)
+        ? deployment.contracts.feeRouter
+        : null
+      if (envAddress && recorded && envAddress.toLowerCase() !== recorded.toLowerCase()) {
+        throw new Error(
+          `[relay-gateway] FEE_ROUTER_ADDRESS=${envAddress} contradicts the deployment record's feeRouter ` +
+            `${recorded} for chain ${chainId} (${deployment.file}). Refusing to start.`
+        )
+      }
+      return { address: envAddress || recorded, chainId, cacheTtlMs }
+    })(),
     maxQueueDepth: int(env, 'MAX_QUEUE_DEPTH', 100),
     spendWindowMs: int(env, 'SPEND_WINDOW_MS', 3_600_000),
     defaultGasLimit: bigInt(env, 'DEFAULT_GAS_LIMIT', 300_000n),
