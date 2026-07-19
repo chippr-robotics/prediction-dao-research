@@ -11,6 +11,7 @@ const NO_ROLES = {
   isAccountModerator: false,
   isRoleManager: false,
   isSanctionsAdmin: false,
+  isFeeAdmin: false,
 }
 
 const ids = (groups) => flattenNavGroups(groups).map((i) => i.id)
@@ -65,6 +66,19 @@ describe('buildAdminNavGroups', () => {
   it('a compliance officer without full admin reaches the deny-list', () => {
     const groups = buildAdminNavGroups({ ...NO_ROLES, isSanctionsAdmin: true })
     expect(ids(groups)).toContain('deny-list')
+  })
+
+  it('a fee admin without full admin reaches the Fees view (spec 060)', () => {
+    const groups = buildAdminNavGroups({ ...NO_ROLES, isFeeAdmin: true })
+    const flat = ids(groups)
+    expect(flat).toContain('fees')
+    expect(flat).not.toContain('tiers')
+    expect(flat).not.toContain('treasury')
+  })
+
+  it('full admin also sees the Fees view without the dedicated role', () => {
+    const groups = buildAdminNavGroups({ ...NO_ROLES, isAdmin: true })
+    expect(ids(groups)).toContain('fees')
   })
 
   it('role manager sees Members but not Tiers/Treasury (admin-only)', () => {

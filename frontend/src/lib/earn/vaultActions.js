@@ -18,6 +18,8 @@
  */
 import { Contract, Interface } from 'ethers'
 import { ERC4626_VAULT_ABI } from '../../abis/ERC4626Vault'
+import { FEE_ROUTER_ABI } from '../../abis/FeeRouter'
+import { FEE_SERVICES } from '../fees/feeQuote'
 
 const ERC20_MIN_ABI = [
   'function balanceOf(address) view returns (uint256)',
@@ -27,6 +29,7 @@ const ERC20_MIN_ABI = [
 
 const VAULT_IFACE = new Interface(ERC4626_VAULT_ABI)
 const ERC20_IFACE = new Interface(ERC20_MIN_ABI)
+const FEE_ROUTER_IFACE = new Interface(FEE_ROUTER_ABI)
 
 /**
  * Read the member's state against one vault over a read provider:
@@ -92,30 +95,64 @@ export function validateWithdrawAmount({ amount, maxWithdrawAssets }) {
  * member's address so vault-side rejections (cap reached, paused) surface
  * before anything is signed. Reads go over the chain's read `provider` — a
  * signer is never needed here.
+ *
+ * When a platform fee applies (spec 060: `feeQuote.available && feeQuote.bps
+ * > 0`), the deposit routes through the FeeRouter instead of the vault:
+ * approve the ROUTER for the gross amount, then
+ * `depositToVaultWithFee(earn.lend, vault, amount, account, quotedBps)` —
+ * fee to treasury and net deposit for the member in one atomic call, pinned
+ * to the quoted rate (FR-005). With no fee the batch is byte-identical to the
+ * pre-fee behavior.
  * Returns { calls, requiresApproval }.
  */
-export async function buildDepositCalls({ vault, account, amount, provider }) {
+export async function buildDepositCalls({ vault, account, amount, provider, feeQuote = null }) {
+  const feeApplies = Boolean(feeQuote?.available && feeQuote.bps > 0 && feeQuote.routerAddress)
+  const spender = feeApplies ? feeQuote.routerAddress : vault.address
   const token = new Contract(vault.asset.address, ERC20_MIN_ABI, provider)
-  const allowance = await token.allowance(account, vault.address)
+  const allowance = await token.allowance(account, spender)
   const requiresApproval = allowance < amount
   const calls = []
   if (requiresApproval) {
     calls.push({
       target: vault.asset.address,
-      data: ERC20_IFACE.encodeFunctionData('approve', [vault.address, amount]),
+      data: ERC20_IFACE.encodeFunctionData('approve', [spender, amount]),
       value: 0n,
     })
-  } else {
+  } else if (feeApplies) {
     // Only dry-runnable when the allowance already covers the deposit — with
     // an approval leg in the batch the simulation would revert on allowance.
+    const router = new Contract(feeQuote.routerAddress, FEE_ROUTER_ABI, provider)
+    await router.depositToVaultWithFee.staticCall(
+      FEE_SERVICES.EARN_LEND,
+      vault.address,
+      amount,
+      account,
+      feeQuote.bps,
+      { from: account }
+    )
+  } else {
     const vaultContract = new Contract(vault.address, ERC4626_VAULT_ABI, provider)
     await vaultContract.deposit.staticCall(amount, account, { from: account })
   }
-  calls.push({
-    target: vault.address,
-    data: VAULT_IFACE.encodeFunctionData('deposit', [amount, account]),
-    value: 0n,
-  })
+  if (feeApplies) {
+    calls.push({
+      target: feeQuote.routerAddress,
+      data: FEE_ROUTER_IFACE.encodeFunctionData('depositToVaultWithFee', [
+        FEE_SERVICES.EARN_LEND,
+        vault.address,
+        amount,
+        account,
+        feeQuote.bps,
+      ]),
+      value: 0n,
+    })
+  } else {
+    calls.push({
+      target: vault.address,
+      data: VAULT_IFACE.encodeFunctionData('deposit', [amount, account]),
+      value: 0n,
+    })
+  }
   return { calls, requiresApproval }
 }
 

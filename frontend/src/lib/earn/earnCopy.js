@@ -28,12 +28,14 @@ export const EARN_TIPS = {
     'Reward figures are recalculated by the rewards program every few hours, so what you see updates on that schedule — not every second.',
   positions:
     'Your active positions: what your deposit is worth right now in each vault. The value includes the return earned so far.',
+  platformFee:
+    'FairWins charges this small platform fee when your deposit goes in — it is taken from the amount once, sent to the FairWins treasury, and the rest goes into the vault. The rate is always shown here before you confirm, and withdrawing is free.',
 }
 
 /** Powered-by attribution + risk disclosure (FR-012; Morpho integration terms). */
 export const EARN_DISCLOSURE = {
   attribution: 'Powered by Morpho',
-  risk: 'Lending happens through Morpho, a third-party on-chain lending protocol, from your own wallet. Returns are variable and not guaranteed, and smart contracts carry risk. FairWins never holds your deposit and charges no fee on Earn.',
+  risk: 'Lending happens through Morpho, a third-party on-chain lending protocol, from your own wallet. Returns are variable and not guaranteed, and smart contracts carry risk. FairWins never holds your deposit; if a FairWins platform fee applies to a deposit, it is always shown before you confirm.',
 }
 
 /** Honest "not yet" copy for future earning areas (FR-002). */
