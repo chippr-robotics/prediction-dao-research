@@ -72,10 +72,14 @@ US1 (fee wrapper + Earn) is the MVP.
 
 - [X] T029 [P] CLAUDE.md guardrail + SPECKIT plan pointer
 - [X] T030 [P] `.env.example` FEE_ROUTER_* + demoted POLYMARKET_BUILDER_* fallback
-- [ ] T031 full gates: compile + test + check:storage-layout + test:frontend + gateway vitest;
-      Slither on `contracts/fees/` (slither not installed locally — run in CI)
-- [ ] T032 security pass against `.github/agents/smart-contract-security.agent.md`
-      (reentrancy, CEI, access control, fee-math, token edge cases) — record in PR
+- [X] T031 full gates: compile + test + check:storage-layout + test:frontend + gateway vitest
+      all green in CI (Slither included); local frontend needs `npm install` for the uniswap SDK
+- [X] T032 security pass against `.github/agents/smart-contract-security.agent.md` — adversarial
+      multi-agent review: APPROVE WITH NITS, EthTrust-SL L2, nothing above Informational survived.
+      All actionable findings applied in the hardening commit (ZeroShares guard, treasury-aware
+      quoteFee, one-event-per-deposit, reentrancy/boundary/dust/launch-table tests, deploy hygiene);
+      review posted to PR #936. Remaining pre-mainnet: Slither/Medusa asset sign-off, treasury set
+      per network, admin-role handoff to multisig.
 
 ## Notes
 
