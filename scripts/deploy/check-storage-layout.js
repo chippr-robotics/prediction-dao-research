@@ -24,6 +24,7 @@ const UPGRADEABLE_CONTRACTS = [
   { name: "ExternalDAORegistry", deploymentsKey: "externalDAORegistry" }, // spec 030 — ClearPath external-DAO registry
   { name: "WagerPoolFactory", deploymentsKey: "wagerPoolFactory" }, // spec 034 — WagerPools factory (address-based)
   { name: "CallsignRegistry", deploymentsKey: "callsignRegistry" }, // spec 054 — in-house %callsign naming registry
+  { name: "FeeRouter", deploymentsKey: "feeRouter" }, // spec 060 — unified platform-fee registry + wrapper
 ];
 
 function loadDeployedImpl(deploymentsKey) {

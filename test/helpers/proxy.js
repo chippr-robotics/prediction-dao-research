@@ -150,10 +150,28 @@ async function deployTokenFactoryV2({ adminSigner, sanctionsGuard = ethers.ZeroA
   return { factory, templates, v2 };
 }
 
+/// Deploy FeeRouter behind an ERC1967 UUPS proxy and return the contract bound to the proxy address
+/// (spec 060). `initArgs` is `[admin, treasury]` (treasury may be the zero address — the charge path
+/// then skips fees). Same rationale as deployWagerRegistry: manual proxy wiring keeps the suite fast;
+/// the plugin's storage-layout/safety validation runs in test/upgradeable/ and `npm run check:storage-layout`.
+async function deployFeeRouter(initArgs) {
+  const Impl = await ethers.getContractFactory("FeeRouter");
+  const impl = await Impl.deploy();
+  await impl.waitForDeployment();
+
+  const initData = Impl.interface.encodeFunctionData("initialize", initArgs);
+  const Proxy = await ethers.getContractFactory("ERC1967Proxy");
+  const proxy = await Proxy.deploy(await impl.getAddress(), initData);
+  await proxy.waitForDeployment();
+
+  return Impl.attach(await proxy.getAddress());
+}
+
 module.exports = {
   mergeAbis,
   deployWagerRegistry,
   deployMembershipManager,
+  deployFeeRouter,
   deployTokenTemplates,
   deployTokenFactory,
   deployTokenTemplatesV2,
