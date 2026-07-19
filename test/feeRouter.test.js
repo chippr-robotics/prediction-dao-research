@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { deployFeeRouter } = require("./helpers/proxy");
+const { LAUNCH_FEE_SERVICES } = require("../scripts/deploy/lib/feeServices");
 
 // spec 060 — unified platform-fee registry + atomic ERC-4626 fee wrapper.
 describe("FeeRouter", function () {
@@ -141,6 +142,14 @@ describe("FeeRouter", function () {
         "AccessControlUnauthorizedAccount"
       );
     });
+
+    it("accepts a rate at exactly the cap (inclusive boundary)", async function () {
+      // Guards against an off-by-one regression to `>=` on the maximum fee the platform can charge.
+      await router.connect(feeAdmin).setFeeBps(EARN_LEND, 250);
+      expect(await router.feeBps(EARN_LEND)).to.equal(250);
+      await router.connect(feeAdmin).setFeeBps(PM_TAKER, 100);
+      expect(await router.feeBps(PM_TAKER)).to.equal(100);
+    });
   });
 
   describe("setTreasury", function () {
@@ -174,6 +183,35 @@ describe("FeeRouter", function () {
 
     it("reverts for unknown services", async function () {
       await expect(router.quoteFee(UNKNOWN, 1n)).to.be.revertedWithCustomError(router, "ServiceUnknown");
+    });
+
+    it("reports zero fee when no treasury is configured (mirrors the charge path)", async function () {
+      const bare = await deployFeeRouter([admin.address, ethers.ZeroAddress]);
+      await bare.connect(admin).registerService(EARN_LEND, 250, Kind.Wrapped);
+      await bare.connect(admin).setFeeBps(EARN_LEND, 50);
+      const [fee, net] = await bare.quoteFee(EARN_LEND, USDC("100"));
+      expect(fee).to.equal(0n);
+      expect(net).to.equal(USDC("100"));
+    });
+  });
+
+  describe("launch fee-service table (deploy config)", function () {
+    it("registers exactly the intended services with the right kind and cap", async function () {
+      // Locks scripts/deploy/lib/feeServices.js against drift (the deploy script uses the same table).
+      const fresh = await deployFeeRouter([admin.address, treasury.address]);
+      for (const svc of LAUNCH_FEE_SERVICES) {
+        const id = ethers.keccak256(ethers.toUtf8Bytes(svc.label));
+        await fresh.connect(admin).registerService(id, svc.capBps, svc.kind);
+        const got = await fresh.getService(id);
+        expect(got.kind, `${svc.label} kind`).to.equal(svc.kind);
+        expect(got.capBps, `${svc.label} cap`).to.equal(svc.capBps);
+        expect(got.feeBps, `${svc.label} starts at 0`).to.equal(0);
+      }
+      // The flagship wrapped consumer must be chargeable; the Polymarket entries must not be.
+      const earn = await fresh.getService(ethers.keccak256(ethers.toUtf8Bytes("earn.lend")));
+      expect(earn.kind).to.equal(Kind.Wrapped);
+      const taker = await fresh.getService(ethers.keccak256(ethers.toUtf8Bytes("polymarket.taker")));
+      expect(taker.kind).to.equal(Kind.ConfigOnly);
     });
   });
 
@@ -220,6 +258,34 @@ describe("FeeRouter", function () {
       await router.connect(member).depositToVaultWithFee(EARN_LEND, await vault.getAddress(), 199n, member.address, 50);
       expect(await usdc.balanceOf(treasury.address)).to.equal(0n);
       expect(await vault.maxWithdraw(member.address)).to.equal(199n);
+    });
+
+    it("emits FeeCharged with zero fee on a dust deposit (exactly one event per deposit)", async function () {
+      await expect(
+        router.connect(member).depositToVaultWithFee(EARN_LEND, await vault.getAddress(), 199n, member.address, 50)
+      )
+        .to.emit(router, "FeeCharged")
+        .withArgs(EARN_LEND, member.address, await usdc.getAddress(), 199n, 0n, await vault.getAddress(), member.address);
+    });
+
+    it("reverts if the vault mints zero shares (no fee for nothing)", async function () {
+      await vault.setZeroShares(true);
+      await expect(
+        router.connect(member).depositToVaultWithFee(EARN_LEND, await vault.getAddress(), USDC("100"), member.address, 50)
+      ).to.be.revertedWithCustomError(router, "ZeroShares");
+      // The whole action rolled back — no fee kept, member made whole.
+      expect(await usdc.balanceOf(treasury.address)).to.equal(0n);
+      expect(await usdc.balanceOf(member.address)).to.equal(USDC("1000"));
+    });
+
+    it("rejects a re-entrant vault via the nonReentrant guard", async function () {
+      const Reentrant = await ethers.getContractFactory("MockReentrantERC4626Vault");
+      const evil = await Reentrant.deploy(await usdc.getAddress());
+      await evil.arm(await router.getAddress(), EARN_LEND);
+      await expect(
+        router.connect(member).depositToVaultWithFee(EARN_LEND, await evil.getAddress(), USDC("100"), member.address, 50)
+      ).to.be.revertedWithCustomError(router, "ReentrancyGuardReentrantCall");
+      expect(await usdc.balanceOf(treasury.address)).to.equal(0n);
     });
 
     it("pins the member to the quoted rate (FeeAboveQuoted)", async function () {

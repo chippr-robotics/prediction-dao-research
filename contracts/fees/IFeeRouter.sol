@@ -44,6 +44,7 @@ interface IFeeRouter {
     error FeeAboveQuoted();
     error ZeroAmount();
     error ZeroAddress();
+    error ZeroShares();
 
     // --- reads ---
     function treasury() external view returns (address);

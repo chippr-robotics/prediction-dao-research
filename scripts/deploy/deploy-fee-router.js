@@ -23,12 +23,7 @@ const path = require("path");
 
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
 const { deployProxy } = require("./lib/upgradeable");
-
-const LAUNCH_SERVICES = [
-  { label: "earn.lend", capBps: 250, kind: 1 /* Wrapped */ },
-  { label: "polymarket.taker", capBps: 100, kind: 2 /* ConfigOnly */ },
-  { label: "polymarket.maker", capBps: 50, kind: 2 /* ConfigOnly */ },
-];
+const { LAUNCH_FEE_SERVICES } = require("./lib/feeServices");
 
 async function main() {
   const network = await ethers.provider.getNetwork();
@@ -72,15 +67,8 @@ async function main() {
     initArgs: [deployer.address, treasury],
   });
 
-  // Register launch services (rates start at 0; enable from the Fees admin tab).
-  const router = proxy.contract;
-  for (const svc of LAUNCH_SERVICES) {
-    const id = ethers.keccak256(ethers.toUtf8Bytes(svc.label));
-    await (await router.registerService(id, svc.capBps, svc.kind)).wait();
-    console.log(`  ✓ registered ${svc.label} (cap ${svc.capBps} bps, kind ${svc.kind})`);
-  }
-
-  // APPEND to the record (preserve everything already there).
+  // Persist the proxy address IMMEDIATELY (before the registration loop) so an interrupted run —
+  // e.g. an RPC timeout on a registerService tx — leaves a RECORDED proxy rather than an orphan.
   contracts.feeRouter = proxy.proxy;
   contracts.feeRouterImpl = proxy.implementation;
   record.constructorArgs = record.constructorArgs || {};
@@ -88,11 +76,31 @@ async function main() {
   record.feeRouterDeployedAt = new Date().toISOString();
   saveDeployment(filename, record);
 
+  // Register launch services idempotently (rates start at 0; enable from the Fees admin tab). A
+  // resumed run skips services already registered (AlreadyRegistered), so re-running finishes setup.
+  const router = proxy.contract;
+  for (const svc of LAUNCH_FEE_SERVICES) {
+    const id = ethers.keccak256(ethers.toUtf8Bytes(svc.label));
+    const existing = await router.getService(id);
+    if (Number(existing.kind) !== 0) {
+      console.log(`  • ${svc.label} already registered — skipping`);
+      continue;
+    }
+    await (await router.registerService(id, svc.capBps, svc.kind)).wait();
+    console.log(`  ✓ registered ${svc.label} (cap ${svc.capBps} bps, kind ${svc.kind})`);
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log("Appended to deployments/" + filename);
   console.log("=".repeat(60));
   console.log(`  feeRouter     ${contracts.feeRouter}`);
   console.log(`  feeRouterImpl ${contracts.feeRouterImpl}`);
+  console.log("\n" + "!".repeat(60));
+  console.log("ADMIN HANDOFF (do NOT skip): the deployer EOA currently holds DEFAULT_ADMIN_ROLE,");
+  console.log("UPGRADER_ROLE and FEE_ADMIN_ROLE on a value-bearing UUPS router. Transfer these to");
+  console.log("the designated multisig/timelock and renounce the deployer's roles per the fee");
+  console.log("operations runbook before this router carries production fees.");
+  console.log("!".repeat(60));
   console.log(`\nNext: npm run sync:frontend-contracts, then set FEE_ROUTER_ADDRESS on the relay-gateway.`);
 }
 

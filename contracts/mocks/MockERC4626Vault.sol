@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
  */
 contract MockERC4626Vault is ERC4626 {
     bool public revertOnDeposit;
+    bool public zeroShares;
 
     constructor(IERC20 asset_) ERC20("Mock Vault", "mVLT") ERC4626(asset_) {}
 
@@ -17,8 +18,16 @@ contract MockERC4626Vault is ERC4626 {
         revertOnDeposit = value;
     }
 
+    /// @notice When set, deposit accepts the call but returns zero shares — models a vault that
+    ///         (e.g. via inflation griefing) mints nothing for the assets, exercising the router's
+    ///         `ZeroShares` guard.
+    function setZeroShares(bool value) external {
+        zeroShares = value;
+    }
+
     function deposit(uint256 assets, address receiver) public override returns (uint256) {
         require(!revertOnDeposit, "MockERC4626Vault: deposit disabled");
+        if (zeroShares) return 0;
         return super.deposit(assets, receiver);
     }
 }

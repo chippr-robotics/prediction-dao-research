@@ -76,7 +76,10 @@ contract FeeRouter is IFeeRouter, UUPSManaged, ReentrancyGuardUpgradeable {
     }
 
     /// @notice Fee/net split for `grossAmount` at the service's live rate (floor — the
-    ///         member's favor; a fee that rounds to zero is charged as zero).
+    ///         member's favor; a fee that rounds to zero is charged as zero). Mirrors the
+    ///         charge path exactly, including the treasury-unset skip: when `treasury` is
+    ///         address(0) no fee is actually taken, so the quote reports zero too (an
+    ///         integrator UI never displays a fee the router would not charge).
     function quoteFee(bytes32 serviceId, uint256 grossAmount)
         public
         view
@@ -84,7 +87,7 @@ contract FeeRouter is IFeeRouter, UUPSManaged, ReentrancyGuardUpgradeable {
     {
         Service storage svc = _services[serviceId];
         if (svc.kind == ServiceKind.Unregistered) revert ServiceUnknown();
-        feeAmount = (grossAmount * svc.feeBps) / BPS_DENOMINATOR;
+        feeAmount = treasury == address(0) ? 0 : (grossAmount * svc.feeBps) / BPS_DENOMINATOR;
         netAmount = grossAmount - feeAmount;
     }
 
@@ -156,11 +159,19 @@ contract FeeRouter is IFeeRouter, UUPSManaged, ReentrancyGuardUpgradeable {
             emit FeeCharged(serviceId, msg.sender, address(asset), assets, feeAmount, vault, receiver);
         } else if (liveBps > 0 && to == address(0)) {
             emit FeeSkippedNoTreasury(serviceId, msg.sender, assets);
+        } else if (liveBps > 0) {
+            // Fee floored to zero on a small principal (treasury configured). Still record the
+            // wrapper action so off-chain reconciliation counts exactly one router event per
+            // successful deposit, never under-counting dust.
+            emit FeeCharged(serviceId, msg.sender, address(asset), assets, 0, vault, receiver);
         }
 
         uint256 netAmount = assets - feeAmount;
         asset.forceApprove(vault, netAmount);
         shares = IERC4626(vault).deposit(netAmount, receiver);
+        // The router pulled the member's principal and (may have) taken a fee; refuse to let a
+        // vault swallow it for zero shares — that would break the atomic fee-for-value guarantee.
+        if (shares == 0) revert ZeroShares();
         asset.forceApprove(vault, 0);
     }
 }
