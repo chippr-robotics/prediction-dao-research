@@ -1,0 +1,430 @@
+/**
+ * FeesTab (spec 060) — unified platform-fee management for the operations
+ * control plane.
+ *
+ * One screen for every platform-fee system:
+ *   - Wrapper services on the FeeRouter (earn.lend today) — live bps, hard cap,
+ *     treasury destination; editable on-chain via the connected wallet
+ *     (FEE_ADMIN_ROLE for rates, DEFAULT_ADMIN_ROLE for the treasury). The
+ *     contract enforces caps and roles; the UI validates first for clear errors.
+ *   - The Polymarket builder fee (spec 057) — its taker/maker entries live on
+ *     the SAME FeeRouter (ConfigOnly kind); the relay-gateway reads them, so an
+ *     edit here is live in Predict within the gateway cache TTL (~30 s).
+ *   - The OpenSea referral (spec 056) — display-only: a no-cost attribution
+ *     program with no rate to edit (beneficiary is deployment-managed).
+ *
+ * Change history renders from FeeBpsChanged events (actor / old → new), the
+ * on-chain audit trail — bounded lookback with an explorer link for the rest.
+ */
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ethers } from 'ethers'
+import { getContractAddressForChain } from '../../config/contracts'
+import { FEE_ROUTER_ABI } from '../../abis/FeeRouter'
+import { gatewayBaseUrl } from '../../hooks/useGatewayStatus'
+import { getBlockscoutUrl } from '../../config/blockExplorer'
+
+// Friendly names for known service ids (keccak256 of the registered label).
+const KNOWN_SERVICES = {
+  [ethers.id('earn.lend')]: { label: 'Earn — vault lending (Morpho)', surface: 'Earn deposits' },
+  [ethers.id('polymarket.taker')]: { label: 'Predict — Polymarket builder fee (taker)', surface: 'Predict orders' },
+  [ethers.id('polymarket.maker')]: { label: 'Predict — Polymarket builder fee (maker)', surface: 'Predict orders' },
+  [ethers.id('stake.lido')]: { label: 'Stake — Lido', surface: 'Staking (future)' },
+  [ethers.id('stake.polygon')]: { label: 'Stake — Polygon liquid staking', surface: 'Staking (future)' },
+  [ethers.id('swap.uniswap')]: { label: 'Swap — Uniswap', surface: 'Swaps (future)' },
+}
+
+const KIND_NAMES = { 1: 'Charged on-chain (wrapper)', 2: 'Read by the gateway (config-only)' }
+const HISTORY_LOOKBACK_BLOCKS = 200_000
+const HISTORY_LIMIT = 25
+
+function shortAddr(a) {
+  return a && a !== ethers.ZeroAddress ? `${a.substring(0, 6)}...${a.substring(a.length - 4)}` : ''
+}
+
+function bpsPct(bps) {
+  return `${(Number(bps) / 100).toFixed(2)}%`
+}
+
+export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, isAdmin, isFeeAdmin }) {
+  const routerAddr = getContractAddressForChain('feeRouter', chainId)
+  const canEditFees = Boolean(isAdmin || isFeeAdmin)
+
+  const [services, setServices] = useState(null) // null = loading; [] = none
+  const [treasury, setTreasury] = useState(undefined)
+  const [maxWrappedCap, setMaxWrappedCap] = useState(null)
+  const [readError, setReadError] = useState(null)
+  const [history, setHistory] = useState({ entries: null, truncated: false, error: null })
+  const [gatewayFees, setGatewayFees] = useState(null) // /status fees block, null until loaded
+  const [feeForm, setFeeForm] = useState({ serviceId: '', bps: '' })
+  const [treasuryForm, setTreasuryForm] = useState('')
+  const [formError, setFormError] = useState(null)
+
+  const routerRead = useMemo(
+    () => (routerAddr && provider ? new ethers.Contract(routerAddr, FEE_ROUTER_ABI, provider) : null),
+    [routerAddr, provider]
+  )
+
+  const fetchServices = useCallback(async () => {
+    if (!routerRead) return
+    try {
+      setReadError(null)
+      const [count, treasuryAddr, maxCap] = await Promise.all([
+        routerRead.serviceCount(),
+        routerRead.treasury(),
+        routerRead.MAX_WRAPPED_FEE_BPS(),
+      ])
+      const ids = await Promise.all(
+        Array.from({ length: Number(count) }, (_, i) => routerRead.serviceAt(i))
+      )
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          const svc = await routerRead.getService(id)
+          return {
+            serviceId: id,
+            label: KNOWN_SERVICES[id]?.label || `Service ${id.substring(0, 10)}…`,
+            surface: KNOWN_SERVICES[id]?.surface || '—',
+            feeBps: Number(svc.feeBps),
+            capBps: Number(svc.capBps),
+            kind: Number(svc.kind),
+          }
+        })
+      )
+      setServices(entries)
+      setTreasury(treasuryAddr)
+      setMaxWrappedCap(Number(maxCap))
+    } catch (e) {
+      setReadError(`Could not read the FeeRouter: ${e?.message || e}`)
+    }
+  }, [routerRead])
+
+  const fetchHistory = useCallback(async () => {
+    if (!routerRead || !provider) return
+    try {
+      const latest = await provider.getBlockNumber()
+      const fromBlock = Math.max(0, Number(latest) - HISTORY_LOOKBACK_BLOCKS)
+      const events = await routerRead.queryFilter(routerRead.filters.FeeBpsChanged(), fromBlock, 'latest')
+      const recent = events.slice(-HISTORY_LIMIT).reverse()
+      const entries = await Promise.all(
+        recent.map(async (ev) => {
+          const block = await provider.getBlock(ev.blockNumber).catch(() => null)
+          return {
+            serviceId: ev.args.serviceId,
+            label: KNOWN_SERVICES[ev.args.serviceId]?.label || `${ev.args.serviceId.substring(0, 10)}…`,
+            oldBps: Number(ev.args.oldBps),
+            newBps: Number(ev.args.newBps),
+            actor: ev.args.actor,
+            at: block ? new Date(block.timestamp * 1000) : null,
+            txHash: ev.transactionHash,
+          }
+        })
+      )
+      setHistory({ entries, truncated: fromBlock > 0, error: null })
+    } catch (e) {
+      // Some RPCs bound log ranges — the full history stays available on the explorer.
+      setHistory({ entries: [], truncated: true, error: e?.message || String(e) })
+    }
+  }, [routerRead, provider])
+
+  useEffect(() => {
+    fetchServices()
+    fetchHistory()
+  }, [fetchServices, fetchHistory])
+
+  // Gateway-enforced fee systems (read-only telemetry): Polymarket bps source + OpenSea referral.
+  useEffect(() => {
+    const base = gatewayBaseUrl()
+    if (!base) return
+    let cancelled = false
+    fetch(`${base}/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) setGatewayFees(data?.fees ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setGatewayFees(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const refresh = () => {
+    fetchServices()
+    fetchHistory()
+  }
+
+  const selectedService = services?.find((s) => s.serviceId === feeForm.serviceId) || null
+
+  const handleSetFeeBps = () => {
+    setFormError(null)
+    if (!selectedService) {
+      setFormError('Pick a service first.')
+      return
+    }
+    const bps = Number.parseInt(feeForm.bps, 10)
+    if (!Number.isInteger(bps) || bps < 0) {
+      setFormError('Enter the new rate in basis points (whole number, 0 or more).')
+      return
+    }
+    if (bps > selectedService.capBps) {
+      setFormError(
+        `${bps} bps is above this service's hard cap of ${selectedService.capBps} bps — the contract will refuse it.`
+      )
+      return
+    }
+    runTx(
+      () => new ethers.Contract(routerAddr, FEE_ROUTER_ABI, signer).setFeeBps(feeForm.serviceId, bps),
+      `${selectedService.label} fee set to ${bps} bps (${bpsPct(bps)})`
+    ).then(refresh)
+  }
+
+  const handleSetTreasury = () => {
+    setFormError(null)
+    const value = treasuryForm.trim()
+    if (!ethers.isAddress(value) || value === ethers.ZeroAddress) {
+      setFormError('Enter a valid, nonzero treasury address — fees would otherwise be skipped or lost.')
+      return
+    }
+    runTx(
+      () => new ethers.Contract(routerAddr, FEE_ROUTER_ABI, signer).setTreasury(value),
+      `Fee treasury set to ${shortAddr(value)}`
+    ).then(refresh)
+  }
+
+  if (!routerAddr) {
+    return (
+      <div className="admin-tab-content" role="tabpanel">
+        <div className="admin-card">
+          <h3>Platform Fees</h3>
+          <p className="card-info">
+            No FeeRouter is deployed on this network, so no platform fees are active here — member
+            flows behave exactly as if the fee system did not exist. Deploy it with{' '}
+            <code>scripts/deploy/deploy-fee-router.js</code> (see the fee operations runbook).
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="admin-tab-content" role="tabpanel">
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h3>Platform Fees</h3>
+          <button type="button" className="refresh-btn" onClick={refresh} aria-label="Refresh fees">↻</button>
+        </div>
+        {readError && <p className="card-info error">{readError}</p>}
+        <div className="status-details">
+          <div className="status-row">
+            <span className="status-label">FeeRouter</span>
+            <span className="status-value"><code title={routerAddr}>{shortAddr(routerAddr)}</code></span>
+          </div>
+          <div className="status-row">
+            <span className="status-label">Fee treasury (this network)</span>
+            <span className="status-value">
+              {treasury === undefined ? '…'
+                : treasury && treasury !== ethers.ZeroAddress
+                  ? <code title={treasury}>{shortAddr(treasury)}</code>
+                  : <span className="status-value paused">unset — fees are skipped, not charged</span>}
+            </span>
+          </div>
+          {maxWrappedCap != null && (
+            <div className="status-row">
+              <span className="status-label">Wrapper-fee hard cap</span>
+              <span className="status-value">{maxWrappedCap} bps ({bpsPct(maxWrappedCap)})</span>
+            </div>
+          )}
+        </div>
+
+        {services == null && !readError ? (
+          <p className="card-info">Loading fee services…</p>
+        ) : services?.length === 0 ? (
+          <p className="card-info">No fee services are registered on this network yet.</p>
+        ) : services?.length > 0 ? (
+          <table className="admin-table" aria-label="Registered fee services">
+            <thead>
+              <tr>
+                <th scope="col">Service</th>
+                <th scope="col">Live rate</th>
+                <th scope="col">Hard cap</th>
+                <th scope="col">Enforcement</th>
+              </tr>
+            </thead>
+            <tbody>
+              {services.map((s) => (
+                <tr key={s.serviceId}>
+                  <td>{s.label}<div className="hint">{s.surface}</div></td>
+                  <td>{s.feeBps} bps ({bpsPct(s.feeBps)})</td>
+                  <td>{s.capBps} bps</td>
+                  <td>{KIND_NAMES[s.kind] || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+        <p className="card-info">
+          Rates are read live by member surfaces — the confirm step always shows the rate in force,
+          and a member is never charged more than the rate they were shown. A rate of 0 shows no
+          fee line at all.
+        </p>
+      </div>
+
+      <div className="admin-card">
+        <h3>Other fee programs</h3>
+        <div className="status-details">
+          <div className="status-row">
+            <span className="status-label">Polymarket builder fee — gateway source</span>
+            <span className="status-value">
+              {gatewayFees?.polymarket
+                ? `${gatewayFees.polymarket.takerBps} bps taker / ${gatewayFees.polymarket.makerBps} bps maker · ${
+                    gatewayFees.polymarket.source === 'chain'
+                      ? 'live from the FeeRouter'
+                      : 'env fallback (router not read)'
+                  }`
+                : 'gateway unreachable — showing nothing rather than a stale rate'}
+            </span>
+          </div>
+          <div className="status-row">
+            <span className="status-label">OpenSea referral (Collect)</span>
+            <span className="status-value">
+              {gatewayFees?.opensea
+                ? gatewayFees.opensea.referralConfigured
+                  ? `configured${gatewayFees.opensea.beneficiary ? ` · ${shortAddr(gatewayFees.opensea.beneficiary)}` : ''} · no member cost`
+                  : 'not configured · no member cost either way'
+                : 'gateway unreachable'}
+            </span>
+          </div>
+        </div>
+        <p className="card-info">
+          The Polymarket taker/maker rates are edited below like any other service (they live on the
+          FeeRouter; the gateway re-reads them within ~30 s). The OpenSea referral has no rate to
+          edit — it never costs the member anything, and its beneficiary is deployment-managed.
+        </p>
+      </div>
+
+      {canEditFees && (
+        <div className="admin-card">
+          <h3>Change a fee rate</h3>
+          <p>
+            Takes effect for all subsequent member actions (in-flight actions are protected by the
+            rate they were quoted). The contract refuses rates above a service's hard cap.
+          </p>
+          <div className="admin-form">
+            <label>
+              Service
+              <select
+                value={feeForm.serviceId}
+                onChange={(e) => setFeeForm((f) => ({ ...f, serviceId: e.target.value }))}
+              >
+                <option value="">Choose a service…</option>
+                {(services || []).map((s) => (
+                  <option key={s.serviceId} value={s.serviceId}>
+                    {s.label} (now {s.feeBps} bps, cap {s.capBps})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              New rate (bps)
+              <input
+                type="number"
+                min="0"
+                max={selectedService?.capBps ?? undefined}
+                value={feeForm.bps}
+                onChange={(e) => setFeeForm((f) => ({ ...f, bps: e.target.value }))}
+                placeholder={selectedService ? `0 – ${selectedService.capBps}` : 'bps'}
+              />
+            </label>
+            {selectedService && (
+              <span className="hint">
+                {feeForm.bps !== '' && Number.isInteger(Number(feeForm.bps))
+                  ? `${feeForm.bps} bps = ${bpsPct(Number(feeForm.bps))} of each amount`
+                  : `Cap: ${selectedService.capBps} bps (${bpsPct(selectedService.capBps)})`}
+              </span>
+            )}
+            {formError && <p className="card-info error" role="alert">{formError}</p>}
+            <button
+              type="button"
+              className="confirm-btn primary"
+              onClick={handleSetFeeBps}
+              disabled={pendingTx || !signer}
+            >
+              Set fee rate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="admin-card">
+          <h3>Change the fee treasury</h3>
+          <p>
+            Where wrapper fees on this network are sent. Must be a FairWins-controlled address; the
+            contract refuses the zero address.
+          </p>
+          <div className="admin-form">
+            <label>
+              Treasury address
+              <input
+                type="text"
+                value={treasuryForm}
+                onChange={(e) => setTreasuryForm(e.target.value)}
+                placeholder="0x…"
+              />
+            </label>
+            <button
+              type="button"
+              className="confirm-btn danger"
+              onClick={handleSetTreasury}
+              disabled={pendingTx || !signer}
+            >
+              Set treasury
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="admin-card">
+        <h3>Change history</h3>
+        {history.entries == null ? (
+          <p className="card-info">Loading history…</p>
+        ) : history.entries.length === 0 ? (
+          <p className="card-info">
+            {history.error
+              ? 'This RPC bounds event lookups — view the full history on the block explorer.'
+              : 'No fee changes recorded in the recent lookback window.'}
+          </p>
+        ) : (
+          <table className="admin-table" aria-label="Fee change history">
+            <thead>
+              <tr>
+                <th scope="col">When</th>
+                <th scope="col">Service</th>
+                <th scope="col">Change</th>
+                <th scope="col">By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.entries.map((h) => (
+                <tr key={h.txHash + h.serviceId}>
+                  <td>{h.at ? h.at.toLocaleString() : '—'}</td>
+                  <td>{h.label}</td>
+                  <td>{h.oldBps} → {h.newBps} bps</td>
+                  <td><code title={h.actor}>{shortAddr(h.actor)}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="card-info">
+          Every change is an on-chain event (who, when, old → new).{' '}
+          {getBlockscoutUrl(chainId, routerAddr, 'address') && (
+            <a href={getBlockscoutUrl(chainId, routerAddr, 'address')} target="_blank" rel="noopener noreferrer">
+              Full history on the block explorer ↗
+            </a>
+          )}
+        </p>
+      </div>
+    </div>
+  )
+}

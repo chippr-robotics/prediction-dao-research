@@ -656,6 +656,7 @@ const ROLE_NAME_TO_HASH = {
   'ACCOUNT_MODERATOR': ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
   'ROLE_MANAGER': ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
   'SANCTIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
+  'FEE_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('FEE_ADMIN_ROLE')),
 }
 
 // Minimal ABI for role manager contract
@@ -1021,6 +1022,10 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
     if (addr) candidates.push(addr)
   } else if (roleName === 'SANCTIONS_ADMIN') {
     const addr = resolveAddress('sanctionsGuard')
+    if (addr) candidates.push(addr)
+  } else if (roleName === 'FEE_ADMIN') {
+    // FEE_ADMIN lives on the FeeRouter (spec 060); no router deployed => nobody holds it here.
+    const addr = resolveAddress('feeRouter')
     if (addr) candidates.push(addr)
   } else {
     const wager = resolveAddress('wagerRegistry')

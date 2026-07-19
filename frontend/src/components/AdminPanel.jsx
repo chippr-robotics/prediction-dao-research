@@ -16,6 +16,7 @@ import DenyListAdmin from './admin/DenyListAdmin'
 import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
 import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import ProtocolConfigTab from './admin/ProtocolConfigTab'
+import FeesTab from './admin/FeesTab'
 import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
@@ -89,6 +90,7 @@ function AdminPanel() {
   const isAccountModerator = hasRole(ROLES.ACCOUNT_MODERATOR)
   const isRoleManager = hasRole(ROLES.ROLE_MANAGER)
   const isSanctionsAdmin = hasRole(ROLES.SANCTIONS_ADMIN)
+  const isFeeAdmin = hasRole(ROLES.FEE_ADMIN)
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
   const [activeTab, setActiveTab] = useState('overview')
@@ -314,6 +316,7 @@ function AdminPanel() {
     isAccountModerator,
     isRoleManager,
     isSanctionsAdmin,
+    isFeeAdmin,
   })
   const adminTabs = flattenNavGroups(navGroups)
 
@@ -745,6 +748,18 @@ function AdminPanel() {
             chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'fees' && (isAdmin || isFeeAdmin) && (
+          <FeesTab
+            signer={signer}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+            isAdmin={isAdmin}
+            isFeeAdmin={isFeeAdmin}
           />
         )}
 

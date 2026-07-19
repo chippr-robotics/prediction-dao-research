@@ -133,9 +133,22 @@ artifacts live under `specs/<feature>/`.
   never hidden, never "free". Resolve nothing through `wagerRegistry`. Builder code + fee are public
   config; the CLOB API key + L2 creds are gateway-only secrets. Boot fails loudly if the fee exceeds the
   caps. See `docs/developer-guide/predict-polymarket.md` + `specs/057-predict-polymarket/`.
+- **Platform fees (spec 060) have ONE source of truth: the `FeeRouter`** (UUPS proxy, deployment keys
+  `feeRouter` / `feeRouterImpl`, `contracts/fees/`). Every configurable fee lives there as a
+  `bytes32 serviceId` (keccak of e.g. `earn.lend`, `polymarket.taker`) with a per-service hard cap
+  (wrapped services ≤ 250 bps; Polymarket keeps its spec-057 caps) — never hardcode a bps value in
+  client or gateway code, and never invent a second fee-config store (the gateway stays stateless
+  and only READS the router via `services/relay-gateway/src/fees/onchain.js`, env bps are fallback).
+  Wrapped charging is atomic (`depositToVaultWithFee`: fee → treasury + net → ERC-4626 vault in one
+  tx) and every member surface MUST disclose the live rate before signature and pass the quoted bps
+  as `maxFeeBps` (members can never be charged above what they saw); zero fee ⇒ no fee line and
+  byte-identical pre-060 behavior. New integrations (Lido, Polygon LST, Uniswap) REGISTER a service
+  (config only) instead of building their own fee path. `FEE_ADMIN_ROLE` edits rates from the
+  AdminPanel Fees tab; history = `FeeBpsChanged` events. See
+  `docs/developer-guide/platform-fees.md` + `docs/runbooks/fee-operations.md` + `specs/060-platform-fee-wrapper/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/059-notification-profiles/plan.md
+at specs/060-platform-fee-wrapper/plan.md
 <!-- SPECKIT END -->

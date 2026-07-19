@@ -17,6 +17,7 @@ export const ADMIN_TAB_ICONS = {
   tiers: 'layers',
   members: 'users',
   treasury: 'bank',
+  fees: 'coin',
   'protocol-config': 'settings',
   'oracle-adapters': 'broadcast',
   maintenance: 'sliders',
@@ -31,6 +32,7 @@ export function buildAdminNavGroups({
   isAccountModerator,
   isRoleManager,
   isSanctionsAdmin,
+  isFeeAdmin,
 }) {
   const item = (id, label) => ({ id, label, icon: ADMIN_TAB_ICONS[id] })
 
@@ -58,6 +60,8 @@ export function buildAdminNavGroups({
         isAdmin && item('tiers', 'Tiers'),
         isRoleManager && item('members', 'Members'),
         isAdmin && item('treasury', 'Treasury'),
+        // Unified platform-fee management (spec 060): FEE_ADMIN edits rates; ADMIN also enters.
+        (isAdmin || isFeeAdmin) && item('fees', 'Fees'),
       ].filter(Boolean),
     },
     {
