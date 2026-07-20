@@ -8,18 +8,31 @@
  * No bundler, relayer, or FairWins-operated service is involved — the same
  * calls work from any generic wallet tool (see
  * docs/runbooks/passkey-account-recovery.md).
+ *
+ * Recovery is rare and high-stakes, so the flow is a guided series of bottom
+ * sheets that explain each step as it happens (mirroring the connect surface),
+ * uses the app's standard address entry (paste / address book / QR scan), and
+ * turns the raw ethers/WebAuthn failures testers hit into plain-language,
+ * actionable guidance instead of an error boundary.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
+import { getNetwork } from '../../config/networks'
 import {
   createCredential,
   rememberCredential,
   knownCredentials,
+  detectCapability,
   CeremonyCancelled,
 } from '../../lib/passkey/credentials'
+import AddressInput from '../ui/AddressInput'
+import AddressBookButton from '../ui/AddressBookButton'
+import QRScanner from '../ui/QRScanner'
+import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+import './RecoverAccountPanel.css'
 
 // Human-readable fragments for the vendored Coinbase Smart Wallet MultiOwnable
 // surface (ethers v6 signer path — the wallet talks to the account directly).
@@ -28,17 +41,126 @@ const RECOVERY_ABI = [
   'function addOwnerPublicKey(bytes32 x, bytes32 y)',
 ]
 
-const isHexAddress = (s) => /^0x[0-9a-fA-F]{40}$/.test(s.trim())
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+const isHexAddress = (s) => ADDRESS_RE.test((s || '').trim())
+const shortAddr = (a) => (a ? `${a.substring(0, 6)}…${a.substring(a.length - 4)}` : '')
 
 // User-facing guide for how passkey account recovery via a linked wallet works.
 const RECOVERY_DOCS_URL = 'https://docs.FairWins.app/user-guide/account-recovery/'
 
+/**
+ * The bottom-sheet host. Kept local (no global modal singleton) and styled to
+ * match the connect surface — including the mobile bottom-nav clearance fixed
+ * in #938 (backdrop z-index 1500 + safe-area padding so the actions never hide
+ * behind the icon nav). Renders nothing when closed; closes on backdrop click
+ * and Escape and traps focus (aria-modal).
+ */
+function RecoverSheet({ open, onClose, title, step, children }) {
+  const dialogRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current?.()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusables = dialog.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const outside = !dialog.contains(document.activeElement)
+      if (e.shiftKey && (document.activeElement === first || outside)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (document.activeElement === last || outside)) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.focus()
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div className="recover-sheet__backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="recover-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        ref={dialogRef}
+        tabIndex={-1}
+        data-step={step}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="recover-sheet__handle" aria-hidden="true" />
+        <div className="recover-sheet__header">
+          <h3>{title}</h3>
+          <button type="button" className="recover-sheet__close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className="recover-sheet__body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+RecoverSheet.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.string.isRequired,
+  step: PropTypes.string,
+  children: PropTypes.node,
+}
+
+const STEP_TITLES = {
+  intro: 'Recover your account',
+  account: 'Which account?',
+  confirm: 'Create your new passkey',
+  done: 'Recovery complete',
+}
+
 function RecoverAccountPanel({ deps = {} }) {
-  const { address: walletAddress, signer, provider, loginMethod, isConnected } = useWallet()
-  const [accountAddress, setAccountAddress] = useState('')
-  // idle → verifying → ready → creating → submitting → confirmed | failed
-  const [txState, setTxState] = useState('idle')
+  const { address: walletAddress, signer, provider, loginMethod, isConnected, chainId } = useWallet()
+
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState('intro')
+  // idle → verifying (account step) | creating → submitting (confirm step)
+  const [phase, setPhase] = useState('idle')
   const [notice, setNotice] = useState(null)
+  const [accountInput, setAccountInput] = useState('')
+  const [accountResolved, setAccountResolved] = useState('')
+  const [scanOpen, setScanOpen] = useState(false)
+  const [capability, setCapability] = useState(null)
+
+  const networkName = useMemo(() => getNetwork(chainId)?.name || 'this network', [chainId])
+
+  // The account we act on: a resolved address (ENS/callsign/book/QR) wins,
+  // otherwise the raw pasted value.
+  const target = useMemo(() => {
+    const r = (accountResolved || '').trim()
+    if (isHexAddress(r)) return r
+    return accountInput.trim()
+  }, [accountResolved, accountInput])
 
   // Local hints: addresses this browser has ever associated with a passkey.
   const hints = useMemo(() => {
@@ -48,47 +170,124 @@ function RecoverAccountPanel({ deps = {} }) {
       .filter((a) => a && !seen.has(a.toLowerCase()) && seen.add(a.toLowerCase()))
   }, [deps.knownCredentials])
 
+  // Probe passkey capability once the wizard opens so we can warn honestly
+  // BEFORE the member invests effort verifying ownership (testers reached the
+  // final step in an in-app browser only to hit "Passkeys are not available").
+  useEffect(() => {
+    if (!open) return undefined
+    let cancelled = false
+    Promise.resolve((deps.detectCapability ?? detectCapability)())
+      .then((c) => {
+        if (!cancelled) setCapability(c)
+      })
+      .catch(() => {
+        if (!cancelled) setCapability({ available: false, reason: 'Passkey support could not be confirmed.' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, deps.detectCapability])
+
+  const resetWizard = useCallback(() => {
+    setStep('intro')
+    setPhase('idle')
+    setNotice(null)
+    setAccountInput('')
+    setAccountResolved('')
+    setScanOpen(false)
+  }, [])
+
+  const openWizard = useCallback(() => {
+    resetWizard()
+    setOpen(true)
+  }, [resetWizard])
+
+  const closeWizard = useCallback(() => {
+    // Never yank the sheet out from under an in-flight ceremony/transaction.
+    if (phase === 'creating' || phase === 'submitting') return
+    setOpen(false)
+  }, [phase])
+
+  const applyAddress = useCallback((addr) => {
+    setAccountInput(addr)
+    setAccountResolved(addr)
+    setNotice(null)
+  }, [])
+
+  const handleScan = useCallback(
+    (decodedText) => {
+      const addr = extractAddressFromScan(decodedText)
+      if (addr) applyAddress(addr)
+      setScanOpen(false)
+    },
+    [applyAddress]
+  )
+
   const verify = useCallback(async () => {
     setNotice(null)
-    setTxState('verifying')
+    setPhase('verifying')
     try {
-      const target = accountAddress.trim()
-      const account = new ethers.Contract(target, RECOVERY_ABI, deps.provider ?? provider)
+      const prov = deps.provider ?? provider
+      // Preflight: a counterfactual/undeployed account (or the wrong network)
+      // returns empty calldata, which surfaced to testers as the cryptic
+      // "could not decode result data (value=\"0x\" … isOwnerAddress) BAD_DATA".
+      // Catch it here with a plain explanation instead.
+      if (prov?.getCode) {
+        const code = await prov.getCode(target)
+        if (!code || code === '0x') {
+          setPhase('idle')
+          setNotice({
+            kind: 'error',
+            text: `No passkey account is deployed at that address on ${networkName}. Recovery only works on the network where your account lives — switch networks (top-right of the app), and double-check you pasted the account address (not a wallet address).`,
+          })
+          return
+        }
+      }
+      const account = new ethers.Contract(target, RECOVERY_ABI, prov)
       const isOwner = await account.isOwnerAddress(walletAddress)
       if (!isOwner) {
-        setTxState('idle')
+        setPhase('idle')
         setNotice({
           kind: 'error',
-          text: 'The connected wallet is not a controller of that account. Recovery needs a wallet that was linked while you still had passkey access.',
+          text: 'The connected wallet is not a controller of that account. Recovery needs the wallet you linked as a controller while you still had passkey access.',
         })
         return
       }
-      setTxState('ready')
+      setPhase('idle')
+      setNotice(null)
+      setStep('confirm')
     } catch (e) {
-      setTxState('idle')
+      setPhase('idle')
+      const badData = e?.code === 'BAD_DATA' || /BAD_DATA|could not decode/i.test(e?.message || '')
       setNotice({
         kind: 'error',
-        text: `Could not verify that account on this network: ${e.reason || e.message}`,
+        text: badData
+          ? `That address doesn't respond like a FairWins passkey account on ${networkName}. Make sure you're on the right network and that you pasted the account address (not a wallet address).`
+          : `Could not verify that account on ${networkName}: ${e.reason || e.shortMessage || e.message}`,
       })
     }
-  }, [accountAddress, walletAddress, provider, deps.provider])
+  }, [target, walletAddress, provider, deps.provider, networkName])
 
   const recover = useCallback(async () => {
     setNotice(null)
-    setTxState('creating')
+    setPhase('creating')
     let credential
     try {
       credential = await (deps.createCredential ?? createCredential)({ label: 'Recovered device', deps })
     } catch (e) {
-      setTxState('ready')
-      if (!(e instanceof CeremonyCancelled || e?.name === 'CeremonyCancelled')) {
-        setNotice({ kind: 'error', text: e.message })
-      }
+      setPhase('idle')
+      if (e instanceof CeremonyCancelled || e?.name === 'CeremonyCancelled') return // clean abort
+      const unavailable = e?.name === 'AuthenticatorUnavailable'
+      setNotice({
+        kind: 'error',
+        text: unavailable
+          ? `${e.message}. This usually happens inside in-app browsers — open fairwins.app in your device's default browser (Safari or Chrome) and run recovery again.`
+          : e.message,
+      })
       return
     }
     try {
-      setTxState('submitting')
-      const target = accountAddress.trim()
+      setPhase('submitting')
       const account = new ethers.Contract(target, RECOVERY_ABI, deps.signer ?? signer)
       const tx = await account.addOwnerPublicKey(credential.publicKey.x, credential.publicKey.y)
       const receipt = await tx.wait()
@@ -96,20 +295,20 @@ function RecoverAccountPanel({ deps = {} }) {
       // Only now is the credential a real controller — record it so passkey
       // sign-in works immediately (spec 045 FR-005).
       rememberCredential({ ...credential, address: target }, deps.storage)
-      setTxState('confirmed')
-      setNotice({
-        kind: 'success',
-        text: 'New passkey authorized. You can now sign out of this wallet and sign in with the passkey.',
-      })
+      setPhase('idle')
+      setStep('done')
     } catch (e) {
-      setTxState('ready')
-      setNotice({ kind: 'error', text: `Authorizing the new passkey failed: ${e.reason || e.message}` })
+      setPhase('idle')
+      setNotice({ kind: 'error', text: `Authorizing the new passkey failed: ${e.reason || e.shortMessage || e.message}` })
     }
-  }, [accountAddress, signer, deps])
+  }, [target, signer, deps])
 
   // Wallet-session only: a passkey session manages controllers in the
   // Controllers panel instead; disconnected visitors must connect first.
   if (!isConnected || loginMethod === 'passkey') return null
+
+  const busy = phase === 'creating' || phase === 'submitting'
+  const passkeyBlocked = capability && capability.available === false
 
   return (
     <section className="recover-account-panel section" aria-label="Recover passkey account">
@@ -121,67 +320,192 @@ function RecoverAccountPanel({ deps = {} }) {
           Learn how account recovery works →
         </a>
       </p>
+      <button type="button" className="btn btn-primary recover-account-panel__start" onClick={openWizard}>
+        Recover an account
+      </button>
 
-      <label htmlFor="recover-account-address">Passkey account address</label>
-      <input
-        id="recover-account-address"
-        type="text"
-        placeholder="0x… account to recover"
-        value={accountAddress}
-        onChange={(e) => {
-          setAccountAddress(e.target.value)
-          setTxState('idle')
-        }}
-        disabled={txState === 'creating' || txState === 'submitting'}
-      />
-      {hints.length > 0 && txState === 'idle' && (
-        <div className="recover-account-panel__hints">
-          <span>Known on this browser:</span>
-          {hints.map((h) => (
-            <button key={h} type="button" className="btn btn-small" onClick={() => setAccountAddress(h)}>
-              {`${h.substring(0, 6)}...${h.substring(h.length - 4)}`}
-            </button>
-          ))}
-        </div>
-      )}
+      <RecoverSheet open={open} onClose={closeWizard} title={STEP_TITLES[step]} step={step}>
+        {/* Step 1 — what this does + prerequisites, checked while it's fresh. */}
+        {step === 'intro' && (
+          <div className="recover-step">
+            <p>
+              You&apos;re signed in with a wallet. If this wallet was linked as a controller of a passkey
+              account, you can authorize a brand-new passkey on this device — FairWins is never involved,
+              and it takes one wallet transaction.
+            </p>
+            <ol className="recover-step__list">
+              <li>Tell us which passkey account you&apos;re recovering.</li>
+              <li>We confirm on-chain that this wallet controls it.</li>
+              <li>Create a new passkey and authorize it with one transaction.</li>
+            </ol>
+            <div className="recover-step__meta">
+              <span className="recover-step__chip" title={walletAddress}>
+                Wallet {shortAddr(walletAddress)}
+              </span>
+              <span className="recover-step__chip">{networkName}</span>
+            </div>
+            {passkeyBlocked && (
+              <p className="recover-step__warn" role="status">
+                ⚠ This browser can&apos;t create passkeys{capability?.reason ? ` (${capability.reason})` : ''}. You
+                can still verify ownership, but to finish you&apos;ll need to open fairwins.app in your
+                device&apos;s default browser (Safari or Chrome).
+              </p>
+            )}
+            <p className="recover-step__hint">
+              <a href={RECOVERY_DOCS_URL} target="_blank" rel="noopener noreferrer">
+                Learn how account recovery works →
+              </a>
+            </p>
+            <div className="recover-step__actions">
+              <button type="button" className="btn" onClick={closeWizard}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setStep('account')}>
+                Get started
+              </button>
+            </div>
+          </div>
+        )}
 
-      <div className="recover-account-panel__actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!isHexAddress(accountAddress) || txState !== 'idle'}
-          onClick={verify}
-        >
-          {txState === 'verifying' ? 'Verifying…' : 'Verify ownership'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={txState !== 'ready'}
-          onClick={recover}
-        >
-          {txState === 'creating'
-            ? 'Waiting for your device…'
-            : txState === 'submitting'
-              ? 'Authorizing on-chain…'
-              : 'Create & authorize new passkey'}
-        </button>
-      </div>
+        {/* Step 2 — standard address entry (paste / address book / QR). */}
+        {step === 'account' && (
+          <div className="recover-step">
+            <p>
+              Enter the passkey account you&apos;re recovering. Paste the address, pick it from your address
+              book, or scan a QR code.
+            </p>
+            <div className="recover-step__address-row">
+              <div className="recover-step__address-wrap">
+                <AddressInput
+                  id="recover-account-address"
+                  label="Passkey account address"
+                  value={accountInput}
+                  onChange={(e) => {
+                    setAccountInput(e.target.value)
+                    setNotice(null)
+                  }}
+                  onResolvedChange={(addr) => setAccountResolved(addr || '')}
+                  chainId={chainId}
+                  placeholder="0x… account to recover"
+                  disabled={phase === 'verifying'}
+                />
+              </div>
+              <AddressBookButton
+                disabled={phase === 'verifying'}
+                onSelect={(entry) => applyAddress(entry.address)}
+              />
+              <button
+                type="button"
+                className="recover-step__scan-btn"
+                onClick={() => setScanOpen(true)}
+                disabled={phase === 'verifying'}
+                title="Scan QR code"
+                aria-label="Scan QR code"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+                </svg>
+              </button>
+            </div>
+            <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
 
-      {txState === 'ready' && (
-        <p role="status" data-testid="recover-verified">
-          ✓ This wallet controls the account. Creating a passkey will prompt your device, then send one
-          wallet transaction.
-        </p>
-      )}
-      {notice && (
-        <p
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-          className={`recover-account-panel__${notice.kind}`}
-        >
-          {notice.text}
-        </p>
-      )}
+            {hints.length > 0 && (
+              <div className="recover-step__hints">
+                <span>Known on this browser:</span>
+                {hints.map((h) => (
+                  <button key={h} type="button" className="btn btn-small" onClick={() => applyAddress(h)}>
+                    {shortAddr(h)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="recover-step__meta-line">
+              Verifying with wallet <code>{shortAddr(walletAddress)}</code> on {networkName}.
+            </p>
+
+            {notice && (
+              <p role="alert" className={`recover-step__notice recover-step__notice--${notice.kind}`}>
+                {notice.text}
+              </p>
+            )}
+
+            <div className="recover-step__actions">
+              <button type="button" className="btn" onClick={() => setStep('intro')} disabled={phase === 'verifying'}>
+                Back
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!isHexAddress(target) || phase === 'verifying'}
+                onClick={verify}
+              >
+                {phase === 'verifying' ? 'Verifying…' : 'Verify ownership'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3 — verified; create + authorize the new passkey. */}
+        {step === 'confirm' && (
+          <div className="recover-step">
+            <p role="status" data-testid="recover-verified" className="recover-step__ok">
+              ✓ This wallet controls <code>{shortAddr(target)}</code>.
+            </p>
+            <p>
+              Next, create a new passkey on this device and authorize it with one wallet transaction. After
+              it confirms, you can sign in with the new passkey.
+            </p>
+            {passkeyBlocked && (
+              <p className="recover-step__warn" role="status">
+                ⚠ This browser can&apos;t create passkeys{capability?.reason ? ` (${capability.reason})` : ''}.
+                Open fairwins.app in your device&apos;s default browser (Safari or Chrome) and run recovery
+                there to finish.
+              </p>
+            )}
+
+            {phase === 'creating' && <p className="recover-step__progress">Waiting for your device…</p>}
+            {phase === 'submitting' && <p className="recover-step__progress">Authorizing on-chain…</p>}
+
+            {notice && (
+              <p role="alert" className={`recover-step__notice recover-step__notice--${notice.kind}`}>
+                {notice.text}
+              </p>
+            )}
+
+            <div className="recover-step__actions">
+              <button type="button" className="btn" onClick={() => setStep('account')} disabled={busy}>
+                Back
+              </button>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={recover}>
+                {phase === 'creating'
+                  ? 'Waiting for your device…'
+                  : phase === 'submitting'
+                    ? 'Authorizing on-chain…'
+                    : 'Create & authorize new passkey'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4 — done. */}
+        {step === 'done' && (
+          <div className="recover-step">
+            <p role="status" className="recover-step__ok">
+              ✓ New passkey authorized.
+            </p>
+            <p>
+              Sign out of this wallet, then choose <strong>Passkey</strong> at sign-in to use your new
+              passkey on this device.
+            </p>
+            <div className="recover-step__actions">
+              <button type="button" className="btn btn-primary" onClick={closeWizard}>
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </RecoverSheet>
     </section>
   )
 }
