@@ -16,7 +16,7 @@
  * actionable guidance instead of an error boundary.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
@@ -32,6 +32,7 @@ import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+import ActionSheet from './ActionSheet'
 import './RecoverAccountPanel.css'
 
 // Human-readable fragments for the vendored Coinbase Smart Wallet MultiOwnable
@@ -47,90 +48,6 @@ const shortAddr = (a) => (a ? `${a.substring(0, 6)}…${a.substring(a.length - 4
 
 // User-facing guide for how passkey account recovery via a linked wallet works.
 const RECOVERY_DOCS_URL = 'https://docs.FairWins.app/user-guide/account-recovery/'
-
-/**
- * The bottom-sheet host. Kept local (no global modal singleton) and styled to
- * match the connect surface — including the mobile bottom-nav clearance fixed
- * in #938 (backdrop z-index 1500 + safe-area padding so the actions never hide
- * behind the icon nav). Renders nothing when closed; closes on backdrop click
- * and Escape and traps focus (aria-modal).
- */
-function RecoverSheet({ open, onClose, title, step, children }) {
-  const dialogRef = useRef(null)
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  })
-
-  useEffect(() => {
-    if (!open) return undefined
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        onCloseRef.current?.()
-        return
-      }
-      if (e.key !== 'Tab') return
-      const dialog = dialogRef.current
-      if (!dialog) return
-      const focusables = dialog.querySelectorAll(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
-      if (!focusables.length) return
-      const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      const outside = !dialog.contains(document.activeElement)
-      if (e.shiftKey && (document.activeElement === first || outside)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (document.activeElement === last || outside)) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    dialogRef.current?.focus()
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
-  }, [open])
-
-  if (!open) return null
-
-  return (
-    <div className="recover-sheet__backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="recover-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        ref={dialogRef}
-        tabIndex={-1}
-        data-step={step}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="recover-sheet__handle" aria-hidden="true" />
-        <div className="recover-sheet__header">
-          <h3>{title}</h3>
-          <button type="button" className="recover-sheet__close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div className="recover-sheet__body">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-RecoverSheet.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func.isRequired,
-  title: PropTypes.string.isRequired,
-  step: PropTypes.string,
-  children: PropTypes.node,
-}
 
 const STEP_TITLES = {
   intro: 'Recover your account',
@@ -324,7 +241,7 @@ function RecoverAccountPanel({ deps = {} }) {
         Recover an account
       </button>
 
-      <RecoverSheet open={open} onClose={closeWizard} title={STEP_TITLES[step]} step={step}>
+      <ActionSheet open={open} onClose={closeWizard} title={STEP_TITLES[step]} closeDisabled={busy}>
         {/* Step 1 — what this does + prerequisites, checked while it's fresh. */}
         {step === 'intro' && (
           <div className="recover-step">
@@ -505,7 +422,7 @@ function RecoverAccountPanel({ deps = {} }) {
             </div>
           </div>
         )}
-      </RecoverSheet>
+      </ActionSheet>
     </section>
   )
 }

@@ -1,79 +1,20 @@
-/* Guided passkey-recovery wizard (spec 045, US6). The sheet mirrors the
-   connect surface (ConnectModal.css): centered card on desktop, bottom sheet on
-   mobile, and the same mobile bottom-nav clearance fixed in #938 (backdrop
-   z-index 1500 + safe-area padding) so the actions never hide behind the fixed
-   icon nav. Uses shared theme variables to render in both themes. */
+/* Guided passkey-recovery wizard (spec 045, US6). The sheet shell lives in the
+   shared ActionSheet (ActionSheet.css); this file styles only the recovery
+   entry card and the per-step content that fills the sheet.
+
+   Colors use the FairWins theme tokens from src/theme.css (--text-primary,
+   --text-secondary, --border-color, --warning-color, --danger-color,
+   --brand-primary) so text stays high-contrast in BOTH light and dark themes.
+   Fallbacks are the light-mode values (light is the default theme) — never dark
+   literals, which is what made light-theme text and chips unreadable before. */
 
 .recover-account-panel__start {
   margin-top: 8px;
 }
 
-/* --- Sheet shell --- */
-.recover-sheet__backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1500;
-  padding: 16px;
-}
-
-.recover-sheet {
-  width: 100%;
-  max-width: 460px;
-  max-height: 85vh;
-  overflow-y: auto;
-  background: var(--color-surface, var(--surface-color, #1a1a1a));
-  border: 1px solid var(--color-border, #333);
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  outline: none;
-}
-
-.recover-sheet__handle {
-  display: none;
-}
-
-.recover-sheet__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--color-border, #333);
-}
-
-.recover-sheet__header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--color-text, #fff);
-}
-
-.recover-sheet__close {
-  background: none;
-  border: none;
-  color: var(--color-text-secondary, #aaa);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-
-.recover-sheet__close:hover,
-.recover-sheet__close:focus-visible {
-  color: var(--color-text, #fff);
-  background: var(--color-surface-secondary, #262626);
-}
-
-.recover-sheet__body {
-  padding: 16px 20px 20px;
-}
-
 /* --- Step content --- */
 .recover-step p {
-  color: var(--color-text-secondary, #ccc);
+  color: var(--text-secondary, #5a6772);
   font-size: 0.92rem;
   line-height: 1.5;
   margin: 0 0 12px;
@@ -82,7 +23,7 @@
 .recover-step__list {
   margin: 0 0 14px;
   padding-left: 1.2rem;
-  color: var(--color-text-secondary, #ccc);
+  color: var(--text-secondary, #5a6772);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -100,16 +41,16 @@
 
 .recover-step__chip {
   font-size: 0.78rem;
-  color: var(--color-text-secondary, #aaa);
-  background: var(--color-surface-secondary, #262626);
-  border: 1px solid var(--color-border, #333);
+  color: var(--text-secondary, #5a6772);
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
   border-radius: 999px;
   padding: 4px 10px;
 }
 
 .recover-step__meta-line {
   font-size: 0.8rem !important;
-  color: var(--color-text-secondary, #999) !important;
+  color: var(--text-muted, #8a959e) !important;
 }
 
 .recover-step__meta-line code {
@@ -117,7 +58,7 @@
 }
 
 .recover-step__ok {
-  color: var(--color-success, #36B37E) !important;
+  color: var(--brand-primary, #36b37e) !important;
   font-weight: 600;
 }
 
@@ -126,16 +67,16 @@
 }
 
 .recover-step__warn {
-  border: 1px solid var(--color-warning, #E2A93B);
+  border: 1px solid var(--warning-color, #f59e0b);
   border-radius: 10px;
   padding: 10px 12px;
-  color: var(--color-text, #eee) !important;
-  background: color-mix(in srgb, var(--color-warning, #E2A93B) 12%, transparent);
+  color: var(--text-primary, #1f2933) !important;
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 14%, transparent);
   font-size: 0.86rem !important;
 }
 
 .recover-step__progress {
-  color: var(--color-primary, #36B37E) !important;
+  color: var(--brand-primary, #36b37e) !important;
   font-size: 0.88rem !important;
 }
 
@@ -145,7 +86,7 @@
 
 .recover-step__hint a,
 .recover-account-panel a {
-  color: var(--color-primary, #36B37E);
+  color: var(--brand-primary, #36b37e);
 }
 
 .recover-step__notice {
@@ -156,9 +97,9 @@
 }
 
 .recover-step__notice--error {
-  border: 1px solid var(--color-danger, #ef4444);
-  color: var(--color-danger, #ef4444) !important;
-  background: color-mix(in srgb, var(--color-danger, #ef4444) 8%, transparent);
+  border: 1px solid var(--danger-color, #dc2626);
+  color: var(--danger-color, #dc2626) !important;
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
 }
 
 /* --- Address entry (matches the controllers panel link row) --- */
@@ -183,15 +124,15 @@
   min-width: 42px;
   height: 42px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-secondary);
-  color: var(--color-text);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
   cursor: pointer;
 }
 
 .recover-step__scan-btn:hover:not(:disabled) {
-  border-color: var(--color-primary, #36B37E);
-  color: var(--color-primary, #36B37E);
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
 }
 
 .recover-step__scan-btn:disabled {
@@ -206,7 +147,7 @@
   gap: 8px;
   margin-bottom: 12px;
   font-size: 0.82rem;
-  color: var(--color-text-secondary, #aaa);
+  color: var(--text-secondary, #5a6772);
 }
 
 /* --- Actions --- */
@@ -218,30 +159,4 @@
 
 .recover-step__actions .btn {
   flex: 1;
-}
-
-/* Bottom sheet on mobile, like the connect surface. */
-@media (max-width: 640px) {
-  .recover-sheet__backdrop {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .recover-sheet {
-    max-width: 100%;
-    max-height: calc(85vh - 64px);
-    border-radius: 20px 20px 0 0;
-    /* Reserve room so the last actions clear the fixed icon nav (z-index 1200)
-       and stay visible/tappable (#938). */
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .recover-sheet__handle {
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 999px;
-    background: var(--color-border, #444);
-    margin: 8px auto 0;
-  }
 }
