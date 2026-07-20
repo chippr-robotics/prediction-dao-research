@@ -29,10 +29,13 @@ import {
   getPortfolioRegistry,
   getPortfolioChainIds,
   getTaxonomyCategory,
+  getBitcoinPortfolioAsset,
   TAXONOMY_CATEGORIES,
 } from '../config/assetTaxonomy'
 import { fetchPortfolioPrices, underlyingSymbolOf } from '../lib/portfolio/prices'
 import { aggregateHoldings } from '../lib/portfolio/aggregate'
+import { loadBitcoinHoldings, toBitcoinHolding } from '../lib/bitcoin/portfolioSource'
+import { createBitcoinGatewayClient, bitcoinGatewayUrl } from '../lib/bitcoin/gatewayClient'
 
 const POLL_MS = 60_000
 
@@ -84,7 +87,22 @@ export function usePortfolio() {
     [chainIds],
   )
 
-  const [reads, setReads] = useState({ balances: null, failedAssets: [], error: null })
+  // Non-EVM bitcoin scope (spec 061, FR-008/021): mainnet always, testnet only
+  // with the same testnet preference that gates EVM testnets. String ids —
+  // these NEVER enter the EVM balance-read loop or the provider map.
+  const bitcoinNetworkIds = useMemo(
+    () => (showTestnetAssets ? ['bitcoin', 'bitcoin-testnet'] : ['bitcoin']),
+    [showTestnetAssets],
+  )
+  // Bitcoin asset descriptors join the PRICING registry only (so underlying
+  // `BTC` resolves through the existing Chainlink feed path) — never the scan
+  // registry: their chainId is a string network id, not an EVM chain.
+  const bitcoinAssets = useMemo(
+    () => bitcoinNetworkIds.map((id) => getBitcoinPortfolioAsset(id)).filter(Boolean),
+    [bitcoinNetworkIds],
+  )
+
+  const [reads, setReads] = useState({ balances: null, failedAssets: [], error: null, bitcoinEntries: [] })
   const [priceMap, setPriceMap] = useState(() => new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -97,17 +115,26 @@ export function usePortfolio() {
     // A retry after a failed load must leave the error state immediately so
     // the panel shows loading (and its Retry button goes away) instead of
     // inviting overlapping retries against a stale error.
-    setReads((prev) => (prev.error ? { balances: null, failedAssets: [], error: null } : prev))
+    setReads((prev) => (prev.error ? { balances: null, failedAssets: [], error: null, bitcoinEntries: [] } : prev))
     try {
       // Prices resolve concurrently with balances; a total pricing failure
       // leaves assets honestly unpriced without failing the portfolio.
-      const [settled, priced] = await Promise.all([
+      // The bitcoin source runs alongside (spec 061): a wallet with no issued
+      // bitcoin addresses contributes nothing and makes no gateway calls, and
+      // a total bitcoin failure degrades to failedAssets ['BTC'] — stale, not
+      // zero (FR-010) — without touching the EVM path (SC-008).
+      const [settled, priced, bitcoinRes] = await Promise.all([
         Promise.allSettled(
           registry.map((asset) =>
             readAssetBalance(asset, { provider: providers.get(asset.chainId), address }),
           ),
         ),
-        fetchPortfolioPrices(providers, registry).catch(() => new Map()),
+        fetchPortfolioPrices(providers, [...registry, ...bitcoinAssets]).catch(() => new Map()),
+        loadBitcoinHoldings({
+          account: address,
+          networkIds: bitcoinNetworkIds,
+          gateway: createBitcoinGatewayClient({ baseUrl: bitcoinGatewayUrl() }),
+        }).catch(() => ({ holdings: [], failed: ['BTC'] })),
       ])
       if (reqId !== reqIdRef.current) return
 
@@ -123,27 +150,34 @@ export function usePortfolio() {
       })
 
       if (failedAssets.length === registry.length) {
-        // Nothing readable on any network — an explicit error state, never a
-        // $0 portfolio.
-        setReads({ balances: null, failedAssets, error: 'Unable to read balances from the supported networks.' })
+        // Nothing readable on any EVM network — an explicit error state,
+        // never a $0 portfolio (unchanged pre-bitcoin semantics).
+        setReads({ balances: null, failedAssets, error: 'Unable to read balances from the supported networks.', bitcoinEntries: [] })
       } else {
-        setReads({ balances, failedAssets, error: null })
+        setReads({
+          balances,
+          // Bitcoin failures ride the same honest-degradation channel the EVM
+          // reads use: named in failedAssets, never rendered as zero.
+          failedAssets: [...failedAssets, ...bitcoinRes.failed],
+          error: null,
+          bitcoinEntries: bitcoinRes.holdings,
+        })
         setPriceMap(priced)
         setLastUpdated(Date.now())
       }
     } catch (err) {
       if (reqId !== reqIdRef.current) return
-      setReads({ balances: null, failedAssets: [], error: err?.message || 'Failed to load portfolio' })
+      setReads({ balances: null, failedAssets: [], error: err?.message || 'Failed to load portfolio', bitcoinEntries: [] })
     } finally {
       if (reqId === reqIdRef.current) setIsLoading(false)
     }
-  }, [isConnected, address, providers, registry])
+  }, [isConnected, address, providers, registry, bitcoinAssets, bitcoinNetworkIds])
 
   // Reset synchronously on account or scan-scope change so a stale snapshot
   // (e.g. testnet rows after the preference flips off) can never render.
   useEffect(() => {
     reqIdRef.current++
-    setReads({ balances: null, failedAssets: [], error: null })
+    setReads({ balances: null, failedAssets: [], error: null, bitcoinEntries: [] })
     setPriceMap(new Map())
     setLastUpdated(null)
     load()
@@ -172,6 +206,13 @@ export function usePortfolio() {
         const raw = reads.balances.get(`${asset.chainId}:${asset.id}`)
         if (raw == null) continue
         holdings.push(toHolding(asset, raw, priceMap))
+      }
+      // Native bitcoin holdings (spec 061) append AFTER the EVM scan so
+      // aggregateHoldings rolls native BTC + WBTC into one Bitcoin row. Each
+      // carries `holding.bitcoin` (pending/protected/spendable sats) for the
+      // instance-level pending/protected disclosures (FR-009/FR-018).
+      for (const entry of reads.bitcoinEntries || []) {
+        holdings.push(toBitcoinHolding(entry, priceMap))
       }
     }
 

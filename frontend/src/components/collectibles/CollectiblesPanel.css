@@ -170,3 +170,24 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/* Bitcoin Stamps section (spec 061): spec-055 card pattern, display-only. */
+.bitcoin-stamps-section {
+  margin-top: 24px;
+}
+
+.bitcoin-stamp-body {
+  cursor: default;
+}
+
+.bitcoin-stamp-protected-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(15, 118, 110, 0.9);
+}

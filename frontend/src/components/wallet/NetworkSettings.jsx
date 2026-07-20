@@ -1,7 +1,95 @@
 import { useChainId, useSwitchChain } from 'wagmi'
 import { getSelectableNetworks } from '../../config/networks'
 import { getNetworkFeatures } from '../../config/networkCapabilities'
+import { BITCOIN_NETWORKS } from '../../config/bitcoinNetworks'
 import './NetworkSettings.css'
+
+/**
+ * Bitcoin capability tags (spec 061, FR-020) — resolved from the non-EVM
+ * registry's `capabilities`, the single source of truth for what Bitcoin
+ * supports. `collect: 'stamps-only'` is truthy: the Stamps section without
+ * OpenSea integration.
+ */
+const BITCOIN_FEATURE_TAGS = [
+  { key: 'portfolio', label: 'Portfolio', description: 'Native BTC balance in the portfolio.' },
+  { key: 'send', label: 'Send', description: 'Send BTC to any standard Bitcoin address.' },
+  { key: 'receive', label: 'Receive', description: 'Receive BTC via rotating addresses.' },
+  { key: 'collect', label: 'Stamps collectibles', description: 'Bitcoin Stamps shown in Collect (no OpenSea integration).' },
+  { key: 'wagers', label: 'P2P Wagers', description: 'Create and settle peer-to-peer wagers.' },
+  { key: 'pools', label: 'Wager Pools', description: 'Group wager pools.' },
+  { key: 'membership', label: 'Memberships', description: 'On-chain membership tiers and access roles.' },
+  { key: 'gasless', label: 'Gasless', description: 'Fee-sponsored transactions. Bitcoin sends always pay the network fee.' },
+  { key: 'swap', label: 'Token Swap', description: 'In-app token swaps.' },
+  { key: 'earn', label: 'Earn', description: 'In-app lending and yield.' },
+  { key: 'predict', label: 'Predict', description: 'Polymarket prediction-market trading.' },
+]
+
+/**
+ * Display-only Bitcoin network card (spec 061, T033). Bitcoin is a non-EVM
+ * network: there is NO wallet chain switch for it (network-registry rule 2),
+ * so the card carries no switch affordance — surfaces activate per feature
+ * (portfolio, send, receive) instead. Capability tags state truthfully what
+ * is and is not supported (FR-020).
+ */
+function BitcoinNetworkCard({ net }) {
+  return (
+    <li className="network-card network-card-display-only">
+      <div className="network-card-header">
+        <div className="network-card-title">
+          <span className="network-name">{net.name}</span>
+          <span className={`network-kind ${net.isTestnet ? 'testnet' : 'mainnet'}`}>
+            {net.isTestnet ? 'Testnet' : 'Mainnet'}
+          </span>
+        </div>
+        <span className="network-active-badge network-display-only-badge">No wallet switch</span>
+      </div>
+
+      <ul className="network-feature-tags">
+        {BITCOIN_FEATURE_TAGS.map((feature) => {
+          const supported = Boolean(net.capabilities?.[feature.key])
+          return (
+            <li
+              key={feature.key}
+              className={`network-tag ${supported ? 'available' : 'unavailable'}`}
+              title={`${feature.description} ${supported ? '(Supported)' : '(Not supported on Bitcoin)'}`}
+            >
+              <span className="network-tag-icon" aria-hidden="true">
+                {supported ? '✓' : '—'}
+              </span>
+              <span className="network-tag-label">{feature.label}</span>
+            </li>
+          )
+        })}
+      </ul>
+
+      <dl className="network-docs">
+        <div className="network-doc-row">
+          <dt>Native currency</dt>
+          <dd>BTC (Bitcoin)</dd>
+        </div>
+        {net.explorer?.baseUrl && (
+          <div className="network-doc-row">
+            <dt>Explorer</dt>
+            <dd>
+              <a href={net.explorer.baseUrl} target="_blank" rel="noopener noreferrer">
+                {net.explorer.name || 'Block explorer'}
+              </a>
+            </dd>
+          </div>
+        )}
+        <div className="network-doc-row">
+          <dt>Wallet</dt>
+          <dd>Requires a FairWins passkey on a PRF-capable device.</dd>
+        </div>
+      </dl>
+
+      <p className="network-display-only-note">
+        Bitcoin has no wallet network switch — it activates per feature
+        (portfolio, send, receive). Members always pay the Bitcoin network fee.
+      </p>
+    </li>
+  )
+}
 
 /**
  * NetworkSettings
@@ -145,6 +233,13 @@ function NetworkSettings() {
               </li>
             )
           })}
+          {/* Non-EVM networks (spec 061): display-only rows — the EVM list
+              always includes testnets, and the Bitcoin pair mirrors that. */}
+          {Object.values(BITCOIN_NETWORKS)
+            .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
+            .map((net) => (
+              <BitcoinNetworkCard key={net.id} net={net} />
+            ))}
         </ul>
       </div>
     </div>

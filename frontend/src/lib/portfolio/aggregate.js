@@ -12,10 +12,15 @@ import { getUnderlyingMeta } from '../../config/assetTaxonomy'
 import { underlyingSymbolOf } from './prices'
 
 // A native instance on its underlying's canonical mainnet is "at home" —
-// it renders without a network badge (FR-026).
+// it renders without a network badge (FR-026). Non-EVM homes (spec 061:
+// native BTC on 'bitcoin') match via the string `homeNetwork` id.
 export function isHomeInstance(asset) {
   const meta = getUnderlyingMeta(underlyingSymbolOf(asset))
-  return asset.kind === 'native' && meta.homeChainId === asset.chainId
+  return (
+    asset.kind === 'native' &&
+    (meta.homeChainId === asset.chainId ||
+      (meta.homeNetwork != null && meta.homeNetwork === asset.chainId))
+  )
 }
 
 // Member-facing form label for an instance ("Native" / "Wrapped (WETH)").

@@ -15,6 +15,9 @@ import usePortfolio from '../../hooks/usePortfolio'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
 import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
+import { getBitcoinNetwork } from '../../config/bitcoinNetworks'
+import BitcoinSendPanel from './BitcoinSendPanel'
 
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 const toNum = (v) => (v == null || v === '' ? null : Number(v))
@@ -43,6 +46,10 @@ export default function TransferForm({ onSent }) {
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
+  // Bitcoin (spec 061): a parallel, non-EVM send pipeline. The asset row only
+  // appears when the wallet is actually usable (ready, unlocked) — the
+  // receive/portfolio surfaces own the unlock journey, honest-state style.
+  const btc = useBitcoinWallet()
 
   const [selectedKey, setSelectedKey] = useState(null)
   const [toRaw, setToRaw] = useState('')
@@ -100,6 +107,23 @@ export default function TransferForm({ onSent }) {
       })
     }
 
+    // Native Bitcoin — personal wallet only (custody vaults are EVM Safes and
+    // can never hold BTC). Balance is the SPENDABLE amount: what a send can
+    // actually move (protected/pending value is disclosed in the panel).
+    if (!isVault && btc.status === 'ready') {
+      put({
+        key: 'bitcoin:native',
+        chainId: btc.networkId,
+        kind: 'btc-native',
+        address: null,
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        decimals: 8,
+        networkName: getBitcoinNetwork(btc.networkId)?.name || 'Bitcoin',
+        balance: (btc.balances.spendableSats ?? 0) / 1e8,
+      })
+    }
+
     const source = isVault ? vaultAssets.holdings : portfolio.holdings
     for (const h of source || []) {
       if (h.asset.kind !== 'native' && h.asset.kind !== 'erc20') continue // no NFTs in a value transfer
@@ -124,7 +148,7 @@ export default function TransferForm({ onSent }) {
       if (ac !== bc) return ac - bc
       return (b.balance ?? 0) - (a.balance ?? 0)
     })
-  }, [isVault, vaultAssets.holdings, portfolio.holdings, tokens, connectedChainId, balanceOf, isConnectedStableAddr])
+  }, [isVault, vaultAssets.holdings, portfolio.holdings, tokens, connectedChainId, balanceOf, isConnectedStableAddr, btc.status, btc.networkId, btc.balances.spendableSats])
 
   // Default to the connected chain's stablecoin, then its native coin, then whatever's first.
   const defaultKey = useMemo(() => {
@@ -140,8 +164,15 @@ export default function TransferForm({ onSent }) {
   const activeKey = selectedKey && assetOptions.some((o) => o.key === selectedKey) ? selectedKey : defaultKey
   const selectedAsset = assetOptions.find((o) => o.key === activeKey) || null
 
+  const isBitcoinAsset = selectedAsset?.kind === 'btc-native'
   const onConnectedChain = selectedAsset && Number(selectedAsset.chainId) === connectedChainId
-  const gasless = selectedAsset ? quoteGaslessForAsset(selectedAsset) : false
+  // Bitcoin is never gasless (FR-015) — both the badge and the dropdown's
+  // per-option marker must say so, whatever the EVM quote would claim.
+  const gaslessForOption = useCallback(
+    (opt) => (opt?.kind === 'btc-native' ? false : quoteGaslessForAsset(opt)),
+    [quoteGaslessForAsset],
+  )
+  const gasless = selectedAsset ? gaslessForOption(selectedAsset) : false
   const bal = selectedAsset?.balance ?? null
   const symbol = selectedAsset?.symbol || ''
 
@@ -275,7 +306,7 @@ export default function TransferForm({ onSent }) {
           options={assetOptions}
           value={activeKey}
           onChange={handleSelectAsset}
-          isGasless={quoteGaslessForAsset}
+          isGasless={gaslessForOption}
           disabled={busy}
         />
         {gasless ? (
@@ -285,7 +316,13 @@ export default function TransferForm({ onSent }) {
         )}
       </div>
 
-      {!previewing ? (
+      {isBitcoinAsset ? (
+        <BitcoinSendPanel
+          btc={btc}
+          usdPerBtc={portfolio.priceMap?.get('BTC')?.usd ?? null}
+          onSent={onSent}
+        />
+      ) : !previewing ? (
         <>
           {/* From — connected wallet or a Protect vault */}
           <div className="pt-field">

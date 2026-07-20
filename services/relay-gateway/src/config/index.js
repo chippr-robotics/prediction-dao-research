@@ -62,6 +62,22 @@
  *                              unset/unreachable; the on-chain rate is the source of truth.
  *   POLYMARKET_BUILDER_MAKER_FEE_BPS  builder fee on maker orders (default 0; hard cap 50 — fails boot if over).
  *                              Fallback since spec 060, same as the taker fee.
+ *   BTC_ENABLED                'true' enables the /v1/bitcoin/* proxy (spec 061). Default false =>
+ *                              routes answer 503 bitcoin_disabled and the SPA soft-fails the capability
+ *   BTC_ESPLORA_URL            Esplora-compatible mainnet upstream (default https://mempool.space/api;
+ *                              swappable to blockstream.info or self-hosted electrs)
+ *   BTC_ESPLORA_TESTNET_URL    Esplora-compatible testnet4 upstream (default https://mempool.space/testnet4/api)
+ *   BTC_STAMPS_URL             stampchain.io-compatible Stamps indexer base. Unset => the stamps route
+ *                              answers degraded:true and the client fail-safes (protects unverified coins)
+ *   BTC_MAX_FEE_RATE           sat/vB clamp on fee responses (default 500; must be >= 1 when enabled)
+ *   BTC_TIMEOUT_MS             upstream request timeout (default 5000)
+ *   BTC_RETRIES                upstream retries on 5xx/transport for reads (default 1; broadcast never retries)
+ *   BTC_QUOTA_PER_IP           reads/min per caller IP (default 60 — polymarket parity)
+ *   BTC_QUOTA_GLOBAL           reads/min across all callers (default 300 — polymarket parity)
+ *   BTC_QUOTA_WINDOW_MS        quota window (default 60000)
+ *   BTC_WRITE_QUOTA_PER_IP     broadcasts/min per caller IP (default 20 — stricter than reads)
+ *   BTC_WRITE_QUOTA_GLOBAL     broadcasts/min across all callers (default 100)
+ *   BTC_KILLSWITCH             'true' => all /v1/bitcoin/* routes answer 503 bitcoin_killed (ops kill)
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -376,6 +392,52 @@ export function loadConfig(env = process.env, opts = {}) {
         return bps
       })(),
     },
+    // Bitcoin proxy (spec 061): optional like the OpenSea/Polymarket proxies — disabled means the
+    // /v1/bitcoin/* routes 503 fail-closed (bitcoin_disabled) and the SPA soft-fails the capability;
+    // boot is unaffected. Fail-loud validation applies only when the module is ENABLED: a malformed
+    // upstream URL or a nonsensical fee clamp must stop the boot rather than serve garbage
+    // (same philosophy as the polymarket fee-cap boot check).
+    bitcoin: (() => {
+      const enabled = opt(env, 'BTC_ENABLED', 'false').toLowerCase() === 'true'
+      const esploraUrl = opt(env, 'BTC_ESPLORA_URL', 'https://mempool.space/api')
+      const esploraTestnetUrl = opt(env, 'BTC_ESPLORA_TESTNET_URL', 'https://mempool.space/testnet4/api')
+      const stampsUrl = opt(env, 'BTC_STAMPS_URL', null)
+      const maxFeeRate = int(env, 'BTC_MAX_FEE_RATE', 500)
+      if (enabled) {
+        const urls = [
+          ['BTC_ESPLORA_URL', esploraUrl],
+          ['BTC_ESPLORA_TESTNET_URL', esploraTestnetUrl],
+          ...(stampsUrl ? [['BTC_STAMPS_URL', stampsUrl]] : []),
+        ]
+        for (const [name, url] of urls) {
+          let ok = false
+          try {
+            ok = ['http:', 'https:'].includes(new URL(url).protocol)
+          } catch {
+            ok = false
+          }
+          if (!ok) throw new Error(`[relay-gateway] ${name}=${url} is not a valid http(s) URL`)
+        }
+        // Clamp sanity (contract: min >= 1, max >= min; the lower bound is the fixed 1 sat/vB floor).
+        if (maxFeeRate < 1) throw new Error(`[relay-gateway] BTC_MAX_FEE_RATE=${maxFeeRate} must be >= 1 sat/vB`)
+      }
+      return {
+        enabled,
+        esploraUrl,
+        esploraTestnetUrl,
+        stampsUrl,
+        maxFeeRate,
+        timeoutMs: int(env, 'BTC_TIMEOUT_MS', 5000),
+        retries: int(env, 'BTC_RETRIES', 1),
+        quotaPerIp: int(env, 'BTC_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'BTC_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'BTC_QUOTA_WINDOW_MS', 60_000),
+        // Broadcast: a separate, tighter per-IP quota (contract: stricter than reads).
+        writeQuotaPerIp: int(env, 'BTC_WRITE_QUOTA_PER_IP', 20),
+        writeQuotaGlobal: int(env, 'BTC_WRITE_QUOTA_GLOBAL', 100),
+        killSwitch: opt(env, 'BTC_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env
     // takerFeeBps/makerFeeBps above become the FALLBACK when the router is unset or unreachable.
     // The address defaults to the deployment record's feeRouter (same pinning philosophy as

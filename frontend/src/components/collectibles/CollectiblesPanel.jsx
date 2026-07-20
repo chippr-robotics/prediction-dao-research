@@ -3,6 +3,7 @@ import { useWallet } from '../../hooks/useWalletManagement'
 import { useCollectibles } from '../../hooks/useCollectibles'
 import EmptyState from '../account/EmptyState'
 import CollectibleDetailSheet from './CollectibleDetailSheet'
+import BitcoinStampsSection from './BitcoinStampsSection'
 import './CollectiblesPanel.css'
 
 const OPENSEA_EXPLORE_URL = 'https://opensea.io'
@@ -129,6 +130,11 @@ export default function CollectiblesPanel() {
           )}
         </>
       )}
+
+      {/* Bitcoin Stamps (spec 061, `collect: 'stamps-only'`): independent of
+          the OpenSea-backed grid above — it renders (or hides) on its own
+          bitcoin ledger + gateway state, with no OpenSea integration. */}
+      <BitcoinStampsSection />
 
       <CollectibleDetailSheet
         key={openItem ? `${openItem.contract}:${openItem.identifier}` : 'closed'}

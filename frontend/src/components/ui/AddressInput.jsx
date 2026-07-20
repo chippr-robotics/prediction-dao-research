@@ -5,7 +5,17 @@ import { formatCallsign, isValidCallsign, normalizeCallsign } from '../../lib/ca
 import { CallsignStatus } from '../../lib/callsigns/resolveCallsign'
 import ReportCallsignButton from '../callsigns/ReportCallsignButton'
 import AddressInputBookAddon from './AddressInputBookAddon'
+import { classifyAddress } from '../../lib/bitcoin/addresses'
 import styles from './AddressInput.module.css'
+
+// Member-facing labels for recognized Bitcoin destination types (spec 061).
+const BTC_TYPE_LABEL = {
+  p2pkh: 'Legacy',
+  p2sh: 'Script (P2SH)',
+  p2wpkh: 'SegWit',
+  p2wsh: 'SegWit script',
+  p2tr: 'Taproot',
+}
 
 /**
  * AddressInput Component
@@ -31,6 +41,11 @@ import styles from './AddressInput.module.css'
  * @param {string} props.errorMessage - External error message to display
  * @param {string} props.ariaDescribedBy - ID of description element
  * @param {boolean} props.showResolvedAddress - Show resolved address preview
+ * @param {string} props.bitcoinNetworkId - Bitcoin mode (spec 061): validate as a
+ *   Bitcoin destination for this network id ('bitcoin' | 'bitcoin-testnet')
+ *   instead of the EVM/ENS/callsign stack. Accepts every standard type
+ *   (legacy, P2SH, bech32, bech32m/taproot) with per-reason rejection
+ *   messages; the recognized type is surfaced as a tag.
  */
 const AddressInput = forwardRef(({
   value = '',
@@ -48,8 +63,16 @@ const AddressInput = forwardRef(({
   label,
   enableAddressBook = false,
   chainId,
+  bitcoinNetworkId = null,
   ...props
 }, ref) => {
+  // Bitcoin mode (spec 061): pure synchronous validation via classifyAddress.
+  // The EVM resolver hooks below still mount (rules of hooks) but are fed
+  // empty input so they stay inert.
+  const isBitcoinMode = Boolean(bitcoinNetworkId)
+  const btcTrimmed = isBitcoinMode ? (value || '').trim() : ''
+  const btc = isBitcoinMode && btcTrimmed ? classifyAddress(btcTrimmed, bitcoinNetworkId) : null
+
   // Use ENS resolution hook
   const {
     resolvedAddress,
@@ -57,20 +80,22 @@ const AddressInput = forwardRef(({
     error: resolutionError,
     isEns,
     isAddress
-  } = useEnsResolution(value)
+  } = useEnsResolution(isBitcoinMode ? '' : value)
 
   // Use reverse lookup to show ENS name for addresses
   const {
     ensName,
     isLoading: isLookingUp
-  } = useEnsReverseLookup(isAddress ? value?.trim() : null)
+  } = useEnsReverseLookup(!isBitcoinMode && isAddress ? value?.trim() : null)
 
   // Callsign forward-resolution (spec 054). Additive: only engages for callsign-shaped input that is
   // neither an address nor an ENS name. A resolved ACTIVE callsign becomes the effective resolved address;
   // any other status is surfaced as a non-committable message (FR-011/022). Registry unreachable → soft
   // no-op, raw-address entry unaffected (FR-013).
-  const callsignRes = useCallsignResolution(value, { chainId })
-  const effectiveResolvedAddress = (callsignRes.isCallsign && callsignRes.address) ? callsignRes.address : resolvedAddress
+  const callsignRes = useCallsignResolution(isBitcoinMode ? '' : value, { chainId })
+  const effectiveResolvedAddress = isBitcoinMode
+    ? (btc?.valid ? btcTrimmed : null)
+    : ((callsignRes.isCallsign && callsignRes.address) ? callsignRes.address : resolvedAddress)
 
   // Notify parent of resolved address changes (callsign-resolved address included)
   useEffect(() => {
@@ -93,9 +118,10 @@ const AddressInput = forwardRef(({
 
   // Determine error state. A callsign-shaped input suppresses the ENS "invalid address/name" error and
   // instead surfaces the callsign's own status ("No such callsign", "address changing", etc.) when non-ACTIVE.
-  const callsignError = callsignRes.isCallsign && !callsignRes.isLoading && !!callsignRes.message && callsignRes.status !== CallsignStatus.ACTIVE
-  const hasError = externalError || callsignError || (value && !isLoading && !callsignRes.isCallsign && resolutionError)
-  const displayError = externalErrorMessage || (callsignError ? callsignRes.message : (!callsignRes.isCallsign ? resolutionError : undefined))
+  const callsignError = !isBitcoinMode && callsignRes.isCallsign && !callsignRes.isLoading && !!callsignRes.message && callsignRes.status !== CallsignStatus.ACTIVE
+  const bitcoinError = isBitcoinMode && Boolean(btc) && !btc.valid
+  const hasError = externalError || bitcoinError || callsignError || (!isBitcoinMode && value && !isLoading && !callsignRes.isCallsign && resolutionError)
+  const displayError = externalErrorMessage || (bitcoinError ? btc.message : (callsignError ? callsignRes.message : (!callsignRes.isCallsign ? resolutionError : undefined)))
 
   // Determine status indicator
   const showLoading = isLoading || isLookingUp || callsignRes.isLoading
@@ -183,6 +209,11 @@ const AddressInput = forwardRef(({
           )}
           {showEnsLabel && !showLoading && (
             <span className={styles.ensLabel} role="img" aria-label="ENS name detected">ENS</span>
+          )}
+          {isBitcoinMode && btc?.valid && (
+            <span className={styles.ensLabel} role="img" aria-label={`Bitcoin ${BTC_TYPE_LABEL[btc.type]} address`}>
+              {BTC_TYPE_LABEL[btc.type]}
+            </span>
           )}
         </div>
       </div>
