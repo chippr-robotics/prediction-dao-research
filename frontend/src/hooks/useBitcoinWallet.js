@@ -62,7 +62,7 @@ const EMPTY_VIEW = Object.freeze({
   stale: false,
   stampsDegraded: false,
   activity: [],
-  current: null, // { address, type, index } shown on the receive surface
+  shownAddress: null, // { address, type, index } shown on the receive surface
   preferredType: 'segwit',
   gatewayOff: null,
   feeQuote: null, // { rates, tipHeight, fetchedAt }
@@ -409,7 +409,7 @@ export function useBitcoinWallet(deps = {}) {
     const t = type ?? getSnapshot().preferredType
     const entry = wallet.nextReceiveAddress(t)
     internals.sessionCurrent.set(`${internals.networkId}:${t}`, entry)
-    setView({ current: entry })
+    setView({ shownAddress: entry })
     return entry
   }, [])
 
@@ -424,7 +424,7 @@ export function useBitcoinWallet(deps = {}) {
     const key = `${internals.networkId}:${type}`
     const entry = internals.sessionCurrent.get(key) ?? wallet.nextReceiveAddress(type)
     internals.sessionCurrent.set(key, entry)
-    setView({ current: entry })
+    setView({ shownAddress: entry })
     return entry
   }, [])
 
@@ -550,8 +550,10 @@ export function useBitcoinWallet(deps = {}) {
       coins: snapshot.coins,
       activity: snapshot.activity,
       receive: {
-        current: snapshot.current,
-        uri: snapshot.current ? formatBip21(snapshot.current.address) : null,
+        // Public API name is `current`; the snapshot field avoids the name
+        // so ref-inference (react-hooks/preserve-manual-memoization) stays happy.
+        current: snapshot.shownAddress,
+        uri: snapshot.shownAddress ? formatBip21(snapshot.shownAddress.address) : null,
         preferredType: snapshot.preferredType,
         setPreferredType,
         nextReceiveAddress,
