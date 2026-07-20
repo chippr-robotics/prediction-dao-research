@@ -1,82 +1,15 @@
-/* Guided passkey-recovery wizard (spec 045, US6). The sheet mirrors the
-   connect surface (ConnectModal.css): centered card on desktop, bottom sheet on
-   mobile, and the same mobile bottom-nav clearance fixed in #938 (backdrop
-   z-index 1500 + safe-area padding) so the actions never hide behind the fixed
-   icon nav.
+/* Guided passkey-recovery wizard (spec 045, US6). The sheet shell lives in the
+   shared ActionSheet (ActionSheet.css); this file styles only the recovery
+   entry card and the per-step content that fills the sheet.
 
    Colors use the FairWins theme tokens from src/theme.css (--text-primary,
-   --text-secondary, --surface-color, --border-color, --warning-color,
-   --danger-color, --brand-primary) so text stays high-contrast in BOTH light
-   and dark themes. Fallbacks are the light-mode values (light is the default
-   theme) — never dark literals, which is what made light-theme text and chips
-   unreadable before. */
+   --text-secondary, --border-color, --warning-color, --danger-color,
+   --brand-primary) so text stays high-contrast in BOTH light and dark themes.
+   Fallbacks are the light-mode values (light is the default theme) — never dark
+   literals, which is what made light-theme text and chips unreadable before. */
 
 .recover-account-panel__start {
   margin-top: 8px;
-}
-
-/* --- Sheet shell --- */
-.recover-sheet__backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1500;
-  padding: 16px;
-}
-
-.recover-sheet {
-  width: 100%;
-  max-width: 460px;
-  max-height: 85vh;
-  overflow-y: auto;
-  background: var(--surface-color, #ffffff);
-  color: var(--text-primary, #1f2933);
-  border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
-  outline: none;
-}
-
-.recover-sheet__handle {
-  display: none;
-}
-
-.recover-sheet__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border-color, #e3e7eb);
-}
-
-.recover-sheet__header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-primary, #1f2933);
-}
-
-.recover-sheet__close {
-  background: none;
-  border: none;
-  color: var(--text-secondary, #5a6772);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-
-.recover-sheet__close:hover,
-.recover-sheet__close:focus-visible {
-  color: var(--text-primary, #1f2933);
-  background: var(--bg-primary, #f7f9fa);
-}
-
-.recover-sheet__body {
-  padding: 16px 20px 20px;
 }
 
 /* --- Step content --- */
@@ -226,30 +159,4 @@
 
 .recover-step__actions .btn {
   flex: 1;
-}
-
-/* Bottom sheet on mobile, like the connect surface. */
-@media (max-width: 640px) {
-  .recover-sheet__backdrop {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .recover-sheet {
-    max-width: 100%;
-    max-height: calc(85vh - 64px);
-    border-radius: 20px 20px 0 0;
-    /* Reserve room so the last actions clear the fixed icon nav (z-index 1200)
-       and stay visible/tappable (#938). */
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .recover-sheet__handle {
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 999px;
-    background: var(--border-color, #e3e7eb);
-    margin: 8px auto 0;
-  }
 }

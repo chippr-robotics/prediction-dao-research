@@ -26,6 +26,7 @@ import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+import ActionSheet from './ActionSheet'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
@@ -40,6 +41,8 @@ function ControllersPanel({ deps = {} }) {
   const [linkAddress, setLinkAddress] = useState('')
   const [linkAddressResolved, setLinkAddressResolved] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
+  // Informed-consent bottom sheet before a full-controller action: null | 'add' | 'link'.
+  const [sheet, setSheet] = useState(null)
 
   const applyLinkAddress = useCallback((addr) => {
     setLinkAddress(addr)
@@ -52,6 +55,8 @@ function ControllersPanel({ deps = {} }) {
     setScanOpen(false)
   }, [applyLinkAddress])
 
+  // Returns true only when the action fully succeeded, so a confirmation sheet
+  // can close on success and stay open (for a retry) on error/cancel.
   const run = useCallback(
     async (fn) => {
       setBusy(true)
@@ -59,9 +64,11 @@ function ControllersPanel({ deps = {} }) {
       try {
         await fn()
         await account.refresh()
+        return true
       } catch (e) {
         if (e?.name === 'CeremonyCancelled') setNotice(null) // clean abort
         else setNotice({ kind: 'error', text: e.message })
+        return false
       } finally {
         setBusy(false)
       }
@@ -139,6 +146,18 @@ function ControllersPanel({ deps = {} }) {
     [run, account.controllerCount, sendCalls, address, deps]
   )
 
+  // Confirm handlers for the informed-consent sheets: run the action, and close
+  // the sheet only if it fully succeeded (errors stay in the sheet for a retry).
+  const confirmAddPasskey = useCallback(async () => {
+    if (await addPasskey()) setSheet(null)
+  }, [addPasskey])
+
+  const confirmLinkWallet = useCallback(async () => {
+    if (await linkWallet()) setSheet(null)
+  }, [linkWallet])
+
+  const linkTarget = (linkAddressResolved || linkAddress).trim()
+
   if (!account.isPasskeySession) return null
 
   return (
@@ -194,7 +213,15 @@ function ControllersPanel({ deps = {} }) {
       </ul>
 
       <div className="controllers-panel__actions">
-        <button type="button" className="btn" disabled={busy || !account.deployed} onClick={addPasskey}>
+        <button
+          type="button"
+          className="btn"
+          disabled={busy || !account.deployed}
+          onClick={() => {
+            setNotice(null)
+            setSheet('add')
+          }}
+        >
           Add a passkey
         </button>
         <div className="controllers-panel__link">
@@ -239,20 +266,94 @@ function ControllersPanel({ deps = {} }) {
           <button
             type="button"
             className="btn"
-            disabled={busy || !account.deployed || !ADDRESS_RE.test((linkAddressResolved || linkAddress).trim())}
-            onClick={linkWallet}
+            disabled={busy || !account.deployed || !ADDRESS_RE.test(linkTarget)}
+            onClick={() => {
+              setNotice(null)
+              setSheet('link')
+            }}
           >
             Link wallet
           </button>
         </div>
       </div>
 
-      {notice && (
+      {/* Panel-level notice only when no sheet is up (the sheet shows its own). */}
+      {!sheet && notice && (
         <p role={notice.kind === 'error' ? 'alert' : 'status'} className={`controllers-panel__${notice.kind}`}>
           {notice.text}
         </p>
       )}
       {account.error && <p role="alert">{account.error}</p>}
+
+      {/* Add-a-passkey: full-controller consequences before the ceremony. */}
+      <ActionSheet
+        open={sheet === 'add'}
+        onClose={() => setSheet(null)}
+        title="Add a passkey"
+        closeDisabled={busy}
+      >
+        <p className="action-sheet__text">
+          A passkey is a second key for this account, stored on this device and unlocked with Face ID,
+          Touch ID, or your device PIN.
+        </p>
+        <p className="action-sheet__warn">
+          It becomes a <strong>full controller</strong> — like your current passkey, it can approve
+          actions, move funds, and add or remove controllers. Keeping a second key is the recommended way
+          to make sure losing one device never locks you out.
+        </p>
+        <ol className="action-sheet__list">
+          <li>Your device prompts you to create the passkey.</li>
+          <li>One on-chain transaction authorizes it on the account.</li>
+        </ol>
+        {busy && <p className="action-sheet__progress">Working… confirm the prompts on your device.</p>}
+        {notice && (
+          <p role="alert" className={`action-sheet__notice action-sheet__notice--${notice.kind}`}>
+            {notice.text}
+          </p>
+        )}
+        <div className="action-sheet__actions">
+          <button type="button" className="btn" onClick={() => setSheet(null)} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={confirmAddPasskey} disabled={busy}>
+            {busy ? 'Adding…' : 'Create passkey'}
+          </button>
+        </div>
+      </ActionSheet>
+
+      {/* Link-wallet: linking grants FULL control — say so plainly before the act (FR-011). */}
+      <ActionSheet
+        open={sheet === 'link'}
+        onClose={() => setSheet(null)}
+        title="Link this wallet?"
+        closeDisabled={busy}
+      >
+        <p className="action-sheet__text">You&apos;re about to link this wallet as a controller:</p>
+        <code className="action-sheet__addr">{linkTarget}</code>
+        <p className="action-sheet__warn">
+          A linked wallet becomes a <strong>full controller</strong> of your account. It can move your
+          funds, add or remove controllers, and recover the account if you lose your passkeys. Only link a
+          wallet you exclusively control.
+        </p>
+        <ol className="action-sheet__list">
+          <li>We screen the address first (linking is blocked if screening flags it or can&apos;t run).</li>
+          <li>One on-chain transaction links it to your account.</li>
+        </ol>
+        {busy && <p className="action-sheet__progress">Screening and linking… confirm any prompts.</p>}
+        {notice && (
+          <p role="alert" className={`action-sheet__notice action-sheet__notice--${notice.kind}`}>
+            {notice.text}
+          </p>
+        )}
+        <div className="action-sheet__actions">
+          <button type="button" className="btn" onClick={() => setSheet(null)} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={confirmLinkWallet} disabled={busy}>
+            {busy ? 'Linking…' : 'Link wallet'}
+          </button>
+        </div>
+      </ActionSheet>
     </section>
   )
 }

@@ -5,7 +5,7 @@
  * fail-closed), remove with last-controller refusal, counterfactual gating.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 let walletState
 vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: () => walletState }))
@@ -23,6 +23,15 @@ import ControllersPanel from '../ControllersPanel'
 
 const ACCOUNT = '0x00000000000000000000000000000000000A11CE'
 const WALLET = '0x' + 'c'.repeat(40)
+
+// Open the link-wallet consent sheet and click its confirm button. The panel
+// button and the sheet's confirm button share the label "Link wallet", so the
+// confirm is scoped to the dialog.
+function confirmLink() {
+  fireEvent.click(screen.getByRole('button', { name: /link wallet/i })) // panel → opens sheet
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: /link wallet/i })) // confirm
+}
 
 function passkeyRow(i, extra = {}) {
   return {
@@ -69,11 +78,18 @@ describe('ControllersPanel', () => {
     expect(screen.getByRole('button', { name: /remove/i })).toBeDisabled()
   })
 
-  it('links a CLEAR wallet through one sendCalls self-call (FR-019)', async () => {
+  it('shows an informed-consent sheet before linking, then links a CLEAR wallet through one sendCalls self-call (FR-019)', async () => {
     const screenController = vi.fn(async () => ({ clear: true, available: true }))
     render(<ControllersPanel deps={{ screenController }} />)
     fireEvent.change(screen.getByLabelText(/wallet address to link/i), { target: { value: WALLET } })
+    // Opening the sheet alone must NOT act — the member has to confirm first.
     fireEvent.click(screen.getByRole('button', { name: /link wallet/i }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent(/full controller/i)
+    expect(dialog).toHaveTextContent(WALLET)
+    expect(screenController).not.toHaveBeenCalled()
+    // Confirm inside the sheet performs the action.
+    fireEvent.click(within(dialog).getByRole('button', { name: /link wallet/i }))
     await waitFor(() => expect(walletState.sendCalls).toHaveBeenCalledTimes(1))
     expect(screenController).toHaveBeenCalledWith(WALLET, walletState.provider)
     expect(walletState.sendCalls.mock.calls[0][0][0].target).toBe(ACCOUNT) // self-call
@@ -83,7 +99,7 @@ describe('ControllersPanel', () => {
     const screenController = vi.fn(async () => ({ clear: false, available: true }))
     render(<ControllersPanel deps={{ screenController }} />)
     fireEvent.change(screen.getByLabelText(/wallet address to link/i), { target: { value: WALLET } })
-    fireEvent.click(screen.getByRole('button', { name: /link wallet/i }))
+    confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/flagged/i))
     expect(walletState.sendCalls).not.toHaveBeenCalled()
   })
@@ -96,7 +112,7 @@ describe('ControllersPanel', () => {
     }
     render(<ControllersPanel deps={{ screenController }} />)
     fireEvent.change(screen.getByLabelText(/wallet address to link/i), { target: { value: WALLET } })
-    fireEvent.click(screen.getByRole('button', { name: /link wallet/i }))
+    confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/already a controller/i))
     expect(screenController).not.toHaveBeenCalled()
     expect(walletState.sendCalls).not.toHaveBeenCalled()
@@ -106,12 +122,12 @@ describe('ControllersPanel', () => {
     const screenController = vi.fn(async () => ({ clear: false, available: false }))
     render(<ControllersPanel deps={{ screenController }} />)
     fireEvent.change(screen.getByLabelText(/wallet address to link/i), { target: { value: WALLET } })
-    fireEvent.click(screen.getByRole('button', { name: /link wallet/i }))
+    confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/fail-closed/i))
     expect(walletState.sendCalls).not.toHaveBeenCalled()
   })
 
-  it('adds a passkey: ceremony → ownerAdd self-call → refresh (FR-019)', async () => {
+  it('shows an informed-consent sheet before adding a passkey, then runs the ceremony → ownerAdd self-call → refresh (FR-019)', async () => {
     const createCredential = vi.fn(async () => ({
       credentialId: 'cred-new',
       publicKey: { x: '0x' + '3'.repeat(64), y: '0x' + '4'.repeat(64) },
@@ -119,6 +135,10 @@ describe('ControllersPanel', () => {
     }))
     render(<ControllersPanel deps={{ createCredential }} />)
     fireEvent.click(screen.getByRole('button', { name: /add a passkey/i }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent(/full controller/i)
+    expect(createCredential).not.toHaveBeenCalled() // opening the sheet doesn't act
+    fireEvent.click(within(dialog).getByRole('button', { name: /create passkey/i }))
     await waitFor(() => expect(walletState.sendCalls).toHaveBeenCalledTimes(1))
     expect(createCredential).toHaveBeenCalled()
     expect(accountState.refresh).toHaveBeenCalled()

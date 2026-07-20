@@ -1,0 +1,185 @@
+/* Shared informative bottom sheet for account-security actions (specs 041/045).
+   Mirrors the connect surface (ConnectModal.css): centered card on desktop,
+   bottom sheet on mobile, with the mobile bottom-nav clearance fixed in #938
+   (backdrop z-index 1500 + safe-area padding) so actions never hide behind the
+   fixed icon nav.
+
+   Colors use the FairWins theme tokens from src/theme.css so text stays
+   high-contrast in BOTH light and dark themes. Fallbacks are the light-mode
+   values (light is the default theme) — never dark literals. */
+
+/* --- Sheet shell --- */
+.action-sheet__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  padding: 16px;
+}
+
+.action-sheet {
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--surface-color, #ffffff);
+  color: var(--text-primary, #1f2933);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
+  outline: none;
+}
+
+.action-sheet__handle {
+  display: none;
+}
+
+.action-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-color, #e3e7eb);
+}
+
+.action-sheet__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary, #1f2933);
+}
+
+.action-sheet__close {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #5a6772);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.action-sheet__close:hover:not(:disabled),
+.action-sheet__close:focus-visible {
+  color: var(--text-primary, #1f2933);
+  background: var(--bg-primary, #f7f9fa);
+}
+
+.action-sheet__close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-sheet__body {
+  padding: 16px 20px 20px;
+}
+
+/* --- Shared content helpers --- */
+.action-sheet__text {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.action-sheet__list {
+  margin: 0 0 14px;
+  padding-left: 1.2rem;
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.action-sheet__list li {
+  margin-bottom: 4px;
+}
+
+.action-sheet__warn {
+  border: 1px solid var(--warning-color, #f59e0b);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 14%, transparent);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.action-sheet__addr {
+  display: block;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.85rem;
+  color: var(--text-primary, #1f2933);
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.action-sheet__progress {
+  color: var(--brand-primary, #36b37e);
+  font-size: 0.88rem;
+  margin: 0 0 12px;
+}
+
+.action-sheet__notice {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+.action-sheet__notice--error {
+  border: 1px solid var(--danger-color, #dc2626);
+  color: var(--danger-color, #dc2626);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+}
+
+.action-sheet__notice--info {
+  border: 1px solid var(--accent-color, #4c9aff);
+  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--accent-color, #4c9aff) 10%, transparent);
+}
+
+.action-sheet__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.action-sheet__actions .btn {
+  flex: 1;
+}
+
+/* Bottom sheet on mobile, like the connect surface. */
+@media (max-width: 640px) {
+  .action-sheet__backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .action-sheet {
+    max-width: 100%;
+    max-height: calc(85vh - 64px);
+    border-radius: 20px 20px 0 0;
+    /* Reserve room so the last actions clear the fixed icon nav (z-index 1200)
+       and stay visible/tappable (#938). */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .action-sheet__handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-color, #e3e7eb);
+    margin: 8px auto 0;
+  }
+}
