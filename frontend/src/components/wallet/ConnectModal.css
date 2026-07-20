@@ -227,11 +227,20 @@
 @media (max-width: 640px) {
   .connect-modal__backdrop {
     align-items: flex-end;
+    /* Sit above the fixed bottom icon nav (z-index 1200) and nav drawer
+       (1401); otherwise the nav covers the bottom of the sheet and hides the
+       Continue/Back actions (e.g. the passkey explainer step), leaving users
+       unable to proceed. */
+    z-index: 1500;
   }
 
   .connect-modal {
     max-width: 100%;
+    max-height: calc(85vh - 64px);
     border-radius: 20px 20px 0 0;
+    /* Reserve room at the bottom so the last actions clear the icon nav and
+       stay visible/tappable. */
+    padding-bottom: calc(0.75rem + 64px + env(safe-area-inset-bottom, 0px));
   }
 }
 
