@@ -13,6 +13,7 @@ import {
   listClientRecordsAllChains,
   mergeClientRecordsAllChains,
 } from '../../data/ledger/ledgerClientStore'
+import { readVaultEnvelope, writeVaultEnvelope, hasVault } from '../openChallenge/codeVault'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -99,6 +100,30 @@ export const syncedObjects = [
       const fresh = (incoming || []).filter((r) => r?.entryId && !have.has(r.entryId))
       return { value: [...(current || []), ...fresh], conflicts: [] }
     },
+  },
+  {
+    // Spec 024/037 follow-up — the open-challenge recovery-code vault. Passkeys sync across
+    // devices but the vault is device-local localStorage, so a new device / reinstall lost every
+    // saved four-word code (the exact "passkey users can't recover their codes" gap). Riding this
+    // channel restores them, because the vault's at-rest envelope is encrypted under the account's
+    // key material and the SAME account re-derives that key on any device (passkey master seed or
+    // wallet signature). The value put in the bundle is the OPAQUE ciphertext envelope — the codes
+    // never enter the backup channel in cleartext, and this stays consistent whether or not the
+    // member has ever run a manual backup (auto-backup carries it too).
+    key: 'openChallengeCodes',
+    label: 'Recovery codes',
+    networkScoped: false, // the envelope is opaque ciphertext; code entries are not identity-keyed by chain
+    load: (account) => readVaultEnvelope(account),
+    // Ciphertext envelopes from the same account share a key but use per-write nonces over
+    // different entry sets, so they can't be unioned without the (async, ceremony-gated) vault
+    // key that this synchronous path deliberately never holds. Both modes therefore RESTORE the
+    // backed-up envelope only when this device has no local vault, and NEVER clobber existing
+    // local codes — recovery is purely additive from the member's perspective.
+    apply: (account, value, _mode) => {
+      if (value && !hasVault(account)) writeVaultEnvelope(account, value)
+      return { conflicts: [] }
+    },
+    merge: (current, incoming) => ({ value: current || incoming || null, conflicts: [] }),
   },
 ]
 

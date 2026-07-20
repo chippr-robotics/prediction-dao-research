@@ -39,6 +39,7 @@ import {
   lookupPublicKey,
   hasRegisteredKey,
   ensureKeyRegistered,
+  registerEncryptionKey,
   buildRegisterKeyCalls,
   clearKeyCache
 } from '../utils/keyRegistryService.js'
@@ -341,6 +342,44 @@ export function useEncryption() {
   }, [signature, cachedVersion, keyPairs, isPasskey, applyKeyPairs, initializeKeys])
 
   /**
+   * Register this account's X25519 encryption key on-chain, AWAITING the write and surfacing
+   * real errors (unlike initializeKeys' passkey auto-register, which is deliberately non-blocking
+   * so wager creation isn't delayed and therefore can only warn on failure). This is what the
+   * explicit "Register Encryption Key" control needs: a passkey user must be able to see whether
+   * registration actually landed — and why it didn't — rather than a fire-and-forget that leaves
+   * the status stuck on "Not registered".
+   *
+   * @returns {Promise<{ publicKey: Uint8Array, alreadyRegistered: boolean }>}
+   * @throws when key derivation or the on-chain registration fails (caller surfaces the message)
+   */
+  const registerKeyNow = useCallback(async () => {
+    if (!account || (!signer && !isPasskey)) {
+      throw new Error('Connect your account to register an encryption key.')
+    }
+    const readProvider = signer?.provider || provider
+    const { publicKey } = await ensureInitialized()
+    if (!publicKey) throw new Error('Failed to derive encryption keys.')
+
+    // Idempotent: never re-submit (and never charge a fee / ceremony) for an already-registered key.
+    if (readProvider && (await hasRegisteredKey(account, readProvider))) {
+      return { publicKey, alreadyRegistered: true }
+    }
+
+    if (isPasskey) {
+      if (typeof sendCalls !== 'function') {
+        throw new Error('This account cannot register a key on the current transaction rail.')
+      }
+      const termsHash = getCurrentDocument('terms')?.hash || null
+      // Awaited (not fire-and-forget): a relayer/paymaster outage or an undeployed KeyRegistry
+      // now surfaces to the caller instead of being swallowed as a console warning.
+      await sendCalls(buildRegisterKeyCalls(publicKey, chainId, termsHash))
+    } else {
+      await registerEncryptionKey(signer, publicKey)
+    }
+    return { publicKey, alreadyRegistered: false }
+  }, [account, signer, isPasskey, provider, sendCalls, chainId, ensureInitialized])
+
+  /**
    * Create encrypted market metadata
    * Returns envelope ready for IPFS upload
    * Uses X-Wing (post-quantum) by default for new markets
@@ -627,6 +666,7 @@ export function useEncryption() {
     // Key management
     initializeKeys,
     ensureInitialized,
+    registerKeyNow,
     clearKeys,
 
     // Encryption operations

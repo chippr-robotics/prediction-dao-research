@@ -56,10 +56,12 @@ vi.mock('../utils/legalDocs.js', () => ({
 
 const buildRegisterKeyCalls = vi.fn(() => [{ target: '0xkeyRegistry', data: '0xdead', value: 0n }])
 const hasRegisteredKey = vi.fn(async () => false)
+const registerEncryptionKey = vi.fn(async () => ({ hash: '0x1', status: 'success' }))
 vi.mock('../utils/keyRegistryService.js', () => ({
   lookupPublicKey: vi.fn(async () => null),
   hasRegisteredKey: (...a) => hasRegisteredKey(...a),
   ensureKeyRegistered: vi.fn(async () => false),
+  registerEncryptionKey: (...a) => registerEncryptionKey(...a),
   buildRegisterKeyCalls: (...a) => buildRegisterKeyCalls(...a),
   clearKeyCache: vi.fn(),
 }))
@@ -75,6 +77,42 @@ describe('useEncryption — passkey encrypt/decrypt surface', () => {
     ensurePasskeyEncryptionKeys.mockClear()
     buildRegisterKeyCalls.mockClear()
     hasRegisteredKey.mockClear()
+    hasRegisteredKey.mockResolvedValue(false)
+  })
+
+  it('registerKeyNow awaits the on-chain register through sendCalls and surfaces failures', async () => {
+    const { result } = renderHook(() => useEncryption())
+    // Initialize first and let the non-blocking auto-register settle, so the assertions below
+    // observe registerKeyNow's OWN sendCalls rather than racing initializeKeys' auto-register.
+    await act(async () => { await result.current.ensureInitialized() })
+    await vi.waitFor(() => expect(sendCalls).toHaveBeenCalled())
+    sendCalls.mockClear()
+    buildRegisterKeyCalls.mockClear()
+
+    let out
+    await act(async () => {
+      out = await result.current.registerKeyNow()
+    })
+    expect(buildRegisterKeyCalls).toHaveBeenCalledWith(PASSKEY_KEYS.publicKey, 137, null)
+    expect(sendCalls).toHaveBeenCalledWith([{ target: '0xkeyRegistry', data: '0xdead', value: 0n }])
+    expect(out).toMatchObject({ alreadyRegistered: false })
+
+    // A relayer/paymaster outage now propagates to the caller (was swallowed by the fire-and-forget path).
+    sendCalls.mockRejectedValueOnce(new Error('paymaster unavailable'))
+    await act(async () => {
+      await expect(result.current.registerKeyNow()).rejects.toThrow(/paymaster unavailable/i)
+    })
+  })
+
+  it('registerKeyNow is idempotent — an already-registered key skips the ceremony', async () => {
+    hasRegisteredKey.mockResolvedValue(true)
+    const { result } = renderHook(() => useEncryption())
+    let out
+    await act(async () => {
+      out = await result.current.registerKeyNow()
+    })
+    expect(out).toMatchObject({ alreadyRegistered: true })
+    expect(sendCalls).not.toHaveBeenCalled()
   })
 
   it('derives encryption keys from the PRF seed — no signer, no signMessage', async () => {

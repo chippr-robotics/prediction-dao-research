@@ -8,7 +8,7 @@ import { usePwaUpdate } from '../hooks/usePwaUpdate'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
-import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
+import { hasRegisteredKey } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
 import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
@@ -86,7 +86,7 @@ function WalletPage() {
   const isPasskey = loginMethod === 'passkey'
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
-  const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
+  const { isInitialized, isInitializing, registerKeyNow } = useEncryption()
   const { preferences, setPolymarketCategories } = useUserPreferences()
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
@@ -150,9 +150,11 @@ function WalletPage() {
   }, [address, provider])
 
   const handleRegisterKey = useCallback(async () => {
-    // Passkey sessions have no ethers signer — keys derive from the WebAuthn PRF master seed and the
-    // on-chain registration is submitted through the smart account (sendCalls), all inside
-    // ensureInitialized(). Classic wallets keep the signer path (sign the derivation message → register tx).
+    // registerKeyNow derives the account's encryption keys and AWAITS the on-chain registration,
+    // login-method agnostic: a passkey submits through the smart account (sendCalls / one WebAuthn
+    // ceremony), a classic wallet signs the register tx. Awaiting it — rather than the old
+    // fire-and-forget + poll — is what lets a passkey user actually see success or a real failure
+    // reason instead of a status stuck on "Not registered".
     if (!address || (!signer && !isPasskey)) {
       setKeyError('Not connected. Please sign in again.')
       return
@@ -160,35 +162,21 @@ function WalletPage() {
     setKeyRegisterLoading(true)
     setKeyError(null)
     try {
-      const result = await ensureInitialized()
-      if (!result?.publicKey) {
-        throw new Error('Failed to derive encryption keys')
+      await registerKeyNow()
+      // Confirm against the registry so the flip to "Registered" reflects on-chain truth. A passkey
+      // UserOp can take a moment to include, so poll briefly before reporting.
+      let registered = await hasRegisteredKey(address, provider)
+      for (let i = 0; !registered && isPasskey && i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        registered = await hasRegisteredKey(address, provider)
       }
-      if (isPasskey) {
-        // ensureInitialized() already kicked off the on-chain registration (non-blocking, via sendCalls).
-        // Reflect it honestly: poll the registry briefly so the UI flips to "Registered" once it lands,
-        // and otherwise tell the user it's finishing rather than claiming failure.
-        let registered = await hasRegisteredKey(address, provider)
-        for (let i = 0; !registered && i < 5; i++) {
-          await new Promise((r) => setTimeout(r, 2000))
-          registered = await hasRegisteredKey(address, provider)
-        }
-        setKeyRegistered(registered)
-        if (!registered) {
-          setKeyError('Encryption key setup submitted — it can take a moment to finish. Use “Check Status” shortly.')
-        }
-        return
-      }
-      // ensureKeyRegistered checks on-chain first, only registers if needed
-      const wasNewlyRegistered = await ensureKeyRegistered(signer, address, result.publicKey)
-      setKeyRegistered(true)
-      if (!wasNewlyRegistered) {
-        // Key was already registered — not an error, just inform user
-        console.log('[WalletPage] Key was already registered on-chain')
+      setKeyRegistered(registered)
+      if (!registered && isPasskey) {
+        setKeyError('Encryption key setup submitted — it can take a moment to confirm. Use “Check Status” shortly.')
       }
     } catch (err) {
-      if (err.message.includes('rejected') || err.message.includes('denied')) {
-        setKeyError('Transaction was rejected.')
+      if (err.message.includes('rejected') || err.message.includes('denied') || err.name === 'CeremonyCancelled') {
+        setKeyError('Registration was cancelled.')
       } else if (err.message.includes('KeyAlreadyExists') || err.message.includes('0xe0accd63')) {
         // Key already exists on-chain — treat as success
         setKeyRegistered(true)
@@ -198,7 +186,7 @@ function WalletPage() {
     } finally {
       setKeyRegisterLoading(false)
     }
-  }, [ensureInitialized, signer, address, isPasskey, provider])
+  }, [registerKeyNow, signer, address, isPasskey, provider])
 
   // Auto-check key status when Security tab is shown
   useEffect(() => {
