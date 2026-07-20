@@ -174,3 +174,15 @@
 .network-doc-row a:hover {
   text-decoration: underline;
 }
+
+/* Non-EVM display-only cards (spec 061): no switch affordance, neutral badge. */
+.network-display-only-badge {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border, var(--color-text-secondary));
+}
+
+.network-display-only-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}

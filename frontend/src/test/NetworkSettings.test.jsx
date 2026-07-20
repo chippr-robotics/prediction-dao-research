@@ -113,4 +113,63 @@ describe('NetworkSettings — relocated network selector', () => {
     const link = within(card).getByRole('link', { name: /Open Uniswap/ })
     expect(link).toHaveAttribute('href', expect.stringContaining('app.uniswap.org'))
   })
+
+  // Spec 061 — Bitcoin renders as a DISPLAY-ONLY row (network-registry rule 2):
+  // no wallet chain switch exists for a non-EVM network.
+  describe('Bitcoin display-only rows (spec 061, FR-020)', () => {
+    it('lists Bitcoin mainnet and its testnet pair without any switch affordance', () => {
+      render(<NetworkSettings />)
+      const mainnetCard = screen.getByText('Bitcoin').closest('.network-card')
+      const testnetCard = screen.getByText('Bitcoin Testnet4').closest('.network-card')
+      expect(mainnetCard).toBeInTheDocument()
+      expect(within(mainnetCard).getByText('Mainnet')).toBeInTheDocument()
+      expect(within(testnetCard).getByText('Testnet')).toBeInTheDocument()
+      for (const card of [mainnetCard, testnetCard]) {
+        expect(within(card).queryByRole('button', { name: /switch/i })).toBeNull()
+        expect(within(card).getByText('No wallet switch')).toBeInTheDocument()
+      }
+    })
+
+    it('states supported capabilities truthfully: portfolio, send, receive, Stamps collectibles', () => {
+      render(<NetworkSettings />)
+      const card = screen.getByText('Bitcoin').closest('.network-card')
+      for (const label of ['Portfolio', 'Send', 'Receive', 'Stamps collectibles']) {
+        expect(within(card).getByText(label).closest('.network-tag')).toHaveClass('available')
+      }
+    })
+
+    it('states unsupported capabilities truthfully: wagers, pools, membership, gasless, swap, earn, predict', () => {
+      render(<NetworkSettings />)
+      const card = screen.getByText('Bitcoin').closest('.network-card')
+      for (const label of ['P2P Wagers', 'Wager Pools', 'Memberships', 'Gasless', 'Token Swap', 'Earn', 'Predict']) {
+        expect(within(card).getByText(label).closest('.network-tag')).toHaveClass('unavailable')
+      }
+    })
+
+    it('discloses the wallet requirement and that members pay the Bitcoin network fee', () => {
+      render(<NetworkSettings />)
+      const card = screen.getByText('Bitcoin').closest('.network-card')
+      expect(within(card).getByText(/Requires a FairWins passkey on a PRF-capable device/)).toBeInTheDocument()
+      expect(within(card).getByText(/always pay the Bitcoin network fee/)).toBeInTheDocument()
+    })
+
+    it('documents the mempool.space explorer on the Bitcoin card', () => {
+      render(<NetworkSettings />)
+      const card = screen.getByText('Bitcoin').closest('.network-card')
+      const link = within(card).getByRole('link', { name: 'mempool.space' })
+      expect(link).toHaveAttribute('href', 'https://mempool.space')
+      expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    })
+
+    it('never routes a Bitcoin row through wagmi switchChain', () => {
+      render(<NetworkSettings />)
+      // Clicking around the Bitcoin card can produce no switchChain call —
+      // there is no button — and the EVM switch buttons never carry a
+      // bitcoin id.
+      expect(switchChain).not.toHaveBeenCalled()
+      for (const btn of screen.getAllByRole('button', { name: /^Switch to / })) {
+        expect(btn.getAttribute('aria-label')).not.toMatch(/Bitcoin/)
+      }
+    })
+  })
 })

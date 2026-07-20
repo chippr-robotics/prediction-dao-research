@@ -10,6 +10,7 @@
 
 import { getContractAddressForChain } from './contracts'
 import { getNetwork } from './networks'
+import { isBitcoinNetworkId } from './bitcoinNetworks'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
@@ -84,11 +85,17 @@ export const NETWORK_FEATURES = [
  * @returns {{ key: string, label: string, description: string, deployed: boolean }[]}
  */
 export function getNetworkFeatures(chainId) {
+  // Boundary type guard (spec 061, network-registry rule 1): non-EVM string
+  // ids must never flow into getContractAddressForChain / getNetwork, whose
+  // fallback would dishonestly report the DEFAULT network's capabilities.
+  // Bitcoin surfaces read BITCOIN_NETWORKS.capabilities instead; here every
+  // EVM protocol feature is truthfully undeployed.
+  const isBitcoin = isBitcoinNetworkId(chainId)
   return NETWORK_FEATURES.map(({ key, label, description, deployed }) => ({
     key,
     label,
     description,
-    deployed: deployed(chainId),
+    deployed: isBitcoin ? false : deployed(chainId),
   }))
 }
 

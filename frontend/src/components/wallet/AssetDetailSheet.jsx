@@ -25,6 +25,30 @@ function formatAmount(holding) {
   return formatAssetAmount(holding.balance, holding.asset.symbol, holding.asset.kind)
 }
 
+/**
+ * Bitcoin instance disclosures (spec 061, FR-009/FR-018): pending value is
+ * never presented as final, and Stamps-protected value explains why
+ * total ≠ spendable. Only rendered for holdings carrying `holding.bitcoin`
+ * (native BTC from the bitcoin balance source) — EVM instances are untouched.
+ */
+function bitcoinInstanceNotes(holding) {
+  const btc = holding.bitcoin
+  if (!btc) return []
+  const notes = []
+  if (btc.pendingSats) {
+    const sign = btc.pendingSats > 0 ? '+' : '−'
+    notes.push(`${sign}${formatAssetAmount(Math.abs(btc.pendingSats) / 1e8, 'BTC')} pending`)
+  }
+  if (btc.protectedSats > 0) {
+    notes.push(
+      `${formatAssetAmount(btc.protectedSats / 1e8, 'BTC')} protected (${
+        btc.stampsDegraded ? 'Stamps check degraded — treated as protected' : 'Bitcoin Stamps'
+      })`,
+    )
+  }
+  return notes
+}
+
 // Action eligibility per instance — actions the app cannot perform render
 // disabled with a reason, never as dead buttons (constitution III).
 function actionsFor(instance) {
@@ -179,6 +203,11 @@ export default function AssetDetailSheet({ aggregate, onClose }) {
                   <span className="asset-sheet-instance-meta">
                     {holding.network} · {SOURCE_LABELS[holding.asset.source] || holding.asset.source}
                   </span>
+                  {bitcoinInstanceNotes(holding).map((note) => (
+                    <span key={note} className="asset-sheet-instance-meta asset-sheet-instance-bitcoin">
+                      {note}
+                    </span>
+                  ))}
                 </span>
                 <span className="asset-sheet-instance-values">
                   <SensitiveValue className="asset-sheet-instance-balance">{formatAmount(holding)}</SensitiveValue>
