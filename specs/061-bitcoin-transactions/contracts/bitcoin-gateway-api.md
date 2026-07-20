@@ -78,7 +78,21 @@ Stamps holdings for ≤50 addresses. Response 200:
 `degraded: true` (with `stamps: []` or partial) whenever the indexer call
 fails, times out, or is unconfigured — the client MUST then treat unverified
 coins as protected (fail-safe, FR-019). Cache TTL 300s; a degraded result is
-cached ≤30s so recovery is fast.
+cached ≤30s so recovery is fast (an unconfigured indexer is a static config
+condition and is not cached at all).
+
+## Conventions (normative clarifications)
+
+- **Confirmations** = `tip − blockHeight + 1` (the tip block itself is one
+  confirmation) — used consistently by both the addresses and tx-status
+  endpoints.
+- **Additional error slugs** beyond the per-endpoint ones above:
+  `invalid_rawtx` (malformed broadcast hex), `invalid_txid`,
+  `unknown_network` (404 on a bad `:network`), `quota_exceeded` (429, with
+  `Retry-After`). All errors use the flat `{ error, message }` shape.
+- `BTC_TIMEOUT_MS` (default 5000) and `BTC_RETRIES` (default 1) tune upstream
+  fetches, at parity with the other proxy modules; broadcast POSTs are never
+  retried (a timed-out broadcast may still have propagated).
 
 ## Config (env, documented in `.env.example`)
 

@@ -25,6 +25,7 @@
  */
 import { NETWORKS } from './networks'
 import { getContractAddressForChain } from './contracts'
+import { getBitcoinNetwork } from './bitcoinNetworks'
 
 // The five app-aligned regulatory categories (FR-004) plus the honest
 // `unclassified` fallback (FR-012). Order is display order.
@@ -103,11 +104,13 @@ const BASELINE_SET = new Set(SEC_COMMODITY_BASELINE)
  * is the canonical mainnet whose NATIVE coin the symbol is — a native
  * instance on that chain renders its logo without a network badge (FR-026);
  * every other instance (wrapped, bridged, testnet) carries the hosting
- * network's badge.
+ * network's badge. `homeNetwork` is the non-EVM equivalent (spec 061): a
+ * string id from bitcoinNetworks.js for underlyings whose home chain is not
+ * an EVM network.
  */
 export const UNDERLYING_META = {
   ETH: { name: 'Ethereum', homeChainId: 1 },
-  BTC: { name: 'Bitcoin', homeChainId: null },
+  BTC: { name: 'Bitcoin', homeChainId: null, homeNetwork: 'bitcoin' },
   MATIC: { name: 'Polygon', homeChainId: 137 },
   POL: { name: 'Polygon', homeChainId: 137 },
   ETC: { name: 'Ethereum Classic', homeChainId: 61 },
@@ -461,4 +464,33 @@ export function getPortfolioRegistry(chainId) {
   }
 
   return Array.from(byId.values())
+}
+
+/**
+ * Native-Bitcoin portfolio asset for a non-EVM bitcoin network (spec 061,
+ * FR-008). Not part of getPortfolioRegistry — that registry is keyed by EVM
+ * chainId and scanned via RPC; the bitcoin balance source in usePortfolio
+ * feeds this descriptor instead. It aggregates with WBTC under the single
+ * `BTC` underlying via the existing baseline roll-up, and prices through the
+ * already-configured BTC/USD feeds (priceFeeds.js, key `BTC`).
+ *
+ * Returns null for non-bitcoin ids (soft-fail, mirrors getPortfolioRegistry's
+ * empty-registry behavior for unknown chains).
+ */
+export function getBitcoinPortfolioAsset(networkId) {
+  const net = getBitcoinNetwork(networkId)
+  if (!net) return null
+  return {
+    id: 'btc-native',
+    // String network id in the chainId slot — consumers on the bitcoin path
+    // are guarded by isBitcoinNetworkId and never pass this to EVM code.
+    chainId: net.id,
+    kind: 'native',
+    symbol: 'BTC',
+    name: net.isTestnet ? 'Bitcoin (Testnet)' : 'Bitcoin',
+    decimals: 8,
+    categoryId: 'digital-commodities',
+    source: 'sec-baseline',
+    baselineSymbol: 'BTC',
+  }
 }

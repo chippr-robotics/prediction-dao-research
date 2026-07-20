@@ -33,6 +33,8 @@ import { createTtlCache } from './opensea/cache.js'
 import { createOpenSeaRouter } from './opensea/routes.js'
 import { createPolymarketClient } from './polymarket/client.js'
 import { createPolymarketRouter } from './polymarket/routes.js'
+import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
+import { createBitcoinRouter } from './bitcoin/routes.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -162,7 +164,13 @@ export function createApp(config, deps = {}) {
   })
   // Capture the raw body so the engine-webhook route can verify the HMAC over the exact bytes
   // the engine signed (re-serializing could reorder keys and break the signature).
-  app.use(express.json({ limit: '32kb', verify: (req, _res, buf) => { req.rawBody = buf } })) // intents are small fixed-shape JSON; nothing large is legitimate
+  const jsonSmall = express.json({ limit: '32kb', verify: (req, _res, buf) => { req.rawBody = buf } }) // intents are small fixed-shape JSON; nothing large is legitimate
+  // Exception: the Bitcoin broadcast route (spec 061) carries a raw signed transaction as hex —
+  // the contract caps it at 100 kB of tx bytes (200k hex chars), so it gets a larger parse limit;
+  // the route itself enforces the exact cap and hex validity.
+  const jsonBtcTx = express.json({ limit: '256kb' })
+  const BTC_TX_PATH_RE = /^\/v1\/bitcoin\/[^/]+\/tx$/
+  app.use((req, res, next) => (req.method === 'POST' && BTC_TX_PATH_RE.test(req.path) ? jsonBtcTx : jsonSmall)(req, res, next))
 
   // ---- Origin-lock middleware (FR-029, SC-016): client-facing routes require X-Origin-Auth.
   // The Cloudflare Transform Rule injects the header zone-wide; a direct *.run.app hit lacks it.
@@ -612,6 +620,47 @@ export function createApp(config, deps = {}) {
       writeQuotas: pmWriteQuotas,
       killSwitch,
       feeRates,
+    })
+  )
+
+  // ---- GET/POST /v1/bitcoin/* (spec 061 Bitcoin proxy; origin-locked via middleware) ----------
+  // Esplora-compatible reads (balances/UTXOs/fees/tx status) + raw-tx broadcast + Stamps
+  // recognition. Quotas are keyed per caller IP (no signature to recover on these routes); the
+  // broadcast write gets its own tighter quota. The routes 503 fail-closed (bitcoin_disabled)
+  // until BTC_ENABLED=true — mounting is unconditional so the answer is always honest.
+  const btcReadQuotas = createQuotas({
+    signerPerWindow: config.bitcoin.quotaPerIp,
+    globalPerWindow: config.bitcoin.quotaGlobal,
+    windowMs: config.bitcoin.quotaWindowMs,
+    now: nowMs,
+  })
+  const btcWriteQuotas = createQuotas({
+    signerPerWindow: config.bitcoin.writeQuotaPerIp,
+    globalPerWindow: config.bitcoin.writeQuotaGlobal,
+    windowMs: config.bitcoin.quotaWindowMs,
+    now: nowMs,
+  })
+  const btcFetch = deps.bitcoinFetch ? { fetchImpl: deps.bitcoinFetch } : {}
+  const btcClientOpts = { timeoutMs: config.bitcoin.timeoutMs, retries: config.bitcoin.retries, ...btcFetch }
+  const esploraClients = deps.esploraClients ?? {
+    mainnet: createEsploraClient({ baseUrl: config.bitcoin.esploraUrl, ...btcClientOpts }),
+    testnet: createEsploraClient({ baseUrl: config.bitcoin.esploraTestnetUrl, ...btcClientOpts }),
+  }
+  const stampsClient =
+    deps.stampsClient !== undefined
+      ? deps.stampsClient
+      : config.bitcoin.stampsUrl
+        ? createStampsClient({ baseUrl: config.bitcoin.stampsUrl, ...btcClientOpts })
+        : null
+  app.use(
+    createBitcoinRouter(config, {
+      esploraClients,
+      stampsClient,
+      cache: deps.bitcoinCache ?? createTtlCache({ now: nowMs }),
+      quotas: btcReadQuotas,
+      writeQuotas: btcWriteQuotas,
+      killSwitch,
+      now: nowMs,
     })
   )
 
