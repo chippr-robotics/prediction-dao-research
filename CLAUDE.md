@@ -146,6 +146,23 @@ artifacts live under `specs/<feature>/`.
   (config only) instead of building their own fee path. `FEE_ADMIN_ROLE` edits rates from the
   AdminPanel Fees tab; history = `FeeBpsChanged` events. See
   `docs/developer-guide/platform-fees.md` + `docs/runbooks/fee-operations.md` + `specs/060-platform-fee-wrapper/`.
+- **Bitcoin (spec 061) is the FIRST NON-EVM network — portfolio/send/receive ONLY.** Bitcoin
+  networks are STRING ids (`'bitcoin'`, `'bitcoin-testnet'` = testnet4) in
+  `frontend/src/config/bitcoinNetworks.js`, parallel to (never inside) the numeric `NETWORKS`
+  map — never assign Bitcoin a numeric chainId and never pass its ids to
+  `getContractAddressForChain`/wagmi/subgraph code (guard boundaries with `isBitcoinNetworkId`).
+  Keys derive client-side from the spec-041 passkey master seed per
+  `specs/061-bitcoin-transactions/contracts/key-derivation-btc.md` — those constants
+  (HKDF info `fairwins-btc-seed-v1`, BIP84/BIP86 paths) are **wallet-breaking** if changed;
+  key material/xpubs never leave the client (gateway sees bare addresses + signed raw txs only).
+  Receive addresses ROTATE (never reissued; gap-limit-20 discovery rebuilds on recovery; cursor
+  never decreases). Stamps handling is FAIL-SAFE: a UTXO is spendable only when positively
+  verified stamp-free — degraded recognition ⇒ protected, never spent. Fee quotes expire (60s)
+  and the member-confirmed fee is a hard signing ceiling (`FeeOverrunError`); BTC sends are
+  NEVER gasless and the confirm UI must say the member pays the network fee. The gateway module
+  (`services/relay-gateway/src/bitcoin/`, `BTC_*` env) is optional — unset/disabled ⇒ every
+  Bitcoin surface hides/degrades honestly. See `docs/developer-guide/bitcoin.md` +
+  `docs/runbooks/bitcoin-operations.md` + `specs/061-bitcoin-transactions/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
