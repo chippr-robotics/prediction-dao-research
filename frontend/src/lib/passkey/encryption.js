@@ -20,7 +20,7 @@
  * fully valid and only gates encrypted features off.
  */
 
-import { blobStore, initMasterSeed, unwrapMasterSeed, EncryptionUnavailable } from './prfKeys'
+import { blobStore, initMasterSeed, initMasterSeedForCredential, unwrapMasterSeed, EncryptionUnavailable } from './prfKeys'
 import { deriveKeyPairFromSeed, deriveXWingKeyPairFromSeed } from '../../utils/crypto/envelopeEncryption'
 
 /**
@@ -28,16 +28,20 @@ import { deriveKeyPairFromSeed, deriveXWingKeyPairFromSeed } from '../../utils/c
  *
  *  - blob for this credential exists ⇒ unwrap it (returning device / synced credential);
  *  - account has NO blobs at all ⇒ first-time init (this credential becomes the first controller);
- *  - account initialized but not for THIS credential ⇒ EncryptionUnavailable (add it from a
- *    signed-in device via Account → Controllers), never derive wrong keys.
+ *  - account has blobs but NOT for THIS credential ⇒
+ *      · allowInit=false (default) ⇒ EncryptionUnavailable, never derive wrong keys;
+ *      · allowInit=true ⇒ bootstrap a fresh seed for this credential. The CALLER must gate this on
+ *        "nothing depends on a prior seed" (no encryption key published on-chain), so a single-device
+ *        passkey can register self-service instead of being stranded pointing at another device.
  *
  * @param {object} opts
  * @param {string} opts.account - passkey smart-account address
  * @param {string} opts.credentialId - the session credential (pins the ceremony)
+ * @param {boolean} [opts.allowInit] - permit safe bootstrap when this credential has no blob (see above)
  * @param {object} [opts.deps] - injectable getAssertion / store / subtle for tests
  * @returns {Promise<Uint8Array>} 32-byte master seed (memory-only)
  */
-export async function resolveMasterSeed({ account, credentialId, deps = {} }) {
+export async function resolveMasterSeed({ account, credentialId, allowInit = false, deps = {} }) {
   if (!account) throw new Error('resolveMasterSeed: account is required')
   if (!credentialId) {
     throw new EncryptionUnavailable('no passkey credential is bound to this session — sign in again')
@@ -49,8 +53,13 @@ export async function resolveMasterSeed({ account, credentialId, deps = {} }) {
   if (store.listCredentials(account).length === 0) {
     return initMasterSeed({ account, credentialId, deps })
   }
+  // Blobs exist for the account but not for this credential.
+  if (allowInit) {
+    return initMasterSeedForCredential({ account, credentialId, deps })
+  }
   throw new EncryptionUnavailable(
-    'this passkey has no key material on this account yet — add it from a signed-in device (Account → Controllers)'
+    'this passkey has no encryption key material on this account yet — register your encryption key under Backup & Security, ' +
+    'or open FairWins on the device where you first enabled encryption (or restore your encrypted backup) to use it here'
   )
 }
 
@@ -60,13 +69,13 @@ export async function resolveMasterSeed({ account, credentialId, deps = {} }) {
  * into usePurchaseFlow's `sign` step (`{ publicKey }` is required; the rest lets
  * callers encrypt/decrypt locally).
  *
- * @param {object} opts - { account, credentialId, deps }
+ * @param {object} opts - { account, credentialId, allowInit, deps }
  * @returns {Promise<{publicKey: Uint8Array, privateKey: Uint8Array,
  *   xwingPublicKey: Uint8Array, xwingSecretKey: Uint8Array}>}
  * @throws {EncryptionUnavailable} on a non-PRF authenticator or missing key material
  */
-export async function ensurePasskeyEncryptionKeys({ account, credentialId, deps = {} }) {
-  const seed = await resolveMasterSeed({ account, credentialId, deps })
+export async function ensurePasskeyEncryptionKeys({ account, credentialId, allowInit = false, deps = {} }) {
+  const seed = await resolveMasterSeed({ account, credentialId, allowInit, deps })
   const x25519 = deriveKeyPairFromSeed(seed)
   const xwing = deriveXWingKeyPairFromSeed(seed)
   return {

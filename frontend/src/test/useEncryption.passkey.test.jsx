@@ -80,19 +80,16 @@ describe('useEncryption — passkey encrypt/decrypt surface', () => {
     hasRegisteredKey.mockResolvedValue(false)
   })
 
-  it('registerKeyNow awaits the on-chain register through sendCalls and surfaces failures', async () => {
+  it('registerKeyNow bootstraps (allowInit) + awaits the on-chain register, and surfaces failures', async () => {
     const { result } = renderHook(() => useEncryption())
-    // Initialize first and let the non-blocking auto-register settle, so the assertions below
-    // observe registerKeyNow's OWN sendCalls rather than racing initializeKeys' auto-register.
-    await act(async () => { await result.current.ensureInitialized() })
-    await vi.waitFor(() => expect(sendCalls).toHaveBeenCalled())
-    sendCalls.mockClear()
-    buildRegisterKeyCalls.mockClear()
-
     let out
     await act(async () => {
       out = await result.current.registerKeyNow()
     })
+    // No on-chain key yet ⇒ allowInit true, so a stranded single-device passkey can mint its own seed.
+    expect(ensurePasskeyEncryptionKeys).toHaveBeenCalledWith(
+      expect.objectContaining({ account: ACCOUNT, credentialId: 'cred-1', allowInit: true })
+    )
     expect(buildRegisterKeyCalls).toHaveBeenCalledWith(PASSKEY_KEYS.publicKey, 137, null)
     expect(sendCalls).toHaveBeenCalledWith([{ target: '0xkeyRegistry', data: '0xdead', value: 0n }])
     expect(out).toMatchObject({ alreadyRegistered: false })
@@ -104,13 +101,17 @@ describe('useEncryption — passkey encrypt/decrypt surface', () => {
     })
   })
 
-  it('registerKeyNow is idempotent — an already-registered key skips the ceremony', async () => {
+  it('registerKeyNow never bootstraps a fresh seed when a key is already published on-chain', async () => {
     hasRegisteredKey.mockResolvedValue(true)
     const { result } = renderHook(() => useEncryption())
     let out
     await act(async () => {
       out = await result.current.registerKeyNow()
     })
+    // allowInit MUST be false so we never mint a second seed that would orphan the published key.
+    expect(ensurePasskeyEncryptionKeys).toHaveBeenCalledWith(
+      expect.objectContaining({ allowInit: false })
+    )
     expect(out).toMatchObject({ alreadyRegistered: true })
     expect(sendCalls).not.toHaveBeenCalled()
   })
