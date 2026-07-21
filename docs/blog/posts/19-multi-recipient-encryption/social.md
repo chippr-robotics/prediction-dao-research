@@ -1,25 +1,25 @@
-# Social & Image — One Ciphertext, N Wrapped Keys: Multi-Recipient Encryption for Private Wagers
+# Social & Image — One Locked Box, Several Keyholders: How a Private Wager Can Add a Referee
 
 ## X (Twitter)
 
-Encrypt once, wrap the key N times: FairWins private wagers keep one ChaCha20-Poly1305 ciphertext plus an X25519-wrapped DEK per reader. Adding a neutral arbitrator was a third array entry — not a redesign. 🔗 <link> #encryption #privacy #web3
+Lock the agreement once, hand out a personal key-envelope per reader. That's how a two-person private wager on FairWins adds a neutral referee — a third keyholder, not a redesign, and everyone opens the exact same box. 🔗 <link> #encryption #privacy #web3
 
 ## LinkedIn
 
-A resolver who can't read the agreement they're supposed to rule on is worse than no resolver. That was the state of FairWins' third-party arbitration: the arbitrator was named and authorized on-chain, but the wager terms were end-to-end encrypted for exactly two participants. Re-encrypting per reader, sharing keys out-of-band, or holding a platform master key were all non-starters.
+A referee who can't read the agreement they're supposed to judge is worse than no referee. That was the state of FairWins' private wagers: the referee was named and authorized on-chain, but the terms were end-to-end encrypted for exactly two players. Making a fresh copy per reader, sharing a password by chat, or handing the platform a master key were all non-starters.
 
-The fix required zero new cryptography — the envelope format was multi-recipient from day one. The new post walks the mechanism:
+The fix required zero new cryptography — the design already supported multiple keyholders. The new post walks it in plain terms:
 
-- One DEK encrypts the terms once (ChaCha20-Poly1305 AEAD); each reader gets an X25519 + HKDF wrapped copy of the DEK — ~60 bytes per reader, and everyone provably decrypts the same ciphertext.
-- An on-chain `KeyRegistry` supplies encryption public keys, sized to fit both X25519 and X-Wing hybrid post-quantum keys without a contract change.
-- Fail-closed creation: no registered key for a named arbitrator, no wager — never a wager its own resolver can't read.
-- Honest limits: removing a reader from the envelope is not revocation, and the design says so plainly.
+- One sealed box holds the agreement; each reader gets a tiny personal envelope holding the key to it — everyone opens the same box, no drifting copies.
+- A small public directory on-chain supplies each person's encryption key, with room for a future quantum-resistant key type built in.
+- Refuse-to-create: no registered key for a named referee, no wager — never a bet its own referee can't read.
+- Honest limits: striking someone from the guest list isn't the same as taking back a key they already saw, and the design says so plainly.
 
 Full write-up: 🔗 <link>
 
-Where do you draw the line between access-grant machinery and true revocation in E2EE systems?
+Where do you draw the line between granting access and truly revoking it in end-to-end encrypted systems?
 
-#encryption #cryptography #privacy #web3 #ethereum
+#encryption #privacy #web3 #ethereum
 
 ## Image prompt (Gemini / Nano Banana)
 

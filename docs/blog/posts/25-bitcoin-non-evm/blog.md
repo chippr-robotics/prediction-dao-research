@@ -1,131 +1,70 @@
-# Bitcoin in an EVM-Native App: Guarding Every Boundary
+# Adding Bitcoin to an App That Was Never Built for It
 
-*How FairWins added its first non-EVM chain — string network ids, seed-derived BIP84/86 keys, and fail-safe UTXO handling — without corrupting a codebase built on numeric chainIds*
+*How FairWins added its first non-Ethereum blockchain without quietly breaking everything built around the old assumptions*
 
 | | |
 |---|---|
 | **Series** | Finance Surfaces (part 4) |
 | **Part** | 25 of 34 |
-| **Audience** | Multi-chain and wallet engineers |
-| **Tags** | `bitcoin`, `non-evm`, `bip84`, `bip86`, `hd-wallets`, `multi-chain` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product and engineering readers curious about multi-chain design |
+| **Tags** | `bitcoin`, `wallets`, `multi-chain`, `product` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-## The Assumption Buried in Every File
+## The assumption hiding in a mature app
 
-Imagine you maintain a mature EVM app. Every network is a numeric chainId: 137 is Polygon, 80002 is Amoy, 61 is Ethereum Classic. That number is a load-bearing key in dozens of places — `getContractAddressForChain(name, chainId)` resolves contract addresses, wagmi builds providers from it, the subgraph router selects endpoints by it, the testnet toggle flips between paired numbers. The assumption "a network is an integer with contracts on it" is not written down anywhere, because it never needed to be. It is simply everywhere.
+Picture a wallet app that has only ever spoken one dialect of blockchain: the Ethereum family. Polygon, Ethereum Classic, and the test networks are all cut from the same cloth. Deep in the code, each network is identified by a plain number, and that number quietly drives almost everything — which smart contract to talk to, which server to query, which network the app is pointed at right now.
 
-Then the roadmap says: add Bitcoin. Portfolio, send, receive — a real non-custodial wallet inside the existing passkey account.
+Nobody ever wrote down the rule "a blockchain is a number with contracts on it." They didn't have to. It was simply true everywhere, until the roadmap said: add Bitcoin.
 
-Bitcoin breaks every one of those silent assumptions at once. There is no chainId — [EIP-155](https://eips.ethereum.org/EIPS/eip-155) is an Ethereum construct. There are no contracts, so `getContractAddressForChain` is meaningless. There are no accounts or nonces — value lives in UTXOs, addresses are supposed to rotate rather than persist, and fees are priced in sat/vB against a transaction's virtual size, not gas. The tempting shortcut — assign Bitcoin a fake numeric id like `-1` or `99999` and let it flow through the existing plumbing — is exactly how multi-chain codebases rot: every consumer of chainId becomes a landmine that might receive a number that is not actually an EVM chain.
+Bitcoin does not fit that mold. It has no identifying number the way Ethereum networks do. It has no smart contracts, so "which contract do I talk to?" has no answer. And it doesn't even track balances the same way: instead of an account with a running total, Bitcoin holds value in discrete chunks of unspent coins, addresses are meant to be used once and rotated, and fees are priced by transaction size rather than by "gas."
 
-FairWins spec 061 took the opposite approach: Bitcoin is *structurally* different, so it gets a *structurally* different type, and every place the two worlds touch gets an explicit guard. This post walks the four boundaries that made it work.
+The tempting shortcut is to hand Bitcoin a fake number and let it ride through the existing plumbing. That is exactly how multi-chain codebases rot: every place that trusted "this number is an Ethereum network" becomes a hidden trap waiting to receive something that isn't one. FairWins took the opposite path. Bitcoin is genuinely different, so it gets its own separate identity, and every point where the two worlds touch gets an explicit checkpoint. The scope is deliberately small — portfolio, send, and receive — a real wallet you control, living inside your existing FairWins passkey account.
 
-## Boundary 1: A Parallel Registry, Not a New Row
+This is the story of the four boundaries that made that work.
 
-Bitcoin networks are string ids — `'bitcoin'` and `'bitcoin-testnet'` (testnet4) — in their own registry, `frontend/src/config/bitcoinNetworks.js`, deliberately parallel to and never merged into the numeric `NETWORKS` map:
+## Boundary 1: keep Bitcoin in its own lane
 
-```js
-export const BITCOIN_NETWORKS = Object.freeze({
-  bitcoin: Object.freeze({
-    id: 'bitcoin',
-    kind: 'bitcoin',
-    isTestnet: false,
-    gatewaySegment: 'mainnet',
-    addressHrp: 'bc',   // bech32 HRP — drives wrong-network rejection
-    coinType: 0,        // BIP44 coin type (hardened)
-    capabilities: CAPABILITIES,
-  }),
-  // 'bitcoin-testnet' → testnet4, hrp 'tb', coinType 1
-})
+Rather than smuggling Bitcoin into the list of Ethereum networks, FairWins gives it a small, separate registry of its own. Bitcoin's networks are named with words — a mainnet and a test network — not numbers, and they live apart from the numeric world on purpose.
 
-export function isBitcoinNetworkId(id) {
-  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(BITCOIN_NETWORKS, id)
-}
-```
+A single yes/no check acts as the gatekeeper: *is this a Bitcoin network?* Any shared screen runs that check before handing an identifier to code that only understands Ethereum, so a Bitcoin identifier can never wander into Ethereum-only plumbing by accident.
 
-`isBitcoinNetworkId()` is the boundary type guard. Any shared code path — portfolio aggregation, the network switcher, activity feeds — checks it before handing an id to anything typed on numeric chainIds. A string id must never reach `getContractAddressForChain`, wagmi provider construction, or subgraph routing; the guard makes the crossing impossible to do by accident rather than merely discouraged.
+Two touches keep this honest. The app's single testnet toggle flips Bitcoin between its test and main networks in lockstep with the Ethereum side, so the two environments never mix. And a small capabilities list is the single source of truth for what Bitcoin can do: wagers, group pools, membership, and gasless transactions are switched off; sending and receiving are on. Anything switched off simply doesn't appear, so the interface never implies Bitcoin can do something it can't.
 
-Two details keep the parallel registry honest. First, `BITCOIN_TESTNET_MAINNET_PAIR` mirrors the existing EVM testnet/mainnet toggle semantics, so the app's single global toggle flips Bitcoin between testnet4 and mainnet in lockstep with 80002 ↔ 137 — the two environments never mix. Second, a frozen `capabilities` map (`wagers: false`, `pools: false`, `gasless: false`, `send: true`, …) is the single source of truth for what Bitcoin supports. Everything false hides its surface exactly like a disabled EVM capability. There are no wagers, pools, membership, or gasless transactions on Bitcoin, and the UI never implies otherwise.
+## Boundary 2: one backup, two kinds of keys
 
-## Boundary 2: One Seed, Two Cryptographies
+A FairWins passkey account already holds a single master secret that lives only in memory and can be recovered through the passkey itself — the same WebAuthn standard your phone uses for Face ID or fingerprint login. Bitcoin keys grow from that same secret. There is no second seed phrase to write down and no separate backup to lose.
 
-FairWins passkey accounts (spec 041) hold a 32-byte, PRF-recoverable, memory-only master seed. Bitcoin keys derive from that same seed — no separate backup, no new recovery phrase — through a domain-separated subtree defined in `specs/061-bitcoin-transactions/contracts/key-derivation-btc.md`:
+So the Bitcoin keys can never collide with the account's other uses of that master secret, they are grown through a one-way derivation stamped with a Bitcoin-specific label, following Bitcoin's own standard recipes for turning a seed into spending keys — the widely used approaches for modern "native SegWit" addresses (the `bc1...` addresses you've probably seen) and, optionally, newer Taproot addresses. Every constant in that recipe is wallet-breaking: real money lives at the resulting addresses, so those values are versioned and migrated, never quietly edited.
 
-```
-btcSeed     = HKDF-SHA256(ikm = masterSeed, salt = 32 zero bytes,
-                          info = "fairwins-btc-seed-v1", length = 64)
-root        = BIP32.fromMasterSeed(btcSeed)
-segwitAcct  = root.derive("m/84'/{coin}'/0'")   // BIP84 → P2WPKH bc1q…
-taprootAcct = root.derive("m/86'/{coin}'/0'")   // BIP86 → P2TR   bc1p…
-receive(i)  = acct/0/i                          // external chain only (v1)
-```
+Two rules shape everything downstream. First, the keys are memory-only: the seed and private keys are never saved to disk, logged, or sent anywhere, and the app forgets them the moment a transaction is signed. Second, even the "public" master keys that could reveal your whole history of addresses stay on your device. FairWins' server sees only bare addresses and already-signed transactions. A server that never holds keys cannot leak your wallet or quietly map out everywhere you've received money.
 
-The [HKDF](https://datatracker.ietf.org/doc/html/rfc5869) info string `"fairwins-btc-seed-v1"` is exclusive to this tree, so the Bitcoin subtree can never collide with the spec-041 key-encryption path or any future consumer of the master seed. Native segwit ([BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)) is the default; taproot ([BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki), key-path only, [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki)-tweaked) is opt-in. Every constant in that block is marked **wallet-breaking**: funds live at the derived addresses, so changing the info string, paths, or coin-type mapping requires a versioned migration, never an edit.
+There's also a firm "no wrong keys" rule. If the master secret isn't available — say you're signed in with an outside wallet that doesn't support it — the Bitcoin wallet honestly reports itself as unavailable and explains why. It never improvises keys from some other source, because keys derived from the wrong material would be a *different wallet*, and someone's funds would be stranded behind a technical accident.
 
-Two invariants shape everything downstream. *Memory-only:* `btcSeed`, the BIP32 root, account xprvs, and child private keys are never persisted, logged, serialized, or transmitted — `frontend/src/lib/bitcoin/derivation.js` derives transiently and callers drop references after signing. *xpub confinement:* even the account xpubs stay in the client; the relay gateway sees bare addresses (at most 50 per call) and signed raw transactions, nothing else. A server that never holds keys or extended public keys cannot leak the wallet or link its full address graph.
+## Boundary 3: rotating addresses and coins that fail safe
 
-There is also a "no wrong keys" rule: if the master seed is unavailable — a non-PRF authenticator, an injected or WalletConnect EVM wallet — the Bitcoin wallet reports an honest `unavailable` state with the reason. It never falls back to deriving from other material, because a fallback derivation would be a *different wallet* holding someone's funds hostage to an implementation detail.
+Ethereum habits say "your address is your identity." Bitcoin practice says nearly the opposite: use a fresh receiving address every time. FairWins hands out a new address on each request, never reuses one, and keeps a simple forward-only counter of how far it has gone.
 
-## Boundary 3: Rotation, Recovery, and Coins That Fail Safe
+The saved list of addresses is treated as a convenience cache, not the source of truth. On a brand-new device, the wallet rediscovers your addresses by scanning forward until it sees a long-enough run of unused ones — the standard "gap limit" convention Bitcoin wallets have used for years — and picks up where it left off. Because the passkey seed plus the standard recipe *is* the backup, there's nothing Bitcoin-specific to write down.
 
-EVM habits say "your address is your identity." Bitcoin practice says the opposite: `frontend/src/lib/bitcoin/wallet.js` issues a fresh receive address per request and never repeats one. The rotation cursor per (network, address type) only increases, and the persisted ledger is explicitly a cache, never the source of truth. On a new device, gap-limit-20 discovery — scan sequential addresses, stop after 20 consecutive unused ones, the convention descended from [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)/BIP-44 wallets — rebuilds the issued set and resumes the cursor after the highest used index. Recovery needs no Bitcoin-specific backup because the passkey seed plus deterministic derivation *is* the backup.
+Spending is where Bitcoin's chunk-of-coins model bites hardest. Some Bitcoin coins carry collectible data ("Stamps") baked into that specific chunk; spend one as ordinary money and the collectible is destroyed forever. So FairWins classifies every coin before it can be selected for a payment, leaning deliberately cautious: a coin counts as spendable only when it has been *positively confirmed* to be an ordinary, collectible-free coin. If the service that recognizes collectibles is degraded or unreachable, those coins are held back from spending, not risked. Occasionally that means you can send a little less than your full balance during an outage — but the alternative, accidentally destroying a collectible, isn't reversible, so caution wins.
 
-Spending is where UTXO reality bites hardest. Bitcoin Stamps embed collectible data in specific UTXOs; spend one as ordinary money and the collectible is destroyed. FairWins classifies every coin before it can be selected:
+## Boundary 4: the fee you see is the most you'll pay
 
-```js
-if ((u.confirmations ?? 0) < 1) {
-  classification = 'pending'
-} else if (!recognitionHealthy) {
-  // Fail safe: nothing is positively stamp-free while recognition is down.
-  classification = 'unverified'
-} else if (stampByOutpoint.has(key)) {
-  classification = 'protected'
-} else {
-  classification = 'spendable'
-}
-```
+On the Ethereum side, FairWins can sometimes cover transaction fees for you. Bitcoin has no such arrangement, and the app says so plainly: **on Bitcoin, you pay the network fee.** What FairWins *can* promise is that the fee shown when you confirm is the ceiling — you will never be charged more than that.
 
-The polarity is the point: a coin is spendable only when *positively verified* stamp-free. If the stamps indexer is degraded or unreachable, coins classify `unverified` and coin selection treats them exactly like `protected` — excluded from sends and from spendable balance, shown as protected value. Over-protection temporarily shrinks what a member can send; the alternative is irreversibly destroying an asset during an outage.
+Fee estimates go stale fast, so a quote expires after about a minute; if it's older, the app throws it out and re-quotes before building anything, so a fee spike can't silently reprice your payment. The fee you confirm then becomes a hard limit at the last step: before signing, the app calculates the real fee and refuses to sign anything above what you approved. Tiny leftover change too small to be worth its own output is folded into the fee, and payments are sent in a way that lets a stuck transaction be bumped later if the network gets congested.
 
-## Boundary 4: Fees Are a Ceiling, Not an Estimate
+The server component for Bitcoin is deliberately dull: it checks that the feature is on, validates the request, enforces rate limits, and relays data to a public Bitcoin data provider. It never touches keys or funds, and the whole thing is optional — turn it off and every Bitcoin screen hides or degrades honestly. If it goes down entirely, none of the Ethereum-side money features are affected at all.
 
-On the EVM side, FairWins runs two gasless rails. Bitcoin has neither — there is no relayer and no paymaster for BTC, and the confirm UI says plainly that the member pays the network fee. What the platform *can* guarantee is that the fee the member confirmed is the most they will ever pay.
+## Why we built it this way
 
-Fee quotes (sat/vB tiers) expire after 60 seconds; `frontend/src/lib/bitcoin/send.js` rejects a stale quote with `stale_fee_quote` before a plan is even built, so a fee spike between quote and confirmation can never silently reprice a send. The confirmed fee then becomes a hard ceiling enforced at the signing layer in `frontend/src/lib/bitcoin/psbt.js`:
+A separate identity for Bitcoin beats a fake number: the shortcut would have been one line of code and an endless audit headache, whereas guarding every crossing turns a whole category of "wrong network" bugs into an impossibility. Reusing the passkey seed means no second recovery ritual, at the honest cost of a hard dependency — Bitcoin needs a passkey that supports it. Treating saved address state as a rebuildable cache means the wallet survives device loss with zero Bitcoin-specific backup. And throughout, the app prefers to fail safe over always acting: both the collectible check and the fee ceiling would rather refuse than act on unverified information, because a blocked send is recoverable while a destroyed collectible or a surprise fee is not.
 
-```js
-const feeSats = inSats - outSats
-if (feeSats < 0) throw new Error('psbt: outputs exceed inputs')
-if (feeSats > maxFeeSats) throw new FeeOverrunError(feeSats, maxFeeSats)
-```
+## Further reading
 
-`buildAndSignTx` computes the actual fee from inputs minus outputs *before* signing and refuses to produce a signature above `maxFeeSats` — the same shape as the EVM-side `maxFeeBps` rule from the FeeRouter work: the quote shown at confirmation is a binding maximum, not a talking point. Sub-dust change folds into the fee rather than creating an unspendable output, and sends are RBF-signaled per [BIP-125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) so a stuck transaction has an escape hatch.
-
-The server side, `services/relay-gateway/src/bitcoin/routes.js`, is a deliberately dumb proxy: killswitch check, enable check, parameter validation, per-IP quotas, TTL cache, then Esplora upstream. It never touches intents, funds, or keys. And the whole module is optional — with `BTC_ENABLED=false` or the killswitch active, every Bitcoin surface in the frontend hides or degrades honestly rather than pretending. A total gateway outage leaves every EVM value path untouched.
-
-## Design Decisions
-
-**String ids over a fake chainId.** A synthetic numeric id would have been one line of code and an unbounded audit surface — every chainId consumer forever suspect. Distinct types plus `isBitcoinNetworkId` guards cost more upfront and make the wrong crossing a type error instead of a runtime surprise.
-
-**One seed, domain-separated.** Deriving from the passkey master seed means no second recovery ceremony, at the price of hard coupling: Bitcoin availability requires a PRF-capable passkey. The availability matrix in the derivation contract makes that an honest, explained limitation rather than a silent failure.
-
-**Cache-as-ledger.** Treating persisted state as a rebuildable cache (gap-limit discovery, never-decreasing cursor) trades extra lookups on unlock for a wallet that survives device loss with zero Bitcoin-specific backup.
-
-**Fail-safe over available.** Both the stamps classifier and the fee ceiling prefer refusing to act over acting on unverified data. A blocked send is recoverable; a destroyed Stamp or an unexpectedly expensive transaction is not.
-
-**Scope discipline.** Portfolio, send, receive — nothing else. No wagers, no gasless, no contracts on Bitcoin. The capabilities map turns that scope into enforced configuration instead of tribal knowledge.
-
-## Sources
-
-- `specs/061-bitcoin-transactions/` — spec.md, plan.md, `contracts/key-derivation-btc.md`
-- `docs/developer-guide/bitcoin.md`, `docs/runbooks/bitcoin-operations.md`
-- `frontend/src/config/bitcoinNetworks.js`
-- `frontend/src/lib/bitcoin/` — `derivation.js`, `wallet.js`, `send.js`, `psbt.js`
-- `services/relay-gateway/src/bitcoin/routes.js`
-- [BIP-32: Hierarchical Deterministic Wallets](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
-- [BIP-84: Derivation scheme for P2WPKH](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)
-- [BIP-86: Key derivation for single-key P2TR outputs](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
-- [BIP-341: Taproot](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki) · [BIP-125: Opt-in RBF](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki)
-- [RFC 5869: HKDF](https://datatracker.ietf.org/doc/html/rfc5869) · [EIP-155: Chain ID](https://eips.ethereum.org/EIPS/eip-155)
+- [Bitcoin BIP-32: Hierarchical Deterministic Wallets](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) — how one seed grows a tree of keys
+- [BIP-84: native SegWit (`bc1...`) address derivation](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) and [BIP-86: Taproot addresses](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
+- [BIP-125: opt-in "replace-by-fee"](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) — bumping a stuck transaction
+- [WebAuthn / passkeys explained](https://webauthn.guide/) — the standard behind Face ID and fingerprint login

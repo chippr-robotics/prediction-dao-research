@@ -2,26 +2,26 @@
 
 ## X (Twitter)
 
-How do you run a hot gas key in production? Make sure the service that decides is never the service that signs. Our relayer splits policy (screening, quotas, killswitch) from execution (nonces, gas, KMS key) — worst case: censor, never steal. 🔗 <link> #web3 #infrastructure #gasless
+How do you run a funded gas wallet on the open internet safely? Make sure the service that decides is never the service that signs. FairWins splits the gasless server into a bouncer (screening, limits, emergency switch) and an engine (pays and confirms). Worst case: censor, never steal. 🔗 <link> #web3 #gasless #security
 
 ## LinkedIn
 
-Gasless transactions sound great until you're the one operating the relayer: a funded key on a server, accepting signed blobs from the open internet, paying gas for strangers.
+Gasless transactions sound great until you're the one running the server behind them: a funded wallet, accepting signed instructions from anyone on the internet, paying network fees for strangers.
 
-Part 2 of our Gasless Rails series covers how FairWins made that server safe to run — by splitting it in two. A policy gateway decides whether a transaction should exist; a separate execution engine decides how it gets mined. Neither can do the other's job.
+Part 2 of our Gasless Rails series covers how FairWins made that server safe to run — by splitting it in two. A bouncer decides whether a transaction should exist at all; a separate engine decides how it gets paid for and confirmed. Neither can do the other's job.
 
 The post walks through:
 
-- The policy/engine seam: the gateway recovers signers, screens them fail-closed against an on-chain sanctions guard, enforces quotas and spend caps — then hands the engine only `{to, data, speed}`, never the intent
-- Why the trust budget fits in a table: a full compromise of the hosted stack yields the gas balance plus the ability to refuse service — no user funds, no admin authority
-- How the same policy chassis serves two rails: relayed EIP-712 intents and an ERC-7677 verifying-paymaster endpoint for ERC-4337 UserOps, sharing one killswitch, one quota system, one audit stream
-- The never-stranded rule: every flow degrades to self-submit with an identical on-chain result, so the kill switch is cheap enough to actually pull
+- The seam between the two: the bouncer works out who really signed, screens them, enforces limits and spend caps — then hands the engine only a finished transaction, never the original instruction
+- Why the worst case fits in a small table: a full takeover of the hosted system yields the small gas balance plus the ability to refuse service — no user funds, no admin authority
+- How one checklist serves two gasless systems — user-signed instructions and sponsored fees for passkey (Face ID) wallets — sharing one emergency switch, one set of limits, one audit trail
+- The never-stranded rule: every flow falls back to self-pay with an identical on-chain result, so the emergency switch is cheap enough to actually pull
 
 Read it here: <link>
 
-If you operate relayers or paymasters: where do you draw the line between policy and execution — and what does a total compromise of your stack actually buy an attacker?
+Where would you draw the line between deciding and executing — and what would a total compromise of your setup actually buy an attacker?
 
-#web3 #ethereum #infrastructure #accountabstraction #relayer
+#web3 #gasless #infrastructure #security #fintech
 
 ## Image prompt (Gemini / Nano Banana)
 

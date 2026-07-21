@@ -2,28 +2,28 @@
 
 ## X (Twitter)
 
-Your on-chain RBAC is only as good as your admin UI. We found a role (`SANCTIONS_ADMIN_ROLE`) that existed in Solidity but not in the frontend — so the operator's tab was gated on full admin. How FairWins fixed it: one action, one role, contract to console. 🔗 <link> #solidity #web3 #rbac
+Your on-chain access control is only as good as your admin dashboard. We found a compliance permission that existed on the blockchain but not in the operator's screen — so the tab was hidden behind full admin. How FairWins fixed it: one action, one role, contract to console. 🔗 <link> #web3 #accesscontrol #security
 
 ## LinkedIn
 
-Least privilege dies quietly: not when a contract is exploited, but when an operator gets granted a bigger role "just so the tab shows up."
+Least privilege dies quietly: not when a contract is exploited, but when an operator gets handed a bigger role "just so the tab shows up."
 
-During FairWins' control-surface audit we found exactly that. Our compliance deny-list was gated on-chain by a dedicated `SANCTIONS_ADMIN_ROLE` — correct, narrow, auditable. But the frontend's role model didn't know the role existed, so the deny-list view required full `DEFAULT_ADMIN_ROLE`. The compliance officer couldn't reach her own tool without protocol-wide admin.
+While auditing its own controls, FairWins found exactly that. Our compliance block-list was guarded on-chain by a dedicated, narrow permission — correct and auditable. But the admin dashboard didn't know that permission existed, so the block-list screen required full administrator access. The compliance officer couldn't reach her own tool without being handed the keys to everything.
 
 The new post covers how we rebuilt both halves:
 
-- The role inventory: one user-purchasable role and six operator roles, all plain OpenZeppelin AccessControl `bytes32` hashes — no bespoke permission system
+- The permission inventory: one membership members buy, and six clearly bounded operator roles, all built on a standard, audited access-control library — no homegrown permission system
 - The "one action, one role" discipline, including the negative-space table of what each role explicitly cannot do
-- The `/admin` operations control plane: each view gated by the exact on-chain role its actions require, with a unit-testable pure-function nav model and per-contract grant routing
-- What deliberately stays off the panel: air-gapped upgrade keys, and a relay gateway with no remote admin API by design
+- The admin console that mirrors it: each screen shown only to operators who hold the exact permission its actions require
+- What deliberately stays off the console: air-gapped upgrade keys, and a relay service with no remote admin controls by design
 
-If you run privileged operations against smart contracts, the reusable idea is simple: model every on-chain role in your operator UI, or watch over-granting erode your least-privilege design.
+If you run privileged operations against smart contracts, the reusable idea is simple: model every on-chain permission in your operator UI, or watch over-granting erode your least-privilege design.
 
 Read it here: <link>
 
-How does your team keep operator UIs in sync with on-chain roles?
+How does your team keep operator dashboards in sync with real permissions?
 
-#smartcontracts #solidity #accesscontrol #web3 #platformengineering
+#smartcontracts #accesscontrol #web3 #platformengineering #security
 
 ## Image prompt (Gemini / Nano Banana)
 

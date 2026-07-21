@@ -2,7 +2,7 @@
 
 ## X (Twitter)
 
-A private bet with public enforceability: wager terms encrypted once, the key wrapped per participant with wallet-derived X-Wing keypairs (X25519 + ML-KEM-768), envelope on IPFS, 60-byte CID on-chain. Escrow + oracle pegging settle it automatically. 🔗 <link> #web3 #privacy
+A private bet with public enforceability: wager terms encrypted once, then the key re-wrapped for each participant using keys derived from their own wallets. The envelope lives off-chain; only a tiny reference goes on-chain. Escrow and market pegging settle it automatically. 🔗 <link> #web3 #privacy
 
 ## LinkedIn
 
@@ -11,9 +11,9 @@ Public prediction markets have a problem for professionals: your position is the
 Our engineering post on FairWins' private prediction markets shows how envelope encryption resolves this tension. It covers:
 
 - The five-stage contract lifecycle — creation, offer, consideration, acceptance, execution — mapped onto smart-contract escrow and automatic settlement
-- Envelope encryption in practice: terms encrypted once with a random key, then that key wrapped per participant using keypairs derived deterministically from each wallet's signature — no central key custody
-- Post-quantum protection via X-Wing (hybrid X25519 + ML-KEM-768) with ChaCha20-Poly1305, defending against harvest-now-decrypt-later attacks
-- Off-chain/on-chain separation: the encrypted envelope lives on IPFS while the chain stores only a CID, addresses, stakes, and outcome — so larger post-quantum ciphertexts cost no extra gas
+- Envelope encryption in practice: terms encrypted once with a random key, then that key re-wrapped for each participant using keys derived from their own wallet — so no central service ever holds a master key
+- Post-quantum protection via a hybrid scheme that pairs today's proven encryption with a quantum-resistant one, defending against "harvest now, decrypt later" attacks
+- Off-chain/on-chain separation: the encrypted envelope lives off-chain while the blockchain stores only a tiny reference, the addresses, stakes, and outcome — so larger ciphertexts cost no extra gas
 
 One thing we're explicit about: this privacy protects competitive intelligence and trading strategies, not illegal activity. Participants remain fully subject to applicable law and professional obligations.
 

@@ -1,30 +1,29 @@
-# Social & Image — The Nullifier System: A Privacy-Preserving Blocklist That Never Shipped
+# Social & Image — The Blocklist That Never Shipped: Voiding Bad Markets Without Publishing a Wall of Shame
 
 ## X (Twitter)
 
-"Nullifier" in Tornado = anti-double-spend. FairWins' "nullifier" = something else entirely: an RSA-accumulator blocklist that voids bad markets and proves a market is NOT revoked in ~256 bytes — no public blacklist. It's archived, and we explain honestly why. 🔗 <link>
+"Nullifier" in a coin mixer = anti-double-spend. FairWins explored something else entirely: a way to void bad markets and prove a market is NOT blocked in a tiny proof — with no public blacklist. It was shelved, and the new post explains honestly why. 🔗 <link>
 
-#ZK #privacy #cryptography
+#privacy #cryptography #moderation
 
 ## LinkedIn
 
-Moderating a permissionless market venue has an awkward requirement: you sometimes need to revoke a malicious market or a bad-actor address — but publishing a plaintext, fully-enumerable blocklist on-chain leaks your threat model and grows gas with every entry.
+Moderating an open marketplace has an awkward requirement: you sometimes need to revoke a scam market or a repeat bad actor — but posting a plaintext, fully-readable blocklist on a public blockchain broadcasts your threat model and grows in cost with every entry.
 
-FairWins' archived "nullifier system" reached for the same primitive the ZK-mixer world uses for its nullifier sets — an RSA accumulator — and pointed it at moderation instead of anonymity. The latest engineering post walks the design and is candid about the fact that it never reached a live network:
+FairWins explored a design that borrowed a trick from privacy tech — compress the entire blocklist into one small value, then prove a specific market is *not* on it without revealing the rest. The new design-history post walks it in plain terms and is candid that it never reached a live network:
 
-- Why "nullifier" here means *void*, not the Tornado/Semaphore anti-replay value — and where the two ideas genuinely overlap
-- Deterministic hash-to-prime + `A = g^(product of primes) mod n`: the whole revoked set collapses to one 256-byte value
-- Non-membership proofs via a Bezout witness — prove a market is clean without revealing the blocklist
-- The honest limits: a trusted-setup ceremony that was never run, enforcement off by default, and why FairWins shipped a sanctions guard instead
+- Why "nullifier" here means *void*, not the coin-mixer anti-double-spend value — and where the two ideas genuinely overlap
+- The everyday-analogy version: many blocked items threaded into a single compact seal, plus a short "certificate of innocence" for anything that's clean
+- The honest limits: a trusted-setup ceremony that was never performed, enforcement switched off by default, and why FairWins shipped a real sanctions check instead
 
-A clean case study in applying real accumulator cryptography to a set-membership problem — with the trade-offs on the label.
+A clean case study in reaching for exotic cryptography only when the problem truly needs it — trade-offs printed on the label.
 
 🔗 <link>
 
-When does a compact cryptographic accumulator actually beat a plain on-chain mapping for your use case — and is the trusted setup worth it?
+When does a compact cryptographic membership check actually beat a plain on/off list — and is the setup ceremony worth it?
 
-#ZeroKnowledge #Cryptography #Blockchain #SmartContracts #Privacy
+#Cryptography #Privacy #Blockchain #Moderation
 
 ## Image prompt (Gemini / Nano Banana)
 
-A clean modern editorial illustration in isometric style for a fintech-engineering blog banner. Central subject metaphor: a single glowing sealed vault-node or lockbox that many faint, ghostly geometric tokens flow toward, but instead of being listed on a public ledger they are absorbed and compressed into one small luminous cube — visualizing many blocked items collapsing into a single compact cryptographic value. Around it, a scattering of prime-number motifs and thin mathematical filament lines (modular-arithmetic curves) drift as translucent overlays. Composition: off-center focal cube on the right third, negative space on the left, subtle depth with layered planes. Color mood: deep navy and teal base with a single warm amber accent used only on the compressed cube and one proof-witness beam. Lighting: soft volumetric glow from the cube, cool ambient fill, gentle rim light on the geometric shapes. Slightly muted, precise, engineering-grade aesthetic — not flashy, not neon. No text, no logos, no watermarks. Aspect ratio 16:9.
+A clean modern editorial illustration in isometric style for a fintech-engineering blog banner. Central subject metaphor: a single glowing sealed vault-node or lockbox that many faint, ghostly geometric tokens flow toward, but instead of being listed on a public ledger they are absorbed and compressed into one small luminous cube — visualizing many blocked items collapsing into a single compact cryptographic value. Around it, a scattering of abstract number motifs and thin mathematical filament lines drift as translucent overlays. Composition: off-center focal cube on the right third, negative space on the left, subtle depth with layered planes. Color mood: deep navy and teal base with a single warm amber accent used only on the compressed cube and one thin proof beam. Lighting: soft volumetric glow from the cube, cool ambient fill, gentle rim light on the geometric shapes. Slightly muted, precise, engineering-grade aesthetic — not flashy, not neon. No text, no logos, no watermarks. Aspect ratio 16:9.

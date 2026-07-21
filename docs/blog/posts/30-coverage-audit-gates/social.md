@@ -1,29 +1,29 @@
-# Social & Image — Coverage and Audit Gates That Fail Loudly
+# Social & Image — Quality Gates That Fail Loudly
 
 ## X (Twitter)
 
-Our escrow contract once reported 0% coverage in CI. Nothing was broken — instrumentation ran the tests out of gas and the safety net lied. Fixing it meant a gate that fails a merge when coverage *drops*, not a report nobody reads. 🔗 <link>
+Our escrow contract once reported 0% test coverage. Nothing was broken — the measurement tooling ran the tests out of gas and the safety net lied. Fixing it meant a guardrail that blocks a change when coverage *drops*, not a report nobody reads. 🔗 <link>
 
-#SmartContracts #DevSecOps #Solidity
+#SmartContracts #DevSecOps #QualityGates
 
 ## LinkedIn
 
-A test suite that reports a false negative is more dangerous than one that fails outright — a broken test is loud, but a safety net quietly reporting your most critical contract as "untested" lets a real regression slip through unnoticed.
+A test suite that reports a false alarm is more dangerous than one that fails outright — a broken test is loud, but a safety net quietly reporting your most critical contract as "untested" lets a real regression slip through unnoticed.
 
-That happened to us. Coverage instrumentation inflated bytecode past the gas limit, 182 tests ran out of gas, and our funds-handling escrow contract read as 0% covered while the actual logic was fine. The blended coverage number dropped by half and meant nothing either way.
+That happened to us. The coverage tooling inflated the contract code past its execution budget, 182 tests ran out of gas, and our funds-handling escrow contract read as 0% covered while the actual logic was fine. The overall coverage number dropped by half and meant nothing either way.
 
-The fix wasn't "write more tests." It was building quality gates that can't be gamed into a false pass. The new post walks through:
+The fix wasn't "write more tests." It was building quality gates that can't be tricked into a false pass. The new post walks through:
 
-- Restoring a trustworthy measurement (instrumentation headroom gated behind a COVERAGE flag, so production gas stays realistic)
-- First-party accounting in post-processing — not skipFiles — to avoid corrupting source maps while excluding vendored code
+- Restoring a trustworthy measurement (extra execution headroom only in coverage mode, so production limits stay realistic)
+- Filtering out third-party code in accounting, not in measurement, so the numbers stay honest without corrupting line-attribution
 - A tiered, ratcheting threshold policy in one auditable file, where coverage can only go up
-- Being honest about which checks hard-block a merge (coverage, storage layout) vs. which are advisory review inputs (Slither, Medusa)
+- Being honest about which checks hard-block a merge (coverage, storage layout) vs. which are advisory review inputs (the heuristic security analyzers)
 
 The theme running through all of it: a "fail loudly" culture is only credible when you're precise about which checks are loud.
 
 How does your team draw the line between a blocking gate and an advisory one? 🔗 <link>
 
-#SmartContracts #DevSecOps #CodeCoverage #Solidity #EngineeringLeadership
+#SmartContracts #DevSecOps #QualityGates #EngineeringLeadership
 
 ## Image prompt (Gemini / Nano Banana)
 

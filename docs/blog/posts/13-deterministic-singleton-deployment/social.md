@@ -1,25 +1,25 @@
-# Social & Image — One Salt, Three Chains: What Deterministic Deployment Actually Buys You
+# Social & Image — One Address, Everywhere: Why Deterministic Deployment Matters
 
 ## X (Twitter)
 
-CREATE2 gives you the same address on every chain — until a constructor arg differs. How FairWins deploys via the Safe Singleton Factory, why the deploy script is idempotent, and why a per-chain resolver still does the real work. 🔗 <link> #Solidity #DevOps
+The same smart contract can live at the same address on every blockchain — until one setting differs. How FairWins keeps addresses reproducible across three chains, why re-running a deploy is a safe no-op, and why one source of truth for addresses does the real work. 🔗 <link> #Blockchain #Reliability
 
 ## LinkedIn
 
-The worst multi-chain bug ships silently: a redeploy mints a fresh address, the frontend gets updated, the subgraph doesn't, and the relay gateway keeps an address from a three-month-old env var. Nothing crashes — the systems just quietly drift apart.
+The worst multi-chain bug ships silently: a contract gets redeployed to a new address, the app is updated, the search index isn't, and a background service keeps an address from a config nobody remembers. Nothing crashes — the systems just quietly drift apart, and users see wagers that "exist" but never show up.
 
-Our latest FairWins engineering post walks through the two-layer defense we run across Mordor, Amoy, and Polygon:
+Our latest FairWins engineering post walks through the two-layer defense we run across three blockchains:
 
-- CREATE2 via the Safe Singleton Factory: same salt + same init code = same address, with human-readable versioned salts and idempotent deploy scripts (re-running is a safe no-op)
-- Where determinism honestly breaks: per-chain constructor args change the init code, and UUPS proxies aren't CREATE2 at all — their stability comes from in-place upgrades, not opcodes
-- One recorded deployment file per chain as the single source of truth, consumed three ways: regenerated frontend config, subgraph manifests, and a relay gateway that refuses to boot against an unknown target
-- Why "resolve per chain, every time" is the rule even for contracts that happen to share an address today
+- Reproducible addresses: with the right approach, the same contract lands at the same address on every chain, using human-readable versioned labels and deploys you can safely re-run
+- Where sameness honestly breaks: a per-chain setting changes the contract's contents and therefore its address, and our upgradeable contracts get their stability a different way entirely
+- One recorded file per chain as the single source of truth, consumed three ways: regenerated app config, search-index watch-lists, and a fee-sponsoring service that refuses to start against an unknown target
+- Why "look it up per chain, every time" is the rule even for contracts that happen to share an address today
 
 Read the full post: <link>
 
-How does your team keep contract addresses in sync across frontends, indexers, and off-chain services — computed, recorded, or something else?
+How does your team keep contract addresses in sync across apps, indexers, and background services — computed, recorded, or something else?
 
-#Solidity #DevOps #SmartContracts #Ethereum #web3
+#Blockchain #Reliability #SmartContracts #Web3
 
 ## Image prompt (Gemini / Nano Banana)
 

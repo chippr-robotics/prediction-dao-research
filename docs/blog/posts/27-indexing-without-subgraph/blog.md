@@ -1,251 +1,80 @@
-# Indexing Without a Subgraph
+# When the Search Index Isn't There
 
-*Keeping every read path working on a chain The Graph has never heard of*
+*Keeping every screen working on a blockchain that no indexing service has ever heard of*
 
 | | |
 | --- | --- |
 | **Series** | Multi-chain Infra (part 2) |
 | **Part** | 2 |
-| **Audience** | Data and infrastructure engineers |
-| **Tags** | `the-graph`, `subgraph`, `indexing`, `rpc`, `graceful-degradation` |
-| **Reading time** | ~8 minutes |
+| **Audience** | Product and infrastructure readers curious about blockchain data |
+| **Tags** | `indexing`, `the-graph`, `resilience`, `multi-chain` |
+| **Reading time** | ~7 minutes |
 
-## The chain with no indexer
+## The chain with no index
 
-We were deploying FairWins to Ethereum Classic — specifically the Mordor
-testnet, chain 63 — as a step toward broadening past Polygon. The contracts
-compiled, deployed, and verified. A member could create a wager, an opponent
-could accept it, and USDC moved exactly as it did on Polygon. Then someone
-opened the "My Wagers" list and it was empty. Not an error. Just empty, on an
-account that had three live wagers on-chain.
+We were deploying FairWins to Ethereum Classic as a step toward broadening past Polygon. A member could create a wager, an opponent could accept it, and USDC moved exactly as it did on Polygon. Then someone opened the "My Wagers" list, and it was empty. Not an error — just empty, on an account that had three live wagers sitting right there on the blockchain.
 
-The cause was not in our code. It was that The Graph's hosted and decentralized
-networks do not index Ethereum Classic. There is no provider you can deploy a
-subgraph to for chain 63. We could — and do — keep a subgraph manifest with
-Mordor's addresses and start blocks in `subgraph/networks.json`, but a manifest
-is not an endpoint. Without a running indexer, `SubgraphSource` had nothing to
-POST a GraphQL query to, so the list came back empty.
+The cause wasn't in our code. To understand it, you need one piece of background about how apps read blockchain history.
 
-This is the recurring shape of a multi-chain app: the indexing layer you lean on
-for one network simply does not exist on the next one. You can treat that as a
-hard dependency and let features break on unsupported chains, or you can treat
-the indexer as one of several interchangeable data sources and degrade to a
-slower path that always works. FairWins takes the second route. The rule we
-settled on: **every read path has an RPC-only fallback, and whether a chain uses
-the fast path is per-network metadata, not a global flag.**
+Reading the *current* state of a blockchain is easy — "what's this account's balance right now?" is a single quick question. But reconstructing *history* — "show me every wager this person has ever been part of, newest first" — is slow and awkward if you ask the blockchain directly. So most blockchain apps don't. They lean on a **search-index service**: a separate system that watches the chain, records everything relevant into a fast database, and answers rich history questions in milliseconds. The dominant one is called The Graph, and the little indexing recipe you give it is a "subgraph." Think of it as Google for one app's on-chain activity — instead of re-reading the whole chain every time, you query a tidy pre-built index.
 
-## "Does this chain have an indexer?" is per-chain data
+The problem on Ethereum Classic was simply this: **The Graph doesn't index that chain.** There is no service to point a subgraph at. Our app knew the contract addresses, but with no running index behind it, the history query had nothing to talk to — so the list came back empty.
 
-The decision is encoded directly on each network. In
-`frontend/src/config/networks.js` every entry declares a `subgraphUrl`, and two
-helpers read it:
+This is the recurring shape of a multi-chain app: the indexing service you lean on for one network simply doesn't exist on the next. You can treat that as a hard dependency and let features break on unsupported chains, or treat the index as *one of several interchangeable data sources* and fall back to a slower path that always works. FairWins takes the second route. The rule we settled on: **every screen that reads history has a fallback that talks directly to the blockchain, and whether a network has an index is a per-network setting, not a global switch.**
 
-```js
-export function getSubgraphUrl(chainId) {
-  const net = getNetwork(chainId)
-  return net?.subgraphUrl || null
-}
-export function hasSubgraph(chainId) {
-  return Boolean(getSubgraphUrl(chainId))
-}
-```
+## "Does this chain have an index?" is per-chain data
 
-Polygon (137) and Amoy (80002) carry a Studio endpoint; Mordor (63) and local
-Hardhat (1337) carry `null`. Resolution is strictly per-chain, which matters for
-correctness as much as for coverage: a Polygon endpoint is never queried while
-the wallet is connected to Mordor, so a testnet session can never surface
-mainnet wagers. Adding another un-indexed network later is a config change —
-set `subgraphUrl: null` and record the contract addresses — not a code change.
+The decision is recorded on each network individually: every network entry declares whether it has an index. Polygon and its test network carry one; Ethereum Classic and the local development chain carry none.
 
-## One boundary, two sources
+Keeping this strictly per-chain matters for correctness as much as coverage. A Polygon index is never queried while you're connected to Ethereum Classic, so a testnet session can never accidentally surface mainnet wagers. And adding another un-indexed network later is a configuration change, not a code change.
 
-The UI never talks to a data source directly. It goes through
-`frontend/src/data/wagers/WagerRepository.js`, a thin boundary bound to a chain
-id that picks a source for that chain:
+## One doorway, two sources behind it
 
-```js
-function resolveSourceKey(explicit, chainId) {
-  if (explicit && SOURCE_REGISTRY[explicit]) return explicit
-  const envSource = import.meta.env?.VITE_WAGER_SOURCE
-  if (envSource && SOURCE_REGISTRY[envSource]) return envSource
-  if (chainId != null) return hasSubgraph(chainId) ? 'subgraph' : 'registry'
-  return 'subgraph'
-}
-```
+The interface never talks to a data source directly. It goes through a single thin boundary, tied to whichever network you're on, that picks the right source. Two sources sit behind that doorway, and both hand back wagers in the exact same shape, so the list, detail, and report screens neither know nor care which one produced them:
 
-Two live sources implement the same `WagerSource` interface —
-`listPage`, `getById`, `syncIndex` — and both emit the identical mapped `Wager`
-shape, so the list, detail, and report views are agnostic to which one produced
-a page:
+- **The index source** — asks The Graph. Used when the network has an index.
+- **The direct source** — reads the blockchain directly. The default for any network without an index.
 
-- **`SubgraphSource`** — GraphQL against the chain's `subgraphUrl`. Used when
-  `hasSubgraph(chainId)` is true.
-- **`RegistrySource`** — direct RPC reads of the v2 `WagerRegistry`. The default
-  for any chain without a subgraph.
+Because the screens only know the doorway and a common wager shape, we could swap The Graph for a different indexing product later, or fall back to direct reads today, and nothing above the data layer would notice.
 
-(A third, `EventsSource`, reads the retired `FriendGroupMarketFactory` and is no
-longer in the automatic path; it survives only behind an explicit
-`VITE_WAGER_SOURCE=events` override.)
+## Why reading the chain directly is usually painful — and how we avoid it
 
-## Why RPC reads are usually painful — and how the registry avoids it
+The naive way to rebuild someone's wager history by reading the chain is to scan its event log — every "a wager was created" event, filtered to that user, from the contract's first day to now. This is exactly what falls apart on public blockchain nodes. Free endpoints reject wide scans with errors like "query returned too many results," so a from-the-beginning scan collapses into a flood of throttled, range-limited requests. It's the very problem an index exists to solve.
 
-The naive way to reconstruct a user's wagers over RPC is to scan event logs:
-`eth_getLogs` for `WagerCreated` filtered by the user, from the deployment block
-to head. This is exactly what breaks on public RPC nodes. Free endpoints for
-Amoy and Mordor reject wide block ranges — "query returned more than N results,"
-"block range too large" — so a from-genesis scan turns into a flood of
-range-limited requests and rate-limit errors. It is the same problem that a
-subgraph exists to solve.
-
-`RegistrySource` sidesteps log scanning entirely because the v2 `WagerRegistry`
-was built with a per-user index on-chain. The contract exposes purpose-built
-pagination views (`contracts/wagers/WagerRegistry.sol`):
-
-```solidity
-function getUserWagerCount(address user) external view returns (uint256);
-function getUserWagerIds(address user, uint256 offset, uint256 limit)
-    external view returns (uint256[] memory);
-function getUserWagers(address user, uint256 offset, uint256 limit)
-    external view returns (Wager[] memory);
-function getWager(uint256 wagerId) external view returns (Wager memory);
-```
-
-These are plain `view` calls — `eth_call`, not `eth_getLogs` — so no node
-rejects them for range. `RegistrySource` reads the count, then pages through the
-structs in fixed windows, capping the total pulled per account so a pathological
-user can't stall the UI:
-
-```js
-async function fetchAllForUser(contract, userAddress) {
-  const total = Number(await contract.getUserWagerCount(userAddress))
-  if (!total) return []
-  const count = Math.min(total, MAX_USER_WAGERS) // 500
-  const wagers = []
-  for (let offset = 0; offset < count; offset += PAGE) { // PAGE = 100
-    const limit = Math.min(PAGE, count - offset)
-    const [ids, structs] = await Promise.all([
-      contract.getUserWagerIds(userAddress, offset, limit),
-      contract.getUserWagers(userAddress, offset, limit),
-    ])
-    for (let i = 0; i < ids.length; i++) wagers.push(toWager(String(ids[i]), structs[i]))
-  }
-  return wagers
-}
-```
-
-Sort, filter, and pagination then happen client-side over this bounded set. One
-detail the RPC path actually improves on: v2 stores explicit `acceptDeadline`
-and `resolveDeadline` on-chain, which the subgraph's events do not carry, so
-`RegistrySource` populates deadlines directly instead of rehydrating them later.
+FairWins sidesteps log scanning entirely because the wager contract was built with a per-user index *baked into the contract itself.* The contract can answer, directly and cheaply, "how many wagers does this user have?" and "give me their wagers, one page at a time." These are the cheap kind of question no node rejects, so the direct source asks for the count and pages through the wagers in fixed-size windows, capping the total per account so one extreme user can't stall the screen. Sorting, filtering, and pagination then happen on the device over that bounded set. As a bonus, the direct path reads each wager's deadlines straight from the contract — data the index's event history doesn't even carry.
 
 ## Fallback is automatic, not just configured
 
-Missing configuration is only one way a subgraph becomes unavailable. The other
-is a configured endpoint that errors or goes down. `SubgraphSource` handles both
-by delegating to `RegistrySource` — and it labels the result so the difference
-is observable in telemetry rather than silent:
+A missing index is only one way things go wrong. The other is a configured index that errors or goes down. FairWins handles both the same way: if a history query to the index fails, it quietly retries through the direct-blockchain source instead — and labels the result so the switch shows up in monitoring rather than passing silently.
 
-```js
-try {
-  const data = await postGraphQL(subgraphUrl, PAGE_QUERY, variables)
-  // ... map rows, return { ..., source: 'subgraph' }
-} catch (err) {
-  console.warn('[SubgraphSource] falling back to RegistrySource (RPC):', err?.message)
-  const fallback = await RegistrySource.listPage({ userAddress, cursor, pageSize, sortKey, filter, chainId })
-  return { ...fallback, source: 'subgraph-fallback' }
-}
-```
+So an Ethereum Classic member uses the direct source because that chain has no index at all, while a Polygon member whose index is briefly unreachable falls through to the direct source and still sees their wagers. The feature never hard-fails just because a data source had a bad day.
 
-So a Mordor user hits `RegistrySource` because the chain has no `subgraphUrl`; a
-Polygon user whose indexer is briefly unreachable transparently falls to
-`subgraph-fallback` over RPC and still sees their wagers. The feature never
-hard-fails on a data-source outage.
+## The harder case: reports that need data direct reads can't cheaply give
 
-## The harder case: reports that need data the RPC can't cheaply give
+Not everything degrades this cleanly. The tax and activity report needs the specific transaction reference and network fee for every transfer — details the contract's paginated views don't return. On indexed networks that's one query. On an un-indexed one it isn't, so the report falls back to two steps: first it *lists* the user's wagers through the same doorway (so enumeration always works), then it does a **bounded** event scan per wager for the transaction detail — never from the beginning. Each wager's creation time gives a tight window to search, and the scan adjusts its own chunk size on the fly under a hard request budget: shrink and retry when a node complains, grow back when things go smoothly.
 
-Not everything degrades this cleanly. The tax/activity report
-(`frontend/src/data/reports/reportDataSource.js`) needs per-transfer transaction
-hashes and gas fees — data the pagination views don't return. On indexed chains
-this is one query: spec 017 added an immutable `WagerTransfer` entity carrying
-txHash, party, direction, token, amount, and timestamp, so `listTransfers` reads
-a user's whole history from the index with no log scan at all.
-
-On an un-indexed chain that path returns `null` and the report falls back to two
-steps. First it *enumerates* the user's wagers over RPC through the same
-`WagerRepository` (so enumeration always works). Then, because it still needs the
-txHash and gas per value movement, it does a **bounded** event scan per wager —
-but never from genesis. Each wager's `createdAt` gives a tight block window, and
-the scan uses adaptive chunking with a hard request budget:
-
-```js
-if (budget.used >= budget.max) { // SCAN_BUDGET = 60 calls per wager
-  throw new Error(
-    'This report period is too large to read from the network without the ' +
-    'indexing subgraph. Try a shorter period, or configure VITE_SUBGRAPH_URL...')
-}
-// on a range/limit error, shrink the chunk and retry; grow it back on success
-if (/range|limit|exceed|too many|big/i.test(msg) && chunk > MIN_CHUNK) {
-  chunk = Math.max(MIN_CHUNK, Math.floor(chunk / 4)); continue
-}
-```
-
-This is degradation that stays honest about its limits: the report works on
-Mordor, but when a requested window genuinely can't be scanned within budget it
-says so and suggests a shorter period, rather than silently returning a partial
-history that a member might file taxes against.
+This is degradation that stays honest about its limits. The report works on Ethereum Classic, but when a window genuinely can't be scanned within budget, it says so and suggests a shorter period — rather than silently returning a partial history a member might file taxes against.
 
 ## Degrade honestly, or hide honestly
 
-Some views can't be reconstructed over RPC at a reasonable cost, and the right
-answer there is to tell the truth rather than fake it. The token holders and
-activity panels are aggregate rollups that only a subgraph produces; on Mordor,
-`tokenSubgraph.js` returns `{ available: false }` and `HoldersPanel` /
-`ActivityPanel` render a plain "unavailable on this network" message
-(`docs/developer-guide/token-mint.md`). The underlying balances and events are
-still enforced on-chain — only the aggregated view is absent — so nothing about
-the guarantee changes, only the convenience layer.
+Some views simply can't be rebuilt from direct reads at a reasonable cost, and the right answer there is to tell the truth rather than fake it. The "token holders" and aggregate activity panels are exactly this: rollups only an index can produce. On a network without one, they render a plain "unavailable on this network" message. The underlying balances and events are still fully enforced on-chain — only the convenient aggregated view is missing — so nothing about the actual guarantees changes.
 
-Membership and role reads never had this problem: `hasRoleOnChain` and the Quick
-Start banner have always read `MembershipManager` over RPC and are chain-aware,
-so they work identically on indexed and un-indexed networks.
+Membership and role checks never had this problem, since they always read the blockchain directly and work identically on indexed and un-indexed networks alike.
 
-## Design decisions
+## Why we built it this way
 
-- **Per-chain source selection over a global switch.** Treating "has an indexer"
-  as network metadata means the same code serves Polygon, Amoy, Mordor, and
-  Hardhat, and a fifth network is a config entry. A global flag would have forced
-  a branch at every call site.
-- **A stable repository boundary.** Because the UI only knows `WagerRepository`
-  and a mapped `Wager` shape, swapping The Graph for Envio, Ponder, or Goldsky
-  later — or falling back to RPC today — is invisible above the data layer.
-- **Contract-supported pagination instead of log scanning.** Investing in
-  on-chain `getUserWager*` views is what makes the RPC path viable on nodes that
-  reject wide `eth_getLogs` ranges. The fallback is only cheap because the
-  contract was designed to be read directly.
-- **Bounded work with honest failure.** The report scan carries an explicit
-  request budget and a windowed range; when a request genuinely exceeds what a
-  public RPC can serve, it surfaces an actionable error instead of a silent
-  partial result. Correctness of a financial report outranks always returning
-  something.
+**Per-chain source selection over a global switch.** Treating "has an index" as network metadata means the same code serves every network, and a fifth one is a config entry rather than a branch at every call site.
 
-The trade-off is real: RPC reads are slower and coarser than an indexed query,
-client-side pagination is bounded rather than unlimited, and a few aggregate
-views are simply absent off the indexed chains. What we buy is that no member on
-an un-indexed network hits a broken screen. Every feature either works, works
-slower, or says plainly that it can't — and which of those happens is a property
-of the network config, not a bug waiting on a chain The Graph may never support.
+**A stable doorway.** Because the interface only knows the doorway and a common wager shape, swapping indexing providers later — or falling back to direct reads today — is invisible to everything above the data layer.
 
-## Sources
+**Contract-supported pagination instead of log scanning.** A per-user index inside the contract is what makes the direct path viable on nodes that reject wide scans. The fallback is only cheap because the contract was designed to be read directly.
 
-- `docs/developer-guide/networks-without-subgraph.md` — the per-chain data-source strategy
-- `frontend/src/data/wagers/WagerRepository.js` — the source-selection boundary
-- `frontend/src/data/wagers/RegistrySource.js` — RPC reads via registry pagination views
-- `frontend/src/data/wagers/SubgraphSource.js` — GraphQL source with automatic RPC fallback
-- `frontend/src/data/reports/reportDataSource.js` — indexed vs. bounded-scan report paths
-- `frontend/src/config/networks.js` — `subgraphUrl`, `getSubgraphUrl`, `hasSubgraph`
-- `contracts/wagers/WagerRegistry.sol`, `contracts/interfaces/IWagerRegistry.sol` — `getUserWagerCount` / `getUserWagerIds` / `getUserWagers` / `getWager`
-- `subgraph/README.md`, `subgraph/networks.json`, `subgraph/schema.graphql` — what the subgraph provides (`Wager`, `WagerTransfer`)
-- `specs/017-subgraph-v2-wager-transfers/` — the `WagerTransfer` entity for reports
-- `specs/015-mordor-network-deployment/` — Ethereum Classic / Mordor deployment
-- `docs/developer-guide/token-mint.md` — truthful "unavailable here" fallback for aggregate panels
-- The Graph documentation — supported networks and subgraph deployment: https://thegraph.com/docs/
+**Bounded work with honest failure.** The report scan carries an explicit budget; when a request genuinely exceeds what a public node can serve, it surfaces an actionable error rather than a silent partial result. For a financial report, correctness outranks always returning something.
+
+The trade-off is real: direct reads are slower and coarser than an indexed query, on-device pagination is bounded, and a few aggregate views are simply absent off the indexed chains. What we buy is that no member on an un-indexed network hits a broken screen. Every feature either works, works slower, or says plainly that it can't — and which of those happens is a property of the network's configuration, not a bug waiting on a chain the indexing service may never support.
+
+## Further reading
+
+- [The Graph documentation](https://thegraph.com/docs/) — what a subgraph is and which networks it supports
+- [Ethereum's `eth_getLogs` reference](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getlogs) — the event-scanning method that public nodes rate-limit
+- [Ethereum Classic](https://ethereumclassic.org/) — the network at the center of this story

@@ -5,112 +5,79 @@
 | | |
 |---|---|
 | **Series** | Identity & Access, part 2 |
-| **Audience** | Token designers, product engineers, growth |
-| **Tags** | `soulbound`, `erc721`, `tokenomics`, `memberships`, `access-control` |
-| **Reading time** | ~8 minutes |
+| **Audience** | Product managers, founders, growth teams, junior engineers |
+| **Tags** | `memberships`, `token-design`, `gifting`, `access-control` |
+| **Reading time** | ~7 minutes |
 
-> **Responsible use.** FairWins wagers are based on publicly available information and legitimate forecasting. Memberships gate access to that activity; they are not a mechanism for circumventing any law. All participants remain fully subject to applicable laws and compliance requirements, and every membership grant — however acquired — passes sanctions screening.
+> **Responsible use.** FairWins wagers are based on publicly available information and legitimate forecasting. Memberships gate access to that activity; they are not a mechanism for circumventing any law. All participants remain fully subject to applicable laws and compliance requirements, and every membership — however acquired — passes sanctions screening.
 
 ## The gift you can't give
 
-A FairWins membership is deliberately boring. You pay USDC — $2 for Bronze, $8 Silver, $25 Gold, $100 Platinum — and for 30 days your wallet can create and accept wagers, up to a per-tier throughput limit. The membership is **soulbound**: it lives at your address, it cannot be transferred, and there is no market for it. That's a feature. Access records that can move are access records that can be stolen, rented to sanctioned parties, or flash-loaned through a compliance check.
+A FairWins membership is deliberately boring. You pay in USDC — $2 for Bronze, $8 for Silver, $25 for Gold, $100 for Platinum — and for the next 30 days your wallet can create and accept wagers, up to a limit set by your tier. The membership is **soulbound**, a term for something permanently bound to a single wallet: it lives at your address, it can't be transferred, and there's no market for it. That's a feature, not a limitation. An access record that can move is an access record that can be stolen, rented out to a sanctioned party, or briefly borrowed to sneak past a compliance check.
 
-Then a product request landed: *let me buy a membership for a friend.* And its sibling: *let me resell the one I bought and don't want.* Both are completely reasonable — gift cards and secondary markets are table stakes for any paid product — and both are, on their face, impossible. A soulbound record keyed to an address has nothing to hand over. Making it transferable would torch the properties the platform depends on: sanctions screening happens when membership is granted, usage limits are tracked per address, and `WagerRegistry` trusts that the address holding a membership is the address that was screened.
+Then a product request landed: *let me buy a membership for a friend.* And its sibling: *let me resell the one I bought and don't want.* Both are completely reasonable — gift cards and resale markets are table stakes for any paid product — and both are, on their face, impossible. A record welded to your address has nothing to hand over. And making it movable would destroy the very properties the platform relies on: sanctions screening happens when membership is granted, usage limits are tracked per wallet, and the wager engine trusts that the wallet holding a membership is the one that was screened.
 
-The wrong fix is a "transfer with re-screening" function on the membership itself — a mutable access record with a moving owner, special-cased through every downstream read. The fix FairWins shipped in spec 026 is cleaner: don't make the membership transferable. Make the *right to claim one* transferable, and keep the two ideas in separate contracts with separate lifecycles.
+The tempting-but-wrong fix is to bolt a "transfer, and re-screen the new owner" button onto the membership itself — turning a fixed access record into a moving target every other part of the system has to special-case. The fix FairWins shipped is cleaner: don't make the *membership* transferable. Make the *right to claim one* transferable, and keep the two ideas in completely separate contracts.
 
 ## Two rails, one membership
 
-The first thing to notice is what "soulbound" means here. A FairWins membership is not an NFT with transfers disabled — it is not a token at all. It's a plain storage record inside `MembershipManager` (a UUPS proxy, spec 027), keyed by `(address, role)`:
+Start with what "soulbound" actually means here. A FairWins membership isn't an NFT with transfers switched off — it isn't a token at all. It's just a record in the platform's membership ledger, filed under your wallet address: which tier you have, when it expires, and how much of your usage limit you've used this month. There's no "transfer" button to disable because there's nothing to hand over — non-transferability simply falls out of how the data is shaped.
 
-```solidity
-// contracts/interfaces/IMembershipManager.sol
-struct Membership {
-    Tier    tier;        // None, Bronze, Silver, Gold, Platinum
-    uint64  expiresAt;
-    uint32  monthCount;  // rolling 30-day wager-creation counter
-    uint32  activeCount; // concurrent open wagers
-    uint64  monthAnchor;
-}
-```
+It's worth contrasting this with the popular "soulbound token" — a standard for NFTs permanently locked to a wallet but still visible in it. FairWins didn't need the token part at all: memberships are read by contracts, not shown off in wallets, so a plain ledger entry is simpler, cheaper, and has no transfer machinery to audit.
 
-There is no `transfer` to disable because there is nothing to transfer — non-transferability falls out of the data model rather than being enforced against it. (This is worth contrasting with the soulbound-token discourse around [EIP-5192](https://eips.ethereum.org/EIPS/eip-5192), which standardizes *locked* ERC-721s. EIP-5192 solves the problem of making a token non-transferable while keeping it wallet-visible. FairWins didn't need the token part at all: memberships are read by contracts, not displayed in wallets, so a mapping is simpler, cheaper, and has no transfer surface to audit.)
+Buying a membership directly writes that record: it screens the buyer against sanctions lists, pulls the tier's price in USDC, marks the tier and its expiry, and resets the usage counters. Thirty days later, it lapses.
 
-Direct purchase (`purchaseTier` / `purchaseTierWithTerms`) writes that record: sanctions screen the buyer, pull the tier's USDC price, set `tier` and `expiresAt`, reset the counters. Thirty days later it lapses.
+The new idea adds a **second way in** that lands on the exact same record. A **membership voucher** is a real, freely transferable NFT — think of it as a prepaid gift card for a membership — minted for the tier's normal price. The whole trick is in what a voucher *doesn't* do:
 
-Spec 026 adds a **second acquisition rail** that converges on the exact same record. `contracts/access/MembershipVoucher.sol` is a real, freely transferable ERC-721 — "FairWins Membership Voucher", symbol `FWMV` — minted for the tier's configured USDC price. The critical property is what a voucher *doesn't* do:
+- It grants **no membership** while you hold it. No clock is running, no usage limits accrue, your wallet has no access.
+- It **never expires.** A voucher is a bearer claim you can sit on for a year and still redeem into a fresh, full 30-day membership.
+- It **locks in its tier and duration at the moment it's minted.** If the team later reprices or retires that tier, the voucher still delivers exactly what it was bought for.
 
-- It confers **no membership** while held. `hasActiveRole` on the holder stays false; no clock starts, no limits accrue.
-- It never expires. A voucher is a bearer claim you can hold for a year and still redeem into a full 30-day membership.
-- It snapshots its `(role, tier, durationDays)` at mint. If the admin later reprices or deactivates the tier, the voucher still grants exactly what it was minted for.
-
-Because the voucher is inert, it is safe to trade. Gifting is a `transferFrom`. Reselling is any standard NFT marketplace — the contract advertises a best-effort [EIP-2981](https://eips.ethereum.org/EIPS/eip-2981) royalty to the treasury (2.5% default, hard-capped at 5% by `MAX_ROYALTY_BPS`; `setRoyaltyBps` reverts above it). Nothing about a transfer touches compliance, because nothing about a transfer grants access.
+Because the voucher is inert — it confers nothing until redeemed — it is completely safe to trade. Gifting it is an ordinary transfer. Reselling it works on any standard NFT marketplace. The contract even suggests a small resale royalty back to the treasury (2.5% by default, capped in the code at 5% so it can never be cranked higher). None of that touches compliance, because none of it grants anyone access.
 
 ## Redemption: where the rails converge
 
-The voucher becomes a membership through `redeemVoucher(uint256 voucherId, bytes32 acceptedTermsHash)` on `MembershipManager`. This is the single control point where everything a direct purchaser faces is imposed on the redeemer:
+A voucher becomes a membership at one moment: redemption. This is the single control point where everything a direct buyer faces gets applied to the person redeeming.
 
-```solidity
-// contracts/access/MembershipManager.sol — _redeemVoucher (abridged)
-if (IMembershipVoucher(v).ownerOf(voucherId) != actor) revert NotVoucherOwner();
-IMembershipVoucher.VoucherInfo memory info = IMembershipVoucher(v).voucherInfo(voucherId);
+In plain terms, the redemption does this, in order:
 
-Membership storage m = _memberships[actor][info.role];
-if (m.tier != Tier.None && m.expiresAt > block.timestamp) revert AlreadyActive();
+1. Confirm the person redeeming actually owns the voucher.
+2. Confirm they don't already have an active membership for that role.
+3. Screen them against the sanctions lists — and if they're listed, stop everything right here.
+4. Write the membership: grant the exact tier and duration the voucher locked in, reset the usage counters, record which terms they agreed to.
+5. Only then, as the very last step, burn the voucher.
 
-_screen(actor); // sanctions screen — fail-closed, before effects
+The ordering carries the product's failure semantics. If the redeemer is sanctioned, or already holds an active membership, the entire call is undone and the voucher is left **completely untouched** — still owned, still tradable. A legitimate buyer is never punished because some previous holder couldn't redeem, and because the voucher is destroyed only at the very end, any earlier failure rolls the whole thing back safely.
 
-m.tier = info.tier;                    // grant the snapshotted (role, tier)
-m.expiresAt = uint64(block.timestamp) + uint64(info.durationDays) * 1 days;
-m.monthCount = 0;
-m.monthAnchor = uint64(block.timestamp);
-_recordTerms(actor, info.role, acceptedTermsHash);
+Notice *who* gets screened: **only the person redeeming, and only at the moment of redemption.** Minters and resale buyers are deliberately not screened. That's a conscious trade-off: a sanctioned party could profit by reselling a voucher they never redeem. What they can never do is turn one into actual platform access, because the screen sits exactly where access is granted. Compliance lives at the point of *use*, not the point of *trade*.
 
-IMembershipVoucher(v).burn(voucherId); // interaction LAST — reverts roll everything back
-```
-
-The ordering is strict checks-effects-interactions, and it carries the product's failure semantics: if the redeemer is sanctioned, or already has an active membership for the role, the whole call reverts and the voucher is **untouched** — still owned, still tradable. A legitimate buyer is never punished because a previous holder couldn't redeem. The burn is the only external call, performed last, against a contract the manager itself was wired to via `setVoucher`.
-
-Note who gets screened: **only the redeemer, only at redemption.** Minters and secondary buyers are deliberately unscreened. That's an explicitly accepted tradeoff, recorded in the spec: a sanctioned party could profit from reselling a voucher without ever redeeming it. What they can never do is convert one into platform access, because the screen sits exactly where standing is granted — the same non-bypassable choke point the direct rail uses. Compliance lives at the point of *use*, not the point of *trade*.
-
-After redemption, the two rails are indistinguishable. `WagerRegistry` reads the same `Membership` struct either way and has no idea how it was acquired — spec 026's FR-008 makes that a hard requirement, verified by running the full membership and wager suites against both rails.
+After redemption, the two routes are indistinguishable. The wager engine reads the same membership record either way and has no idea how it was obtained — and that's a hard requirement, verified by running the full test suite against both routes.
 
 ## The economics are deliberately flat
 
-A voucher costs exactly the tier's configured price — the same `TierConfig.priceUSDC` the direct rail charges — so neither rail is cheaper and there's no mint-vs-purchase arbitrage. Proceeds go to the treasury **at mint** (the voucher does `token.safeTransferFrom(msg.sender, treasury_, cfg.priceUSDC)` before `_safeMint`), which works because granting a membership at redemption costs the platform nothing on-chain; no escrow or solvency reserve is needed for outstanding vouchers. There is no primary refund: minter's remorse is resolved by reselling or redeeming. And the on-chain `tokenURI` — self-contained JSON plus SVG, no IPFS dependency — literally says "Utility access token, not an investment" in the token description.
+A voucher costs exactly the tier's normal price — the same amount the direct route charges — so neither path is cheaper and there's no buy-here-redeem-there arbitrage to game. The money goes to the treasury the moment the voucher is minted, which works because granting the membership later costs the platform essentially nothing, so there's no need to hold reserves against outstanding vouchers. There are no primary refunds: buyer's remorse is resolved by reselling or redeeming. And the voucher's own artwork and description — generated entirely on-chain — literally reads "utility access token, not an investment."
 
-Batch buying and direct gifting arrive via a third contract, `contracts/access/VoucherBatchMinter.sol`, because the voucher is immutable and only ever mints one token to `msg.sender`. The helper's `mintBatch(role, tier, quantity, recipient)` pulls exactly `quantity × price` in one approval, loops the mints (capped at `MAX_QUANTITY = 50`), and forwards every token to the recipient in the same transaction. It is stateless and custody-free — no funds or NFTs at rest, allowance reset to zero after the loop via `forceApprove`, no admin, no withdrawal path, no upgradeability. If it isn't deployed on a network, single self-mint still works and the UI degrades honestly.
+Buying a batch of vouchers as gifts and sending them straight to a recipient is handled by a small, separate helper, since the voucher itself only mints one at a time. The helper pulls the exact total, mints the batch, and forwards every one to the recipient in a single transaction. It holds no funds at rest and has no admin or withdrawal path. If it isn't deployed on a given network, buying one at a time still works.
 
 ## Privacy: pseudonymity, stated plainly
 
-The voucher rail has a quiet second use. Because redemption only checks that the redeemer *owns* the voucher — never that they minted it — a holder can transfer a voucher to a fresh wallet and redeem there. The resulting membership record stores no back-reference to the mint or trade history, so wagering activity isn't on-chain-linked to the wallet that bought the voucher. The relayed twin `redeemVoucherWithSig` (spec 035's EIP-712 intent rail) goes further: since redemption moves no money, a relayer can submit it, so even the gas payer needn't be the trading wallet.
+The voucher route has a quiet second use. Because redemption only checks that you *own* the voucher — never that you *minted* it — you can move a voucher to a fresh wallet and redeem it there. The resulting membership keeps no back-reference to who bought it or how it changed hands, so your wagering activity isn't chained on the public ledger to the wallet that originally paid. A gasless version goes further: since redeeming moves no money, a helper service can submit the transaction for you, so even the wallet paying the network fee needn't be your trading wallet.
 
-The spec is emphatic about not overselling this. Mints, transfers, and burns are public ERC-721 events; anyone can watch a voucher move. What fresh-wallet redemption provides is **pseudonymity, not cryptographic unlinkability**, and FR-020 requires the UI to say exactly that. Zero-knowledge redemption was considered and explicitly scoped out.
+FairWins is careful not to oversell this. Voucher mints, transfers, and burns are all public events — anyone can watch a voucher move. What redeeming from a fresh wallet buys you is **pseudonymity, not cryptographic unlinkability**, and the interface is required to say exactly that.
 
 ## Design decisions
 
-**Mutable logic upgradeable, bearer asset immutable.** `MembershipManager` is a UUPS proxy — spec 026's redemption capability shipped as the first in-place, append-only upgrade of the spec 027 proxy (the `voucher` address slot consumed one `__gap` slot; `check:storage-layout` gates it in CI). The voucher is the opposite: intentionally *not* upgradeable, because a tradable bearer asset's rules must not change after purchase, and an immutable contract minimizes the attack surface on a USDC-taking token. Screening, Terms, and grant logic — the parts that must evolve — live behind the proxy; the thing people pay for is frozen.
+**Changeable logic, frozen asset.** The membership ledger can be upgraded in place — the voucher feature itself arrived as one such upgrade — because screening, terms, and grant logic must be able to evolve. The voucher is the opposite: deliberately *not* upgradeable, because the rules of a tradable, paid-for bearer asset must not change after someone buys it. The thing people pay for stays fixed; the machinery around it can improve.
 
-**The membership is a mapping, not a locked NFT.** No transfer function to disable, no operator approvals to reason about, no EIP-5192 lock semantics to implement. The cost is wallet invisibility, which doesn't matter for a record only contracts read.
+**The membership is a ledger entry, not a locked NFT.** No transfer function to disable, no locked-token standard to implement. The only cost is that it's invisible in your wallet — which doesn't matter for something only contracts ever read.
 
-**Least privilege at the seam.** The manager never gets broad minting rights over vouchers, and the voucher never writes memberships. The voucher's `burn` accepts exactly two callers — the owner (or approved operator) and the `membershipManager` address — so redemption authority is scoped to the one action redemption needs (FR-025).
+**Royalty as a hint, not a cage.** Forcing royalties would mean whitelisting marketplaces or running our own, killing open trading and the trade privacy that comes with it. A flat, capped suggestion keeps the utility framing honest, accepts that some marketplaces will ignore it, and lets the platform earn reliably on the first sale.
 
-**Royalty as a hint, not a cage.** Enforced royalties would mean allowlisted operators or a platform marketplace, killing open composability and trade privacy. A flat 2.5% EIP-2981 hint with a contract-enforced 5% ceiling keeps the utility framing defensible and accepts that some marketplaces will ignore it — the platform earns reliably on the primary mint.
+The general pattern travels well. When you need a token to be *both* non-transferable (for compliance and integrity) *and* transferable (for gifting and resale), you don't need one token that does both badly. You need two artifacts — an inert, tradable *claim* and a soulbound *grant* — joined by a single, guarded redemption that burns one and writes the other.
 
-**Screening only where standing is granted.** One choke point, identical for both rails, fail-closed, with the documented residual that unredeemed vouchers trade unscreened.
+## Further reading
 
-The general pattern travels well: when you need a token to be both non-transferable (for compliance and integrity) and transferable (for gifting and resale), you don't need one token that does both badly. You need two artifacts — an inert, tradable *claim* and a soulbound *grant* — joined by a single, guarded redemption that burns one and writes the other.
-
-## Sources
-
-- `specs/026-membership-vouchers/spec.md` — voucher rail requirements, clarifications, accepted tradeoffs
-- `specs/027-upgradeable-membership/` — UUPS migration of the membership authority
-- `contracts/access/MembershipManager.sol` — `_purchaseTier`, `_redeemVoucher`, `redeemVoucherWithSig`, storage layout and `__gap`
-- `contracts/access/MembershipVoucher.sol` — mint, snapshot, burn authorization, EIP-2981, on-chain `tokenURI`
-- `contracts/access/VoucherBatchMinter.sol` — custody-free batch/gift helper
-- `contracts/interfaces/IMembershipManager.sol` — `Membership`, `TierConfig`, `Tier`
-- `docs/system-overview/roles-and-tiers.md` — tier table ($2/$8/$25/$100, 30-day terms) and role model
-- [ERC-721: Non-Fungible Token Standard](https://eips.ethereum.org/EIPS/eip-721)
-- [EIP-2981: NFT Royalty Standard](https://eips.ethereum.org/EIPS/eip-2981)
-- [EIP-5192: Minimal Soulbound NFTs](https://eips.ethereum.org/EIPS/eip-5192)
-- [OpenZeppelin Contracts — ERC721, ERC2981, AccessControl](https://docs.openzeppelin.com/contracts)
+- ERC-721, the non-fungible token standard the voucher is built on: https://eips.ethereum.org/EIPS/eip-721
+- EIP-2981, the NFT royalty standard: https://eips.ethereum.org/EIPS/eip-2981
+- EIP-5192, the minimal soulbound (locked) NFT standard discussed above: https://eips.ethereum.org/EIPS/eip-5192
+- OpenZeppelin Contracts, the audited building blocks behind the token and access logic: https://docs.openzeppelin.com/contracts

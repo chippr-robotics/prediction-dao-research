@@ -2,9 +2,9 @@
 
 ## X (Twitter)
 
-Most "DAO aggregators" make you delegate to a contract they control. ClearPath's
-ExternalDAORegistry owns nothing: an ERC-165 `IGovernor` probe records that a DAO exists —
-no key, no role, no authority. Every vote stays member-signed. 🔗 <link>
+Most "DAO aggregators" make you delegate your votes to a contract they control. ClearPath's
+registry owns nothing: a quick check confirms an address really is a DAO, then records that it
+exists — no key, no role, no authority. Every vote stays signed by you. 🔗 <link>
 
 #DAO #web3 #interoperability
 
@@ -14,26 +14,25 @@ The moment a DAO registry can act *on behalf of* the DAOs it references, it beco
 liability — a new key to steal, a new trust assumption, a new thing an auditor has to
 reason about. For a non-custodial platform, that's the wrong default.
 
-ClearPath (FairWins specs 030 + 042) takes the opposite position: a registry that owns
-nothing. The new post walks the design:
+ClearPath takes the opposite position: a registry that owns nothing. The new post walks the
+design:
 
-- The on-chain `ExternalDAORegistry` — five fields per entry, ids starting at 1, an
-  append-only storage layout gated in CI, and an ERC-165 + defensive-view probe that
-  proves an address is really a Governor before recording it.
-- Why it imports OpenZeppelin's `IGovernor` interface only (never the implementation) — the
-  trick that lets one registry serve DAOs on pre-Cancun Ethereum Classic and Ethereum
-  mainnet from the same bytecode.
-- Invariant INV-4: registration is metadata, not power. No sanctions screen, no quota, no
-  authority. Every governance action stays member-signed against the DAO's own contract.
-- How multi-network support was layered on as a frontend-only change — registry-optional
-  tracking, per-chain aggregation via `Promise.allSettled`, and pluggable per-framework
-  connectors (OZ Governor + GovernorBravo) — with zero new contract deploys.
+- The on-chain registry — a few facts per entry, an append-only layout checked before every
+  upgrade, and a two-tier probe that proves an address is really a DAO before recording it.
+- Why it borrows only the *shape* of a governance contract, never a full implementation — the
+  trick that lets one registry serve DAOs on a lightweight older network and on Ethereum from
+  the same code.
+- The core principle: registration is metadata, not power. No sanctions screen, no quota, no
+  authority. Every governance action stays signed by the member, sent to the DAO's own contract.
+- How multi-network support was added as a frontend-only change — registry-optional tracking,
+  parallel aggregation across networks, and pluggable per-framework connectors — with zero new
+  contract deployments.
 
 How do you draw the line between a useful DAO registry and an over-privileged one?
 
 🔗 <link>
 
-#DAO #SmartContracts #web3 #Ethereum #Interoperability
+#DAO #Governance #web3 #Ethereum #Interoperability
 
 ## Image prompt (Gemini / Nano Banana)
 

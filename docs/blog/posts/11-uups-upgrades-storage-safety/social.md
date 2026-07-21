@@ -2,26 +2,26 @@
 
 ## X (Twitter)
 
-Shipping new logic to a live escrow contract without stranding a wager: 7 UUPS proxies, one ~40-line shared base, and a CI gate that diffs storage layouts against the deployed impl before merge. The `__gap` shrank 50→48→45 — on purpose. 🔗 <link> #Solidity #UUPS #web3
+How do you ship new logic to a live escrow contract without stranding people's money? Renovate the building without changing its address: a permanent front door, swappable logic behind it, and an automated check that refuses any change that would scramble the records. 🔗 <link> #web3 #smartcontracts #security
 
 ## LinkedIn
 
-Every Solidity team eventually faces the same problem: the contract holding user funds needs new logic, but a fresh deployment starts with empty storage — stranding every balance and mapping at the old address.
+Every smart-contract team eventually faces the same problem: the contract holding user funds needs new logic — but historically, "changing" a contract meant deploying a fresh one at a new address, stranding every balance at the old one.
 
-Our latest engineering post walks through how FairWins made in-place upgrades boring (in the best way) across seven UUPS proxies, from the wager escrow to the fee router:
+Our latest post walks through how FairWins made in-place upgrades boring (in the best way), using an analogy: renovating a building without changing its street address. The tenants, mail, and lease stay put; only the interior gets redone.
 
-- A single shared base, `UUPSManaged`, that locks out implementation hijacking (`_disableInitializers`), separates `UPGRADER_ROLE` from admin, and keeps the upgrade path non-brickable by construction
-- Constructor-to-`initialize` conversion, including the silent bug everyone hits: inline state initializers that never run behind a proxy
-- Append-only storage with a trailing `__gap` that shrinks by exactly the slots each upgrade appends — with the real history from two shipped upgrades
-- A CI-gated storage-layout check that validates new code against the *recorded deployed implementation*, so a state-corrupting upgrade fails the build instead of corrupting funds
+- A single shared foundation that locks the door on hijacking a fresh renovation, keeps upgrade power separate, and makes it impossible to lose the ability to upgrade again later
+- The silent bug everyone hits: setting starting values the "old" way, which quietly never takes effect behind a permanent front door
+- Append-only records — think numbered shelves you only ever add to — so an upgrade can never scramble what's already stored
+- An automated check that compares proposed new logic against what's actually running live, and fails the build before a fund-corrupting change can ship
 
-We also cover the honest trade-off: upgradeability is a trust statement, and some contracts (like bearer-asset NFTs) deliberately stay immutable.
+We also cover the honest trade-off: upgradeability is a trust statement, and some contracts (like a permanent bearer collectible) deliberately stay immutable.
 
 Read the full post: <link>
 
-How does your team gate storage-layout compatibility — CI, deploy-time validation, or both?
+How does your team keep upgrades from corrupting live state — automated checks, deploy-time validation, or both?
 
-#Solidity #SmartContracts #UUPS #DevOps #Ethereum
+#web3 #smartcontracts #security #fintech #engineering
 
 ## Image prompt (Gemini / Nano Banana)
 

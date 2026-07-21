@@ -1,150 +1,90 @@
-# Three Kinds of Truth, One Interface: The Oracle Adapter Layer
+# Three Kinds of Truth, One Referee Slot: How FairWins Settles a Bet
 
-*How a single `IOracleAdapter` contract interface absorbs push feeds, request/callback oracles, optimistic dispute, and Polymarket's resolved markets — without the escrow contract knowing the difference*
+*How four very different sources of truth — live price feeds, on-demand data lookups, human-judgment disputes, and resolved prediction markets — all plug into the same slot, so the escrow never has to know the difference*
 
 | | |
 |---|---|
 | **Series** | Prediction Markets (part 2) |
 | **Part** | 15 of 34 |
-| **Audience** | Oracle integrators, smart-contract engineers |
-| **Tags** | `oracles`, `chainlink`, `uma`, `polymarket`, `adapter-pattern` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product managers, founders, and the crypto-curious |
+| **Tags** | `oracles`, `prediction-markets`, `how-it-works` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-> **Important Note**: This article describes prediction markets based on publicly available information and legitimate forecasting. Oracle-settled wagers are not a mechanism for trading on material non-public information or circumventing securities regulations. All participants remain fully subject to applicable laws and compliance requirements.
+> **Responsible-use note.** This article describes prediction markets based on publicly available information and legitimate, skill-based forecasting. Oracle-settled wagers are not a mechanism for trading on material non-public information or circumventing securities regulations. All participants remain fully subject to applicable law and compliance obligations in their jurisdiction.
 
 ---
 
-## Three wagers, three truths
+## Three wagers, three kinds of truth
 
 Consider three wagers a member might create on FairWins:
 
-1. *"ETH closes above $4,000 on September 30."* The truth is a number that a Chainlink price feed already publishes on-chain, continuously, whether anyone asks or not.
-2. *"The city's open-data API reports more than 40mm of rainfall for October."* The truth lives behind an HTTPS endpoint. Nothing on-chain knows it until someone goes and fetches it.
-3. *"The Meridian–Vantage merger closes before Q3."* The truth is a human judgment about a messy real-world event. No feed publishes it; no API is authoritative. Someone has to assert it, and someone else has to be able to dispute them.
+1. *"ETH closes above $4,000 on September 30."* The truth is a number that a well-known price feed already publishes on the blockchain, continuously, whether anyone asks or not.
+2. *"The city's open-data service reports more than 40mm of rainfall for October."* The truth lives behind a web address. Nothing on the blockchain knows it until someone goes and fetches it.
+3. *"The Meridian–Vantage merger closes before the third quarter."* The truth is a human judgment about a messy real-world event. No feed publishes it and no service is authoritative. Someone has to assert it, and someone else has to be able to dispute them.
 
-Each of these needs a fundamentally different oracle. The first is a **push feed**: data arrives on-chain on the oracle's schedule and you read the latest value. The second is **request/callback**: you send a request, a decentralized network executes it off-chain, and the answer comes back in an asynchronous callback. The third is **optimistic dispute**: anyone may assert the answer with a bond; the assertion stands unless challenged within a liveness window, and challenges escalate to a voting-based resolution.
+Each needs a fundamentally different referee — an oracle, meaning the trusted outside source that tells the contract who won. The first is a live feed: data arrives on the blockchain on its own schedule and you read the latest value. The second is an on-demand lookup: you ask a question, a network fetches the answer off the blockchain, and it comes back a moment later. The third is a dispute process: anyone may assert the answer by putting up a deposit, and the assertion stands unless someone challenges it within a set window.
 
-FairWins' escrow contract — the `WagerRegistry` covered in part 1 — should not care about any of this. It holds two stakes and needs exactly one bit: did YES win? The engineering problem is designing the seam so that four very different resolution machines (the three above, plus reading Polymarket's already-resolved markets) all collapse to that one bit, with the same failure semantics, behind the same interface.
+Here's the key idea. The FairWins escrow — the wager engine from part 1 — should not care about any of this. It holds two stakes and needs exactly one fact: did the "yes" side win? The engineering challenge is designing a single slot so that four wildly different referees all reduce to that one yes-or-no answer, with the same behavior when the answer isn't available yet.
 
-## The interface: one bit, one sentinel
+## The slot: one yes-or-no, one "not yet"
 
-The seam is `contracts/oracles/IOracleAdapter.sol`. Every adapter — Polymarket, Chainlink Data Feeds, Chainlink Functions, UMA Optimistic Oracle V3 — implements it. The heart of the interface is two functions:
+Every referee, no matter how it works inside, plugs into the same standard slot and answers two questions: has this been decided yet, and if so, who won? The answer to "who won" is deliberately just a single yes-or-no. FairWins wagers are binary — the creator takes one side, the opponent the other — so every referee's richer internal output (numbers, arrays, verdicts) gets boiled down to one bit right at the boundary, keeping the escrow's settlement logic to a single shape of answer.
 
-```solidity
-function isConditionResolved(bytes32 conditionId)
-    external view returns (bool resolved);
+One more convention does a surprising amount of work: asking a referee is always safe and never errors out. If the answer isn't ready, it simply reports "not resolved yet." That lets the app, the escrow, and automated helpers all check in cheaply and often — and, as we'll see, it lets an undecidable outcome route to a refund instead of a wrong payout. Each referee also advertises whether it's available on a given network, so the app can hide a settlement option that isn't wired up rather than let a member start a wager that would dead-end.
 
-function getOutcome(bytes32 conditionId) external view returns (
-    bool outcome,      // true if the "YES" or "PASS" side won
-    uint256 confidence, // basis points, 10000 = 100%
-    uint256 resolvedAt  // timestamp; 0 = not resolved
-);
-```
+## How the escrow stays referee-agnostic
 
-Three conventions do the real work:
+The escrow keeps a small directory: for each kind of oracle settlement, which referee to consult. Wiring one up is an admin action; leaving one unset disables that option on that network. The referee is consulted at exactly two moments.
 
-**`bytes32 conditionId` is the universal key.** Each adapter defines what a condition id *means* — a Polymarket CTF condition hash, an admin-registered feed-threshold config, a Functions request template, an UMA claim — but to the registry it is an opaque 32-byte handle stored on the wager.
+At creation, the escrow checks that an oracle-settled wager names a valid question, that a referee for its type is configured, and — importantly — that the question hasn't already been decided. You can't open a wager on an outcome the referee has already called.
 
-**The outcome is a `bool`, deliberately.** FairWins wagers are binary: creator takes one side, opponent takes the other. Collapsing every oracle's richer output (payout numerator arrays, `int256` feed answers, DON byte responses, assertion verdicts) down to a single bool at the adapter boundary means the registry's settlement code has exactly one shape.
+At settlement, anyone may trigger resolution. This is permissionless on purpose: the outcome is a pure fact of public record, so there's no reason to restrict who pushes the button. The escrow looks up the right referee, asks who won, and pays out — or, if the answer is "not yet," waits. That's the entire connection; the escrow contains no referee-specific code at all.
 
-**`resolvedAt == 0` is the unresolved sentinel.** `getOutcome` is a view; it never reverts on "not yet." A zero timestamp tells the caller there is nothing to act on. This one convention carries surprising weight, as we'll see with Polymarket ties.
+## Referee one: reading a resolved prediction market
 
-The interface also carries operational surface: `oracleType()` (a human-readable tag like `"Polymarket"` or `"UMA-OOv3"`), `isAvailable()` (is the underlying oracle actually deployed and responsive on this network?), `isConditionSupported`, and `getConditionMetadata`.
+The simplest referee doesn't run an oracle at all — it reads the output of one. Large public prediction markets already resolve their questions and publish the result on the blockchain. This referee looks up that published result and maps it to a plain yes-or-no. It costs almost nothing to operate — no deposits, no subscriptions, no data to curate — which is why it's the model FairWins offers first.
 
-## The consumer: how `WagerRegistry` stays oracle-agnostic
+The subtle case is a tie. These markets occasionally resolve 50/50 — an "invalid" or disputed outcome. That's not a decidable yes-or-no, and paying either side would be wrong. So the referee reports "not resolved" even though the market technically settled, and the escrow reads that as "resolved tie" and settles the wager as an immediate draw: both stakes returned. The failure mode of an undecidable question is a refund, never a coin flip.
 
-The registry (`contracts/wagers/WagerRegistryCore.sol`) holds a dedicated `IOracleAdapter public polymarketAdapter` slot — kept for ABI compatibility with the original Polymarket-only design — plus a generic registry for everything after it:
+The trade-offs: you can only wager on questions the market already lists, and the timing is out of your hands. In exchange, it's nearly free to run.
 
-```solidity
-mapping(ResolutionType => IOracleAdapter) public oracleAdapters;
-```
+## Referee two: a threshold on a live price feed
 
-`ResolutionType` (in `contracts/interfaces/IWagerRegistryTypes.sol`) enumerates `Polymarket`, `ChainlinkDataFeed`, `ChainlinkFunctions`, and `UMA` alongside the human-arbitrated types. Admins wire adapters with `setPolymarketAdapter` / `setOracleAdapter`; an unset adapter simply disables that resolution type on that network.
+The second referee turns a continuously-updated price feed into a yes-or-no. An admin registers a condition like "is this feed above this number after this date?" Once the date passes, anyone can trigger the evaluation: it reads the feed, insists the reading is fresh enough (rejecting stale data), compares it to the threshold, and locks in the answer.
 
-The adapter is consulted at exactly two moments in a wager's life:
+The trade-offs: this only answers questions that boil down to "a number versus a threshold at or after a time." But for those it's the cheapest and lowest-trust of the four, because the data is already on the blockchain and anyone can trigger the check. The honest caveat: the reading is the latest value at the moment someone evaluates, not the exact value at the deadline instant — though the freshness requirement bounds this.
 
-**At creation**, `_checkOracleLinkage` enforces that an oracle-typed wager carries a non-zero condition id, that the adapter for its type is configured, and — the stale-condition mitigation — that the condition is *not already resolved*. You cannot open a wager on an outcome the oracle has already decided.
+## Referee three: an on-demand lookup for arbitrary data
 
-**At settlement**, anyone may call `autoResolveFromPolymarket(wagerId)` or the generic `autoResolveFromOracle(wagerId)` (both live in the `WagerRegistryIntents` facet; part 1 covered why the registry is two facets behind one proxy). The path is permissionless by design — settlement is a pure function of public oracle state, so there is no reason to gate who triggers it. The generic path is four lines of essence: look up the adapter for `w.resolutionType`, call `getOutcome`, revert `ConditionNotResolved` if `resolvedAt == 0`, otherwise settle the win.
+The third referee handles truths that live behind a web service. It registers a small, pinned script describing exactly what to fetch, then anyone can request resolution: a decentralized network runs the script off the blockchain and delivers the answer back a moment later, which gets locked in.
 
-That's the whole coupling. The registry never imports a Chainlink or UMA interface.
+Because the answer comes back asynchronously, two safeguards matter. A second request is blocked while one is in flight, and a failed fetch leaves the question unresolved — so a flaky data source means "try again," never "wrong answer locked in forever."
 
-## Adapter one: Polymarket, reading someone else's settled truth
+The trade-offs: maximum flexibility — any public data a script can reach — paid for in trust and upkeep. You're trusting the registered script and the service it queries. There's a funded subscription to maintain, and the round trip means settlement takes two steps.
 
-`contracts/oracles/PolymarketOracleAdapter.sol` doesn't run an oracle at all — it reads the output of one. Polymarket markets settle on the Gnosis Conditional Token Framework (CTF), where a condition id is `keccak256(oracle, questionId, outcomeSlotCount)` and resolution is a pair of payout numerators: `[1,0]` means YES, `[0,1]` means NO. The adapter fetches `getPayoutNumerators` from the CTF contract (Polygon only — Polymarket runs nowhere else), caches the result, and maps `payouts[0] > payouts[1]` to `outcome = true`.
+## Referee four: truth by unchallenged assertion
 
-The subtle case is a tie. Polymarket markets occasionally resolve 50/50 — an "invalid" or UMA-disputed market. Equal numerators are not a decidable YES/NO, and paying either side would be wrong. The adapter's answer is the sentinel:
+The fourth referee handles the merger question — outcomes that need human judgment. Someone asserts the answer and puts up a deposit. If nobody disputes it within a set window, the assertion is accepted as truth. If someone does dispute it, the question escalates to a broader token-holder vote, and the verdict comes back the same way. The referee doesn't care whether the answer arrived quietly or after a fight — it just records it.
 
-```solidity
-// A tie (equal payout numerators — e.g. a 50/50 split or an
-// "invalid"/UMA-disputed Polymarket resolution) is not a decidable
-// YES/NO outcome. Return the unresolved sentinel (resolvedAt=0) so
-// WagerRegistry leaves the wager unsettled and the deadline-based
-// refund path returns both stakes, rather than paying a fixed side.
-if (cached.passNumerator == cached.failNumerator) {
-    return (false, 0, 0);
-}
-```
+The trade-offs: this is the only one of the four that can answer genuinely arbitrary questions — at the cost of capital (someone must post a deposit), time (the challenge window is a floor on resolution), and an economic assumption: an unchallenged false assertion wins, so the deposit has to make it worthwhile for honest people to watch.
 
-On the registry side, `autoResolveFromPolymarket` disambiguates: `resolvedAt == 0` *plus* `isConditionResolved() == true` means "resolved tie," and the wager settles as an immediate draw — both stakes back. A genuinely unresolved market reverts and the deadline-based refund path remains the backstop. The failure mode of an undecidable question is a refund, never a coin-flip payout.
+## The shared discipline
 
-**Trade-offs:** you can only wager on questions Polymarket already lists; resolution timing is entirely external; and you inherit Polymarket's own resolution stack (which is itself UMA underneath). In exchange, the adapter is nearly free to operate — no bonds, no subscriptions, no feed curation — which is why it's the model FairWins exposes first.
+The four referees agree on more than the slot. Each remembers its answer after the first resolution, so future checks are cheap. Each makes triggering settlement open to anyone while keeping the setup of questions restricted to admins — curation is trusted, settlement is not. And here's the quiet payoff: FairWins currently exposes only the resolved-prediction-market option to members, keeping the other three behind a configuration switch, while the underlying system fully supports all four. Narrowing the product to one option required zero changes to the escrow, because the slot was already there.
 
-## Adapter two: Chainlink Data Feeds, a threshold on a push feed
+## Why we built it this way
 
-`contracts/oracles/ChainlinkDataFeedOracleAdapter.sol` turns a continuously-updated price feed into a binary outcome. An admin registers a condition as `(feed, threshold, comparison, deadline)` — the comparison being one of `GT/GTE/LT/LTE/EQ` — against an allowlisted `AggregatorV3Interface` feed. After the deadline, *anyone* calls `evaluate(conditionId)`: it reads `latestRoundData()`, requires `updatedAt >= deadline` (rejecting stale data with `StaleFeedData`), compares the answer to the threshold, and caches the boolean forever.
+- **A yes-or-no answer, not a rich payout.** Binary wagers need one bit; funneling every referee's output through that single shape keeps settlement singular. The cost is that multi-outcome markets need a different design.
+- **Fail toward a refund.** Undecidable market outcomes settle as draws; failed lookups stay unresolved; stale feeds are rejected. No path ever guesses a winner.
+- **Referees are optional add-ons.** The escrow works with zero referees configured; each degrades gracefully to "this settlement type isn't available here," and the app reflects that per network.
 
-**Trade-offs:** this model only answers questions that reduce to *number vs. threshold at/after time T* — but for those it is the cheapest and lowest-trust of the four, because the data is already on-chain and the evaluation is a pure function anyone can trigger. The honest caveat: `latestRoundData()` is the latest answer *at evaluation time*, not the answer at the deadline instant. The staleness check bounds this (the round must postdate the deadline), and the first caller after the deadline fixes the reading — an incentive to evaluate promptly if the number is drifting your way.
+Four referees, three ways of working, one slot — and an escrow that never learned the difference.
 
-## Adapter three: Chainlink Functions, request/callback for arbitrary APIs
+## Further reading
 
-`contracts/oracles/ChainlinkFunctionsOracleAdapter.sol` handles truths that live behind an API. A condition registers an encoded Chainlink Functions request (the JavaScript source is pinned by a `sourceHash`), a subscription id, gas limit, and DON id. `requestResolution(conditionId)` — again permissionless — sends the request to the Decentralized Oracle Network; the answer arrives asynchronously in the inherited `fulfillRequest` callback, which decodes the DON script's single `uint8` return (0 = NO, 1 = YES) and caches it.
-
-Asynchrony forces two guards the synchronous adapters don't need: a `conditionToPendingRequest` mapping rejects a second request while one is in flight, and a DON-reported error emits `RequestFailed` and leaves the condition unresolved — so a flaky API means "try again," never "wrong answer cached forever."
-
-**Trade-offs:** maximum expressiveness — any public API a script can query — paid for in trust and operations. You are trusting the registered script and the API it queries; the source hash makes the script auditable but not less trusted. There's a funded subscription to maintain, and the request/callback round trip means resolution is a two-transaction affair.
-
-## Adapter four: UMA Optimistic Oracle V3, truth by unchallenged assertion
-
-`contracts/oracles/UMAOptimisticOracleV3Adapter.sol` handles the merger question — outcomes that need human judgment. A condition registers a human-readable `claim`, a bond currency and amount, and a liveness window. `assertResolution(conditionId, asserter)` pulls the bond from the caller and posts the claim to UMA's Optimistic Oracle V3 via `assertTruth`. If the liveness window passes undisputed, OOv3 calls back `assertionResolvedCallback(assertionId, assertedTruthfully)` and the adapter caches the verdict. If disputed, the question escalates to UMA's Data Verification Mechanism (a token-holder vote) and resolves through the same callback — the adapter doesn't distinguish a quiet settlement from a fought one.
-
-One implementation detail worth stealing: the adapter reserves `conditionToAssertion[conditionId]` with a sentinel value *before* the external `assertTruth` call, so a reentrant call sees "assertion already pending" and reverts — checks-effects-interactions preserved without a post-call write to that mapping (the real `assertionId → conditionId` link lives in a separate mapping written after the call). The regression suite for this lives in `test/oracles/UMAOptimisticOracleV3Adapter.test.js`.
-
-**Trade-offs:** the only model of the four that can answer *arbitrary* questions — at the cost of capital (someone must post the bond), latency (the liveness window is a floor on resolution time), and an economic-security assumption: an unchallenged false assertion wins, so the bond must make watching worthwhile.
-
-## Shared discipline across all four
-
-The adapters converge on more than the interface. All cache resolutions in an identical `CachedResolution` struct, making `getOutcome` a cheap view after the first resolution. All make the resolution *trigger* permissionless while keeping condition *registration* owner-only — curation is trusted, settlement is not. And all take an explicit `admin` constructor argument rather than `Ownable(msg.sender)`: FairWins deploys adapters deterministically via CREATE2 through the Safe Singleton Factory, and `msg.sender` in that context is the factory, not the operator. `test/oracles/AdapterDeterministicOwnership.test.js` is the regression test for the day that bug shipped.
-
-`isAvailable()` earns its keep off-chain: spec 023 (`specs/023-oracle-graph-gating/`) gates the frontend's oracle-wager entry point per network, so a user on a chain with no adapters never starts a flow that dead-ends. And spec 003 (`specs/003-polymarket-only-oracle-ui/`) is the abstraction's quiet payoff: the frontend currently exposes *only* the Polymarket model, hiding Chainlink and UMA behind a configuration switch — while the contracts keep all four fully supported. Narrowing the product surface required zero contract changes, because the seam was already there.
-
-## Design decisions
-
-- **A `bool` outcome, not a payout vector.** Binary wagers need one bit; forcing every oracle's output through that funnel at the adapter boundary keeps settlement code singular. The cost is that multi-outcome markets need a different design (wager pools solve this differently — spec 034).
-- **Sentinel over revert for "unresolved."** `getOutcome` as a non-reverting view lets the registry, the frontend, and keepers poll cheaply, and lets "resolved tie" and "not resolved" share a wire format while the registry disambiguates with one extra call.
-- **Fail toward refund.** Undecidable Polymarket outcomes settle as draws; failed Functions requests stay unresolved; stale feeds revert. No path guesses a winner.
-- **`confidence` is honest.** Every adapter today returns 10,000 basis points (or 0 with the sentinel). The field exists so a future probabilistic adapter can report less than certainty without an interface break — it is headroom, not a claim.
-- **Adapters are peripherals, not dependencies.** The registry works with zero adapters configured; each adapter degrades to "this resolution type unavailable here," and the UI reflects that per network.
-
-Four resolution machines, three interaction models, one interface — and an escrow contract that never learned the difference.
-
-## Sources
-
-- `contracts/oracles/IOracleAdapter.sol` — the shared interface
-- `contracts/oracles/PolymarketOracleAdapter.sol` — CTF resolved-market reads, tie sentinel
-- `contracts/oracles/ChainlinkDataFeedOracleAdapter.sol` — push-feed threshold evaluation
-- `contracts/oracles/ChainlinkFunctionsOracleAdapter.sol` — request/callback via DON
-- `contracts/oracles/UMAOptimisticOracleV3Adapter.sol` — optimistic assertion + dispute callback
-- `contracts/wagers/WagerRegistryCore.sol`, `contracts/wagers/WagerRegistryIntents.sol` — `_checkOracleLinkage`, `autoResolveFromPolymarket`, `autoResolveFromOracle`
-- `contracts/interfaces/IWagerRegistryTypes.sol` — `ResolutionType` enum
-- `specs/003-polymarket-only-oracle-ui/spec.md` — Polymarket-only frontend exposure
-- `specs/023-oracle-graph-gating/spec.md` — per-network oracle availability gating
-- `test/oracles/` — adapter unit tests incl. `AdapterDeterministicOwnership.test.js`
-- `docs/developer-guide/oracle-open-challenges.md` — oracle-settled open challenges
-- Chainlink Data Feeds: https://docs.chain.link/data-feeds
-- Chainlink Functions: https://docs.chain.link/chainlink-functions
-- UMA Optimistic Oracle V3: https://docs.uma.xyz/developers/optimistic-oracle-v3
-- Polymarket documentation: https://docs.polymarket.com
-- Gnosis Conditional Token Framework: https://docs.gnosis.io/conditionaltokens/
+- [Chainlink Data Feeds](https://docs.chain.link/data-feeds) — live on-chain price feeds
+- [Chainlink Functions](https://docs.chain.link/chainlink-functions) — on-demand off-chain data lookups
+- [UMA Optimistic Oracle](https://docs.uma.xyz/developers/optimistic-oracle-v3) — truth by unchallenged assertion with a dispute window
+- [Polymarket](https://docs.polymarket.com) and the [Gnosis Conditional Token Framework](https://docs.gnosis.io/conditionaltokens/) — how public prediction markets record their resolved outcomes

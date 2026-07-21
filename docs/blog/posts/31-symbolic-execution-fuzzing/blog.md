@@ -1,148 +1,81 @@
-# Three Ways to Break an Escrow: Slither, Manticore, and Medusa on a Wager Protocol
+# Three Ways to Break an Escrow: How We Stress-Test the Code That Holds the Money
 
-*A layered verification stack for peer-to-peer escrow — and the bug each layer is uniquely positioned to catch*
+*One small function decides who gets paid. Here are the three very different tools we point at it — and why no single one is enough.*
+
+| | |
+|---|---|
+| **Series** | Security & DevOps |
+| **Audience** | Founders, product managers, and the crypto-curious — no Solidity required |
+| **Tags** | `security`, `testing`, `smart-contracts`, `plain-english` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-> **Important Note**: FairWins is a platform for peer-to-peer wagers based on publicly available information and legitimate forecasting. Nothing here is a mechanism for trading on material non-public information or circumventing applicable law. All participants remain fully subject to applicable regulations and compliance requirements. This post is about verifying escrow code, not about the wagers themselves.
+> **A note on what FairWins is.** FairWins lets friends make peer-to-peer wagers based on public information and honest forecasting — who wins Sunday's match, not inside information. Everyone using it stays subject to the laws that apply to them. This post is about the code that holds the money safely, not about the wagers themselves.
 
 ---
 
 ## The function that can never be wrong
 
-Here is the single function in `WagerRegistry` that moves money to a winner. Two people staked USDC, an oracle (or a counterparty) declared an outcome, and now the winner claims the pot:
+Somewhere inside a FairWins wager, there is a single, tiny piece of code whose only job is to move money to the winner. Two people each put up some stablecoin. An outcome gets declared. The winner clicks "claim," and this code hands over the pot.
 
-```solidity
-function _claimPayout(address actor, uint256 wagerId) internal {
-    Wager storage w = _wagers[wagerId];
-    if (w.status != Status.Resolved) revert NotResolved();
-    if (actor != w.winner) revert NotWinner();
-    if (w.paid) revert AlreadyPaid();
+It is maybe a dozen lines long, and every one matters. It has to check three things before it pays: that the wager is actually resolved, that the person claiming is actually the winner, and that the pot has not already been paid out. It has to mark the wager "paid" *before* it sends the money, not after. And it has to add the two stakes together correctly, without the total silently wrapping around to a wrong number.
 
-    w.paid = true;
-    // Compute as uint256 to avoid uint128 overflow on sum
-    uint256 payout = uint256(w.creatorStake) + uint256(w.opponentStake);
-    IERC20(w.token).safeTransfer(w.winner, payout);
+Get the order of those steps wrong and a malicious token could trick the contract into paying twice. Get the "already paid" check wrong and anyone could claim someone else's winnings. Get the arithmetic wrong and the payout is simply incorrect. On a public blockchain, each mistake is permanent and there for attackers to find.
 
-    emit PayoutClaimed(wagerId, w.winner, payout);
-}
-```
+Here is the uncomfortable part: no single testing method catches all three. A tool that is brilliant at spotting a dangerous *ordering* of steps has no idea whether the math is right. A tool that can *prove* the math never overflows grinds to a halt if you ask it about ten wagers happening in an unpredictable order. And a tool that cheerfully throws ten thousand wagers at the contract in random orders can *find* failures but never *prove* their absence.
 
-Twelve lines, and every one of them is load-bearing. The three `if` checks are the *checks*. Setting `w.paid = true` before the transfer is the *effect*. The `safeTransfer` is the *interaction*. That ordering — checks-effects-interactions — is the difference between a contract that pays each winner once and a contract that a reentrant token can drain. The `uint256` cast on the sum is the difference between a correct payout and a silent `uint128` overflow. The `actor != w.winner` check is the difference between a winner claiming their pot and anyone claiming everyone's.
+So we point three different tools at that money-moving code, each chosen for what the others miss. Think of them as two automated ways to hammer on the code to find bugs a human might overlook — one explores every possible path, the other throws millions of random inputs — plus a fast pattern-checker that runs first.
 
-No single testing technique gives you confidence across all of those failure modes at once. A pattern matcher can see that `w.paid = true` sits before the transfer, but it has no idea whether `payout` is arithmetically correct. A path explorer can prove the arithmetic never overflows, but it will time out before it can reason about ten wagers created and settled in an arbitrary order. A fuzzer can hammer that arbitrary order until the escrow goes insolvent, but it will never *prove* anything — only fail to disprove it.
+## Layer one: the fast pattern-checker
 
-So `contracts/wagers/WagerRegistry.sol` sits under three tools that catch different things. This is a tour of what each one actually does to the escrow and payout logic, grounded in the configuration and harnesses that ship in the repo.
+The first tool is a *static analyzer*. "Static" means it reads the code without ever running it — the way a spell-checker reads a document without understanding the plot. It knows what dangerous code *shapes* look like and flags them.
 
-## Layer 1: Slither, on every pull request
+Because it is cheap and fast, it runs automatically on every code change, before anything can be merged. We tune it to be strict, and to look only at our own code, not the well-known libraries underneath.
 
-Slither is static analysis — it reads the compiled contract without ever executing it, and matches known-bad shapes. It is the cheap, fast layer, so it runs on every PR as the `slither-analysis` job in `.github/workflows/security-testing.yml`, gating merges alongside the Hardhat suite and coverage.
+What it is genuinely good at is the class of bug you can see in the *shape* of the code. Sending money before marking the wager paid? It flags the ordering instantly — that is the classic "reentrancy" trap, where an attacker re-enters the function mid-payment. A function that changes ownership with no lock on it, or a missing check for an empty address? It catches those too.
 
-The configuration is deliberately un-permissive (`slither.config.json`):
+What it *cannot* do is tell you whether the payout amount is right. To a pattern-checker, "add both stakes together" and "use just one stake" look almost identical. It sees grammar, not meaning. Closing that gap is the job of the next two layers.
 
-```json
-{
-  "filter_paths": "node_modules|test|contracts/mocks",
-  "exclude_dependencies": true,
-  "exclude_informational": false,
-  "exclude_low": false,
-  "exclude_medium": false,
-  "exclude_high": false,
-  "compile_force_framework": "hardhat"
-}
-```
+## Layer two: exploring every path
 
-Nothing below high severity is filtered out. Dependencies and mocks are excluded so the signal is about *our* code, but every severity band on our code is surfaced.
+The second tool does *symbolic execution*, and the plain-English version is worth pausing on.
 
-What Slither is good at, on `_claimPayout`, is exactly the class of bug that is visible in the *shape* of the code: a reentrancy detector notices when a function makes an external call before it finishes updating state. Point it at a version of this function where `w.paid = true` came *after* the `safeTransfer` and it flags the ordering immediately — the reentrancy-eth detector exists precisely for that. It also catches unprotected state-changing functions (a `setOwner` with no modifier), missing zero-address validation on constructor and setter inputs, and dangerous strict equalities like `require(msg.value == bondAmount)`.
+A normal test asks: "Does this work when the stake is 100?" You pick a number, run the code, check the answer. Symbolic execution asks a far bigger question: "Is there *any* stake — literally any value at all — that makes this go wrong?" Instead of a concrete number, it feeds the code an unknown and follows every branch, keeping track of the conditions that lead down each path. Where the code splits, it splits with it.
 
-What Slither cannot do is tell you whether the payout is *right*. `uint256(w.creatorStake) + uint256(w.opponentStake)` and `uint256(w.creatorStake)` on its own are the same shape to a pattern matcher. Static analysis sees syntax and control-flow, not the semantics of "the winner should receive both stakes and no more." That is the gap the next two layers exist to close.
+That means it can do something tests cannot: it can *prove* things. Point it at our payout math and it reasons across the entire range of possible stakes and confirms the sum can never overflow into a wrong number. It confirms there is no sneaky path that skips one of the three safety checks. This is the layer that turns "I'm pretty sure the math is fine" into "there is no input for which it isn't." Because it is slow and thorough, we run it on a schedule against the highest-risk contracts, not on every change.
 
-## Layer 2: Manticore, and the fix that made it real
+There is a lesson buried in how we got this working. For a while, this tool ran on schedule and reported success every time — while quietly doing nothing. It couldn't find the shared libraries our code depends on, so it failed to even assemble the code, and our automation counted that failure as a pass. A security tool that reports green because it never actually examined your code is worse than no tool: it manufactures confidence you haven't earned. The fix was unglamorous. The real lesson was noticing it had been asleep.
 
-Manticore is symbolic execution. Instead of running the contract with concrete inputs, it runs it with *symbolic* ones — each input is an unknown, and at every branch it forks the world, accumulating the constraints that lead down each path. Where a unit test asks "does it work for `amount = 100`?", Manticore asks "is there *any* `amount` for which this assertion can fail, this arithmetic can overflow, or this path can revert unexpectedly?" For a bounded number of transactions it explores paths exhaustively, which is why it is aimed at the highest-risk contracts: it runs weekly in the `torture-test.yml` workflow against `WagerRegistry`, `MembershipManager`, `KeyRegistry`, and every oracle adapter (Polymarket, both Chainlink adapters, and UMA).
+Its honest limit: it shines on one contract at a time with a bounded number of steps. Ask it to reason about ten wagers created and settled in an arbitrary order and it drowns in possibilities. That is exactly where the third tool takes over.
 
-That weekly run existed for a while before it was actually doing anything — and that is the most instructive part of the story. Manticore drives its own Solidity compiler, and it did not know where FairWins keeps its dependencies. Every run died on:
+## Layer three: throwing millions of random inputs
 
-```
-Error: Source "@openzeppelin/contracts/access/Ownable.sol" not found: File not found.
-```
+The third tool is a *fuzzer*. Its entire personality is chaos with a purpose. It stands up a realistic copy of the whole system and then throws long, random sequences of real actions at it — create a wager, accept it, claim it, refund it, cancel it, in wild combinations, up to a hundred moves in a row — and after *every single move* it checks whether a set of rules still holds.
 
-followed, in the finalizer, by an `AttributeError: 'NoneType' object has no attribute 'result'`. That second error is the tell: when compilation fails, Manticore has no transaction objects to finalize, so it crashes trying to read results that never existed. The CI step was catching the failure and moving on. The verification tool was green and inert — the worst state a security tool can be in, because it manufactures confidence it hasn't earned.
+It is hunting the kind of bug no single action causes but some *order* of actions does. The most important rule it checks is solvency: at every moment, in any history of moves, does the contract still hold at least enough money to cover every stake it still owes? If some sequence ever pays out twice, or releases a stake it already released, that rule goes false — and the fuzzer hands you the exact sequence that broke it.
 
-The fix, documented in `docs/MANTICORE_FIX.md`, is unglamorous and exactly right. A `remappings.txt` at the repo root tells the compiler where the imports live:
+It checks other rules the same way: that "paid" can never flip back to unpaid, that a wager's status only moves forward, that a winner is always one of the two participants, that the payout always equals the two stakes combined. There is even a clever one for private wagers: the fuzzer deliberately holds no secret key, so it *cannot* forge the signature needed to accept an open challenge. If it ever activates one anyway, the signature lock is broken.
 
-```
-@openzeppelin/=node_modules/@openzeppelin/
-@chainlink/=node_modules/@chainlink/
-@uma/=node_modules/@uma/
-```
+Crucially, we fuzz a copy built the way the real thing is deployed — same setup, same memberships — not a stripped-down toy. A rule that only holds for a system you don't actually ship is worthless.
 
-And a wrapper script, `scripts/run-manticore.py`, reads those remappings and passes them through to Manticore as `--solc-remaps` arguments, validates the environment before it starts, and handles timeouts gracefully so a partial exploration still yields artifacts. The workflow calls the wrapper instead of the bare binary:
+The fuzzer's weakness is the mirror of the path-explorer's strength: it is random, not exhaustive. A clean run means "no counterexample found this time," never "no counterexample exists." That is precisely why the payout math is checked by *both* the path-explorer (which proves it) and the fuzzer (which pressure-tests it under live sequences).
 
-```bash
-timeout 600 python scripts/run-manticore.py contracts/wagers/WagerRegistry.sol \
-  --contract WagerRegistry --timeout 600
-```
+## Why three, and why the overlap
 
-With imports resolving, Manticore compiles the registry and starts forking paths through `_claimPayout` and its siblings. Now the `uint256` cast earns its comment: symbolic execution reasons about the full `2^128` range of each stake and confirms the sum can't overflow the way a naive `uint128` addition would. It checks that the three guard clauses have no satisfiable path that skips them. This is the layer that turns "I'm pretty sure the arithmetic is fine" into "there is no input for which it isn't."
+A few deliberate choices tie this together.
 
-Its limits are honest and documented: state explosion means it struggles with deep multi-transaction sequences, unbounded loops, and external calls into contracts it can't model. Manticore proves things about a *bounded* exploration of one contract. It will not, on its own, discover a bug that only emerges after ten interleaved wagers.
+**We order the tools by cost.** The fast pattern-checker runs on every change for instant feedback. The two heavy tools run on a schedule, off the critical path, so nobody waits to save a file.
 
-## Layer 3: Medusa, on the whole stack at once
+**We overlap the math on purpose.** Payout correctness is checked twice — once proven exhaustively over all inputs, once stress-tested over all orderings. Neither replaces the other, and on code that moves money the redundancy is the point.
 
-That interleaving is Medusa's entire job. Medusa is a property-based fuzzer: it deploys a harness, then throws long, random sequences of real transactions at it — up to 100 calls per sequence, per `medusa.json` — and after every call it re-checks a set of invariants. It is looking for the emergent bug: the one that no single transaction causes, but some *order* of transactions does.
+**We test the real deployment, not a stand-in,** and we treat a silent tool as a failure. A guarantee that only holds for a contract you don't ship is a guarantee about nothing, and a verification tool asleep at its post is the most dangerous state it can be in.
 
-The harness for the escrow is `contracts/test/WagerRegistryFuzzTest.sol`, and critically it deploys the *production* stack the way production does — the real `MembershipManager` and `WagerRegistry` behind ERC-1967 proxies, initialized through the proxy, with tiers configured and memberships purchased. Medusa then fuzzes against the proxy. The invariants are plain `bool`-returning functions with a `property_` prefix (declared in `medusa.json` under `testPrefixes`). The one that matters most is escrow solvency:
+None of this makes bugs impossible. It makes whole *categories* of them very hard to ship — which, for code that quietly holds other people's money, is the entire job.
 
-```solidity
-function property_escrow_covers_active_stakes() public view returns (bool) {
-    uint256 totalLocked = 0;
-    uint256 count = registry.nextWagerId();
-    for (uint256 i = 1; i < count; i++) {
-        IWagerRegistryTypes.Wager memory w = registry.getWager(i);
-        if (w.status == IWagerRegistryTypes.Status.Open) {
-            totalLocked += w.creatorStake;
-        } else if (w.status == IWagerRegistryTypes.Status.Active && !w.paid) {
-            totalLocked += uint256(w.creatorStake) + uint256(w.opponentStake);
-        } else if (w.status == IWagerRegistryTypes.Status.Resolved && !w.paid) {
-            totalLocked += uint256(w.creatorStake) + uint256(w.opponentStake);
-        }
-    }
-    return token.balanceOf(address(registry)) >= totalLocked;
-}
-```
+## Further reading
 
-This is a claim no static or symbolic tool made: *at every point in any transaction history, the registry holds at least enough tokens to cover every stake it still owes.* If some sequence of create / accept / claim / refund / cancel ever pays out twice, or refunds a stake it already released, or leaks tokens on the open-challenge path, this property goes false and Medusa hands you the exact failing call sequence.
-
-The rest of the harness fences the state machine from every angle: `property_no_double_claim` asserts the `paid` flag is irreversible; `property_state_only_progresses_forward` tracks per-wager status across calls and rejects any backward transition (`Resolved` and `Refunded` are terminal); `property_winner_is_participant` requires every resolved winner to be the creator or the opponent; `property_payout_equals_total_stakes` guards the arithmetic that Manticore proved, now under live sequences; and `property_cannot_reinitialize` confirms the UUPS proxy's one-time initializer can never be called again to seize roles.
-
-There is a genuinely clever bit in the open-challenge invariants. The harness holds no private key for any claim authority, so it *cannot* forge the EIP-712 signature that accepts an open wager. `property_open_never_active_without_signature` turns that into a test: none of the harness's open wagers may ever reach `Active`, because reaching `Active` would require a signature the fuzzer can't produce. If Medusa ever finds a path that activates one anyway, the signature gate is broken.
-
-Medusa's weakness is the mirror of Manticore's strength: it is random, not exhaustive. A passing run means "no counterexample found in this campaign," never "no counterexample exists." That is precisely why the arithmetic invariant lives in *both* the fuzzer and the symbolic layer.
-
-## Design decisions
-
-**Cost-order the layers.** Slither is cheap and runs on every PR; Manticore and Medusa are expensive and run weekly in `torture-test.yml`. You get fast pattern feedback on the critical path and heavyweight proof/fuzzing off it. Nobody waits ten minutes per push for a symbolic run.
-
-**Overlap the arithmetic on purpose.** Payout correctness is checked by Manticore (exhaustive over inputs, one transaction) *and* Medusa (random over sequences, many transactions). Neither subsumes the other: one proves the sum never overflows, the other proves no ordering of settlements ever breaks solvency. The redundancy is the point.
-
-**Fuzz the real deployment shape.** The Medusa harness stands up UUPS proxies and buys memberships instead of poking a bare logic contract. An invariant that only holds for a contract you don't ship is worthless; the escrow-solvency property is only meaningful against the proxy users actually transact with.
-
-**Treat a silent security tool as a failure.** The Manticore import bug is the lesson that generalizes past this repo: a verification tool that green-lights because it never compiled your code is worse than no tool, because it launders false confidence. The fix wasn't cleverness — it was noticing the tool wasn't running and making it run.
-
-## Sources
-
-- `contracts/wagers/WagerRegistryCore.sol` — `_claimPayout` (checks-effects-interactions, payout formula)
-- `contracts/wagers/WagerRegistry.sol` — `claimPayout` / `claimRefund` / `createWager` externals
-- `contracts/test/WagerRegistryFuzzTest.sol` — Medusa invariant harness (escrow solvency, forward-only state, open-challenge signature gate)
-- `medusa.json` — fuzzing config (target contracts, `property_` prefixes, sequence length)
-- `slither.config.json` — Slither configuration (severity bands, remaps, filtered paths)
-- `remappings.txt` — OpenZeppelin / Chainlink / UMA import remaps
-- `docs/MANTICORE_FIX.md` — the import-resolution fix and the `run-manticore.py` wrapper
-- `docs/security/index.md`, `static-analysis.md`, `symbolic-execution.md`, `fuzz-testing.md` — the layered testing overview
-- `.github/workflows/security-testing.yml` — PR-gating Slither job
-- `.github/workflows/torture-test.yml` — weekly Manticore + Medusa runs
-- [Slither](https://github.com/crytic/slither), [Manticore](https://github.com/trailofbits/manticore), [Medusa](https://github.com/crytic/medusa) — Trail of Bits / crytic tooling
-- [SWC Registry](https://swcregistry.io/), [Smart Contract Best Practices](https://consensys.github.io/smart-contract-best-practices/)
-- ERC-1167 minimal proxy and EIP-712 typed-data signing — [eips.ethereum.org](https://eips.ethereum.org)
+- Reentrancy and the checks-effects-interactions pattern: [Ethereum smart contract best practices](https://consensys.github.io/smart-contract-best-practices/)
+- The Smart Contract Weakness Registry, a catalog of known contract bug classes: [swcregistry.io](https://swcregistry.io/)
+- A plain introduction to [symbolic execution](https://en.wikipedia.org/wiki/Symbolic_execution) and [fuzz testing](https://en.wikipedia.org/wiki/Fuzzing) on Wikipedia
+- Open-source tools in this space from Trail of Bits and crytic: [Slither](https://github.com/crytic/slither) (static analysis), [Manticore](https://github.com/trailofbits/manticore) (symbolic execution), and [Medusa](https://github.com/crytic/medusa) (fuzzing)

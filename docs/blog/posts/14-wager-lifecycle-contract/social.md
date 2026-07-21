@@ -1,27 +1,27 @@
-# Social & Image — The Wager Lifecycle Contract
+# Social & Image — The Wager Lifecycle
 
 ## X (Twitter)
 
-A P2P escrow contract is really a state machine over other people's money. FairWins' WagerRegistry: 7 states, 2 hard deadlines (30d accept / 180d resolve), 8 resolution authorities — and no state without a unilateral exit. Anatomy inside. 🔗 <link> #Solidity #SmartContracts #web3
+A peer-to-peer escrow is really a careful set of rules over other people's money. FairWins wagers: a handful of clear states, two hard deadlines (accept within a month, resolve within ~6 months), several ways to decide a winner — and no state without a one-sided exit. Anatomy inside. 🔗 <link> #PredictionMarkets #Web3
 
 ## LinkedIn
 
-Informal bets fail in predictable ways: the counterparty never commits their stake, nobody has authority to declare the winner, the event never resolves, or the money gets stuck. Building an on-chain escrow that closes every one of those holes is a design exercise in state machines, not just token transfers.
+Informal bets fail in predictable ways: the other person never puts their money in, nobody has authority to declare the winner, the event never happens, or the money gets stuck. Building an escrow that closes every one of those holes is a design exercise in clear states and guaranteed exits, not just moving tokens around.
 
-Part 1 of our Prediction Markets series dissects FairWins' `WagerRegistry` — the peer-to-peer wager escrow contract — as a lifecycle:
+Part 1 of our Prediction Markets series walks through the FairWins wager lifecycle in plain terms:
 
-- Seven explicit states (Open → Active → Resolved/Refunded/Draw) where every state that holds funds has an exit requiring no cooperation from the other party
-- Two absolute deadlines per wager (acceptDeadline, resolveDeadline) with hard caps of 30 and 180 days, so escrow can never be stranded indefinitely
-- Eight resolution types — participant-declared, arbitrator, and oracle-driven (Polymarket, Chainlink, UMA) — each fixing exactly one settlement authority at creation
-- Checks-effects-interactions discipline on every token movement, and why exit paths deliberately stay open even when the contract is paused
+- A handful of clear states (open → active → resolved / refunded / draw) where every state that holds funds has an exit needing no cooperation from the other person
+- Two hard deadlines per wager — one to accept, one to resolve — capped so escrow can never be stranded indefinitely
+- Several ways to decide a winner — named parties, a neutral arbitrator, or an oracle (the trusted referee that tells the contract who won) — each fixed at creation
+- "Check, record, then move money" discipline on every payout, and why exits deliberately stay open even when the system is paused
 
-If you're building anything that escrows funds between untrusting parties, the lifecycle framing here generalizes well beyond wagers.
+These are skill-based forecasts on publicly available information; participants remain subject to applicable law. If you're building anything that escrows funds between parties who don't fully trust each other, the lifecycle framing here generalizes well beyond wagers.
 
 Read the full post: <link>
 
-What's your approach to guaranteeing liveness in escrow contracts — timeouts, keepers, or something else?
+What's your approach to guaranteeing that escrowed funds always have a way out — timeouts, automated helpers, or something else?
 
-#Solidity #SmartContracts #Ethereum #DeFi #Engineering
+#PredictionMarkets #SmartContracts #Fintech #Web3 #Engineering
 
 ## Image prompt (Gemini / Nano Banana)
 

@@ -1,119 +1,76 @@
-# CallsignRegistry: An In-House ENS-Style Naming System That Nothing Depends On
+# Callsigns: A Human-Readable Name That Nothing Depends On
 
-*How FairWins built a commit–reveal naming registry as an optional perk — and kept it strictly off the value path*
+*How FairWins built an optional, ENS-style handle for members — and deliberately made sure you can send, receive, and settle every wager without ever using one.*
+
+| | |
+|---|---|
+| **Series** | FairWins Engineering |
+| **Audience** | Product teams, founders, and the crypto-curious — no Solidity required |
+| **Tags** | `naming`, `identity`, `usability`, `plain-english` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-- **Series:** Standalone
-- **Part:** 33 of 34
-- **Audience:** Naming/identity engineers, product teams, Solidity engineers
-- **Tags:** `naming`, `ens`, `commit-reveal`, `identity`, `uups`
-- **Reading time:** ~9 minutes
+## The forty-two-character problem
 
----
+Maya wants to invite her friend Dev to a wager on Sunday's match. The invite form asks for a wallet address. Dev's address is `0x7f3a…` — forty-two characters of hex that Maya has to dig out of a chat thread, paste, and then squint at, because one wrong character sends the invite, and eventually the stake, to a stranger.
 
-## The Forty-Character Problem
+Every crypto product hits this wall. The best-known answer is ENS, the Ethereum Name Service — register a name like `dev.eth` and type that instead of the hex. But ENS lives on Ethereum's main network, and FairWins runs its wagers elsewhere. More importantly, FairWins already has its own notion of identity that ENS knows nothing about: an on-chain membership system with tiers, sanctions screening, and role-based access. A name that resolves to "some wallet, somewhere" is less useful than a name that resolves to "a screened member of this platform."
 
-Maya wants to invite her friend Dev to a wager on Sunday's match. The invite form wants a wallet address. Dev's address is `0x7f3a…` — forty-two characters of hex that Maya has to fetch from a chat thread, paste, and then squint at, because a wrong character means the invite (and eventually the stake) goes to a stranger.
+So FairWins built its own: a **callsign**. A member can optionally claim a handle like `%chipprbots`, and it resolves to their wallet everywhere the app asks you to enter or display an address.
 
-Every crypto product hits this wall, and the ecosystem's standard answer is ENS: register `dev.eth`, type a name instead of hex. But ENS is an Ethereum-mainnet system, and FairWins runs its wager escrow on Polygon and the Mordor testnet. More importantly, FairWins already has an identity spine ENS knows nothing about: an on-chain `MembershipManager` with tiers, sanctions screening, and role-gated access. A name that resolves to "some wallet somewhere" is less useful than a name that resolves to "a screened, top-tier member of this platform."
+The interesting part isn't that we built a naming system. It's the two disciplines wrapped around it. It borrows the hardest-won safety mechanism from ENS while deliberately refusing ENS's most dangerous flexibility — and, the part to remember, **the whole thing is engineered so that nothing of value ever depends on it.** You can create, accept, and settle every wager you'll ever make without ever registering or using a callsign. That is not a marketing line; it is a property the test suite actively verifies.
 
-So spec 054 built the thing in-house: the **CallsignRegistry** (`contracts/naming/CallsignRegistry.sol`), a UUPS-proxied naming contract where a Gold-tier-or-above member may optionally register a `%callsign` — `%chipprbots`, say — that resolves trustlessly to their wallet across every address-entry and display surface in the app.
+## Optional, and we mean it
 
-The interesting part isn't that FairWins built an ENS-lite. It's the two disciplines wrapped around it: the registry borrows ENS's hardest-won mechanism (commit–reveal registration) while deliberately rejecting its most flexible one (separating name controller from resolution target), and the whole system is engineered so that *nothing of value ever depends on it*. A member can create, accept, and settle every wager they'll ever make with a raw address and never touch the registry. That optionality is a tested invariant, not a marketing line.
+Start here, because it shapes everything else. **A callsign is a perk, never a requirement.** No wager, no pool, no transfer, and no payout ever checks the naming system as a precondition. Money moves on wallet addresses, full stop.
 
-## A Name Format Chosen for Safety, Not Expressiveness
+This isn't left to good intentions. The automated tests include an account with no callsign at all, below the tier that could even register one, completing a full wager from start to finish. The naming system can be switched off on a given network, be unreachable, or be paused entirely, and every dollar-moving flow works exactly the same. If callsigns vanished tomorrow, every wager would still settle — some screens would just show hex again.
 
-A callsign is 3–20 characters of `a-z0-9` plus single interior hyphens — no leading, trailing, or consecutive hyphens, no uppercase, no Unicode. The on-chain validator (`_validate` in `CallsignRegistry.sol`) enforces this byte by byte, and the frontend mirrors it in `frontend/src/lib/callsigns/normalizeCallsign.js`.
+Because it never touches the money, the naming system is deliberately kept off to the side. It holds no funds and has no ability to move anyone's money. Its worst-case failure is cosmetic: a name doesn't show up, and you see a raw address instead. That containment is the whole design philosophy in one sentence.
 
-The ASCII whitelist is the impersonation defense. ENS supports Unicode names and inherits an entire research area of homoglyph attacks — Cyrillic `а` versus Latin `a`, and thousands of confusable pairs that ENSIP-15 normalization tries to tame. Spec 054's research explicitly rejected Unicode normalization in favor of the blunter tool: if the only registrable characters are lowercase ASCII letters, digits, and hyphens, there is no confusable pair to defend against. Names are keyed by `keccak256` of the canonical string, and case variants normalize to the same lookup before they reach the chain.
+## A name format chosen for safety, not flair
 
-## Commit → Reveal, Plus a Griefing Fix
+A callsign is 3 to 20 characters: lowercase letters, digits, and single interior hyphens. No uppercase, no spaces, no emoji, no accented or non-Latin characters.
 
-Naming registries have a classic front-running problem: you broadcast `register("chipprbots")`, a mempool observer sees it, and their bot registers the name one block ahead of you. ENS's `.eth` registrar solved this with commit–reveal, and CallsignRegistry adopts the same pattern:
+That last restriction is doing serious security work. ENS supports the full range of Unicode characters, and in doing so inherits an entire category of impersonation attack: homoglyphs — characters that look identical but aren't, like a Cyrillic "а" standing in for a Latin "a." A scammer can register a name that looks pixel-for-pixel like a trusted one. FairWins simply removes the possibility: if the only characters you can register are plain lowercase letters, digits, and hyphens, there is no look-alike to defend against. Less expressive, categorically safer. Names that differ only in capitalization collapse to the same handle, so there's no trickery there either.
 
-1. `makeCommitment(callsign, owner, salt)` — a pure function returning `keccak256(abi.encode(callsignHash, owner, salt))`.
-2. `commit(commitment)` — stores only the opaque hash on-chain. Observers learn nothing.
-3. Wait at least `minCommitmentAge` (default 1 minute).
-4. `register(callsign, salt)` — the reveal. By the time the name is visible, your priority is already locked; a sniper's own commitment can't be old enough.
+## Claiming a name without getting sniped
 
-Commitments expire after `maxCommitmentAge` (default 1 day), which prevents commitment squatting. But the implementation also closes a subtler hole that the naive version of this pattern leaves open. A commitment hash is public calldata — anyone can see it once you've committed. If `commit` blindly overwrote the stored timestamp, an attacker could replay *your* commitment every few blocks, perpetually resetting its age so your reveal forever fails with `CommitmentTooNew`:
+Naming systems have a classic front-running problem. You broadcast "register `chipprbots`," a bot watching the network sees it, and it registers the name one step ahead of you. ENS solved this years ago with a two-step "commit then reveal" dance, and FairWins uses the same idea:
 
-```solidity
-function _commit(bytes32 commitment) internal {
-    // Reject re-committing a still-unexpired commitment — re-commit is
-    // allowed only once the prior one has expired (ENS anti-snipe pattern).
-    uint64 existing = commitments[commitment];
-    if (existing != 0 && block.timestamp <= uint256(existing) + maxCommitmentAge) {
-        revert CommitmentPending();
-    }
-    commitments[commitment] = uint64(block.timestamp);
-    emit CallsignCommitted(commitment, uint64(block.timestamp));
-}
-```
+1. First you quietly commit — you publish a scrambled fingerprint of the name you want, which reveals nothing to onlookers.
+2. You wait a short mandatory period (about a minute).
+3. Then you reveal and register. By the time your desired name is visible, your claim to it is already locked in, and a sniper's own commitment can't possibly be old enough to jump the queue.
 
-This reveal-griefing fix was one of two MEDIUM findings hardened during the spec's security review; the other appears below in the repoint flow.
+The FairWins version also closes a subtler hole. That committed fingerprint is public. In a naive design, an attacker could keep re-submitting *your* fingerprint every few blocks, forever resetting its clock so your reveal never becomes eligible — a way to grief you out of your own name. The registry refuses to reset a commitment that's still pending, which quietly defeats that attack. It was one of two issues caught and hardened during the security review.
 
-## The Gold Gate — and the Optionality Doctrine
+## One name, one address — on purpose
 
-Registration is gated on membership: `_requireEligible` checks `membershipManager.getActiveTier(user, membershipRole) >= minTier`, where the role is `WAGER_PARTICIPANT_ROLE` and `minTier` initializes to Gold. The gate is tunable but only upward — `setMembershipGate` reverts with `TierBelowFloor` if an admin tries to drop it below Gold. A hard floor in code, not a policy document. Sanctions screening rides along in the same check when a guard is configured.
+Here's the design choice that most sharply distinguishes callsigns from ENS. ENS separates who *owns* a name from what the name *points at*, and lets the owner freely repoint it. That flexibility is also a fraud vector: point the name at a new address and every future payment aimed at that name silently goes somewhere else.
 
-The mirror-image rule is the one that shapes the whole design: **nothing on the value path may require a callsign** (FR-001a). No wager creation, pool join, transfer, or claim reads the registry as a precondition. This isn't left to convention — the integration suite (`test/integration/callsignRegistry.membership.test.js`) includes a below-Gold, callsign-less account completing a full wager end to end. The registry can be undeployed on a chain, unreachable, or paused, and every dollar-moving flow works identically.
+A callsign points at exactly one address, and moving it is treated as a rare, deliberate migration. When you request to move a callsign to a new wallet, the name enters a visible "address changing" state, refuses to resolve for any payment during that window, and only completes after a built-in delay of about two days. If someone hijacked your session and tried to redirect your name, you get two days of visible warning to cancel it. And repointing is genuinely rare to begin with, because FairWins' smart-account wallets keep the same address even when you recover access with a new credential.
 
-That's also why the registry is a *standalone* UUPS proxy. It is not routed through `WagerRegistry`, holds no funds — there are no payable functions and no token custody, so its worst-case failure is cosmetic — and it lives at a stable address with append-only storage, a trailing `__gap`, and the CI-gated `npm run check:storage-layout` shared by the platform's other proxies. Deployment keys are `callsignRegistry` / `callsignRegistryImpl` in `deployments/<network>.json`, resolved in app code via `getContractAddressForChain('callsignRegistry', chainId)`.
+A few more touches serve the same goal: a name that once routed payments can never silently start routing them elsewhere. A released or changed name goes into a long quarantine during which *nobody* — not even its former owner — can re-register it, so a stranger can't capture payments aimed at the old name. And moderators can reserve obvious names (brand terms, `admin`, `support`) or suspend a name — but crucially, **no one, not even the platform operator, can ever reassign a callsign to a different wallet.** Suspension can stop a name from resolving; it can never move it or touch funds.
 
-## Lifecycle: Quarantine, Cooldown, Repoint, Lapse
+## How the app uses a name — carefully
 
-A name that routes payments needs a careful lifecycle. Callsigns move through six statuses — `NONE`, `ACTIVE`, `REPOINTING`, `QUARANTINED`, `SUSPENDED`, `LAPSED_RECLAIMABLE` — governed by bounded, operator-tunable policy parameters:
+When you look up a callsign, the match is exact — no "did you mean," no fuzzy matching, because a near-match on an address field is a payment-misdirection bug waiting to happen. And a name only displays if it currently points back at the address showing it; a suspended or mid-move name simply disappears rather than telling you a stale story.
 
-- **Release and change enter quarantine.** A released or replaced callsign is unregistrable by *anyone* — including its former owner — for `quarantinePeriod` (default 90 days). Payments and invitations aimed at the old name cannot be silently captured by a stranger who re-registers it. Changes are additionally rate-limited by `changeCooldown` (default 30 days).
-- **Repointing is delayed, visible, and cancellable.** Here's where the design diverges from ENS on purpose. ENS separates the name's owner from its resolver record, which is flexible — and is exactly the payout-redirect vector spec 054 guards against. A callsign points at one address, and moving it (`requestRepoint` → wait `repointDelay`, default 48 hours → `finalizeRepoint`) puts the name into `REPOINTING`, during which it is refused for value-bearing resolution and surfaces show an honest "address changing" state. A compromised session that requests a repoint gives the real owner two days of visible warning to `cancelRepoint`. Requesting is tier-exempt (a downgraded owner is never stranded holding their own identity), but the security review added a second hardening: `finalizeRepoint` requires the *incoming* owner to be Gold-eligible — otherwise a lapsed member could repoint names around a ring of wallets to reset the lapse clock and hoard them for free. Finalizing also clears the `verified` marker, because verification was granted to a reviewed identity, not to a name. Suspension, deliberately, persists across a repoint.
-- **Lapse is grace-then-release.** If Gold coverage ends, the callsign stays `ACTIVE` until the membership term expires, then survives a `lapseGrace` window (default 365 days). Only after that does the permissionless `reclaimLapsed` push it into standard quarantine.
+Callsigns also slot politely into a chain of name sources rather than taking over. When the app shows who's on the other side of a wager, it prefers, in order: your own private nickname for that address, then their callsign, then an ENS name, and finally a friendly auto-generated two-word label so no card ever shows raw hex or a spinner. Every step fails softly — if the naming system is off on your network or a lookup times out, the app falls through to the next option. When you type a `%callsign` into an address field, it resolves it and shows you the full address plus whether the name is verified, so you can confirm before anything is committed.
 
-Moderation follows least privilege: `REGISTRY_CURATOR_ROLE` reserves terms (brand names, `admin`, `support`), `MODERATOR_ROLE` suspends, `VERIFIER_ROLE` marks business callsigns verified. None of these roles — nor the platform operator — can ever reassign a callsign to a different wallet. Suspension stops resolution; it never moves a name or touches funds.
+## Why we built it this way
 
-## Resolution: Exact-Match Forward, Guarded Reverse
+- **In-house instead of leaning on ENS.** We needed membership gating, sanctions screening, moderation, and presence on the networks we actually run on — none of which ENS offers here. ENS still participates, as one option in the display chain.
+- **A plain ASCII name format instead of full Unicode.** Less expressive, but it *eliminates* the look-alike impersonation attack rather than trying to mitigate it.
+- **One name, one address.** Splitting a name's owner from its target invites redirect fraud; keeping them fused makes the common case safe and the rare migration deliberate.
+- **A perk, not a primitive.** Making callsigns an optional membership benefit — and actively testing that wagers work without one — keeps a nice-to-have from ever hardening into a load-bearing requirement.
 
-Forward resolution (`resolve(string)`) is exact-match only — no fuzzy matching, no "did you mean," because a near-match substitution on an address-entry field is a payment misdirection bug. Reverse resolution is guarded by a forward==reverse invariant: an address's displayed callsign must currently resolve back to that address.
+The result is a naming system with the registration safety of the best in the ecosystem, a narrower and safer way of pointing names at addresses, and a blast radius engineered down to zero. It makes the product friendlier. It is not allowed to make the product more fragile.
 
-```solidity
-function callsignOf(address account) external view returns (string memory) {
-    bytes32 h = callsignHashOf[account];
-    if (h == bytes32(0)) return "";
-    // Reverse only reports a callsign whose forward resolution is ACTIVE.
-    if (_statusOf(h) != CallsignStatus.ACTIVE) return "";
-    return _records[h].callsign;
-}
-```
+## Further reading
 
-A suspended, repointing, or lapsed callsign simply disappears from display rather than telling a stale story.
-
-On the frontend, callsigns slot into an existing name-resolution chain rather than replacing it. `frontend/src/hooks/useOpponentName.js` resolves any counterparty in priority order: **address book > callsign > ENS > generated**. Your own private nickname for an address always wins; a registered `%callsign` beats an ENS name; and a deterministic two-word generated name is always available synchronously so no card ever shows a spinner or raw hex. Every step soft-fails — if the registry is undeployed on the current chain or a lookup times out, the chain falls through silently. Address entry (`frontend/src/components/ui/AddressInput.jsx`) accepts `%callsign` input, resolves it, and shows the full resolved address plus verification status for explicit confirmation before anything is committed. Only an `ACTIVE` callsign is committable.
-
-## Gasless Twins, Same Three-Way Sync
-
-Like every actor-facing contract on the platform, each callsign action has an EIP-712 `…WithSig` twin via `SignerIntentBase`: `commitWithSig`, `registerWithSig`, `changeCallsignWithSig`, `releaseWithSig`, `requestRepointWithSig`, `cancelRepointWithSig`, under the domain `"FairWins CallsignRegistry"` / version `"1"`. The six intent structs must stay byte-identical in three places — the contract typehashes, `frontend/src/lib/relay/intentTypes.js`, and `services/relay-gateway/src/intent/intentTypes.js` — and the release/repoint intents pin the exact `callsignHash` so a relayed signature can't be applied to a different name. `finalizeRepoint` and `reclaimLapsed` are permissionless and need no signed twin. Per the platform's never-stranded rule, every gasless path keeps a self-submit fallback.
-
-## Design Decisions
-
-- **In-house over ENS integration.** The registry needed membership gating, sanctions screening, role-based moderation, and presence on chains where ENS doesn't live. ENS still participates — as step three of the display chain — but the platform-native handle is anchored to platform-native identity.
-- **ASCII whitelist over Unicode normalization.** Less expressive, categorically safer. The homoglyph attack surface is eliminated rather than mitigated.
-- **One name, one address — no resolver indirection.** Splitting controller from target invites payout-redirect fraud; FairWins' passkey smart accounts already keep their address across credential recovery, so repointing is a rare migration action worth a 48-hour delay, not an everyday record edit.
-- **Direct chain reads over a subgraph.** Callsign→address routes value; an indexer would add a second, laggier source of truth. The trade-off shows up in the admin console: with no on-chain counters, registry metrics come from a bounded client-side event scan with an honest "recent window only" banner.
-- **Perk, not primitive.** Gating registration at Gold makes the callsign a membership benefit; hard-flooring the gate and testing the no-callsign wager path keeps it from ever hardening into a requirement.
-
-The result is a naming system with ENS's registration security, a narrower and safer resolution model, and a blast radius engineered to zero: if the CallsignRegistry vanished tomorrow, every wager would still settle — some screens would just show hex again.
-
-## Sources
-
-- `specs/054-callsign-registry/spec.md`, `plan.md`, `research.md`, `data-model.md`
-- `contracts/naming/CallsignRegistry.sol` (interface: `contracts/interfaces/ICallsignRegistry.sol`)
-- `docs/developer-guide/callsigns.md`
-- `docs/developer-guide/upgradeable-contracts.md`
-- `frontend/src/hooks/useOpponentName.js`, `frontend/src/lib/callsigns/normalizeCallsign.js`, `frontend/src/components/ui/AddressInput.jsx`
-- `frontend/src/lib/relay/intentTypes.js`, `services/relay-gateway/src/intent/intentTypes.js`
-- `test/integration/callsignRegistry.membership.test.js`
-- ENS `.eth` registrar commit–reveal registration: https://docs.ens.domains/
-- ENSIP-15 (ENS name normalization): https://docs.ens.domains/ensip/15
-- EIP-712 (typed structured data signing): https://eips.ethereum.org/EIPS/eip-712
-- ERC-1822 / UUPS proxies: https://eips.ethereum.org/EIPS/eip-1822 and OpenZeppelin upgradeable contracts docs: https://docs.openzeppelin.com/contracts/5.x/api/proxy
+- [ENS (Ethereum Name Service)](https://docs.ens.domains/) and its commit–reveal registration, the model this borrows from
+- [ENS name normalization (ENSIP-15)](https://docs.ens.domains/ensip/15), the standard that wrestles with the Unicode look-alike problem we sidestep
+- A general explainer on [homoglyph / look-alike attacks](https://en.wikipedia.org/wiki/IDN_homograph_attack)
+- The broader FairWins developer documentation for how identity and address entry fit together

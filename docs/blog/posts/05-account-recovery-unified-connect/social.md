@@ -2,32 +2,32 @@
 
 ## X (Twitter)
 
-Passkeys killed the seed phrase. So what happens when the phone dies?
+Passkeys killed the seed phrase. So what happens when the phone goes in the river?
 
-Our answer: any linked wallet is a full 1-of-N owner — recovery is one plain `addOwnerPublicKey(x, y)` tx to the smart account. No bundler, no relayer, no us.
+Our answer: any wallet you linked ahead of time is a full, equal owner of your account — so recovery is one ordinary transaction. No relayer, no service, no us required.
 
 🔗 <link>
 
-#passkeys #AccountAbstraction #selfcustody
+#passkeys #selfcustody #wallets
 
 ## LinkedIn
 
-Recovery is the make-or-break problem for passkey wallets. Seed phrases were brutal, but everyone knew the recovery story. Passkeys deleted the twelve words — and if your credential lived in an unsynced browser profile, platform sync won't save you.
+Recovery is the make-or-break problem for passkey wallets. Seed phrases were brutal, but everyone understood the recovery story. Passkeys deleted the twelve words — and if your credential lived in a browser profile that wasn't syncing, phone backup won't save you.
 
-Our latest engineering post covers how FairWins made passkey smart accounts recoverable without reintroducing a seed phrase — and why the contracts needed zero changes:
+Our latest post covers how FairWins made passkey accounts recoverable without bringing back the seed phrase — and why the contracts needed zero changes:
 
-- One connect surface for passkey, WalletConnect, and browser wallets, with serialized attempts so parallel connects and background session restores can never race into a stuck state
-- Root-causing two shipped defects: the Chrome/Brave "reading 'id'" crash (an incomplete local credential record) and Brave silently asserting the first passkey (an unpinned WebAuthn ceremony — fixed with allowCredentials pinning plus an in-app account picker)
-- Linking an external wallet as a full 1-of-N controller on the vendored Coinbase Smart Wallet MultiOwnable owner list, sanctions-screened fail-closed, with honest "this wallet gains full control" consent
-- Wallet-only recovery: verify isOwnerAddress on-chain, create a fresh passkey, authorize it with one ordinary transaction — reproducible with Foundry's cast even if our service disappears
+- One connect screen for passkey, WalletConnect, and browser wallets, with one attempt at a time so a background session restore can't race you into a stuck state
+- Root-causing two real bugs: a crash-on-every-transaction from a half-saved credential, and a browser silently signing users into the wrong passkey (fixed by always naming the exact credential, plus an in-app account picker)
+- Linking an external wallet as a full, equal owner — sanctions-screened, fail-closed, with honest "this wallet gains full control" consent
+- Wallet-only recovery: confirm ownership on-chain, create a fresh passkey, authorize it with one ordinary transaction — reproducible with generic tools even if our service disappeared
 
-The hard trade: no guardians, no custodial backstop. An account that never linked a second controller is unrecoverable by design.
+The hard trade: no guardians, no custodial backstop. An account that never linked a backup is unrecoverable by design.
 
 Read the full post: <link>
 
-How is your team handling passkey recovery — pre-linked controllers, guardians, or something else?
+How is your team handling passkey recovery — pre-linked backups, guardians, or something else?
 
-#AccountAbstraction #passkeys #selfcustody #web3 #walletengineering
+#passkeys #selfcustody #wallets #web3 #ux
 
 ## Image prompt (Gemini / Nano Banana)
 

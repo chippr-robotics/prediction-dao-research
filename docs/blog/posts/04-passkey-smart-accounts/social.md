@@ -1,27 +1,27 @@
-# Social & Image — Passkey Smart Accounts: Putting WebAuthn Signatures on an ERC-4337 Wallet
+# Social & Image — Passkey Smart Accounts: A Wallet You Open With Your Fingerprint
 
 ## X (Twitter)
 
-Your phone's secure enclave signs P-256. Ethereum recovers secp256k1. No amount of UX polish fixes a curve mismatch — so we made the account a contract. ERC-4337 + WebAuthn, RIP-7212 precompile at ~3,450 gas, no seed phrase. 🔗 <link> #AccountAbstraction #passkeys #ERC4337
+Most crypto onboarding still starts with "write down these twelve words." Your phone already has better: the same Face ID / fingerprint tech you use to log in everywhere. We turned it into a real, self-custodial wallet — no seed phrase, nothing to lose. 🔗 <link> #passkeys #wallets #selfcustody
 
 ## LinkedIn
 
-Most crypto onboarding still starts with "write down these twelve words." The hardware to do better has been in everyone's pocket for years — but secure enclaves sign on secp256r1 (P-256), and Ethereum EOAs only understand secp256k1. You cannot bridge that gap at the key level; you have to bridge it at the account level.
+Most crypto onboarding still starts with "write down these twelve words." The hardware to do better has been in everyone's pocket for years — it's the same passkey technology behind Face ID and fingerprint login. The catch is that phones and blockchains speak different signature "dialects," so you can't just plug one into the other. You have to make the account itself a small smart contract that understands your phone.
 
-Our new engineering post walks through how FairWins ships self-custodial passkey wallets on ERC-4337 smart accounts, built on the vendored Coinbase Smart Wallet stack:
+Our new post walks through how FairWins ships self-custodial passkey wallets, built on the audited, open-source Coinbase Smart Wallet design:
 
-- How `MultiOwnable` treats a 64-byte P-256 public key and a 20-byte EOA as interchangeable account controllers
-- Verifying full WebAuthn assertions on-chain: clientDataJSON checks, malleability guards, and the RIP-7212 precompile with a FreshCryptoLib fallback
-- Deterministic counterfactual addresses and first-use deployment via ERC-4337 initCode — including a real bug from an SDK's hardwired factory address
-- ERC-1271 replay-safe hashing, so one passkey owning multiple accounts can never have a signature replayed across them
+- Why an account is a *list of owners* — a passkey and an ordinary wallet can be equal controllers of the same account
+- How the contract checks a real passkey signature on-chain, using the network's fast built-in helper where it exists
+- Why your account address exists before the wallet is even deployed — so a friend can fund it instantly — plus a real bug from a toolkit that assumed the wrong address
+- Why "no seed phrase" still doesn't mean "no keys"
 
-Honest trade-offs included: what the on-chain verifier deliberately skips, and why account upgrades belong to users, not the platform.
+Honest trade-offs included: what the on-chain check deliberately skips, and why account upgrades belong to users, not the platform.
 
 Read the full post: <link>
 
-If you are building on account abstraction — where did passkey integration bite you first: the curve, the factory, or the gas?
+If you're building onboarding for crypto — what's the first thing that scares off new users: the seed phrase, the wallet install, or the fees?
 
-#AccountAbstraction #ERC4337 #WebAuthn #passkeys #web3
+#passkeys #wallets #selfcustody #web3 #fintech
 
 ## Image prompt (Gemini / Nano Banana)
 

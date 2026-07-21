@@ -1,119 +1,63 @@
-# Passkey Smart Accounts: Putting WebAuthn Signatures on an ERC-4337 Wallet
+# Passkey Smart Accounts: A Wallet You Open With Your Fingerprint
 
-*How FairWins turned Face ID into a self-custodial Ethereum account — no seed phrase, no browser extension, and a P-256 verifier that runs on-chain*
+*How FairWins turned Face ID into a real, self-custodial crypto account — no seed phrase, no browser extension, nothing to write down*
 
 | | |
 |---|---|
 | **Series** | Accounts & Keys (part 1) |
-| **Audience** | Wallet developers, account-abstraction engineers |
-| **Tags** | `account-abstraction`, `erc4337`, `passkeys`, `webauthn`, `p256`, `erc1271` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product folks, founders, crypto-curious readers, and developers new to wallets |
+| **Tags** | `passkeys`, `wallets`, `self-custody`, `onboarding`, `account-abstraction` |
+| **Reading time** | ~7 minutes |
 
-## The curve nobody asked for
+## The twelve words nobody wants to write down
 
-Picture the onboarding funnel for a peer-to-peer wager platform. A friend sends you a wager link. You have never installed MetaMask, you have never written twelve words on paper, and you are not going to start tonight. What you do have is a phone with a fingerprint sensor and a secure enclave that has been signing things for you — payments, logins — for years.
+Picture how someone joins a peer-to-peer wager app. A friend sends a link. You have never installed a crypto wallet, you have never copied twelve recovery words onto a scrap of paper, and you are not about to start tonight. What you *do* have is a phone with a fingerprint sensor and a small, tamper-resistant security chip that has been quietly signing things for you — payments, app logins — for years.
 
-That enclave speaks WebAuthn. When you register a passkey, the authenticator mints a keypair and will sign challenges after a biometric check, without the private key ever leaving the hardware. This is exactly the custody model crypto wallets have been chasing: keys that cannot be exported, phished, or pasted into a fake support chat.
+That chip speaks a standard called **passkeys** — the same WebAuthn technology behind Face ID and fingerprint sign-in on the sites you already use. When you create a passkey, your device generates a private key that it never hands out. It will only prove who you are after a biometric check, and the secret itself never leaves the hardware. That is exactly the security model crypto wallets have chased for a decade: a key that can't be exported, phished, or pasted into a fake support chat.
 
-There is one problem, and it is a stubborn one: the curve. Secure enclaves and platform authenticators sign on **secp256r1** (P-256, the NIST curve). Ethereum externally-owned accounts recover signatures on **secp256k1**. There is no way to make a passkey pretend to be an EOA — `ecrecover` will never accept a P-256 signature. If you want passkeys to control funds, the account itself has to become a smart contract that knows how to verify P-256, and something other than the user has to be able to feed it transactions, because a passkey cannot pay gas from an address that does not exist yet.
+There is one stubborn catch. Passkeys and Ethereum accounts speak different mathematical "dialects" for signatures. The security chip in your phone signs using one type of cryptographic curve; ordinary Ethereum accounts expect a different one. They simply don't recognize each other's signatures, and no amount of interface polish papers over that. If you want a passkey to control real funds, the account itself has to become a small smart contract — a program on the blockchain — that knows how to read the passkey's dialect. And something other than the user has to be able to submit that first transaction, because a brand-new passkey can't pay a network fee from an account that doesn't exist on-chain yet.
 
-That is the shape of FairWins spec 041: an **ERC-4337 smart account** owned by a WebAuthn credential, with on-chain P-256 verification, deterministic counterfactual addresses, and first-use deployment. This post walks the contract stack in `contracts/account/` — what we vendored, what we wired around it, and where the sharp edges were.
+That is the whole idea behind FairWins passkey accounts: a smart-contract wallet controlled by a passkey, able to verify the phone's signatures directly, living at an address that's known before the wallet is ever deployed.
 
-## An account is a set of owners, not a key
+## An account is a list of owners, not a single key
 
-The account contract is a vendored **Coinbase Smart Wallet v1.1.0** — `contracts/account/CoinbaseSmartWallet.sol` plus its pinned dependency closure (`webauthn-sol`, `FreshCryptoLib`, Solady, `account-abstraction`). The vendoring rule, documented in `contracts/account/README.md`, is strict: no logic modifications, path-only import rewrites. We wanted an audited, widely deployed account implementation, not a fork we would have to re-audit forever.
+Rather than build this from scratch, FairWins uses a widely deployed, professionally audited smart-wallet design — Coinbase's Smart Wallet — and adopts it as-is, without rewriting its logic. The rule is deliberate: an audited contract is only worth something if you don't quietly fork and change it. Reusing it unmodified means those outside audits still apply.
 
-The foundation is `contracts/account/MultiOwnable.sol`, and its central trick is that an owner is just `bytes`:
+The clever part of that design is how it defines ownership. An "owner" of the account isn't one fixed key; it's simply an entry in a list, and each entry can be one of two things:
 
-- a 32-byte ABI-encoded Ethereum address (a linked EOA), or
-- a 64-byte P-256 public key — the `(x, y)` coordinates of a passkey.
+- a linked ordinary Ethereum wallet address (say, a MetaMask you already have), or
+- a passkey — represented by the two numbers that make up its public key.
 
-Both kinds sit in the same index-addressed mapping and are interchangeable controllers. Adding or removing one (`addOwnerPublicKey(bytes32 x, bytes32 y)`, `addOwnerAddress(address)`, `removeOwnerAtIndex`) is an owner-authorized self-call, and `removeOwnerAtIndex` reverts with `LastOwner()` rather than let an account brick itself by removing its final controller.
+Both kinds sit in the same list and carry equal authority. Any owner can add or remove other owners, and the contract refuses to remove the *last* one — so an account can never accidentally lock itself out by deleting its only controller. When a signature arrives, the account looks at which owner produced it and checks it the right way: the passkey path for a passkey, the ordinary path for a linked wallet. One mechanism covers both signing in for transactions and approving off-chain messages.
 
-Signature validation dispatches on the owner's byte length. Every signature arrives wrapped with the index of the owner that produced it:
+## Checking a passkey signature on the blockchain
 
-```solidity
-struct SignatureWrapper {
-    /// @dev The index of the owner that signed, see `MultiOwnable.ownerAtIndex`
-    uint256 ownerIndex;
-    /// @dev If `MultiOwnable.ownerAtIndex` is an Ethereum address, this should be `abi.encodePacked(r, s, v)`
-    ///      If `MultiOwnable.ownerAtIndex` is a public key, this should be `abi.encode(WebAuthnAuth)`.
-    bytes signatureData;
-}
-```
+A passkey signature is more than a scribble over some data. When your device signs, it wraps the thing you're approving inside a small standardized bundle that also records details like "this was a genuine WebAuthn sign-in" and "a user was present." To trust that signature, the contract re-runs the important checks from the official WebAuthn specification right on-chain: it confirms the bundle is the expected kind, that the challenge inside it matches what was really being approved, that a user was actually present, and it rejects a known signature-tampering trick. It deliberately skips a few checks that the phone and the app's site association already enforce — an honest trade that keeps verification affordable.
 
-In `CoinbaseSmartWallet._isValidSignature`, 32-byte owners go through Solady's `SignatureCheckerLib` (ECDSA or nested ERC-1271); 64-byte owners take the WebAuthn path:
+Then there's the heavy math of actually verifying the signature, which is expensive to do on a blockchain. Where the network offers a fast built-in helper for exactly this kind of signature, the contract uses it (cheap — a few thousand units of gas). Where a network doesn't, the same contract quietly falls back to doing the math the slow, pure-software way. Same code, both worlds — which is why supporting a new network later is a configuration change, not a contract rewrite.
 
-```solidity
-if (ownerBytes.length == 64) {
-    (uint256 x, uint256 y) = abi.decode(ownerBytes, (uint256, uint256));
+## An address before there's an account
 
-    WebAuthn.WebAuthnAuth memory auth = abi.decode(sigWrapper.signatureData, (WebAuthn.WebAuthnAuth));
+Here's a nice trick that makes onboarding feel instant: your account address exists *before* the wallet is actually deployed. The address is calculated purely from your initial list of owners, so the app can show it — and a friend can send funds to it — while the contract itself is still just a plan. FairWins deploys the piece that mints these addresses in an identical way on every supported network, so your address is the same everywhere.
 
-    return WebAuthn.verify({challenge: abi.encode(hash), requireUV: false, webAuthnAuth: auth, x: x, y: y});
-}
-```
+Deployment happens lazily, the first time you actually do something. That first action carries a little bundle of setup instructions: the network deploys your account and performs your transaction together, in one shot. (One hard-won lesson from building this: a popular off-the-shelf toolkit assumed a *different* deployment source than the one FairWins uses, which quietly produced the wrong predicted address and made every early transaction fail. The fix was to pin everything to the exact same source. If you ever wire a custom wallet into a generic toolkit, check its address assumptions first.)
 
-This one function backs both ERC-4337 `validateUserOp` and ERC-1271 `isValidSignature` — one verification path for transactions and off-chain signatures alike.
+## No seed phrase doesn't mean no keys
 
-## Verifying WebAuthn where gas is real
+Passkeys are great at signing but they don't encrypt. Some FairWins features — the private ones — need encryption keys too. So the app uses a companion capability of the passkey standard to derive a stable secret from your authenticator, stretch it into an encryption key, and use that to wrap a single master seed. Every owner on the account unwraps the *same* seed, which is why your encrypted data survives switching devices. If an authenticator doesn't support this capability, the app says so plainly rather than silently generating the wrong keys.
 
-A WebAuthn assertion is not a bare signature over a hash. The authenticator signs `sha256(authenticatorData || sha256(clientDataJSON))`, where `clientDataJSON` embeds the challenge (base64url-encoded) and a ceremony type. `contracts/account/lib/webauthn-sol/WebAuthn.sol` re-runs the relevant verification steps from the W3C spec on-chain: it checks the client data `type` is `"webauthn.get"`, that the encoded challenge in the JSON matches the expected hash, that the User Present flag is set in `authenticatorData`, and it rejects high-`s` P-256 signatures to close the malleability hole. The library's NatSpec is refreshingly explicit about what it deliberately does *not* verify — origin, `rpIdHash`, signature counters — trusting platform authenticators and app-site association to enforce those, which is the honest trade for keeping verification affordable.
+## Why we built it this way
 
-Then comes the actual curve math. P-256 verification in pure EVM is expensive, so the library tries the **RIP-7212 precompile** at address `0x100` first — about 3,450 gas on Polygon and Amoy, where FairWins runs passkeys today. On chains without the precompile, the `staticcall` returns empty and the code falls back to `FCL_ecdsa.ecdsa_verify` from FreshCryptoLib, a Solidity implementation costing a couple hundred thousand gas. The same bytecode serves both worlds — which is precisely why the deferred ETC/Mordor increment needs no contract changes, only a self-hosted bundler.
+- **Reuse an audited design, don't fork it.** Using the Coinbase Smart Wallet unmodified keeps its outside security audits meaningful. A private fork would need re-auditing forever.
+- **Upgrades belong to the user.** These accounts can be upgraded, but only the account's own owner can authorize that. FairWins holds no override switch over anyone's wallet — which is what makes this genuinely self-custodial, not "self-custodial" in scare quotes.
+- **Fast where possible, correct everywhere.** Using the network's built-in signature helper where it exists, and falling back to software elsewhere, costs a bit more on some chains but means one single codebase runs everywhere.
+- **Honest about fees.** The confirm screen only says a transaction is sponsored when it truly is; otherwise it says you pay the network fee. (A later post covers how sponsorship works.)
 
-## An address before an account
+The result is an account you open with a thumbprint, funded at an address that exists before the contract does, and controlled by keys that no server — including ours — ever holds.
 
-The user's account address must exist before any contract does — it is where a friend sends their stake. `contracts/account/CoinbaseSmartWalletFactory.sol` makes the address a pure function of the initial owners:
+## Further reading
 
-```solidity
-function createAccount(bytes[] calldata owners, uint256 nonce)
-    external payable virtual returns (CoinbaseSmartWallet account)
-{
-    if (owners.length == 0) revert OwnerRequired();
-
-    (bool alreadyDeployed, address accountAddress) =
-        LibClone.createDeterministicERC1967(msg.value, implementation, _getSalt(owners, nonce));
-    ...
-}
-```
-
-The salt is `keccak256(abi.encode(owners, nonce))`, and the account is a deterministic ERC-1967 proxy over the shared implementation. `getAddress(owners, nonce)` predicts the address without deploying anything. FairWins deploys the factory itself through a canonical CREATE2 deployer with a pinned salt (`scripts/deploy/deploy-account-stack.js`), so the factory — and therefore every account address — is identical on every supported network. Recorded deployment keys: `entryPoint`, `accountFactory`, `accountImpl`.
-
-Deployment happens lazily. The first time the user acts, the frontend (`frontend/src/lib/passkey/sendBatch.js`) attaches ERC-4337 `initCode` that calls `createAccount`; the EntryPoint deploys the account and executes the operation in the same transaction. One war story worth passing on, preserved as a comment in `frontend/src/lib/passkey/smartAccount.js`: viem's smart-account helper defaults to the *canonical Coinbase factory address*, which derives a **different** counterfactual address than the FairWins-deployed factory. Left unpinned, every UserOp was built for an empty account and reverted with "exceeds balance". The fix is to pin the sender to the address returned by the FairWins factory's `getAddress` and generate `initCode` against that same factory. If you integrate any vendored factory with a generic AA SDK, audit its address-derivation defaults first.
-
-## ERC-1271, with a seatbelt
-
-Wagering on FairWins mostly rides gasless EIP-712 intents (specs 035/036), and USDC moves via EIP-3009 authorizations — both off-chain signatures. A contract account signs those through **ERC-1271**: verifiers call `isValidSignature(hash, signature)` and expect the `0x1626ba7e` magic value.
-
-The vendored `contracts/account/ERC1271.sol` adds one crucial layer: an anti-cross-account-replay wrapper. Because the same passkey can own several accounts, a naive implementation would let a signature approved for account A validate on account B. So the contract never verifies the raw hash — it verifies `replaySafeHash(hash)`, an EIP-712 hash of `CoinbaseSmartWalletMessage(bytes32 hash)` under a domain separator bound to `block.chainid` and `address(this)`. A signature is valid for exactly one account on exactly one chain. On the platform side, spec 041 extended `contracts/upgradeable/SignerIntentBase.sol` with an ECDSA-then-ERC-1271 check so intent verification accepts contract signers, with a matching fail-closed `eth_call` fallback in `services/relay-gateway/src/intent/verify.js`. One honest scope note: the EIP-3009 payment leg is still ECDSA-only in the intent twins, so passkey stake-moving actions ride `executeBatch` UserOps until the ERC-7598 bytes-signature leg is plumbed through — `test/fork/usdc-erc1271-authorization.test.js` already proves native USDC accepts the contract-account authorization.
-
-`executeBatch(Call[] calldata calls)` matters for UX too: approve-and-act becomes one biometric ceremony instead of two.
-
-## No seed phrase does not mean no keys
-
-Passkeys sign; they do not encrypt. FairWins' private-market features need deterministic encryption keys, so `frontend/src/lib/passkey/prfKeys.js` uses the WebAuthn **PRF extension**: a fixed, versioned evaluation point (`fairwins.prf.salt.v1`) is fed through the authenticator's PRF, the output through HKDF-SHA256 (`info="fairwins-kek-v1"`) into a key-encryption key, which wraps a random 32-byte master seed with AES-GCM. Every controller on the account unwraps the *same* master seed, so encryption keys survive device changes. Authenticators without PRF degrade explicitly — the UI reports encryption unavailable rather than deriving silently wrong keys.
-
-## Design decisions
-
-- **Vendor, don't fork.** Coinbase Smart Wallet v1.1.0 is battle-tested and audited; the repo's rule of zero logic modifications means upstream audits remain meaningful. The one deviation is documented in `MultiOwnable.sol` itself: an ERC-7201 NatSpec annotation removed because tooling choked on it — a comment, not bytecode.
-- **User-sovereign upgrades.** The account is UUPS-upgradeable, but `_authorizeUpgrade` is `onlyOwner`. FairWins holds no authority over deployed instances — deliberately outside the platform's `UUPSManaged` regime, and the reason this is genuinely self-custodial rather than "self-custodial."
-- **`requireUV: false`.** The account checks User Present, not User Verified, at the contract layer, matching upstream. Platform authenticators enforce biometrics at the ceremony; hard-requiring UV on-chain would strand security keys that report UP only.
-- **Precompile-first, fallback-always.** RIP-7212 where available, FreshCryptoLib elsewhere. Costlier on precompile-less chains, but one bytecode everywhere beats per-chain builds.
-- **Gas honesty.** Spec 041 shipped with users paying their own UserOp gas (FR-015); spec 050 later superseded that with a self-hosted verifying paymaster — but the confirm UI only ever claims "sponsored" when a sponsorship was actually obtained, and the self-funded fallback keeps users never stranded.
-
-The result: an account a user opens with a thumbprint, funds at an address that exists before the contract does, and controls through keys that no server — including ours — ever holds.
-
-## Sources
-
-- `specs/041-passkey-wallet-login/` — feature spec and plan
-- `docs/developer-guide/passkey-accounts.md` — architecture guide
-- `contracts/account/CoinbaseSmartWallet.sol`, `contracts/account/MultiOwnable.sol`, `contracts/account/CoinbaseSmartWalletFactory.sol`, `contracts/account/ERC1271.sol`
-- `contracts/account/lib/webauthn-sol/WebAuthn.sol`, `contracts/account/lib/FreshCryptoLib/`
-- `frontend/src/lib/passkey/smartAccount.js`, `frontend/src/lib/passkey/prfKeys.js`
-- ERC-4337: <https://eips.ethereum.org/EIPS/eip-4337>
-- ERC-1271: <https://eips.ethereum.org/EIPS/eip-1271>
-- EIP-712: <https://eips.ethereum.org/EIPS/eip-712>
-- RIP-7212 (secp256r1 precompile): <https://github.com/ethereum/RIPs/blob/master/RIPS/rip-7212.md>
-- WebAuthn Level 2 (W3C): <https://www.w3.org/TR/webauthn-2/>
-- Coinbase Smart Wallet: <https://github.com/coinbase/smart-wallet>
+- Passkeys / WebAuthn (W3C): <https://www.w3.org/TR/webauthn-2/>
+- What passkeys are, in plain terms (FIDO Alliance): <https://fidoalliance.org/passkeys/>
+- The ERC-4337 account-abstraction standard (smart-contract wallets): <https://eips.ethereum.org/EIPS/eip-4337>
+- Coinbase Smart Wallet (open source): <https://github.com/coinbase/smart-wallet>

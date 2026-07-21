@@ -1,238 +1,75 @@
-# The Nullifier System: A Privacy-Preserving Blocklist That Never Shipped
+# The Blocklist That Never Shipped: Voiding Bad Markets Without Publishing a Wall of Shame
 
-*What FairWins built when it needed to revoke bad markets without publishing a
-blacklist — and why the word "nullifier" means something different here than it
-does in Tornado Cash*
+*A design-history piece: what FairWins built to revoke bad markets without posting a public blacklist — a compact cryptographic membership check — and the honest reasons it was shelved*
 
 | | |
 |---|---|
 | **Series** | Privacy Architecture (part 4) |
-| **Audience** | ZK and privacy engineers |
-| **Tags** | `nullifiers`, `zk`, `privacy`, `rsa-accumulator`, `moderation` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product, founders, and the crypto-curious |
+| **Tags** | `privacy`, `moderation`, `design-history`, `plain-english` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-> This post describes a peer-to-peer wager platform built around forecasting on
-> publicly available information. Nothing here is a mechanism for evading law or
-> sanctions screening; the "nullifier" below is a moderation primitive, and it is
-> archived. Participants on any live FairWins surface remain subject to applicable
-> law and to the platform's on-chain sanctions guard.
+> This post describes a design that was explored and then shelved. It is a moderation idea, not a way to evade law or sanctions screening. Everything live on FairWins today runs the platform's real compliance checks, and all participants remain subject to applicable law.
 
 ## A word with two meanings
 
-If you come from the zero-knowledge world, "nullifier" has a precise meaning. In
-Tornado Cash, a nullifier is a value you reveal when you withdraw a note so that
-the same note cannot be withdrawn twice. In Semaphore, a nullifier hash binds a
-signal to an identity and an external topic so a member can prove "I am in this
-group and I have not spoken on this topic before" without revealing which member
-they are. The nullifier is the anti-double-spend, anti-replay half of an
-otherwise anonymous action. You never learn *who*; you only learn *again* — and
-you reject the "again."
+"Nullifier" is a loaded term. In privacy tech — coin mixers and anonymous-signaling systems — a nullifier is a one-time value you reveal to prove you haven't already spent something or already voted, all without revealing *who* you are. It's the anti-double-use safeguard behind an otherwise anonymous action. You never learn *who*; you only learn *again* — and you reject the "again."
 
-FairWins has a "nullifier system" too, documented in `docs/NULLIFIER_SYSTEM.md`
-and `docs/developer-guide/nullifier-system.md`. It is worth being blunt up front:
-it is **not** that. The FairWins nullifier does not prevent replay of a
-privacy-preserving action. It uses "nullify" in the older sense — *to make null,
-to void* — and it is a moderation tool: a way for a platform admin to revoke a
-malicious market or a bad-actor address so the frontend stops displaying it and,
-optionally, contracts stop transacting with it.
+The FairWins design explored here borrowed that word for a different, older meaning: *to nullify* as in *to void, to cancel*. It was a moderation tool — a way for a platform admin to void a scam market or block a repeat bad actor, so the app would stop showing it and, optionally, the smart contracts would refuse to deal with it. Worth being blunt: it is not the anonymous-spend kind of nullifier, and it never reached a live network. This is a design-history piece.
 
-What makes it interesting to a ZK engineer is the *shape* of the problem, which
-turns out to be the same shape as a nullifier set. A blocklist is a set. You want
-to answer one question against that set — "is this thing revoked?" — and its dual,
-"prove this thing is *not* revoked." The FairWins design reached for the same
-cryptographic primitive the ZK-mixer literature reaches for when it wants compact,
-privacy-preserving set membership: an **RSA accumulator**. This post walks that
-design, and is honest about the fact that it never reached a live network.
+What makes it interesting anyway is the *shape* of the problem. A blocklist is a set of things. You want to answer one question about that set — "is this thing blocked?" — and its harder twin, "prove this thing is *not* blocked." That second question is exactly what a certain family of cryptography is unusually good at — the same family the privacy-tech world reaches for. So the design reached for it too.
 
 ## The problem: revoking without publishing
 
-Consider the moderation problem for a permissionless-feeling market venue. An
-admin discovers a market crafted to defraud participants, or an address that keeps
-seeding abusive markets. They want it gone from the interface, and for
-high-value paths they want the contract itself to refuse to interact with it.
+Picture moderating an open, permissionless-feeling marketplace. An admin finds a market built to defraud people, or an address that keeps spinning up abusive markets. They want it gone from the interface — and for high-value actions, they want the contract itself to refuse to touch it.
 
-The naive implementation is an on-chain mapping — `mapping(address => bool)
-blocked` — and that is genuinely fine for small sets. But it has two properties
-the designers disliked. First, the blocklist is fully public and fully
-enumerable: anyone can read every entry, which turns a moderation list into a
-published "wall of shame" and leaks the platform's threat model. Second, storage
-and gas grow with the list. The `docs/NULLIFIER_SYSTEM.md` table lays out the
-trade study explicitly: an on-chain mapping is O(n) storage with a public list; a
-Merkle tree gives O(log n) proofs and partial privacy; an RSA accumulator gives
-O(1) storage, O(1) on-chain footprint, and — the headline property — the ability
-to prove that something is **not** in the set without revealing the set.
+The obvious way to do this is a simple on/off list stored on the blockchain: this address is blocked, that one isn't. For small lists, that's genuinely fine. But it has two properties the designers disliked. First, a blocklist on a public blockchain is fully readable — anyone can pull up every entry, turning a moderation list into a published "wall of shame" that broadcasts the platform's threat model. Second, its storage and cost grow with every entry.
 
-That last property is exactly what a ZK nullifier set needs, approached from the
-opposite direction. A mixer proves *membership* of a commitment and *non-membership*
-of a nullifier. Here the platform wants to prove *non-membership* in a blocklist:
-"this market is clean, and here is a 256-byte witness that says so, and the witness
-tells you nothing about what else is blocked."
+So the design set a more ambitious goal: check whether something is blocked, and even *prove* that something is *not* blocked, without ever publishing the list itself.
 
-## The design: prime mapping plus an RSA accumulator
+## The idea: shrink the whole list into one small value
 
-The archived contract lives at
-`contracts-archive/security/NullifierRegistry.sol`, with its cryptography in
-`contracts-archive/libraries/RSAAccumulator.sol` and
-`contracts-archive/libraries/PrimeMapping.sol`. It is `AccessControl`,
-`ReentrancyGuard`, `Pausable`, and it supports two modes that share one storage
-layout.
+Here's the everyday-analogy version. Imagine every blocked item gets its own unique padlock, and you build a single master seal by threading all those padlocks together into one compact object. That one object stands in for the entire blocklist — whether the list has one entry or a million, the object on the blockchain stays the same tiny size.
 
-**Simple mode** is the boring, working half — plain mappings with an audit trail:
+The clever part is what you can do with that seal. Given it, someone can produce a short "certificate of innocence" for a specific market — a small proof that this market's padlock was *never* threaded into the seal. And critically, that certificate reveals nothing about what *else* is on the list. You learn "this one is clean," and nothing more.
 
-```solidity
-mapping(bytes32 => bool) public nullifiedMarkets;
-mapping(address => bool) public nullifiedAddresses;
-mapping(bytes32 => uint256) public marketNullifiedAt;
-mapping(bytes32 => address) public marketNullifiedBy;
-```
+That's the mirror image of the privacy-tech nullifier. Here the platform proves: "this market is *not* in the blocklist, here's a compact proof, and the proof tells you nothing about the rest of the list."
 
-An admin holding `NULLIFIER_ADMIN_ROLE` calls `nullifyMarket` or `nullifyAddress`
-with a human-readable reason; the mapping flips, a timestamp and the admin address
-are recorded, and an event carries the reason off-chain for indexing. Batch
-variants exist, capped at `MAX_BATCH_SIZE = 50` to bound gas and prevent a
-DoS-by-huge-array. Reads are trivial:
+Under the hood this used a well-known cryptographic accumulator — a construction from the academic literature designed for exactly this "compress a set into one value, then prove membership or non-membership" job. The app could carry a cached copy of the seal and check a market on the spot, and a sensitive on-chain action could demand a proof instead of trusting a simple list lookup.
 
-```solidity
-function isAddressNullified(address addr) external view returns (bool) {
-    return nullifiedAddresses[addr];
-}
-```
+## Two modes, one design
 
-**Accumulator mode** is where the ZK-adjacent machinery appears. Every element —
-a market hash or an address hash — is deterministically mapped to a prime. The
-mapping starts from the keccak hash, forces it odd, and walks upward by twos until
-a Miller-Rabin test passes:
+The design actually offered two ways to run, sharing one structure.
 
-```solidity
-function hashToPrimeUint(bytes32 hash) internal pure returns (uint256 prime) {
-    uint256 candidate = uint256(hash) | 1;   // ensure odd
-    uint256 iterations = 0;
-    while (!isPrime(candidate) && iterations < 1000) {
-        candidate += 2;                        // only test odd numbers
-        iterations++;
-    }
-    require(iterations < 1000, "Prime search exceeded limit");
-    return candidate;
-}
-```
+**The simple mode** was the boring, working half: a plain on/off list with an audit trail. An admin marks a market or address as void with a human-readable reason; the change is timestamped, the admin recorded, the reason logged. Batch versions were capped at a fixed size so nobody could jam the system with an enormous request. This mode ships zero fancy cryptography and gives you an obvious paper trail — but the list is public, exactly the downside above.
 
-Deterministic hash-to-prime is the same trick the RSA-accumulator literature uses
-so that the accumulator value is a single group element representing the product
-of all members' primes: `A = g^(p1 * p2 * ... * pn) mod n`. Adding an element is a
-single modular exponentiation, `A_new = A^p mod n`. The whole revoked set — one
-entry or a million — collapses to one 256-byte value stored on-chain.
+**The compact mode** was the privacy upgrade: the single-seal, prove-it's-not-blocked machinery just described, layered on the same structure. The guidance was to use simple mode for small lists and reach for the compact one only when the list got large or hiding it actually mattered.
 
-Non-membership is the payoff. To prove an element `x` is *not* in the set, an
-off-chain prover computes a Bezout witness `(d, b)` such that the accumulator and
-generator satisfy the identity `A^d · g^b ≡ g (mod n)` — which can only hold if
-`gcd(prime(x), product_of_members) = 1`, i.e. `x` was never accumulated. The
-contract verifies it:
+## The catch: enforcement, and a ceremony that never happened
 
-```solidity
-function verifyNonMembership(
-    bytes32 elementHash,
-    bytes calldata witnessD,
-    bytes calldata witnessB,
-    bool dNegative
-) external view returns (bool valid);
-```
+Two parts of the platform were wired to *enforce* a block on-chain: a legacy market-creation path that could refuse a blocked address, and a treasury component that could refuse to pay out to a blocked recipient. But both hid that enforcement behind a switch that defaulted to **off**. Left alone, the system degraded to "the app hides bad markets, the contracts don't care." That was a safety choice — a bug or a stolen admin key couldn't freeze trading unless someone had flipped the switch — but it also meant "voided" meant nothing on-chain until someone did.
 
-The frontend can carry a cached accumulator and check a market client-side, and a
-critical on-chain path can demand a proof rather than trusting a mapping read. The
-JavaScript side of this lives in `frontend/src/utils/rsaAccumulator.js` and
-`frontend/src/utils/primeMapping.js`, wired through the React hooks
-`useNullifierContracts` and `useMarketNullification` and surfaced in the admin
-`NullifierTab`.
+The bigger catch was the compact mode's foundation. That scheme depends on a **trusted setup**: some secret numbers must be generated to bootstrap the system and then *destroyed*. If anyone keeps them, they can forge proofs in both directions — mark a real scam market as clean, or frame a legitimate one as blocked. This is a well-known caveat for this family of cryptography, the same class of setup risk many privacy systems carry. The design called for a careful, verifiable ceremony to generate and destroy those secrets safely. That ceremony was never run.
 
-## The integration points — and the trust model
+## Why it was shelved
 
-Two consumers were designed to enforce revocation on-chain. The legacy
-`FriendGroupMarketFactory` imports the registry, holds an `enforceNullification`
-flag, and checks `isAddressNullified` before letting an address create, accept, or
-be added to a market — reverting with `AddressNullified()` if blocked. A
-`TreasuryVault` could refuse withdrawals to a nullified recipient. Both gate the
-check behind an owner-set enforcement toggle that defaults **off**, so the system
-degrades to "frontend filters, chain does not care" unless an operator explicitly
-opts in.
+Search the live codebase and there's no blocklist system in it. No live network runs one. The whole thing sits in a reference-only archive — kept for study, never deployed. The app hooks that once talked to it now simply do nothing when no such system answers.
 
-The security of accumulator mode rests entirely on a **trusted setup**: the RSA
-modulus `n` must be the product of two secret safe primes that are destroyed after
-generation. If anyone knows the factorization, they can forge both membership and
-non-membership proofs — add a market to the blocklist that verifies as clean, or
-clear a real one. That is the classic RSA-accumulator caveat, and it is the same
-class of ceremony risk that ZK systems carry for their structured reference
-strings. The docs call for a verifiable ceremony or MPC; nothing in the repo
-performs one.
+The honest read is that FairWins pivoted. Instead of an admin-run market blocklist with its own bespoke cryptography and an unperformed ceremony, the platform shipped compliance checks that are actually wired into the money path: a shared sanctions check run against real wallet addresses across wagers and pools, plus role-based gating of who can participate. Those solve the real "keep bad actors out" problem without the ceremony risk and without a custom accumulator to maintain.
 
-## Design decisions and trade-offs
+## What's worth keeping from it
 
-- **Accumulator over Merkle tree.** A Merkle blocklist gives non-membership too,
-  but requires sorted leaves and O(log n) proofs that grow with the set, and it
-  still tends to leak neighbors. The accumulator's constant on-chain footprint and
-  set-hiding property were the deciding factors — at the cost of a trusted setup a
-  Merkle tree does not need.
-- **Two modes, one contract.** Simple mode is deployable today with zero ceremony
-  and an obvious audit trail; accumulator mode is the privacy upgrade layered on
-  the same storage. The `docs/developer-guide/nullifier-system.md` guidance is to
-  use simple mode below ~1,000 entries and only reach for the accumulator when the
-  set is large or the privacy of the list itself matters.
-- **Enforcement off by default.** Making on-chain checks opt-in keeps gas and
-  liveness risk out of the common path — a bug or a compromised admin key cannot
-  freeze trading unless an operator turned enforcement on. The flip side is that
-  "revoked" means nothing on-chain until someone flips that switch.
-- **Admin, not governance.** Revocation is a single role, `NULLIFIER_ADMIN_ROLE`,
-  granted by the default admin. The docs themselves flag this as the weak point and
-  list multisig/timelock and a future governance-based path as the mitigation. It
-  is centralized moderation wearing a cryptographic coat.
+So if you came looking for a mixer-style anonymous-spend nullifier, the accurate answer is: this was a *nullification* registry — a voiding tool — not a nullifier in the privacy-tech sense, and it was shelved before launch.
 
-## Why it is archived — and what a real nullifier looks like here
+What survives is a clean case study in a genuinely useful idea: you can compress an entire blocklist into a single small value and then prove a specific item *isn't* on it, without ever revealing the rest. That's a real capability with real trade-offs — a trusted-setup ceremony you have to actually perform, enforcement that's meaningless until switched on, and moderation that ultimately rested on a single admin role rather than governance. The value of studying it is precisely that the cryptography is real and the limits are printed on the label.
 
-Grep the active tree and there is no nullifier: `contracts/` has no
-`NullifierRegistry`, no live network in `deployments/` configures one (only a
-`localhost` chain-1337 registries file references a `nullifierRegistry` address),
-and the testnet address that appears in the old dev guide points at Polygon Amoy,
-a network FairWins has since moved off. The whole system sits in
-`contracts-archive/`, which the project guide marks reference-only: never import,
-never deploy. The frontend hooks still exist but soft-fail to a no-op when no
-registry answers.
+The lesson for builders is familiar: reach for exotic cryptography only when the problem truly needs it. A plain list was simpler, honest, and — for the sizes that actually mattered — good enough. When FairWins needed real enforcement, it chose primitives already proven on the value path over a beautiful mechanism that still owed the world a ceremony.
 
-The honest read is that FairWins pivoted away from an admin-run market blocklist
-toward compliance primitives that are actually wired into the value path — a shared
-`ISanctionsGuard` checked on real wallet addresses across wagers and pools, and
-role-gated participation via `MembershipManager`. Those solve the "keep bad actors
-out" problem without a bespoke accumulator and its ceremony risk.
+## Further reading
 
-So if you came looking for a Semaphore-style spend-nullifier preventing replay of
-an anonymous action, the accurate answer is: FairWins designed a *nullification*
-registry, not a *nullifier* in the mixer sense, and then shelved it. What survives
-is a clean, self-contained study in applying an RSA accumulator to a set-membership
-problem — the exact primitive the ZK world uses, pointed at moderation instead of
-anonymity. That is a genuinely useful thing to have read in full, even as reference
-code, precisely because the cryptography is real and the honest limits are on the
-label.
-
-## Sources
-
-- `docs/NULLIFIER_SYSTEM.md` — full RSA-accumulator design, trade study, and
-  security model
-- `docs/developer-guide/nullifier-system.md` — simple vs. accumulator mode, admin
-  workflow, historical deployment notes
-- `contracts-archive/security/NullifierRegistry.sol` — the registry contract
-  (archived, reference-only)
-- `contracts-archive/libraries/RSAAccumulator.sol`,
-  `contracts-archive/libraries/PrimeMapping.sol` — accumulator math and
-  deterministic hash-to-prime
-- `contracts-archive/markets/FriendGroupMarketFactory.sol` — legacy on-chain
-  enforcement integration
-- `frontend/src/hooks/useNullifierContracts.js`,
-  `frontend/src/hooks/useMarketNullification.js`,
-  `frontend/src/utils/rsaAccumulator.js` — client-side filtering and proof
-  verification
-- `deployments/localhost-chain1337-registries-deployment.json` — the only
-  deployment record that references a `nullifierRegistry`
-- Background: Semaphore protocol (semaphore.pse.dev) and Tornado Cash on ZK
-  nullifiers; Camenisch–Lysyanskaya, *Dynamic Accumulators* (2002) and Boneh–Bünz–Fisch,
-  *Batching Techniques for Accumulators* (2018) on RSA accumulators; RFC-style RSA
-  parameter guidance at eips.ethereum.org for on-chain `modExp` (EIP-198)
+- [The Semaphore protocol](https://semaphore.pse.dev/) — the anonymous-signaling sense of "nullifier"
+- [Camenisch & Lysyanskaya, *Dynamic Accumulators* (2002)](https://link.springer.com/chapter/10.1007/3-540-45708-9_5) — the foundational paper on cryptographic accumulators
+- [Boneh, Bünz & Fisch, *Batching Techniques for Accumulators* (2018)](https://eprint.iacr.org/2018/1188) — modern non-membership proofs
+- [Trusted setup ceremonies, explained](https://en.wikipedia.org/wiki/Trusted_setup) — why generating-and-destroying secrets is the recurring risk

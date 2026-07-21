@@ -2,32 +2,26 @@
 
 ## X (Twitter)
 
-Our contract compiled to 24,460 of 24,576 bytes — 116 bytes of headroom — and the next feature needed 16 new entrypoints.
-
-We didn't reach for a Diamond. One proxy, two implementations, one shared storage base, and a CI gate that validates the pair.
-
-🔗 <link>
-
-#Solidity #EVM #SmartContracts
+Our central contract had ~116 bytes of room left — and the next feature needed 16 new entrypoints. Smart contracts have a hard size limit, like a strict page limit for one binder. Our fix: split one contract into two cooperating halves that share one set of records, at one unchanged address. 🔗 <link> #web3 #smartcontracts
 
 ## LinkedIn
 
-Every serious Solidity team eventually hits EIP-170: deployed bytecode is capped at 24,576 bytes, and no optimizer setting saves you once a live, audited contract needs a large new feature. Our wager registry sat at 24,460 bytes when a gasless-transactions spec called for roughly sixteen new EIP-712 entrypoints.
+Ethereum-style blockchains cap how big a single smart contract can be — roughly 24 KB, a hard ceiling you can't optimize your way past. Think of it as a strict page limit for a document that must fit in one binder. Our central wager contract had almost filled its binder when a big new gasless-features effort needed sixteen more entrypoints.
 
-The obvious answer is an EIP-2535 Diamond. We shipped something smaller instead — and the new post walks through exactly how and why:
+The elaborate industry answer is the "Diamond" pattern. We shipped something smaller — and the new post walks through how and why:
 
-- One UUPS proxy, two implementation facets: unknown selectors delegatecall from the main contract's fallback to an extension facet, so callers still see one address, one ABI, one event stream, and one EIP-712 domain.
-- A single abstract base contract defines the storage layout and all internal action bodies; both facets inherit it, so layouts structurally cannot drift.
-- A CI gate runs OpenZeppelin's validateUpgrade on the facet pair, treating the extension as an upgrade of the main implementation — drift fails the build.
-- An honest comparison with Diamonds: what we gave up (introspection, per-selector upgrades) and what we kept (direct dispatch on hot paths, existing tooling, a twelve-line routing layer).
+- One address, one public face, but two cooperating halves behind it: the main half handles what it knows; anything it doesn't recognize gets quietly forwarded to an extension half — which runs as if it were the same contract, sharing the same records and identity.
+- The record layout is defined in exactly one shared place both halves are built on, so they structurally cannot disagree about where things are stored.
+- An automated gate checks the two halves line up before any change can merge.
+- An honest comparison with the Diamond pattern: what we gave up, and what we kept (fast common paths, existing tooling, a tiny routing layer).
 
-If your contract is creeping toward the ceiling, this is a shipped, testable pattern you can borrow before committing to a full facet framework.
+If your contract is creeping toward the ceiling, this is a shipped, testable pattern worth knowing before you reach for a heavier framework.
 
 🔗 <link>
 
-Where do you draw the line between "split the contract" and "adopt a Diamond"?
+Where would you draw the line between "split the contract" and "adopt a heavier framework"?
 
-#Solidity #EVM #SmartContracts #Web3 #ProtocolEngineering
+#web3 #smartcontracts #architecture #engineering #fintech
 
 ## Image prompt (Gemini / Nano Banana)
 
