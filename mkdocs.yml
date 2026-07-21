@@ -160,6 +160,35 @@ nav:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
     - Configuration: reference/configuration.md
+  - Knowledge Base:
+    - Overview: blog/knowledge/README.md
+    - Inventory & Schedule: blog/knowledge-base-inventory.md
+    - Wallets & Keys:
+      - Self-Custody Explained: blog/knowledge/01-self-custody-explained/blog.md
+      - Passkeys & Smart Accounts: blog/knowledge/02-passkeys-and-smart-accounts/blog.md
+      - Gas Fees & Going Gasless: blog/knowledge/03-gas-fees-and-gasless/blog.md
+    - Payments & Markets:
+      - Stablecoins Explained: blog/knowledge/04-stablecoins-explained/blog.md
+      - Escrow & Trustless Settlement: blog/knowledge/05-escrow-and-trustless-settlement/blog.md
+      - Prediction Markets 101: blog/knowledge/06-prediction-markets-101/blog.md
+    - Earning & Yield:
+      - DeFi Lending & Yield: blog/knowledge/07-defi-lending-and-yield/blog.md
+      - Morpho & Vaults Explained: blog/knowledge/08-morpho-and-vaults/blog.md
+      - Reading APY & Risk: blog/knowledge/09-apy-and-risk/blog.md
+      - Fees & Basis Points: blog/knowledge/10-fees-and-basis-points/blog.md
+    - Security & Custody:
+      - Multisig Wallets: blog/knowledge/11-multisig-wallets/blog.md
+      - Spending Guardrails: blog/knowledge/12-spending-guardrails/blog.md
+      - Sanctions & Compliance: blog/knowledge/13-sanctions-and-compliance/blog.md
+    - Oracles & Trading:
+      - Oracles Explained: blog/knowledge/14-oracles-explained/blog.md
+      - Polymarket & Builder Fees: blog/knowledge/15-polymarket-and-builder-fees/blog.md
+    - Identity, Privacy & Networks:
+      - NFTs, Soulbound Tokens & Memberships: blog/knowledge/16-nfts-soulbound-and-memberships/blog.md
+      - On-Chain Names: blog/knowledge/17-onchain-names/blog.md
+      - Private & Encrypted: blog/knowledge/18-private-and-encrypted/blog.md
+      - Blockchain Networks & Layer-2s: blog/knowledge/19-blockchain-networks-and-l2s/blog.md
+      - What Is a DAO?: blog/knowledge/20-what-is-a-dao/blog.md
   - Engineering Blog:
     - Overview: blog/posts/README.md
     - Topic Inventory: blog/blog-topics-inventory.md
@@ -212,6 +241,7 @@ nav:
 # Companion social/image-prompt assets live beside each post but are not nav pages.
 not_in_nav: |
   /blog/posts/*/social.md
+  /blog/knowledge/*/social.md
   /blog/private-prediction-markets-envelope-encryption.md
 
 extra:
