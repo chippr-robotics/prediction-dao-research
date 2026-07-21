@@ -11,7 +11,14 @@
  * so `deriveAddress` is chain-independent by construction.
  */
 
-import { http, createPublicClient, encodeFunctionData, parseAbi } from 'viem'
+import {
+  http,
+  createPublicClient,
+  encodeFunctionData,
+  encodeAbiParameters,
+  decodeAbiParameters,
+  parseAbi,
+} from 'viem'
 import {
   toWebAuthnAccount,
   toCoinbaseSmartAccount,
@@ -81,6 +88,51 @@ export const ACCOUNT_ABI = parseAbi([
   'function replaySafeHash(bytes32 hash) view returns (bytes32)',
   'function executeBatch((address target, uint256 value, bytes data)[] calls) payable',
 ])
+
+/**
+ * The `CoinbaseSmartWallet.SignatureWrapper` tuple — `(uint8 ownerIndex, bytes
+ * signatureData)`. Byte-identical to what viem's internal `wrapSignature` emits
+ * (a small `uint8` right-aligns in a 32-byte word exactly like the contract's
+ * `uint256 ownerIndex`), so decode/re-encode round-trips cleanly.
+ */
+const SIGNATURE_WRAPPER_ABI = [
+  {
+    type: 'tuple',
+    components: [
+      { name: 'ownerIndex', type: 'uint8' },
+      { name: 'signatureData', type: 'bytes' },
+    ],
+  },
+]
+
+/**
+ * Re-point a stub `SignatureWrapper` at `ownerIndex`, preserving its dummy
+ * `signatureData`.
+ *
+ * viem 2.53's `toCoinbaseSmartAccount.getStubSignature()` hardcodes
+ * `ownerIndex = 0` for WebAuthn owners (its constant WebAuthn stub) — unlike
+ * `signUserOperation`, which wraps the REAL index. Gas estimation
+ * (`eth_estimateUserOperationGas`, the UI "Prepare" step) therefore validates
+ * the stub against owner slot 0. On an account whose slot 0 was removed
+ * (passkey rotation / recovery, spec 045), `ownerAtIndex(0)` is empty and the
+ * account's `validateUserOp` reverts (`InvalidOwnerBytesLength`) — surfaced as
+ * "The `validateUserOp` function on the Smart Account reverted." BEFORE the user
+ * is ever prompted to sign, on every transaction. Re-wrapping the stub under the
+ * credential's real, live owner index makes estimation and signing agree.
+ *
+ * `ownerIndex` 0 is returned unchanged (viem's stub already targets slot 0 — the
+ * pristine single-passkey case, byte-for-byte unchanged). A stub that does not
+ * decode as a `SignatureWrapper` is returned as-is (defensive; never blocks a send).
+ */
+export function rewrapStubOwnerIndex(stub, ownerIndex) {
+  if (!ownerIndex) return stub
+  try {
+    const [{ signatureData }] = decodeAbiParameters(SIGNATURE_WRAPPER_ABI, stub)
+    return encodeAbiParameters(SIGNATURE_WRAPPER_ABI, [{ ownerIndex, signatureData }])
+  } catch {
+    return stub
+  }
+}
 
 /** Resolve the passkey stack config for a chain, or throw ChainNotSupportedError (FR-022). */
 export function requirePasskeySupport(chainId) {
@@ -226,18 +278,32 @@ export async function buildAccount({ chainId, credential, accountAddress, ownerI
     accountAddress ??
     (await deriveAddress({ chainId, ownersBytes: [initialOwnerBytes], nonce, deps: { publicClient: client } }))
 
+  // ownerIndex of THIS owner inside the account's owner list. Resolved from the
+  // chain by callers (resolveOwnerIndex); 0 is the initial credential's slot.
+  // Controller additions never reindex (append-only).
+  const resolvedOwnerIndex = ownerIndex ?? deps.ownerIndex ?? 0
+
   const account = await toCoinbaseSmartAccount({
     client,
     owners: [owner],
-    // ownerIndex of THIS owner inside the account's owner list. Resolved from
-    // the chain by callers (resolveOwnerIndex); 0 is the initial credential's
-    // slot. Controller additions never reindex (append-only).
-    ownerIndex: ownerIndex ?? deps.ownerIndex ?? 0,
+    ownerIndex: resolvedOwnerIndex,
     nonce,
     // Pin the sender: viem returns this verbatim from getAddress() instead of querying its
     // own (wrong) factory. Signing (replaySafeHash/ERC-1271) binds this same address + chainId.
     address,
   })
+
+  // Gas estimation runs the account's `validateUserOp` against a STUB signature.
+  // viem's WebAuthn stub hardcodes ownerIndex 0 (see rewrapStubOwnerIndex), so an
+  // account whose slot 0 was removed reverts during estimation — before the user
+  // can sign. Re-point the stub at the credential's real index so estimation
+  // validates the same live owner slot that `signUserOperation` will. No-op for
+  // slot 0 (viem's stub already targets it) and for a mock without the method.
+  if (resolvedOwnerIndex && typeof account.getStubSignature === 'function') {
+    const originalGetStubSignature = account.getStubSignature.bind(account)
+    account.getStubSignature = async (...args) =>
+      rewrapStubOwnerIndex(await originalGetStubSignature(...args), resolvedOwnerIndex)
+  }
 
   // First-use deployment must land the account code at `address`, so the initCode MUST call the
   // FairWins factory's createAccount — not viem's hardwired Coinbase factory (which would deploy a
