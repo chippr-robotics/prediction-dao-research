@@ -1,14 +1,14 @@
-# When Nobody Wins and Anyone Can Play: Draw Resolution and Open-Challenge Wagers
+# When Nobody Wins and Anyone Can Play: Draws and Open Challenges
 
-*The two edge cases that make a peer-to-peer betting protocol feel finished: settling a wager that has no fair winner, and posting a wager that has no opponent yet*
+*The two edge cases that make a peer-to-peer betting app feel finished: settling a wager that has no fair winner, and posting a wager that has no opponent yet*
 
 | | |
 |---|---|
 | **Series** | Prediction Markets, part 3 |
 | **Part** | 16 of 34 |
-| **Audience** | Smart-contract developers |
-| **Tags** | `prediction-markets`, `escrow`, `edge-cases`, `solidity` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product-minded builders, founders, and the crypto-curious |
+| **Tags** | `prediction-markets`, `escrow`, `edge-cases`, `product-design` |
+| **Reading time** | ~7 minutes |
 
 ---
 
@@ -16,147 +16,72 @@
 
 ---
 
-## Two Wagers That the Happy Path Can't Handle
+## Two wagers the happy path can't handle
 
-Dana and Priya have 200 USDC each escrowed on whether a cup final ends in a home win. Mid-week, the match is abandoned — rescheduled outside the window their wager described. Neither of them should win. Under the original `WagerRegistry`, their only exit was to do nothing: wait for the `resolveDeadline` to pass, then call `claimRefund`, which returns both stakes on a timed-out Active wager. It works, but it is slow, and on-chain it is indistinguishable from two people who simply forgot about their bet. An indexer, a history view, or a dispute reviewer cannot tell a deliberate "we agree this is void" from abandonment.
+Dana and Priya each put 200 USDC into escrow on whether a cup final ends in a home win. Mid-week the match is abandoned and rescheduled outside the window their wager described. Neither of them should win.
 
-The second gap is at the other end of the lifecycle. Marcus wants to post a wager to his group chat: 50 USDC on a Polymarket market, first taker wins the other side. But `createWager` binds a named `opponent` at creation, and only that exact address can accept. There is no way to say "whoever wants this, take it" — let alone to do so without broadcasting the private terms to every mempool scanner watching for fresh escrow.
+In the earliest version of FairWins, their only exit was to do nothing: wait for the resolution deadline to pass, then claim a refund, which returns both stakes on a timed-out wager. That works, but it is slow — and on the public ledger it looks identical to two people who simply forgot about their bet. Anyone reading the history later, including a dispute reviewer, could not tell a deliberate "we agree this is void" from plain abandonment.
 
-These are the edge cases that separate a demo from a protocol. FairWins closed them with two features: **draw resolution** (spec 004) — a deliberate, distinctly-recorded "both stakes back" outcome — and **open-challenge wagers** (specs 024 and 041) — counterparty-less wagers gated by a four-word claim code. Both live in the same contracts: `contracts/wagers/WagerRegistry.sol` and the shared storage/logic base `contracts/wagers/WagerRegistryCore.sol`.
+The second gap sits at the other end of the story. Marcus wants to drop a wager into his group chat: 50 USDC on a public prediction market, first taker gets the other side. But a normal wager names one specific opponent at creation, and only that exact wallet can accept. There was no way to say "whoever wants this, take it" — let alone to do it without broadcasting the private terms to every automated bot watching for fresh escrow.
 
-## A Seventh Terminal State
+These are the edge cases that separate a demo from a product. FairWins closed them with two features: **draw resolution** — a deliberate, distinctly recorded "both stakes back" outcome — and **open-challenge wagers** — counterparty-less wagers protected by a four-word claim code.
 
-The wager state machine gained one enum member and one event:
+## A distinct "draw" outcome
 
-```solidity
-enum Status { None, Open, Active, Resolved, Cancelled, Refunded, Draw }
+The first fix was to give the system a real, named outcome for a draw, separate from a refund. That distinction is the whole point. A timed-out refund and a mutually agreed draw return the same money, but they mean different things, and now the app and its public history can show "settled as a draw" differently from "timed out."
 
-event WagerDrawn(uint256 indexed wagerId, address indexed creator,
-                 address indexed opponent, address by);
-```
+Settlement itself is deliberately boring: each party gets back exactly their own stake. Stakes need not be equal, and no value moves between participants — it is a clean unwind, not a payout. Under the hood it reuses the same safe transfer pattern the refund path already relied on, updating the wager's status before any money moves.
 
-(`contracts/interfaces/IWagerRegistryTypes.sol`.) `Draw` is terminal and distinct from `Refunded`, which is the whole point: the subgraph and the app can render "settled as a draw" differently from "timed out." Settlement itself is deliberately boring — it reuses the proven refund shape, checks-effects-interactions throughout:
+The interesting design question was authority: who is allowed to say "draw"? A unilateral draw would be an attack. The losing side of a live wager would declare a draw the instant the outcome turned against them. So the right to call a draw depends on how the wager resolves in the first place:
 
-```solidity
-function _settleDraw(uint256 wagerId, Wager storage w, address by) internal {
-    w.status = Status.Draw;
-    delete _drawConsent[wagerId];
-    membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
-    membershipManager.recordClose(w.opponent, WAGER_PARTICIPANT_ROLE);
+- **Wagers the two parties settle between themselves** require *both* of them to agree. The first person to declare a draw simply records a proposal; the second person's confirmation completes it. A pending proposal never freezes the wager — either side can still declare a winner or fall back to the timeout refund, and the proposer can withdraw the offer. "Declining" a draw takes no action at all: just don't confirm.
+- **Wagers settled by a named arbitrator** let that arbitrator call a draw alone, consistent with their existing power to name a winner.
+- **Wagers settled by an outside data source** (a public prediction market, a price feed) allow *no* human to force a draw — not a participant, not an arbitrator, not an admin. On these, a draw can only come from the data source itself.
 
-    IERC20 token = IERC20(w.token);
-    token.safeTransfer(w.creator, w.creatorStake);
-    token.safeTransfer(w.opponent, w.opponentStake);
+Manual draws are also blocked once the resolution deadline passes, because past that point the timeout refund already returns both stakes; a late manual draw would only muddy the record.
 
-    emit WagerDrawn(wagerId, w.creator, w.opponent, by);
-}
-```
+## When the market itself ties
 
-Each party gets back exactly their own stake — stakes need not be equal, and no value moves between participants. Status flips and consent state clears before any token transfer, and both parties' concurrency slots on the `MembershipManager` are released.
+Public prediction markets can resolve indecisively — a 50/50 split, or an "invalid" ruling after a dispute. FairWins reads that tie directly from the market and settles the wager as a draw the moment anyone triggers resolution, refunding both sides rather than inventing a winner. A market that resolves cleanly still produces a winner; one that hasn't resolved yet still waits. The system is careful to tell "resolved as a tie" apart from "not resolved yet."
 
-## Who Gets to Say "Draw"?
+## A wager with no opponent
 
-The interesting design question was authority. A unilateral draw is an attack: the losing side of an `Either`-resolved wager would declare a draw the moment the outcome went against them. Spec 004 splits authority three ways by resolution type, implemented in `_declareDraw`:
+Open challenges attack the second gap. The creator posts a wager with no named opponent, escrows their own stake as usual, and ties the wager to one clever thing: a **four-word claim code**, drawn from the standard BIP-39 word list that crypto wallets use for recovery phrases. Four words out of 2,048 gives roughly seventeen trillion combinations. The code is generated on the creator's own device and never sent to any server.
 
-- **Participant-resolved wagers** (`Either`, `Creator`, `Opponent`) require *both* parties. The contract keeps a per-wager consent bitmask — `bit0` for the creator, `bit1` for the opponent — outside the `Wager` struct so `getWager`'s ABI is untouched:
+The trick is that the code *is* a key. Run the four words through a fixed recipe and you get a cryptographic keypair, plus a separate key that unlocks the wager's encrypted terms. That one shareable secret does three jobs at once:
 
-```solidity
-uint8 consent = _drawConsent[wagerId];
-if ((consent & bit) == 0) {
-    consent |= bit;
-    _drawConsent[wagerId] = consent;
-    emit DrawProposed(wagerId, actor);
-}
-if (consent == _CONSENT_BOTH) {
-    _settleDraw(wagerId, w, actor);
-}
-```
+1. **Discovery.** The code points to the single live wager it belongs to. Without it, an open challenge is one anonymous entry among many.
+2. **Authorization to accept.** To take the wager, you prove you hold the code by signing a short, structured message with the code's key. Crucially, that signature is bound to the taker's own wallet address — so a bot that copies a pending "accept" transaction out of the network's waiting area cannot reuse the signature for itself. Re-signing requires the code.
+3. **Readability.** The same secret decrypts the private terms — which is what makes an open challenge possible at all, since you cannot encrypt terms to a specific recipient when you don't yet know who the recipient is.
 
-  The first `declareDraw` records a proposal; the second party's call completes it. Crucially, a pending proposal never locks the wager — `declareWinner` and the timeout refund remain fully available, and the proposer can back out via `revokeDraw` (emitting `DrawRevoked`). "Declining" a draw needs no action at all: just don't confirm.
+The first valid acceptance locks in the taker as the opponent, flips the wager to active, and frees the code's fingerprint for reuse. Uniqueness only has to hold among challenges that are open right now, so nothing piles up in storage forever.
 
-- **`ThirdParty` wagers**: the named arbitrator settles a draw alone, consistent with their existing authority to declare a winner.
+## Guardrails for an unknown counterparty
 
-- **Oracle-resolved wagers** (Polymarket, Chainlink, UMA): no human — participant, arbitrator, or admin — can force a draw. `_declareDraw` reverts with `DrawNotApplicable()`. A draw on these wagers can only come from the oracle itself.
+An unknown taker changes the threat model, so open challenges carry extra rules:
 
-Manual draws are also rejected after the `resolveDeadline` (`ResolveExpired`) — past that point the timeout refund already returns both stakes, so a manual draw would only muddy the record.
+- **No self-resolution.** A lone unknown party can never be the sole judge of the outcome. Open challenges must resolve by an outside data source, by mutual agreement, or by a named arbitrator.
+- **Equal stakes only.** Both sides post the same amount. A publicly shared code with lopsided odds would invite people to snipe only the favorable side; equal stakes make it a race about *who* takes the bet, not an economic edge.
+- **Higher tier to create, any active member to take.** Posting a code-gated wager is a Silver-and-above privilege, while accepting runs the same checks as any named opponent — sanctions screening of both parties, active membership, concurrency limits — with no membership backdoor.
+- **No decline, one clean cancel.** There is no "decline" on an open challenge; the creator canceling an unaccepted challenge is the only way to release it early.
+- **Party separation.** The creator can't take their own challenge, and a named arbitrator can't take it either — a check that has to run at accept time, because the opponent was unknown when the wager was posted.
 
-## The Oracle Tie
+Layer the market-settled version on top and the platform's most trustless combination falls out for free: a challenge anyone with the code can take, settled automatically by a public market, timeline derived from the market's own end date, and refunding both sides if that market resolves invalid.
 
-Polymarket markets can resolve indecisively: a 50/50 split, or an "invalid" resolution after a UMA dispute. The `PolymarketOracleAdapter` (`contracts/oracles/PolymarketOracleAdapter.sol`) detects this as equal payout numerators from the Conditional Tokens Framework and returns its unresolved sentinel (`resolvedAt == 0`) rather than inventing a winner. That sentinel is ambiguous, though — it also means "not resolved yet." The resolve path disambiguates in `contracts/wagers/WagerRegistryIntents.sol`:
+## Design decisions
 
-```solidity
-(bool outcome, , uint256 resolvedAt) = polymarketAdapter.getOutcome(w.polymarketConditionId);
-if (resolvedAt == 0) {
-    if (polymarketAdapter.isConditionResolved(w.polymarketConditionId)) {
-        _settleDraw(wagerId, w, msg.sender);   // resolved tie -> immediate draw
-        return;
-    }
-    revert ConditionNotResolved();             // genuinely unresolved -> unchanged
-}
-_settleOracleWin(wagerId, w, outcome);
-```
+**A draw is a new outcome, not a new kind of judge.** The list of who can resolve a wager is untouched. A draw is simply a new thing that can *happen*, permitted or forbidden depending on the resolution type. That kept every ordinary wager's path exactly as it was.
 
-A resolved tie settles as a draw the moment anyone calls `autoResolveFromPolymarket` — no waiting out the deadline. A decisive market still produces a winner; an unresolved one still reverts.
+**Mutual consent over unilateral mercy.** Requiring both sides to agree on a participant-settled draw costs a second confirmation, but it removes the "losing side declares a draw" grief entirely — and because an unconfirmed proposal never locks anything, the worst a stalling counterparty can do is nothing.
 
-## A Wager With No Opponent
+**No admin override for stuck data sources.** A market that never resolves falls back to the deadline refund, which already returns both stakes. Adding a human override there would have created exactly the trusted party the whole design works to avoid.
 
-Open challenges (spec 024) attack the second gap. `createOpenWager` creates a wager with `w.opponent` left as `address(0)`, escrows the creator's stake as usual, and binds one new thing: a `claimAuthority` address. That address is the on-chain face of a **four-word claim code** — four words from the BIP-39 English wordlist (2048⁴ = 2⁴⁴ combinations), generated client-side and never sent to any server.
+**A fast code recipe, honestly scoped.** Turning the four words into a key is deliberately cheap. Because the code's public fingerprint sits on-chain, a determined attacker with dedicated hardware could in principle grind through the seventeen-trillion space. FairWins accepts that residual risk openly, scopes the guarantee to casual guessing, and asks the interface to say so for meaningful stakes. The recipe is versioned, leaving room to swap in a slower, harder-to-crack method later without breaking existing wagers.
 
-The trick is that the code *is* a keypair. `frontend/src/utils/claimCode/deriveFromCode.js` derives, from the normalized four words, a secp256k1 private key (`keccak256("FairWins/claim/v1" || code)`) whose address becomes the on-chain `claimAuthority`, plus an independent domain-separated symmetric key that seals the private terms envelope. One shareable secret does triple duty:
+Edge cases are where escrow apps earn trust. A wager that can end with nobody winning, and begin with nobody on the other side, is a wager system that has met its users.
 
-1. **Discovery** — `openWagerIdForClaim(authority)` maps the derived address to the single live wager. Without the code, an open challenge is one indistinguishable entry among many.
-2. **Accept authorization** — the taker proves knowledge of the code by presenting an EIP-712 signature *from the code-derived key*:
+## Further reading
 
-```solidity
-bytes32 digest = _hashTypedDataV4(
-    keccak256(abi.encode(OPEN_ACCEPT_TYPEHASH, wagerId, taker)));
-if (digest.recover(signature) != authority) revert BadClaimSignature();
-```
-
-   The typed struct is `OpenAccept(uint256 wagerId, address taker)`. Binding `taker` into the signed digest is the front-running defense: a mempool observer who copies a pending `acceptOpenWager` transaction cannot replay the signature for their own address — re-signing requires the code.
-3. **Readability** — the symmetric key opens the encrypted terms, replacing the usual recipient-key encryption that is impossible when the recipient is unknown at creation.
-
-The first valid acceptance binds the taker as opponent, flips the wager to `Active`, and calls `_clearClaim`, which frees the commitment for reuse — uniqueness is enforced only among *currently open* challenges (`ClaimAuthorityInUse` on collision), so no unbounded state accumulates.
-
-## Guardrails for an Unknown Counterparty
-
-An unknown taker changes the threat model, and `createOpenWager` encodes the responses directly:
-
-- **No self-resolution.** `Creator` and `Opponent` resolution types revert with `OpenResolutionTypeNotAllowed` — a lone unknown party must never be the sole resolver. Open challenges are restricted to oracle types, `Either`, and `ThirdParty`.
-- **Equal stakes only.** One `stake` parameter sets both sides. A publicly shared code with asymmetric odds would invite adverse-selection sniping of the favorable side; symmetric stakes make the race merely about *who* takes the bet, not an economic edge.
-- **Silver-and-above to create, any active tier to take.** Per `docs/system-overview/roles-and-tiers.md`, posting a code-gated wager is a higher-tier privilege (`getActiveTier(...) >= Silver`, else `InsufficientMembershipTier`), while accepting runs the same gauntlet as any named opponent — sanctions screening of both parties, active membership, concurrency limits — with no tier floor and no membership backdoor.
-- **No decline.** `declineWager` on an open challenge reverts with `DeclineNotAllowedForOpenChallenge`; the creator's `cancelOpen` is the sole release for an unaccepted open challenge.
-- **Party separation.** The creator cannot take their own challenge (`SelfWager`), and a taker who is the named arbitrator is refused (`ArbitratorCannotTake`) — a check that must run at accept because the opponent was unknown at creation.
-
-Spec 041 then layered on oracle-settled open challenges: the creator picks a Polymarket market and the *event* defines the timeline — `frontend/src/lib/openChallenge/oracleTimeline.js` derives `acceptDeadline` from the market's end date and `resolveDeadline` from end-plus-settlement-buffer, both capped. Combined with the tie-handling above, the platform's most trustless combination falls out for free: a challenge anyone with the code can take, settled automatically by a public market, and refunding both sides if that market resolves invalid.
-
-## Design Decisions
-
-**Draw is a new outcome, not a new resolution type.** The eight resolution types (who resolves) are untouched; a draw is a ninth thing that can *happen*, gated per-type. That kept the accept, escrow, and payout paths byte-identical for every wager that never draws.
-
-**Mutual consent over unilateral mercy.** Requiring both signatures on participant-resolved draws costs a second transaction, but removes the "losing side declares a draw" grief entirely — and because an unconfirmed proposal never locks anything, the worst a stalling counterparty can do is nothing.
-
-**No admin override for stuck oracles.** A permanently unresolved oracle falls back to the deadline refund, which already returns both stakes. Adding a human draw override for oracle wagers would have created a trusted party where the whole point was not having one.
-
-**A fast KDF, honestly scoped.** The v1 code derivation is two keccak passes — deliberately cheap. With the commitment public on-chain, a determined attacker with dedicated hardware could brute-force 2⁴⁴; spec 024 accepts this residual risk explicitly, scopes the guarantee to casual/indiscriminate guessing, and requires the UI to say so for meaningful stakes. The `v1` domain tags (`FairWins/claim/v1`, `FairWins/terms/v1`) leave room to swap in a memory-hard KDF without breaking existing wagers.
-
-**Code-derived readability, forever.** Even after acceptance, the opponent reads terms via the code — there is no re-keying to their registered encryption key. Losing the code means "terms unavailable," never lost funds or blocked resolution.
-
-Edge cases are where escrow protocols earn trust. A wager that can end with nobody winning, and begin with nobody on the other side, is a wager system that has met its users.
-
-## Sources
-
-- `specs/004-draw-resolution/spec.md` — draw resolution requirements and authority model
-- `specs/024-open-challenge-wagers/spec.md` — claim-code open challenges, entropy floor, tier gating
-- `specs/041-oracle-open-challenges/spec.md` — oracle-settled open challenges, event-derived timelines
-- `contracts/wagers/WagerRegistry.sol` — `createOpenWager`, `acceptOpenWager`, `declareDraw`, `revokeDraw`
-- `contracts/wagers/WagerRegistryCore.sol` — `_declareDraw`, `_settleDraw`, `_acceptOpenWager`, draw-consent bitmask
-- `contracts/wagers/WagerRegistryIntents.sol` — `autoResolveFromPolymarket` tie disambiguation
-- `contracts/oracles/PolymarketOracleAdapter.sol` — equal-payout-numerator tie detection
-- `contracts/interfaces/IWagerRegistryTypes.sol` — `Status` enum, `WagerDrawn` / `DrawProposed` / `DrawRevoked` events
-- `frontend/src/utils/claimCode/deriveFromCode.js`, `frontend/src/utils/claimCode/wordlist.js` — code→keypair derivation, BIP-39 wordlist
-- `frontend/src/lib/openChallenge/oracleTimeline.js` — event-derived deadlines
-- `docs/system-overview/roles-and-tiers.md` — Silver+ creation gate, tier limits
-- EIP-712: Typed structured data hashing and signing — https://eips.ethereum.org/EIPS/eip-712
-- BIP-39: Mnemonic code for generating deterministic keys — https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
-- Polymarket / Conditional Tokens documentation — https://docs.polymarket.com
+- [EIP-712: Typed structured data hashing and signing](https://eips.ethereum.org/EIPS/eip-712) — the standard behind the signed "accept" message
+- [BIP-39: Mnemonic code word list](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) — the word list the four-word claim code draws from
+- [Polymarket documentation](https://docs.polymarket.com) — how public prediction markets resolve, including ties and invalid outcomes

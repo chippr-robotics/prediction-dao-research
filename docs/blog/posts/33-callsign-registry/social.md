@@ -1,27 +1,27 @@
-# Social & Image — CallsignRegistry: An In-House ENS-Style Naming System That Nothing Depends On
+# Social & Image — Callsigns: A Human-Readable Name That Nothing Depends On
 
 ## X (Twitter)
 
-FairWins built an ENS-style naming registry — commit–reveal, ASCII-only to kill homoglyph attacks — then engineered its blast radius to zero. A callsign is optional and never gates the value path: undeploy the registry and every wager still settles, some screens just show hex again. 🔗 <link>
+FairWins built an ENS-style handle — claim a %callsign instead of pasting 42 characters of hex — then made sure nothing depends on it. A callsign is fully optional and never gates sending or receiving money. Switch the whole thing off and every wager still settles; some screens just show hex again. 🔗 <link>
 
-#Ethereum #Solidity #Identity
+#Crypto #Identity #Usability
 
 ## LinkedIn
 
-A forty-two-character hex address is a payment-misdirection bug waiting to happen. The ecosystem's answer is ENS — but ENS is Ethereum-mainnet-only, and FairWins runs on Polygon and Mordor with an on-chain membership spine ENS knows nothing about.
+A forty-two-character wallet address is a payment-misdirection bug waiting to happen. The ecosystem's answer is ENS — but it lives on Ethereum's main network, and FairWins runs elsewhere, with its own membership identity ENS knows nothing about.
 
-So spec 054 built the CallsignRegistry in-house — and wrapped two disciplines around it. The post covers:
+So we built an in-house handle: claim an optional %callsign and it resolves to your wallet everywhere you'd otherwise paste hex. The new post covers, in plain terms:
 
-- Commit–reveal registration borrowed from ENS, plus a hardening fix that stops an attacker from replaying your public commitment to perpetually reset its age.
-- An ASCII-only name format (`a-z0-9`, interior hyphens): less expressive, but the homoglyph attack surface is eliminated rather than mitigated.
-- One name, one address — deliberately rejecting ENS's controller/resolver split, the classic payout-redirect vector; repointing is a delayed, cancellable migration, not an everyday edit.
-- The optionality doctrine: nothing on the value path may require a callsign (FR-001a). A below-Gold, callsign-less account completing a full wager is a tested invariant, not a marketing line.
+- The optionality doctrine, first and loudest: a callsign is a perk, never a requirement. Nothing on the money path checks it — and a callsign-less account completing a full wager is a test we actually run, not a promise.
+- A plain lowercase-ASCII name format that *eliminates* look-alike impersonation attacks instead of trying to mitigate them.
+- Commit-then-reveal registration borrowed from ENS, hardened so no one can grief you out of your own name.
+- One name, one address — deliberately rejecting the split that lets a name be silently repointed at a new wallet. Moving a callsign is a rare, delayed, cancellable migration, and no one can ever reassign your name for you.
 
-The result: ENS's registration security, a narrower resolution model, and a blast radius engineered to zero. If the registry vanished tomorrow, every wager would still settle.
+The result: real usability, with a blast radius engineered to zero. If the naming system vanished tomorrow, every wager would still settle.
 
-Where's the line for you between a nice-to-have perk and a load-bearing primitive? 🔗 <link>
+Where's your line between a nice-to-have perk and a load-bearing primitive? 🔗 <link>
 
-#Ethereum #Solidity #Identity #ENS #SmartContracts
+#Crypto #Identity #ProductDesign #Usability
 
 ## Image prompt (Gemini / Nano Banana)
 

@@ -1,27 +1,27 @@
-# Social & Image — Enough Signatures Is Not Enough: An On-Chain Policy Engine for Safe Multisigs
+# Social & Image — Enough Signatures Is Not Enough: Adding Real Rules to a Shared Vault
 
 ## X (Twitter)
 
-Your multisig has one control: k-of-n signatures. Phish two owners and the treasury is gone. We built a Safe transaction guard enforcing spending limits, allowlists + cooldowns at execution — no admin key, no way to brick a vault. 🔗 <link> #Safe #multisig #web3security
+A multisig has one control: enough people approve. Phish two owners and the treasury is gone. We added a guard that enforces spending limits, allowlists, and cooldowns at the moment of execution — no admin key, and no way to lock a vault out of its own money. 🔗 <link> #multisig #web3security
 
 ## LinkedIn
 
-A threshold multisig has exactly one control: k of n owners agree. Once that bar is cleared, the Safe will send any amount, to any destination. Every other safeguard most teams rely on is procedural — and procedures fail quietly when someone approves a plausible-looking proposal between meetings.
+A shared multisig has exactly one control: enough owners agree. Once that bar is cleared, it will send any amount, to any destination. Every other safeguard most teams rely on is procedure — and procedures fail quietly when someone approves a plausible-looking proposal between meetings.
 
-Our latest engineering post walks through FairWins' on-chain multisig policy engine: a singleton Safe v1.4.1 transaction guard that enforces rules on approved transactions at execution time. It covers:
+Our latest post walks through FairWins' on-chain policy engine for shared vaults — a guard contract that enforces real rules on already-approved transactions, at the moment they execute. In plain terms:
 
-- How Safe's guard interface (checkTransaction / checkAfterExecution) gives a contract veto power over every execution, and why the engine is one immutable singleton per chain with no admin role and no upgrade key
-- The v1 rule set — per-transaction limits, 24-hour window limits, recipient allowlists, cooldowns — and why counting ERC-20 approve() closes the approve-then-pull bypass
-- Lockout-proofing: vault self-management and policy configuration bypass fund rules (but still require the threshold), so a too-strict policy can always be loosened and no vault can brick itself
-- Honest trade-offs: fixed-reset windows vs. rolling, unvalued calldata, conservative pre-execution accounting, and why delegatecall and gas refunds are hard-denied
+- How a "transaction guard" gives a contract veto power over every spend, and why it's one immutable, shared contract with no admin role and no upgrade key
+- The rule set — per-transaction limits, daily limits, recipient allowlists, cooldowns — and why counting token approvals closes an obvious drain-later loophole
+- Lockout-proofing: managing the vault and changing its rules skip the spending limits (but still require the group's approval), so a too-strict policy can always be loosened and no vault can brick itself
+- Honest trade-offs: a fixed daily window vs. a perfectly rolling one, uninterpreted transactions, conservative accounting, and why two dangerous transaction shapes are refused outright
 
-If you run a DAO treasury or build custody tooling, the design decisions here — especially what we chose *not* to make upgradeable — may be useful.
+If you run a shared treasury or build custody tooling, the design decisions here — especially what we chose *not* to make upgradeable — may be useful.
 
 🔗 <link>
 
 Where do you draw the line between on-chain enforcement and operational procedure for treasury controls?
 
-#Safe #multisig #DAOtreasury #smartcontracts #web3security
+#multisig #DAOtreasury #web3security #custody
 
 ## Image prompt (Gemini / Nano Banana)
 

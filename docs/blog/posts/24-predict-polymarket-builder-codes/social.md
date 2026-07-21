@@ -1,27 +1,27 @@
-# Social & Image — Predict: Monetizing Polymarket Order Flow Without Ever Touching an Order
+# Social & Image — Predict: Earning From Prediction-Market Trades Without Ever Touching One
 
 ## X (Twitter)
 
-A 401 redesigned our whole feature: Polymarket's CLOB binds every order to its signer, so a shared relayer can't submit for you. FairWins earns by *attributing* trades — a bytes32 builder code in signed headers — and discloses the additive builder fee as its own line, never "free." 🔗 <link>
+One error message redesigned our whole feature: Polymarket ties every order to the wallet that signed it, so a shared server can't trade for you. FairWins earns by *crediting* trades — a small referral tag on each order — and shows the builder fee as its own line, never "free." 🔗 <link>
 
-#PredictionMarkets #Polymarket #Web3
+#PredictionMarkets #Polymarket #transparency
 
 ## LinkedIn
 
-The first design for Predict — FairWins' prediction-market trading surface built on publicly available information and skill-based forecasting — looked like every relayer pattern we had: a shared gateway credential submits orders on the member's behalf. It failed against the live API with a 401.
+The first design for Predict — FairWins' prediction-market trading feature, built on publicly available information and skill-based forecasting — looked like every server pattern we had: one shared credential submits orders for the member. It failed against the live system with an "invalid API key" error.
 
-Polymarket's CLOB binds every order to its signer by design. That killed the intermediating-relayer architecture and forced a better one. The post covers:
+Polymarket ties every order to the wallet that signed it, by design. That killed the middleman approach and forced a better one. The post covers:
 
-- Client-direct orders: the member's own wallet is the only order signer; credentials never touch a FairWins server.
-- Attribution over intermediation: a `bytes32` builder code rides on signed request headers, not in the order struct — FairWins earns on volume without holding orders, credentials, or funds.
-- Honest fee disclosure: unlike an OpenSea referral that costs the user nothing, Polymarket's builder fee is *additive* — a real taker cost — so it gets its own labelled "FairWins builder fee" line, never folded into a total.
-- Boot-time cap enforcement: rates are config (default 50 bps taker / 0 maker), hard-capped at the program limits; a misconfigured fee refuses to boot.
+- Direct trading: the member's own wallet is the only thing that signs an order; credentials never touch a FairWins server.
+- Crediting over intermediation: a small referral tag rides alongside each order, not inside it — FairWins earns on volume without holding orders, credentials, or funds.
+- Honest fees: unlike a marketplace referral that costs the user nothing, Polymarket's builder fee is *additive* — a real trading cost — so it gets its own labeled line, never blended into a total.
+- A hard cap at startup: the rate is a setting (default 0.5% for takers, 0 for makers), capped at the program limits; misconfigure it and the server refuses to start.
 
-Participants remain subject to applicable law and Polymarket's own regional restrictions, which the app surfaces and never bypasses.
+Everyone who participates remains subject to applicable law and Polymarket's own regional restrictions, which the app surfaces and never bypasses. 🔗 <link>
 
-How do you decide which fees to itemize versus blend? 🔗 <link>
+How do you decide which fees to itemize versus blend?
 
-#PredictionMarkets #Polymarket #Web3 #NonCustodial #FinTech
+#PredictionMarkets #Polymarket #transparency #noncustodial #fintech
 
 ## Image prompt (Gemini / Nano Banana)
 

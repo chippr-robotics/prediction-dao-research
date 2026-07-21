@@ -2,26 +2,26 @@
 
 ## X (Twitter)
 
-How does an escrow contract settle a forecast nobody should win? FairWins added a distinct Draw state (mutual consent, per-resolution-type authority) and open challenges gated by a 4-word claim code that is secretly a keypair. 🔗 <link> #Solidity #SmartContracts
+How does an escrow app settle a forecast nobody should win? FairWins added a distinct "draw" outcome (mutual consent, authority set by how the wager resolves) plus open challenges protected by a 4-word claim code that is secretly a key. 🔗 <link> #PredictionMarkets #Web3
 
 ## LinkedIn
 
-Two edge cases separate a demo escrow contract from a finished protocol. First: a forecast between two parties is voided by events — the match is abandoned, the question becomes moot. Neither side should win, but "wait for the deadline and refund" is indistinguishable on-chain from two people forgetting about it. Second: someone wants to post a challenge with no named counterparty — first qualified taker joins — without broadcasting the terms to every mempool observer.
+Two edge cases separate a demo escrow app from a finished product. First: a forecast between two parties is voided by events — the match is abandoned, the question becomes moot. Neither side should win, but "wait for the deadline and refund" looks identical on the public ledger to two people forgetting about it. Second: someone wants to post a challenge with no named counterparty — first qualified taker joins — without broadcasting the terms to every bot watching for new escrow.
 
-Our latest FairWins engineering post walks through how both were closed:
+Our latest FairWins post walks through how both were closed:
 
-- A distinct `Draw` terminal state that returns each party exactly their own stake, with authority split by resolution type: mutual consent for participant-resolved wagers, arbitrator-only for third-party, and no human override at all for oracle-settled ones
-- Tie handling: an invalid or 50/50 oracle resolution settles as an immediate draw — the protocol refunds rather than inventing a winner
-- Open challenges gated by a four-word claim code that doubles as a keypair: discovery, EIP-712 accept authorization bound to the taker's address (front-running defense), and terms decryption from one shareable secret
+- A distinct "draw" outcome that returns each party exactly their own stake, with authority set by how the wager resolves: mutual consent when the two parties settle it, arbitrator-only for a named judge, and no human override at all when an outside market settles it
+- Tie handling: an invalid or 50/50 market resolution settles as an immediate draw — the platform refunds rather than inventing a winner
+- Open challenges protected by a four-word claim code that doubles as a key: it points to the wager, authorizes acceptance (bound to the taker's own address, so a copied transaction can't be replayed), and decrypts the private terms — all from one shareable secret
 - The guardrails an unknown counterparty demands: no self-resolution, equal stakes only, tier gating, sanctions screening
 
 These are skill-based forecasts on public information between consenting, screened participants — and the design bias throughout is refund over guesswork.
 
 Read the full post: <link>
 
-Where do you draw the line between admin override and pure protocol rules when a contract outcome becomes undecidable?
+Where do you draw the line between admin override and pure rules when an outcome becomes undecidable?
 
-#Solidity #SmartContracts #Ethereum #ProtocolDesign
+#PredictionMarkets #Web3 #ProductDesign #Ethereum
 
 ## Image prompt (Gemini / Nano Banana)
 

@@ -1,29 +1,29 @@
-# Social & Image — The Unified Activity Ledger
+# Social & Image — One Timeline From Five Sources
 
 ## X (Twitter)
 
-Your dashboard says one P&L, your tax report says another. Both read different sources. We killed the drift with ONE ledger: 5 activity classes, 3 provenance namespaces (oc:/dv:/cl:), a merge where the on-chain row always beats the derived one. 🔗 <link>
+Your dashboard says one profit-and-loss number, your tax report says another. Both were reading different sources, and they drifted. We killed it with ONE activity feed: five categories, three kinds of origin, and a merge where the real on-chain record always beats the estimated one. 🔗 <link>
 
-#web3 #datamodeling #thegraph
+#web3 #dataquality #product
 
 ## LinkedIn
 
-An activity feed that grows one feature at a time eventually lies to you. At FairWins we had six read paths each answering "what happened to my money?" — the dashboard derived wager transfers from cached state, the tax report read real subgraph events, transfers lived in a local store. Predictably, the totals drifted, and one path even rendered a payout dated "20645d ago" from a zero timestamp.
+An activity feed that grows one feature at a time eventually lies to you. At FairWins we had six different screens each answering "what happened to my money?" — the dashboard estimated from cached state, the tax report read real blockchain history, transfers lived in a local list. Predictably, the totals drifted, and one path even rendered a payout dated "20645d ago" from a placeholder timestamp.
 
-Spec 051 replaces all six with a single client-side activity ledger. The new engineering post walks through:
+The new post replaces all six with a single activity feed built into the app, and walks through:
 
-- The canonical LedgerEntry: five activity classes (wager, transfer, earn, pool, membership) normalized into one value object.
-- Three identity namespaces — on-chain, derived, client-only — and a merge that applies fixed precedence instead of fragile reconciliation.
-- Source adapters that degrade honestly: a failing subgraph marks its class stale, it doesn't blank the feed.
-- Invariants that make totals trustworthy: zero timestamps become "date unavailable," failed operations are listed but never totaled, unpriced assets are flagged not zeroed.
+- One uniform record: five categories (wager, transfer, earn, pool, membership) flattened into the same shape.
+- Three kinds of origin — on-chain, derived, and device-only — and a merge that applies a fixed pecking order instead of fragile guesswork.
+- Sources that degrade honestly: if one fails, that category is marked stale, the whole feed doesn't go blank.
+- Rules that make totals trustworthy: placeholder dates become "date unavailable," failed operations are listed but never totaled, unpriced assets are flagged not zeroed.
 
-No new backend, no subgraph change, no contract change — just one read path the dashboard and the tax report both consume, so they can't disagree.
+No new server, no blockchain-index change, no contract change — just one reading path the dashboard and the tax report both consume, so they can't disagree.
 
 🔗 <link>
 
 How do you keep a multi-source activity feed from quietly contradicting itself?
 
-#Web3 #DataEngineering #TheGraph #Blockchain #FullStack
+#Web3 #DataQuality #Product #Blockchain
 
 ## Image prompt (Gemini / Nano Banana)
 

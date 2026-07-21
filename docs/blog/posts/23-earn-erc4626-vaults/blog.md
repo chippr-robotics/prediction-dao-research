@@ -1,120 +1,82 @@
-# Earn Without Custody Surprises: Wrapping ERC-4626 Vaults With a Disclosed, Atomic Fee
+# Earn Without Surprises: Putting Idle Funds to Work, With a Fee You Can See
 
-*How FairWins routes lending deposits into external Morpho vaults, charges its platform fee in the same transaction, and shows the member the exact rate before they sign*
+*How FairWins lets members earn yield on idle stablecoins without ever handing over custody — and charges its fee in the open, in the same transaction*
 
 - **Series:** Finance Surfaces (part 2)
 - **Part:** 23 of 34
-- **Audience:** DeFi integrators; protocol and product engineers
-- **Tags:** `erc4626`, `defi`, `lending`, `yield`, `fees`
-- **Reading time:** ~8 minutes
+- **Audience:** Product managers, founders, and the crypto-curious
+- **Tags:** `yield`, `savings`, `non-custodial`, `fees`, `transparency`
+- **Reading time:** ~7 minutes
 
 ---
 
-## The idle-balance problem, and the two bad answers
+## The idle-money problem, and two tempting shortcuts
 
-FairWins members hold stablecoins in their connected accounts between wagers. Between the moment a payout lands and the moment the next wager is created, that USDC sits idle. Members asked the obvious question — can it earn something in the meantime? — and the team faced the two answers most consumer crypto apps reach for.
+FairWins members hold stablecoins — digital dollars like USDC — in their accounts between wagers. In the stretch between one payout landing and the next wager being created, that money just sits there. Members asked the obvious question: can it earn something in the meantime? And the team ran straight into the two answers most consumer crypto apps reach for.
 
-The first bad answer is custody: run your own yield product, pool member deposits, and manage the strategy in-house. That turns a wager-escrow platform into an asset manager, with everything that implies — a new value-bearing contract surface, discretionary control over member funds, and a trust model the rest of the platform deliberately avoids.
+The first tempting shortcut is to take custody: build your own savings product, pool everyone's deposits, and manage the strategy in-house. That quietly turns a wager-escrow platform into an asset manager — holding member money and taking on exactly the kind of trust obligations the rest of FairWins is deliberately designed to avoid.
 
-The second bad answer is the hidden spread: route deposits into someone else's protocol, quietly keep a slice of the yield or the principal, and let the member discover the difference in their statement. Plenty of "earn" features work this way. It's also exactly the kind of quiet skim that FairWins' constitution forbids — every fee on the platform is disclosed before signature, or it doesn't exist.
+The second tempting shortcut is the hidden skim: route deposits into someone else's yield product, quietly keep a slice of the return, and let members discover the difference only if they go looking. Plenty of "earn" features work this way. It's also precisely the kind of quiet markup FairWins' own standards forbid — every fee is shown before you approve it, or it doesn't exist.
 
-The Earn section (spec `050-earn-lending-rewards`) is the answer that avoids both: deposits go **directly from the member's account into third-party ERC-4626 vaults** — curated Morpho lending vaults on Ethereum mainnet and Polygon PoS — with FairWins never taking custody, and the platform fee, when one is configured, charged **atomically in the same transaction** by an on-chain router that refuses to charge more than the rate the member was shown. This post walks through both layers: the non-custodial vault integration, and the fee wrapper that monetizes it honestly.
+The Earn feature avoids both traps. Deposits go **straight from the member's own account into established, third-party yield pools** — curated lending vaults run by Morpho, a well-known protocol, on Ethereum and Polygon — with FairWins never holding the money. And the platform fee, when one is turned on, is charged **in the very same transaction**, by an on-chain price list that refuses to charge a penny more than the rate the member was shown.
 
-## Layer one: direct ERC-4626 deposits, no FairWins contracts
+## A "vault," in plain terms
 
-[ERC-4626](https://eips.ethereum.org/EIPS/eip-4626) is the tokenized-vault standard: `deposit(assets, receiver)` mints shares, `convertToAssets(shares)` values a position, `maxDeposit`/`maxWithdraw` report honest limits, `withdraw`/`redeem` exit. Because Morpho's Vault V1 (MetaMorpho) implements the full surface, the base Earn integration shipped as a **frontend-only** feature — no FairWins contracts, no backend. The client discovers vaults through Morpho's public GraphQL API (`listed: true`, the same curation the Morpho app itself uses), reads positions authoritatively on-chain, and claims protocol rewards through Merkl's distributor.
+Before going further, one piece of vocabulary. In this world, a **vault** is just a shared pool that earns yield. Many people deposit the same kind of digital dollar into one pool; the pool lends those dollars out and earns interest; and each depositor owns a proportional slice, which grows as the interest accrues. When you want out, you redeem your slice for your share of the pool.
 
-One curation detail matters for anyone wrapping vaults: only Morpho **Vault V1** is surfaced. Vault V2 returns `0` from `maxDeposit`/`maxWithdraw` by design, which makes honest limit display impossible — and honest limits are load-bearing in this UI, not decoration.
+There's a widely adopted standard for how these pools behave, called ERC-4626. Because it's a standard, any app can deposit into, check, and withdraw from any compliant pool in a consistent way — the same reason a standard electrical outlet lets any appliance plug in. Morpho's vaults follow it fully, which is what let FairWins connect to them cleanly.
 
-The write path (`frontend/src/lib/earn/vaultActions.js`) applies safety rails before any wallet prompt:
+## Half one: deposits that never touch a FairWins wallet
 
-- pure validators reject zero, over-balance, and over-cap amounts with member-facing reasons;
-- approvals are for the **exact amount** — no unlimited allowances;
-- spendable deposits are dry-run with `staticCall` from the member's address, so vault-side rejections (cap reached, paused) surface before anything is signed;
-- withdrawals are bounded by `maxWithdraw`, and full exits use `redeem(shares)` so share dust never strands.
+Because these vaults follow a common standard, the basic Earn experience needed **no FairWins smart contracts and no FairWins server** in the money path at all. The app finds available vaults through Morpho's public directory (the same curated list the Morpho app itself uses), reads each member's balance directly from the blockchain, and lets members claim earned rewards through the standard distributor.
 
-Writes are expressed as `{ target, data, value }` batches through the app's unified `sendCalls` rail: a passkey smart account authorizes the whole approve-plus-deposit batch with one WebAuthn ceremony via a UserOp; a classic wallet signs the legs sequentially. Custody never changes hands — the vault's `deposit` names the member as `receiver`, and shares sit in the member's own account.
+One curation detail is worth mentioning because it protects members: FairWins only surfaces vaults that can honestly report their own deposit and withdrawal limits. A newer vault design that hides those limits is deliberately left out — because showing members accurate limits is load-bearing here, not decoration.
 
-Notably, spec 050 shipped with **no platform fee at all**. Morpho has no referral or transaction-source fee parameter (nothing like Aave's referral code), so there was no way to monetize attribution natively — and rather than bolt on a rushed fee mechanism, FR-013 made fee-free operation an explicit, documented decision, with treasury revenue deferred to a future spec.
+Before any deposit, the app runs several safety checks: it rejects amounts that are zero, more than the member has, or over the vault's cap; it approves only the **exact amount** — never an open-ended, unlimited permission; it does a dry run first, so a vault-side rejection surfaces *before* the member signs; and on a full exit it redeems the member's entire slice, so no tiny remnant gets stranded.
 
-## Layer two: the FeeRouter, and why the fee is a contract concern
+Members using a passkey wallet — the same face-or-fingerprint login standard (WebAuthn) your phone uses — can approve the whole thing with a single tap. Throughout, custody never changes hands: the vault deposits directly in the member's name, and the resulting slice sits in the member's own account, not FairWins'.
 
-That future spec is `060-platform-fee-wrapper`, and its core decision is that a platform fee on someone else's protocol must be **atomic** — fee and deposit in one transaction, or neither. The naive alternative, two transfers ("send us the fee, then deposit the rest"), can strand a member mid-flow: fee paid, deposit failed, treasury holding money for a service that never happened.
+Notably, Earn first shipped with **no platform fee at all**. Morpho has no built-in way to reward an app for sending it deposits, so there was no clean way to earn revenue on the connection — and rather than bolt on a rushed fee, FairWins made fee-free operation an explicit, documented decision and deferred the revenue question to later.
 
-The `FeeRouter` (`contracts/fees/FeeRouter.sol`, a UUPS proxy) is the single on-chain source of truth for every configurable platform fee. Each fee is a `bytes32 serviceId = keccak256("<label>")` — Earn's is `earn.lend` — with a `Service { capBps, feeBps, kind }` entry. `Wrapped` services are charged by the router itself; `ConfigOnly` entries (the Polymarket builder rates) just store rates that off-chain enforcers read. Wrapped caps are fixed at registration and bounded by `MAX_WRAPPED_FEE_BPS = 250` (2.5%); `earn.lend` registers at that cap with a live rate of **zero** until a `FEE_ADMIN_ROLE` holder deliberately sets one.
+## Half two: the fee, and why it belongs on-chain
 
-The member-facing entrypoint is the wrapper deposit:
+"Later" is this feature's second half. The key decision: a platform fee charged on top of someone else's yield product must be **all-or-nothing** — the fee and the deposit happen together in one transaction, or neither happens. The naive alternative, two separate steps ("send us the fee, then deposit the rest"), can leave a member stranded halfway: fee paid, deposit failed, treasury holding money for a service that never happened.
 
-```solidity
-function depositToVaultWithFee(
-    bytes32 serviceId,
-    address vault,
-    uint256 assets,
-    address receiver,
-    uint16 maxFeeBps
-) external nonReentrant returns (uint256 shares) {
-    // ...service lookup and zero checks elided...
-    uint16 liveBps = svc.feeBps;
-    if (liveBps > svc.capBps) revert CapExceeded(); // defense in depth
-    if (liveBps > maxFeeBps) revert FeeAboveQuoted();
-    // ...fee math elided...
-    asset.safeTransferFrom(msg.sender, address(this), assets);
-    // ...fee transfer + FeeCharged event elided...
-    uint256 netAmount = assets - feeAmount;
-    asset.forceApprove(vault, netAmount);
-    shares = IERC4626(vault).deposit(netAmount, receiver);
-    if (shares == 0) revert ZeroShares();
-    asset.forceApprove(vault, 0);
-}
-```
+FairWins solves this with its single on-chain price list — the one and only home for every platform fee. Each fee is one labeled entry with a current rate and a permanent ceiling it can never exceed. The Earn fee registers at a ceiling of 2.5%, with a live rate of **zero** until an administrator deliberately sets one.
 
-One call pulls the member's gross principal, sends `floor(assets · bps / 10 000)` to the treasury, and deposits the remainder into the ERC-4626 vault with the member as `receiver`. Any failing leg reverts everything — the treasury can never keep a fee for a deposit that did not happen. The router holds no balance outside a transaction.
+When a fee is active, a single transaction does the whole job: it pulls in the member's money, sends the small fee to the treasury, and deposits the remainder into the vault with the member as the owner. If any step fails, the entire thing is undone — the treasury can never keep a fee for a deposit that didn't go through. Three safeguards carry most of the design's weight:
 
-Three details in that function carry most of the design's weight:
+**The rate you saw is a hard ceiling.** The app sends back the exact rate it displayed. If an administrator raises the rate while a member's transaction is in flight, the transaction stops rather than charging the higher number. A member can never pay more than what was on the confirmation screen — enforced by the system, not by good manners.
 
-**`maxFeeBps` is a consent ceiling.** The frontend passes back the exact rate it displayed. If an admin raises `feeBps` while the member's transaction is in flight, the call reverts with `FeeAboveQuoted()` instead of charging the higher rate. A member can never pay more than the number they saw on the confirm screen — enforced by the contract, not by UI politeness.
+**A missing treasury skips the fee; it never loses funds.** If some network was never set up with a treasury to receive fees, the system simply deposits the full amount, fee-free. A setup mistake costs FairWins revenue; it never strands a member's principal.
 
-**A missing treasury skips the fee, never loses funds.** If `treasury` is `address(0)` on some network, the router deposits the full amount and emits `FeeSkippedNoTreasury`. An ops misconfiguration costs FairWins revenue; it never strands a member's principal.
+**No value, no charge.** If the member's money would somehow buy them nothing in the vault, the whole transaction reverts rather than taking a fee for nothing.
 
-**Zero shares reverts.** The router pulled principal and possibly took a fee; if the vault would mint nothing in return, `ZeroShares()` unwinds the whole action rather than breaking the fee-for-value guarantee.
+Rounding always favors the member — a fee small enough to round to nothing is charged as zero — and the system deliberately supports only ordinary, well-behaved digital dollars like USDC.
 
-The math floors in the member's favor — a fee that rounds to zero in the asset's smallest unit is charged as zero — and fee-on-transfer or rebasing tokens are explicitly unsupported, which is fine for the curated vault assets (plain ERC-20s like USDC).
+## The disclosure promise: three outcomes, no fourth
 
-## The disclosure contract: three outcomes, no fourth
+Before the deposit screen ever shows a confirm button, the app reads the live rate and lands in exactly one of three states:
 
-The client half lives in `frontend/src/lib/fees/feeQuote.js`. Before the deposit sheet ever shows a confirm button, `fetchFeeQuote({ serviceId, chainId, provider })` reads the live rate from the router and resolves to exactly one of three states:
+1. **No fee applies** (this network has no price list, or the Earn fee was never turned on): the flow proceeds fee-free, behaving *exactly* as it did before fees existed. No fee line appears — because implying a fee that isn't charged is as dishonest as hiding one that is.
+2. **A live rate is available**: the deposit screen shows a clearly named "FairWins platform fee" line — the percentage, the dollar amount, and the net amount reaching the vault — before any signature. The rate the member saw is pinned to the transaction as its ceiling.
+3. **The rate couldn't be read** on a network that should have one: the screen **blocks the deposit** with an honest "we couldn't confirm the fee right now" message. Proceeding on a possibly-understated rate isn't an option, and neither is silently assuming zero.
 
-1. **No router on this chain** (or the service isn't registered): `{ available: false, bps: 0 }`. The flow proceeds fee-free — and `buildDepositCalls` emits a batch **byte-identical** to the pre-fee behavior: approve the vault, `deposit(amount, account)`. No fee line appears, because implying a fee that isn't charged is as dishonest as hiding one that is.
-2. **Live rate obtained**: the `VaultSheet` (`frontend/src/components/earn/VaultSheet.jsx`) renders a named "FairWins platform fee" line — rate as a percent, absolute amount, and the net amount reaching the vault — with an info bubble, before any signature. The deposit reroutes through the router: approve the **router** for the gross amount, then `depositToVaultWithFee(earn.lend, vault, amount, account, quotedBps)`, pinning the transaction to the disclosed rate.
-3. **The read failed on a chain that has a router**: the quote throws, and the sheet **blocks deposits** with an honest "the platform fee rate could not be confirmed right now" message. Proceeding on a possibly understated rate is not an option; neither is silently assuming zero.
+There is deliberately no fourth outcome. Every rate change, meanwhile, is public and permanent, forming the audit history the admin panel reads back — and each charge is a matching public record, so the fee taken always equals the transfer to the treasury in the same transaction.
 
-There is deliberately no fourth state. The quote helper mirrors the contract's `quoteFee` math exactly — including the treasury-unset skip, so the UI never displays a fee the router would not actually charge.
+## Why build it this way
 
-Every rate change is public history: `FeeBpsChanged(serviceId, oldBps, newBps, actor)` events are the audit log the AdminPanel Fees tab renders, and `FeeCharged` is the reconciliation record — its `feeAmount` equals the ERC-20 transfer to the treasury in the same transaction.
+**A fee on the way in, not a cut of your yield.** FairWins takes a small percentage of the principal at deposit and touches nothing afterward. A performance fee — a cut of the returns — would require FairWins to sit inside the yield path and effectively hold member deposits, which is exactly the custody the platform refuses. An entry fee keeps positions purely member-owned.
 
-## Design decisions
+**One price list, not a fee per feature.** The next yield integration just registers a new labeled entry — a configuration change, not new code — reusing the same charge-and-deposit path, ceiling, consent limit, and public record. The alternative, every feature inventing its own fee handling, is how platforms end up with rates hardcoded in three places and no audit trail.
 
-**Entry-only fee, not a performance fee.** The router skims basis points of the principal at deposit time and touches nothing afterward. A performance or management fee would require FairWins to sit in the yield path — Morpho's documented "distributor revenue" pattern of a treasury-owned wrapper vault does exactly that, and was considered and deferred precisely because it is a new value-bearing contract that would custody member deposits. An entry fee keeps the router stateless between transactions and keeps positions purely member-owned.
+**Honest failure over a smooth guess.** Much of the design's care goes into refusing to guess: a rate that can't be read blocks the action rather than defaulting to zero; an unconfigured fee is treated as no fee rather than an unknown fee; a missing treasury skips rather than reverts. The rule underneath all of it: the member either sees the true number, or the action doesn't happen.
 
-**One router, not per-integration fee logic.** The next wrapped integration (Lido, Polygon liquid staking, Uniswap) registers a `serviceId` — config, not code. Anything ERC-4626-shaped reuses `depositToVaultWithFee` as-is; differently shaped actions add a purpose-built entrypoint to the same router with the same cap re-check, consent ceiling, and event discipline. The alternative — each feature inventing its own fee store — is how platforms end up with rates hardcoded in three clients and no audit trail.
+Worth naming honestly: the fee only touches deposits, so withdrawals are always free — the system can't hold an exit hostage. And the yield itself is entirely Morpho's. FairWins doesn't guarantee any particular return, and the vaults carry their own risk as third-party software — which the Earn screen states plainly, right under a required "Powered by Morpho" credit.
 
-**Caps are immovable.** A wrapped service's `capBps` is fixed at registration, bounded at 250 bps, and re-checked on the charge path (defense in depth against a corrupted rate). The emergency lever is `setFeeBps(id, 0)`, not cap surgery. Members and integrators get a hard, on-chain upper bound on what the fee can ever become.
+## Further reading
 
-**Honest failure over graceful degradation.** Most of the fee system's complexity is in refusing to guess: a failed rate read blocks the action rather than defaulting to zero; an unregistered service is fee-free rather than fee-unknown; a missing treasury skips rather than reverts. The rule generalizing all of it: the member either sees the true number or the action doesn't happen.
-
-The honest limits of the design are worth naming too. The fee only wraps deposits — withdrawals go straight to the vault, so the router can't ransom an exit, but also can't meter one. And the yield itself remains entirely Morpho's: FairWins guarantees neither APY nor the third-party vault's smart-contract risk, and the Earn UI says so under a mandated "Powered by Morpho" attribution.
-
-## Sources
-
-- `specs/050-earn-lending-rewards/spec.md` — Earn section requirements, custody model, FR-013 fee decision
-- `specs/060-platform-fee-wrapper/spec.md` — fee wrapper requirements, caps, disclosure rules
-- `docs/developer-guide/earn-integration.md` — Earn architecture, vault curation, safety rails
-- `docs/developer-guide/platform-fees.md` — FeeRouter architecture, disclosure rules, service registration
-- `contracts/fees/FeeRouter.sol`, `contracts/fees/IFeeRouter.sol` — router implementation and interface
-- `frontend/src/lib/earn/vaultActions.js` — deposit/withdraw batch construction, fee routing
-- `frontend/src/lib/fees/feeQuote.js` — live-rate quoting and the three-outcome contract
-- `frontend/src/components/earn/VaultSheet.jsx` — fee-line disclosure and blocked-state UI
-- `scripts/deploy/lib/feeServices.js` — `earn.lend` registration (cap 250 bps, Wrapped)
-- ERC-4626 Tokenized Vaults: https://eips.ethereum.org/EIPS/eip-4626
-- OpenZeppelin ERC-4626 / SafeERC20 / UUPS docs: https://docs.openzeppelin.com/contracts
-- Morpho distributor revenue concepts: https://docs.morpho.org/build/earn/concepts/generate-revenue/
+- [ERC-4626: Tokenized Vaults](https://eips.ethereum.org/EIPS/eip-4626) — the shared standard behind the yield pools this feature connects to
+- [Morpho documentation](https://docs.morpho.org/) — the third-party lending protocol whose vaults power Earn
+- [OpenZeppelin contract libraries](https://docs.openzeppelin.com/contracts) — the widely used building blocks for safe token handling and upgradeable on-chain systems
+- For deeper implementation details, see the FairWins developer documentation.

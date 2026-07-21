@@ -2,24 +2,24 @@
 
 ## X (Twitter)
 
-How do you gift a non-transferable membership? Split the token in two: an inert ERC-721 voucher that trades freely + a soulbound access record it burns into. Sanctions screening happens once — at redemption, where standing is granted. 🎟️ 🔗 <link> #Solidity #tokendesign #web3
+How do you gift a non-transferable membership? Split the token in two: an inert voucher (a prepaid gift card, really) that trades freely, plus a soulbound access record it burns into. Sanctions screening happens once — at redemption, where access is granted. 🎟️ 🔗 <link> #tokendesign #web3
 
 ## LinkedIn
 
-"Make the membership transferable" is the obvious answer to gifting and resale — and the wrong one when your access records feed compliance checks and per-address usage limits.
+"Just make the membership transferable" is the obvious answer to gifting and resale — and the wrong one when your access records feed compliance checks and per-wallet usage limits.
 
-FairWins memberships are soulbound by construction: not a locked NFT, just a storage record keyed to an address, with nothing to transfer. So how do you build a gift-and-resale market on top of that? By making the *right to claim* a membership transferable instead. The new post walks through the split:
+FairWins memberships are soulbound by construction: not a locked NFT, just a ledger entry tied to a wallet, with nothing to hand over. So how do you build a gift-and-resale market on top of that? By making the *right to claim* a membership transferable instead. The new post walks through the split:
 
-- A membership voucher as a plain ERC-721 bearer claim: minted at the tier's USDC price, confers zero access while held, never expires, snapshots its (role, tier) at mint so later config changes can't touch it
-- Redemption as the single control point: strict checks-effects-interactions, sanctions screening fail-closed on the redeemer only, voucher burned last so a failed redemption leaves it intact and re-tradable
-- Why the tradable asset is immutable while the redemption logic lives behind a UUPS proxy — and why the mapping beat an EIP-5192 locked token
-- Honest privacy: fresh-wallet redemption gives pseudonymity, not unlinkability, and the UI is required to say so
+- A membership voucher as a plain bearer claim — a prepaid gift card, essentially: bought at the tier's normal price, grants zero access while held, never expires, and locks in its tier at mint so later pricing changes can't touch it
+- Redemption as the single control point: sanctions screening applies to the person redeeming, and the voucher is burned last, so a failed redemption leaves it intact and re-tradable
+- Why the tradable asset is frozen while the redemption logic stays upgradeable — and why a plain ledger entry beat a locked token
+- Honest privacy: redeeming from a fresh wallet gives pseudonymity, not unlinkability, and the interface is required to say so
 
 If you're designing a token that "should" be both transferable and soulbound, the answer may be two artifacts joined by a burn.
 
 Read it here: <link>
 
-Where do you put the compliance choke point in a two-token design — mint, transfer, or redemption? #Solidity #tokenomics #smartcontracts #NFT #accesscontrol
+Where do you put the compliance checkpoint in a two-token design — mint, transfer, or redemption? #tokendesign #smartcontracts #NFT #accesscontrol
 
 ## Image prompt (Gemini / Nano Banana)
 

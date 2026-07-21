@@ -1,27 +1,25 @@
-# Social & Image — Sponsored Gas Without a Vendor: A Self-Hosted ERC-7677 Verifying Paymaster
+# Social & Image — Sponsored Gas Without a Vendor: How "No Network Fee" Became True
 
 ## X (Twitter)
 
-We rejected every vendor paymaster and built our own: a 173-line ERC-4337 v0.6 verifying paymaster with zero-storage validation, an ERC-7677 endpoint on our existing relay gateway, and a KMS-held signer. Worst-case loss = the deposit. Here's the full writeup 🔗 <link>
-
-#ERC4337 #AccountAbstraction #paymaster
+Our confirm screen said "no network fee" before that was actually true. Two options: change the words, or make them true. We made them true — quietly covering the fee ourselves, no third-party service, worst-case loss capped at the deposit. Here's how 🔗 <link> #gasless #wallets #web3
 
 ## LinkedIn
 
-Our passkey smart accounts had a broken promise: the confirm screen said "sponsored — no network fee," but with no paymaster configured, every UserOperation from a USDC-only account failed with AA21. We had two options — change the copy, or make it true. We made it true, without a third-party paymaster service.
+Our passkey wallets had a broken promise: the confirm screen said "sponsored — no network fee," but with nothing set up to cover it, a member holding only USDC couldn't pay the fee, and the transfer failed. We had two options — change the words, or make them true. We made them true, without any third-party sponsorship service.
 
 The new post walks through how FairWins ships sponsored gas on infrastructure it already runs:
 
-- A minimal EntryPoint v0.6 verifying paymaster whose validation is signature-only and zero-storage — ERC-7562-safe, portable to any bundler, with the EntryPoint deposit as a hard loss cap.
-- An ERC-7677 endpoint (pm_getPaymasterStubData / pm_getPaymasterData) added to the existing relay gateway, reusing its sanctions screening, per-account and global quotas, and killswitch — plus per-op gas and cost ceilings so one expensive op can't drain the pool.
-- A Cloud KMS signing key whose derived address must match the on-chain verifyingSigner, enforced by a fail-loud boot check; a compromised signer can grief the deposit but can never withdraw it.
-- A never-stranded fallback: any sponsorship failure degrades to self-funded submission with honest fee disclosure — the UI never claims "free" unless it is.
+- A deliberately tiny paymaster contract: it just checks an approval "stamp" and covers the fee, keeps no memory of past transactions, and caps worst-case loss at its own deposit
+- An approval service added to the gateway FairWins already ran, reusing its sanctions screening, per-account and platform-wide quotas, and kill switch — plus new size and cost ceilings so one expensive transaction can't drain the pool
+- A securely managed signing key whose identity must match what the contract expects, enforced by a fail-loud startup check; a stolen key can waste the deposit but can never withdraw it
+- A never-stranded fallback: any sponsorship failure quietly degrades to member-paid fees, with honest disclosure — the screen never says "free" unless it is
 
-Full architecture and trade-offs (why v0.6, why verifying over ERC-20, why self-hosted): <link>
+Full architecture and trade-offs (why sponsor rather than charge in stablecoin, why self-host): <link>
 
-If you run account abstraction in production — would you self-host the paymaster, or is a vendor the right call at your scale?
+If you run gasless flows in production — would you self-host the sponsorship, or is a vendor the right call at your scale?
 
-#AccountAbstraction #ERC4337 #ERC7677 #web3infrastructure #Ethereum
+#gasless #wallets #selfcustody #web3 #fintech
 
 ## Image prompt (Gemini / Nano Banana)
 

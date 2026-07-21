@@ -2,24 +2,24 @@
 
 ## X (Twitter)
 
-Group wager pools as immutable ERC-1167 clones: one UUPS factory, 45-byte proxies, and a payout matrix where the winner's address IS the claim code. We built the ZK version first — testers killed it. 🔗 <link> #Solidity #SmartContracts #ERC1167
+Group wager pools as tamper-proof ERC-1167 clones: one upgradeable factory, tiny 45-byte proxies, and a payout list where the winner's public address IS the claim code. We built the zero-knowledge version first — testers killed it. 🔗 <link> #PredictionMarkets #Web3
 
 ## LinkedIn
 
-How do twelve people escrow a season-long fantasy league on-chain when no oracle can answer "who won our league"? Our 1v1 wager registry couldn't express it — so FairWins built wager pools as a deliberately parallel system, and made two choices that run opposite to the registry's architecture.
+How do twelve people escrow a season-long fantasy league on-chain when no outside market can answer "who won our league"? Our one-on-one wager escrow couldn't express it — so FairWins built wager pools as a deliberately parallel system, and made two choices that run opposite to the core design.
 
 The new post covers:
 
-- Why each pool is an immutable ERC-1167 minimal-proxy clone (45 bytes of runtime code) stamped out by a single UUPS factory — and why "the rules cannot change under your escrow" beat upgradeability for bounded-lifetime group funds
-- The address-keyed payout matrix: creator proposes, the contract validates sum == escrow on-chain, members approve to a fraction-of-joined threshold (minimum two approvals, so no self-dealing lock), and the winner's public address is the claim code — no secrets to exchange
-- Baking EIP-712 gasless twins and EIP-3009 joins into immutable bytecode, plus factory forwarders that let a relayer whitelist one stable address while on-chain provenance checks constrain reachable targets
-- The honest part: we built and empirically verified the Semaphore/Groth16 anonymous version first. Testers rejected the private claim code, and the spec directory name is the fossil record.
+- Why each pool is a tamper-proof minimal-proxy clone (about 45 bytes) stamped out by a single upgradeable factory — and why "the rules cannot change under your escrow" beat upgradeability for bounded-lifetime group funds
+- The address-keyed payout list: the creator proposes, the contract checks the amounts sum to the exact pot on-chain, members approve to a fraction-of-joined threshold (minimum two approvals, so no self-dealing lock), and the winner's public address is the claim code — no secrets to exchange
+- Gasless collection baked into every pool from day one, plus a stable factory front door that lets a helper service submit on behalf of members while on-chain checks constrain what it can reach
+- The honest part: we built and verified the anonymous zero-knowledge version first. Testers rejected the private claim code, so we swapped it for plain public addresses.
 
 Full write-up: <link>
 
-When have you chosen immutability over upgradeability for value-bearing contracts — and did it hold up?
+When have you chosen "the rules can't change" over upgradeability for value-bearing contracts — and did it hold up?
 
-#Solidity #SmartContracts #Ethereum #Web3 #ProtocolEngineering
+#PredictionMarkets #Web3 #ProductDesign #Ethereum
 
 ## Image prompt (Gemini / Nano Banana)
 

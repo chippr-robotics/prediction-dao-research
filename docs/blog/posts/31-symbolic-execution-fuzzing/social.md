@@ -2,24 +2,25 @@
 
 ## X (Twitter)
 
-12 lines move money to a wager winner. Slither checks the shape, Manticore proves the sum can't overflow, Medusa hammers 100-tx sequences at escrow solvency. Each catches what the others miss — and Manticore silently ran on nothing until we fixed one import. 🔗 <link>
+A tiny piece of code decides who gets paid in a wager. We point three very different tools at it: one checks the code's shape, one explores every possible path to prove the math can't overflow, one throws thousands of random action sequences at it to test that the pot always stays solvent. Each catches what the others miss. 🔗 <link>
 
-#SmartContractSecurity #Solidity #Fuzzing
+#SmartContractSecurity #Testing #Web3
 
 ## LinkedIn
 
-A payout function in a peer-to-peer wager protocol has to be right on every axis at once: checks-effects-interactions ordering so a reentrant token can't drain it, an irreversible paid flag so no one claims twice, and arithmetic that sums two stakes without overflowing. No single testing technique gives you confidence across all of that — so FairWins runs three, and this post is a tour of what each one actually catches on the escrow code.
+A single, tiny function inside a FairWins wager decides who gets paid. It has to be right on every axis at once: pay in the correct order so no one can trick it into paying twice, never let the same pot be claimed twice, and add two stakes together without the total silently overflowing.
 
-The post covers:
+No single testing method catches all of that — so we run three, and the new post is a plain-English tour of what each one actually does:
 
-- **Slither** (static analysis, every PR): catches the reentrancy ordering, missing access control, and zero-address gaps that are visible in the shape of the code — but can't tell you whether a payout is arithmetically correct.
-- **Manticore** (symbolic execution, weekly): explores paths with symbolic inputs to prove the payout sum can't overflow for any input — plus the story of the OpenZeppelin import bug that left it silently running on nothing.
-- **Medusa** (property fuzzing, weekly): throws 100-transaction sequences at the real proxy-deployed stack and re-checks escrow solvency after every call, hunting the emergent bug no single transaction causes.
-- **Why the layers overlap on purpose** — and why a green-but-inert security tool is worse than none.
+- A fast pattern-checker that reads the code without running it, catching dangerous code shapes on every change — but it can't tell you whether a payout amount is correct.
+- Symbolic execution, which explores every possible path with unknown inputs to *prove* the math can never overflow. (Including the story of when this tool reported success for weeks while quietly examining nothing at all.)
+- A fuzzer, which throws long random sequences of real actions at a realistic copy of the system and re-checks after every move that the contract still holds enough money to cover what it owes.
 
-How do you order your verification stack by cost vs. depth? 🔗 <link>
+The theme: on code that quietly holds other people's money, overlapping tools — and distrusting green checkmarks until you've proven the tool is actually looking — is the whole job.
 
-#SmartContractSecurity #Solidity #Fuzzing #SymbolicExecution #Web3Security
+How do you order your testing by cost versus depth? 🔗 <link>
+
+#SmartContractSecurity #Testing #Web3Security #Fintech
 
 ## Image prompt (Gemini / Nano Banana)
 

@@ -1,6 +1,6 @@
-# One Signature, Zero Gas: Intent-Based Payments with EIP-712 and EIP-3009
+# One Signature, Zero Gas: How Gasless Payments Actually Work
 
-*How FairWins turned every user action into a signed intent — and the byte-identical struct discipline that keeps three codebases honest*
+*How FairWins turned every action into a signed "intent" — you sign what you want, and someone else pays the fee to submit it*
 
 ---
 
@@ -8,121 +8,78 @@
 |---|---|
 | **Series** | Gasless Rails (part 1 of 2) |
 | **Part** | 9 of 34 |
-| **Audience** | dApp developers, meta-transaction and relayer engineers |
-| **Tags** | `eip712`, `eip3009`, `meta-transactions`, `gasless`, `intents` |
-| **Reading time** | ~8 minutes |
+| **Audience** | Founders, product managers, and the crypto-curious |
+| **Tags** | `gasless`, `payments`, `user-experience`, `stablecoins` |
+| **Reading time** | ~7 minutes |
 
 ---
 
 ## The Stranded User
 
-A user wins a wager on FairWins. Fifty USDC sits in escrow with their address recorded as the winner. All they have to do is call `claimPayout`. One problem: their wallet holds exactly zero POL. They funded it with USDC from an exchange, they've never touched Polygon's native token, and they have no intention of learning what a gas station is. Their money is on-chain, provably theirs, and unreachable.
+A user wins a wager on FairWins. Fifty USDC sits in escrow with their address recorded as the winner. All they have to do is claim it. One problem: their wallet holds exactly zero of Polygon's native coin — the token every transaction needs to pay its network fee, its "gas." They funded their wallet with USDC from an exchange, never touched the native token, and have no intention of learning what a gas station is. Their money is on-chain, provably theirs, and completely out of reach.
 
-The pre-intent flow was worse than one stranded action — it was two transactions per money-in action. Creating a wager meant an ERC-20 `approve()` followed by the create call. Accepting one meant the same dance. Every step required native gas, and the spec for this feature (`specs/035-intent-based-payments/spec.md`) named the failure mode plainly: a user who holds only the platform stablecoin is stranded — they cannot act at all.
+The old flow was worse than one stuck action. Just creating a wager took *two* transactions: a step to authorize the platform to move your stablecoin, then the step that actually creates the wager. Accepting one meant the same dance. Every step needed native gas, and the failure mode was plain: a user who holds only the stablecoin can't act at all.
 
-The worst version of this is asymmetric: a user who scraped together gas to *stake* but can't afford gas to *claim*. Money in, no money out. Any gasless design that fixes deposits but not withdrawals has built a lobster trap.
+The cruelest version is lopsided — a user who scraped together enough gas to *place* a bet but can't afford the gas to *claim* their winnings. Money in, no money out. Any gasless design that fixes deposits but not withdrawals has built a lobster trap.
 
-Spec 035's answer is to make the entire platform operate on **signed intents**. The user signs a structured message off-chain — free — describing exactly what they want. Anyone can carry that message on-chain, but the on-chain effect is always attributed to the *signer*, never the submitter. One signature replaces approve-plus-act, and a relayer's gas wallet pays the transaction fee.
+The fix is to make the entire platform run on **signed intents**. Instead of sending a transaction and paying the fee, the user signs a message — for free, no gas — describing exactly what they want to do. Anyone can then carry that signed message onto the blockchain and pay the fee to submit it. Crucially, the on-chain effect is always credited to the person who *signed* it, never to whoever submitted it. One signature replaces the whole authorize-then-act dance, and a helper service — a "relayer" — pays the fee.
 
-## Anatomy of an Intent
+## What an Intent Actually Is
 
-An intent is an [EIP-712](https://eips.ethereum.org/EIPS/eip-712) typed struct. Every action on the platform has one — `CreateWagerIntent`, `AcceptWagerIntent`, `ClaimPayoutIntent`, `DeclareDrawIntent`, `PurchaseTierIntent`, and so on. Each struct binds three things:
+An intent is a structured, human-readable message the user signs with their wallet, built on **EIP-712** — a widely used standard for signable data a wallet can display in plain terms, so you see the actual stake, deadline, and counterparty, not a wall of hex. Every action on the platform has its own intent: create a wager, accept one, claim a payout, declare a draw, buy a membership tier, and so on.
 
-1. **The acting address** — a named field (`creator`, `taker`, `claimant`, `member`) that must equal the recovered signer.
-2. **Every action parameter** — stake amounts, deadlines, the wager ID, the metadata hash. Nothing is left for the submitter to fill in.
-3. **A replay guard and validity window** — a random 32-byte `nonce`, plus `validAfter` / `validBefore` timestamps.
+Each intent locks down three things:
 
-Here is the accept-wager struct as the contract declares it in `contracts/wagers/WagerRegistryIntents.sol`:
+1. **Who is acting** — a named field that must match whoever actually signed. You can't sign on someone else's behalf.
+2. **Every detail of the action** — stake amounts, deadlines, which wager. Nothing is left blank for the submitter to fill in later.
+3. **A replay guard and an expiry** — a random one-time code so the same intent can't be reused, plus a window so a stale intent eventually expires.
 
-```solidity
-bytes32 private constant ACCEPT_WAGER_INTENT_TYPEHASH = keccak256(
-    "AcceptWagerIntent(uint256 wagerId,address taker,bytes32 paymentNonce,"
-    "bytes32 nonce,uint256 validAfter,uint256 validBefore)"
-);
-```
+Signatures are checked under a fingerprint unique to each contract *and* each network, so a signed intent is valid on exactly one contract on exactly one blockchain — a one-time code used up on one contract can never be replayed on another. The check also accepts signatures from smart-contract wallets, so FairWins' passkey wallets can sign intents too. A failed intent never uses up its one-time code; a successful one can never run twice.
 
-Signatures are verified under a **per-contract domain**: `("FairWins WagerRegistry", "1", chainId, proxyAddress)` for wager actions, `("FairWins MembershipManager", "1", ...)` for membership actions. Chain ID and verifying contract in the domain mean a signature is valid on exactly one contract on exactly one network — a nonce consumed on one contract can never be replayed on another.
+## Paying With a Signature, Not a Gas Balance
 
-The verification machinery lives in one shared mixin, `contracts/upgradeable/SignerIntentBase.sol`. Its `_verifyIntent` checks the validity window, recovers the signer (ECDSA first, then an [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) `isValidSignature` staticcall so contract accounts — including FairWins' passkey smart wallets — can sign intents too), and burns the nonce before the action body runs any external interaction. A failed intent never consumes its nonce; a succeeded one can never run twice.
+Signing an action is the easy half. The hard half is *money-in* actions. The intent says "stake 50 USDC" — but the platform still has to pull 50 USDC out of the wallet, which normally needs a separate, gas-paying authorization first.
 
-One detail worth stealing: the nonce map lives in [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201)-namespaced storage rather than sequential slots. That made `SignerIntentBase` safe to add to two *already-live* UUPS proxies (`WagerRegistry` and `MembershipManager`) without shifting a single existing storage slot or spending `__gap` reserve.
+This is what **EIP-3009** is for — a feature built into Circle's USDC that lets a holder authorize a specific payment purely by signing. The user signs an authorization naming who gets paid, how much, and a validity window; the receiving contract presents that signature to the USDC token, and the transfer happens. No standing "allowance" ever exists, and no separate transaction is needed.
 
-## The Payment Leg: EIP-3009
+So a money-in intent carries *two* signatures: the FairWins intent ("accept wager 41") and the USDC payment authorization ("pay 50 USDC"). Which raises the attack that shapes the whole design: **what stops the submitter from mixing and matching?** Could they staple your payment authorization to a different action, or pair your accept-intent with a payment meant for something else?
 
-Signature-based actions are the easy half. The hard half is money-in actions — the intent says "stake 50 USDC," but the contract still has to actually pull 50 USDC without a prior `approve()`.
+They can't, because the two signatures are cryptographically stapled together. The intent you sign references the exact payment it's meant to travel with, and the contract refuses to proceed unless the payment matches — same amount, same one-time code — the one you committed to. The USDC token adds the final lock: the payment can only land in the contract that's asking. The net result: a submitter can *refuse* to carry your intent, but can never substitute, redirect, or resize the payment.
 
-This is what [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) exists for. Circle's USDC implements `receiveWithAuthorization`: the token holder signs an authorization — under the *stablecoin's own* EIP-712 domain, not FairWins' — naming a payee, an amount, a validity window, and a random nonce. The payee contract presents that signature to the token and the transfer executes. No allowance ever exists.
+## Two Twins, Identical Rules
 
-So a money-in intent carries two signatures: the FairWins intent and the USDC authorization. Which raises the attack that defines this design: **what stops a relayer from mixing and matching?** Take Alice's payment authorization, pair it with a different action; take her accept-intent for wager 41, staple on an authorization meant for something else.
+Every gasless action is a *twin* of an ordinary one. Accepting a wager the normal way and accepting it via a signed intent run **the exact same checks against the person acting** — sanctions screening, membership gating, ownership, account freezes. The only difference is *how* the acting identity is established: from the sender on the direct path, from the recovered signature on the intent path. The submitter's own standing is never consulted, and because both twins run the same underlying action, they can't quietly drift apart.
 
-The answer is that the two legs are cryptographically stapled. Every money-in intent struct carries a `paymentNonce` field — you can see it in the typehash above — and the contract asserts that the relayer-supplied authorization is exactly the one the signer committed to:
+## Keeping Three Codebases in Perfect Sync
 
-```solidity
-function _pullWithAuthorization(
-    address token, address from, uint256 expectedValue,
-    bytes32 expectedPaymentNonce, ERC3009Auth memory auth
-) internal {
-    if (auth.value != expectedValue || auth.nonce != expectedPaymentNonce)
-        revert PaymentAuthMismatch();
-    IERC3009(token).receiveWithAuthorization(
-        from, address(this), auth.value,
-        auth.validAfter, auth.validBefore, auth.nonce,
-        auth.v, auth.r, auth.s
-    );
-}
-```
+Here's the lesson most write-ups skip. The exact shape of each intent has to be defined in *three* separate places: the smart contract that verifies it, the app that helps the user sign it, and the relayer service that handles it.
 
-The token itself enforces the third edge: `receiveWithAuthorization` requires the payee to be the calling contract, so the money can only land in the registry. The net result, stated in `docs/developer-guide/gasless-intents.md`: a relayer can *censor* an intent, but it can never substitute, redirect, or resize a payment. That is the correct trust boundary for optional infrastructure.
+These three definitions must be **byte-identical** — not just similar in spirit. The signing standard fingerprints the *entire* structure, so a single reordered field, or a field's type written slightly differently, produces a completely different fingerprint and a signature that verifies to a random, wrong address. The failure is silent when you build it and total when a real user tries: every signature rejected, every time.
 
-## The Twin Invariant
-
-Every gasless entrypoint is a *twin* of an existing self-submit function — `acceptWager` gains `acceptWagerWithAuthorization`, `claimPayout` gains `claimPayoutWithSig` — and both twins run **identical checks and effects against the acting identity**: sanctions screening, membership gating, ownership, account freeze. For self-submit that identity is `msg.sender`; for the intent path it is the recovered signer. The submitter's own entitlements are never consulted. Both facets of the wager registry inherit the same `WagerRegistryCore` action bodies, so the twins cannot drift apart behaviorally: the twin is a thin verification wrapper around the exact same internal function the direct call uses.
-
-(The registry hosts these twins on a second implementation facet reached by delegatecall, because the main implementation sits 116 bytes shy of the EVM's 24 KB code limit — a story that deserves, and gets, its own post.)
-
-## The Three-Way Struct Sync
-
-Here is the lesson most meta-transaction tutorials skip. The EIP-712 struct definitions exist in **three places**:
-
-- the Solidity typehash strings in `contracts/wagers/WagerRegistryIntents.sol` (and `MembershipManager.sol`),
-- the frontend signing definitions in `frontend/src/lib/relay/intentTypes.js`,
-- the gateway verification definitions in `services/relay-gateway/src/intent/intentTypes.js`.
-
-These must stay **byte-identical**. Not semantically equivalent — byte-identical. EIP-712 hashes the full type string, so `uint256 wagerId` versus `uint wagerId`, a reordered field, or a renamed one produces a different typehash, a different digest, and a signature that recovers to a random address. The failure is silent at build time and absolute at runtime: `InvalidIntentSignature`, every time, for every user.
-
-The discipline FairWins landed on: the deployed contract typehashes are *authoritative*; each JS file declares in its header comment which spec document it mirrors and where deviations from the spec doc were resolved in the contract's favor (the schemas doc elided fields with `…`; the deployed `AcceptWagerIntent` really does carry `paymentNonce`, so both JS files do too). The gateway file goes further and makes itself the single source its own verification, encoding, and tests all derive from — a schema change inside that service is a one-file edit. When later features added intent structs (wager pools, the callsign registry), each new struct shipped simultaneously in all three places with cross-references in comments. It is unglamorous, and it is the difference between a working gasless rail and a support queue.
+The discipline FairWins landed on treats the deployed contract as authoritative, and every other copy documents exactly where it matches. New intents ship in all three places at once, with cross-references so no one edits one and forgets the others. It's unglamorous bookkeeping, and it's the entire difference between a working gasless system and a flood of mysterious support tickets.
 
 ## Never Stranded
 
-The final rule is architectural humility: the relayer is optional infrastructure, and the design must survive its absence. Every gasless flow keeps a **self-submit fallback** — the original pay-your-own-gas path is never removed, and the frontend hook `frontend/src/lib/relay/useIntentAction.js` enforces it at wiring time: the hook *throws during development* if a call site fails to supply a `selfSubmit` function, so no screen can ship a gasless-only dead end. Relayer unset, unhealthy, rate-limiting, timing out — the hook transparently falls back, and the on-chain result is identical.
+The final rule is architectural humility: the relayer is *optional*, and the design has to survive without it. Every gasless flow keeps a **pay-your-own-gas fallback** — the original path is never removed. The app enforces this at the wiring level: a screen literally can't ship a gasless-only dead end, because the code refuses to build one. If the relayer is switched off, overloaded, rate-limiting, or timing out, the app quietly falls back to the user paying their own gas, and the on-chain result is identical.
 
-The fallback also covers chains where the payment leg simply doesn't exist. Mordor's USC stablecoin lacks EIP-3009; the frontend's `stablecoinDomain()` check throws `PaymentUnsupportedOnChain` *before* the wallet prompt ever opens, and the flow self-submits. And status is honest end to end: the UI never shows `confirmed` before a mined transaction exists — signed, pending, confirmed, expired, and failed are distinct, truthful states.
+The fallback also covers networks where the signature-based payment simply doesn't exist — one test network's stablecoin lacks it entirely, so the app detects the gap *before* opening the signing prompt and uses the normal path. And status is honest end to end: the interface never shows "confirmed" before a transaction is actually mined. Signed, pending, confirmed, expired, and failed are all distinct, truthful states.
 
 ## Design Decisions
 
-**Random nonces, not sequential.** Nonces are client-generated random 32-byte values, usable out of order — EIP-3009's own scheme, adopted for intents too. Sequential nonces serialize a user's actions and let one stuck intent block everything behind it; random nonces let a user sign three intents and have them land in any order. Cancellation is targeted: `invalidateNonce(nonce)` kills one specific unsubmitted intent, and `invalidateNonceWithSig` makes even *cancellation* gasless.
+**Random one-time codes, not a counter.** Each intent's replay guard is a random value, usable in any order. A counter would force a user's actions into strict sequence and let one stuck intent block everything behind it; random codes let someone sign three intents and have them land in any order. Cancellation is precise — a user can kill one specific unsubmitted intent, and even that can be gasless.
 
-**Sign everything, trust nothing.** Every parameter the action consumes is inside the signed struct. The alternative — signing a hash of parameters delivered out-of-band — is fewer bytes but gives wallets nothing legible to display. EIP-712 typed data means the wallet shows the user the actual stake, deadline, and counterparty they are authorizing.
+**Sign everything, trust nothing.** Every detail the action uses is inside the signed message. The alternative — signing a compact code that stands for details delivered separately — is fewer bytes but shows the user nothing legible to approve. Human-readable signed data means the wallet displays the real stake, deadline, and counterparty.
 
-**Fee netting is bounded and segregated.** An optional second EIP-3009 authorization lets the platform recover gas costs in USDC, but it is capped on-chain (`FeeExceedsCap`), settles atomically with the action, and pays a segregated `gasFeeRecipient` — never the relayer's hot key. A compromised relayer gains no fee-redirection power.
+**Fee recovery is bounded and segregated.** An optional second payment authorization lets the platform recover its gas cost in USDC, but it's capped on-chain, settles in the same transaction as the action, and pays into a segregated account — never the relayer's own wallet. A compromised relayer gains no power to skim fees.
 
-**Censorship is the accepted residual risk.** A relayer can decline to submit. It cannot forge, alter, or replay. Because self-submit always exists, censorship degrades to inconvenience — the user pays their own gas and proceeds. That trade — accept censorship, eliminate custody — is the entire design in one sentence.
+**Censorship is the accepted residual risk.** A relayer can decline to submit an intent; it cannot forge, alter, or replay one. And because the pay-your-own-gas path always exists, refusal degrades to mere inconvenience. That trade — accept the possibility of censorship, eliminate any custody of user funds — is the entire design in one sentence.
 
 ---
 
-> **Note**: FairWins wagers are peer-to-peer agreements based on publicly available information and legitimate forecasting. Gasless submission changes who pays the transaction fee, not who is accountable: every intent is attributed to its signer, who remains fully subject to applicable law and the platform's compliance screening.
+> **Note**: FairWins wagers are peer-to-peer agreements based on publicly available information and legitimate forecasting. Gasless submission changes who pays the transaction fee, not who is accountable: every intent is credited to its signer, who remains fully subject to applicable law and the platform's compliance screening.
 
-## Sources
+## Further reading
 
-- `specs/035-intent-based-payments/spec.md` — feature spec, user stories, never-stranded rule
-- `specs/035-intent-based-payments/contracts/intent-eip712-schemas.md` — intent struct schemas
-- `docs/developer-guide/gasless-intents.md` — architecture overview, twin invariant, rollout
-- `contracts/upgradeable/SignerIntentBase.sol` — shared verification mixin, nonce map, fee netting
-- `contracts/wagers/WagerRegistryIntents.sol` — the `…WithSig` / `…WithAuthorization` twins
-- `frontend/src/lib/relay/intentTypes.js` — frontend struct definitions and domain builders
-- `frontend/src/lib/relay/useIntentAction.js` — never-stranded enforcement point
-- `services/relay-gateway/src/intent/intentTypes.js` — gateway struct definitions
-- [EIP-712: Typed structured data hashing and signing](https://eips.ethereum.org/EIPS/eip-712)
-- [EIP-3009: Transfer With Authorization](https://eips.ethereum.org/EIPS/eip-3009)
-- [ERC-1271: Standard Signature Validation Method for Contracts](https://eips.ethereum.org/EIPS/eip-1271)
-- [ERC-7201: Namespaced Storage Layout](https://eips.ethereum.org/EIPS/eip-7201)
+- EIP-712, the standard for human-readable signable data — https://eips.ethereum.org/EIPS/eip-712
+- EIP-3009, "transfer with authorization," the pay-by-signature feature in USDC — https://eips.ethereum.org/EIPS/eip-3009
+- ERC-1271, how smart-contract wallets prove a signature — https://eips.ethereum.org/EIPS/eip-1271

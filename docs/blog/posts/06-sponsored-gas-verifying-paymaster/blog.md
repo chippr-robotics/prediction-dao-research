@@ -1,97 +1,72 @@
-# Sponsored Gas Without a Vendor: A Self-Hosted ERC-7677 Verifying Paymaster
+# Sponsored Gas Without a Vendor: How "No Network Fee" Became True
 
-*How FairWins made "no network fee" true — with a 173-line contract, a KMS key, and the relay gateway it already ran*
+*How FairWins made "no network fee" an honest promise — by quietly covering the fee itself, using infrastructure it already ran*
 
-- **Series:** Accounts & Keys, part 3
-- **Part:** 6 of 34
-- **Audience:** Account-abstraction and infrastructure developers
-- **Tags:** `paymaster`, `erc7677`, `erc4337`, `gasless`, `bundler`, `kms`
-- **Reading time:** ~9 minutes
-
----
+| | |
+|---|---|
+| **Series** | Accounts & Keys (part 3) |
+| **Audience** | Product folks, founders, and developers curious how gasless apps work |
+| **Tags** | `gasless`, `sponsored-gas`, `wallets`, `self-custody`, `onboarding` |
+| **Reading time** | ~7 minutes |
 
 ## The lie in the confirm screen
 
 A member creates a FairWins passkey account, receives 40 USDC from a friend, and tries to send 10 of it onward. The confirm screen says "Gasless · sponsored — no network fee." They tap confirm with their fingerprint. The transfer fails.
 
-Under the hood, the EntryPoint rejected the UserOperation with `AA21 — Smart Account does not have sufficient funds`. The account held USDC and zero POL. With no paymaster configured, every ERC-4337 UserOperation must prefund its own gas from the account's native balance — and a stablecoin-only account has none. Worse, on the account's very first action the prefund also covers on-chain deployment, so during a gas spike even an account holding *some* native token could fail.
+Here's why. Every blockchain transaction costs a small network fee, paid in the chain's own native token — not in the stablecoin the member actually holds. This account had 40 USDC and zero native token, so there was nothing to pay the fee with, and the transaction was rejected. It's worse on a member's very first action, which also has to pay to deploy their account on-chain — so during a busy period even an account holding *some* native token could come up short.
 
-The product had promised sponsorship before the infrastructure existed. That violated one of FairWins' standing principles — the UI must never claim a state that isn't true — and there were two ways to fix it: change the copy, or make the claim true. Spec 050 chose the second, with a constraint the product owner set explicitly: no third-party paymaster service. No Pimlico, no Circle. FairWins already ran its own ERC-4337 bundler (pimlico's alto, self-hosted on Cloud Run) and its own relay gateway for gasless intents. Sponsorship had to be built from those parts.
+In other words, the product had promised "sponsored" before the machinery to sponsor anything existed. That broke a standing FairWins principle: the interface must never claim something that isn't true. There were two ways to fix it — change the words, or make them true. FairWins chose to make them true, with one firm constraint: no third-party sponsorship service. The company already ran the plumbing that submits these gasless transactions and the gateway that screens them, so sponsorship had to be built from those parts.
 
-This post walks through what that took: a deliberately minimal verifying paymaster contract on EntryPoint v0.6, an ERC-7677 endpoint bolted onto the existing policy gateway, a KMS-held signing key, and — because the platform's never-stranded rule is non-negotiable — a fallback that keeps every user able to act even when sponsorship is down.
+This post walks through what that took: a deliberately tiny "paymaster" contract, an approval service bolted onto the gateway FairWins already ran, a securely held signing key, and — because nobody may ever be stranded — a fallback that keeps every member able to act even when sponsorship is down.
 
-## What a verifying paymaster actually is
+## What sponsoring a fee actually means
 
-ERC-4337 lets a UserOperation name a paymaster: a contract that tells the EntryPoint "I'll pay for this one." The EntryPoint deducts the actual gas cost from the paymaster's deposit and reimburses the bundler's beneficiary. The whole design question is *how the paymaster decides which ops to pay for*.
+The smart-account standard these wallets use lets a transaction name a **paymaster**: a contract that tells the network, "I'll cover the fee for this one." The network then charges the fee to the paymaster's pre-funded balance instead of the user's. The entire design question is *how the paymaster decides which transactions to pay for.*
 
-A *verifying* paymaster answers with a signature. An off-chain service inspects each operation, and if it approves, signs a digest binding that exact op. The contract's only job is to recover the signer:
+A *verifying* paymaster answers that with a signature. An off-chain service looks at each transaction and, if it approves, signs a stamp of approval tied to that exact transaction. The contract's only on-chain job is to check the stamp is genuine — signed by the one authorized signer — and, if so, cover the fee.
 
-```solidity
-function validatePaymasterUserOp(UserOperation calldata userOp, bytes32, uint256)
-    external view override onlyEntryPoint
-    returns (bytes memory context, uint256 validationData)
-{
-    (uint48 validUntil, uint48 validAfter, bytes calldata signature) =
-        _parsePaymasterAndData(userOp.paymasterAndData);
+The FairWins paymaster is intentionally minimal: its approval stamp is bound to the specific transaction — its sender, its exact contents, the fee ceiling, the network, the paymaster's own address, and a short expiry window. Because the stamp is nailed to all of that, an approval can't be reused on a different transaction, on a different network, or after it expires. And it needs no memory of past transactions: the account's own built-in transaction counter already makes each one single-use. A contract that checks a signature and stores no state is the simplest and safest kind, and stays portable to other networks later.
 
-    bytes32 digest = MessageHashUtils.toEthSignedMessageHash(
-        getHash(userOp, validUntil, validAfter));
-    (address recovered, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, signature);
-    bool sigFailed = err != ECDSA.RecoverError.NoError || recovered != verifyingSigner;
+The economics are just as simple. The paymaster holds a pre-funded deposit with the network, and that deposit *is* both the sponsorship pool and the hard cap on how much can ever be lost. When the network runs a sponsored transaction, it draws the fee from that deposit — FairWins paying its own gas back, one transaction at a time, all accounted for on-chain.
 
-    // context "" => EntryPoint skips postOp (pure sponsoring, no settlement).
-    return ("", _packValidationData(sigFailed, validUntil, validAfter));
-}
-```
+## The decision half: an approval service on the gateway FairWins already ran
 
-That is the heart of `contracts/account/FairWinsVerifyingPaymaster.sol` — 173 lines including the interface it vendors. The digest from `getHash` commits to the op's sender, nonce, `initCode`, `callData`, all five gas fields, the chain id, the paymaster's own address, and a validity window. An approval therefore cannot be replayed on a different op, a different chain, a different paymaster, or after its TTL. Notably absent: any `senderNonce` mapping. Replay of the *same* op is already impossible — the account's own EntryPoint nonce makes each UserOperation single-use — so the paymaster's validation touches no storage at all. Zero-storage, external-call-free validation is the safest posture under ERC-7562's validation rules, which means the contract stays portable to any public bundler later, even though FairWins' own bundler doesn't enforce them.
+The approval signature has to come from somewhere, and *where* is the real policy decision. There's an open standard for exactly this handshake — how a wallet asks a sponsorship service for approval — with two steps: a dummy approval so the wallet can estimate the transaction size, then the real, signed one. Because the FairWins frontend already builds transactions with standard tooling, adopting it made the client-side work nearly free.
 
-The approval travels in `paymasterAndData` with the v0.6 layout: `[paymaster (20)] [validUntil (6)] [validAfter (6)] [signature (65)]` — 97 bytes.
+Rather than stand up a whole new service, FairWins added a sponsorship route to the gateway that already fronts its other gasless features. That gateway already had the three controls sponsorship needs, and the new route reuses them instead of reinventing them:
 
-The economics are equally simple. The contract holds a deposit at the EntryPoint (`deposit()` is permissionless; `withdrawTo` is owner-only), and that deposit *is* the sponsorship pool and the hard loss cap. Polygon mainnet runs at `0xe14554D14eB5DeC47f7824ebeeDa6C9f3A50d105` against the canonical v0.6 EntryPoint (`0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`), recorded in `deployments/`. When the EntryPoint executes a sponsored op, it draws the gas cost from that deposit and reimburses the alto bundler's executor — FairWins pays FairWins's bundler back, per-op, with on-chain accounting.
+1. **A kill switch** — one setting halts all sponsorship instantly; clients quietly fall back to paying their own fee.
+2. **Sanctions screening** — the account is checked against sanctions lists, and it fails closed: if it can't be screened, it isn't sponsored.
+3. **Quotas** — per-account and platform-wide rate limits, so no one account and no single day can drain the pool.
 
-## The decision half: ERC-7677 on the existing gateway
+Two extra ceilings are new, because sponsorship spends real money on every transaction: a sanity limit on transaction size and a worst-case cost cap, so a single deliberately expensive transaction can't burn a big slice of the deposit. Every refusal happens *before* anything is signed, so a rejected request costs the operator nothing.
 
-The signature has to come from somewhere, and *where* is the real policy decision. ERC-7677 standardizes how a wallet client asks a paymaster service for sponsorship: two JSON-RPC methods, `pm_getPaymasterStubData` (a dummy-signature stub so gas estimation sizes `verificationGasLimit` correctly) and `pm_getPaymasterData` (the real, signed approval). Because the frontend already builds UserOps with viem, adopting the standard meant the client work was nearly free — `createPaymasterClient` pointed at the endpoint, unmodified.
+That signature comes from a securely managed cloud key service — the gateway never holds the raw signing key. Critically, the gateway **refuses to start** if its signing key doesn't match the signer the on-chain contract expects. A mismatch that would otherwise silently break every sponsorship instead fails loudly at deploy time, where someone will notice.
 
-Rather than stand up a paymaster microservice, spec 050 added `POST /v1/paymaster` to the relay gateway that already fronts FairWins' relayed-intent rail (spec 036). That gateway already had the three controls sponsorship needs, and the paymaster route composes the *same modules* rather than reimplementing them (`services/relay-gateway/src/paymaster/policy.js`):
-
-1. **Killswitch** — one env flag halts all sponsorship within a single request cycle; clients fall back to self-submit.
-2. **Sanctions screening** — keyed off the smart-account address, fail-closed, same screen the intent path uses.
-3. **Quotas** — per-account (6 ops/min, 25/day) and global (500/day) rate limits.
-
-Two ceilings are new, because sponsorship spends real money per op: a gas-units sanity cap (3M gas; a deploy-plus-transfer runs under ~2M) and a worst-case cost cap (`totalGas × maxFeePerGas ≤ 2 POL`), so a single deliberately expensive op can't burn a large slice of the deposit. Every refusal happens *before* signing — a refused request costs the operator nothing. Only a granted op reaches step nine of the pipeline: the actual signature.
-
-That signature comes from Google Cloud KMS. The gateway holds no key material; `services/relay-gateway/src/paymaster/sign.js` derives the signer's Ethereum address from the KMS public key at boot, then signs each approval digest via `asymmetricSign`, normalizing the DER output to a low-S 65-byte `{r,s,v}` signature. The contract's `verifyingSigner` is set to that derived address, and the gateway **refuses to boot** if its KMS key doesn't match the on-chain signer — a config drift that would silently break every sponsorship instead fails loudly at deploy time.
-
-One discipline deserves its own paragraph: the digest is computed in two codebases. `FairWinsVerifyingPaymaster.getHash` (Solidity) and `getHash` in `services/relay-gateway/src/paymaster/build.js` (JS) must stay byte-identical — thirteen ABI-encoded fields in exact order — or every sponsored op fails with an opaque `AA34`. A cross-check test deploys the real contract and asserts the two implementations agree, the same struct-sync discipline FairWins already applies to its EIP-712 intent types.
+One discipline is worth calling out: the "stamp" being signed is computed in two separate codebases — the contract and the gateway — and they must produce byte-for-byte identical results, or every sponsored transaction fails. A cross-check test deploys the real contract and asserts the two agree.
 
 ## Never stranded, never dishonest
 
-Sponsorship is best-effort infrastructure, and the platform rule is that optional infrastructure never strands a user. The frontend treats *any* failure to obtain sponsorship — endpoint down, killswitch, quota, sanctions refusal, network error — identically: rebuild the bundler client without a paymaster and retry once, self-funded (`frontend/src/lib/passkey/sendBatch.js`). There's a subtle trap here the code comments call out: an op that reverts in bundler *simulation* (say, a transfer exceeding the account's balance) must be surfaced, not retried — a self-funded retry would revert identically and mask the real error behind a confusing `AA21`. So the fallback classifier lets only genuine sponsorship/transport failures through.
+Sponsorship is a nice-to-have, and the platform rule is that a nice-to-have must never strand a member. So the app treats *every* failure to get sponsorship — service down, kill switch on, quota hit, screening refusal, network blip — identically: rebuild the transaction to pay its own fee and quietly retry once.
 
-The disclosure follows the same honesty rule that produced this feature in the first place. The account builder returns a `sponsored` boolean — true only when a paymaster is actually wired for this attempt — and the confirm UI renders from it: "Gasless — no network fee" when true, "You pay the POL network fee" when false, including the exact shortfall if the account lacks the native token to self-fund. On networks with no deployed paymaster, the config simply omits the sponsor URL and the path behaves exactly as before, honest copy included. Spec 050's success criteria demand the disclosure match the outcome in 100% of cases; the mechanism makes that structural rather than aspirational.
+There's a subtle trap the code is careful about. If a transaction would fail on its own merits — say, sending more than the account holds — that's not a sponsorship failure and must not be silently retried, because the retry would fail identically and hide the real reason. So the fallback only kicks in for genuine sponsorship or network failures.
 
-## Design decisions
+The disclosure follows the same honesty rule that created this feature. The system tracks a single fact: was this transaction actually sponsored? The confirm screen renders straight from it — "Gasless — no network fee" when true, "You pay the network fee" when false, including the exact shortfall when the account can't cover it. The rule that the words must match reality is built into the mechanism, not left to good intentions.
 
-**Stay on EntryPoint v0.6.** EntryPoint v0.7 is newer, but the deployed account factory, the Coinbase smart-account implementation, and alto are all v0.6 — and migrating changes every deterministic account *address*, orphaning deployed accounts and any funds sent to their counterfactual addresses. Not worth it for a paymaster. The v0.6 verifying pattern is the most well-trodden path in AA.
+## Why we built it this way
 
-**Verifying, not ERC-20.** A fee-in-USDC paymaster was considered and rejected: it needs a price oracle, token-pull-and-refund accounting, and an approval in the first op — more contract surface, more failure modes, for an outcome where the user still pays. Sponsoring is the smallest pattern and the only one that makes "no network fee" literally true.
+**Sponsor the fee, don't charge it in stablecoin.** An alternative was a paymaster that quietly takes a little USDC to cover the fee — but that needs price feeds, extra accounting, and an approval step, all for an outcome where the member still pays. Sponsoring is the smallest pattern and the only one that makes "no network fee" literally true.
 
-**Self-hosted, eyes open.** Rejecting vendor paymasters costs real work — KMS plumbing, quota design, runway monitoring — and buys independence: no vendor coupling of bundler to paymaster, no per-op markup, and policy (sanctions, quotas, killswitch) enforced in FairWins' own gateway rather than a third party's dashboard.
+**Self-hosted, eyes open.** Refusing outside vendors costs real work — key management, quota design, watching the runway — and buys independence: no vendor lock-in, no per-transaction markup, and every policy decision enforced in FairWins' own gateway.
 
-**Bounded compromise blast radius.** A stolen `verifyingSigner` key can approve sponsorships — spending the deposit on other people's gas — but *cannot withdraw funds*; withdrawal is owner-only, and the owner key lives on FairWins' air-gapped floppy keystore. Worst-case loss is the deposit, throttled by quotas, cut off by the killswitch, and recovered by rotating the signer via `setVerifyingSigner` (`docs/runbooks/paymaster-operations.md`). Never overfunding the deposit — topping up on a 48-hour runway alert instead — keeps that worst case small by policy, not hope.
+**A small, bounded blast radius.** If the approval-signing key were ever stolen, the thief could approve sponsorships — wasting the deposit on other people's fees — but *could not withdraw a cent*: withdrawal is restricted to a separate owner key kept in offline, air-gapped storage. The worst case is capped at the deposit, throttled by quotas, cut off by the kill switch, and cleaned up by rotating to a new signer. Keeping the deposit deliberately small keeps that worst case small by policy, not by hope.
 
-**Identity-open eligibility.** Sponsorship isn't gated on membership tier. Any passkey account that passes screening and is within quota qualifies; spend is bounded by the ceilings, the pool, and the killswitch rather than by narrowing who benefits.
+**Open to everyone.** Sponsorship isn't reserved for higher membership tiers. Any passkey account that passes screening and stays within quota qualifies — spend is bounded by the ceilings, the pool, and the kill switch, not by narrowing who benefits.
 
-## Sources
+The result: when the confirm screen says "no network fee," it's telling the truth — the app quietly covered it — and when it can't, it says so plainly.
 
-- `specs/050-sponsored-paymaster/spec.md`, `research.md`, `contracts/gateway-paymaster-api.md`
-- `contracts/account/FairWinsVerifyingPaymaster.sol`
-- `services/relay-gateway/src/paymaster/build.js`, `sign.js`, `policy.js`
-- `services/alto-bundler/README.md`
-- `frontend/src/lib/passkey/smartAccount.js`, `frontend/src/lib/passkey/sendBatch.js`
-- `docs/runbooks/paymaster-operations.md`
-- ERC-4337: Account Abstraction Using Alt Mempool — https://eips.ethereum.org/EIPS/eip-4337
-- ERC-7677: Paymaster Web Service Capability — https://eips.ethereum.org/EIPS/eip-7677
-- ERC-7562: Account Abstraction Validation Scope Rules — https://eips.ethereum.org/EIPS/eip-7562
+## Further reading
+
+- The ERC-4337 account-abstraction standard (smart-contract wallets): <https://eips.ethereum.org/EIPS/eip-4337>
+- ERC-7677, the paymaster / sponsorship web-service standard: <https://eips.ethereum.org/EIPS/eip-7677>
+- What "gas" is, in plain terms (ethereum.org): <https://ethereum.org/en/developers/docs/gas/>

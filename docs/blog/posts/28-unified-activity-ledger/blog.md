@@ -1,142 +1,75 @@
-# The Unified Activity Ledger: One Timeline From Five Disagreeing Sources
+# One Timeline From Five Sources That Kept Disagreeing
 
-*How FairWins merges wagers, transfers, pools, earn, and memberships from subgraph and RPC into a single chronological feed that the dashboard, the transfer list, and the tax report can never contradict.*
+*How FairWins merges wagers, transfers, pools, earn, and memberships into a single activity feed so the dashboard, the transfer list, and the tax report can never contradict each other.*
 
 | | |
 |---|---|
 | **Series** | Multi-chain Infrastructure (part 3) |
-| **Audience** | Full-stack and data engineers |
-| **Tags** | `activity-feed`, `indexing`, `data-modeling`, `the-graph`, `rpc`, `full-stack` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product managers, founders, and curious builders |
+| **Tags** | `activity-feed`, `data-quality`, `product`, `blockchain` |
+| **Reading time** | ~7 minutes |
 
 ---
 
-## The bug that only a ledger could kill
+## The bug that only a single source of truth could kill
 
-A member opens the Account tab and sees a wager payout dated "20645d ago." Fifty-six years in the future, more or less — the classic Unix epoch-zero timestamp rendered as a relative time. On the same screen, the running profit-and-loss tile disagrees with the number at the top of the tax report they downloaded ten minutes earlier. Neither figure is wrong, exactly; they were computed by two different code paths reading two different sources, and the paths had quietly drifted.
+A member opens their Account tab and sees a wager payout dated "20645d ago" — fifty-six years in the future, roughly. On the same screen, the running profit-and-loss tile disagrees with the total on the tax report they downloaded ten minutes earlier. Neither number is exactly *wrong* — they were each calculated by a different part of the app, reading a different source, and over time the two had quietly drifted apart.
 
-This is the ordinary fate of an activity feed that grows one feature at a time. FairWins accumulated six surfaces that each answered "what happened to my money?" in isolation: the Account dashboard derived wager transfers from cached wager state; the Pay & Transfer activity tab read a local `transferStore`; the tax report enumerated `WagerTransfer` rows from the subgraph; pools, earn, and membership purchases each had their own read path. The dashboard used synthetic timestamps and empty transaction hashes because deriving-from-state is all it had. The report used real block times and real hashes because the subgraph gives you those. When the two are supposed to sum to the same P&L, they can't — not reliably, not across a subgraph-less network like Mordor where one of them has no data at all.
+This is the ordinary fate of an activity feed that grows one feature at a time. FairWins had ended up with six different screens that each answered the same question — "what happened to my money?" — in isolation. The dashboard estimated wager transfers from whatever it had cached; the transfer tab read a small list kept on your device; the tax report pulled its rows from the blockchain index; pools, earn, and memberships each had their own path. And these sources have different fidelity: the blockchain index gives you real transaction times and IDs, while the cached-estimate path has neither, so it invented placeholder timestamps and left the transaction ID blank. When two screens that should add up to the same profit-and-loss are built on sources of different quality, they can't reliably agree — and on a network with no blockchain index at all, one of them has no data to show.
 
-Spec 051 — the unified activity ledger — replaces all six read paths with exactly one. The Account tab, the transfer activity list, `useAccountStats`, and the CSV/PDF tax report now consume the same normalized entry stream. That is the whole point of the design: **their line items and totals are structurally incapable of disagreeing, because there is only one place the numbers come from.** No new backend, no new subgraph entity, no contract change. The entire feature is a client-side aggregation layer living in `frontend/src/data/ledger/`.
+The fix was to replace all six reading paths with exactly one. Today the Account tab, the transfer list, the profit-and-loss tile, and the tax report all draw from the same normalized stream of activity, so their line items and totals are *structurally incapable* of disagreeing — there is only one place the numbers come from. No new server, no change to the blockchain index, no smart-contract change — just one shared layer, living in the app, that gathers and reconciles everything.
 
 ## The shape of one entry
 
-Everything the ledger does hangs off a single canonical value object, the `LedgerEntry`. Heterogeneous events — a USDC send, a wager payout, a pool refund, a failed gasless UserOp — all normalize into the same fields so downstream code never branches on "what kind of thing is this." The vocabulary is frozen in one file, `frontend/src/data/ledger/constants.js`, and shared by sources, repository, UI, and report:
+Everything hangs off a single, uniform record. A dollar send, a wager payout, a pool refund, a failed gasless transaction — they all flatten into the same fields, so the rest of the app never has to ask "what kind of thing is this?" before displaying it. Each record carries a category (wager, transfer, earn, pool, or membership), a more specific kind, a direction, a status, the amount, an optional US-dollar value, a transaction ID and timestamp where those exist, and — crucially — where the record came from. That last field, the record's origin, is how the system decides which of two records describing the same real event should win.
 
-```js
-export const LEDGER_CLASS = Object.freeze({
-  WAGER: 'wager', TRANSFER: 'transfer', EARN: 'earn',
-  POOL: 'pool', MEMBERSHIP: 'membership',
-})
-export const LEDGER_STATUS = Object.freeze({
-  SETTLED: 'settled', PENDING: 'pending',
-  FAILED: 'failed', CANCELLED: 'cancelled',
-})
-export const PROVENANCE = Object.freeze({
-  ONCHAIN: 'onchain', DERIVED: 'derived', CLIENT: 'client',
-})
-```
+## Three kinds of origin, one identity
 
-An entry carries a `class` and a class-specific `kind` (`deposit`, `payout`, `refund`, `send`, `pool_claim`, `voucher_purchase`, and so on), a `direction` (`in` / `out` / `none`), a `status`, the exact `amountRaw` in chain units, an optional `valueUsd` with a `valuationStatus`, a `txHash` and `timestamp` where they exist, and — crucially — a `provenance`. Provenance is not decoration. It is how the merge layer decides which of two rows describing the same event wins.
+Reconciliation begins with identity: every record gets a stable ID reflecting where it came from. There are three origins.
 
-## Three namespaces, one identity
+- **On-chain.** Read directly from confirmed blockchain history, always carries a real transaction ID. This is the high-fidelity truth.
+- **Derived.** Reconstructed from on-chain *state* when there is no indexed event to read — the fallback for networks with no blockchain index. Its ID is built only from the durable facts of the event — network, wager, kind, party — and never from a timestamp or random value, so recomputing yields the same ID every time. That repeatability lets a constantly re-polling system add records without creating phantom duplicates.
+- **Client-only.** Exists solely on this one device. A gasless transaction that failed before the chain ever recorded it lives here.
 
-Reconciliation begins with identity. Every entry gets a stable `entryId` in a namespace that mirrors its provenance, built by pure functions in `frontend/src/data/ledger/identity.js`:
+## The merge: a fixed pecking order, not guesswork
 
-```js
-export function onchainEntryId({ chainId, txHash, logIndex }) {
-  return `oc:${Number(chainId)}:${txHash}:${logIndex ?? 'x'}`
-}
-export function derivedWagerEntryId({ chainId, wagerId, kind, party }) {
-  return `dv:${Number(chainId)}:wager:${String(wagerId)}:${kind}:${String(party || '').toLowerCase()}`
-}
-export function clientEntryId(uuid) {
-  return `cl:${uuid}`
-}
-```
+The hard part of any unified feed is deciding what to do when the same real-world event shows up from two sources at once. FairWins does not try to compare-and-patch the two versions; it applies a fixed pecking order and drops or folds the loser. The rules are short:
 
-- `oc:` — on-chain, re-derivable, always carries a `txHash`. The high-fidelity truth.
-- `dv:` — derived from on-chain *state* when there is no indexed event to read (a subgraph-less network). Deterministic, so re-deriving on the next poll produces a byte-identical id and nothing duplicates.
-- `cl:` — client-only, existing solely on this device. A failed UserOp the chain never recorded lives here.
+1. **Same ID, first one wins** — records with the same ID are identical by construction, so this is just de-duplication.
+2. **On-chain beats derived for the same event.** Both the real indexed record and its derived stand-in are stamped with a shared key identifying the underlying event, so when a genuine on-chain record exists, the derived placeholder is dropped entirely.
+3. **Client-only folds into on-chain.** A device-only record that later matches a confirmed on-chain one isn't shown twice: the on-chain record wins the financial details and absorbs whatever extra context the local record carried.
 
-The derived id is the subtle one. Because it hashes only `(chainId, wagerId, kind, party)` — not a timestamp, not a nonce — calling `list()` twice yields the same id both times. Re-derivation is idempotent, which is what makes an append-only, poll-driven system safe.
+That logic is the antidote to the original bug. The old dashboard made the low-fidelity estimated path primary everywhere; the new design inverts it — the real indexed source is primary, the estimate is a clearly flagged fallback that yields the instant real data arrives, and dashboard and report agree because they read the same merged output.
 
-## The merge: precedence, not reconciliation
+## Sources that can fail without breaking the feed
 
-The hard part of any unified feed is what to do when the same real-world event shows up from two sources. FairWins does not "reconcile" in the sense of comparing and patching; it applies a fixed precedence and drops or folds the losers. The logic is in `mergeEntries` in `identity.js`, and it runs in three passes:
+Each activity domain — wagers, transfers, pools, earn, memberships — is handled by its own small adapter that only reads: none writes anything, crashes on an empty history, or returns data for the wrong network.
 
-1. **Union by `entryId`.** First occurrence wins. Append-only records with the same id are identical by construction, so this is a set union.
-2. **`oc:` beats `dv:` for the same underlying event.** Both the subgraph row and the derived fallback stamp the same `refs.dedupKey` — `wager:{wagerId}:{kind}` — so when a real indexed event exists, the derived stand-in for that event is filtered out entirely.
-3. **`cl:` folds into `oc:` by `txHash`.** A client record that later matches a confirmed on-chain entry is not shown twice: the on-chain entry wins the financial fields and gains the client record's context (its `route`, its linked id) as annotations.
+The feed runs all those adapters at once and waits for each to settle. The important property: if one fails, the feed does not go blank — that category is marked temporarily stale, and the app *discloses that honestly*. So if the blockchain index is down but your local transfer list is healthy, you still see your transfers, with a visible note that pool and membership history is momentarily out of date. Graceful degradation, earned one adapter at a time.
 
-```js
-merged = merged.filter(
-  (e) => !(namespaceOf(e.entryId) === 'dv'
-        && e.refs?.dedupKey
-        && onchainDedupKeys.has(e.refs.dedupKey)),
-)
-```
+## Rules that keep the numbers honest
 
-That single filter is the antidote to the original bug. The old Account tab made the derived path primary everywhere; the ledger inverts it — subgraph transfers are primary (they carry the `txHash` and real block time the tax report needs), and the derived path is a clearly flagged fallback that yields the moment real data arrives. Dashboard and report agree because they read the *same* merged output, with the *same* precedence, from the same query.
+Before any record is shown, a normalization step enforces the guarantees that killed the original defects:
 
-## Sources that fail without failing the ledger
+- **A timestamp is either a real date or explicitly nothing — the placeholder "zero" date never survives.** A missing or zero time becomes an honest "date unavailable," so "20645d ago" is now impossible.
+- **A failed operation counts as moving no money.** Failed items are still *listed everywhere* — a failed gasless send, with the exact reason it failed, is first-class history — but excluded from every total.
+- **An asset with no known price is flagged, never silently valued at zero,** so it can't quietly skew your profit-and-loss.
+- **Records are strictly scoped to the network you asked about,** so one network's data can never leak into another's totals.
 
-Each activity domain is a `LedgerSource` adapter under `frontend/src/data/ledger/sources/`, implementing a deliberately small contract: a `class` string and an async `list(ctx)` that performs reads only, never writes a store, never throws on empty history, and never returns an entry for a chain other than the one queried. The wager source (`wagerLedgerSource.js`) is the richest — it tries the subgraph's `WagerTransfer` rows first and, on a subgraph-less network, falls back to `deriveTransfersFromWagers` with block times hydrated by a bounded RPC scan:
+## Durability without keeping a dossier
 
-```js
-const indexed = await listTransfers({ account })
-if (indexed !== null && indexed !== undefined) {
-  return indexed.map((row) => wagerTransferToEntry(row, { chainId, account }))
-}
-// Subgraph-less network — derive from wager state (the My Wagers truth).
-let wagers = await listWagers({ account, chainId })
-wagers = await hydrate(wagers, chainId)   // real block times, bounded scan
-const derived = deriveTransfersFromWagers({ wagers, address: account })
-return derived.map((row) => derivedTransferToEntry(row, { chainId, account }))
-```
+On-chain and derived records are never stored — they rebuild from public blockchain data on any device, which keeps backups tiny and keeps FairWins from hoarding a profile of your activity. Only the device-only records need durable storage, kept as an append-only log inside the platform's existing encrypted backup and merged by de-duplication on restore, so history is never destructively overwritten.
 
-The repository (`ledgerRepository.js`) assembles all sources with `Promise.allSettled`. A source that rejects does not blank the feed — its class is added to `staleClasses`, which the UI discloses honestly rather than hiding:
+## Why we built it this way
 
-```js
-settled.forEach((res, i) => {
-  if (res.status === 'fulfilled') collected.push(...res.value)
-  else staleClasses.push(sources[i].class)
-})
-```
+- **Reconcile in the app, not on a server.** A server-side ledger would only see traffic that passed through our relayer, would add another thing that has to be online, and would mean keeping a dossier of every member's activity — against the platform's privacy stance. Every source was already readable from the app; all that was missing was one layer to gather and reconcile it.
+- **A fixed pecking order beats fuzzy reconciliation.** Assigning every event an origin and applying one clear precedence rule is simpler and more predictable than comparing two versions and patching them together — and repeatable derived IDs make it safe to run over and over.
+- **Honest degradation, and known limits stated plainly.** Stale categories, unpriced assets, and unavailable dates are all surfaced so limits are disclosed, never hidden; automatic cleanup can never touch the current or previous tax year. Earn actions taken outside the app aren't in the feed, and pool and membership history need the network's blockchain index — on index-free networks those return an honest empty list rather than a wrong guess.
 
-So if the subgraph is down but the local transfer store is healthy, you still see your transfers, with a visible note that pool and membership history is temporarily stale. Graceful degradation is a property of the whole ledger, earned one source boundary at a time.
+The result is boring in the best possible way: one reading path, five categories, three kinds of origin — and a dashboard and tax report that finally read from the same page.
 
-## Invariants that make the numbers honest
+## Further reading
 
-Normalization (`normalize.js`) is where pre-items become validated entries, and it enforces the guarantees that kill the original defects:
-
-- **`timestamp` is real epoch milliseconds or `null` — the value `0` never survives.** A missing or zero time becomes `null` with `timestampProvenance: 'unavailable'`, and `formatRelativeTime` returns `null` for invalid input so the UI renders an explicit "date unavailable." The "20645d ago" render is now unreachable.
-- **`status: 'failed'` forces `direction: 'none'`.** Failed operations moved no value. They are *listed everywhere* — a failed gasless send with its verbatim bundler reason is first-class history — but excluded from every total by the summary helpers, not by omission.
-- **`valuationStatus: 'unvalued'` entries are flagged, never zeroed or dropped.** An asset with no price source is honestly marked, so it can't silently distort a P&L.
-- **Entries are strictly scoped to the queried `chainId`;** normalization throws if a source leaks a cross-chain row.
-
-Because the repository returns immutable value objects and never mutates a returned entry, these invariants hold all the way to the render layer.
-
-## Durability without a dossier
-
-On-chain and derived entries are never persisted — they re-derive from public data on any device, which keeps backups small. Only the `cl:` records (failed UserOps, in-flight sends) need durable storage, and they live in an append-only `ledgerClientStore`: a status transition appends a superseding record via `refs.supersedes` rather than mutating history. That store rides along in the spec-032 encrypted backup as the `activityLedger` synced object, merged by `entryId` union in both restore modes — a destructive replace would violate the audit guarantee. A one-time, marker-guarded `migrate.js` imports the legacy `fairwins.transfers.v1` log with id-stable mapping, so pre- and post-migration data dedup cleanly.
-
-## Design decisions
-
-- **Client-side aggregation over a server ledger.** A relay-gateway ledger would only ever see relayed traffic, would add an availability dependency, and would violate the platform's no-dossier privacy stance. Every source the ledger needs already had a client read path; what was missing was one normalization and merge layer.
-- **Precedence over reconciliation.** Rather than compare-and-patch, the merge assigns each event to a namespace and applies a fixed `oc: > dv:`, `cl:`-folds-into-`oc:` order. Deterministic derived ids make this idempotent under polling.
-- **Subgraph primary, derived fallback — the inverse of the old dashboard.** This is the single change that lets the report and the dashboard agree: both consume the same merged stream where the high-fidelity source always wins.
-- **Honest degradation as a first-class output.** `staleClasses`, `prunedBefore`, `valuationStatus`, and `timestampProvenance` are all returned to the UI so limits are disclosed, never hidden. Pruning can never touch the current or previous tax year.
-- **Known limits, stated plainly.** Earn actions made outside the app aren't in the ledger (there's no fixed vault registry to scan); pool and membership history require the chain's subgraph and return an honest empty list on RPC-only networks.
-
-The result is boring in the best way. One read path, five classes, three provenance namespaces, and a merge that a test suite can pin down completely because every function in it is pure.
-
-## Sources
-
-- `specs/051-unified-activity-ledger/spec.md`, `plan.md`, `research.md` (decisions D1–D9), `data-model.md`
-- `specs/051-unified-activity-ledger/contracts/ledger-source.md`, `ledger-entry.md`, `backup-object.md`
-- `docs/developer-guide/activity-ledger.md`
-- `frontend/src/data/ledger/`: `ledgerRepository.js`, `identity.js`, `normalize.js`, `constants.js`, `ledgerClientStore.js`, `migrate.js`, `timestamps.js`
-- `frontend/src/data/ledger/sources/`: `wagerLedgerSource.js`, `transferLedgerSource.js`, `poolLedgerSource.js`, `earnLedgerSource.js`, `membershipLedgerSource.js`
-- The Graph documentation — https://thegraph.com/docs/
-- Unix epoch / timestamp conventions — https://en.wikipedia.org/wiki/Unix_time
+- The Graph — how blockchain data gets indexed for apps to read: https://thegraph.com/docs/
+- Unix time — why a "zero" timestamp renders as a date decades off: https://en.wikipedia.org/wiki/Unix_time
+- For more on how FairWins is built, see the FairWins developer documentation.

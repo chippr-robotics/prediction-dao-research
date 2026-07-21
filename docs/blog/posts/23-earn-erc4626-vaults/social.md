@@ -1,27 +1,27 @@
-# Social & Image — Earn Without Custody Surprises
+# Social & Image — Earn Without Surprises
 
 ## X (Twitter)
 
-Idle USDC between wagers should earn — without custody and without a hidden skim. FairWins deposits straight into Morpho ERC-4626 vaults, and charges its platform fee atomically via a FeeRouter that reverts if the live rate ever exceeds the bps you saw at signing. 🔗 <link>
+Idle stablecoins between wagers should earn — without custody and without a hidden skim. FairWins deposits straight into Morpho's shared yield pools, and charges its platform fee openly in the same transaction, refusing to charge more than the rate you saw at approval. 🔗 <link>
 
-#DeFi #ERC4626 #SmartContracts
+#DeFi #yield #transparency
 
 ## LinkedIn
 
-Every consumer crypto "earn" feature faces two tempting shortcuts: take custody and become an asset manager, or route into someone else's protocol and quietly keep a slice of the yield. FairWins refused both.
+Every consumer crypto "earn" feature faces two tempting shortcuts: take custody and become an asset manager, or route into someone else's yield product and quietly keep a slice of the return. FairWins refused both.
 
-Our new Earn section (spec 050 + 060) deposits idle stablecoins directly from the member's account into curated Morpho ERC-4626 vaults — FairWins never holds funds — and monetizes it with a single honest fee. The post walks through both layers:
+Our new Earn feature deposits idle stablecoins directly from the member's own account into curated, third-party yield pools run by Morpho — FairWins never holds the funds — and monetizes it with a single honest fee. The post walks through both halves:
 
-- Non-custodial ERC-4626 integration: exact-amount approvals, staticCall dry-runs, `redeem` on full exits so share dust never strands.
-- The `FeeRouter`: one on-chain source of truth, each fee a `bytes32 serviceId` with an immovable hard cap (250 bps max on wrapped services).
-- Atomic charging: `depositToVaultWithFee` takes the fee and deposits the remainder in one transaction — any failing leg reverts everything.
-- Honest disclosure: `maxFeeBps` is a consent ceiling; a member can never pay more than the rate shown on the confirm screen, and a failed rate read blocks the deposit rather than guessing zero.
+- No custody: exact-amount approvals, a dry run before you sign, and a clean full-exit so no leftover dust gets stranded.
+- One on-chain price list: every fee has a permanent ceiling it can never exceed (2.5% max on fees FairWins charges directly).
+- All-or-nothing charging: the fee and the deposit happen in one transaction — any failing step reverts everything.
+- Honest disclosure: the rate you see at approval is a hard limit; you can never pay more, and if the rate can't be confirmed the deposit is blocked rather than guessed.
 
-The rule that generalizes all of it: the member either sees the true number, or the action doesn't happen.
+The rule that generalizes all of it: the member either sees the true number, or the action doesn't happen. 🔗 <link>
 
-How does your team handle fee disclosure when integrating third-party DeFi protocols? 🔗 <link>
+How does your team handle fee disclosure when building on top of third-party protocols?
 
-#DeFi #ERC4626 #SmartContracts #Solidity #FinTech
+#DeFi #yield #transparency #fintech #noncustodial
 
 ## Image prompt (Gemini / Nano Banana)
 

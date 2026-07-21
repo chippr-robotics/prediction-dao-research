@@ -1,144 +1,83 @@
-# One Ciphertext, N Wrapped Keys: Multi-Recipient Encryption for Private Wagers
+# One Locked Box, Several Keyholders: How a Private Wager Can Add a Referee
 
-*How FairWins lets two participants and a neutral arbitrator each decrypt the same payload — without re-encrypting it for anyone*
+*How FairWins lets two players and a neutral referee each open the same encrypted agreement — without making a second copy for anyone*
 
 | | |
 |---|---|
 | **Series** | Privacy Architecture (part 2 of 4) |
 | **Part** | Follows [Envelope encryption for private prediction markets](../../private-prediction-markets-envelope-encryption.md) |
-| **Audience** | Applied cryptography engineers |
-| **Tags** | `encryption`, `key-wrapping`, `privacy`, `cryptography` |
-| **Reading time** | ~9 minutes |
+| **Audience** | Product, founders, and the crypto-curious |
+| **Tags** | `encryption`, `privacy`, `plain-english` |
+| **Reading time** | ~7 minutes |
 
-> **Important note**: As in part 1, the private wagers described here are based on publicly available information and legitimate forecasting. Encryption protects competitive intelligence and trading strategies — not illegal activity. All participants remain fully subject to applicable laws and compliance obligations.
+> **Important note**: As in part 1, the private wagers described here are based on publicly available information and legitimate forecasting. Encryption protects competitive intelligence and trading strategy — not illegal activity. All participants remain fully subject to applicable laws and compliance obligations.
 
-## The Third Reader Problem
+## The third-reader problem
 
-In part 1 of this series, Sarah and Marcus made a 50,000 USDC private wager on a pharmaceutical merger. Their terms lived encrypted on IPFS; the chain held only a reference. Exactly two people on Earth could read the plaintext, and the smart contract guaranteed settlement anyway.
+In part 1, Sarah and Marcus made a 50,000 USDC private wager on a pharmaceutical merger. Their terms lived encrypted in public storage; the blockchain held only a reference. Exactly two people on Earth could read the agreement, and the smart contract guaranteed the money would settle correctly anyway.
 
-That design had a quiet casualty: arbitration. Some wagers can't be resolved by an oracle — "the merger closes before Q3" maps cleanly to a Polymarket condition, but "our redesign ships before yours" does not. For those, FairWins supports a `ThirdParty` resolution type where a neutral human declares the winner. And here the two-reader envelope broke down completely. The arbitrator could be *named* on-chain and *authorized* to call `declareWinner` — but they could not read the terms they were supposed to rule on, and they couldn't even enumerate the wagers naming them. The feature was disabled in the app: a resolver who can't see the agreement is worse than no resolver.
+That design had a quiet casualty: refereeing. Some bets settle themselves — "the merger closes before Q3" can be checked against a public prediction market. But "our team's redesign ships before yours" cannot. Those bets need a neutral human to read the terms and declare a winner. And here the two-reader setup fell apart. The referee could be named on the blockchain and given authority to call the result — but they couldn't read the agreement they were supposed to judge, or even find the wagers that named them. So the feature sat disabled. A referee who can't see the contract is worse than no referee.
 
-The naive fixes are all bad. Re-encrypt the whole payload once per reader, and storage grows linearly while the copies can silently diverge — three ciphertexts that may not decrypt to the same terms is a dispute generator, not a dispute resolver. Share one symmetric key among all readers out-of-band, and you've reinvented the key-distribution problem the system exists to avoid. Give the platform a master key so it can grant access, and you've abandoned end-to-end encryption entirely.
+The obvious fixes are all bad. Make a fresh encrypted copy for each reader, and you now have several copies that can quietly drift apart — a recipe for disputes, not a way to settle them. Share one password by email or chat, and you've reinvented the exact problem the system exists to avoid. Give the platform a master key, and you've thrown away the whole promise that no one but the players can read the bet.
 
-The actual fix — FairWins spec 005 — required zero changes to the cryptography. The envelope format was multi-recipient from day one. What changed is *who gets counted as a recipient*, plus a one-line contract change so arbitrators can find their wagers. This post walks the mechanism that made that a config change instead of a redesign.
+The real fix needed no new cryptography. The design was already built to have multiple keyholders — it just wasn't using that capability. What changed was *who counts as a keyholder*, plus a tiny bookkeeping tweak so referees can find their cases. This post walks the mechanism that turned a redesign into a settings change.
 
-## One DEK, a Wrapped Key per Reader
+## One locked box, one key per person
 
-The envelope scheme (implemented in `frontend/src/utils/crypto/envelopeEncryption.js`, entirely client-side) separates *content encryption* from *access grants*:
+Think of the system as a locked box. Instead of scrambling the agreement separately for each person, it does something cleverer:
 
-1. Generate a random 32-byte **data encryption key (DEK)**.
-2. Encrypt the wager terms **once** with the DEK using ChaCha20-Poly1305 (RFC 8439) — an AEAD, so tampering fails authentication rather than yielding garbage plaintext.
-3. For each recipient, **wrap the DEK**: run X25519 ECDH between a fresh ephemeral keypair and the recipient's registered public key, derive a key-encryption key (KEK) with HKDF-SHA256, and encrypt the DEK under that KEK.
+1. It picks a fresh, random key and locks the agreement **once**. This is the only copy of the content, sealed with modern authenticated encryption — the kind where tampering makes the box refuse to open rather than spilling out garbage.
+2. Then, for each person allowed in, it locks *that key itself* inside a small personal envelope only that person's wallet can open.
 
-Here is the wrap loop, verbatim from `encryptEnvelope`:
+The result is a single sealed box plus a bundle of personal envelopes — one per reader, each labeled with that reader's wallet address — all built on well-known, independently audited cryptography.
 
-```javascript
-const wrappedKeys = recipients.map(recipient => {
-  const ephemeralKeyPair = generateEphemeralKeyPair()
+This is what makes multiple readers practical. The expensive part — locking the agreement — happens once no matter how many people you add; each extra reader costs one tiny envelope. And because everyone opens the *same* box, there's no question about which copy is the "real" one for a referee to argue over.
 
-  // ECDH to derive shared secret
-  const sharedSecret = x25519.getSharedSecret(
-    ephemeralKeyPair.privateKey,
-    recipient.publicKey
-  )
+Opening it runs in reverse: find the envelope with your address on it, your wallet opens it to recover the shared key, and the key opens the box. Each person's path is independent — if one player's wallet is compromised, the attacker gets that player's envelope, not anyone else's.
 
-  // Derive key encryption key from shared secret
-  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), ENVELOPE_INFO, 32)
+## Where the personal envelopes come from
 
-  // Encrypt DEK with KEK
-  const keyNonce = randomBytes(12)
-  const keyCipher = chacha20poly1305(kek, keyNonce)
-  const wrappedDek = keyCipher.encrypt(dek)
-  ...
-})
-```
+To lock the key for someone, you need their public "lockbox address" — the thing anyone can use to seal a message only they can open. But the person creating the wager may never have met the referee. So FairWins keeps a small public directory on the blockchain mapping each wallet to its current encryption key. Anyone can look up anyone's key; only you can set your own.
 
-The resulting JSON envelope has a single `content` block (nonce + ciphertext) and a `keys[]` array with one entry per reader, keyed by lowercase Ethereum address. Everything uses the audited Noble libraries (`@noble/curves`, `@noble/ciphers`, `@noble/hashes`).
+Users never manage these keys by hand. A regular wallet produces its encryption key by signing one fixed message and turning that signature into a key — same wallet, same key, every device. Passkey accounts (the same Face ID / fingerprint sign-in standard, WebAuthn, your phone already uses) derive the same kind of key from their own secure seed. Either way: nothing to write down, no key server to trust. The directory allows a range of key sizes, leaving room for a future-proof key type (below) without ever changing the contract.
 
-The cost model is what makes multi-recipient practical. Content encryption is O(1) in the reader count; each additional reader costs one ephemeral keypair, one ECDH, one HKDF call, and ~60 bytes of wrapped-key entry. A 5 KB terms document shared with three readers is stored once, not three times — and every reader provably decrypts the *same* ciphertext, so there is no "which copy is canonical" question for an arbitrator to litigate.
+## Making the referee a real reader
 
-Decryption is the mirror image: find your entry in `keys[]`, recompute the shared secret against the stored ephemeral public key, derive the KEK, unwrap the DEK, decrypt the content. Each reader's path is fully independent — compromise of one reader's wallet exposes their wrapped key, not the wrapping of anyone else's.
+With multiple keyholders and a public key directory already in place, "let the referee read the wager" came down to one thing: add a third person to the list of keyholders when a wager names a referee. Two people for a normal bet, three with a referee — who then opens the agreement exactly like a player.
 
-## Where Public Keys Come From
+Three surrounding decisions carry the real design weight:
 
-Wrapping a DEK for someone requires their encryption public key, and the creator may never have communicated with the arbitrator directly. That directory is on-chain: `contracts/privacy/KeyRegistry.sol`, a deliberately minimal contract.
+**Refuse to create a bet the referee can't read.** A wager can only be locked for someone whose encryption key is already in the directory. If the named referee has never registered a key, creation is *blocked* right away, naming who's missing. The alternative — quietly minting a wager whose own referee can never open it, discovered months later at settlement — is far worse than a little friction up front.
 
-```solidity
-contract KeyRegistry {
-    uint256 private constant MIN_KEY_LENGTH = 32;
-    uint256 private constant MAX_KEY_LENGTH = 2048;
+**Finding your cases is public bookkeeping, not guesswork.** Being able to open an agreement is useless if you don't know it exists. So when a wager names a referee, the blockchain quietly adds it to the referee's personal index, alongside the two players. Referees browse their caseload the same way players already do — one extra line in a ledger, no new machinery.
 
-    mapping(address => bytes) private _keys;
+**The blockchain vouches for the sealed box.** The blockchain stores a fingerprint of the sealed agreement. Before trusting anything it fetches, a reader re-checks that fingerprint, so a swapped or corrupted box is *detected*, not shown as real. And if storage is temporarily unreachable, the app says so — the money never waits on the text being available.
 
-    event KeyRegistered(address indexed user, bytes key, uint64 timestamp);
+One honesty point mirrors the platform's approach to fees: when a referee is a reader, the interface says so. Players should never believe a bet is strictly two-party-private when a third keyholder exists.
 
-    function registerKey(bytes calldata publicKey) external { ... }
-    function getPublicKey(address user) external view returns (bytes memory);
-    function hasKey(address user) external view returns (bool);
-}
-```
+## Growing and shrinking the guest list
 
-Keys are opaque bytes bounded to 32–2048 bytes, which is not an accident: it accommodates both a 32-byte X25519 key and a 1216-byte X-Wing hybrid post-quantum key (more below) without a contract change. Re-registering overwrites — the wallet is the identity, the key is just its current encryption endpoint.
+Because access is granted through those little envelopes, changing the guest list never touches the sealed agreement. Any existing reader — not just the creator — can open the shared key and seal a new envelope for a newcomer, with no blockchain transaction at all.
 
-Users never manage these keys. An EOA derives its keypair deterministically from an EIP-191 `personal_sign` of a fixed message; the signature is hashed with Keccak-256 into the private key or seed. Passkey smart accounts (which have no EOA to sign with) derive the same shape of keypair via HKDF from their WebAuthn PRF master seed. Same wallet, same key, every device — nothing to back up, no key server to trust.
+Removal is where the design is honest about its limits. You can strike someone's envelope from the bundle, but that doesn't un-tell them a key they already saw and might have saved. True revocation means re-locking under a brand-new key. FairWins documents this plainly rather than pretending removing a name equals taking back access. Locks grant access; they can't reach into someone's memory.
 
-## Making the Arbitrator a First-Class Reader
+## The future-proof variant
 
-With N-recipient wrapping and an on-chain key directory already in place, spec 005 (`specs/005-multi-recipient-encryption/`) reduced "let the arbitrator read the wager" to recipient assembly at creation time:
+Everything above also runs in a second mode built to resist a future threat: an attacker who records encrypted data today, hoping to crack it years from now once quantum computers mature ("harvest now, decrypt later"). This variant seals each envelope with a hybrid approach (an emerging standard called X-Wing) combining today's proven encryption with a new quantum-resistant method — if *either* holds, your data stays sealed. The envelopes get bigger; the sealed agreement and blockchain footprint don't change, and old and new bets coexist.
 
-```
-recipients = [
-  { address: creator,    publicKey: lookupPublicKey(creator) },
-  { address: opponent,   publicKey: lookupPublicKey(opponent) },
-  // only for ThirdParty wagers with an assigned arbitrator:
-  { address: arbitrator, publicKey: lookupPublicKey(arbitrator) },
-]
-envelope = encryptEnvelope(termsPlaintext, recipients)
-```
+## Why it was built this way
 
-Two without an arbitrator, three with. The arbitrator decrypts exactly like a participant — the decryption hooks already key off `keys[].address` and needed no changes. But three surrounding decisions carry the real design weight:
+- **Reuse the multiple-keyholder capability instead of inventing an "observer" role.** The referee simply *is* a third keyholder who also declares the winner — one more entry in a list that always supported many.
+- **Block creation on a missing key rather than patch it later.** Failing loudly at creation beats failing silently at settlement, at the cost of a little friction: a referee registers a key before being named.
+- **No pretend revocation.** Removing a reader without re-locking is documented as *not* true revocation. Correct-but-limited, stated openly, beats a guarantee the math can't back.
 
-**Fail closed on missing keys (FR-007).** A wager can only be encrypted for a reader whose key is registered. If the named arbitrator has never called `registerKey`, creation is *blocked* with a message naming the missing party — the alternative is silently minting a wager its own resolver can never read, discovered months later at resolution time. The reader set is fixed when the bundle is prepared; late-binding a reader after creation is explicitly out of scope for v1.
+The through-line so far: part 1 encrypted one agreement for two rival readers; part 2 shows the same locked box stretching to whatever readers a wager's life requires. Part 3 turns the same machinery inward — syncing your own private data across your own devices.
 
-**Discovery is on-chain, not cryptographic.** Being able to decrypt a wager is useless if you don't know it exists. The one contract change in spec 005 extends the existing per-user index in `WagerRegistry.createWager`: alongside the creator and opponent, `_userWagerIds[w.arbitrator].add(wagerId)` when an arbitrator is set. Arbitrators enumerate their caseload through the same `getUserWagerIds` reads participants already use — one extra `SSTORE`, no new events or storage variables.
+## Further reading
 
-**Integrity binds off-chain to on-chain.** The envelope lives on IPFS; the wager stores `metadataHash = keccak256("encrypted:ipfs://<CID>")` on-chain. A reader recomputes the hash before trusting a fetched bundle, so a substituted or corrupted envelope is *detected*, never displayed as valid. And if IPFS is unreachable, the terms degrade to an honest "unavailable" state — funds and resolution never block on plaintext availability.
-
-One honest-disclosure point mirrors the platform's fee doctrine: when an arbitrator is a reader, the UI says so. Participants should never believe a wager is two-party-private when a third key entry exists.
-
-## Growing and Shrinking the Reader Set
-
-Because access is granted per wrapped key, membership changes don't touch the content ciphertext. `addRecipient` lets *any existing reader* — not only the creator — unwrap the DEK with their own key and wrap it for a newcomer, appending one entry to `keys[]`. Since the envelope lives off-chain, this needs no transaction.
-
-Removal is where the abstraction is honest about its limits. `removeRecipient` filters an entry out of `keys[]`, and its docstring says the quiet part loud: *"This doesn't re-encrypt — they may still have the DEK cached. For true revocation, create a new envelope with new DEK."* Multi-recipient encryption grants access; it cannot un-know a key someone already held. FairWins documents this rather than pretending deletion equals revocation.
-
-## The Post-Quantum Variant
-
-Everything above runs identically under the v2.0 envelope, which swaps the per-recipient X25519 exchange for **X-Wing** — the IETF hybrid KEM combining X25519 with ML-KEM-768. `encryptEnvelopeXWing` calls `xwingEncapsulate` per recipient (a 1120-byte KEM ciphertext replaces the 32-byte ephemeral key) and derives the KEK from the combined shared secret via the spec's SHA3-256 combiner. If *either* component algorithm holds, the wrap holds — protection against harvest-now-decrypt-later adversaries. The wrapping layer absorbed the ~35× ciphertext growth with no change to content encryption or the on-chain footprint: the chain still stores a ~60-byte reference regardless of how heavy the envelope gets. `decryptEnvelopeUnified` dispatches on the envelope's `algorithm` field, so v1.0 and v2.0 bundles coexist.
-
-## Design Decisions
-
-- **Reuse the N-recipient API instead of adding an "observer" role.** The original request asked for participants plus an observer; the spec resolved the observer *as* the arbitrator, who reads and resolves. No new cryptosystem, no new role machinery — a third entry in an array that always supported N.
-- **Block creation on missing keys rather than late-bind.** Fail loudly at creation beats failing silently at resolution. The trade-off is friction — an arbitrator must register a key before being named — accepted for v1.
-- **Discovery via the registry index, not encrypted scanning.** Trial-decrypting every envelope on IPFS would be private but unusable; an on-chain index write is cheap and reuses existing reads. The trade-off: who arbitrates what is public metadata.
-- **Accept visible recipient addresses.** `keys[].address` is plaintext, so the reader set of any bundle is enumerable. Hiding it would break the "find my entry" decryption step; the design accepts this as consistent with blockchain transparency.
-- **No backward secrecy by design.** Removal without DEK rotation is documented as non-revocation. Correct-but-limited, stated plainly, beats an implied guarantee the math doesn't back.
-
-The through-line of the series so far: part 1 encrypted one agreement for two adversarial readers; part 2 shows the same envelope stretching to any reader set the wager's lifecycle demands. Part 3 turns the same machinery inward — syncing a user's own encrypted data across their devices.
-
-## Sources
-
-- `specs/005-multi-recipient-encryption/spec.md` — requirements, edge cases, decisions
-- `specs/005-multi-recipient-encryption/contracts/encryption-bundle-contract.md` — bundle invariants, recipient assembly
-- `specs/005-multi-recipient-encryption/contracts/wager-registry-arbitrator-index.md` — the arbitrator discovery index
-- `docs/developer-guide/envelope-encryption-spec.md` — primitives, envelope formats, security considerations
-- `docs/developer-guide/encryption-architecture.md` — end-to-end flow and key registry integration
-- `contracts/privacy/KeyRegistry.sol` — on-chain public-key directory
-- `frontend/src/utils/crypto/envelopeEncryption.js` — envelope encryption implementation (v1.0 X25519, v2.0 X-Wing)
-- `docs/blog/private-prediction-markets-envelope-encryption.md` — series anchor (part 1)
-- [RFC 7748 — X25519](https://datatracker.ietf.org/doc/html/rfc7748)
-- [RFC 8439 — ChaCha20-Poly1305](https://datatracker.ietf.org/doc/html/rfc8439)
-- [RFC 5869 — HKDF](https://datatracker.ietf.org/doc/html/rfc5869)
-- [EIP-191 — Signed Data Standard](https://eips.ethereum.org/EIPS/eip-191)
-- [IETF X-Wing hybrid KEM draft](https://datatracker.ietf.org/doc/draft-connolly-cfrg-xwing-kem/)
-- [Noble cryptography libraries](https://paulmillr.com/noble/)
+- [ChaCha20-Poly1305 authenticated encryption (RFC 8439)](https://datatracker.ietf.org/doc/html/rfc8439) — the "tampering makes it refuse to open" property
+- [X25519 key exchange (RFC 7748)](https://datatracker.ietf.org/doc/html/rfc7748) — how two parties agree on a shared key
+- [HKDF key derivation (RFC 5869)](https://datatracker.ietf.org/doc/html/rfc5869)
+- [WebAuthn / passkeys](https://www.w3.org/TR/webauthn-2/) — the Face ID / fingerprint sign-in standard
+- [The X-Wing hybrid post-quantum scheme](https://datatracker.ietf.org/doc/draft-connolly-cfrg-xwing-kem/)
+- [The Noble cryptography libraries](https://paulmillr.com/noble/) — the audited building blocks used here

@@ -2,24 +2,24 @@
 
 ## X (Twitter)
 
-We deployed FairWins to Ethereum Classic and "My Wagers" came back empty — The Graph doesn't index chain 63. Fix: treat the indexer as one swappable source. No subgraph? Read the registry's on-chain pagination views over RPC. eth_call, not eth_getLogs. 🔗 <link>
+We deployed FairWins to Ethereum Classic and "My Wagers" came back empty — The Graph doesn't index that chain, so there was no search index to query. Fix: treat the index as one swappable data source. No index? Read the blockchain directly, using a per-user index baked into the contract instead of a slow log scan. 🔗 <link>
 
 #TheGraph #web3 #multichain
 
 ## LinkedIn
 
-Most multi-chain dApps lean on The Graph for reads — until they deploy to a chain no Graph provider indexes. For us that was Ethereum Classic (chain 63): contracts worked perfectly, but the wager list was empty because there was no indexer to query.
+Most blockchain apps read history through a search-index service — a system like The Graph that watches the chain and answers "show me everything this user did" in milliseconds. Until you deploy to a chain no such service supports. For us that was Ethereum Classic: contracts worked perfectly, but the wager list was empty because there was no index to query.
 
-Our new post walks through how FairWins keeps every read path working when the subgraph isn't there:
+Our new post walks through how FairWins keeps every screen working when the index isn't there:
 
-- Source selection as per-network metadata (`hasSubgraph(chainId)`), not a global flag — a fifth network is a config entry, not a code change.
-- A stable repository boundary so the UI is agnostic to whether a page came from The Graph or direct RPC.
-- Why we read purpose-built on-chain pagination views (`getUserWagerCount` / `getUserWagerIds` / `getUserWagers`) instead of `eth_getLogs` — public RPCs reject wide log ranges.
-- Automatic fallback when a configured indexer errors, and honest degradation for aggregate views that RPC can't cheaply rebuild.
+- "Has an index?" as per-network metadata, not a global flag — a fifth network is a config entry, not a code change.
+- A stable doorway so the interface is agnostic to whether a page came from the index or a direct blockchain read.
+- Why we read a per-user index built into the contract itself instead of scanning the raw event log — public nodes reject wide scans.
+- Automatic fallback when a configured index errors, and honest "unavailable here" messaging for aggregate views a direct read can't cheaply rebuild.
 
 The theme: features should either work, work slower, or say plainly that they can't — and which one happens should be a property of the network config, not a bug.
 
-How do you handle chains your indexing layer doesn't support? 🔗 <link>
+How do you handle chains your indexing service doesn't support? 🔗 <link>
 
 #TheGraph #web3 #blockchain #infrastructure #multichain
 
