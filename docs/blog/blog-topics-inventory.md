@@ -362,15 +362,23 @@ The published post anchors this series; the rest deepen the privacy story.
 - **Quality:** ⭐⭐⭐ — Practical E2EE sync content; moderate reach.
 
 ### 21. The nullifier system
-- **Description:** The nullifier system (`docs/NULLIFIER_SYSTEM.md`,
-  `docs/developer-guide/nullifier-system.md`): preventing double-spend/replay
-  of privacy-preserving actions using nullifiers, a core primitive from the ZK
-  world applied here. How nullifiers are derived, stored, and checked.
+- **Description:** A design-history explainer, corrected during drafting to
+  match the repo. FairWins' "nullifier system" (`docs/NULLIFIER_SYSTEM.md`,
+  `docs/developer-guide/nullifier-system.md`) is **not** a ZK anti-replay
+  nullifier — it is an **archived moderation/blocklist primitive** built on an
+  RSA accumulator with deterministic hash-to-prime
+  (`contracts-archive/security/NullifierRegistry.sol`), with no live
+  deployment. The post explains what a ZK nullifier is (Semaphore/Tornado
+  background), what FairWins actually built and why it shares the
+  set-membership shape, and why it was shelved in favor of the live
+  `SanctionsGuard` + `MembershipManager` compliance path.
 - **Audience:** ZK and privacy engineers.
-- **Tags:** `nullifiers`, `zk`, `privacy`, `replay-protection`.
+- **Tags:** `nullifiers`, `rsa-accumulator`, `privacy`, `design-history`,
+  `moderation`.
 - **Series:** Privacy Architecture (part 4).
-- **Quality:** ⭐⭐⭐⭐ — Nullifiers are catnip for the ZK-curious and
-  underexplained outside pure-ZK contexts.
+- **Quality:** ⭐⭐⭐⭐ — Nullifiers are catnip for the ZK-curious; the honest
+  "what we built, why we shelved it" arc is more interesting than the blurb's
+  original framing.
 
 ---
 
