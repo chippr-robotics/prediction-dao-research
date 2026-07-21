@@ -131,6 +131,23 @@ export async function initMasterSeed({ account, credentialId, deps = {} }) {
   return seed
 }
 
+/**
+ * Bootstrap key material for a SPECIFIC credential even when the account already carries blobs for
+ * other credentials. `initMasterSeed` deliberately refuses a non-empty account (it must never mint a
+ * second seed out from under an existing controller); this is the guarded escape hatch for a
+ * credential that is otherwise dead-ended with no usable seed on this device. The CALLER is
+ * responsible for the safety gate — mint fresh material only when nothing depends on a prior seed
+ * (i.e. no encryption key is published on-chain yet), so a single-device passkey can register
+ * instead of being stranded. Mints a fresh random seed, wraps it for this credential, returns it.
+ */
+export async function initMasterSeedForCredential({ account, credentialId, deps = {} }) {
+  const store = deps.store ?? blobStore()
+  const seed = crypto.getRandomValues(new Uint8Array(32))
+  const kek = await kekForCredential({ credentialId, deps })
+  store.set(account, credentialId, await wrapSeed(kek, seed, deps.subtle))
+  return seed
+}
+
 /** Recover the master seed with one PRF ceremony (returning device or synced credential). */
 export async function unwrapMasterSeed({ account, credentialId, deps = {} }) {
   const store = deps.store ?? blobStore()
@@ -185,6 +202,6 @@ export function capability({ account, credentialId, prfCapable, deps = {} }) {
   if (store.get(account, credentialId)) return { state: 'available' }
   return {
     state: 'unavailable',
-    reason: 'This passkey has no key material yet — add it from a signed-in device (Account → Controllers).',
+    reason: 'This passkey has no key material yet — register your encryption key under Backup & Security, or open FairWins on the device where you first enabled encryption.',
   }
 }

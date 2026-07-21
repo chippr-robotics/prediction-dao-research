@@ -89,6 +89,31 @@ describe('ensurePasskeyEncryptionKeys', () => {
     await expect(
       resolveMasterSeed({ account: ACCOUNT, credentialId: CRED_B, deps: { store, getAssertion: makeAssertion(9) } })
     ).rejects.toMatchObject({ name: 'EncryptionUnavailable' })
+    // The message must NOT point at a non-existent "Account → Controllers" component.
+    await resolveMasterSeed({ account: ACCOUNT, credentialId: CRED_B, deps: { store, getAssertion: makeAssertion(9) } })
+      .catch((e) => {
+        expect(e.message).not.toMatch(/Account → Controllers/)
+        expect(e.message).toMatch(/Backup & Security/)
+      })
+  })
+
+  it('allowInit bootstraps a fresh seed for a stranded credential (single-device register self-heal)', async () => {
+    const store = blobStore(storage)
+    // The account carries a stale/foreign blob for CRED_A, but this device signs as CRED_B and has
+    // no on-chain key — the caller opts into a safe bootstrap instead of dead-ending.
+    await ensurePasskeyEncryptionKeys({
+      account: ACCOUNT, credentialId: CRED_A, deps: { store, getAssertion: makeAssertion(1) },
+    })
+    const keys = await ensurePasskeyEncryptionKeys({
+      account: ACCOUNT, credentialId: CRED_B, allowInit: true, deps: { store, getAssertion: makeAssertion(9) },
+    })
+    expect(keys.publicKey).toHaveLength(32)
+    // The bootstrap wrote a wrapped seed for CRED_B, so a later ceremony unwraps deterministically.
+    expect(store.get(ACCOUNT, CRED_B)).toBeTruthy()
+    const again = await ensurePasskeyEncryptionKeys({
+      account: ACCOUNT, credentialId: CRED_B, deps: { store, getAssertion: makeAssertion(9) },
+    })
+    expect(Array.from(again.publicKey)).toEqual(Array.from(keys.publicKey))
   })
 
   it('requires a bound credential id', async () => {
