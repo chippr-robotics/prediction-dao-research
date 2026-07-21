@@ -237,11 +237,36 @@ nav:
     - Standalone:
       - CallsignRegistry (ENS-Style Naming): blog/posts/33-callsign-registry/blog.md
       - TokenFactory (Templated Minting): blog/posts/34-token-factory/blog.md
+  - Finance Professional Series:
+    - Overview: blog/finance/README.md
+    - Series Inventory: blog/finance-professional-inventory.md
+    - Custody & Settlement:
+      - Self-Custody vs. Qualified Custodians: blog/finance/01-self-custody-vs-qualified-custodians/blog.md
+      - Trustless Escrow & Counterparty Risk: blog/finance/02-trustless-escrow-counterparty-risk/blog.md
+      - Atomic Settlement (DvP at T+0): blog/finance/03-atomic-settlement-dvp/blog.md
+      - Institutional Controls & Multisig: blog/finance/04-institutional-controls-multisig/blog.md
+      - Programmable Spending Policy: blog/finance/05-programmable-spending-policy/blog.md
+    - Money, Yield & Markets:
+      - Stablecoins as a Settlement Asset: blog/finance/06-stablecoins-settlement-asset/blog.md
+      - On-Chain Lending vs. Money Markets: blog/finance/07-onchain-lending-vs-money-markets/blog.md
+      - Tokenized Vaults as Fund Structures: blog/finance/08-tokenized-vaults-fund-structures/blog.md
+      - A Risk Framework for DeFi Yield: blog/finance/09-defi-yield-risk-framework/blog.md
+      - Oracles & Reference-Data Integrity: blog/finance/10-oracles-reference-data-integrity/blog.md
+      - Prediction Markets as Event Contracts: blog/finance/11-prediction-markets-event-derivatives/blog.md
+      - Builder Codes & Best Execution: blog/finance/12-builder-codes-best-execution/blog.md
+    - Compliance, Disclosure & Governance:
+      - Programmatic Compliance & the Travel Rule: blog/finance/13-programmatic-compliance-travel-rule/blog.md
+      - Fee Transparency & Cost Disclosure: blog/finance/14-fee-transparency-cost-disclosure/blog.md
+      - Confidentiality on a Public Ledger: blog/finance/15-confidentiality-public-ledger-mnpi/blog.md
+      - Operational Risk in Upgradeable Systems: blog/finance/16-operational-risk-upgradeable-systems/blog.md
+      - "Assurance: Audits & Formal Verification": blog/finance/17-assurance-audits-formal-verification/blog.md
+      - DAOs & Member-Owned Governance: blog/finance/18-daos-member-owned-governance/blog.md
 
 # Companion social/image-prompt assets live beside each post but are not nav pages.
 not_in_nav: |
   /blog/posts/*/social.md
   /blog/knowledge/*/social.md
+  /blog/finance/*/social.md
   /blog/private-prediction-markets-envelope-encryption.md
 
 extra:
