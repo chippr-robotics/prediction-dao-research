@@ -160,6 +160,59 @@ nav:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
     - Configuration: reference/configuration.md
+  - Engineering Blog:
+    - Overview: blog/posts/README.md
+    - Topic Inventory: blog/blog-topics-inventory.md
+    - Identity & Access:
+      - Role-Based Access Control: blog/posts/01-rbac-operations-control-plane/blog.md
+      - Soulbound Memberships & Vouchers: blog/posts/02-soulbound-memberships-vouchers/blog.md
+      - Sanctions & Compliance Gating: blog/posts/03-sanctions-compliance-gating/blog.md
+    - Accounts & Keys:
+      - Passkey Smart Accounts: blog/posts/04-passkey-smart-accounts/blog.md
+      - Account Recovery & Unified Connect: blog/posts/05-account-recovery-unified-connect/blog.md
+      - Sponsored Gas & Verifying Paymaster: blog/posts/06-sponsored-gas-verifying-paymaster/blog.md
+    - Custody & Multisig:
+      - Safe Multisig Custody: blog/posts/07-safe-multisig-custody/blog.md
+      - Multisig Policy Engine: blog/posts/08-multisig-policy-engine/blog.md
+    - Gasless Rails:
+      - Intent-Based Gasless Payments: blog/posts/09-intent-based-gasless-payments/blog.md
+      - Relayer Gateway Architecture: blog/posts/10-relayer-gateway-architecture/blog.md
+    - Contract Architecture:
+      - UUPS Upgrades & Storage Safety: blog/posts/11-uups-upgrades-storage-safety/blog.md
+      - The Two-Facet Proxy (24 KB Limit): blog/posts/12-two-facet-proxy-24kb/blog.md
+      - Deterministic Singleton Deployment: blog/posts/13-deterministic-singleton-deployment/blog.md
+    - Prediction Markets:
+      - The Wager Lifecycle Contract: blog/posts/14-wager-lifecycle-contract/blog.md
+      - Oracle Adapter Abstraction: blog/posts/15-oracle-adapter-abstraction/blog.md
+      - Draw Resolution & Open Challenges: blog/posts/16-draw-resolution-open-challenges/blog.md
+      - Wager Pools (ERC-1167 Clones): blog/posts/17-wager-pools-erc1167/blog.md
+    - Privacy Architecture:
+      - Envelope Encryption (Published): blog/posts/18-envelope-encryption/blog.md
+      - Multi-Recipient Encryption: blog/posts/19-multi-recipient-encryption/blog.md
+      - Encrypted Data Sync: blog/posts/20-encrypted-data-sync/blog.md
+      - The Nullifier System (Design History): blog/posts/21-nullifier-system/blog.md
+    - Finance Surfaces:
+      - The FeeRouter: blog/posts/22-fee-router/blog.md
+      - Earn (ERC-4626 Vaults): blog/posts/23-earn-erc4626-vaults/blog.md
+      - Predict (Polymarket Builder Codes): blog/posts/24-predict-polymarket-builder-codes/blog.md
+      - Bitcoin (Non-EVM): blog/posts/25-bitcoin-non-evm/blog.md
+    - Multi-Chain Infrastructure:
+      - ClearPath DAO Registry: blog/posts/26-clearpath-dao-registry/blog.md
+      - Indexing Without a Subgraph: blog/posts/27-indexing-without-subgraph/blog.md
+      - The Unified Activity Ledger: blog/posts/28-unified-activity-ledger/blog.md
+    - Security & DevOps:
+      - AI-Driven Security Review in CI: blog/posts/29-ai-security-review-ci/blog.md
+      - Coverage & Audit Gates: blog/posts/30-coverage-audit-gates/blog.md
+      - Symbolic Execution & Fuzzing: blog/posts/31-symbolic-execution-fuzzing/blog.md
+      - Spec-Driven Development: blog/posts/32-spec-driven-development/blog.md
+    - Standalone:
+      - CallsignRegistry (ENS-Style Naming): blog/posts/33-callsign-registry/blog.md
+      - TokenFactory (Templated Minting): blog/posts/34-token-factory/blog.md
+
+# Companion social/image-prompt assets live beside each post but are not nav pages.
+not_in_nav: |
+  /blog/posts/*/social.md
+  /blog/private-prediction-markets-envelope-encryption.md
 
 extra:
   social:
