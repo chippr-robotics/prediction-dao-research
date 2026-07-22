@@ -202,6 +202,6 @@ export function capability({ account, credentialId, prfCapable, deps = {} }) {
   if (store.get(account, credentialId)) return { state: 'available' }
   return {
     state: 'unavailable',
-    reason: 'This passkey has no key material yet — register your encryption key under Backup & Security, or open FairWins on the device where you first enabled encryption.',
+    reason: 'This passkey has no key material yet — register your encryption key under Recovery, or open FairWins on the device where you first enabled encryption.',
   }
 }

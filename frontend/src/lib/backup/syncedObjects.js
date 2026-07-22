@@ -14,6 +14,11 @@ import {
   mergeClientRecordsAllChains,
 } from '../../data/ledger/ledgerClientStore'
 import { readVaultEnvelope, writeVaultEnvelope, hasVault } from '../openChallenge/codeVault'
+import {
+  loadLegacyRecoveredKeys,
+  saveLegacyRecoveredKeys,
+  mergeLegacyRecoveredKeys,
+} from '../recovery/legacyRecoveredKeysStore'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -124,6 +129,27 @@ export const syncedObjects = [
       return { conflicts: [] }
     },
     merge: (current, incoming) => ({ value: current || incoming || null, conflicts: [] }),
+  },
+  {
+    // Spec 062 — recovered legacy accounts. The value is a map of
+    // passphrase-ENCRYPTED vault entries (ciphertext blobs only; no plaintext
+    // key material), so it is safe to place in the backup. Not network-scoped:
+    // a legacy EOA address is the same across every EVM chain, so entries are
+    // keyed by address alone.
+    key: 'legacyRecoveredKeys',
+    label: 'Recovered accounts',
+    networkScoped: false,
+    load: (account) => loadLegacyRecoveredKeys(account),
+    apply: (account, value, mode) => {
+      if (mode === 'replace') {
+        saveLegacyRecoveredKeys(account, value)
+        return { conflicts: [] }
+      }
+      const { value: merged, conflicts } = mergeLegacyRecoveredKeys(loadLegacyRecoveredKeys(account), value)
+      saveLegacyRecoveredKeys(account, merged)
+      return { conflicts }
+    },
+    merge: (current, incoming) => mergeLegacyRecoveredKeys(current, incoming),
   },
 ]
 

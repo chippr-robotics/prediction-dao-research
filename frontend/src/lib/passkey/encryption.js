@@ -58,7 +58,7 @@ export async function resolveMasterSeed({ account, credentialId, allowInit = fal
     return initMasterSeedForCredential({ account, credentialId, deps })
   }
   throw new EncryptionUnavailable(
-    'this passkey has no encryption key material on this account yet — register your encryption key under Backup & Security, ' +
+    'this passkey has no encryption key material on this account yet — register your encryption key under Recovery, ' +
     'or open FairWins on the device where you first enabled encryption (or restore your encrypted backup) to use it here'
   )
 }

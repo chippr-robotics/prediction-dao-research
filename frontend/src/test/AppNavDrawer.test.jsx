@@ -45,9 +45,9 @@ describe('AppNavDrawer (global nav drawer)', () => {
     // semantics with aria-current — not tablist/tab.
     expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Trade' })).toBeInTheDocument()
-    // Custody is surfaced as "Protect"; Security relocated into Tools.
+    // Custody is surfaced as "Protect"; the Backup & Security section is now "Recovery".
     expect(screen.getByRole('button', { name: 'Protect' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Backup & Security' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recovery' })).toBeInTheDocument()
     // Not a tablist.
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
 
@@ -97,7 +97,7 @@ describe('AppNavDrawer (global nav drawer)', () => {
 
   it('highlights the active section from the URL with aria-current', () => {
     renderDrawer('/wallet?tab=security')
-    expect(screen.getByRole('button', { name: 'Backup & Security' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Recovery' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Trade' })).not.toHaveAttribute('aria-current')
   })
 

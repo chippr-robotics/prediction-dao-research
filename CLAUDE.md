@@ -163,9 +163,24 @@ artifacts live under `specs/<feature>/`.
   (`services/relay-gateway/src/bitcoin/`, `BTC_*` env) is optional — unset/disabled ⇒ every
   Bitcoin surface hides/degrades honestly. See `docs/developer-guide/bitcoin.md` +
   `docs/runbooks/bitcoin-operations.md` + `specs/061-bitcoin-transactions/`.
+- **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
+  "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
+  **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a
+  PBKDF2-650k passphrase key) and **NEVER** persisted in the clear, transmitted, or logged — only the
+  ciphertext blob is stored/backed up. `legacyKeyVault(account)` (in
+  `frontend/src/lib/recovery/legacyKeys.js`) is a per-account CRUD facade over
+  `legacyRecoveredKeysStore.js` (userStorage key `legacy_recovered_keys`, the single source of truth);
+  it rides the spec-032 backup via the non-network-scoped `legacyRecoveredKeys` synced object. Storing
+  completes recovery; **moving funds is OPTIONAL** — `sweepAllAssets` moves ALL supported fungible
+  assets (native + every `getPortfolioRegistry` ERC-20, ERC-20s first / native last with a gas
+  reserve) with **per-asset outcomes** (one failure never aborts the rest; NFTs excluded + disclosed).
+  Recovered accounts save to the address book via `useAddressBook()` (usable platform-wide) and the
+  recovery is audited via `captureLegacyRecovery` (client-ledger `legacy_account_recovered`, address +
+  type only, stable/idempotent entryId, **never** key material). See
+  `docs/developer-guide/legacy-account-recovery.md` + `specs/062-legacy-account-recovery/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/061-bitcoin-transactions/plan.md
+at specs/062-legacy-account-recovery/plan.md
 <!-- SPECKIT END -->

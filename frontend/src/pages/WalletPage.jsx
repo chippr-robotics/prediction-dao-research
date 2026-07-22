@@ -21,6 +21,7 @@ import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
+import LegacyKeyRecoveryPanel from '../components/account/LegacyKeyRecoveryPanel'
 import NotificationProfilesPanel from '../components/account/NotificationProfilesPanel'
 import HomePreferencesPanel from '../components/account/HomePreferencesPanel'
 import WalletDisplayPreferencesPanel from '../components/account/WalletDisplayPreferencesPanel'
@@ -50,7 +51,7 @@ const WALLET_TABS = [
   { id: 'membership', label: 'Membership' },
   { id: 'network', label: 'Network' },
   { id: 'preferences', label: 'Preferences' },
-  { id: 'security', label: 'Backup & Security' },
+  { id: 'security', label: 'Recovery' },
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
@@ -65,7 +66,7 @@ const WALLET_TABS = [
 ]
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
-// old standalone Backup tab is now part of the combined "Backup & Security" panel).
+// old standalone Backup tab is now part of the combined "Recovery" panel).
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
@@ -390,6 +391,10 @@ function WalletPage() {
                         access using a linked wallet). Each self-gates. */}
                     <ControllersPanel />
                     <RecoverAccountPanel />
+                    {/* Recover an account from a legacy private key or word
+                        list, store it encrypted on-device, and move its funds
+                        to a smart account. Self-gates to connected sessions. */}
+                    <LegacyKeyRecoveryPanel />
                     <div className="section">
                       <h3>Encryption Key</h3>
                       <p className="section-description">
