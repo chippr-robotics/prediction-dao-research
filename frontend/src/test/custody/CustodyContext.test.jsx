@@ -41,6 +41,53 @@ describe('CustodyContext', () => {
     expect(screen.getByTestId('mode')).toHaveTextContent('personal')
   })
 
+  it('operates as a recovered legacy account and holds its signer, clearing on switch-back', () => {
+    const signer = { sendTransaction: vi.fn() }
+    function LegacyProbe() {
+      const { active, legacySigner, operateAsLegacy, operateAsPersonal } = useCustody()
+      return (
+        <div>
+          <span data-testid="mode">{active.mode}</span>
+          <span data-testid="legacy-addr">{active.address || ''}</span>
+          <span data-testid="has-signer">{legacySigner ? 'yes' : 'no'}</span>
+          <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137, kind: 'privateKey', label: 'Old', signer })}>as-legacy</button>
+          <button onClick={operateAsPersonal}>as-personal</button>
+        </div>
+      )
+    }
+    render(
+      <CustodyProvider>
+        <LegacyProbe />
+      </CustodyProvider>,
+    )
+    fireEvent.click(screen.getByText('as-legacy'))
+    expect(screen.getByTestId('mode')).toHaveTextContent('legacy')
+    expect(screen.getByTestId('legacy-addr')).toHaveTextContent('0xLegacy')
+    expect(screen.getByTestId('has-signer')).toHaveTextContent('yes')
+    fireEvent.click(screen.getByText('as-personal'))
+    expect(screen.getByTestId('mode')).toHaveTextContent('personal')
+    expect(screen.getByTestId('has-signer')).toHaveTextContent('no') // in-memory key dropped
+  })
+
+  it('ignores a legacy descriptor with no signer (never acts as an un-unlocked key)', () => {
+    function BadLegacy() {
+      const { active, operateAsLegacy } = useCustody()
+      return (
+        <div>
+          <span data-testid="mode">{active.mode}</span>
+          <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137 })}>bad</button>
+        </div>
+      )
+    }
+    render(
+      <CustodyProvider>
+        <BadLegacy />
+      </CustodyProvider>,
+    )
+    fireEvent.click(screen.getByText('bad'))
+    expect(screen.getByTestId('mode')).toHaveTextContent('personal')
+  })
+
   it('ignores an invalid vault (missing address/chainId)', () => {
     function BadProbe() {
       const { active, operateAsVault } = useCustody()

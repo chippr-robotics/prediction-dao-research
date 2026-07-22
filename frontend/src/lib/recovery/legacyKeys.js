@@ -235,6 +235,19 @@ export async function unlockLegacySecret({ entry, passphrase, deps = {} }) {
 }
 
 /**
+ * Unlock a stored recovered account into a live, provider-connected ethers signer
+ * that can be used to "act as" that account (spec 062 follow-up). The secret is
+ * decrypted (biometric or passphrase) into a signer and returned; the caller
+ * holds it in memory only for the session and never persists it.
+ *
+ * @returns {Promise<ethers.Signer>}
+ */
+export async function unlockLegacyAccount({ entry, passphrase, provider, deps = {} }) {
+  const secret = await unlockLegacySecret({ entry, passphrase, deps })
+  return walletFromSecret({ kind: entry.kind, secret }, provider)
+}
+
+/**
  * Per-account, device-local vault of encrypted legacy keys, keyed by lowercased
  * address so a given legacy account is stored once. Backed by the same
  * per-account storage the spec-032 backup reads (legacyRecoveredKeysStore), so
