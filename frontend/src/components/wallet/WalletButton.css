@@ -738,3 +738,9 @@
     }
   }
 }
+
+/* Global acting-account switcher wrapper (spec 062). Collapses to nothing when
+   the switcher self-hides (only a personal wallet), so no empty gap appears. */
+.dropdown-account-switcher:not(:empty) {
+  margin-top: 12px;
+}

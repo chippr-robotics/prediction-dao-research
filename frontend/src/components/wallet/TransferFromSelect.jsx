@@ -47,6 +47,7 @@ export default function TransferFromSelect({ accounts = [], value, onChange, dis
       <span className="pt-from-label">
         {account.label || short(account.address)}
         {account.kind === 'vault' && <span className="pt-from-tag">Vault</span>}
+        {account.kind === 'legacy' && <span className="pt-from-tag">Recovered</span>}
       </span>
       <span className="pt-from-addr">{short(account.address)}</span>
     </>
