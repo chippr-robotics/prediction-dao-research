@@ -63,6 +63,7 @@ function makeProvider(balances, extra = {}) {
   return {
     getBalance: async () => balances.native ?? 0n,
     getFeeData: async () => ({ maxFeePerGas: GAS, gasPrice: GAS }),
+    estimateGas: async () => 21000n, // EOA baseline unless a test overrides
     _balances: balances,
     _sent: [],
     ...extra,
@@ -92,6 +93,14 @@ describe('quoteAllAssets', () => {
     const q = await quoteAllAssets({ kind: 'privateKey', secret: PK, chainId: 1, provider })
     expect(q.holdings.map((h) => h.asset.symbol)).toEqual(['DAI'])
     expect(q.hasNative).toBe(false)
+  })
+
+  it('sizes the native reserve + gas limit from a gas estimate to the destination', async () => {
+    // A smart-account recipient needs more than 21k; estimate to `to` and buffer 20%.
+    const provider = makeProvider({ native: 10n ** 18n }, { estimateGas: async () => 90_000n })
+    const q = await quoteAllAssets({ kind: 'privateKey', secret: PK, chainId: 1, provider, to: TO })
+    expect(q.nativeGasLimit).toBe((90_000n * 12n) / 10n) // 108000
+    expect(q.nativeGasReserve).toBe(((90_000n * 12n) / 10n) * GAS)
   })
 })
 

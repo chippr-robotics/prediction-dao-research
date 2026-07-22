@@ -186,11 +186,17 @@ describe('LegacyKeyRecoveryPanel', () => {
     lib.encryptLegacySecret.mockResolvedValue({ v: 1, address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
     lib.quoteAllAssets.mockResolvedValue({
       from: LEGACY_ADDR,
-      holdings: [{ asset: { id: 'usdc', symbol: 'USDC', decimals: 6 }, balance: 5_000_000n }],
+      holdings: [
+        { asset: { id: 'usdc', symbol: 'USDC', decimals: 6 }, balance: 5_000_000n },
+        { asset: { id: 'native', symbol: 'MATIC', decimals: 18 }, balance: 10n ** 17n },
+      ],
       nativeGasReserve: 1n,
-      hasNative: false,
+      hasNative: true,
     })
-    lib.sweepAllAssets.mockResolvedValue([{ asset: { symbol: 'USDC' }, status: 'failed', error: 'reverted' }])
+    lib.sweepAllAssets.mockResolvedValue([
+      { asset: { symbol: 'USDC' }, status: 'failed', error: 'reverted' },
+      { asset: { symbol: 'MATIC' }, status: 'sent', txHash: '0x2' },
+    ])
     render(<LegacyKeyRecoveryPanel />)
     await importToSaved(user)
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
@@ -200,6 +206,44 @@ describe('LegacyKeyRecoveryPanel', () => {
     // Failure is shown; we do NOT advance to the success screen.
     expect(await screen.findByText(/failed — reverted/i)).toBeInTheDocument()
     expect(screen.queryByText(/Funds moved to your smart account/i)).not.toBeInTheDocument()
+  })
+
+  it('discloses the estimated fee and blocks transfer when there is no native for gas', async () => {
+    const user = userEvent.setup()
+    lib.encryptLegacySecret.mockResolvedValue({ v: 1, address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
+    // Tokens present but zero native ⇒ cannot pay gas ⇒ transfer must be blocked.
+    lib.quoteAllAssets.mockResolvedValue({
+      from: LEGACY_ADDR,
+      holdings: [{ asset: { id: 'usdc', symbol: 'USDC', decimals: 6 }, balance: 5_000_000n }],
+      nativeGasReserve: 0n,
+      hasNative: false,
+    })
+    render(<LegacyKeyRecoveryPanel />)
+    await importToSaved(user)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
+    await user.click(screen.getByRole('button', { name: 'Check balances' }))
+    await waitFor(() => expect(screen.getByText('USDC')).toBeInTheDocument())
+    expect(screen.getByText(/no MATIC to pay network fees/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Transfer all' })).toBeDisabled()
+    expect(lib.sweepAllAssets).not.toHaveBeenCalled()
+  })
+
+  it('discloses the estimated network fee before signing', async () => {
+    const user = userEvent.setup()
+    lib.encryptLegacySecret.mockResolvedValue({ v: 1, address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
+    lib.quoteAllAssets.mockResolvedValue({
+      from: LEGACY_ADDR,
+      holdings: [{ asset: { id: 'native', symbol: 'MATIC', decimals: 18 }, balance: 10n ** 18n }],
+      nativeGasReserve: 5n * 10n ** 16n, // 0.05 MATIC
+      nativeGasLimit: 25200n,
+      hasNative: true,
+    })
+    render(<LegacyKeyRecoveryPanel />)
+    await importToSaved(user)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
+    await user.click(screen.getByRole('button', { name: 'Check balances' }))
+    expect(await screen.findByText(/Estimated network fee/i)).toBeInTheDocument()
+    expect(screen.getByText(/≈ 0.05 MATIC/)).toBeInTheDocument()
   })
 
   it('unlocks a stored key before moving funds', async () => {

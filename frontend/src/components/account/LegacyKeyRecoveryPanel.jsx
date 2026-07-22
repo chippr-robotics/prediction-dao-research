@@ -87,6 +87,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const network = useMemo(() => getNetwork(chainId), [chainId])
   const networkName = network?.name || 'this network'
   const nativeSymbol = network?.nativeCurrency?.symbol || 'the native token'
+  const nativeDecimals = network?.nativeCurrency?.decimals ?? 18
 
   const detected = useMemo(() => classifySecret(rawSecret), [rawSecret])
   const alreadyStored = detected.address ? vault.has(detected.address) : false
@@ -236,14 +237,16 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     setNotice(null)
     setPhase('quoting')
     try {
-      const q = await quoteAllAssets({ kind: active.kind, secret: active.secret, chainId, provider: deps.provider ?? provider })
+      // Pass the destination so the native-leg fee is estimated against it (a
+      // smart-account recipient needs more than the 21k EOA baseline).
+      const q = await quoteAllAssets({ kind: active.kind, secret: active.secret, chainId, provider: deps.provider ?? provider, to: destTarget || undefined })
       setQuote(q)
       setPhase('idle')
     } catch (e) {
       setPhase('idle')
       setNotice({ kind: 'error', text: `Could not read balances on ${networkName}: ${e.reason || e.shortMessage || e.message}` })
     }
-  }, [active, chainId, provider, deps.provider, networkName])
+  }, [active, chainId, provider, deps.provider, networkName, destTarget])
 
   const doSweep = useCallback(async () => {
     if (!active || !destTarget) return
@@ -303,6 +306,9 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const noticeEl = notice && (
     <p role="alert" className={`lkr-notice lkr-notice--${notice.kind}`}>{notice.text}</p>
   )
+
+  // Tokens present but no native to pay gas ⇒ nothing can be moved from here.
+  const noNativeForGas = Boolean(quote && !quote.hasNative && quote.holdings.length > 0)
 
   const renderOutcomes = () =>
     outcomes && outcomes.length > 0 && (
@@ -574,7 +580,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
             </div>
 
             <div className="recover-step__actions">
-              <button type="button" className="btn" onClick={checkBalances} disabled={phase !== 'idle'}>
+              <button type="button" className="btn" onClick={checkBalances} disabled={phase !== 'idle' || !destTarget}>
                 {phase === 'quoting' ? 'Checking…' : 'Check balances'}
               </button>
             </div>
@@ -584,12 +590,26 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
                 {quote.holdings.length === 0 ? (
                   <p className="lkr-quote__empty">No supported-asset balances found on {networkName} for this account.</p>
                 ) : (
-                  quote.holdings.map((h) => (
-                    <div key={h.asset.id || h.asset.symbol}>
-                      <span>{h.asset.symbol}</span>
-                      <strong>{ethers.formatUnits(h.balance, h.asset.decimals ?? 18)}</strong>
-                    </div>
-                  ))
+                  <>
+                    {quote.holdings.map((h) => (
+                      <div key={h.asset.id || h.asset.symbol}>
+                        <span>{h.asset.symbol}</span>
+                        <strong>{ethers.formatUnits(h.balance, h.asset.decimals ?? 18)}</strong>
+                      </div>
+                    ))}
+                    {quote.hasNative && (
+                      <div className="lkr-quote__fee">
+                        <span>Estimated network fee</span>
+                        <strong>≈ {ethers.formatUnits(quote.nativeGasReserve ?? 0n, nativeDecimals)} {nativeSymbol}</strong>
+                      </div>
+                    )}
+                  </>
+                )}
+                {noNativeForGas && (
+                  <p className="lkr-quote__empty">
+                    This account has no {nativeSymbol} to pay network fees, so its tokens can&apos;t be moved from here.
+                    Send a little {nativeSymbol} to <code>{shortAddr(active?.address)}</code> first, then check balances again.
+                  </p>
                 )}
               </div>
             )}
@@ -609,7 +629,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={busy || !destTarget || !quote || quote.holdings.length === 0}
+                disabled={busy || !destTarget || !quote || quote.holdings.length === 0 || noNativeForGas}
                 onClick={doSweep}
               >
                 {phase === 'sweeping' ? 'Transferring…' : 'Transfer all'}

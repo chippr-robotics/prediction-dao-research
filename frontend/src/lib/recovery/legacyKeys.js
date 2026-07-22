@@ -240,10 +240,15 @@ export function supportedAssetsForChain(chainId, registry) {
  * active chain and read the legacy account's balance for each. Only non-zero
  * balances are returned (native listed last). Read-only — no signing.
  *
+ * When `to` is a valid address, the native leg's gas is estimated against that
+ * exact destination (a smart-account recipient with a `receive()`/fallback needs
+ * more than the 21k EOA baseline), and both the reserved fee and the gas limit
+ * used at send time are sized from that estimate.
+ *
  * @returns {Promise<{ from: string, holdings: Array<{ asset: object, balance: bigint }>,
- *   nativeGasReserve: bigint, hasNative: boolean }>}
+ *   nativeGasReserve: bigint, nativeGasLimit: bigint, gasPrice: bigint, hasNative: boolean }>}
  */
-export async function quoteAllAssets({ kind, secret, chainId, provider, registry }) {
+export async function quoteAllAssets({ kind, secret, chainId, provider, registry, to }) {
   if (!provider) throw new Error('No network connection to read balances.')
   const from = walletFromSecret({ kind, secret }).address
   const assets = supportedAssetsForChain(chainId, registry)
@@ -269,12 +274,26 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
 
   const feeData = await provider.getFeeData()
   const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
-  const nativeGasReserve = (TRANSFER_GAS_LIMIT * gasPrice * GAS_BUFFER_NUM) / GAS_BUFFER_DEN
+
+  // Estimate the native-transfer gas against the real destination so a smart
+  // account (contract) recipient is funded for its receive()/fallback; fall back
+  // to the EOA baseline if estimation is unavailable. Buffer the gas units by 20%
+  // and derive the reserve from the SAME buffered limit, so `value + gas ≤ balance`.
+  let estimatedGas = TRANSFER_GAS_LIMIT
+  if (hasNative && to && ethers.isAddress(to) && typeof provider.estimateGas === 'function') {
+    try {
+      estimatedGas = await provider.estimateGas({ from, to, value: 1n })
+    } catch {
+      estimatedGas = TRANSFER_GAS_LIMIT
+    }
+  }
+  const nativeGasLimit = (estimatedGas * GAS_BUFFER_NUM) / GAS_BUFFER_DEN
+  const nativeGasReserve = nativeGasLimit * gasPrice
 
   // ERC-20s first, native last (native pays the gas for every transfer).
   const holdings = [...erc20Holdings]
   if (hasNative) holdings.push(nativeRead)
-  return { from, holdings, nativeGasReserve, hasNative }
+  return { from, holdings, nativeGasReserve, nativeGasLimit, gasPrice, hasNative }
 }
 
 /**
@@ -290,7 +309,7 @@ export async function quoteAllAssets({ kind, secret, chainId, provider, registry
  */
 export async function sweepAllAssets({ kind, secret, to, chainId, provider, registry, onProgress }) {
   if (!ethers.isAddress(to)) throw new Error('Enter a valid destination address.')
-  const quote = await quoteAllAssets({ kind, secret, chainId, provider, registry })
+  const quote = await quoteAllAssets({ kind, secret, chainId, provider, registry, to })
   if (to.toLowerCase() === quote.from.toLowerCase()) {
     throw new Error('Choose a destination other than the legacy account.')
   }
@@ -309,7 +328,7 @@ export async function sweepAllAssets({ kind, secret, to, chainId, provider, regi
         continue
       }
       try {
-        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: TRANSFER_GAS_LIMIT })
+        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: quote.nativeGasLimit })
         await tx.wait()
         record({ asset, status: 'sent', txHash: tx.hash })
       } catch (e) {
