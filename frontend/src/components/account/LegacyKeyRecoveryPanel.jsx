@@ -76,7 +76,10 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   // Biometric-first protection: when the session is a passkey, protect the key
   // with this device's biometrics (no password); fall back to a passphrase only
   // when biometrics aren't available or the member opts out.
-  const sessionCredentialId = useMemo(() => (deps.readSession ?? readSession)()?.credentialId || null, [deps.readSession])
+  // Read the session's passkey credential inline (cheap localStorage read) so it
+  // always reflects the CURRENT session — a memo keyed on deps.readSession alone
+  // went stale across sign-in/out and account switches.
+  const sessionCredentialId = (deps.readSession ?? readSession)()?.credentialId || null
   const biometricAvailable = loginMethod === 'passkey' && Boolean(sessionCredentialId)
   const [protectMode, setProtectMode] = useState('passkey') // 'passkey' | 'passphrase'
 

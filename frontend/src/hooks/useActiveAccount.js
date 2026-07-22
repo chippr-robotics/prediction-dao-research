@@ -43,17 +43,26 @@ export function useActiveAccount() {
         // is gone (e.g. after a reload cleared the in-memory signer), the member
         // must re-unlock the account before acting as it.
         if (!legacySigner) throw new Error('Unlock this recovered account again to act as it.')
+        // The unlocked signer is bound to the provider at unlock time; if the
+        // member has since switched networks, sending would land on the wrong
+        // chain. Refuse until they're back on the network they unlocked on
+        // (mirrors the vault network guard).
+        if (active.chainId != null && Number(chainId) !== Number(active.chainId)) {
+          throw new Error('Switch back to the network where you unlocked this recovered account before acting as it.')
+        }
         return submitAsActiveAccount(payload, { mode: 'personal', signer: legacySigner })
       }
       return submitAsActiveAccount(payload, { mode: 'personal', signer })
     },
-    [active, signer, provider, legacySigner],
+    [active, chainId, signer, provider, legacySigner],
   )
 
   // Whether a vault action can currently be sent (connected to the vault's network).
   const canActAsVault = isVault && Number(chainId) === Number(active.chainId)
-  // A legacy account can act only while its unlocked signer is still in memory.
-  const canActAsLegacy = isLegacy && Boolean(legacySigner)
+  // A legacy account can act only while its unlocked signer is still in memory AND
+  // the wallet is on the network it was unlocked for (else a switch would send on
+  // the wrong chain).
+  const canActAsLegacy = isLegacy && Boolean(legacySigner) && (active.chainId == null || Number(chainId) === Number(active.chainId))
 
   return { identity: active, isVault, isLegacy, canActAsVault, canActAsLegacy, submit, operateAsPersonal, operateAsVault, operateAsLegacy }
 }

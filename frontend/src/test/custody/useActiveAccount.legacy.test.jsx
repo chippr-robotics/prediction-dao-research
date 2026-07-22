@@ -2,15 +2,17 @@
 // unlocked in-memory legacy signer (via the audited personal submit path), and
 // refuses to act when the signer is gone.
 
+import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const PERSONAL_SIGNER = { id: 'personal' }
 const LEGACY_SIGNER = { id: 'legacy' }
 
+let connectedChainId = 137
 vi.mock('../../hooks', () => ({ useWallet: () => ({ address: '0xowner' }) }))
 vi.mock('../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ chainId: 137, signer: PERSONAL_SIGNER, provider: {} }),
+  useWallet: () => ({ chainId: connectedChainId, signer: PERSONAL_SIGNER, provider: {} }),
 }))
 
 const submitSpy = vi.fn(async () => ({ kind: 'sent', txHash: '0xabc' }))
@@ -22,18 +24,20 @@ import { CustodyProvider } from '../../contexts/CustodyContext.jsx'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 
 function Probe({ withSigner = true }) {
+  const [, force] = useState(0)
   const { identity, canActAsLegacy, submit, operateAsLegacy } = useActiveAccount()
   return (
     <div>
       <span data-testid="mode">{identity.mode}</span>
       <span data-testid="can">{canActAsLegacy ? 'yes' : 'no'}</span>
       <button onClick={() => operateAsLegacy({ address: '0xLegacy', chainId: 137, kind: 'privateKey', signer: withSigner ? LEGACY_SIGNER : undefined })}>as-legacy</button>
+      <button onClick={() => force((n) => n + 1)}>re-render</button>
       <button onClick={() => submit({ to: '0xdead', value: 1n }).catch((e) => { document.title = e.message })}>submit</button>
     </div>
   )
 }
 
-beforeEach(() => submitSpy.mockClear())
+beforeEach(() => { submitSpy.mockClear(); connectedChainId = 137; document.title = '' })
 
 describe('useActiveAccount — legacy acting account', () => {
   it('signs with the unlocked legacy signer via the personal submit path', async () => {
@@ -47,6 +51,19 @@ describe('useActiveAccount — legacy acting account', () => {
     const [, ctx] = submitSpy.mock.calls[0]
     expect(ctx.signer).toBe(LEGACY_SIGNER) // the legacy key, not the connected wallet
     expect(ctx.signer).not.toBe(PERSONAL_SIGNER)
+  })
+
+  it('refuses to send on the wrong network after unlocking (no wrong-chain send)', async () => {
+    render(<CustodyProvider><Probe /></CustodyProvider>)
+    fireEvent.click(screen.getByText('as-legacy')) // unlocked for chainId 137
+    expect(screen.getByTestId('can')).toHaveTextContent('yes')
+    // Member switches networks after unlocking.
+    connectedChainId = 999
+    fireEvent.click(screen.getByText('re-render'))
+    expect(screen.getByTestId('can')).toHaveTextContent('no') // gated off on the wrong chain
+    fireEvent.click(screen.getByText('submit'))
+    await waitFor(() => expect(document.title).toMatch(/Switch back to the network/i))
+    expect(submitSpy).not.toHaveBeenCalled() // never sent on the wrong chain
   })
 
   it('refuses to act as a legacy account with no signer in memory', async () => {
