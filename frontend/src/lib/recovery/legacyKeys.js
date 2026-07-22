@@ -14,16 +14,16 @@
  *  - a wrong passphrase fails the AES-GCM tag — we never fall through to a
  *    different/empty secret.
  *
- * A legacy EOA is a liability, not a destination: the module deliberately makes
- * "sweep the funds to a smart account" the headline action and stores the key
- * only so the member can finish that move (and retry if gas was short).
+ * A legacy EOA is a liability, not a destination: the module makes "move the
+ * funds to a smart account" the recommended follow-up, but it is OPTIONAL —
+ * storing the key completes recovery on its own. When chosen, the move sweeps
+ * ALL supported assets (native + supported ERC-20s), not just the native coin.
  */
 
 import { ethers } from 'ethers'
-
-// Versioned localStorage key for the encrypted legacy-key vault. Bumping the
-// version is a migration, never an in-place reformat.
-const VAULT_KEY = 'fairwins.recovery.legacyKeys.v1'
+import { getPortfolioRegistry } from '../../config/assetTaxonomy'
+import { TRANSFER_ABI } from '../transfer/eip3009Transfer'
+import { loadLegacyRecoveredKeys, saveLegacyRecoveredKeys } from './legacyRecoveredKeysStore'
 
 // PBKDF2 work factor. OWASP's 2023 floor for PBKDF2-HMAC-SHA256 is 600k; we sit
 // above it. Stored per-entry so a future bump stays backward-compatible.
@@ -148,18 +148,21 @@ export async function decryptLegacySecret({ entry, passphrase, deps = {} }) {
 }
 
 /**
- * Device-local vault of encrypted legacy keys, keyed by lowercased address so a
- * given legacy account is stored once. Mirrors lib/passkey/prfKeys.js#blobStore.
+ * Per-account, device-local vault of encrypted legacy keys, keyed by lowercased
+ * address so a given legacy account is stored once. Backed by the same
+ * per-account storage the spec-032 backup reads (legacyRecoveredKeysStore), so
+ * recovered accounts ride the encrypted backup — the CRUD facade and the backup
+ * domain share one source of truth. `deps.load`/`deps.save` are injectable for
+ * tests.
+ *
+ * @param {string} account - the signed-in account that owns this vault
+ * @param {{ load?: Function, save?: Function }} [deps]
  */
-export function legacyKeyVault(storage = globalThis.localStorage) {
-  const read = () => {
-    try {
-      return JSON.parse(storage.getItem(VAULT_KEY) || '{}')
-    } catch {
-      return {}
-    }
-  }
-  const write = (all) => storage.setItem(VAULT_KEY, JSON.stringify(all))
+export function legacyKeyVault(account, deps = {}) {
+  const load = deps.load ?? loadLegacyRecoveredKeys
+  const save = deps.save ?? saveLegacyRecoveredKeys
+  const read = () => load(account)
+  const write = (all) => save(account, all)
   return {
     list() {
       return Object.values(read()).sort((a, b) => (b.importedAt || 0) - (a.importedAt || 0))
@@ -221,4 +224,108 @@ export async function sweepNativeToSmartAccount({ kind, secret, to, provider }) 
   }
   const wallet = walletFromSecret({ kind, secret }, provider)
   return wallet.sendTransaction({ to, value: quote.sendable, gasLimit: quote.gasLimit })
+}
+
+// Minimal ABI for reading an arbitrary account's ERC-20 balance.
+const BALANCE_OF_ABI = ['function balanceOf(address) view returns (uint256)']
+
+/** The platform-supported fungible assets on a chain (native + ERC-20; NFTs excluded). */
+export function supportedAssetsForChain(chainId, registry) {
+  const all = registry ?? getPortfolioRegistry(chainId)
+  return (all || []).filter((a) => a && (a.kind === 'native' || a.kind === 'erc20'))
+}
+
+/**
+ * Quote a full-portfolio sweep: enumerate every platform-supported asset on the
+ * active chain and read the legacy account's balance for each. Only non-zero
+ * balances are returned (native listed last). Read-only — no signing.
+ *
+ * @returns {Promise<{ from: string, holdings: Array<{ asset: object, balance: bigint }>,
+ *   nativeGasReserve: bigint, hasNative: boolean }>}
+ */
+export async function quoteAllAssets({ kind, secret, chainId, provider, registry }) {
+  if (!provider) throw new Error('No network connection to read balances.')
+  const from = walletFromSecret({ kind, secret }).address
+  const assets = supportedAssetsForChain(chainId, registry)
+
+  const reads = await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        if (asset.kind === 'native') {
+          return { asset, balance: await provider.getBalance(from) }
+        }
+        const erc20 = new ethers.Contract(asset.address, BALANCE_OF_ABI, provider)
+        return { asset, balance: await erc20.balanceOf(from) }
+      } catch {
+        // A single unreadable token must not fail the whole quote — treat as zero.
+        return { asset, balance: 0n }
+      }
+    })
+  )
+
+  const erc20Holdings = reads.filter((h) => h.asset.kind === 'erc20' && h.balance > 0n)
+  const nativeRead = reads.find((h) => h.asset.kind === 'native')
+  const hasNative = Boolean(nativeRead && nativeRead.balance > 0n)
+
+  const feeData = await provider.getFeeData()
+  const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
+  const nativeGasReserve = (TRANSFER_GAS_LIMIT * gasPrice * GAS_BUFFER_NUM) / GAS_BUFFER_DEN
+
+  // ERC-20s first, native last (native pays the gas for every transfer).
+  const holdings = [...erc20Holdings]
+  if (hasNative) holdings.push(nativeRead)
+  return { from, holdings, nativeGasReserve, hasNative }
+}
+
+/**
+ * Sweep ALL supported assets held by the legacy key to `to`. Transfers each
+ * ERC-20 first, then the native currency last (leaving a gas reserve so the
+ * transaction pays for itself). A single asset failing NEVER aborts the rest —
+ * every asset gets an honest outcome, so nothing is silently dropped and funds
+ * are never stranded.
+ *
+ * @param {(outcome: object) => void} [onProgress] - called after each asset
+ * @returns {Promise<Array<{ asset: object, status: 'sent'|'skipped'|'failed',
+ *   txHash?: string, error?: string }>>}
+ */
+export async function sweepAllAssets({ kind, secret, to, chainId, provider, registry, onProgress }) {
+  if (!ethers.isAddress(to)) throw new Error('Enter a valid destination address.')
+  const quote = await quoteAllAssets({ kind, secret, chainId, provider, registry })
+  if (to.toLowerCase() === quote.from.toLowerCase()) {
+    throw new Error('Choose a destination other than the legacy account.')
+  }
+  const signer = walletFromSecret({ kind, secret }, provider)
+  const outcomes = []
+  const record = (o) => {
+    outcomes.push(o)
+    if (onProgress) onProgress(o)
+  }
+
+  for (const { asset, balance } of quote.holdings) {
+    if (asset.kind === 'native') {
+      const sendable = balance > quote.nativeGasReserve ? balance - quote.nativeGasReserve : 0n
+      if (sendable <= 0n) {
+        record({ asset, status: 'skipped', error: 'Not enough to cover the network fee.' })
+        continue
+      }
+      try {
+        const tx = await signer.sendTransaction({ to, value: sendable, gasLimit: TRANSFER_GAS_LIMIT })
+        await tx.wait()
+        record({ asset, status: 'sent', txHash: tx.hash })
+      } catch (e) {
+        record({ asset, status: 'failed', error: e.reason || e.shortMessage || e.message })
+      }
+      continue
+    }
+    try {
+      const erc20 = new ethers.Contract(asset.address, TRANSFER_ABI, signer)
+      const tx = await erc20.transfer(to, balance)
+      await tx.wait()
+      record({ asset, status: 'sent', txHash: tx.hash })
+    } catch (e) {
+      record({ asset, status: 'failed', error: e.reason || e.shortMessage || e.message })
+    }
+  }
+
+  return outcomes
 }

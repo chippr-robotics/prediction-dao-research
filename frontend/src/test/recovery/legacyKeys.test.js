@@ -88,18 +88,17 @@ describe('encrypt/decrypt at rest', () => {
 })
 
 describe('legacyKeyVault', () => {
-  let storage
+  // Per-account vault backed by an injected in-memory map (bypasses userStorage).
+  const account = '0x' + '1'.repeat(40)
+  let mem
+  let deps
   beforeEach(() => {
-    const map = new Map()
-    storage = {
-      getItem: (k) => (map.has(k) ? map.get(k) : null),
-      setItem: (k, v) => map.set(k, v),
-      removeItem: (k) => map.delete(k),
-    }
+    mem = {}
+    deps = { load: () => mem, save: (_acc, m) => { mem = m } }
   })
 
   it('stores by lowercased address, lists newest-first, and deletes', () => {
-    const vault = legacyKeyVault(storage)
+    const vault = legacyKeyVault(account, deps)
     vault.set({ address: EXPECTED_ADDR, kind: 'privateKey', importedAt: 100 })
     vault.set({ address: '0x' + 'b'.repeat(40), kind: 'mnemonic', importedAt: 200 })
     expect(vault.list().map((e) => e.importedAt)).toEqual([200, 100])
@@ -111,7 +110,7 @@ describe('legacyKeyVault', () => {
   })
 
   it('re-storing the same address replaces rather than duplicates', () => {
-    const vault = legacyKeyVault(storage)
+    const vault = legacyKeyVault(account, deps)
     vault.set({ address: EXPECTED_ADDR, kind: 'privateKey', importedAt: 1 })
     vault.set({ address: EXPECTED_ADDR.toLowerCase(), kind: 'privateKey', importedAt: 2 })
     expect(vault.list()).toHaveLength(1)

@@ -35,9 +35,9 @@ description: "Task list for Legacy Account Recovery (062)"
 
 **⚠️ CRITICAL**: Complete before starting US2–US5.
 
-- [ ] T003 Restructure `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` so the import wizard **terminates at a SAVED confirmation** once the encrypted secret is stored (steps: intro → enter → secure → **saved**). Moving funds becomes an optional action offered on the saved screen and on each stored-key row — never a required wizard step (FR-011, research R7). Keep the existing unlock→transfer path for stored keys.
-- [ ] T004 Extract the vault localStorage key + entry shape into a single shared constant so both `legacyKeyVault` (in `frontend/src/lib/recovery/legacyKeys.js`) and the new backup store agree on `legacy_recovered_keys`. No behavior change; refactor + existing tests still green.
-- [ ] T005 [P] Update `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx` for the SAVED terminal state (recovery completes without any transfer; transfer is reachable but optional).
+- [X] T003 Restructure `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` so the import wizard **terminates at a SAVED confirmation** once the encrypted secret is stored (steps: intro → enter → secure → **saved**). Moving funds becomes an optional action offered on the saved screen and on each stored-key row — never a required wizard step (FR-011, research R7). Keep the existing unlock→transfer path for stored keys.
+- [X] T004 Extract the vault localStorage key + entry shape into a single shared constant so both `legacyKeyVault` (in `frontend/src/lib/recovery/legacyKeys.js`) and the new backup store agree on `legacy_recovered_keys`. No behavior change; refactor + existing tests still green.
+- [X] T005 [P] Update `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx` for the SAVED terminal state (recovery completes without any transfer; transfer is reachable but optional).
 
 **Checkpoint**: Import completes at SAVED; the optional-transfer/save/audit hooks have a place to attach.
 
@@ -66,16 +66,16 @@ description: "Task list for Legacy Account Recovery (062)"
 
 ### Tests for User Story 2 ⚠️ (write first)
 
-- [ ] T010 [P] [US2] Unit tests for `quoteAllAssets` in `frontend/src/test/recovery/legacyKeysMultiAsset.test.js`: enumerates native + ERC-20s from a stub registry, reads balances for an arbitrary address, excludes zero balances, computes `nativeGasReserve`.
-- [ ] T011 [P] [US2] Unit tests for `sweepAllAssets` in the same file: ERC-20s-before-native ordering, native-last leaves gas reserve, per-asset outcome array, **partial failure** (one token throws → others still `sent`), invalid/`===from` destination throws, insufficient-native → native `skipped`.
+- [X] T010 [P] [US2] Unit tests for `quoteAllAssets` in `frontend/src/test/recovery/legacyKeysMultiAsset.test.js`: enumerates native + ERC-20s from a stub registry, reads balances for an arbitrary address, excludes zero balances, computes `nativeGasReserve`.
+- [X] T011 [P] [US2] Unit tests for `sweepAllAssets` in the same file: ERC-20s-before-native ordering, native-last leaves gas reserve, per-asset outcome array, **partial failure** (one token throws → others still `sent`), invalid/`===from` destination throws, insufficient-native → native `skipped`.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Add `quoteAllAssets({ kind, secret, chainId, provider, registry? })` to `frontend/src/lib/recovery/legacyKeys.js` per `contracts/legacyKeys.md` — default registry `getPortfolioRegistry(chainId).filter(kind native|erc20)` (`frontend/src/config/assetTaxonomy.js`); concurrent `getBalance` / `balanceOf` reads; non-zero only.
-- [ ] T013 [US2] Add `sweepAllAssets({ kind, secret, to, chainId, provider, onProgress? })` to the same file: ERC-20 `transfer` (via `TRANSFER_ABI` from `frontend/src/lib/transfer/eip3009Transfer.js`) then native last (reuse the existing reserve logic); catch per-asset failures; return outcomes; never log the secret.
-- [ ] T014 [US2] Rework the transfer step in `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` to use `quoteAllAssets`/`sweepAllAssets`: list every asset + balance, disclose the network fee before signing, disclose that only supported assets move (NFTs excluded, FR-017), render per-asset outcomes, and offer retry on partial failure.
-- [ ] T015 [P] [US2] Add asset-list + per-asset-outcome styles to `frontend/src/components/account/LegacyKeyRecoveryPanel.css` (theme tokens, both themes).
-- [ ] T016 [US2] Extend `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`: all-asset listing, fee disclosure, per-asset outcomes, partial-failure UI, and that declining the transfer still leaves recovery complete (FR-011).
+- [X] T012 [US2] Add `quoteAllAssets({ kind, secret, chainId, provider, registry? })` to `frontend/src/lib/recovery/legacyKeys.js` per `contracts/legacyKeys.md` — default registry `getPortfolioRegistry(chainId).filter(kind native|erc20)` (`frontend/src/config/assetTaxonomy.js`); concurrent `getBalance` / `balanceOf` reads; non-zero only.
+- [X] T013 [US2] Add `sweepAllAssets({ kind, secret, to, chainId, provider, onProgress? })` to the same file: ERC-20 `transfer` (via `TRANSFER_ABI` from `frontend/src/lib/transfer/eip3009Transfer.js`) then native last (reuse the existing reserve logic); catch per-asset failures; return outcomes; never log the secret.
+- [X] T014 [US2] Rework the transfer step in `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` to use `quoteAllAssets`/`sweepAllAssets`: list every asset + balance, disclose the network fee before signing, disclose that only supported assets move (NFTs excluded, FR-017), render per-asset outcomes, and offer retry on partial failure.
+- [X] T015 [P] [US2] Add asset-list + per-asset-outcome styles to `frontend/src/components/account/LegacyKeyRecoveryPanel.css` (theme tokens, both themes).
+- [X] T016 [US2] Extend `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`: all-asset listing, fee disclosure, per-asset outcomes, partial-failure UI, and that declining the transfer still leaves recovery complete (FR-011).
 
 **Checkpoint**: A member can optionally move all supported assets; declining still completes recovery.
 
@@ -89,13 +89,13 @@ description: "Task list for Legacy Account Recovery (062)"
 
 ### Tests for User Story 5 ⚠️ (write first)
 
-- [ ] T017 [P] [US5] Unit tests for `captureLegacyRecovery` in `frontend/src/test/recovery/legacyRecoverySource.test.js`: appends the expected record shape; **serialized record contains neither the private key nor the mnemonic**; stable `entryId` makes a repeat call idempotent; never throws.
+- [X] T017 [P] [US5] Unit tests for `captureLegacyRecovery` in `frontend/src/test/recovery/legacyRecoverySource.test.js`: appends the expected record shape; **serialized record contains neither the private key nor the mnemonic**; stable `entryId` makes a repeat call idempotent; never throws.
 
 ### Implementation for User Story 5
 
-- [ ] T018 [P] [US5] Create `frontend/src/data/ledger/sources/legacyRecoverySource.js` exporting `captureLegacyRecovery(account, chainId, { recoveredAddress, source })` per `contracts/recoveryAudit.md` (uses `appendClientRecord`, `clientEntryId`, `LEDGER_CLASS.MEMBERSHIP`, `kind:'legacy_account_recovered'`, `refs` metadata only).
-- [ ] T019 [US5] Call `captureLegacyRecovery` exactly once at the SAVED transition in `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` (session `account`/`chainId`, `source` = classified `kind`); guard so a failed audit write never breaks recovery.
-- [ ] T020 [US5] Add a panel test asserting the audit helper is invoked once on save with address/type (and not with any secret) in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`.
+- [X] T018 [P] [US5] Create `frontend/src/data/ledger/sources/legacyRecoverySource.js` exporting `captureLegacyRecovery(account, chainId, { recoveredAddress, source })` per `contracts/recoveryAudit.md` (uses `appendClientRecord`, `clientEntryId`, `LEDGER_CLASS.MEMBERSHIP`, `kind:'legacy_account_recovered'`, `refs` metadata only).
+- [X] T019 [US5] Call `captureLegacyRecovery` exactly once at the SAVED transition in `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` (session `account`/`chainId`, `source` = classified `kind`); guard so a failed audit write never breaks recovery.
+- [X] T020 [US5] Add a panel test asserting the audit helper is invoked once on save with address/type (and not with any secret) in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`.
 
 **Checkpoint**: Recovery is audited; no secret leaks; idempotent.
 
@@ -109,12 +109,12 @@ description: "Task list for Legacy Account Recovery (062)"
 
 ### Tests for User Story 3 ⚠️ (write first)
 
-- [ ] T021 [P] [US3] Panel test in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`: "Save to address book" calls the address-book upsert with `{ nickname, addresses:[{ address, chainId, notes }] }`; re-saving an existing address updates (no duplicate) via `findByAddress`.
+- [X] T021 [P] [US3] Panel test in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx`: "Save to address book" calls the address-book upsert with `{ nickname, addresses:[{ address, chainId, notes }] }`; re-saving an existing address updates (no duplicate) via `findByAddress`.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Add a "Save to address book" action on the SAVED screen of `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` using `useAddressBook()` (`findByAddress` → `addContact` or `addAddress`), with an editable name (default "Recovered account") and provenance `notes` (research R4, FR-018/019/020).
-- [ ] T023 [P] [US3] Style the save-to-book control + confirmation in `frontend/src/components/account/LegacyKeyRecoveryPanel.css`.
+- [X] T022 [US3] Add a "Save to address book" action on the SAVED screen of `frontend/src/components/account/LegacyKeyRecoveryPanel.jsx` using `useAddressBook()` (`findByAddress` → `addContact` or `addAddress`), with an editable name (default "Recovered account") and provenance `notes` (research R4, FR-018/019/020).
+- [X] T023 [P] [US3] Style the save-to-book control + confirmation in `frontend/src/components/account/LegacyKeyRecoveryPanel.css`.
 
 **Checkpoint**: Recovered accounts are usable platform-wide via the address book.
 
@@ -128,14 +128,14 @@ description: "Task list for Legacy Account Recovery (062)"
 
 ### Tests for User Story 4 ⚠️ (write first)
 
-- [ ] T024 [P] [US4] Unit tests for the store in `frontend/src/test/recovery/legacyRecoveredKeysStore.test.js`: `load/save` round-trip; `mergeLegacyRecoveredKeys` unions by lowercased address with newest `importedAt` winning and reports conflicts; payload is ciphertext-only (no plaintext).
-- [ ] T025 [P] [US4] Backup-integration test in `frontend/src/test/backup/legacyRecoveredKeys.sync.test.js`: `buildBundle`/`applyBundle` include and restore the `legacyRecoveredKeys` domain in merge and replace modes without duplication.
+- [X] T024 [P] [US4] Unit tests for the store in `frontend/src/test/recovery/legacyRecoveredKeysStore.test.js`: `load/save` round-trip; `mergeLegacyRecoveredKeys` unions by lowercased address with newest `importedAt` winning and reports conflicts; payload is ciphertext-only (no plaintext).
+- [X] T025 [P] [US4] Backup-integration test in `frontend/src/test/backup/legacyRecoveredKeys.sync.test.js`: `buildBundle`/`applyBundle` include and restore the `legacyRecoveredKeys` domain in merge and replace modes without duplication.
 
 ### Implementation for User Story 4
 
-- [ ] T026 [US4] Create `frontend/src/lib/recovery/legacyRecoveredKeysStore.js` (`loadLegacyRecoveredKeys` / `saveLegacyRecoveredKeys` / `mergeLegacyRecoveredKeys`) over `userStorage` key `legacy_recovered_keys`, sharing the constant from T004; ciphertext only (contracts/legacyRecoveredKeysStore.md).
-- [ ] T027 [US4] Register the `legacyRecoveredKeys` synced object (`networkScoped:false`, `load`/`apply`/`merge`) in `frontend/src/lib/backup/syncedObjects.js` (no `assertNetworkTagged` branch needed).
-- [ ] T028 [US4] Verify `legacyKeyVault` and the store read/write the same key/shape after T004 (no drift); adjust if needed.
+- [X] T026 [US4] Create `frontend/src/lib/recovery/legacyRecoveredKeysStore.js` (`loadLegacyRecoveredKeys` / `saveLegacyRecoveredKeys` / `mergeLegacyRecoveredKeys`) over `userStorage` key `legacy_recovered_keys`, sharing the constant from T004; ciphertext only (contracts/legacyRecoveredKeysStore.md).
+- [X] T027 [US4] Register the `legacyRecoveredKeys` synced object (`networkScoped:false`, `load`/`apply`/`merge`) in `frontend/src/lib/backup/syncedObjects.js` (no `assertNetworkTagged` branch needed).
+- [X] T028 [US4] Verify `legacyKeyVault` and the store read/write the same key/shape after T004 (no drift); adjust if needed.
 
 **Checkpoint**: Recovered accounts persist across devices via encrypted backup.
 
@@ -143,8 +143,8 @@ description: "Task list for Legacy Account Recovery (062)"
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T029 [P] Accessibility: add an axe test for the new SAVED/transfer/save-to-book UI states in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx` (WCAG 2.1 AA, both themes).
-- [ ] T030 [P] Docs: add `docs/developer-guide/legacy-account-recovery.md` and a CLAUDE.md guardrail bullet summarizing the Recovery section (encrypted-at-rest vault, all-asset sweep, address-book/backup/audit integration, no-secret-in-logs rule).
+- [X] T029 [P] Accessibility: add an axe test for the new SAVED/transfer/save-to-book UI states in `frontend/src/components/account/__tests__/LegacyKeyRecoveryPanel.test.jsx` (WCAG 2.1 AA, both themes).
+- [X] T030 [P] Docs: add `docs/developer-guide/legacy-account-recovery.md` and a CLAUDE.md guardrail bullet summarizing the Recovery section (encrypted-at-rest vault, all-asset sweep, address-book/backup/audit integration, no-secret-in-logs rule).
 - [ ] T031 Run the full frontend gate: `npm run test:frontend` + `npx eslint` over changed files; ensure green with no `continue-on-error`.
 - [ ] T032 Execute `specs/062-legacy-account-recovery/quickstart.md` scenarios 1–5 and confirm each success-criteria mapping.
 - [ ] T033 Update PR #949 description to reflect the full feature (US1–US5) and push.

@@ -1,25 +1,28 @@
 /**
- * Legacy key & word-list recovery (Recovery section).
+ * Legacy key & word-list recovery (Recovery section, spec 062).
  *
  * Members who arrive with an *old* secret — a raw EOA private key or a BIP-39
  * word list — use this to bring that account under FairWins. The flow is a
  * guided series of informational bottom sheets (shared ActionSheet, mirroring
  * RecoverAccountPanel) because handling a raw secret is high-stakes:
  *
- *   intro → enter the key/word list → set a passphrase (encrypt at rest) →
- *   move the funds to a smart account → done.
+ *   intro → enter the key/word list → set a passphrase → SAVED
  *
- * The secret is encrypted on-device with a passphrase-derived key
- * (lib/recovery/legacyKeys.js) and never leaves the browser. The headline
- * outcome is sweeping the funds onto a passkey smart account — a legacy EOA is
- * treated as something to move off of, not a place to keep money.
+ * Storing the encrypted secret COMPLETES recovery (the SAVED screen); the secret
+ * is encrypted on-device with a passphrase-derived key (lib/recovery/legacyKeys)
+ * and never leaves the browser, and the recovery is written to the audit ledger
+ * with no key material. From the SAVED screen (or later, from a stored-key row)
+ * the member may OPTIONALLY move all supported assets to a smart account and/or
+ * save the account to their address book so it is usable across the platform.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useWallet } from '../../hooks/useWalletManagement'
+import { useAddressBook } from '../../hooks/useAddressBook'
 import { getNetwork } from '../../config/networks'
+import { captureLegacyRecovery } from '../../data/ledger/sources/legacyRecoverySource'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import ActionSheet from './ActionSheet'
@@ -28,26 +31,32 @@ import {
   encryptLegacySecret,
   decryptLegacySecret,
   legacyKeyVault,
-  quoteNativeSweep,
-  sweepNativeToSmartAccount,
+  quoteAllAssets,
+  sweepAllAssets,
 } from '../../lib/recovery/legacyKeys'
+import { suggestWords, applySuggestion, currentWord, unknownWordsIn } from '../../lib/recovery/bip39Suggest'
 import './LegacyKeyRecoveryPanel.css'
 
 const shortAddr = (a) => (a ? `${a.substring(0, 6)}…${a.substring(a.length - 4)}` : '')
 const KIND_LABEL = { privateKey: 'private key', mnemonic: 'word list' }
+const kindNoun = (kind) => (kind === 'mnemonic' ? 'word list' : 'private key')
 
 const STEP_TITLES = {
   intro: 'Recover a legacy account',
   enter: 'Enter your key or word list',
   secure: 'Secure this key on your device',
+  saved: 'Recovery complete',
   transfer: 'Move your funds to a smart account',
   unlock: 'Unlock this key',
-  done: 'Recovery complete',
+  done: 'Funds moved',
 }
 
 function LegacyKeyRecoveryPanel({ deps = {} }) {
   const { address: sessionAddress, provider, loginMethod, chainId, isConnected } = useWallet()
-  const vault = useMemo(() => (deps.vault ?? legacyKeyVault)(), [deps.vault])
+  const { findByAddress, addContact, updateContact } = useAddressBook()
+  // Stable module import ⇒ the memo is preservable and re-derives only when the
+  // signed-in account changes. Tests inject a fake vault via the module mock.
+  const vault = useMemo(() => legacyKeyVault(sessionAddress), [sessionAddress])
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState('intro')
@@ -59,14 +68,21 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const [rawSecret, setRawSecret] = useState('')
   const [passphrase, setPassphrase] = useState('')
   const [passphrase2, setPassphrase2] = useState('')
-  // The classified secret currently in memory (from import OR after unlock).
   const [active, setActive] = useState(null) // { kind, address, secret }
+
+  // Save-to-address-book state (on the SAVED screen).
+  const [bookName, setBookName] = useState('')
+  const [bookSaved, setBookSaved] = useState(false)
 
   // Transfer working state.
   const [destInput, setDestInput] = useState('')
   const [destResolved, setDestResolved] = useState('')
   const [quote, setQuote] = useState(null)
-  const [txHash, setTxHash] = useState(null)
+  const [outcomes, setOutcomes] = useState(null)
+
+  // Unlock (stored-key → move funds later).
+  const [unlockEntry, setUnlockEntry] = useState(null)
+  const [unlockPass, setUnlockPass] = useState('')
 
   const network = useMemo(() => getNetwork(chainId), [chainId])
   const networkName = network?.name || 'this network'
@@ -74,6 +90,21 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
 
   const detected = useMemo(() => classifySecret(rawSecret), [rawSecret])
   const alreadyStored = detected.address ? vault.has(detected.address) : false
+
+  // BIP-39 help: only when the input looks like a word list (not a 0x key).
+  const looksLikeWords = rawSecret.trim().length > 0 && !rawSecret.trim().toLowerCase().startsWith('0x')
+  const wordSuggestions = useMemo(
+    () => (looksLikeWords ? suggestWords(currentWord(rawSecret)) : []),
+    [looksLikeWords, rawSecret]
+  )
+  const unknownWords = useMemo(
+    () => (looksLikeWords ? unknownWordsIn(rawSecret) : []),
+    [looksLikeWords, rawSecret]
+  )
+  const pickSuggestion = useCallback((word) => {
+    setRawSecret((prev) => applySuggestion(prev, word))
+    setNotice(null)
+  }, [])
 
   const destTarget = useMemo(() => {
     const r = (destResolved || '').trim()
@@ -83,6 +114,12 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   }, [destResolved, destInput])
 
   const refreshStored = useCallback(() => setStored(vault.list()), [vault])
+  useEffect(() => { refreshStored() }, [refreshStored])
+
+  const suggestedDest = useCallback(
+    () => (loginMethod === 'passkey' && sessionAddress ? sessionAddress : ''),
+    [loginMethod, sessionAddress]
+  )
 
   const resetWizard = useCallback(() => {
     setStep('intro')
@@ -92,37 +129,35 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     setPassphrase('')
     setPassphrase2('')
     setActive(null)
+    setBookName('')
+    setBookSaved(false)
     setQuote(null)
-    setTxHash(null)
-    // Default the destination to the current session account when it is a
-    // passkey smart account — that is exactly where we want the funds to land.
-    const suggest = loginMethod === 'passkey' && sessionAddress ? sessionAddress : ''
+    setOutcomes(null)
+    setUnlockEntry(null)
+    setUnlockPass('')
+    const suggest = suggestedDest()
     setDestInput(suggest)
     setDestResolved(suggest)
-  }, [loginMethod, sessionAddress])
+  }, [suggestedDest])
 
   const openWizard = useCallback(() => {
     resetWizard()
     setOpen(true)
   }, [resetWizard])
 
+  const busy = phase === 'encrypting' || phase === 'sweeping'
+
   const closeWizard = useCallback(() => {
     if (phase === 'encrypting' || phase === 'sweeping') return // never yank mid-write
+    // Clear any secret material from memory as the sheet closes.
+    setRawSecret('')
+    setPassphrase('')
+    setPassphrase2('')
+    setActive(null)
+    setUnlockPass('')
     setOpen(false)
   }, [phase])
 
-  // Clear any secret material from memory when the sheet fully closes.
-  useEffect(() => {
-    if (!open) {
-      setRawSecret('')
-      setPassphrase('')
-      setPassphrase2('')
-      setActive(null)
-    }
-  }, [open])
-
-  // Step 1→2 handoff: capture the classified secret so later steps don't
-  // re-parse the textarea.
   const goSecure = useCallback(() => {
     const c = classifySecret(rawSecret)
     if (c.kind !== 'privateKey' && c.kind !== 'mnemonic') {
@@ -130,10 +165,12 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
       return
     }
     setActive({ kind: c.kind, address: c.address, secret: c.secret })
+    setBookName('Recovered account')
     setNotice(null)
     setStep('secure')
   }, [rawSecret])
 
+  // Encrypt + store, write the audit record, land on SAVED (recovery is now complete).
   const storeAndContinue = useCallback(async () => {
     if (!active) return
     if (passphrase !== passphrase2) {
@@ -152,55 +189,85 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
       })
       vault.set(entry)
       refreshStored()
+      // Audit WITHOUT key material (address/time/type only). Never breaks recovery.
+      try {
+        captureLegacyRecovery(sessionAddress, chainId, { recoveredAddress: active.address, source: active.kind })
+      } catch { /* audit is best-effort */ }
       setPassphrase('')
       setPassphrase2('')
+      setBookSaved(false)
       setPhase('idle')
-      setStep('transfer')
+      setStep('saved')
     } catch (e) {
       setPhase('idle')
       setNotice({ kind: 'error', text: e.message })
     }
-  }, [active, passphrase, passphrase2, deps, vault, refreshStored])
+  }, [active, passphrase, passphrase2, deps, vault, refreshStored, sessionAddress, chainId])
 
-  const checkBalance = useCallback(async () => {
+  // Save the recovered account to the address book (upsert; usable platform-wide).
+  const saveToBook = useCallback(() => {
+    if (!active) return
+    const notes = `Recovered from legacy ${kindNoun(active.kind)}`
+    try {
+      const found = findByAddress(active.address, chainId)
+      if (found) {
+        updateContact(found.contact.id, { nickname: bookName || found.contact.nickname })
+      } else {
+        addContact({ nickname: bookName || 'Recovered account', addresses: [{ address: active.address, chainId, notes }] })
+      }
+      setBookSaved(true)
+    } catch (e) {
+      setNotice({ kind: 'error', text: `Could not save to the address book: ${e.message}` })
+    }
+  }, [active, bookName, chainId, findByAddress, addContact, updateContact])
+
+  const openTransfer = useCallback(() => {
+    setNotice(null)
+    setQuote(null)
+    setOutcomes(null)
+    const suggest = suggestedDest()
+    setDestInput(suggest)
+    setDestResolved(suggest)
+    setStep('transfer')
+  }, [suggestedDest])
+
+  const checkBalances = useCallback(async () => {
     if (!active) return
     setNotice(null)
     setPhase('quoting')
     try {
-      const q = await quoteNativeSweep({ kind: active.kind, secret: active.secret, provider: deps.provider ?? provider })
+      const q = await quoteAllAssets({ kind: active.kind, secret: active.secret, chainId, provider: deps.provider ?? provider })
       setQuote(q)
       setPhase('idle')
     } catch (e) {
       setPhase('idle')
-      setNotice({ kind: 'error', text: `Could not read the balance on ${networkName}: ${e.reason || e.shortMessage || e.message}` })
+      setNotice({ kind: 'error', text: `Could not read balances on ${networkName}: ${e.reason || e.shortMessage || e.message}` })
     }
-  }, [active, provider, deps.provider, networkName])
+  }, [active, chainId, provider, deps.provider, networkName])
 
   const doSweep = useCallback(async () => {
     if (!active || !destTarget) return
     setNotice(null)
     setPhase('sweeping')
+    setOutcomes([])
     try {
-      const tx = await sweepNativeToSmartAccount({
+      const results = await sweepAllAssets({
         kind: active.kind,
         secret: active.secret,
         to: destTarget,
+        chainId,
         provider: deps.provider ?? provider,
+        onProgress: (o) => setOutcomes((prev) => [...(prev || []), o]),
       })
-      const receipt = await tx.wait()
-      if (receipt?.status === 0) throw new Error('the transfer reverted on-chain')
-      setTxHash(tx.hash)
+      setOutcomes(results)
       setPhase('idle')
-      setStep('done')
+      const anyFail = results.some((r) => r.status === 'failed')
+      if (!anyFail) setStep('done')
     } catch (e) {
       setPhase('idle')
-      setNotice({ kind: 'error', text: `The transfer did not go through: ${e.reason || e.shortMessage || e.message}` })
+      setNotice({ kind: 'error', text: `The transfer could not start: ${e.reason || e.shortMessage || e.message}` })
     }
-  }, [active, destTarget, provider, deps.provider])
-
-  // Stored-entry actions.
-  const [unlockEntry, setUnlockEntry] = useState(null)
-  const [unlockPass, setUnlockPass] = useState('')
+  }, [active, destTarget, chainId, provider, deps.provider])
 
   const startTransferStored = useCallback((entry) => {
     resetWizard()
@@ -219,12 +286,12 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
       setActive({ kind: unlockEntry.kind, address: unlockEntry.address, secret })
       setUnlockPass('')
       setPhase('idle')
-      setStep('transfer')
+      openTransfer()
     } catch (e) {
       setPhase('idle')
       setNotice({ kind: 'error', text: e.message })
     }
-  }, [unlockEntry, unlockPass, deps])
+  }, [unlockEntry, unlockPass, deps, openTransfer])
 
   const removeStored = useCallback((address) => {
     vault.delete(address)
@@ -233,18 +300,31 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
 
   if (!isConnected) return null
 
-  const busy = phase === 'encrypting' || phase === 'sweeping'
   const noticeEl = notice && (
     <p role="alert" className={`lkr-notice lkr-notice--${notice.kind}`}>{notice.text}</p>
   )
 
+  const renderOutcomes = () =>
+    outcomes && outcomes.length > 0 && (
+      <ul className="lkr-outcomes" aria-label="Transfer results">
+        {outcomes.map((o, i) => (
+          <li key={`${o.asset.symbol}-${i}`} className={`lkr-outcome lkr-outcome--${o.status}`}>
+            <span className="lkr-outcome__sym">{o.asset.symbol}</span>
+            <span className="lkr-outcome__status">
+              {o.status === 'sent' ? '✓ sent' : o.status === 'skipped' ? 'skipped' : `failed${o.error ? ` — ${o.error}` : ''}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+
   return (
     <section className="legacy-recovery section" aria-label="Recover a legacy key or word list">
-      <h3>Legacy key & word-list recovery</h3>
+      <h3>Legacy key &amp; word-list recovery</h3>
       <p className="section-description">
         Moving from an older wallet? Bring in a legacy <strong>private key</strong> or <strong>word list</strong>{' '}
-        (recovery phrase). FairWins stores it encrypted on this device and helps you move the funds to a modern
-        smart account — the safer place to keep them.
+        (recovery phrase). FairWins stores it encrypted on this device; you can then optionally move its funds to
+        a smart account and save it to your address book.
       </p>
       <button type="button" className="btn btn-primary legacy-recovery__start" onClick={openWizard}>
         Recover a legacy key
@@ -284,13 +364,13 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
         {step === 'intro' && (
           <div className="recover-step">
             <p>
-              Recover an account from a legacy <strong>private key</strong> or <strong>word list</strong>. This
-              lets you move any funds it holds onto a smart account you control here.
+              Recover an account from a legacy <strong>private key</strong> or <strong>word list</strong>. FairWins
+              stores it encrypted on this device; moving its funds to a smart account is an optional next step.
             </p>
             <ol className="recover-step__list">
               <li>Paste the private key or word list — we detect which it is.</li>
               <li>Choose a passphrase so we can store it encrypted on this device.</li>
-              <li>Move its funds to your smart account in one transaction.</li>
+              <li>Optionally move its funds to a smart account and save it to your address book.</li>
             </ol>
             <p className="recover-step__warn" role="note">
               ⚠ Only paste a key you own. Anyone with this secret controls that account — treat it like cash. We
@@ -320,6 +400,20 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
               autoCapitalize="off"
               aria-label="Private key or recovery word list"
             />
+            {wordSuggestions.length > 0 && (
+              <div className="lkr-suggest" role="group" aria-label="Word suggestions">
+                {wordSuggestions.map((w) => (
+                  <button key={w} type="button" className="lkr-suggest__chip" onClick={() => pickSuggestion(w)}>
+                    {w}
+                  </button>
+                ))}
+              </div>
+            )}
+            {unknownWords.length > 0 && detected.kind !== 'mnemonic' && (
+              <p className="lkr-notice lkr-notice--warn" role="status">
+                Not in the recovery word list: <strong>{unknownWords.join(', ')}</strong>. Check for a typo.
+              </p>
+            )}
             {detected.kind === 'privateKey' || detected.kind === 'mnemonic' ? (
               <p className="recover-step__ok" role="status" data-testid="lkr-detected">
                 ✓ Detected a {KIND_LABEL[detected.kind]} for account <code>{shortAddr(detected.address)}</code>.
@@ -381,8 +475,53 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
                 disabled={busy || passphrase.length < 8 || passphrase !== passphrase2}
                 onClick={storeAndContinue}
               >
-                {phase === 'encrypting' ? 'Encrypting…' : 'Encrypt & continue'}
+                {phase === 'encrypting' ? 'Encrypting…' : 'Encrypt & save'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4 — SAVED: recovery is complete. Optional follow-ups only. */}
+        {step === 'saved' && (
+          <div className="recover-step">
+            <p role="status" className="recover-step__ok" data-testid="lkr-saved">
+              ✓ Recovered. <code>{shortAddr(active?.address)}</code> is stored encrypted on this device.
+            </p>
+            <p>Recovery is complete. These next steps are optional.</p>
+
+            <div className="lkr-saved-action">
+              <p className="lkr-saved-action__title">Save to your address book</p>
+              <p className="lkr-saved-action__hint">Makes this account available everywhere you pick an address.</p>
+              {bookSaved ? (
+                <p className="recover-step__ok" role="status">✓ Saved to your address book.</p>
+              ) : (
+                <div className="lkr-book-row">
+                  <input
+                    type="text"
+                    className="lkr-book-name"
+                    value={bookName}
+                    onChange={(e) => setBookName(e.target.value)}
+                    aria-label="Address book name"
+                    placeholder="Name for this account"
+                  />
+                  <button type="button" className="btn" onClick={saveToBook}>Save to address book</button>
+                </div>
+              )}
+            </div>
+
+            <div className="lkr-saved-action">
+              <p className="lkr-saved-action__title">Move funds to a smart account</p>
+              <p className="lkr-saved-action__hint">
+                Recommended — a smart account supports passkeys, recovery, and gasless actions. Moves all supported
+                assets ({nativeSymbol} and tokens).
+              </p>
+            </div>
+
+            {noticeEl}
+
+            <div className="recover-step__actions">
+              <button type="button" className="btn" onClick={closeWizard}>Done</button>
+              <button type="button" className="btn btn-primary" onClick={openTransfer}>Move funds</button>
             </div>
           </div>
         )}
@@ -390,9 +529,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
         {/* Step 3b — unlock a previously stored key before moving funds. */}
         {step === 'unlock' && (
           <div className="recover-step">
-            <p>
-              Enter the passphrase for <code>{shortAddr(unlockEntry?.address)}</code> to move its funds.
-            </p>
+            <p>Enter the passphrase for <code>{shortAddr(unlockEntry?.address)}</code> to move its funds.</p>
             <label className="lkr-field">
               <span>Passphrase</span>
               <input
@@ -413,15 +550,12 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
           </div>
         )}
 
-        {/* Step 4 — recommend + sweep to a smart account. */}
+        {/* Step 5 — move ALL supported assets to a smart account (optional). */}
         {step === 'transfer' && (
           <div className="recover-step">
-            <p role="status" className="recover-step__ok">
-              ✓ Key for <code>{shortAddr(active?.address)}</code> is stored encrypted on this device.
-            </p>
             <p>
-              We recommend moving the funds to a <strong>smart account</strong> — it supports passkeys, recovery,
-              and gasless actions. Send the {nativeSymbol} balance to the account below.
+              Move the supported assets held by <code>{shortAddr(active?.address)}</code> to a smart account. Send
+              them to the account below.
             </p>
             <div className="recover-step__address-row">
               <div className="recover-step__address-wrap">
@@ -440,58 +574,59 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
             </div>
 
             <div className="recover-step__actions">
-              <button type="button" className="btn" onClick={checkBalance} disabled={phase !== 'idle'}>
-                {phase === 'quoting' ? 'Checking…' : 'Check balance'}
+              <button type="button" className="btn" onClick={checkBalances} disabled={phase !== 'idle'}>
+                {phase === 'quoting' ? 'Checking…' : 'Check balances'}
               </button>
             </div>
 
             {quote && (
               <div className="lkr-quote" role="status">
-                <div><span>Balance</span><strong>{ethers.formatEther(quote.balance)} {nativeSymbol}</strong></div>
-                <div><span>Network fee (reserved)</span><strong>~{ethers.formatEther(quote.gasReserve)} {nativeSymbol}</strong></div>
-                <div><span>Will transfer</span><strong>{ethers.formatEther(quote.sendable)} {nativeSymbol}</strong></div>
-                {quote.sendable <= 0n && (
-                  <p className="lkr-quote__empty">Not enough to cover the network fee — add a little {nativeSymbol} to this account first, or there is nothing to move.</p>
+                {quote.holdings.length === 0 ? (
+                  <p className="lkr-quote__empty">No supported-asset balances found on {networkName} for this account.</p>
+                ) : (
+                  quote.holdings.map((h) => (
+                    <div key={h.asset.id || h.asset.symbol}>
+                      <span>{h.asset.symbol}</span>
+                      <strong>{ethers.formatUnits(h.balance, h.asset.decimals ?? 18)}</strong>
+                    </div>
+                  ))
                 )}
               </div>
             )}
 
             <p className="recover-step__meta-line">
-              Only the {nativeSymbol} balance moves. Tokens (USDC, etc.) on this key stay put — move those from Pay
-              &amp; Transfer after you sign in. Checked on {networkName}.
+              Only platform-supported assets ({nativeSymbol} + supported tokens) are moved — collectibles/NFTs are
+              not. The legacy key pays the network fee from its {nativeSymbol}. Checked on {networkName}.
             </p>
 
+            {renderOutcomes()}
             {noticeEl}
 
             <div className="recover-step__actions">
-              <button type="button" className="btn" onClick={closeWizard} disabled={busy}>Do this later</button>
+              <button type="button" className="btn" onClick={closeWizard} disabled={busy}>
+                {outcomes && outcomes.length ? 'Close' : 'Do this later'}
+              </button>
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={busy || !destTarget || !quote || quote.sendable <= 0n}
+                disabled={busy || !destTarget || !quote || quote.holdings.length === 0}
                 onClick={doSweep}
               >
-                {phase === 'sweeping' ? 'Transferring…' : 'Transfer funds'}
+                {phase === 'sweeping' ? 'Transferring…' : 'Transfer all'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 5 — done. */}
+        {/* Step 6 — done (all assets moved with no failure). */}
         {step === 'done' && (
           <div className="recover-step">
-            <p role="status" className="recover-step__ok">✓ Funds sent to your smart account.</p>
+            <p role="status" className="recover-step__ok">✓ Funds moved to your smart account.</p>
+            {renderOutcomes()}
             <p>
-              The transfer is confirmed. Your legacy key stays encrypted on this device in case you need it again —
-              remove it from the Recovery list once you&apos;re sure it&apos;s empty.
+              Your legacy key stays encrypted on this device in case you need it again — remove it from the Recovery
+              list once you&apos;re sure it&apos;s empty.
             </p>
-            {txHash && network?.explorer?.baseUrl && (
-              <p className="recover-step__hint">
-                <a href={`${network.explorer.baseUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer">
-                  View transaction →
-                </a>
-              </p>
-            )}
             <div className="recover-step__actions">
               <button type="button" className="btn btn-primary" onClick={closeWizard}>Done</button>
             </div>

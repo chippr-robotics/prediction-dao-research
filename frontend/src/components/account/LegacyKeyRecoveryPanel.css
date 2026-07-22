@@ -79,6 +79,30 @@
   border-color: var(--brand-primary, #36b37e);
 }
 
+/* --- BIP-39 word suggestions --- */
+.lkr-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.lkr-suggest__chip {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+}
+
+.lkr-suggest__chip:hover {
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
+}
+
 /* --- Passphrase fields --- */
 .lkr-field {
   display: flex;
@@ -158,4 +182,83 @@
   color: var(--warning-color, #b7791f) !important;
   font-size: 0.82rem !important;
   margin: 4px 0 0 !important;
+}
+
+/* --- SAVED screen optional actions --- */
+.lkr-saved-action {
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+
+.lkr-saved-action__title {
+  margin: 0 0 2px !important;
+  font-weight: 600;
+  color: var(--text-primary, #1f2933) !important;
+  font-size: 0.9rem !important;
+}
+
+.lkr-saved-action__hint {
+  margin: 0 !important;
+  color: var(--text-secondary, #5a6772) !important;
+  font-size: 0.82rem !important;
+}
+
+.lkr-book-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lkr-book-name {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.9rem;
+}
+
+.lkr-book-name:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- Per-asset transfer outcomes --- */
+.lkr-outcomes {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lkr-outcome {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  padding: 4px 0;
+}
+
+.lkr-outcome__sym {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-primary, #1f2933);
+}
+
+.lkr-outcome--sent .lkr-outcome__status {
+  color: var(--brand-primary, #36b37e);
+}
+
+.lkr-outcome--skipped .lkr-outcome__status {
+  color: var(--text-muted, #8a959e);
+}
+
+.lkr-outcome--failed .lkr-outcome__status {
+  color: var(--danger-color, #dc2626);
 }
