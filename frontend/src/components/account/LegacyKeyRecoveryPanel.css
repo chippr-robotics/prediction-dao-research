@@ -1,0 +1,161 @@
+/* Legacy key & word-list recovery. The bottom-sheet shell (ActionSheet.css) and
+   the per-step layout (.recover-step*, RecoverAccountPanel.css) are shared; this
+   file styles only the entry card, the stored-key list, and the secret/quote
+   inputs unique to this panel. Theme tokens (src/theme.css) with light-mode
+   fallbacks so text stays readable in both themes. */
+
+.legacy-recovery__start {
+  margin-top: 8px;
+}
+
+/* --- Stored keys --- */
+.lkr-stored {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lkr-stored__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
+  background: var(--bg-primary, #f7f9fa);
+}
+
+.lkr-stored__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lkr-stored__addr {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.9rem;
+}
+
+.lkr-stored__sub {
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a959e);
+}
+
+.lkr-stored__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lkr-stored__remove {
+  color: var(--danger-color, #dc2626);
+}
+
+/* --- Secret entry --- */
+.lkr-secret-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.lkr-secret-input:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- Passphrase fields --- */
+.lkr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.lkr-field span {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #5a6772);
+}
+
+.lkr-field input {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
+  font-size: 0.95rem;
+}
+
+.lkr-field input:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36b37e);
+}
+
+/* --- Notices --- */
+.lkr-notice {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  margin: 0 0 12px;
+}
+
+.lkr-notice--error {
+  border: 1px solid var(--danger-color, #dc2626);
+  color: var(--danger-color, #dc2626);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
+}
+
+.lkr-notice--warn {
+  border: 1px solid var(--warning-color, #f59e0b);
+  color: var(--text-primary, #1f2933);
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+}
+
+/* --- Balance quote --- */
+.lkr-quote {
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lkr-quote > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+.lkr-quote span {
+  color: var(--text-secondary, #5a6772);
+}
+
+.lkr-quote strong {
+  color: var(--text-primary, #1f2933);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.lkr-quote__empty {
+  color: var(--warning-color, #b7791f) !important;
+  font-size: 0.82rem !important;
+  margin: 4px 0 0 !important;
+}

@@ -93,7 +93,7 @@ describe('ensurePasskeyEncryptionKeys', () => {
     await resolveMasterSeed({ account: ACCOUNT, credentialId: CRED_B, deps: { store, getAssertion: makeAssertion(9) } })
       .catch((e) => {
         expect(e.message).not.toMatch(/Account → Controllers/)
-        expect(e.message).toMatch(/Backup & Security/)
+        expect(e.message).toMatch(/Recovery/)
       })
   })
 

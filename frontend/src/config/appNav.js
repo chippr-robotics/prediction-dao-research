@@ -53,9 +53,11 @@ export const NAV_GROUPS = [
     label: 'Tools',
     items: [
       { id: 'addressbook', label: 'Address Book', icon: 'addressbook' },
-      // Backup + Security combined into one panel (tab id 'security'); the old
-      // 'backup' tab id is kept as a deep-link alias (see WalletPage TAB_ALIASES).
-      { id: 'security', label: 'Backup & Security', icon: 'lock' },
+      // Recovery — data backup, account controllers, legacy key/word-list
+      // recovery, and encryption keys, combined into one panel (tab id
+      // 'security', kept stable). The old 'backup' tab id is a deep-link alias
+      // (see WalletPage TAB_ALIASES).
+      { id: 'security', label: 'Recovery', icon: 'lock' },
       { id: 'reports', label: 'Reporting', icon: 'reports' },
       { id: 'network', label: 'Network', icon: 'globe' },
     ],
