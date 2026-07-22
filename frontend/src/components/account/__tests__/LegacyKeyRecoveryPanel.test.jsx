@@ -43,7 +43,9 @@ vi.mock('../../../data/ledger/sources/legacyRecoverySource', () => ({ captureLeg
 const lib = vi.hoisted(() => ({
   classifySecret: vi.fn(),
   encryptLegacySecret: vi.fn(),
+  encryptLegacySecretWithPasskey: vi.fn(),
   decryptLegacySecret: vi.fn(),
+  decryptLegacySecretWithPasskey: vi.fn(),
   quoteAllAssets: vi.fn(),
   sweepAllAssets: vi.fn(),
   store: new Map(),
@@ -51,7 +53,9 @@ const lib = vi.hoisted(() => ({
 vi.mock('../../../lib/recovery/legacyKeys', () => ({
   classifySecret: lib.classifySecret,
   encryptLegacySecret: lib.encryptLegacySecret,
+  encryptLegacySecretWithPasskey: lib.encryptLegacySecretWithPasskey,
   decryptLegacySecret: lib.decryptLegacySecret,
+  decryptLegacySecretWithPasskey: lib.decryptLegacySecretWithPasskey,
   quoteAllAssets: lib.quoteAllAssets,
   sweepAllAssets: lib.sweepAllAssets,
   legacyKeyVault: () => ({
@@ -109,6 +113,53 @@ describe('LegacyKeyRecoveryPanel', () => {
     )
     // Closing here (Done) leaves recovery complete without moving funds.
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+  })
+
+  it('protects the key with biometrics (no passphrase) when a passkey is available', async () => {
+    const user = userEvent.setup()
+    lib.encryptLegacySecretWithPasskey.mockResolvedValue({ v: 2, protection: 'passkey', address: LEGACY_ADDR, credentialId: 'cred-1', importedAt: 1, ct: 'x' })
+    // deps.readSession makes a passkey credential available → biometric-first.
+    render(<LegacyKeyRecoveryPanel deps={{ readSession: () => ({ credentialId: 'cred-1' }) }} />)
+    await user.click(screen.getByRole('button', { name: 'Recover a legacy key' }))
+    await user.click(screen.getByRole('button', { name: 'Get started' }))
+    lib.classifySecret.mockReturnValue({ kind: 'privateKey', address: LEGACY_ADDR, secret: '0xkey' })
+    await user.type(screen.getByLabelText('Private key or recovery word list'), '0xkey')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    // Biometric step: no passphrase fields, a "Protect with biometrics" action.
+    expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Protect with biometrics' }))
+    await waitFor(() =>
+      expect(lib.encryptLegacySecretWithPasskey).toHaveBeenCalledWith(expect.objectContaining({ credentialId: 'cred-1' }))
+    )
+    expect(lib.encryptLegacySecret).not.toHaveBeenCalled()
+    expect(await screen.findByTestId('lkr-saved')).toBeInTheDocument()
+  })
+
+  it('lets the member fall back to a passphrase from the biometric step', async () => {
+    const user = userEvent.setup()
+    render(<LegacyKeyRecoveryPanel deps={{ readSession: () => ({ credentialId: 'cred-1' }) }} />)
+    await user.click(screen.getByRole('button', { name: 'Recover a legacy key' }))
+    await user.click(screen.getByRole('button', { name: 'Get started' }))
+    lib.classifySecret.mockReturnValue({ kind: 'privateKey', address: LEGACY_ADDR, secret: '0xkey' })
+    await user.type(screen.getByLabelText('Private key or recovery word list'), '0xkey')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Use a passphrase instead' }))
+    expect(screen.getByLabelText('Passphrase')).toBeInTheDocument()
+  })
+
+  it('unlocks a biometric-protected stored key without a passphrase', async () => {
+    lib.store.set(LEGACY_ADDR.toLowerCase(), { protection: 'passkey', kind: 'privateKey', address: LEGACY_ADDR, importedAt: 42, credentialId: 'cred-1', ct: 'x' })
+    lib.decryptLegacySecretWithPasskey.mockResolvedValue('0xkey')
+    lib.quoteAllAssets.mockResolvedValue({ from: LEGACY_ADDR, holdings: [], nativeGasReserve: 1n, hasNative: false })
+    const user = userEvent.setup()
+    render(<LegacyKeyRecoveryPanel />)
+    await user.click(screen.getByRole('button', { name: 'Move funds' }))
+    // No passphrase field — biometric unlock button instead.
+    expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Unlock with biometrics' }))
+    await waitFor(() => expect(lib.decryptLegacySecretWithPasskey).toHaveBeenCalled())
+    expect(await screen.findByLabelText('Destination smart account')).toBeInTheDocument()
   })
 
   it('suggests BIP-39 completions while typing a word list', async () => {

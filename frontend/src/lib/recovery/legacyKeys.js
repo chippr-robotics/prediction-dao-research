@@ -24,11 +24,18 @@ import { ethers } from 'ethers'
 import { getPortfolioRegistry } from '../../config/assetTaxonomy'
 import { TRANSFER_ABI } from '../transfer/eip3009Transfer'
 import { loadLegacyRecoveredKeys, saveLegacyRecoveredKeys } from './legacyRecoveredKeysStore'
+import { getAssertion } from '../passkey/credentials'
+import { prfSalt, EncryptionUnavailable } from '../passkey/prfKeys'
 
 // PBKDF2 work factor. OWASP's 2023 floor for PBKDF2-HMAC-SHA256 is 600k; we sit
 // above it. Stored per-entry so a future bump stays backward-compatible.
 export const PBKDF2_ITERATIONS = 650000
 const MIN_PASSPHRASE_LEN = 8
+
+// HKDF context for the biometric (passkey-PRF) wrapping key. Distinct from the
+// spec-041 master-seed KEK info ('fairwins-kek-v1') so the same PRF output can
+// never derive both keys — domain separation.
+const LEGACY_PRF_KEK_INFO = new TextEncoder().encode('fairwins-legacy-kek-v1')
 
 // BIP-39 word lists come in these lengths only.
 const VALID_WORD_COUNTS = [12, 15, 18, 21, 24]
@@ -145,6 +152,86 @@ export async function decryptLegacySecret({ entry, passphrase, deps = {} }) {
   } catch {
     throw new Error('That passphrase did not unlock this key. Check it and try again.')
   }
+}
+
+// Derive an AES-GCM wrapping key from a passkey PRF assertion output (biometric).
+async function kekFromPrfOutput(prfOutput, subtle) {
+  const ikm = await subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey'])
+  return subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: LEGACY_PRF_KEK_INFO },
+    ikm,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+async function runPrfAssertion(credentialId, deps) {
+  const assertion = await (deps.getAssertion ?? getAssertion)({
+    challenge: randomBytes(32),
+    credentialId,
+    prfSalt: (deps.prfSalt ?? prfSalt)(),
+    deps: deps.assertionDeps,
+  })
+  if (!assertion?.prfOutput) {
+    throw new EncryptionUnavailable('this passkey/authenticator cannot derive biometric key material (PRF unsupported)')
+  }
+  return assertion.prfOutput
+}
+
+/**
+ * Encrypt a classified secret at rest under a BIOMETRIC (passkey-PRF) key — no
+ * passphrase. One WebAuthn assertion (Face/Touch ID) yields the PRF output; the
+ * secret is wrapped under an AES-GCM key derived from it. Unlockable only by the
+ * same passkey on this account, so a stolen blob is useless without the device's
+ * biometric. The returned entry records `protection:'passkey'` + the credential
+ * id so unlock knows which ceremony to run.
+ *
+ * @returns {Promise<object>} vault entry (v2, passkey-protected)
+ */
+export async function encryptLegacySecretWithPasskey({ secret, kind, address, credentialId, deps = {} }) {
+  if (!secret) throw new Error('Nothing to encrypt.')
+  if (!credentialId) throw new EncryptionUnavailable('no passkey is available on this device to protect the key')
+  const subtle = subtleOf(deps)
+  const prfOutput = await runPrfAssertion(credentialId, deps)
+  const key = await kekFromPrfOutput(prfOutput, subtle)
+  const iv = randomBytes(12)
+  const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(secret)))
+  return {
+    v: 2,
+    protection: 'passkey',
+    kind,
+    address,
+    credentialId,
+    iv: toB64(iv),
+    ct: toB64(ct),
+    importedAt: deps.now ?? Date.now(),
+  }
+}
+
+/** Recover a biometric-protected secret (one WebAuthn assertion). Fails closed. */
+export async function decryptLegacySecretWithPasskey({ entry, deps = {} }) {
+  if (!entry?.credentialId) throw new Error('This stored key is missing its passkey reference.')
+  const subtle = subtleOf(deps)
+  const prfOutput = await runPrfAssertion(entry.credentialId, deps)
+  const key = await kekFromPrfOutput(prfOutput, subtle)
+  try {
+    const pt = await subtle.decrypt({ name: 'AES-GCM', iv: fromB64(entry.iv) }, key, fromB64(entry.ct))
+    return new TextDecoder().decode(pt)
+  } catch {
+    throw new Error('Biometric unlock did not recover this key on this device.')
+  }
+}
+
+/**
+ * Unified unlock: recover the raw secret from a vault entry regardless of how it
+ * was protected. Passkey entries run a biometric assertion (no passphrase);
+ * passphrase entries need `passphrase`. Callers that sign as a legacy account use
+ * this so the unlock method is transparent to them.
+ */
+export async function unlockLegacySecret({ entry, passphrase, deps = {} }) {
+  if (entry?.protection === 'passkey') return decryptLegacySecretWithPasskey({ entry, deps })
+  return decryptLegacySecret({ entry, passphrase, deps })
 }
 
 /**

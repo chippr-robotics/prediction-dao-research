@@ -29,11 +29,14 @@ import ActionSheet from './ActionSheet'
 import {
   classifySecret,
   encryptLegacySecret,
+  encryptLegacySecretWithPasskey,
   decryptLegacySecret,
+  decryptLegacySecretWithPasskey,
   legacyKeyVault,
   quoteAllAssets,
   sweepAllAssets,
 } from '../../lib/recovery/legacyKeys'
+import { readSession } from '../../connectors/passkey'
 import { suggestWords, applySuggestion, currentWord, unknownWordsIn } from '../../lib/recovery/bip39Suggest'
 import './LegacyKeyRecoveryPanel.css'
 
@@ -69,6 +72,13 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const [passphrase, setPassphrase] = useState('')
   const [passphrase2, setPassphrase2] = useState('')
   const [active, setActive] = useState(null) // { kind, address, secret }
+
+  // Biometric-first protection: when the session is a passkey, protect the key
+  // with this device's biometrics (no password); fall back to a passphrase only
+  // when biometrics aren't available or the member opts out.
+  const sessionCredentialId = useMemo(() => (deps.readSession ?? readSession)()?.credentialId || null, [deps.readSession])
+  const biometricAvailable = loginMethod === 'passkey' && Boolean(sessionCredentialId)
+  const [protectMode, setProtectMode] = useState('passkey') // 'passkey' | 'passphrase'
 
   // Save-to-address-book state (on the SAVED screen).
   const [bookName, setBookName] = useState('')
@@ -136,10 +146,11 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     setOutcomes(null)
     setUnlockEntry(null)
     setUnlockPass('')
+    setProtectMode(biometricAvailable ? 'passkey' : 'passphrase')
     const suggest = suggestedDest()
     setDestInput(suggest)
     setDestResolved(suggest)
-  }, [suggestedDest])
+  }, [suggestedDest, biometricAvailable])
 
   const openWizard = useCallback(() => {
     resetWizard()
@@ -167,27 +178,39 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     }
     setActive({ kind: c.kind, address: c.address, secret: c.secret })
     setBookName('Recovered account')
+    setProtectMode(biometricAvailable ? 'passkey' : 'passphrase')
     setNotice(null)
     setStep('secure')
-  }, [rawSecret])
+  }, [rawSecret, biometricAvailable])
 
   // Encrypt + store, write the audit record, land on SAVED (recovery is now complete).
+  // Biometric protection uses a WebAuthn assertion (no passphrase); the passphrase
+  // path is the fallback.
   const storeAndContinue = useCallback(async () => {
     if (!active) return
-    if (passphrase !== passphrase2) {
+    const usePasskey = protectMode === 'passkey' && biometricAvailable
+    if (!usePasskey && passphrase !== passphrase2) {
       setNotice({ kind: 'error', text: 'The two passphrases do not match.' })
       return
     }
     setNotice(null)
     setPhase('encrypting')
     try {
-      const entry = await encryptLegacySecret({
-        secret: active.secret,
-        kind: active.kind,
-        address: active.address,
-        passphrase,
-        deps,
-      })
+      const entry = usePasskey
+        ? await encryptLegacySecretWithPasskey({
+            secret: active.secret,
+            kind: active.kind,
+            address: active.address,
+            credentialId: sessionCredentialId,
+            deps,
+          })
+        : await encryptLegacySecret({
+            secret: active.secret,
+            kind: active.kind,
+            address: active.address,
+            passphrase,
+            deps,
+          })
       vault.set(entry)
       refreshStored()
       // Audit WITHOUT key material (address/time/type only). Never breaks recovery.
@@ -203,7 +226,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
       setPhase('idle')
       setNotice({ kind: 'error', text: e.message })
     }
-  }, [active, passphrase, passphrase2, deps, vault, refreshStored, sessionAddress, chainId])
+  }, [active, protectMode, biometricAvailable, sessionCredentialId, passphrase, passphrase2, deps, vault, refreshStored, sessionAddress, chainId])
 
   // Save the recovered account to the address book (upsert; usable platform-wide).
   const saveToBook = useCallback(() => {
@@ -285,7 +308,9 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     setNotice(null)
     setPhase('encrypting')
     try {
-      const secret = await decryptLegacySecret({ entry: unlockEntry, passphrase: unlockPass, deps })
+      const secret = unlockEntry.protection === 'passkey'
+        ? await decryptLegacySecretWithPasskey({ entry: unlockEntry, deps })
+        : await decryptLegacySecret({ entry: unlockEntry, passphrase: unlockPass, deps })
       setActive({ kind: unlockEntry.kind, address: unlockEntry.address, secret })
       setUnlockPass('')
       setPhase('idle')
@@ -445,45 +470,91 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
           </div>
         )}
 
-        {/* Step 3 — passphrase → encrypt at rest. */}
+        {/* Step 3 — protect at rest: biometrics first, passphrase fallback. */}
         {step === 'secure' && (
           <div className="recover-step">
-            <p>
-              Choose a passphrase to encrypt this {active ? KIND_LABEL[active.kind] : 'key'} on this device. You
-              will need it to move funds later. <strong>We can&apos;t reset it</strong> — if you forget it, the
-              stored copy is unrecoverable (your original key still works).
-            </p>
-            <label className="lkr-field">
-              <span>Passphrase</span>
-              <input
-                type="password"
-                value={passphrase}
-                onChange={(e) => { setPassphrase(e.target.value); setNotice(null) }}
-                placeholder="At least 8 characters"
-                autoComplete="new-password"
-              />
-            </label>
-            <label className="lkr-field">
-              <span>Confirm passphrase</span>
-              <input
-                type="password"
-                value={passphrase2}
-                onChange={(e) => { setPassphrase2(e.target.value); setNotice(null) }}
-                autoComplete="new-password"
-              />
-            </label>
-            {noticeEl}
-            <div className="recover-step__actions">
-              <button type="button" className="btn" onClick={() => setStep('enter')} disabled={busy}>Back</button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={busy || passphrase.length < 8 || passphrase !== passphrase2}
-                onClick={storeAndContinue}
-              >
-                {phase === 'encrypting' ? 'Encrypting…' : 'Encrypt & save'}
-              </button>
-            </div>
+            {protectMode === 'passkey' && biometricAvailable ? (
+              <>
+                <p>
+                  Protect this {active ? KIND_LABEL[active.kind] : 'key'} with <strong>this device&apos;s
+                  biometrics</strong> (Face/Touch ID). No password to remember — only this passkey can unlock it,
+                  and it stays encrypted on this device.
+                </p>
+                <p className="recover-step__hint">
+                  Uses the same passkey you sign in with. If you replace this device, unlock again there or
+                  re-import your original {active ? KIND_LABEL[active.kind] : 'key'}.
+                </p>
+                {noticeEl}
+                <div className="recover-step__actions">
+                  <button type="button" className="btn" onClick={() => setStep('enter')} disabled={busy}>Back</button>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={storeAndContinue}>
+                    {phase === 'encrypting' ? 'Confirming…' : 'Protect with biometrics'}
+                  </button>
+                </div>
+                <p className="lkr-alt">
+                  <button type="button" className="lkr-linkbtn" onClick={() => { setNotice(null); setProtectMode('passphrase') }}>
+                    Use a passphrase instead
+                  </button>
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Choose a passphrase to encrypt this {active ? KIND_LABEL[active.kind] : 'key'} on this device. You
+                  will need it to move funds later. <strong>We can&apos;t reset it</strong> — if you forget it, the
+                  stored copy is unrecoverable (your original key still works). You can save it in your password
+                  manager.
+                </p>
+                {/* Hidden identity hint so password managers offer to save this passphrase against the account. */}
+                <input
+                  type="text"
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  autoComplete="username"
+                  value={active?.address || ''}
+                  readOnly
+                />
+                <label className="lkr-field">
+                  <span>Passphrase</span>
+                  <input
+                    type="password"
+                    value={passphrase}
+                    onChange={(e) => { setPassphrase(e.target.value); setNotice(null) }}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="lkr-field">
+                  <span>Confirm passphrase</span>
+                  <input
+                    type="password"
+                    value={passphrase2}
+                    onChange={(e) => { setPassphrase2(e.target.value); setNotice(null) }}
+                    autoComplete="new-password"
+                  />
+                </label>
+                {noticeEl}
+                <div className="recover-step__actions">
+                  <button type="button" className="btn" onClick={() => setStep('enter')} disabled={busy}>Back</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={busy || passphrase.length < 8 || passphrase !== passphrase2}
+                    onClick={storeAndContinue}
+                  >
+                    {phase === 'encrypting' ? 'Encrypting…' : 'Encrypt & save'}
+                  </button>
+                </div>
+                {biometricAvailable && (
+                  <p className="lkr-alt">
+                    <button type="button" className="lkr-linkbtn" onClick={() => { setNotice(null); setProtectMode('passkey') }}>
+                      Use this device&apos;s biometrics instead
+                    </button>
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -535,24 +606,42 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
         {/* Step 3b — unlock a previously stored key before moving funds. */}
         {step === 'unlock' && (
           <div className="recover-step">
-            <p>Enter the passphrase for <code>{shortAddr(unlockEntry?.address)}</code> to move its funds.</p>
-            <label className="lkr-field">
-              <span>Passphrase</span>
-              <input
-                type="password"
-                value={unlockPass}
-                onChange={(e) => { setUnlockPass(e.target.value); setNotice(null) }}
-                autoComplete="off"
-                aria-label="Passphrase"
-              />
-            </label>
-            {noticeEl}
-            <div className="recover-step__actions">
-              <button type="button" className="btn" onClick={closeWizard} disabled={busy}>Cancel</button>
-              <button type="button" className="btn btn-primary" disabled={busy || !unlockPass} onClick={doUnlock}>
-                {phase === 'encrypting' ? 'Unlocking…' : 'Unlock'}
-              </button>
-            </div>
+            {unlockEntry?.protection === 'passkey' ? (
+              <>
+                <p>
+                  Unlock <code>{shortAddr(unlockEntry?.address)}</code> with <strong>this device&apos;s
+                  biometrics</strong> to move its funds.
+                </p>
+                {noticeEl}
+                <div className="recover-step__actions">
+                  <button type="button" className="btn" onClick={closeWizard} disabled={busy}>Cancel</button>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={doUnlock}>
+                    {phase === 'encrypting' ? 'Confirming…' : 'Unlock with biometrics'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>Enter the passphrase for <code>{shortAddr(unlockEntry?.address)}</code> to move its funds.</p>
+                <label className="lkr-field">
+                  <span>Passphrase</span>
+                  <input
+                    type="password"
+                    value={unlockPass}
+                    onChange={(e) => { setUnlockPass(e.target.value); setNotice(null) }}
+                    autoComplete="off"
+                    aria-label="Passphrase"
+                  />
+                </label>
+                {noticeEl}
+                <div className="recover-step__actions">
+                  <button type="button" className="btn" onClick={closeWizard} disabled={busy}>Cancel</button>
+                  <button type="button" className="btn btn-primary" disabled={busy || !unlockPass} onClick={doUnlock}>
+                    {phase === 'encrypting' ? 'Unlocking…' : 'Unlock'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

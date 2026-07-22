@@ -160,3 +160,35 @@
 .recover-step__actions .btn {
   flex: 1;
 }
+
+/* Buttons inside a recovery sheet step. The global button{} paints
+   --bg-secondary (DARKER than the --surface-color sheet) with a transparent
+   border, so actions read as low-contrast dark rectangles and .btn-primary —
+   which has no base rule — looks identical to the secondary. Give both a clear
+   affordance that works in light and dark. Shared by both recovery panels. */
+.recover-step .btn {
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 26%, transparent);
+  color: var(--text-primary, #1f2933);
+  font-weight: 600;
+}
+
+.recover-step .btn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+}
+
+.recover-step .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.recover-step .btn-primary {
+  background: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary, #36b37e);
+  color: #fff;
+}
+
+.recover-step .btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+}

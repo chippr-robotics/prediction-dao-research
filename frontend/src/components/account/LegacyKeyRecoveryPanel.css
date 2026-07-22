@@ -24,7 +24,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 10px;
   background: var(--bg-primary, #f7f9fa);
 }
@@ -64,7 +64,7 @@
   resize: vertical;
   min-height: 64px;
   padding: 10px 12px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 8px;
   background: var(--bg-primary, #f7f9fa);
   color: var(--text-primary, #1f2933);
@@ -92,7 +92,7 @@
   font-size: 0.82rem;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   background: var(--bg-primary, #f7f9fa);
   color: var(--text-primary, #1f2933);
   cursor: pointer;
@@ -101,6 +101,26 @@
 .lkr-suggest__chip:hover {
   border-color: var(--brand-primary, #36b37e);
   color: var(--brand-primary, #36b37e);
+}
+
+/* --- Protection fallback link --- */
+.lkr-alt {
+  text-align: center;
+  margin: 10px 0 0 !important;
+}
+
+.lkr-linkbtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brand-primary, #36b37e);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lkr-linkbtn:hover {
+  text-decoration: underline;
 }
 
 /* --- Passphrase fields --- */
@@ -118,7 +138,7 @@
 
 .lkr-field input {
   padding: 10px 12px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 8px;
   background: var(--bg-primary, #f7f9fa);
   color: var(--text-primary, #1f2933);
@@ -152,7 +172,7 @@
 
 /* --- Balance quote --- */
 .lkr-quote {
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 10px;
   padding: 10px 12px;
   margin: 12px 0;
@@ -195,10 +215,14 @@
 }
 
 /* --- SAVED screen optional actions --- */
+/* On the --surface-color sheet the plain --border-color is nearly invisible, so
+   these optional-action cards vanished. Lift them with a faint fill + a
+   text-derived border that stays visible in both themes. */
 .lkr-saved-action {
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 16%, transparent);
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 12px;
   margin: 10px 0;
 }
 
@@ -225,7 +249,7 @@
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 8px;
   background: var(--bg-primary, #f7f9fa);
   color: var(--text-primary, #1f2933);
