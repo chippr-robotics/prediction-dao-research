@@ -87,13 +87,13 @@ beforeEach(() => {
 })
 
 describe('EarnPanel hub (US1)', () => {
-  it('shows all earning areas with future ones honestly disabled', () => {
+  it('shows all earning areas — Stake now live (spec 065), Bridges still honestly disabled', () => {
     renderPanel()
     expect(screen.getByRole('button', { name: /^Lend/ })).toBeEnabled()
     expect(screen.getByRole('button', { name: /^Rewards/ })).toBeEnabled()
-    expect(screen.getByRole('button', { name: /^Stake/ })).toBeDisabled()
+    // Spec 065 flipped Stake live; Bridges remains the honest "coming later" area.
+    expect(screen.getByRole('button', { name: /^Stake/ })).toBeEnabled()
     expect(screen.getByRole('button', { name: /^Bridges/ })).toBeDisabled()
-    expect(screen.getAllByText(/not available in the app yet/i).length).toBeGreaterThan(0)
   })
 
   it('displays protocol attribution, risk disclosure, and the docs link (FR-012/FR-014)', () => {

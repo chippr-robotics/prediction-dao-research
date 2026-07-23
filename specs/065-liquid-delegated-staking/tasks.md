@@ -105,36 +105,36 @@ all three options, and a working stake flow that reflects the new position.
 
 **Independent test**: quickstart.md Scenarios 1, 2 (stake side), and 5.
 
-- [ ] T017 [US1] Implement `frontend/src/hooks/useStakingOptions.js` — normalized `StakingOption[]` for
+- [X] T017 [US1] Implement `frontend/src/hooks/useStakingOptions.js` — normalized `StakingOption[]` for
       the active chain (Lido + sPOL from config; delegated from the curated allowlist decorated with
       live commission/APR/status), list status `loading|ready|unavailable`, capability-gated no-op on
       non-staking chains
-- [ ] T018 [US1] Implement `frontend/src/hooks/useStakingPositions.js` — on-chain positions per option
+- [X] T018 [US1] Implement `frontend/src/hooks/useStakingPositions.js` — on-chain positions per option
       (wstETH/sPOL held → underlying via rate; delegated `getTotalStake`), 60s poll, per account+chain
       scope, honest degradation when enrichment fails (unbond/ready wiring added in US2)
-- [ ] T019 [US1] Implement `frontend/src/hooks/useStakingActions.js` — stake path only: build calls via
+- [X] T019 [US1] Implement `frontend/src/hooks/useStakingActions.js` — stake path only: build calls via
       `stakingActions` dispatcher and submit through the spec-041 unified send rail (`useEarnSend`),
       returning pending/success/failure + receipt
-- [ ] T020 [US1] Build `frontend/src/components/earn/StakeView.jsx` (option list mirroring
+- [X] T020 [US1] Build `frontend/src/components/earn/StakeView.jsx` (option list mirroring
       `EarnLendView`: one card per option with asset, model badge Liquid/Delegated, APR, total staked,
       provider/validator, unbonding/lock-up terms, LST symbol, InfoTips from `stakingCopy`; `?token=`
       prefilter; loading/unavailable/empty states) and `frontend/src/components/earn/StakingPositionsList.jsx`
-- [ ] T021 [US1] Build `frontend/src/components/earn/StakeSheet.jsx` **stake mode** — bottom sheet
+- [X] T021 [US1] Build `frontend/src/components/earn/StakeSheet.jsx` **stake mode** — bottom sheet
       reusing `.asset-sheet-*` (amount + Max with gas reserve, pre-wallet validation, two-prompt
       approval explanation for ERC-20 paths, plain-English summary disclosing the LST received /
       delegation + unbonding, slashing disclosure for delegated, no fee line while fee-free,
       pending/success/failure with tx link)
-- [ ] T022 [US1] Flip the Earn hub: in `frontend/src/components/earn/EarnPanel.jsx` replace the disabled
+- [X] T022 [US1] Flip the Earn hub: in `frontend/src/components/earn/EarnPanel.jsx` replace the disabled
       "Stake" card with `openView('stake')`, add `{view === 'stake' && <StakeView ... />}`, and add the
       Powered-by / risk-disclosure for the staking area; extend `frontend/src/components/earn/Earn.css`
       with Liquid/Delegated badges + unbonding/ready rows
-- [ ] T023 [P] [US1] Component tests `frontend/src/test/staking/StakeView.test.jsx` (option rows incl.
+- [X] T023 [P] [US1] Component tests `frontend/src/test/staking/StakeView.test.jsx` (option rows incl.
       null-APY "—", model badges, unbonding term shown, unavailable disables staking, `?token=` prefilter)
       with mocked hooks
-- [ ] T024 [P] [US1] Component tests `frontend/src/test/staking/StakeSheet.test.jsx` (stake validation
+- [X] T024 [P] [US1] Component tests `frontend/src/test/staking/StakeSheet.test.jsx` (stake validation
       pre-wallet incl. gas reserve, two-prompt copy, sPOL/Lido/delegated summaries, slashing disclosure
       for delegated) with mocked actions
-- [ ] T025 [P] [US1] Accessibility tests `frontend/src/test/staking/StakePanel.axe.test.jsx` (Stake view
+- [X] T025 [P] [US1] Accessibility tests `frontend/src/test/staking/StakePanel.axe.test.jsx` (Stake view
       + stake sheet render with no axe violations)
 
 **Checkpoint**: MVP — a member can discover Staking, stake via any of the three options, and see the

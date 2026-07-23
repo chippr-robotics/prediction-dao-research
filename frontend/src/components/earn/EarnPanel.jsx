@@ -23,11 +23,13 @@ import { getEarnNetworks } from '../../config/networks'
 import InfoTip from '../ui/InfoTip'
 import EarnLendView from './EarnLendView'
 import EarnRewardsView from './EarnRewardsView'
+import StakeView from './StakeView'
 import { EARN_TIPS, EARN_DISCLOSURE, EARN_AREAS_FUTURE } from '../../lib/earn/earnCopy'
+import { STAKING_AREA_DESC } from '../../lib/staking/stakingCopy'
 import './Earn.css'
 
 const EARN_DOCS_URL = 'https://docs.FairWins.app/user-guide/earn/'
-const VIEWS = ['home', 'lend', 'rewards']
+const VIEWS = ['home', 'lend', 'rewards', 'stake']
 
 export default function EarnPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -81,19 +83,14 @@ export default function EarnPanel() {
             </span>
           </button>
 
-          {/* Future areas render honestly disabled — same pattern as the
-              portfolio's Stake action (constitution III: no dead buttons
-              without a reason, no pretend features). */}
-          <button
-            type="button"
-            className="earn-area-card"
-            disabled
-            title={EARN_AREAS_FUTURE.staking}
-          >
+          {/* Staking (spec 065) is now live. */}
+          <button type="button" className="earn-area-card" onClick={() => openView('stake')}>
             <span className="earn-area-name">Stake</span>
-            <span className="earn-area-desc">{EARN_AREAS_FUTURE.staking}</span>
-            <span className="earn-area-flag">Coming later</span>
+            <span className="earn-area-desc">{STAKING_AREA_DESC}</span>
           </button>
+
+          {/* Bridges remains an honest "not yet available" area (constitution
+              III: no dead buttons without a reason, no pretend features). */}
           <button
             type="button"
             className="earn-area-card"
@@ -115,6 +112,7 @@ export default function EarnPanel() {
 
       {view === 'lend' && <EarnLendView tokenFilter={tokenFilter} />}
       {view === 'rewards' && <EarnRewardsView />}
+      {view === 'stake' && <StakeView tokenFilter={tokenFilter} />}
 
       <footer className="earn-footer">
         {earnConfig?.provider && (

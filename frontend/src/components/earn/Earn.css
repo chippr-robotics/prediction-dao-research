@@ -457,3 +457,39 @@
 .earn-docs-link {
   font-size: 0.85rem;
 }
+
+/* Staking (spec 065) — badges + unbonding/ready flags on option/position rows. */
+.staking-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+.staking-badge.liquid {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+.staking-badge.delegated {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+.staking-ready-flag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #15803d;
+}
+.staking-unbonding-flag {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #92700e;
+}
+.earn-disclosure {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  margin-top: 0.75rem;
+  line-height: 1.4;
+}
