@@ -21,7 +21,7 @@ vi.mock('../../lib/staking/lidoStaking', () => ({
 }))
 vi.mock('../../lib/staking/spolStaking', () => ({ readSpolOpenNonces: async () => [] }))
 vi.mock('../../lib/staking/polygonDelegation', () => ({
-  readLatestUnbond: async () => null,
+  readOpenUnbonds: async () => [],
   readStakeManagerTiming: async () => ({ epoch: 100n, withdrawalDelay: 80n }),
 }))
 vi.mock('../../utils/rpcProvider', () => ({ makeReadProvider: () => ({}) }))

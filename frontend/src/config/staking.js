@@ -19,7 +19,8 @@ import { getAddress } from 'ethers'
 // Position refresh cadence — aligned with usePortfolio / useEarnPositions.
 export const STAKING_POLL_MS = 60_000
 
-// Lido APR (7-day SMA) — public, no auth. `data.smaApr` is a fraction.
+// Lido APR (7-day SMA) — public, no auth. `data.smaApr` is a PERCENTAGE
+// (e.g. 3.2 means 3.2%); fetchLidoApr normalizes it to a fraction (÷100).
 export const LIDO_APR_API = 'https://eth-api.lido.fi/v1/protocol/steth/apr/sma'
 
 // Official Polygon staking API v2 — validator list, commission, status. APR is

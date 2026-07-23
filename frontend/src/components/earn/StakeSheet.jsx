@@ -167,7 +167,13 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
 
   const submitStake = async () => {
     if (amount === undefined) return setInputError('Enter a valid number.')
-    const check = validateStakeAmount({ amount, walletBalance, isNative })
+    const check = validateStakeAmount({
+      amount,
+      walletBalance,
+      isNative,
+      minStakeRaw: option.minStakeRaw ?? null,
+      maxStakeRaw: option.maxStakeRaw ?? null,
+    })
     if (!check.ok) return setInputError(check.reason)
     setInputError(null)
     if (!guard()) return
@@ -262,7 +268,11 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
                 <p className="staking-ready-flag">Ready to withdraw</p>
                 {readyExits.map((exit, i) => (
                   <div key={i} className="staking-ready-row">
-                    <span>{fmt(exit.amountRaw, decimals, symbol)}</span>
+                    <span>
+                      {exit.amountRaw != null
+                        ? fmt(exit.amountRaw, decimals, symbol)
+                        : `Your unbonded ${symbol}`}
+                    </span>
                     <button
                       type="button"
                       className="earn-btn primary"

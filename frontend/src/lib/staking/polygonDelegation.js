@@ -135,23 +135,47 @@ export function buildDelegationClaimCalls({ validatorShare }) {
   }
 }
 
+// How many prior unbond nonces to scan back from the latest. A delegator makes
+// at most a handful of unstake requests; this bounds the reads while covering
+// every realistically-open unbond.
+const UNBOND_SCAN_WINDOW = 20n
+
 /**
- * Read the member's latest unbond for a validator and whether it is claimable.
- * Returns { unbondNonce, withdrawEpoch, shares, ready } or null when none.
+ * Read ALL of the member's open unbonds for a validator (not just the latest) —
+ * a delegator can have several in flight, and an earlier nonce can mature while
+ * a later one is still waiting. Scans back a bounded window of nonces and
+ * returns every one that still has shares, with its claimable flag.
+ * Returns [{ unbondNonce, withdrawEpoch, shares, ready }] (newest first).
  */
-export async function readLatestUnbond({ validatorShare, account, provider, epoch, withdrawalDelay }) {
+export async function readOpenUnbonds({ validatorShare, account, provider, epoch, withdrawalDelay }) {
   const vs = new Contract(validatorShare, POLYGON_VALIDATOR_SHARE_ABI, provider)
-  const nonce = await vs.unbondNonces(account)
-  if (nonce === 0n) return null
-  const unbond = await vs.unbonds_new(account, nonce)
-  const shares = BigInt(unbond.shares ?? unbond[0])
-  if (shares === 0n) return null
-  const withdrawEpoch = BigInt(unbond.withdrawEpoch ?? unbond[1])
-  const ready =
-    epoch != null && withdrawalDelay != null
-      ? withdrawEpoch + BigInt(withdrawalDelay) <= BigInt(epoch)
-      : false
-  return { unbondNonce: nonce.toString(), withdrawEpoch: withdrawEpoch.toString(), shares, ready }
+  const latest = await vs.unbondNonces(account)
+  if (latest === 0n) return []
+  const from = latest > UNBOND_SCAN_WINDOW ? latest - UNBOND_SCAN_WINDOW + 1n : 1n
+  const nonces = []
+  for (let n = latest; n >= from; n -= 1n) nonces.push(n)
+  const rows = await Promise.all(nonces.map((n) => vs.unbonds_new(account, n).then((u) => ({ n, u }))))
+  const out = []
+  for (const { n, u } of rows) {
+    const shares = BigInt(u.shares ?? u[0])
+    if (shares === 0n) continue // already withdrawn / never used
+    const withdrawEpoch = BigInt(u.withdrawEpoch ?? u[1])
+    const ready =
+      epoch != null && withdrawalDelay != null
+        ? withdrawEpoch + BigInt(withdrawalDelay) <= BigInt(epoch)
+        : false
+    out.push({ unbondNonce: n.toString(), withdrawEpoch: withdrawEpoch.toString(), shares, ready })
+  }
+  return out
+}
+
+/**
+ * Convenience: the most recent open unbond (or null). Kept for callers that
+ * only need a single "is anything unbonding?" signal.
+ */
+export async function readLatestUnbond(args) {
+  const open = await readOpenUnbonds(args)
+  return open[0] || null
 }
 
 /** Human label for the delegation unbonding period from the on-chain delay. */

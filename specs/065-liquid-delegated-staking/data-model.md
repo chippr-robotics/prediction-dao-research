@@ -83,7 +83,13 @@ Transitions: stake ⇒ staked↑ / lst↑; unstake ⇒ opens an `UnstakeRequest`
 withdraw ⇒ request cleared, funds returned. Poll 60s (aligned with `useEarnPositions`), scoped to
 active chain + connected account. "Has position" = `stakedRaw > 0n || pendingUnbonds.length > 0`.
 
-## UnstakeRequest (pending exit — persisted in `lib/staking/pendingUnbonds.js`)
+## UnstakeRequest (pending exit — read on-chain each poll by `useStakingPositions`)
+
+> Implementation note: exits are the authoritative on-chain source (Lido
+> `getWithdrawalStatus` / `getWithdrawalRequests`, sPOL `getUserOpenNonces`,
+> Polygon `readOpenUnbonds` over all in-flight nonces), so no client-side
+> persistence store is needed — `useStakingPositions` re-derives them every poll.
+
 
 | Field | Type | Source | Notes |
 |---|---|---|---|

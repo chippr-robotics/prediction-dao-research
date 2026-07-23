@@ -16,7 +16,7 @@ import { STAKING_POLL_MS, POL_TOKEN_L1 } from '../config/staking'
 import { makeReadProvider } from '../utils/rpcProvider'
 import { readLidoPosition, readLidoWithdrawalStatuses } from '../lib/staking/lidoStaking'
 import { readSpolPosition, readSpolOpenNonces } from '../lib/staking/spolStaking'
-import { readDelegationPosition, readStakeManagerTiming, readLatestUnbond } from '../lib/staking/polygonDelegation'
+import { readDelegationPosition, readStakeManagerTiming, readOpenUnbonds } from '../lib/staking/polygonDelegation'
 
 const ERC20_BALANCE_ABI = ['function balanceOf(address) view returns (uint256)']
 
@@ -63,24 +63,28 @@ async function readOptionState({ option, account, provider, timingByChain }) {
     return { ...pos, walletBalanceRaw, rewardsClaimableRaw: null, openExits }
   }
 
-  // delegated
+  // delegated — read ALL open unbonds (a delegator can have several in flight).
   const pos = await readDelegationPosition({ validatorShare: option.validatorShare, account, provider })
-  const unbond = await readLatestUnbond({
+  const unbonds = await readOpenUnbonds({
     validatorShare: option.validatorShare,
     account,
     provider,
     epoch: timing?.epoch,
     withdrawalDelay: timing?.withdrawalDelay,
-  }).catch(() => null)
-  const openExits = unbond
-    ? [{ handle: { unbondNonce: unbond.unbondNonce }, amountRaw: null, ready: unbond.ready }]
-    : []
+  }).catch(() => [])
+  const openExits = unbonds.map((u) => ({
+    handle: { unbondNonce: u.unbondNonce },
+    // unbonds_new exposes shares, not a POL amount — the withdraw returns the
+    // exact POL, so the amount is intentionally omitted here (shown as a label).
+    amountRaw: null,
+    ready: u.ready,
+  }))
   return {
     stakedRaw: pos.stakedRaw,
     lstBalanceRaw: null,
     walletBalanceRaw,
     rewardsClaimableRaw: pos.rewardsClaimableRaw,
-    latestUnbond: unbond,
+    latestUnbond: unbonds[0] || null,
     openExits,
   }
 }

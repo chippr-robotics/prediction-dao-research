@@ -17,7 +17,7 @@ import { drainStakingActions } from '../../../lib/staking/stakingActivityBuffer'
 import { stakingPath } from '../../../config/staking'
 import { readLidoWithdrawalStatuses } from '../../../lib/staking/lidoStaking'
 import { readSpolOpenNonces } from '../../../lib/staking/spolStaking'
-import { readLatestUnbond, readStakeManagerTiming } from '../../../lib/staking/polygonDelegation'
+import { readOpenUnbonds, readStakeManagerTiming } from '../../../lib/staking/polygonDelegation'
 
 const EMPTY = { ok: true, entries: [], nextSnapshots: {}, currentIds: [], actionNeededById: {} }
 
@@ -55,14 +55,14 @@ async function readReadyKeys({ optionId, coords, account, provider, timing }) {
     })
     return nonces.filter((n) => n.ready).map((n) => `${optionId}:nonce:${n.unbondNonce}`)
   }
-  const unbond = await readLatestUnbond({
+  const unbonds = await readOpenUnbonds({
     validatorShare: coords.validatorShare,
     account,
     provider,
     epoch: timing?.epoch,
     withdrawalDelay: timing?.withdrawalDelay,
   })
-  return unbond?.ready ? [`${optionId}:nonce:${unbond.unbondNonce}`] : []
+  return unbonds.filter((u) => u.ready).map((u) => `${optionId}:nonce:${u.unbondNonce}`)
 }
 
 export const stakingSource = {
