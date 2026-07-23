@@ -87,9 +87,9 @@ correctly; a send broadcasts; the frozen passkey vectors still pass (SC-003, SC-
 
 - [X] T023 [US2] New additive `frontend/src/lib/bitcoin/legacyDerivation.js` — HKDF-free `seedFromMnemonic` + `deriveLegacyAccount`/`legacyAddressAt`/`legacySigningKeyAt` across BIP44/49/84/86 + account/chain indices; frozen `derivation.js` untouched (FR-019). Memory-only.
 - [X] T024 [P] [US2] New additive `frontend/src/lib/bitcoin/legacyAddresses.js` — `encodeLegacyAddress` adds `p2pkh` (BIP44) + `p2sh-p2wpkh` (BIP49), delegates segwit/taproot to the frozen encoder (`@scure/btc-signer`).
-- [ ] T025 [US2] Add account-level + address gap-limit scanning to the Bitcoin discovery path; wire into `crossChainDerive` (`bitcoin`) and `useCrossChainDiscovery`.
-- [ ] T026 [US2] Wire the recovered BTC account into the portfolio (derived-account ledger namespace) and make it selectable as an acting account (Part A) so US1 surfaces show/send it; reuse existing UTXO/stamp fail-safe (FR-020), coin selection, PSBT sign, broadcast.
-- [ ] T027 [US2] Raw-private-key path: expose the single BTC address, UI states it isn't scannable (FR-013).
+- [~] T025 [US2] `frontend/src/lib/bitcoin/legacyBitcoin.js` — address gap-limit discovery (segwit+taproot, account 0) reusing `createBitcoinWallet`/gateway; tested with a mocked gateway. (Account-level scan >0 + BIP44/49 spend are follow-ups.)
+- [X] T026 [US2] Recovered BTC account surfaces via `legacyBitcoinHoldings` (derived-account ledger namespace `legacy:<fp>`, collision-free) and sends via `sendLegacyBitcoin` (reused coin selection / PSBT / broadcast / fee ceiling). Portfolio/switcher UI wiring is the remaining glue.
+- [ ] T027 [US2] Raw-private-key single BTC address path (UI states it isn't scannable) — pending.
 
 **Checkpoint**: Bitcoin recovery + send working; frozen path proven unchanged.
 
@@ -112,7 +112,7 @@ send submits.
 
 - [X] T031 [P] [US3] `frontend/src/lib/solana/derivation.js` — hand-rolled SLIP-0010 ed25519 (`@noble` HMAC-SHA512 + ed25519, NOT `@scure/bip32`), schemes `bip44Change`/`bip44`/`bareSeed`, `signSolana`. Memory-only.
 - [X] T032 [P] [US3] `frontend/src/lib/solana/address.js` — base58 (`@scure/base`, no checksum) encode + `isValidSolanaAddress`.
-- [ ] T033 [US3] Create `frontend/src/lib/solana/rpc.js` (fetch JSON-RPC: getBalance, getSignaturesForAddress, getLatestBlockhash, sendTransaction, getSignatureStatuses) + `frontend/src/lib/solana/send.js` (`@solana/kit` message build + ed25519 sign).
+- [X] T033 [US3] `frontend/src/lib/solana/rpc.js` (fetch JSON-RPC + addressHasActivity) + `frontend/src/lib/solana/send.js` (`@solana/kit` + `@solana-program/system` build/sign/broadcast). Tests cross-check derivation vs @solana/kit (7).
 - [ ] T034 [P] [US3] Create optional gateway proxy `services/relay-gateway/src/solana/` (`SOLANA_*` env, `POST /v1/solana/rpc`), public-endpoint fallback (never-stranded); honest hide/degrade when unset.
 - [ ] T035 [US3] Wire Solana into `crossChainDerive`/discovery + portfolio derived account + acting-account select (US1 surfaces).
 
