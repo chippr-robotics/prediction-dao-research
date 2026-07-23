@@ -3,8 +3,11 @@ import AmountKeypad from '../ui/AmountKeypad'
 import RequestQRModal from './RequestQRModal'
 import { useWallet } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { getDefaultCurrencyKind } from '../../utils/homePreference'
 import { buildPaymentRequestUri, NOTE_MAX_LENGTH } from '../../lib/payments/paymentRequest'
+
+const shortAddr = (a) => (a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a || '')
 
 /**
  * RequestPanel (spec 058 US2) — ask someone for value: the same amount hero +
@@ -18,8 +21,14 @@ import { buildPaymentRequestUri, NOTE_MAX_LENGTH } from '../../lib/payments/paym
  * Contract: specs/058-send-request-home/contracts/home-mode-components.md
  */
 function RequestPanel() {
-  const { address, isConnected, openConnectModal } = useWallet()
+  const { address: connectedAddress, isConnected, openConnectModal } = useWallet()
   const tokens = useChainTokens()
+  // Spec 063 (US1): the request must be addressed to the account the member is ACTING AS
+  // (a vault or recovered account), not always the connected wallet — otherwise funds land
+  // in the wrong account. Fall back to the connected wallet when no acting account is
+  // selected (the effective address is only absent when truly disconnected).
+  const { address: effectiveAddress, isActingAccount, label: actingLabel, type: actingType } = useEffectiveAccount()
+  const address = effectiveAddress || connectedAddress
 
   const [kind, setKindState] = useState(getDefaultCurrencyKind)
   const [amount, setAmountState] = useState('')
@@ -103,6 +112,13 @@ function RequestPanel() {
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
+
+      {isActingAccount && address && (
+        <p className="fm-pay-acting-note" role="note">
+          Paid to your {actingType === 'vault' ? 'multisig' : 'recovered account'}
+          {actingLabel ? ` · ${actingLabel}` : ` · ${shortAddr(address)}`}
+        </p>
+      )}
 
       {stableUnavailable && (
         <div className="fm-error-banner" role="alert">No {symbol} is configured on this network.</div>

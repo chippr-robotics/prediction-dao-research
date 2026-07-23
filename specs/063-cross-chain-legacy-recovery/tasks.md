@@ -33,7 +33,7 @@ differential oracle before any mainnet path.
 **⚠️ CRITICAL**: Blocks all user stories. US1 needs the effective-account seam; US2–US4 need the
 memory-only seed exposure + discovery framework.
 
-- [ ] T005 [P] Create `frontend/src/hooks/useEffectiveAccount.js` — resolves the per-surface effective address + `canActOn(chainRef)` from `useActiveAccount().identity` (personal/vault/legacy/derived), returning `null` when the account has no address on a chain (FR-007). Test `frontend/src/test/hooks/useEffectiveAccount.test.jsx`.
+- [X] T005 [P] Create `frontend/src/hooks/useEffectiveAccount.js` — resolves the per-surface effective address from the acting identity (personal/vault/legacy/derived), reading Wallet/Custody contexts directly so it degrades without providers. Test `frontend/src/test/hooks/useEffectiveAccount.test.jsx` (6 tests).
 - [ ] T006 Extend `frontend/src/contexts/CustodyContext.jsx` + `frontend/src/hooks/useActiveAccount.js` so a **derived external account** can be an acting identity (type `derived`, per-chain address), reusing the memory-only signer lifecycle (dropped on lock/switch/disconnect, FR-018). Tests in `frontend/src/test/custody/`.
 - [ ] T007 Extend `frontend/src/lib/recovery/legacyKeys.js` to expose the recovered **mnemonic → BIP-39 seed** in memory only (never persisted/logged/transmitted, FR-017), plus a `dropSeed()` tied to the lock/switch/disconnect lifecycle. Test `frontend/src/test/recovery/legacySeed.memory.test.js` (asserts no seed in storage/logs).
 - [ ] T008 Create `frontend/src/lib/recovery/crossChainDerive.js` skeleton — `deriveCrossChainAccounts(seed, {network, chains, accountRange, gapLimit})` returning the `DerivedExternalAccount[]` shape from data-model.md; raw-private-key path returns single EVM + at most one BTC address, NOT scannable (FR-013). Contract test `frontend/src/test/recovery/crossChainDerive.contract.test.js`.
@@ -54,15 +54,15 @@ actions, and dashboard stats all resolve to it; switching to personal resets the
 ### Tests for User Story 1 (write first, must fail)
 
 - [ ] T011 [P] [US1] Integration test `frontend/src/test/acting/portfolioActingAccount.test.jsx` — portfolio holdings follow the acting account (personal/vault/legacy).
-- [ ] T012 [P] [US1] Integration test `frontend/src/test/acting/receiveRequestActingAccount.test.jsx` — Receive address/QR + payment Request recipient equal the acting account, and a chain the account can't use discloses "no address" (never substitutes).
+- [X] T012 [P] [US1] Integration test `frontend/src/test/acting/requestActingAccount.test.jsx` — payment Request recipient equals the acting vault (not the connected wallet), with the receiving-account disclosure; personal resets. (Receive-QR + no-address-on-chain assertions still to add.)
 - [ ] T013 [P] [US1] Integration test `frontend/src/test/acting/homeDashboardActingAccount.test.jsx` — Home actions + dashboard stats follow the acting account; switching to personal resets.
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Extend `frontend/src/hooks/usePortfolio.js` to honor an effective/acting address (address override or select `useAccountAssets(actingAddress)` when acting), keeping personal = cross-network scan.
-- [ ] T015 [P] [US1] Update `frontend/src/components/wallet/PortfolioPanel.jsx` and `frontend/src/hooks/usePredictPortfolio.js` to source from the effective account.
-- [ ] T016 [P] [US1] Update Receive: pass the effective address to `AddressQRModal` from `frontend/src/components/wallet/WalletButton.jsx` and `frontend/src/components/fairwins/Dashboard.jsx`; disclose "no address on this chain" when `null`.
-- [ ] T017 [P] [US1] Update `frontend/src/components/fairwins/RequestPanel.jsx` to address the request to the effective account and restate the receiving account in the confirmation.
+- [X] T014 [US1] Extend `frontend/src/hooks/usePortfolio.js` with a backward-compatible `{accountAddress}` override so acting-account surfaces scope to the selected account (personal passes none → byte-identical).
+- [~] T015 [P] [US1] `frontend/src/components/wallet/PortfolioPanel.jsx` now sources from the effective account. (`usePredictPortfolio.js` still to wire.)
+- [~] T016 [P] [US1] Receive in `frontend/src/components/wallet/WalletButton.jsx` passes the effective address to `AddressQRModal`. (`Dashboard.jsx` receive + explicit "no address on this chain" disclosure still to add.)
+- [X] T017 [P] [US1] `frontend/src/components/fairwins/RequestPanel.jsx` addresses the request to the effective account and discloses the receiving account.
 - [ ] T018 [P] [US1] Update Home/dashboard: `frontend/src/components/fairwins/HomeScreen.jsx`, `frontend/src/components/account/AccountDashboard.jsx` quick actions + stats follow the effective account.
 - [ ] T019 [US1] Ensure switching the acting account re-targets/resets any open send/request form (FR-008) across the above surfaces.
 

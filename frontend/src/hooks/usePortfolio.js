@@ -68,9 +68,15 @@ function toHolding(asset, balanceRaw, priceMap) {
   return { asset, balance, balanceRaw, usd, network: NETWORKS[asset.chainId]?.name || String(asset.chainId) }
 }
 
-export function usePortfolio() {
+export function usePortfolio({ accountAddress } = {}) {
   const wallet = useWallet() || {}
-  const { address, isConnected } = wallet
+  const { isConnected } = wallet
+  // Spec 063 (US1): the portfolio follows the account the member is ACTING AS. When an acting
+  // account (vault / recovered) is selected, its EVM address is scanned across chains instead of
+  // the connected wallet's; personal mode passes no override, so behavior is byte-identical.
+  // (A non-personal account has no passkey-issued Bitcoin addresses, so the Bitcoin source simply
+  // contributes nothing for it — honest, no phantom BTC row.)
+  const address = accountAddress ?? wallet.address
   const { preferences } = useUserPreferences() || {}
   const showTestnetAssets = Boolean(preferences?.showTestnetAssets)
   const showZeroBalances = Boolean(preferences?.showZeroBalances)
