@@ -104,14 +104,14 @@ send submits.
 
 ### Tests for User Story 3 (write first, must fail)
 
-- [ ] T028 [P] [US3] Vector test `frontend/src/test/solana/derivation.vectors.test.js` — zero mnemonic `m/44'/501'/0'/0'` → `HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk`, plus `m/44'/501'/0'` scheme guard; SLIP-0010 ed25519 hardened-only.
-- [ ] T029 [P] [US3] Unit test `frontend/src/test/solana/address.test.js` — base58 encode (no checksum) + `isValidSolanaAddress` (32-byte decode, accepts off-curve destinations).
+- [X] T028 [P] [US3] Vector test `frontend/src/lib/solana/__tests__/derivation.test.js` — `m/44'/501'/0'/0'` → `HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk`, `m/44'/501'/0'` scheme guard, per-account distinctness, bareSeed, ed25519 sign/verify (8 tests).
+- [X] T029 [P] [US3] Address codec `frontend/src/lib/solana/address.js` + tests — base58 no-checksum encode + `isValidSolanaAddress` (32-byte decode).
 - [ ] T030 [P] [US3] Integration test `frontend/src/test/solana/discoverySend.test.js` — scan `bip44Change`/`bip44`/`bareSeed` with `getSignaturesForAddress` activity detection; native SOL send builds+submits on devnet with fee disclosure.
 
 ### Implementation for User Story 3
 
-- [ ] T031 [P] [US3] Create `frontend/src/lib/solana/derivation.js` — SLIP-0010 ed25519 (`@noble/hashes` HMAC-SHA512 + `@noble/curves`, NOT `@scure/bip32`); schemes `bip44Change`/`bip44`/`bareSeed`.
-- [ ] T032 [P] [US3] Create `frontend/src/lib/solana/address.js` — base58 (`@scure/base`, no checksum) + validation.
+- [X] T031 [P] [US3] `frontend/src/lib/solana/derivation.js` — hand-rolled SLIP-0010 ed25519 (`@noble` HMAC-SHA512 + ed25519, NOT `@scure/bip32`), schemes `bip44Change`/`bip44`/`bareSeed`, `signSolana`. Memory-only.
+- [X] T032 [P] [US3] `frontend/src/lib/solana/address.js` — base58 (`@scure/base`, no checksum) encode + `isValidSolanaAddress`.
 - [ ] T033 [US3] Create `frontend/src/lib/solana/rpc.js` (fetch JSON-RPC: getBalance, getSignaturesForAddress, getLatestBlockhash, sendTransaction, getSignatureStatuses) + `frontend/src/lib/solana/send.js` (`@solana/kit` message build + ed25519 sign).
 - [ ] T034 [P] [US3] Create optional gateway proxy `services/relay-gateway/src/solana/` (`SOLANA_*` env, `POST /v1/solana/rpc`), public-endpoint fallback (never-stranded); honest hide/degrade when unset.
 - [ ] T035 [US3] Wire Solana into `crossChainDerive`/discovery + portfolio derived account + acting-account select (US1 surfaces).
