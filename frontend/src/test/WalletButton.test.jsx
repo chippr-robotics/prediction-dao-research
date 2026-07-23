@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+// Control the acting-account switcher hook so we can exercise the biticon caret menu.
+const { switcherHolder } = vi.hoisted(() => ({
+  switcherHolder: {
+    accounts: [], currentId: 'personal', choose: () => {},
+    unlockEntry: null, setUnlockEntry: () => {}, onUnlocked: () => {}, hasChoices: false,
+  },
+}))
+vi.mock('../hooks/useAccountSwitcher', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, useAccountSwitcher: () => switcherHolder }
+})
 // import { axe } from 'vitest-axe' // Unused, commented out for now
 import WalletButton from '../components/wallet/WalletButton'
 import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext, FriendMarketsContext } from '../contexts'
@@ -158,6 +170,11 @@ describe('WalletButton Component - Wagers', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: only the personal wallet ⇒ no caret (matches most tests).
+    Object.assign(switcherHolder, {
+      accounts: [], currentId: 'personal', choose: vi.fn(),
+      unlockEntry: null, setUnlockEntry: vi.fn(), onUnlocked: vi.fn(), hasChoices: false,
+    })
     useAccount.mockReturnValue({
       address: '0x1234567890123456789012345678901234567890',
       isConnected: true
@@ -354,6 +371,39 @@ describe('WalletButton Component - Wagers', () => {
       await user.click(screen.getByRole('button', { name: /show wallet address qr code/i }))
       const qrModal = await screen.findByRole('dialog', { name: /address qr modal/i })
       expect(qrModal).toHaveAttribute('data-address', ACTING)
+    })
+
+    it('expands the acting-account menu from the biticon caret and switches account', async () => {
+      const user = userEvent.setup()
+      const choose = vi.fn()
+      Object.assign(switcherHolder, {
+        hasChoices: true,
+        currentId: 'personal',
+        choose,
+        accounts: [
+          { id: 'personal', kind: 'personal', address: '0x1234567890123456789012345678901234567890', label: 'Personal wallet' },
+          { id: 'legacy:0x5250', kind: 'legacy', address: '0x5250000000000000000000000000000000000abc', label: '0x5250…0abc', entry: {} },
+        ],
+      })
+      renderWithProviders(<WalletButton />)
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+
+      // The caret trigger on the biticon opens the "act as" list.
+      await user.click(screen.getByRole('button', { name: /change acting account/i }))
+      const listbox = screen.getByRole('listbox', { name: /act as account/i })
+      const options = within(listbox).getAllByRole('button')
+      expect(options).toHaveLength(2)
+
+      // Choosing the recovered account routes through the switcher.
+      await user.click(options[1])
+      expect(choose).toHaveBeenCalledWith(expect.objectContaining({ kind: 'legacy' }))
+    })
+
+    it('does not render the caret when only the personal wallet is available', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<WalletButton />)
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+      expect(screen.queryByRole('button', { name: /change acting account/i })).not.toBeInTheDocument()
     })
 
     it('opens the address QR modal from the dropdown header and closes the dropdown', async () => {
