@@ -17,8 +17,9 @@ import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
-import AccountSwitcher from '../account/AccountSwitcher'
+import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
+import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
@@ -45,6 +46,11 @@ function WalletButton({ className = '' }) {
   const { address: actingAddress, label: actingLabel, type: actingType, isActingAccount } = useEffectiveAccount()
   const displayAddress = actingAddress || address
   const acctTypeLabel = actingType === 'vault' ? 'Multisig' : actingType === 'legacy' ? 'Recovered' : actingType === 'derived' ? 'Recovered' : null
+  // Acting-account switcher, surfaced as a caret dropdown ON the wallet biticon (spec 063 follow-up):
+  // picking an account switches the active identity so the biticon, address, balance, copy, and QR all
+  // follow it — no separate "Acting as" row.
+  const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hasChoices } = useAccountSwitcher()
+  const [acctMenuOpen, setAcctMenuOpen] = useState(false)
   const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
   const navigate = useNavigate()
@@ -98,6 +104,12 @@ function WalletButton({ className = '' }) {
   const toggleDropdown = () => {
     setIsOpen(!isOpen)
   }
+
+  // Collapse the acting-account menu whenever the wallet dropdown itself closes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when the dropdown closes
+    if (!isOpen) setAcctMenuOpen(false)
+  }, [isOpen])
 
   const handleDisconnect = () => {
     // Context disconnect: clears wagmi/WalletConnect persistence AND the
@@ -188,7 +200,26 @@ function WalletButton({ className = '' }) {
             >
               <div className="dropdown-header">
                 <div className="account-info">
-                  <BlockiesAvatar address={displayAddress} size={40} />
+                  {/* The biticon IS the acting-account switcher: a caret expands the
+                      "act as" options (personal / multisig / recovered). Picking one
+                      switches the active identity so the biticon, address, balance,
+                      copy, and QR below all follow it. With only the personal wallet
+                      there's nothing to switch, so it's a plain avatar (no caret). */}
+                  {hasChoices ? (
+                    <button
+                      type="button"
+                      className="account-identity-trigger"
+                      onClick={() => setAcctMenuOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={acctMenuOpen}
+                      aria-label="Change acting account"
+                    >
+                      <BlockiesAvatar address={displayAddress} size={40} />
+                      <span className="account-caret" aria-hidden="true">▾</span>
+                    </button>
+                  ) : (
+                    <BlockiesAvatar address={displayAddress} size={40} />
+                  )}
                   <div className="account-details">
                     <button
                       type="button"
@@ -225,13 +256,37 @@ function WalletButton({ className = '' }) {
                   >
                     <NavIcon name="qrcode" size={18} />
                   </button>
+
+                  {acctMenuOpen && hasChoices && (
+                    <ul className="account-switch-menu" role="listbox" aria-label="Act as account">
+                      {accounts.map((acc) => (
+                        <li key={acc.id} role="option" aria-selected={acc.id === currentId}>
+                          <button
+                            type="button"
+                            className="account-switch-opt"
+                            onClick={() => { choose(acc); setAcctMenuOpen(false) }}
+                          >
+                            <BlockiesAvatar address={acc.address} size={20} />
+                            <span className="account-switch-label">
+                              {acc.label || shortAccountAddr(acc.address)}
+                              {ACCOUNT_KIND_TAG[acc.kind] && (
+                                <span className="account-switch-tag">{ACCOUNT_KIND_TAG[acc.kind]}</span>
+                              )}
+                            </span>
+                            <span className="account-switch-addr">{shortAccountAddr(acc.address)}</span>
+                            {acc.id === currentId && <span className="account-switch-check" aria-hidden="true">✓</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                {/* Global acting-account switcher: personal wallet, multisig
-                    vaults, or a recovered legacy account. Self-hides when the
-                    member has only their personal wallet. */}
-                <div className="dropdown-account-switcher">
-                  <AccountSwitcher />
-                </div>
+                <LegacyUnlockDialog
+                  open={Boolean(unlockEntry)}
+                  entry={unlockEntry}
+                  onClose={() => setUnlockEntry(null)}
+                  onUnlocked={onUnlocked}
+                />
               </div>
 
               {/* Roles Section - Enhanced with details */}

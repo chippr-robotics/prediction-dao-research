@@ -124,6 +124,108 @@
   display: flex;
   align-items: center;
   gap: 0.5rem ;
+  position: relative; /* anchor for the acting-account menu */
+}
+
+/* The biticon doubles as the acting-account switcher: a caret badge overlaps the
+   avatar; clicking opens the account list below (spec 063 follow-up). */
+.account-identity-trigger {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.account-identity-trigger:disabled {
+  cursor: default;
+}
+.account-identity-trigger:not(:disabled):hover .account-caret {
+  border-color: var(--brand-primary, #36b37e);
+}
+.account-caret {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 0.7rem;
+  line-height: 1;
+  border-radius: 999px;
+  color: var(--text-primary, #fff);
+  background: var(--surface-color, #1f2933);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 30%, transparent);
+}
+
+/* Acting-account dropdown, anchored under the header identity. */
+.account-switch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  border-radius: 10px;
+  background: var(--surface-color, #1f2933);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 16%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.account-switch-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary, #fff);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+.account-switch-opt:hover {
+  background: color-mix(in srgb, var(--text-primary, #fff) 8%, transparent);
+}
+.account-switch-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-switch-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--brand-secondary, #4c9aff);
+  background: color-mix(in srgb, var(--brand-secondary, #4c9aff) 18%, transparent);
+  flex-shrink: 0;
+}
+.account-switch-addr {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.72rem;
+  color: var(--text-muted, #8a959e);
+  flex-shrink: 0;
+}
+.account-switch-check {
+  color: var(--brand-primary, #36b37e);
+  flex-shrink: 0;
 }
 
 .account-details {
@@ -753,8 +855,3 @@
   }
 }
 
-/* Global acting-account switcher wrapper (spec 062). Collapses to nothing when
-   the switcher self-hides (only a personal wallet), so no empty gap appears. */
-.dropdown-account-switcher:not(:empty) {
-  margin-top: 12px;
-}
