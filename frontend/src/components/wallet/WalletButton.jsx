@@ -38,9 +38,13 @@ function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
   const { address, isConnected } = useAccount()
-  // Spec 063 (US1): Receive shows the account the member is ACTING AS (a vault or recovered
-  // account), not always the connected wallet, so funds are received into the selected account.
-  const { address: receiveAddress } = useEffectiveAccount()
+  // Spec 063 (US1): the whole wallet identity — biticon, address, copy, balance, QR — reflects the
+  // account the member is ACTING AS (personal / multisig / recovered), not always the connected
+  // passkey, so it's obvious at a glance which account they're using. Falls back to the connected
+  // wallet when no acting account is selected.
+  const { address: actingAddress, label: actingLabel, type: actingType, isActingAccount } = useEffectiveAccount()
+  const displayAddress = actingAddress || address
+  const acctTypeLabel = actingType === 'vault' ? 'Multisig' : actingType === 'legacy' ? 'Recovered' : actingType === 'derived' ? 'Recovered' : null
   const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
   const navigate = useNavigate()
@@ -173,7 +177,7 @@ function WalletButton({ className = '' }) {
             aria-expanded={isOpen}
             aria-haspopup="true"
           >
-            <BlockiesAvatar address={address} size={24} />
+            <BlockiesAvatar address={displayAddress} size={24} />
           </button>
 
           {isOpen && (
@@ -184,17 +188,17 @@ function WalletButton({ className = '' }) {
             >
               <div className="dropdown-header">
                 <div className="account-info">
-                  <BlockiesAvatar address={address} size={40} />
+                  <BlockiesAvatar address={displayAddress} size={40} />
                   <div className="account-details">
                     <button
                       type="button"
                       className="account-address-full account-address-copy"
-                      onClick={() => copyAddress(address)}
-                      title={address}
-                      aria-label={addressCopied ? 'Address copied' : 'Copy wallet address'}
+                      onClick={() => copyAddress(displayAddress)}
+                      title={displayAddress}
+                      aria-label={addressCopied ? 'Address copied' : 'Copy account address'}
                     >
                       <span className="account-address-value">
-                        {addressCopied ? 'Copied!' : shortenAddress(address)}
+                        {addressCopied ? 'Copied!' : shortenAddress(displayAddress)}
                       </span>
                       <NavIcon
                         name={addressCopied ? 'check' : 'copy'}
@@ -202,6 +206,9 @@ function WalletButton({ className = '' }) {
                         className="account-address-copy-icon"
                       />
                     </button>
+                    {isActingAccount && (
+                      <span className="account-acting-tag">{actingLabel || acctTypeLabel}</span>
+                    )}
                     <span className="usdc-balance">
                       {balanceLoading
                         ? 'Loading...'
@@ -340,7 +347,7 @@ function WalletButton({ className = '' }) {
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
-          address={receiveAddress || address}
+          address={displayAddress}
           variant="quick"
         />
       )}

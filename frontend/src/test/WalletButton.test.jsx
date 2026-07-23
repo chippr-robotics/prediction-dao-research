@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 // import { axe } from 'vitest-axe' // Unused, commented out for now
 import WalletButton from '../components/wallet/WalletButton'
 import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext, FriendMarketsContext } from '../contexts'
+import { CustodyContext } from '../contexts/CustodyContext'
 import { BrowserRouter } from 'react-router-dom'
 
 // Mock wagmi hooks
@@ -323,7 +324,7 @@ describe('WalletButton Component - Wagers', () => {
 
       await user.click(screen.getByRole('button', { name: /wallet account/i }))
 
-      const copyButton = await screen.findByRole('button', { name: /copy wallet address/i })
+      const copyButton = await screen.findByRole('button', { name: /copy account address/i })
       await user.click(copyButton)
 
       // Visible confirmation, and the full address landed on the clipboard
@@ -332,6 +333,27 @@ describe('WalletButton Component - Wagers', () => {
       expect(await navigator.clipboard.readText()).toBe(
         '0x1234567890123456789012345678901234567890'
       )
+    })
+
+    it('reflects the ACTING account (not the connected passkey) in the header identity + QR', async () => {
+      const user = userEvent.setup()
+      const ACTING = '0x5250000000000000000000000000000000000abc'
+      renderWithProviders(
+        <CustodyContext.Provider value={{ active: { mode: 'legacy', address: ACTING, label: 'Recovered' } }}>
+          <WalletButton />
+        </CustodyContext.Provider>,
+      )
+      await user.click(screen.getByRole('button', { name: /wallet account/i }))
+
+      // Copy targets the acting account's address, and its type tag is shown.
+      const copyBtn = await screen.findByRole('button', { name: /copy account address/i })
+      expect(copyBtn).toHaveAttribute('title', ACTING)
+      expect(screen.getByText('Recovered')).toBeInTheDocument()
+
+      // The QR shows the acting account's address, not the connected wallet.
+      await user.click(screen.getByRole('button', { name: /show wallet address qr code/i }))
+      const qrModal = await screen.findByRole('dialog', { name: /address qr modal/i })
+      expect(qrModal).toHaveAttribute('data-address', ACTING)
     })
 
     it('opens the address QR modal from the dropdown header and closes the dropdown', async () => {

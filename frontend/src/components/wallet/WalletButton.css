@@ -238,6 +238,20 @@
   color: var(--text-primary, #ffffff);
 }
 
+/* Spec 063 — badge showing which acting account the wallet identity reflects
+   (Recovered / Multisig), so the top area makes the active account obvious. */
+.account-acting-tag {
+  align-self: flex-start;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--brand-secondary, #4c9aff);
+  background: color-mix(in srgb, var(--brand-secondary, #4c9aff) 18%, transparent);
+}
+
 /* Extended Dropdown */
 .wallet-dropdown-extended {
   min-width: 340px;
