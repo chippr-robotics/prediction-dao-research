@@ -359,8 +359,13 @@ never derives the asset list, eligibility, or routing.
 - `disabled` (bool), `label` (string, default `'Asset'`), `size` (number, logo px)
 
 **Data + activity scoping:**
-- `hooks/useSelectableAssets({ activity, actingAddress })` builds the option list from the
-  acting account's cross-network portfolio (personal / vault / recovered legacy).
+- `hooks/useSelectableAssets({ activity, actingAddress, catalog })` builds the option list
+  from the acting account's cross-network portfolio (personal / vault / recovered legacy).
+- **`catalog: true` (Request only)** — receiving doesn't require holding, so Request unions
+  the list with the full bundled asset registry across every configured network. A member
+  can request **any** platform-supported asset (unheld ones show balance 0); held balances
+  are preserved. Spending activities (Pay/Wager/Transfer) keep the held-only list. The
+  default selection is USDC either way.
 - `lib/assets/assetActivity.js` holds the **activity capability profiles**: `pay`,
   `request`, and `transfer` allow every asset kind **including non-EVM Bitcoin**; `wager`
   is EVM **ERC-20 only** (the escrow pulls the stake via `transferFrom`, so the native

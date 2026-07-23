@@ -103,14 +103,22 @@ disclosure, gasless routing) as a stablecoin payment today.
 
 ---
 
-### User Story 2 - Request any held asset (Priority: P2)
+### User Story 2 - Request any supported asset (Priority: P2)
 
 A member opens the home **Request** view. The currency control is the same
-universal asset selector, scoped to assets the member can *receive*. The member
-picks an asset (including one on a network other than the connected one, or a
-non-EVM asset like Bitcoin), enters an amount and a note, and generates a payment
-request. The request encodes the correct recipient, amount, asset, and network so
-any compatible wallet can pay it.
+universal asset selector, but because receiving does not require holding, Request
+offers the **full catalog of platform-supported assets** across every configured
+network — not just what the member currently holds — so they can ask to receive
+anything. The member picks an asset (including one on a network other than the
+connected one, or a non-EVM asset like Bitcoin), enters an amount and a note, and
+generates a payment request. The request encodes the correct recipient, amount,
+asset, and network so any compatible wallet can pay it. The default selection
+remains USDC.
+
+> **Follow-up refinement (post-merge):** Request lists the full supported-asset
+> catalog (via `useSelectableAssets({ catalog: true })`), whereas the other
+> surfaces (Pay/Wager/Transfer, which spend) stay held-only. Unheld catalog assets
+> show a zero balance; held balances are preserved. The USDC default is unchanged.
 
 **Why this priority**: Request is the second home money action and shares the same
 selector; extending it makes the home surface consistent. It depends on the

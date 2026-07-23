@@ -395,16 +395,10 @@ function PayPanel({ onSuccess }) {
         />
       </div>
 
-      <div className="fm-pay-status">
-        <span className="fm-hint">
-          {isConnected
-            ? bal != null
-              ? <>Balance: {bal} {symbol}{gasless ? ' · ⚡ gasless' : ''}</>
-              : 'Loading balance…'
-            : 'Connect a wallet to pay.'}
-        </span>
-      </div>
-
+      {/* The selected asset's balance and its gasless marker now live in the
+          currency selector (trigger + rows), so no separate balance/gasless line
+          is shown above the Pay button. The fee/gasless disclosure still appears
+          honestly on the confirm step. */}
       {blockReason && <div className="fm-error-banner" role="alert">{blockReason}</div>}
       {formError && <div className="fm-error-banner" role="alert">{formError}</div>}
 
