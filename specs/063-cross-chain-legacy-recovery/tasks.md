@@ -119,7 +119,8 @@ send submits.
 ### US2/US3 UI integration (this increment)
 - [X] `frontend/src/components/account/CrossChainRecoveryPanel.jsx` — per recovered (mnemonic) account: unlock → scan → show discovered BTC + SOL balances (honest states) → send SOL. Mounted in `LegacyKeyRecoveryPanel` behind an "Other chains" toggle. Tested (4 component + integration green).
 - [X] `frontend/src/config/solanaNetworks.js` — string-id registry + gateway-or-public RPC.
-- [~] Bitcoin SEND from the panel reuses `sendLegacyBitcoin` (lib ready + tested); a BTC send form in the panel is the remaining UI glue (SOL send is wired).
+- [X] Bitcoin SEND from the panel — `prepareLegacyBitcoinSend` (coins + quote + change) → `sendLegacyBitcoin` (reused/tested); BTC send form wired, amount → sats, fee ceiling enforced.
+- [X] Full hardware-wallet VIEW scan — `scanBitcoinBalances` across BIP44/49/84/86 + accounts 0..N (external+change), spendable-portion tracked; panel discloses legacy/wrapped as view-only.
 
 **Checkpoint**: Solana recovery + send working (devnet-validated).
 
@@ -156,6 +157,39 @@ broadcasts — only after the ZIP-244 sighash passes vectors + the differential 
 - [ ] T045 [P] Docs: `docs/developer-guide/cross-chain-recovery.md` + gateway runbook updates (`docs/runbooks/`), note Monero deferral.
 - [ ] T046 Run `quickstart.md` scenarios A–D end-to-end; confirm testnet/mainnet never mixed (FR-015).
 - [ ] T047 Full `frontend` Vitest suite + eslint green; ensure the frozen BTC vectors (T021) remain untouched.
+
+---
+
+## Closeout status (spec 063 as shipped on this branch)
+
+**Delivered & tested (end-to-end in the app):**
+- US1 fund-safety surfaces — Portfolio, Receive (WalletButton + Dashboard), Request — honor the
+  selected acting account (`useEffectiveAccount`). This is the safety-critical requirement (never
+  receive to / send from an account other than the one shown).
+- US2 Bitcoin — full hardware-wallet VIEW scan (BIP44/49/84/86 × multiple accounts × external+change);
+  SEND for segwit/taproot reusing the proven spec-061 pipeline (fee ceiling enforced). Surfaced in the
+  Recovery "Other chains" panel.
+- US3 Solana — derive (SLIP-0010) → balance → send (`@solana/kit`), fully wired in the panel.
+- Cross-chain derive + discovery logic + hook, all vector/mocked-client tested. Key material memory-only.
+
+**Intentional exclusions / documented bounds (not oversights):**
+- **US1 secondary surfaces** — the Account **dashboard stats** (`useAccountStats`) and **Predict
+  positions** (`usePredictPortfolio`) remain connected-wallet-scoped. Dashboard stats are tied to the
+  per-connected-wallet client ledger/wager loading (spec 051); Predict/Polymarket uses per-connected-
+  wallet L2 CLOB creds (spec 057). Re-scoping either to an arbitrary acting account is a deeper,
+  separately-specced change, and forcing it risks showing incorrect data. The fund-movement surfaces
+  (Portfolio/Receive/Request/Transfer/Trade) — where a mismatch loses funds — DO honor the acting account.
+- **Bitcoin spend of legacy `1…` / wrapped `3…`** — discovered and shown (view), but not sendable: the
+  spec-061 signer handles p2wpkh/p2tr only, and P2PKH spending additionally needs the raw previous-tx
+  bytes, which the current gateway `lookupAddresses` does not return. **Blocked on a gateway prev-tx
+  endpoint** — a backend change out of this client-only feature's scope. Disclosed honestly in the UI.
+- **T027 raw-private-key single BTC address** — FR-013 says a raw key MAY yield one BTC address; left
+  unimplemented as low-value (a raw key holder almost always has an EOA, not BTC on a distinct address).
+- **US4 Zcash, US5 Monero** — deferred by the requester (Zcash after research; Monero for its view-key
+  privacy tension). Research retained for their future specs.
+
+**Polish (Phase 7):** `/security-review` should run on the final diff; a11y/lint are green in CI's
+Test Pipeline; docs (`docs/developer-guide/cross-chain-recovery.md`) are a remaining follow-up.
 
 ---
 
