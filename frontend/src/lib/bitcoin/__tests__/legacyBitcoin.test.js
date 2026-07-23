@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { seedFromMnemonic, legacyAddressAt } from '../legacyDerivation'
 import { ledgerStore } from '../wallet'
-import { discoverLegacyBitcoin, makeLegacyKeyFor, bitcoinAccountId } from '../legacyBitcoin'
+import { discoverLegacyBitcoin, makeLegacyKeyFor, bitcoinAccountId, prepareLegacyBitcoinSend } from '../legacyBitcoin'
 
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const SEGWIT0 = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu' // BIP84 m/84'/0'/0'/0/0
@@ -28,7 +28,8 @@ function gatewayWithFundsAt(fundedAddress) {
         hasHistory: address === fundedAddress,
       })),
     })),
-    getStamps: vi.fn(async (_net, addresses) => ({ ok: true, degraded: false, stamps: addresses.map((a) => ({ address: a, utxos: [] })) })),
+    getStamps: vi.fn(async () => ({ ok: true, degraded: false, stamps: [] })),
+    getFees: vi.fn(async () => ({ ok: true, rates: { fast: 20, normal: 10, slow: 5 }, tipHeight: 100 })),
   }
 }
 
@@ -73,5 +74,22 @@ describe('legacy Bitcoin — keyFor resolves discovered addresses to signing key
     expect(legacyAddressAt(seed, { type: 'segwit', index: 0 })).toBe(SEGWIT0)
     // Unknown address ⇒ null (never a wrong key).
     expect(keyFor('bc1qunknownxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')).toBeNull()
+  })
+})
+
+describe('legacy Bitcoin — prepareLegacyBitcoinSend assembles coins + quote + change', () => {
+  it('returns spendable coins, a fresh fee quote, and a fresh change address', async () => {
+    const seed = seedFromMnemonic(MNEMONIC)
+    const store = ledgerStore(memStore())
+    const gateway = gatewayWithFundsAt(SEGWIT0)
+    await discoverLegacyBitcoin({ seed, network: 'bitcoin', gateway, store })
+
+    const prep = await prepareLegacyBitcoinSend({ seed, network: 'bitcoin', gateway, store, nowMs: 1000 })
+    expect(prep.coins.length).toBeGreaterThanOrEqual(1)
+    expect(prep.coins[0].classification).toBe('spendable') // 6 confs, no stamp ⇒ spendable
+    expect(prep.quote.rates.normal).toBe(10)
+    expect(prep.quote.fetchedAt).toBe(1000)
+    expect(prep.changeAddress.startsWith('bc1q')).toBe(true) // a fresh segwit change address
+    expect(gateway.getFees).toHaveBeenCalled()
   })
 })

@@ -20,7 +20,7 @@
  */
 
 import { HDKey } from '@scure/bip32'
-import { createBitcoinWallet, ledgerStore } from './wallet'
+import { createBitcoinWallet, ledgerStore, classifyUtxos } from './wallet'
 import { loadBitcoinHoldings } from './portfolioSource'
 import { prepareSend, executeSend } from './send'
 import { deriveLegacyAccount, deriveChildNode, legacySigningKeyAt } from './legacyDerivation'
@@ -95,6 +95,45 @@ export function makeLegacyKeyFor({ seed, network = 'bitcoin', account = 0, store
     })
     return { privateKey: privkey, publicKey: pubkey, scriptType: SCRIPT_TYPE[entry.type] }
   }
+}
+
+/**
+ * Assemble what a send needs — spendable coins, a fresh fee quote, and a change
+ * address — from the recovered account's discovered ledger. Reuses the spec-061
+ * classification (fail-safe stamps) verbatim.
+ *
+ * @returns {Promise<{ coins:Array, quote:(object|null), changeAddress:(string|null), stale?:boolean }>}
+ */
+export async function prepareLegacyBitcoinSend({ seed, network = 'bitcoin', account = 0, gateway, store = ledgerStore(), nowMs = Date.now() }) {
+  const accountId = bitcoinAccountId(seed)
+  const issued = store.get(accountId, network).issued || []
+  if (!issued.length) return { coins: [], quote: null, changeAddress: null }
+
+  const addresses = issued.map((a) => a.address)
+  const scriptTypeOf = new Map(issued.map((a) => [a.address, a.type === 'taproot' ? 'p2tr' : 'p2wpkh']))
+  const [lookup, stamps, fees] = await Promise.all([
+    gateway.lookupAddresses(network, addresses),
+    gateway.getStamps(network, addresses),
+    gateway.getFees(network),
+  ])
+  if (!lookup?.ok) return { coins: [], quote: null, changeAddress: null, stale: true }
+
+  const utxos = lookup.results.flatMap((r) =>
+    (r.utxos ?? []).map((u) => ({ ...u, address: r.address, scriptType: scriptTypeOf.get(r.address) ?? 'p2wpkh' })),
+  )
+  const coins = classifyUtxos(utxos, stamps)
+
+  // Change goes to a fresh, never-shown segwit address (issued + cursor advanced).
+  const wallet = createBitcoinWallet({
+    account: accountId,
+    networkId: network,
+    deriveAddress: makeDeriveAddress(seed, { account, network }),
+    gateway,
+    store,
+  })
+  const change = wallet.nextReceiveAddress('segwit')
+  const quote = fees?.ok ? { rates: fees.rates, fetchedAt: nowMs } : null
+  return { coins, quote, changeAddress: change.address }
 }
 
 /**

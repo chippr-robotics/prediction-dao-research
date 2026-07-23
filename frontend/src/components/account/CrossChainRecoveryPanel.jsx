@@ -18,10 +18,10 @@ const fmtSol = (lamports) => (Number(lamports) / Number(LAMPORTS_PER_SOL)).toLoc
 const fmtBtc = (sats) => (Number(sats || 0) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 8 })
 
 export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
-  const { status, results, error, runDiscovery, sendSol } = useCrossChainDiscovery({ deps: deps.discovery })
+  const { status, results, error, runDiscovery, sendSol, sendBitcoin } = useCrossChainDiscovery({ deps: deps.discovery })
   const [passphrase, setPassphrase] = useState('')
   const [unlockError, setUnlockError] = useState(null)
-  const [sendFor, setSendFor] = useState(null) // solana address being sent from
+  const [sendFor, setSendFor] = useState(null) // { chain:'solana'|'bitcoin', address? } | null
   const [to, setTo] = useState('')
   const [amount, setAmount] = useState('')
   const [sendState, setSendState] = useState({ status: 'idle', message: null })
@@ -50,18 +50,27 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
     [btc],
   )
 
-  const canSend = sendFor && isValidSolanaAddress(to) && Number(amount) > 0 && sendState.status !== 'sending'
+  const isBtc = sendFor?.chain === 'bitcoin'
+  const toValid = isBtc ? to.trim().length > 10 : isValidSolanaAddress(to)
+  const canSend = sendFor && toValid && Number(amount) > 0 && sendState.status !== 'sending'
 
   const handleSend = useCallback(async () => {
     setSendState({ status: 'sending', message: null })
     try {
-      const res = await sendSol({ address: sendFor, to, amountSol: amount })
-      setSendState({ status: 'sent', message: `Sent — ${res.signature}` })
+      let res
+      if (sendFor.chain === 'bitcoin') {
+        const amountSats = Math.round(Number(amount) * 1e8)
+        res = await sendBitcoin({ to, amountSats })
+        setSendState({ status: 'sent', message: `Sent — ${res.txid}` })
+      } else {
+        res = await sendSol({ address: sendFor.address, to, amountSol: amount })
+        setSendState({ status: 'sent', message: `Sent — ${res.signature}` })
+      }
       setSendFor(null); setTo(''); setAmount('')
     } catch (e) {
       setSendState({ status: 'error', message: e?.message || 'Send failed' })
     }
-  }, [sendSol, sendFor, to, amount])
+  }, [sendSol, sendBitcoin, sendFor, to, amount])
 
   return (
     <section className="lkr-crosschain" aria-label="Recover funds on other chains">
@@ -98,7 +107,14 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
             ) : btc.status === 'unreachable' ? (
               <span className="lkr-asset-row__muted">Couldn&apos;t check — try again</span>
             ) : btcConfirmed > 0 ? (
-              <span className="lkr-asset-row__amount">{fmtBtc(btcConfirmed)} BTC{btcSpendable < btcConfirmed ? ' (some protected)' : ''}</span>
+              <span className="lkr-asset-row__amount">
+                {fmtBtc(btcConfirmed)} BTC{btcSpendable < btcConfirmed ? ' (some protected)' : ''}
+                {btcSpendable > 0 && (
+                  <button type="button" className="btn lkr-linkbtn" onClick={() => { setSendFor({ chain: 'bitcoin' }); setSendState({ status: 'idle', message: null }) }}>
+                    Send
+                  </button>
+                )}
+              </span>
             ) : (
               <span className="lkr-asset-row__muted">No funds found</span>
             )}
@@ -115,7 +131,7 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
                   <li key={s.address}>
                     <span className="lkr-asset-row__amount">{fmtSol(s.balanceLamports)} SOL</span>
                     <span className="lkr-asset-row__addr">{shortAddr(s.address)}</span>
-                    <button type="button" className="btn lkr-linkbtn" onClick={() => { setSendFor(s.address); setSendState({ status: 'idle', message: null }) }}>
+                    <button type="button" className="btn lkr-linkbtn" onClick={() => { setSendFor({ chain: 'solana', address: s.address }); setSendState({ status: 'idle', message: null }) }}>
                       Send
                     </button>
                   </li>
@@ -126,12 +142,16 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
 
           {sendFor && (
             <div className="recover-step lkr-send-form">
-              <p className="recover-step__hint">Send SOL from {shortAddr(sendFor)}. You pay the network fee.</p>
+              <p className="recover-step__hint">
+                Send {isBtc ? 'BTC' : 'SOL'} {sendFor.address ? `from ${shortAddr(sendFor.address)} ` : ''}— you pay the network fee.
+              </p>
               <label className="lkr-field"><span>To</span>
-                <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="Solana address" aria-label="Recipient Solana address" />
+                <input value={to} onChange={(e) => setTo(e.target.value)} placeholder={isBtc ? 'Bitcoin address' : 'Solana address'}
+                  aria-label={isBtc ? 'Recipient Bitcoin address' : 'Recipient Solana address'} />
               </label>
-              <label className="lkr-field"><span>Amount (SOL)</span>
-                <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.0" aria-label="Amount in SOL" />
+              <label className="lkr-field"><span>Amount ({isBtc ? 'BTC' : 'SOL'})</span>
+                <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.0"
+                  aria-label={isBtc ? 'Amount in BTC' : 'Amount in SOL'} />
               </label>
               {sendState.message && (
                 <p role={sendState.status === 'error' ? 'alert' : 'status'} className={`lkr-notice ${sendState.status === 'error' ? 'lkr-notice--error' : ''}`}>{sendState.message}</p>
