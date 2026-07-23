@@ -20,31 +20,31 @@ ValidatorShare (delegated POL). Staking is a **view inside the existing Earn tab
 
 **Purpose**: config, capability gating, ABIs, and asset-registry entries all stories depend on.
 
-- [ ] T001 Create `frontend/src/config/staking.js` — `CURATED_POLYGON_VALIDATORS` (the 8 verified
+- [X] T001 Create `frontend/src/config/staking.js` — `CURATED_POLYGON_VALIDATORS` (the 8 verified
       entries from contracts/staking-config.md, each run through ethers `getAddress()`), poll cadences,
       Lido referral marker address, `stakingPath({ chainId, tokenSymbol })` deep-link builder, and the
       per-provider liquid config helpers per contracts/staking-config.md
-- [ ] T002 Add a `staking` block to chain 1 in `frontend/src/config/networks.js` (`liquid` = [Lido, sPOL]
+- [X] T002 Add a `staking` block to chain 1 in `frontend/src/config/networks.js` (`liquid` = [Lido, sPOL]
       with their contract addresses; `delegated` = Polygon `stakeManager` + `stakingApi` +
       `CURATED_POLYGON_VALIDATORS`), add `staking: Boolean(this.staking)` to every network's
       `capabilities` getter, and export `isStakingAvailable`/`getStakingConfig`/`getStakingNetworks`
       helpers per contracts/staking-config.md
-- [ ] T003 [P] Add Lido ABIs — `frontend/src/abis/LidoStETH.js` (submit, approve, sharesOf,
+- [X] T003 [P] Add Lido ABIs — `frontend/src/abis/LidoStETH.js` (submit, approve, sharesOf,
       getPooledEthByShares), `frontend/src/abis/LidoWstETH.js` (wrap, unwrap, balanceOf,
       stEthPerToken, getStETHByWstETH), `frontend/src/abis/LidoWithdrawalQueue.js`
       (requestWithdrawalsWstETH, claimWithdrawals, getWithdrawalStatus, getWithdrawalRequests,
       findCheckpointHints, getLastCheckpointIndex) per contracts/lido-liquid-staking.md
-- [ ] T004 [P] Add `frontend/src/abis/SPOLController.js` (buySPOL, buySPOLPermit, sellSPOL, withdrawPOL,
+- [X] T004 [P] Add `frontend/src/abis/SPOLController.js` (buySPOL, buySPOLPermit, sellSPOL, withdrawPOL,
       convertPOLtoSPOL, convertSPOLtoPOL, totalsPOLBalance, getUserOpenNonces) per
       contracts/spol-liquid-staking.md
-- [ ] T005 [P] Add `frontend/src/abis/PolygonValidatorShare.js` (buyVoucherPOL, sellVoucherPOL,
+- [X] T005 [P] Add `frontend/src/abis/PolygonValidatorShare.js` (buyVoucherPOL, sellVoucherPOL,
       unstakeClaimTokens_newPOL, getTotalStake, getLiquidRewards, withdrawRewardsPOL, unbondNonces,
       unbonds_new) and `frontend/src/abis/PolygonStakeManager.js` (epoch, withdrawalDelay) per
       contracts/polygon-delegation.md
-- [ ] T006 [P] Add `wstETH`, `sPOL`, and `POL` (on chain 1) entries to `CURATED_REGISTRY` and
+- [X] T006 [P] Add `wstETH`, `sPOL`, and `POL` (on chain 1) entries to `CURATED_REGISTRY` and
       `UNDERLYING_META` in `frontend/src/config/assetTaxonomy.js` so liquid tokens and delegated
       positions render, and wire USD price sources in `frontend/src/config/priceFeeds.js`
-- [ ] T007 Unit tests `frontend/src/test/staking/stakingConfig.test.js` (capability true on chain 1
+- [X] T007 Unit tests `frontend/src/test/staking/stakingConfig.test.js` (capability true on chain 1
       only; helpers; `stakingPath` builder; allowlist addresses are valid checksummed and the list is
       the hard boundary; taxonomy additions resolve)
 

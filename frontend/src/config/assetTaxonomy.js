@@ -130,6 +130,9 @@ export const UNDERLYING_META = {
   MORPHO: { name: 'Morpho', homeChainId: null },
   PYUSD: { name: 'PayPal USD', homeChainId: null },
   FIDD: { name: 'Fidelity Digital Dollar', homeChainId: null },
+  // Staking derivatives (spec 065). Liquid staking tokens held as positions.
+  WSTETH: { name: 'Lido Wrapped Staked ETH', homeChainId: 1 },
+  SPOL: { name: 'Polygon Staked POL', homeChainId: 1 },
 }
 
 export function getUnderlyingMeta(symbol) {
@@ -153,6 +156,33 @@ const CURATED_REGISTRY = {
       decimals: 18,
       categoryId: 'digital-commodities',
       baselineSymbol: 'ETH',
+    },
+    {
+      // Lido wstETH (spec 065) — the liquid staking token members hold after
+      // staking ETH via Lido. Value-accruing yield derivative.
+      address: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+      symbol: 'wstETH',
+      name: 'Lido Wrapped Staked ETH',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // Polygon sPOL (spec 065) — Polygon's official native liquid staking
+      // token, minted on L1 after staking POL. Value-accruing.
+      address: '0x3B790d651e950497c7723D47B24E6f61534f7969',
+      symbol: 'sPOL',
+      name: 'Polygon Staked POL',
+      decimals: 18,
+      categoryId: 'digital-securities',
+    },
+    {
+      // POL on Ethereum L1 (spec 065) — the staking token for Polygon
+      // delegation and sPOL. Verify against VITE_POL_TOKEN_L1 at build time.
+      address: '0x455e53CBB86018Ac2B8092FdCd39d8444aFFC3F6',
+      symbol: 'POL',
+      name: 'Polygon',
+      decimals: 18,
+      categoryId: 'digital-commodities',
     },
     {
       // Tether USD on Ethereum mainnet — transactional stablecoin by known issuer
