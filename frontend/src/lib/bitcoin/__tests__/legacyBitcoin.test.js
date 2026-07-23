@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { seedFromMnemonic, legacyAddressAt } from '../legacyDerivation'
 import { ledgerStore } from '../wallet'
-import { discoverLegacyBitcoin, makeLegacyKeyFor, bitcoinAccountId, prepareLegacyBitcoinSend } from '../legacyBitcoin'
+import { discoverLegacyBitcoin, makeLegacyKeyFor, bitcoinAccountId, prepareLegacyBitcoinSend, scanBitcoinBalances } from '../legacyBitcoin'
 
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const SEGWIT0 = 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu' // BIP84 m/84'/0'/0'/0/0
@@ -74,6 +74,41 @@ describe('legacy Bitcoin — keyFor resolves discovered addresses to signing key
     expect(legacyAddressAt(seed, { type: 'segwit', index: 0 })).toBe(SEGWIT0)
     // Unknown address ⇒ null (never a wrong key).
     expect(keyFor('bc1qunknownxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')).toBeNull()
+  })
+})
+
+describe('legacy Bitcoin — scanBitcoinBalances (full hardware-wallet view)', () => {
+  const LEGACY0 = '1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA' // BIP44 m/44'/0'/0'/0/0
+
+  function gatewayFunding(map) {
+    return {
+      lookupAddresses: vi.fn(async (_net, addresses) => ({
+        ok: true, tipHeight: 100,
+        results: addresses.map((address) => ({
+          address, confirmedSats: map[address] || 0, pendingSats: 0,
+          utxos: map[address] ? [{ txid: 'cc'.repeat(32), vout: 0, valueSats: map[address], confirmations: 3 }] : [],
+          hasHistory: Boolean(map[address]),
+        })),
+      })),
+    }
+  }
+
+  it('sums funds across legacy (view-only) + segwit (spendable) and separates spendable', async () => {
+    const seed = seedFromMnemonic(MNEMONIC)
+    const gateway = gatewayFunding({ [LEGACY0]: 400000, [SEGWIT0]: 600000 })
+    const res = await scanBitcoinBalances({ seed, network: 'bitcoin', accounts: [0], gateway })
+    expect(res.confirmedSats).toBe(1000000)
+    expect(res.spendableSats).toBe(600000) // segwit only; legacy is view-only
+    expect(res.byType.legacy).toBe(400000)
+    expect(res.byType.segwit).toBe(600000)
+    expect(res.stale).toBe(false)
+  })
+
+  it('reports zero for a seed with no Bitcoin, without erroring', async () => {
+    const seed = seedFromMnemonic(MNEMONIC)
+    const res = await scanBitcoinBalances({ seed, network: 'bitcoin', accounts: [0], gateway: gatewayFunding({}) })
+    expect(res.confirmedSats).toBe(0)
+    expect(res.byType).toEqual({})
   })
 })
 

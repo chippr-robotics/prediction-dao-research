@@ -45,7 +45,7 @@ describe('CrossChainRecoveryPanel', () => {
     hookState.results = {
       evm: { address: ENTRY.address },
       solana: [{ scheme: 'bip44Change', account: 0, address: SOL_ADDR, balanceLamports: 2_000_000_000n, status: 'found' }],
-      bitcoin: { status: 'complete', holdings: [{ confirmedSats: 750000, spendableSats: 750000 }] },
+      bitcoin: { status: 'complete', confirmedSats: 750000, spendableSats: 750000, byType: { segwit: 750000 } },
     }
     render(<CrossChainRecoveryPanel entry={ENTRY} />)
     expect(screen.getByText(/0\.0075 BTC/)).toBeInTheDocument()
@@ -77,7 +77,7 @@ describe('CrossChainRecoveryPanel', () => {
     hookState.results = {
       evm: { address: ENTRY.address },
       solana: [],
-      bitcoin: { status: 'complete', holdings: [{ confirmedSats: 1_000_000, spendableSats: 1_000_000 }] },
+      bitcoin: { status: 'complete', confirmedSats: 1_000_000, spendableSats: 1_000_000, byType: { segwit: 1_000_000 } },
     }
     render(<CrossChainRecoveryPanel entry={ENTRY} />)
     fireEvent.click(screen.getByRole('button', { name: /^send$/i })) // BTC row Send opens the form
@@ -90,7 +90,7 @@ describe('CrossChainRecoveryPanel', () => {
 
   it('discloses when no funds are found', () => {
     hookState.status = 'done'
-    hookState.results = { evm: { address: ENTRY.address }, solana: [], bitcoin: { status: 'complete', holdings: [] } }
+    hookState.results = { evm: { address: ENTRY.address }, solana: [], bitcoin: { status: 'complete', confirmedSats: 0, spendableSats: 0 } }
     render(<CrossChainRecoveryPanel entry={ENTRY} />)
     expect(screen.getAllByText(/No funds found/i).length).toBeGreaterThanOrEqual(2)
   })

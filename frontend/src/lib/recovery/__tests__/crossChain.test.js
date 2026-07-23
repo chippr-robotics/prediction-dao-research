@@ -80,7 +80,8 @@ describe('discoverCrossChain — honest per-chain states', () => {
     }
     const res = await discoverCrossChain({ derived: derived(), bitcoinGateway, bitcoinStore: ledgerStore(memStore()) })
     expect(res.bitcoin.status).toBe('complete')
-    expect(res.bitcoin.holdings.length).toBeGreaterThanOrEqual(1)
+    expect(res.bitcoin.confirmedSats).toBe(750000)
+    expect(res.bitcoin.spendableSats).toBe(750000) // segwit ⇒ spendable
   })
 
   it('isolates a Solana failure from Bitcoin success (one chain never blocks another)', async () => {

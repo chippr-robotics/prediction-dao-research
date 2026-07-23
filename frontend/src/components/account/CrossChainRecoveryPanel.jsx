@@ -41,14 +41,10 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
 
   const fundedSolana = useMemo(() => (results?.solana || []).filter((s) => s.status === 'found'), [results])
   const btc = results?.bitcoin || null
-  const btcSpendable = useMemo(
-    () => (btc?.holdings || []).reduce((sum, h) => sum + (h.spendableSats || 0), 0),
-    [btc],
-  )
-  const btcConfirmed = useMemo(
-    () => (btc?.holdings || []).reduce((sum, h) => sum + (h.confirmedSats || 0), 0),
-    [btc],
-  )
+  const btcSpendable = btc?.spendableSats || 0
+  const btcConfirmed = btc?.confirmedSats || 0
+  // Funds on legacy (1…) / wrapped-segwit (3…) address types are viewable but not yet sendable.
+  const btcViewOnly = Math.max(0, btcConfirmed - btcSpendable)
 
   const isBtc = sendFor?.chain === 'bitcoin'
   const toValid = isBtc ? to.trim().length > 10 : isValidSolanaAddress(to)
@@ -108,7 +104,10 @@ export default function CrossChainRecoveryPanel({ entry, deps = {} }) {
               <span className="lkr-asset-row__muted">Couldn&apos;t check — try again</span>
             ) : btcConfirmed > 0 ? (
               <span className="lkr-asset-row__amount">
-                {fmtBtc(btcConfirmed)} BTC{btcSpendable < btcConfirmed ? ' (some protected)' : ''}
+                {fmtBtc(btcConfirmed)} BTC
+                {btcViewOnly > 0 && (
+                  <span className="lkr-asset-row__muted"> · {fmtBtc(btcViewOnly)} on legacy/wrapped types (view only for now)</span>
+                )}
                 {btcSpendable > 0 && (
                   <button type="button" className="btn lkr-linkbtn" onClick={() => { setSendFor({ chain: 'bitcoin' }); setSendState({ status: 'idle', message: null }) }}>
                     Send

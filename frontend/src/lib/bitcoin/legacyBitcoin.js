@@ -23,12 +23,17 @@ import { HDKey } from '@scure/bip32'
 import { createBitcoinWallet, ledgerStore, classifyUtxos } from './wallet'
 import { loadBitcoinHoldings } from './portfolioSource'
 import { prepareSend, executeSend } from './send'
-import { deriveLegacyAccount, deriveChildNode, legacySigningKeyAt } from './legacyDerivation'
+import { deriveLegacyAccount, deriveChildNode, legacySigningKeyAt, LEGACY_PURPOSE } from './legacyDerivation'
 import { encodeLegacyAddress } from './legacyAddresses'
 
 /** spec-061 wallet type → derivation type + PSBT scriptType. */
 const WALLET_TYPE = { segwit: 'segwit', taproot: 'taproot' }
 const SCRIPT_TYPE = { segwit: 'p2wpkh', taproot: 'p2tr' }
+
+/** All hardware/legacy address types, and which the spec-061 signer can currently SPEND. */
+export const ALL_BTC_TYPES = ['legacy', 'wrapped-segwit', 'segwit', 'taproot']
+export const SPENDABLE_BTC_TYPES = ['segwit', 'taproot']
+const GAP_LIMIT = 20
 
 /**
  * A stable, collision-free ledger account id for a recovered seed, so its
@@ -48,6 +53,84 @@ function makeDeriveAddress(seed, { account = 0, network = 'bitcoin' } = {}) {
   const nodes = {}
   const nodeFor = (type) => (nodes[type] ??= deriveLegacyAccount(seed, { type: WALLET_TYPE[type], account, network }))
   return (type, index) => encodeLegacyAddress(deriveChildNode(nodeFor(type), { chain: 0, index }).publicKey, { type: WALLET_TYPE[type], network })
+}
+
+/**
+ * Gap-limit scan of one derivation chain (external or change) for a balance. Batches
+ * addresses GAP_LIMIT at a time; stops once a whole window is unused (the gap limit).
+ * @returns {Promise<{confirmedSats:number, pendingSats:number, usedAddresses:string[], stale:boolean}>}
+ */
+async function scanChain(deriveAt, gateway, network) {
+  let index = 0
+  let confirmedSats = 0
+  let pendingSats = 0
+  const usedAddresses = []
+  // Safety bound: a legitimate wallet never has 500+ addresses on one chain.
+  for (let guard = 0; guard < 25; guard += 1) {
+    const addrs = Array.from({ length: GAP_LIMIT }, (_, i) => deriveAt(index + i))
+    const res = await gateway.lookupAddresses(network, addrs)
+    if (!res?.ok) return { confirmedSats, pendingSats, usedAddresses, stale: true }
+    let lastUsed = -1
+    addrs.forEach((address, i) => {
+      const r = res.results.find((x) => x.address === address)
+      const used = r && (r.confirmedSats > 0 || r.pendingSats !== 0 || (r.utxos?.length ?? 0) > 0 || r.hasHistory === true)
+      if (used) {
+        confirmedSats += r.confirmedSats || 0
+        pendingSats += r.pendingSats || 0
+        usedAddresses.push(address)
+        lastUsed = i
+      }
+    })
+    if (lastUsed === -1) break // a full gap window with no activity → done
+    index += lastUsed + 1
+  }
+  return { confirmedSats, pendingSats, usedAddresses, stale: false }
+}
+
+/**
+ * FULL hardware-wallet scan: sum a recovered seed's Bitcoin across ALL derivation
+ * schemes (BIP44 legacy 1…, BIP49 wrapped 3…, BIP84 segwit bc1q…, BIP86 taproot
+ * bc1p…), across multiple accounts, external + change chains. This is the VIEW side
+ * of "full hardware-wallet scan" — it surfaces funds the account-0-segwit/taproot
+ * discovery misses. Spending legacy/wrapped still needs P2PKH/P2SH signer support
+ * (documented follow-up); `spendableSats` is the portion sendable today.
+ *
+ * @returns {Promise<{ confirmedSats:number, pendingSats:number, spendableSats:number,
+ *   byType:Record<string,number>, stale:boolean }>}
+ */
+export async function scanBitcoinBalances({ seed, network = 'bitcoin', accounts = [0, 1, 2], gateway }) {
+  const byType = {}
+  let confirmedSats = 0
+  let pendingSats = 0
+  let spendableSats = 0
+  let stale = false
+
+  for (const type of ALL_BTC_TYPES) {
+    let typeSats = 0
+    let accountGap = 0
+    for (const account of accounts) {
+      // Cache the account node so external+change reuse one derivation.
+      const acct = deriveLegacyAccount(seed, { type, account, network })
+      const chains = await Promise.all(
+        [0, 1].map((chain) =>
+          scanChain((i) => encodeLegacyAddress(deriveChildNode(acct, { chain, index: i }).publicKey, { type, network }), gateway, network),
+        ),
+      )
+      const acctSats = chains.reduce((s, c) => s + c.confirmedSats, 0)
+      const acctPending = chains.reduce((s, c) => s + c.pendingSats, 0)
+      if (chains.some((c) => c.stale)) stale = true
+      confirmedSats += acctSats
+      pendingSats += acctPending
+      typeSats += acctSats
+      if (SPENDABLE_BTC_TYPES.includes(type)) spendableSats += acctSats
+      // Account-level gap: stop after 2 consecutive empty accounts.
+      accountGap = acctSats > 0 || acctPending > 0 ? 0 : accountGap + 1
+      if (accountGap >= 2) break
+    }
+    if (typeSats > 0) byType[type] = typeSats
+  }
+
+  return { confirmedSats, pendingSats, spendableSats, byType, stale }
 }
 
 /**
