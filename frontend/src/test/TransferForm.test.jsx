@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Mock the standard address input to a plain field that resolves whatever is typed — keeps the test off
@@ -140,6 +140,27 @@ describe('TransferForm', () => {
 
     await user.click(switchBtn)
     await waitFor(() => expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 1 }))
+  })
+
+  it('renders each asset option with the nested asset logo (spec 064 US4)', async () => {
+    holdings = [
+      {
+        asset: { id: 'native', chainId: 1, kind: 'native', symbol: 'ETH', name: 'Ethereum', decimals: 18, address: null },
+        balance: 2, network: 'Ethereum',
+      },
+    ]
+    const user = userEvent.setup()
+    const { container } = render(<TransferForm />)
+    await user.click(screen.getByLabelText('Asset to send'))
+    const list = await screen.findByRole('listbox')
+    // Every option carries a nested AssetLogo (the Earn-page artwork), so same-symbol
+    // assets on different networks are distinguishable at a glance.
+    const options = within(list).getAllByRole('option')
+    expect(options.length).toBeGreaterThan(0)
+    for (const opt of options) {
+      expect(opt.querySelector('.asset-logo')).not.toBeNull()
+    }
+    expect(container.querySelector('.uas-select')).not.toBeNull()
   })
 
   it('funds from a Protect vault: shows the vault balance, gates on it, and sends a proposal', async () => {

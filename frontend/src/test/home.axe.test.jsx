@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
+
+// Spec 064: stub the asset-selector data hook so provider-light home panels render
+// (the real UniversalAssetSelect component still renders, so a11y stays covered).
+vi.mock('../hooks/useSelectableAssets', async () => await import('./helpers/selectableAssetsMock'))
+vi.mock('../hooks/useActiveAccount', () => ({
+  useActiveAccount: () => ({ identity: { mode: 'personal' }, isVault: false, isLegacy: false }),
+}))
+vi.mock('../hooks/useBitcoinWallet', () => ({
+  useBitcoinWallet: () => ({ status: 'idle', receive: { nextReceiveAddress: () => null } }),
+}))
 import { axe } from 'vitest-axe'
 import { MemoryRouter } from 'react-router-dom'
 

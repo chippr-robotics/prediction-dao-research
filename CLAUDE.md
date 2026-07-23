@@ -182,5 +182,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/063-cross-chain-legacy-recovery/plan.md
+at specs/064-universal-asset-selector/plan.md
 <!-- SPECKIT END -->

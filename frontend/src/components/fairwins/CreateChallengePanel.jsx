@@ -1,13 +1,18 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { isAddress } from 'ethers'
+import { useSwitchChain } from 'wagmi'
 import { useOpenChallengeCreate, OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import { useSelectableAssets } from '../../hooks/useSelectableAssets'
 import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefaults'
+import { ASSET_ACTIVITIES } from '../../lib/assets/assetActivity'
+import { getNetwork } from '../../config/networks'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import AmountKeypad from '../ui/AmountKeypad'
+import UniversalAssetSelect from '../ui/UniversalAssetSelect'
 import PolymarketBrowser from './PolymarketBrowser'
 import ClaimCodeResultPanel from './ClaimCodeResultPanel'
 import { toDatetimeLocal, fromDatetimeLocal, HOUR_MS } from './wagerTimeline'
@@ -55,7 +60,14 @@ function CreateChallengePanel({
   initialMarket = null,
 }) {
   const { createOpenChallenge, busy } = useOpenChallengeCreate()
-  const { capabilities } = useChainTokens()
+  const { capabilities, chainId: connectedChainId } = useChainTokens()
+  const { switchChainAsync, isPending: switching } = useSwitchChain()
+  // Stake asset (spec 064 US3): the wager was USDC-locked; it now escrows ANY
+  // ERC-20 the account holds. The head-to-head escrow pulls the stake via
+  // `transferFrom`, so the selector is scoped to ERC-20 kinds only — the native
+  // coin and non-EVM Bitcoin are excluded by the `wager` capability profile.
+  const { options: assetOptions, defaultKey: assetDefaultKey } = useSelectableAssets({ activity: ASSET_ACTIVITIES.WAGER })
+  const [selectedAssetKey, setSelectedAssetKey] = useState(null)
   // Oracle settlement is only offered where the Polymarket CTF is reachable and
   // the model is exposed; otherwise the pill shows locked (spec 052 consolidation).
   const polymarketAvailable =
@@ -96,6 +108,40 @@ function CreateChallengePanel({
   const isThirdParty = Number(resolutionType) === OPEN_RESOLUTION_TYPES.ThirdParty
   const isOracle = Number(resolutionType) === OPEN_RESOLUTION_TYPES.Polymarket
 
+  // Selection with fallback to the activity default (connected stablecoin ⇒ USDC,
+  // so the first-render default is unchanged). The member's pick always wins (FR-013).
+  const activeAssetKey = selectedAssetKey && assetOptions.some((o) => o.key === selectedAssetKey)
+    ? selectedAssetKey
+    : assetDefaultKey
+  const stakeAsset = assetOptions.find((o) => o.key === activeAssetKey) || null
+  const stakeSymbol = stakeAsset?.symbol || 'USDC'
+  // A stake asset on another network is create-gated behind a switch (the wager is
+  // created + escrowed on the connected chain) — only once the wallet is connected.
+  // We only claim a mismatch when the connected chain is actually known (honest state:
+  // never gate on an unknown/NaN chain).
+  const assetChainMismatch =
+    Boolean(stakeAsset) && Number.isFinite(Number(connectedChainId)) &&
+    Number(stakeAsset.chainId) !== Number(connectedChainId)
+  const chainGateActive = isConnected && assetChainMismatch
+  const switchTargetName = assetChainMismatch
+    ? getNetwork(stakeAsset.chainId)?.name || `network ${stakeAsset.chainId}`
+    : null
+
+  const handleSelectAsset = useCallback((option) => {
+    setSelectedAssetKey(option.key)
+    setError(null)
+  }, [])
+
+  const handleSwitchAssetNetwork = useCallback(async () => {
+    if (!stakeAsset) return
+    setError(null)
+    try {
+      await switchChainAsync({ chainId: Number(stakeAsset.chainId) })
+    } catch (err) {
+      setError(err?.shortMessage || err?.message || 'Could not switch network.')
+    }
+  }, [stakeAsset, switchChainAsync])
+
   // Let an embedding host react to the oracle path (the home screen hides its
   // secondary actions while an oracle challenge is being composed — the market +
   // side picker need the room and the goal is a no-scroll view).
@@ -120,7 +166,7 @@ function CreateChallengePanel({
     ? `${market.question} — creator takes ${sideName(side)} · settled automatically by Polymarket`
     : ''
 
-  const canCreate = Number(stake) > 0 && !busy && (
+  const canCreate = Number(stake) > 0 && !busy && Boolean(stakeAsset) && !chainGateActive && (
     isOracle
       ? Boolean(market && oracleTimeline?.eligible && side !== '')
       : (description.trim().length > 0 && arbitratorValid && deadlinesValid)
@@ -184,10 +230,16 @@ function CreateChallengePanel({
     // Normalize the pad string (e.g. "10." → "10", "10.50" → "10.5").
     const cleanStake = Number(stake) > 0 ? String(Number(stake)) : stake
     try {
+      // The selected stake token (spec 064): the create hook denominates escrow +
+      // payout in it (defaulting to USDC when the default asset is chosen). A held
+      // ERC-20 the registry doesn't allowlist surfaces the friendly NotAllowedToken
+      // error from the hook — never a silent failure.
+      const stakeTokenAddress = stakeAsset?.address || undefined
       const payload = isOracle
         ? {
             description: composedDescription,
             stake: cleanStake,
+            token: stakeTokenAddress,
             resolutionType: OPEN_RESOLUTION_TYPES.Polymarket,
             oracleConditionId: market.conditionId,
             creatorIsYes: side === '0',
@@ -208,6 +260,7 @@ function CreateChallengePanel({
         : {
             description: description.trim(),
             stake: cleanStake,
+            token: stakeTokenAddress,
             resolutionType: Number(resolutionType),
             arbitrator: isThirdParty ? arbitratorAddr : undefined,
             acceptDeadline: Number.isFinite(acceptMs) ? Math.floor(acceptMs / 1000) : undefined,
@@ -220,7 +273,7 @@ function CreateChallengePanel({
     } finally {
       setProgress(null)
     }
-  }, [isConnected, onConnect, isOracle, composedDescription, stake, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isConnected, onConnect, isOracle, composedDescription, stake, stakeAsset, market, side, oracleTimeline, description, resolutionType, isThirdParty, arbitratorAddr, acceptMs, resolveMs, createOpenChallenge]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resume a create that was waiting on the wallet: the moment the connection lands, continue.
   useEffect(() => {
@@ -277,13 +330,26 @@ function CreateChallengePanel({
   return (
     <form className={`fm-form fm-pay-form${embedded ? ' oc-create-embedded' : ''}`} onSubmit={handleCreate}>
       {/* Payments-style hero (spec 052): the stake amount is the centerpiece,
-          entered with the on-screen number pad. Token is USDC-locked here. */}
+          entered with the on-screen number pad. The stake asset is chosen with the
+          universal selector (spec 064) — any held ERC-20, not USDC-locked. */}
       <div className="fm-pay-hero">
         <AmountKeypad
           value={stake}
           onChange={setStake}
           prefix="$"
-          token="USDC"
+          token={stakeSymbol}
+          tokenSlot={(
+            <>
+              <span className="sr-only">Stake asset</span>
+              <UniversalAssetSelect
+                label="Stake asset"
+                options={assetOptions}
+                value={activeAssetKey}
+                onChange={handleSelectAsset}
+                disabled={busy}
+              />
+            </>
+          )}
           disabled={busy}
           ariaLabel="Stake amount, each side"
           id="oc-stake"
@@ -408,9 +474,20 @@ function CreateChallengePanel({
       {error && <div className="fm-error-banner" role="alert">{error}</div>}
 
       <div className="fm-success-actions">
-        <button type="submit" className="fm-btn-primary" disabled={!canCreate}>
-          {busy ? 'Opening…' : 'Lock in!'}
-        </button>
+        {chainGateActive ? (
+          <button
+            type="button"
+            className="fm-btn-primary"
+            onClick={handleSwitchAssetNetwork}
+            disabled={switching || busy}
+          >
+            {switching ? 'Switching…' : `Switch to ${switchTargetName} to stake ${stakeSymbol}`}
+          </button>
+        ) : (
+          <button type="submit" className="fm-btn-primary" disabled={!canCreate}>
+            {busy ? 'Opening…' : 'Lock in!'}
+          </button>
+        )}
       </div>
     </form>
   )
