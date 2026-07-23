@@ -175,14 +175,14 @@ notification feed + financial ledger; completed-unbonding is an actionable break
 
 **Independent test**: quickstart.md Scenario 4.
 
-- [ ] T030 [US3] Flip the `stake` action in `frontend/src/components/wallet/AssetDetailSheet.jsx`
+- [X] T030 [US3] Flip the `stake` action in `frontend/src/components/wallet/AssetDetailSheet.jsx`
       (`enabled` when `NETWORKS[chainId]?.staking` && asset is stakeable — ETH→liquid, POL→liquid+
       delegated; deep-link `/wallet?tab=earn&view=stake&chain=<id>&token=<sym>`; disabled reason
       otherwise) and update `frontend/src/test/portfolio/AssetDetailSheet.test.jsx`
-- [ ] T031 [US3] Add `staking` to `DOMAIN_META` in `frontend/src/data/notifications/domains.js` and a
+- [X] T031 [US3] Add `staking` to `DOMAIN_META` in `frontend/src/data/notifications/domains.js` and a
       `staking` row to `NOTIFICATION_CATEGORIES` in
       `frontend/src/lib/notifications/deliveryPreferences.js` (user-configurable + profile-aware)
-- [ ] T032 [US3] Implement `frontend/src/data/notifications/sources/stakingSource.js` (spec-031
+- [X] T032 [US3] Implement `frontend/src/data/notifications/sources/stakingSource.js` (spec-031
       ActivitySource: drain `stakingActivityBuffer` into precise stake/unstake/withdraw/claim entries +
       snapshot-diff positions as a backstop + emit an **actionable** `unbond-ready` entry when a pending
       unbond matures) and register it in `frontend/src/data/notifications/sources/index.js`
@@ -194,7 +194,7 @@ notification feed + financial ledger; completed-unbonding is an actionable break
       useStakingActions): `queueStakingAction(...)` (notifications) + `captureStakingAction(...)`
       (ledger) with the real txHash + `activity?.refresh?.()`, using stable ids so the poll dedups
       (per data-model.md)
-- [ ] T035 [P] [US3] Tests `frontend/src/test/staking/stakingSource.test.js` (baseline-no-entries,
+- [X] T035 [P] [US3] Tests `frontend/src/test/staking/stakingSource.test.js` (baseline-no-entries,
       diff→entry, idempotent re-run, ok:false on failure, `unbond-ready` is actionable and breaks
       through a focused profile) and `frontend/src/test/staking/stakingLedgerSource.test.js`
       (captureStakingAction kind/direction mapping, idempotent entryId, STAKING-class filter)

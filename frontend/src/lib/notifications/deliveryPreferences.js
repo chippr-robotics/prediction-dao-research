@@ -41,6 +41,7 @@ export const NOTIFICATION_CATEGORIES = [
   { domain: 'dao', label: 'Governance', description: 'Proposals to vote on, queue, or execute' },
   { domain: 'token', label: 'Token admin', description: 'Role changes and pause/unpause events' },
   { domain: 'custody', label: 'Custody', description: 'Vault approvals needed, executions, owner/threshold changes, and policy rule changes' },
+  { domain: 'staking', label: 'Staking', description: 'Stakes, unstakes, rewards, and unbonding ready to withdraw' },
 ]
 
 const KNOWN_DOMAINS = NOTIFICATION_CATEGORIES.map((c) => c.domain)

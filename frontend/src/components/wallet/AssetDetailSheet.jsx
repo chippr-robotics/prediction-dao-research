@@ -84,11 +84,22 @@ function actionsFor(instance) {
       to: `/wallet?tab=earn&view=lend&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
     {
+      // Stake (spec 065): stake this asset through the Earn → Stake area.
+      // Enabled when the instance's network supports staking and the asset is
+      // stakeable there (ETH via Lido; POL via sPOL + Polygon delegation).
       id: 'stake',
       label: 'Stake',
-      enabled: false,
-      reason: 'Staking is not available in the app yet',
-      to: null,
+      enabled:
+        asset.kind !== 'nft' &&
+        Boolean(net?.staking) &&
+        ['ETH', 'POL'].includes((asset.symbol || '').toUpperCase()),
+      reason:
+        asset.kind === 'nft'
+          ? 'Collectibles cannot be staked'
+          : net?.staking
+            ? 'This asset cannot be staked yet'
+            : 'Staking is not available on this network',
+      to: `/wallet?tab=earn&view=stake&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
   ]
 }
