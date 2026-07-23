@@ -172,10 +172,30 @@ portfolio bottom sheets."
 **Alternatives considered**: **A separate top-level "Staking" tab** — rejected: the request says "as
 part of the finance > earn > staking section," and a sibling view keeps Lend/Stake visually unified.
 
-## Open items carried to tasks/implementation
+## R8 — Curated Polygon validator allowlist (resolved)
 
-- Confirm the **curated Polygon validator allowlist** (which ValidatorShare addresses) with the
-  product owner; enrich with live commission/APR/status from the staking API at runtime.
+**Decision**: Launch with an **8-validator curated allowlist**, drawn from the live official API
+(`…/api/v2/validators`, 105 validators) and filtered to active/HEALTHY + `delegationEnabled` + strong
+uptime (≥ ~99.8%) + reasonable commission (0–12%) + named/reputable operator + spread across distinct
+entities and pool sizes: **Kiln (47), Figment (87), Everstake (77), Stakin (121), P2P.org (162),
+stake.fish (123), Luganodes (18), Chorus One (106)**. Verified checksummed `ValidatorShare` addresses
+and a set of vetted alternates (Kraken, Blockdaemon, Twinstake, Allnodes, DSRV) are recorded in
+`contracts/staking-config.md#curated-polygon-validator-allowlist`.
+
+**Rationale**: FR-008 requires curated, not free-form, delegation targets. This set gives members a
+short, legible, reputable choice with a commission spread (0–12%) and size spread, avoids
+delegate-hostile (~100% commission), degraded, anonymous, and brand-new/unmeasured validators, and
+does not concentrate on a single entity. Coinbase/Binance validators were deliberately excluded from
+the primary set (largest, exchange-custodied) on decentralization grounds but exist as data if product
+wants them.
+
+**Alternatives considered**: **Full API list** — rejected (FR-008; also exposes 100%-commission and
+anonymous validators). **Single "recommended" validator** — rejected: removes member choice, which is
+the point of the delegated model, and concentrates stake. **Hardcode without build-time revalidation**
+— rejected: commission/state are live per-checkpoint; the allowlist MUST be re-verified at build time
+and each address run through `getAddress()` (see the config doc's build-time revalidation note).
+
+## Open items carried to tasks/implementation
 - Read `StakeManager.withdrawalDelay()` and current slashing state on-chain at build time to keep the
   unbonding copy and risk disclosure accurate.
 - Read the live sPOL `rewardFee`/`feeReceiver` on-chain and disclose that Polygon (not FairWins) takes
