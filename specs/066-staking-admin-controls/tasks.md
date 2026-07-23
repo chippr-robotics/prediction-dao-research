@@ -86,12 +86,12 @@ the smart-contract security review.**
       validator allowlist, and `paused()` over a read provider; build the liquid router stake calls
       (`stakeLido` native `value`; `stakeSpol` approve-router + call); safe-degrade to null when the router
       is undeployed/unreadable, per contracts/admin-and-runtime.md
-- [ ] T018 Define the `STAKING_ADMIN` role + wire the admin tab shell: add `ROLES.STAKING_ADMIN` + `ROLE_INFO`
+- [X] T018 Define the `STAKING_ADMIN` role + wire the admin tab shell: add `ROLES.STAKING_ADMIN` + `ROLE_INFO`
       + `ADMIN_ROLES` in `frontend/src/contexts/RoleContext.js`; `STAKING_ADMIN` `ROLE_HASHES` +
       `roleHomeContract → stakingRouter` + `isStakingAdmin` flag + nav item (`adminNav.js`) + gated render of a
       new `frontend/src/components/admin/StakingTab.jsx` shell (empty, resolves the contract, honest "not
       deployed" state) in `frontend/src/components/AdminPanel.jsx`
-- [ ] T019 [P] Unit tests `frontend/src/test/staking-admin/stakingRouterLib.test.js` (read overlay + safe
+- [X] T019 [P] Unit tests `frontend/src/test/staking-admin/stakingRouterLib.test.js` (read overlay + safe
       fallback; liquid stake-call encoding) and `frontend/src/test/staking-admin/StakingTab.shell.test.jsx`
       (role-gated visibility; "not deployed" empty state; axe clean)
 
