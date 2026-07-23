@@ -105,18 +105,18 @@ the smart-contract security review.**
 
 **Independent test**: quickstart.md Scenario 1 (and Scenario 5 fallback).
 
-- [ ] T020 [US1] Branch `frontend/src/lib/staking/stakingActions.js#buildStakeForOption` (mirroring
+- [X] T020 [US1] Branch `frontend/src/lib/staking/stakingActions.js#buildStakeForOption` (mirroring
       `lib/earn/vaultActions.buildDepositCalls`): when a router + non-zero fee apply, build the liquid router
       path (`stakeLido`/`stakeSpol` with `maxFeeBps`); else the byte-identical spec-065 direct calls. Delegated
       always uses the direct path (fee-free)
-- [ ] T021 [US1] Thread the fee quote into `frontend/src/hooks/useStakingActions.js` (`stake` ctx) and overlay
+- [X] T021 [US1] Thread the fee quote into `frontend/src/hooks/useStakingActions.js` (`stake` ctx) and overlay
       the per-provider `stakingFeeBps` in `frontend/src/hooks/useStakingOptions.js` from
       `fetchFeeQuote(STAKE_LIDO/STAKE_POLYGON)` (liquid options only; delegated shows no fee)
-- [ ] T022 [US1] Add the fee line to `frontend/src/components/earn/StakeSheet.jsx` — mirror `VaultSheet`:
+- [X] T022 [US1] Add the fee line to `frontend/src/components/earn/StakeSheet.jsx` — mirror `VaultSheet`:
       `fetchFeeQuote` state, `feeApplies`/`feeBlocked`/`feeSplit`, a "FairWins platform fee ({bpsToPercent}) /
       You stake {net}" disclosure before signing, pass `bps` as `maxFeeBps`, and block submit on `feeBlocked`
       (router present but rate unreadable). Zero/unavailable ⇒ no fee line (byte-identical to fee-free)
-- [ ] T023 [P] [US1] Component tests `frontend/src/test/staking-admin/StakeSheet.fee.test.jsx` (fee line shows
+- [X] T023 [P] [US1] Component tests `frontend/src/test/staking-admin/StakeSheet.fee.test.jsx` (fee line shows
       rate + net; delegated shows none; `feeBlocked` disables submit; zero-fee = no line) and
       `stakingActions.fee.test.js` (router branch vs direct; maxFeeBps passed; delegated stays direct)
 

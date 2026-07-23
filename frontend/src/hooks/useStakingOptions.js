@@ -15,11 +15,69 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NETWORKS, getStakingNetworks } from '../config/networks'
-import { POL_TOKEN_L1 } from '../config/staking'
+import { POL_TOKEN_L1, stakingRouterServiceIdFor } from '../config/staking'
 import { makeReadProvider } from '../utils/rpcProvider'
 import { fetchLidoApr, readLidoPosition } from '../lib/staking/lidoStaking'
 import { readSpolTvl, readSpolRewardFee } from '../lib/staking/spolStaking'
 import { fetchValidatorDecoration, unbondingLabel, readStakeManagerTiming } from '../lib/staking/polygonDelegation'
+import { readStakingRouterConfig } from '../lib/staking/stakingRouter'
+import { fetchFeeQuote } from '../lib/fees/feeQuote'
+
+const sameAddr = (a, b) => a && b && a.toLowerCase() === b.toLowerCase()
+
+/**
+ * Overlay the on-chain StakingRouter config onto the spec-065 base options for one
+ * network (spec 066). Provider addresses, the validator allowlist, the paused flag,
+ * and the per-provider LIQUID fee are sourced from the router when it is deployed;
+ * when it is absent/unreadable the options keep the spec-065 constants verbatim
+ * (fee-free, direct, availability as configured — FR-009). Mutates `options` in place.
+ */
+export async function overlayRouterConfig(options, { chainId, provider }) {
+  let cfg = null
+  if (provider) {
+    try {
+      cfg = await readStakingRouterConfig({ chainId, provider })
+    } catch {
+      cfg = null
+    }
+  }
+  if (!cfg) return options // no router (or unreadable) ⇒ spec-065 defaults, fee-free
+
+  const kept = []
+  for (const opt of options) {
+    opt.stakingRouterAddress = cfg.routerAddress
+    opt.stakingPaused = cfg.paused
+    if (opt.providerKind === 'lido' && cfg.providers.lido?.steth && cfg.providers.lido?.wsteth) {
+      opt.contracts = { ...opt.contracts, steth: cfg.providers.lido.steth, wsteth: cfg.providers.lido.wsteth }
+    }
+    if (opt.providerKind === 'spol' && cfg.providers.spol?.controller && cfg.providers.spol?.token) {
+      opt.contracts = { ...opt.contracts, controller: cfg.providers.spol.controller, token: cfg.providers.spol.token }
+    }
+    // Delegated: the on-chain allowlist is the source of truth for NEW delegations. A validator
+    // removed on-chain drops from the offered options (existing positions stay exitable via
+    // useStakingPositions). When the router carries no allowlist yet, keep none for new delegations.
+    if (opt.providerKind === 'validator-share') {
+      if (!cfg.validators.some((v) => sameAddr(v, opt.validatorShare))) continue
+    }
+    // LIQUID fee overlay: read the live per-provider rate; a present-but-unreadable router blocks
+    // only the fee-bearing path (never assume a lower rate).
+    const serviceId = stakingRouterServiceIdFor(opt.providerKind)
+    if (serviceId) {
+      try {
+        opt.feeQuote = await fetchFeeQuote({ serviceId, chainId, provider })
+        opt.stakingFeeBps = opt.feeQuote?.available ? opt.feeQuote.bps : 0
+      } catch {
+        opt.feeQuote = null
+        opt.feeBlocked = true
+      }
+    }
+    kept.push(opt)
+  }
+  // Replace in place so removed validators drop from the returned list.
+  options.length = 0
+  options.push(...kept)
+  return options
+}
 
 /** Build the immediate (config-only) option list for one staking network. */
 export function buildBaseOptions(chainId, config) {
@@ -138,6 +196,10 @@ export function useStakingOptions() {
             opt.unbondingLabel = unbondLabel || '~2–4 days'
           }
         }
+
+        // spec 066: overlay the on-chain StakingRouter (addresses, allowlist, paused, LIQUID fee).
+        // No-op when the router is undeployed/unreadable — options keep the spec-065 defaults.
+        await overlayRouterConfig(base, { chainId, provider })
         all.push(...base)
       }
       if (reqId !== reqIdRef.current) return

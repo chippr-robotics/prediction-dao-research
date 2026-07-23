@@ -14,8 +14,7 @@
  * VERIFY every address at build time (Lido deployed-contracts page,
  * 0xPolygon/spol-contracts, and the live Polygon staking API).
  */
-import { getAddress } from 'ethers'
-import { FEE_SERVICES } from '../lib/fees/feeQuote'
+import { getAddress, id as keccakId } from 'ethers'
 
 // Position refresh cadence — aligned with usePortfolio / useEarnPositions.
 export const STAKING_POLL_MS = 60_000
@@ -26,13 +25,16 @@ export const STAKING_POLL_MS = 60_000
  * anything that carries no fee — the Polygon validator `delegated` path (fee-free
  * in v1) and any unknown kind — so callers show no fee line and take the direct
  * spec-065 path. The constants above stay the fee-free fallback default.
+ *
+ * The ids are computed locally (keccak of the label) rather than imported from
+ * feeQuote to avoid a config↔lib import cycle; they equal `FEE_SERVICES.STAKE_*`.
  */
 export function stakingRouterServiceIdFor(kind) {
   switch (kind) {
     case 'lido':
-      return FEE_SERVICES.STAKE_LIDO
+      return keccakId('stake.lido')
     case 'spol':
-      return FEE_SERVICES.STAKE_POLYGON
+      return keccakId('stake.polygon')
     default:
       return null // delegated + unknown kinds are fee-free
   }
