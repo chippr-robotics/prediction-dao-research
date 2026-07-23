@@ -8,8 +8,23 @@ at the edge. Every model is scoped to one `chainId` — nothing crosses networks
 
 | Field | Type | Notes |
 |---|---|---|
-| `liquid` | `{ provider: {name,url}, referral: address, contracts: {steth, wsteth, withdrawalQueue}, aprApi: url }` \| null | Lido config; null ⇒ no liquid option on this chain |
+| `liquid` | `LiquidProviderConfig[]` | one entry per liquid provider on this chain; empty/absent ⇒ no liquid option |
 | `delegated` | `{ provider: {name,url}, stakeManager: address, stakingApi: url, validators: ValidatorAllowlistEntry[] }` \| null | Polygon delegation config; null ⇒ no delegated option |
+
+### LiquidProviderConfig (discriminated by `kind`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `kind` | `'lido' \| 'spol'` | dispatches the lib (`lidoStaking.js` / `spolStaking.js`) |
+| `provider` | `{ name, url }` | attribution + outbound link |
+| `asset` | `{ symbol, decimals }` | staked asset — `ETH` (lido) / `POL` (spol) |
+| `lstSymbol` | string | `wstETH` (lido) / `sPOL` (spol) |
+| `contracts` | kind-specific | lido: `{ steth, wsteth, withdrawalQueue }`; spol: `{ token, controller }` |
+| `referral` | address \| null | lido only (tracking marker, no revenue); spol has no referral param |
+| `aprApi` | url \| null | lido APR endpoint; spol APR is derived on-chain from `convert*` rate drift |
+| `unbonding` | `{ kind: 'queue' \| 'checkpoints', instantExit: boolean }` | lido: queue, no instant exit; spol: ~80 checkpoints, `instantExit:true` (DEX) |
+
+Chain 1 launch: `liquid = [ lidoConfig, spolConfig ]`, `delegated = polygonDelegationConfig`.
 
 Derived: `capabilities.staking === Boolean(this.staking)`. Helpers: `isStakingAvailable(chainId)`,
 `getStakingConfig(chainId)`, `getStakingNetworks()` (staking-enabled network names for honest copy).
@@ -31,16 +46,18 @@ never expands, the list.
 
 | Field | Type | Source | Notes |
 |---|---|---|---|
-| `id` | string | derived | `liquid:lido` or `delegated:<validatorId>` |
+| `id` | string | derived | `liquid:lido`, `liquid:spol`, or `delegated:<validatorId>` |
 | `chainId` | number | config | must equal active chain (guard) |
 | `model` | `'liquid' \| 'delegated'` | config | drives layout + copy |
+| `providerKind` | `'lido' \| 'spol' \| 'validator-share'` | config | dispatches the lib |
 | `asset` | `{ symbol, decimals, name, address? }` | config | staked asset (ETH / POL) |
 | `provider` | `{ name, url }` | config | attribution + outbound link |
 | `validatorName` | string \| null | API | delegated only |
-| `rewardRateApr` | number \| null | API/Lido | fraction (0.034 = 3.4%); null → "—" (honest) |
-| `totalStaked` | `{ raw: bigint, usd: number \| null }` | on-chain/API | "total staked" display |
-| `lstSymbol` | string \| null | config | liquid only (e.g. `wstETH`) |
-| `unbondingLabel` | string \| null | on-chain | delegated only, e.g. "~2–4 days (80 checkpoints)" from `withdrawalDelay()` |
+| `rewardRateApr` | number \| null | API/Lido/on-chain | fraction (0.034 = 3.4%); null → "—" (honest); sPOL derived from rate drift |
+| `totalStaked` | `{ raw: bigint, usd: number \| null }` | on-chain/API | "total staked" display (sPOL: `totalsPOLBalance()`) |
+| `lstSymbol` | string \| null | config | liquid only (`wstETH` / `sPOL`) |
+| `instantExit` | boolean | config | liquid; true for sPOL (DEX swap), false for Lido (queue only) |
+| `unbondingLabel` | string \| null | on-chain | sPOL + delegated, e.g. "~2–4 days (80 checkpoints)"; null for Lido (variable queue) |
 | `commissionPct` | number \| null | API | delegated only |
 | `minStakeRaw` / `maxStakeRaw` | bigint \| null | config | Lido queue bounds; provider minimums |
 | `status` | `'accepting' \| 'closed'` | config/API | closed ⇒ shown read-only (exit-only) |
@@ -54,8 +71,8 @@ never stale numbers as truth).
 |---|---|---|---|
 | `option` | StakingOption ref | — | |
 | `model` | `'liquid' \| 'delegated'` | — | |
-| `stakedRaw` | bigint | on-chain | liquid: wstETH→underlying via `stEthPerToken`; delegated: `getTotalStake` |
-| `lstBalanceRaw` | bigint \| null | on-chain `balanceOf` | liquid only (wstETH held) |
+| `stakedRaw` | bigint | on-chain | lido: wstETH→ETH via `stEthPerToken`; spol: sPOL→POL via `convertSPOLtoPOL`; delegated: `getTotalStake` |
+| `lstBalanceRaw` | bigint \| null | on-chain `balanceOf` | liquid only (wstETH / sPOL held) |
 | `currentValueUsd` | number \| null | price feed | null → "—" (honest) |
 | `rewardsClaimableRaw` | bigint \| null | on-chain `getLiquidRewards` | delegated only; null when N/A (liquid accrues into LST) |
 | `pendingUnbonds` | UnstakeRequest[] | store + on-chain | in-flight exits |
@@ -72,12 +89,12 @@ active chain + connected account. "Has position" = `stakedRaw > 0n || pendingUnb
 |---|---|---|---|
 | `optionId` | string | — | which option this exit belongs to |
 | `model` | `'liquid' \| 'delegated'` | — | |
-| `handle` | `{ requestId }` \| `{ unbondNonce }` | on-chain | Lido ERC-721 id OR Polygon unbond nonce |
+| `handle` | `{ requestId }` \| `{ unbondNonce }` | on-chain | Lido ERC-721 id · sPOL / Polygon unbond nonce |
 | `amountRaw` | bigint | tx | amount exiting |
 | `initiatedAt` | number | tx receipt | device time |
 | `readyAt` | number \| null | derived | estimated ready time (for copy) |
-| `ready` | boolean | on-chain | Lido: `isFinalized && !isClaimed`; Polygon: `withdrawEpoch + withdrawalDelay() <= epoch()` |
-| `claimed` | boolean | on-chain/store | cleared after withdraw |
+| `ready` | boolean | on-chain | Lido: `isFinalized && !isClaimed`; sPOL: nonce matured via `getUserOpenNonces`; Polygon: `withdrawEpoch + withdrawalDelay() <= epoch()` |
+| `claimed` | boolean | on-chain/store | cleared after withdraw (`claimWithdrawals` / `withdrawPOL` / `unstakeClaimTokens_newPOL`) |
 
 Persisted per (account, chain) so "ready to withdraw" survives reloads. Idempotent: re-adding a known
 handle is a no-op; a claimed request is pruned.

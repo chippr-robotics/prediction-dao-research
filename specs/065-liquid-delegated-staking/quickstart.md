@@ -7,10 +7,11 @@ data-model, contracts, and (Phase 2) `tasks.md`. Staking is a **view inside the 
 ## Prerequisites
 
 - Existing frontend dev environment (`npm run frontend`).
-- A connected account on **Ethereum mainnet (chainId 1)** holding some **ETH** (for the liquid option)
-  and/or **POL** (for the delegated option). Chain 1 is the launch staking network.
-- `NETWORKS[1].staking` config populated (Lido addresses + `referral`; Polygon `stakeManager`,
-  `stakingApi`, and the curated `validators[]` allowlist) — see `contracts/staking-config.md`.
+- A connected account on **Ethereum mainnet (chainId 1)** holding some **ETH** (for Lido liquid) and/or
+  **POL** (for sPOL liquid and for Polygon delegation). Chain 1 is the launch staking network.
+- `NETWORKS[1].staking` config populated: `liquid` = [Lido (addresses + `referral`), sPOL (token +
+  controller)]; `delegated` = Polygon `stakeManager` + `stakingApi` + curated `validators[]` allowlist —
+  see `contracts/staking-config.md`.
 
 ## Run / build commands
 
@@ -29,6 +30,11 @@ data-model, contracts, and (Phase 2) `tasks.md`. Staking is a **view inside the 
    received; value grows vs ETH; no fee line while fee-free), confirm in wallet.
 4. **Expect**: success state with tx link; the position appears with staked value + wstETH held; an
    activity-feed entry and a `STAKING`-class ledger entry are recorded.
+5. Repeat for the **sPOL** card (POL → Liquid): stake POL, hold **sPOL** (value-accruing). **Expect**
+   the option discloses that its value grows vs POL, that Polygon (not FairWins) takes a reward-fee, and
+   that exit is either a ~3–4 day unbonding **or** an instant DEX swap. On the sPOL exit flow, **expect**
+   both paths presented honestly (the swap shows its price impact; the queue path is never called
+   "instant"); a matured `sellSPOL` nonce enables `withdrawPOL`.
 
 ## Scenario 2 — Delegate + honest unbonding (delegated, US1/US2)
 
@@ -63,9 +69,10 @@ data-model, contracts, and (Phase 2) `tasks.md`. Staking is a **view inside the 
 
 1. Switch to Polygon (137), Ethereum Classic, or Bitcoin. Open Earn → Stake. **Expect**: an honest
    "not available on this network" explanation naming where staking is available (from
-   `getStakingNetworks()`) — no mock options, no dead buttons.
-2. Force the Lido APR API / Polygon staking API to fail. **Expect**: the option list shows
-   "temporarily unavailable" and new stakes are disabled — never fake zeros/APR.
+   `getStakingNetworks()`) — no mock options, no dead buttons. (Chain 137's native sPOL deposit path
+   via `sPOLChild` is a documented follow-up; at launch staking runs on chain 1.)
+2. Force the Lido APR API / Polygon staking API to fail (and sPOL rate reads). **Expect**: the affected
+   option shows "temporarily unavailable" and new stakes are disabled — never fake zeros/APR.
 
 ## Done when
 

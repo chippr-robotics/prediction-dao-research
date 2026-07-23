@@ -32,21 +32,41 @@ rather than a queue; deferred to keep launch to one liquid provider (can be adde
 `StakingOption`, config-only). **stETH (rebasing) as the held token** — rejected: rebasing balances
 complicate position display and fee accounting; wstETH is the integration-standard form.
 
-## R2 — Polygon liquid staking is deferred (no deposits-open provider)
+## R2 — Polygon liquid staking provider: sPOL (Polygon's official native LST, live)
 
-**Decision**: **Do not ship Polygon (chainId 137) liquid staking at launch.** Present chain 137 as the
-honest unavailable state for liquid staking. Revisit when a provider is accepting new deposits.
+**Decision**: Ship Polygon liquid staking via **sPOL** — Polygon Labs' official native liquid staking
+token for POL, live and accepting deposits since **April 14 2026**, audited (ChainSecurity, Certora),
+open-source (`0xPolygon/spol-contracts`). Member stakes POL and holds **sPOL** (an exchange-rate,
+value-accruing ERC-20 — not rebasing). The canonical mint/unstake happens on **Ethereum L1
+(chainId 1)** via `sPOLController`, so it sits alongside Lido (R1) and Polygon delegation (R3) on the
+same launch chain.
 
-**Rationale**: Both mainstream Polygon LSTs are sunsetting: **Lido on Polygon (stMATIC)** disabled new
-staking Dec 16 2024 (withdrawal window closed June 16 2025); **Stader MaticX** disables deposits
-June 13 2026 (UI Aug 3 2026; contract withdrawals to 2029). Building a new-deposit flow on a
-deposits-closing provider violates constitution III (honest state) — the app would offer an earning
-action that is being withdrawn from the market. This is the honest refinement of the spec's initial
-"Ethereum + Polygon" assumption: Polygon's staking value path is **delegation**, not an LST (see R3).
+- sPOL token (L1): `0x3B790d651e950497c7723D47B24E6f61534f7969` · `sPOLController` (stake/unstake/claim/
+  convert): `0xEaadA411F2600570796c341552b9869DA708a28B` · `sPOLChild` (L2 mirror on 137, cross-chain
+  cached-rate buy): `0xd1CD49A08AeF3Af93457aEc17C786C2b7F48eCd7`.
+- Stake: `buySPOL(uint256 _amount)` (+ `buySPOLPermit` / `buySPOLWithDPOL` to migrate an existing
+  delegated position). Exchange rate via `convertPOLtoSPOL`/`convertSPOLtoPOL`; pool size via
+  `totalsPOLBalance()`.
+- Exit: `sellSPOL(uint256 _amount)` → returns unbonding nonce(s); after the Polygon PoS withdrawal
+  delay (~80–82 checkpoints ≈ 3–4 days) call `withdrawPOL()`. Maturity/claimable detected via
+  `getUserOpenNonces(user) → FullNonceDetails[]`. **Instant exit alternative**: sPOL is a liquid ERC-20
+  with Uniswap V4 pools live at launch — a member may swap out at market rate instead of waiting.
+- Validator selection is **abstracted** (pooled across a Polygon-Labs-curated validator set) — this is
+  what makes it the *liquid* model vs. the *delegated* model (R3). ~8% estimated APR (announcement-level;
+  verify on-chain via rate drift). On-chain `rewardFee` (per-mille, charged on rewards, `MAX_FEE=1000`)
+  goes to Polygon's `feeReceiver`, not FairWins — read live. **No referral/attribution param** (R6).
 
-**Alternatives considered**: **Integrate MaticX anyway before June 2026** — rejected: ships a feature
-with a known imminent shutdown. **Wrap our own Polygon LST** — rejected: a new value-bearing contract,
-out of scope and against YAGNI.
+**Rationale**: sPOL is the official, audited, deposits-open Polygon LST. It replaces the earlier
+deferral: the mainstream third-party LSTs are sunsetting (Lido-on-Polygon disabled new staking Dec 16
+2024; Stader MaticX deposits close June 13 2026), but sPOL is Polygon's own native replacement and is
+actively accepting deposits — so Polygon liquid staking is honest-state viable now. It also keeps
+architecture consistent (canonical mint on L1, exchange-rate token like wstETH).
+
+**Alternatives considered**: **Stader MaticX / Lido-on-Polygon** — rejected: sunsetting, not
+deposits-open (would violate honest state). **Polygon-PoS-native (chainId 137) sPOL deposit via
+`sPOLChild`** — deferred as a follow-up: it settles cross-chain (cached rate) and adds bridge
+complexity; launch uses the canonical L1 controller (member needs POL on Ethereum). **Defer Polygon
+liquid entirely** (the pre-sPOL plan) — superseded by this finding.
 
 ## R3 — Delegated staking provider: Polygon PoS validator delegation (POL, on Ethereum L1)
 
@@ -75,6 +95,13 @@ actually drive (see R4). It cleanly exhibits the staking-specific differences th
 locked principal, an explicit unbonding period, claimable rewards, and slashing exposure. The
 validator target being a small **curated allowlist** (FR-008) keeps members from delegating to an
 unvetted validator from inside the app.
+
+**Coexistence with sPOL (R2)**: sPOL and ValidatorShare delegation are the *two POL models offered
+side by side* — sPOL is **liquid** (pooled, no validator choice, a value-accruing token, instant DEX
+exit), ValidatorShare is **delegated** (member picks a curated validator, holds a locked per-validator
+position). sPOL does not remove ValidatorShare; it abstracts over it. Offering both is exactly the
+spec's "liquid and delegated." A member with an existing delegated position can later migrate into
+sPOL via `buySPOLWithDPOL` (a documented future convenience, not launch scope).
 
 **Alternatives considered**: **API-discovered full validator list** — rejected: FR-008 requires curated
 targets, not free-form; the API decorates the allowlist with live commission/APR/status but never
@@ -151,7 +178,11 @@ part of the finance > earn > staking section," and a sibling view keeps Lend/Sta
   product owner; enrich with live commission/APR/status from the staking API at runtime.
 - Read `StakeManager.withdrawalDelay()` and current slashing state on-chain at build time to keep the
   unbonding copy and risk disclosure accurate.
+- Read the live sPOL `rewardFee`/`feeReceiver` on-chain and disclose that Polygon (not FairWins) takes
+  a reward-fee; confirm the canonical sPOL addresses against `0xPolygon/spol-contracts` at build time.
 - Confirm the **FairWins `_referral` attribution address** to pass to Lido `submit` (tracking only, no
-  revenue — R1).
-- Decide the exact set of `UNDERLYING_META`/`CURATED_REGISTRY` additions (wstETH, and POL on chain 1)
-  and price-feed wiring for USD valuation of positions.
+  revenue — R1). sPOL has no referral param (R2/R6).
+- Decide the exact set of `UNDERLYING_META`/`CURATED_REGISTRY` additions (wstETH, sPOL, and POL on
+  chain 1) and price-feed wiring for USD valuation of positions.
+- Follow-up (post-launch): the Polygon-PoS-native sPOL deposit path via `sPOLChild` (chainId 137,
+  cross-chain settle) so members can stake POL held on Polygon without bridging to L1 first.

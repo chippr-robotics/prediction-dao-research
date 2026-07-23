@@ -14,15 +14,19 @@ with honest unbonding disclosure, withdraw when the wait elapses, and claim rewa
 provider distributes them — all from their own wallet, non-custodial, with FairWins never taking
 custody.
 
-Two models ship on **Ethereum mainnet (chainId 1)** at launch, both executed against audited
-third-party contracts from the member's wallet:
+Three options across two models ship on **Ethereum mainnet (chainId 1)** at launch, all executed
+against audited third-party contracts from the member's wallet:
 
 - **Liquid — ETH via Lido** → member stakes ETH and holds **wstETH** (non-rebasing LST). Exit is a
   Lido Withdrawal Queue request (ERC-721 claim ticket) with an honest, variable wait.
+- **Liquid — POL via sPOL** → member stakes POL and holds **sPOL**, Polygon's official native LST
+  (value-accruing, pooled across a Polygon-curated validator set; canonical mint on Ethereum L1).
+  Exit via `sellSPOL` → ~3–4 day unbonding → `withdrawPOL`, or an instant DEX swap of the liquid token.
 - **Delegated — POL via Polygon validator delegation** → member delegates POL to a **curated**
   validator's `ValidatorShare` contract (the Polygon PoS staking contracts live on Ethereum L1),
   with a ~80-checkpoint (~2–4 day) unbonding period before withdrawal, claimable rewards, and
-  disclosed slashing risk.
+  disclosed slashing risk. (sPOL and ValidatorShare are the liquid vs. delegated POL options offered
+  side by side.)
 
 The feature flips on two existing honestly-disabled stubs: the Earn hub's "Stake" area
 (`EarnPanel.jsx:87-96`) and the portfolio asset sheet's "Stake" action
@@ -39,8 +43,8 @@ hook).
 
 **Primary Dependencies**: ethers v6 (contract reads/writes), existing InfoTip / nav / Earn panel /
 activity-feed / ledger infrastructure, the spec-041 unified send rail (`useEarnSend`). **No new npm
-dependencies** — Lido APR REST and the Polygon staking API are consumed with `fetch`; Lido +
-Polygon `ValidatorShare`/`StakeManager` calls use minimal inline ABIs.
+dependencies** — Lido APR REST and the Polygon staking API are consumed with `fetch`; Lido, sPOL
+(`sPOLController`), and Polygon `ValidatorShare`/`StakeManager` calls use minimal inline ABIs.
 
 **Storage**: none new — activity persists through the existing spec-031 activity store and the
 spec-051 client ledger store (`localStorage`, per account+chain), travelling in the spec-032
@@ -63,9 +67,10 @@ and unbond status); no flow implies instant availability when a withdrawal queue
 applies; WCAG 2.1 AA; per-chain data isolation; all copy non-technical with InfoTip explainers;
 delegated targets are a curated allowlist, never free-form addresses.
 
-**Scale/Scope**: 1 staking-enabled network at launch (chainId 1); 1 liquid option (Lido) + a small
-curated set of Polygon validators; staking added as a **view within the existing Earn tab**
-(`?tab=earn&view=stake`), ~10 new components/modules + notification/ledger source + 2 docs pages.
+**Scale/Scope**: 1 staking-enabled network at launch (chainId 1); 2 liquid options (Lido ETH, sPOL
+POL) + a small curated set of Polygon validators (delegated); staking added as a **view within the
+existing Earn tab** (`?tab=earn&view=stake`), ~11 new components/modules + notification/ledger source
++ 2 docs pages.
 
 ## Constitution Check
 
@@ -86,10 +91,11 @@ curated set of Polygon validators; staking added as a **view within the existing
   unsupported network, over-balance/below-minimum amounts, mid-unbonding, ready-to-withdraw); axe
   tests for the new views. Fork tests are **not** applicable (no FairWins contract); provider calls
   are exercised with simulated data at the test layer only.
-- **III. Honest State**: PASS — live Lido/Polygon data only; explicit unavailable states; no
-  staking surface on networks without a real, deposits-open provider (Polygon-137 LST is deferred
-  because no provider is accepting new deposits — research.md R2); APR and unbond status carry "as
-  of" freshness; unbonding/withdrawal waits are surfaced before confirmation; slashing risk
+- **III. Honest State**: PASS — live Lido/sPOL/Polygon data only; explicit unavailable states; no
+  staking surface on networks without a real, deposits-open provider (chain 1 launch; the
+  Polygon-PoS-native sPOL path via `sPOLChild` is a documented follow-up — research.md R2); APR and
+  unbond status carry "as of" freshness; unbonding/withdrawal waits are surfaced before confirmation
+  (and sPOL's instant-DEX-exit alternative is presented honestly with its price impact); slashing risk
   disclosed; no fee implied while none is charged.
 - **IV. Fail Loudly in CI**: PASS — no CI changes; new tests join the gating suite.
 - **V. Accessible, Consistent Frontend**: PASS — InfoTip / Earn panel / `.asset-sheet-*` /
@@ -126,25 +132,30 @@ frontend/src/
 ├── config/
 │   ├── networks.js                  # + staking block on chain 1 (stakingConfig()), + staking
 │   │                                #   capability, + isStakingAvailable/getStakingConfig/getStakingNetworks
-│   ├── staking.js                   # NEW — Lido contract addresses + APR API, Polygon StakeManager +
-│   │                                #   staking API, curated validator allowlist, poll cadences,
-│   │                                #   stakingPath() deep-link helper, FairWins referral marker address
-│   └── assetTaxonomy.js             # + wstETH/stETH + POL(on chain 1) entries in CURATED_REGISTRY +
+│   ├── staking.js                   # NEW — liquid providers (Lido + sPOL) config, Polygon StakeManager +
+│   │                                #   staking API, curated validator allowlist, APR endpoints, poll
+│   │                                #   cadences, stakingPath() deep-link helper, Lido referral address
+│   └── assetTaxonomy.js             # + wstETH/sPOL + POL(on chain 1) entries in CURATED_REGISTRY +
 │                                    #   UNDERLYING_META so LSTs and delegated positions render
 ├── abis/
 │   ├── LidoStETH.js                 # NEW — submit(referral), approve, sharesOf, getPooledEthByShares
 │   ├── LidoWstETH.js                # NEW — wrap/unwrap, receive(), stEthPerToken, balanceOf
 │   ├── LidoWithdrawalQueue.js       # NEW — requestWithdrawals(WstETH), claimWithdrawals,
 │   │                                #   getWithdrawalStatus, getWithdrawalRequests, findCheckpointHints
+│   ├── SPOLController.js            # NEW — buySPOL/buySPOLPermit, sellSPOL, withdrawPOL,
+│   │                                #   convertPOLtoSPOL/convertSPOLtoPOL, totalsPOLBalance, getUserOpenNonces
 │   ├── PolygonValidatorShare.js     # NEW — buyVoucherPOL/sellVoucherPOL/unstakeClaimTokens_newPOL,
 │   │                                #   getTotalStake, getLiquidRewards, withdrawRewardsPOL, unbonds_new
 │   └── PolygonStakeManager.js       # NEW — epoch(), withdrawalDelay()
 ├── lib/staking/
 │   ├── lidoStaking.js               # NEW — stake(submit→wstETH), requestWithdrawal, claim, status,
 │   │                                #   APR fetch, share-accounting helpers
+│   ├── spolStaking.js               # NEW — buySPOL stake, sellSPOL→withdrawPOL exit, getUserOpenNonces
+│   │                                #   claimable detection, exchange-rate/APR from convert* + rewardFee read
 │   ├── polygonDelegation.js         # NEW — buyVoucher/sellVoucher/claim builders, unbond-nonce
 │   │                                #   claimable math, rewards read/claim, validator-list fetch
-│   ├── stakingActions.js            # NEW — shared amount validation + native gas reserve + build-calls
+│   ├── stakingActions.js            # NEW — shared amount validation + native gas reserve + build-calls;
+│   │                                #   dispatches by option.provider kind (lido|spol|validator-share)
 │   ├── stakingCopy.js               # NEW — member-facing InfoTip copy + risk disclosure
 │   └── stakingActivityBuffer.js     # NEW — queue/drain for the notification source (mirrors earnActivityBuffer)
 ├── lib/staking/pendingUnbonds.js    # NEW — persist Lido request ids + Polygon unbond nonces (account+chain)
@@ -188,20 +199,23 @@ finance > earn > staking section."
 
 ## Design decisions (Phase 1 digest)
 
-1. **Capability gating** mirrors `earn`/`dex`: `NETWORKS[id].staking` block (per-model provider
-   identity, Lido addresses, Polygon StakeManager + validator allowlist) → `capabilities.staking` →
-   UI self-gates; unavailable networks name the staking-enabled networks (from
-   `getStakingNetworks()`), never dead-end. **Chain 1 only at launch**; Polygon-137 is the honest
-   unavailable state until a deposits-open LST provider exists (research.md R2).
-2. **Two models, one list.** Each `StakingOption` declares `model: 'liquid' | 'delegated'`. Liquid
-   options come from the fixed Lido config; delegated options come from the **curated validator
-   allowlist** enriched with live commission/APR/status from the Polygon staking API (allowlist is
-   the hard boundary — API only decorates, never expands it). FR-008.
-3. **Liquid stake/exit (Lido).** Stake: `submit`/route to wstETH, validate + native gas reserve,
-   summary discloses the wstETH received. Exit: `requestWithdrawalsWstETH` mints an ERC-721 claim
-   ticket (request id persisted); "ready to withdraw" when `getWithdrawalStatus` reports
-   `isFinalized && !isClaimed`; `claimWithdrawals(ids, hints)` returns ETH. Share-accounting used
-   to avoid rebase drift (research.md R1).
+1. **Capability gating** mirrors `earn`/`dex`: `NETWORKS[id].staking` block (liquid providers +
+   Polygon StakeManager + validator allowlist) → `capabilities.staking` → UI self-gates; unavailable
+   networks name the staking-enabled networks (from `getStakingNetworks()`), never dead-end. **Chain 1
+   only at launch** (Lido + sPOL + Polygon delegation all mint/execute on Ethereum L1); the
+   Polygon-PoS-native sPOL path (`sPOLChild`, chainId 137) is a documented follow-up (research.md R2).
+2. **Two models, one list.** Each `StakingOption` declares `model: 'liquid' | 'delegated'` and a
+   `provider` kind (`lido` | `spol` | `validator-share`). Liquid options come from the fixed
+   Lido + sPOL config; delegated options come from the **curated validator allowlist** enriched with
+   live commission/APR/status from the Polygon staking API (allowlist is the hard boundary — API only
+   decorates, never expands it). FR-008.
+3. **Liquid stake/exit.** *Lido (ETH):* `submit`/route to wstETH; exit via `requestWithdrawalsWstETH`
+   (ERC-721 ticket persisted), "ready" when `getWithdrawalStatus` reports `isFinalized && !isClaimed`,
+   `claimWithdrawals(ids, hints)` returns ETH; share-accounting avoids rebase drift (R1). *sPOL (POL):*
+   `buySPOL` (member holds the value-accruing sPOL token); exit via `sellSPOL` → unbonding nonce
+   persisted → "ready" when the nonce matures (`getUserOpenNonces`) → `withdrawPOL`; the confirm UI
+   also surfaces the instant-DEX-swap exit as an honest alternative to the ~3–4 day wait (R2). Both
+   are exchange-rate tokens (no separate reward claim; value accrues into the token).
 4. **Delegated stake/exit (Polygon).** Delegate: `approve` POL to StakeManager → `buyVoucherPOL`
    with `_minSharesToMint` slippage bound. Undelegate: `sellVoucherPOL` records a `DelegatorUnbond`
    at an epoch (unbond nonce persisted). "Ready to withdraw" when
@@ -212,11 +226,13 @@ finance > earn > staking section."
 5. **Honest unbonding & slashing.** No exit flow implies instant funds. Delegated confirm requires
    acknowledging the unbonding wait; the risk disclosure covers slashing (principal can be reduced),
    variable/non-guaranteed rewards, third-party smart-contract risk, and illiquidity. FR-006/FR-014.
-6. **Fee.** Ships **fee-free** (no fee line, behavior identical to pre-fee). Because Lido `submit`
-   and Polygon `buyVoucher` are not ERC-4626 deposits, the FeeRouter's `depositToVaultWithFee`
-   entrypoint does not fit; a fee-on-input staking router is a new value-bearing contract and is
-   **deferred to its own spec** (research.md R6). Spec-060 `earn.stake` service registration is the
-   documented future hook; FR-015 is satisfied (single fee source; zero ⇒ no fee line).
+6. **Fee.** Ships **fee-free** (no fee line, behavior identical to pre-fee). None of Lido `submit`,
+   sPOL `buySPOL`, or Polygon `buyVoucher` are ERC-4626 deposits, so the FeeRouter's
+   `depositToVaultWithFee` entrypoint does not fit; a fee-on-input staking router is a new
+   value-bearing contract and is **deferred to its own spec** (research.md R6). Providers take their
+   own protocol fees (Lido ~10% of rewards; sPOL's on-chain `rewardFee`) — those are the provider's,
+   not FairWins', and are disclosed as such. Spec-060 `earn.stake` registration is the documented
+   future hook; FR-015 is satisfied (single FairWins fee source; zero ⇒ no fee line).
 7. **Activity + audit.** `stakingSource` (notifications): drains the action buffer into precise
    stake/unstake/withdraw/claim entries and snapshot-diffs positions as a backstop; a completed
    unbonding emits an **actionable** "ready to withdraw" entry (`actionable: true`) that breaks
@@ -231,6 +247,7 @@ finance > earn > staking section."
 ## Complexity Tracking
 
 No constitution violations to justify. New-technology check: none added (fetch + ethers v6 +
-existing Earn/notification/ledger patterns). The single scope-shaped decisions — deferring the
-on-chain staking fee router, and deferring Polygon-137 liquid staking until a deposits-open provider
-exists — are recorded in research.md (R6, R2) and reflected in spec FR-015/FR-008.
+existing Earn/notification/ledger patterns). The scope-shaped decisions — deferring the on-chain
+staking fee router (R6), and launching the Polygon-PoS-native sPOL deposit path (`sPOLChild`,
+chainId 137) as a follow-up while the canonical L1 mint ships now (R2) — are recorded in research.md
+and reflected in spec FR-015/FR-008.
