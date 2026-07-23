@@ -27,7 +27,11 @@ const ZERO = '0x0000000000000000000000000000000000000000'
 export function DexProvider({ children }) {
   const { provider, address, isConnected, sendCalls } = useWallet()
   // Spec 043 (US3): swapping while operating as a vault becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, identity: activeIdentity, submit: submitAsActive } = useActiveAccount()
+  const {
+    isVault: operatingAsVault, canActAsVault,
+    isLegacy: operatingAsLegacy, canActAsLegacy,
+    identity: activeIdentity, submit: submitAsActive,
+  } = useActiveAccount()
   const wagmiChainId = useChainId()
   const chainId = wagmiChainId || getCurrentChainId()
   const network = getNetwork(chainId)
@@ -46,7 +50,11 @@ export function DexProvider({ children }) {
   // member operates as one (on the vault's own network), else the connected
   // wallet. Balances and swap recipients follow this address so "available to
   // trade" is accurate for the selected account (Spec 043).
-  const tradingAddress = operatingAsVault && canActAsVault ? activeIdentity.vaultAddress : address
+  const tradingAddress = operatingAsVault && canActAsVault
+    ? activeIdentity.vaultAddress
+    : operatingAsLegacy && activeIdentity?.address
+      ? activeIdentity.address
+      : address
 
   const dexConfig = network?.dex || null
   const stableConfig = network?.stablecoin || null
@@ -268,6 +276,15 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      // Spec 062: as a recovered legacy account, sign with its unlocked key (via
+      // the active-account seam), executing immediately — never the connected wallet.
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to act as it.')
+        const res = await submitAsActive({ batch: [call] })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
       const res = await sendCalls([call])
       if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
@@ -280,7 +297,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive, sendCalls, fetchBalances])
 
   const unwrapNative = useCallback(async (amount) => {
     if (!contracts) {
@@ -299,6 +316,13 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to act as it.')
+        const res = await submitAsActive({ batch: [call] })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       if (typeof sendCalls !== 'function') throw new Error('Wallet not connected')
       const res = await sendCalls([call])
       if (res?.state === 'failed') throw new Error(res.reason || 'Transaction failed')
@@ -311,7 +335,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, addresses, operatingAsVault, canActAsVault, submitAsActive, sendCalls, fetchBalances])
+  }, [contracts, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive, sendCalls, fetchBalances])
 
   // Decimals lookup for a token by address used in quote/swap calls below.
   // Defaults to 18 (native/wrapped) when the token isn't in our known set.
@@ -517,6 +541,28 @@ export function DexProvider({ children }) {
         return { proposed: true, safeTxHash: res.safeTxHash }
       }
 
+      // Spec 062: swap AS a recovered legacy account. Same [approve?, swap] batch,
+      // recipient = the legacy account, signed by its unlocked key via the
+      // active-account seam (sequential txs for an EOA), executed immediately.
+      // Approve is included only when the current allowance is short.
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to swap as it.')
+        const legacyAllowance = await new ethers.Contract(tokenIn, ERC20_ABI, readProvider)
+          .allowance(tradingAddress, addresses.SWAP_ROUTER_02)
+        const batch = []
+        if (legacyAllowance < amountInWei) {
+          batch.push({ to: tokenIn, value: 0n, data: erc20.encodeFunctionData('approve', [addresses.SWAP_ROUTER_02, amountInWei]) })
+        }
+        batch.push({
+          to: addresses.SWAP_ROUTER_02,
+          value: 0n,
+          data: contracts.swapRouter.interface.encodeFunctionData('exactInputSingle', [swapParams(tradingAddress)]),
+        })
+        const res = await submitAsActive({ batch })
+        await fetchBalances()
+        return { sent: true, txHash: res.txHash }
+      }
+
       // Personal mode rides the unified spec-041 write rail: one batch through
       // sendCalls covers approval (only when needed, for the exact amount) and
       // the swap — a single WebAuthn ceremony for passkey sessions, sequential
@@ -553,7 +599,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [contracts, tradingAddress, readProvider, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, activeIdentity, submitAsActive, sendCalls])
+  }, [contracts, tradingAddress, readProvider, getBestQuote, fetchBalances, decimalsOf, addresses, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, activeIdentity, submitAsActive, sendCalls])
 
   const value = {
     balances,

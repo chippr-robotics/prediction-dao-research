@@ -17,6 +17,7 @@ import NavIcon from '../nav/NavIcon'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
+import AccountSwitcher from '../account/AccountSwitcher'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
@@ -213,6 +214,12 @@ function WalletButton({ className = '' }) {
                   >
                     <NavIcon name="qrcode" size={18} />
                   </button>
+                </div>
+                {/* Global acting-account switcher: personal wallet, multisig
+                    vaults, or a recovered legacy account. Self-hides when the
+                    member has only their personal wallet. */}
+                <div className="dropdown-account-switcher">
+                  <AccountSwitcher />
                 </div>
               </div>
 

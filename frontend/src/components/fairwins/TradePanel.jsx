@@ -14,6 +14,8 @@ import { useWallet } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
+import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
+import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
 import './TradePanel.css'
@@ -57,11 +59,15 @@ function TradePanel() {
   const { isConnected, chainId, address, loginMethod } = useWallet()
   const { native: nativeSymbol, stable: stableSymbol } = useChainTokens()
 
-  // Account selection (spec 043): trade as the personal wallet or as one of the
-  // member's saved multisig vaults. Selecting a vault turns every order into a
-  // threshold-gated proposal; balances shown below always follow the selection.
-  const { identity, isVault, operateAsVault, operateAsPersonal } = useActiveAccount()
+  // Account selection (spec 043 + 062): trade as the personal wallet, one of the
+  // member's saved multisig vaults, or a recovered legacy account. A vault turns
+  // every order into a threshold-gated proposal; a recovered account signs each
+  // order with its unlocked in-memory key. Balances always follow the selection.
+  const { identity, isVault, isLegacy, operateAsVault, operateAsPersonal, operateAsLegacy } =
+    useActiveAccount()
   const { vaults } = useCustodyVaults()
+  const legacyAccounts = useLegacyAccounts()
+  const [unlockEntry, setUnlockEntry] = useState(null)
 
   // Session rails: passkey accounts transact through their smart account —
   // gasless (FairWins-sponsored) where the network has a sponsor paymaster
@@ -210,8 +216,27 @@ function TradePanel() {
       operateAsPersonal()
       return
     }
+    if (value.startsWith('legacy:')) {
+      // Unlock (biometric/passphrase) before acting; operateAsLegacy on success.
+      const acct = legacyAccounts.find((a) => a.id === value)
+      if (acct) setUnlockEntry(acct.entry)
+      return
+    }
     const vault = vaults.find((v) => v.address === value)
     if (vault) operateAsVault(vault)
+  }
+
+  const handleLegacyUnlocked = (signer) => {
+    if (unlockEntry) {
+      operateAsLegacy({
+        address: unlockEntry.address,
+        chainId,
+        kind: unlockEntry.kind,
+        label: shortAddress(unlockEntry.address),
+        signer,
+      })
+    }
+    setUnlockEntry(null)
   }
 
   // A Limit order's floor: limit price (output per 1 unit paid) × quantity,
@@ -307,7 +332,9 @@ function TradePanel() {
   const severity = impactSeverity(quote?.priceImpactPercent)
   const canExecute =
     !loading &&
-    passkeyReady &&
+    // A recovered account signs with its own EOA key, not the passkey rail, so
+    // passkey readiness doesn't gate it.
+    (passkeyReady || isLegacy) &&
     !isPerpsOrder &&
     amount &&
     parseFloat(amount) > 0 &&
@@ -321,12 +348,18 @@ function TradePanel() {
         ? `1 ${quote.tokenOutSymbol} = ${quote.executionPriceInverted} ${quote.tokenInSymbol}`
         : null
 
-  const accountValue = isVault ? identity.vaultAddress : 'personal'
+  const accountValue = isVault
+    ? identity.vaultAddress
+    : identity.mode === 'legacy' && identity.address
+      ? `legacy:${String(identity.address).toLowerCase()}`
+      : 'personal'
   const feeBadge = isVault
     ? { className: 'trade-badge-proposal', text: 'Multisig proposal' }
-    : passkeySponsored
-      ? { className: 'trade-badge-gasless', text: '⚡ Gasless · sponsored' }
-      : { className: 'trade-badge-fee', text: 'Network fee applies' }
+    : isLegacy
+      ? { className: 'trade-badge-fee', text: 'Network fee applies' }
+      : passkeySponsored
+        ? { className: 'trade-badge-gasless', text: '⚡ Gasless · sponsored' }
+        : { className: 'trade-badge-fee', text: 'Network fee applies' }
 
   return (
     <div className="trade-panel">
@@ -365,7 +398,24 @@ function TradePanel() {
               {(v.label || shortAddress(v.address)) + ' · Multisig'}
             </option>
           ))}
+          {legacyAccounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {(a.label || shortAddress(a.address)) + ' · Recovered'}
+            </option>
+          ))}
         </select>
+        <LegacyUnlockDialog
+          open={Boolean(unlockEntry)}
+          entry={unlockEntry}
+          onClose={() => setUnlockEntry(null)}
+          onUnlocked={handleLegacyUnlocked}
+        />
+        {isLegacy && (
+          <p className="trade-account-note" role="note">
+            Orders sign with your recovered account&apos;s key on {networkName}. You pay the
+            network fee — recovered accounts aren&apos;t gasless.
+          </p>
+        )}
         <dl className="trade-account-rows">
           <div className="trade-account-row">
             <dt>Available to trade ({symbolFor(fromToken)})</dt>
@@ -386,7 +436,7 @@ function TradePanel() {
             owners approve.
           </p>
         )}
-        {!passkeyReady && (
+        {!passkeyReady && !isLegacy && (
           <p className="trade-account-note" role="note">
             Passkey accounts can’t send transactions on {networkName} yet — connect a
             browser wallet to trade here.
@@ -657,7 +707,7 @@ function TradePanel() {
               : 'Enter an amount'}
       </button>
 
-      {isPasskey && passkeyReady && !isVault && (
+      {isPasskey && passkeyReady && !isVault && !isLegacy && (
         <p className="trade-session-note">
           One passkey confirmation covers the whole order — including the spending
           permission when it’s needed.

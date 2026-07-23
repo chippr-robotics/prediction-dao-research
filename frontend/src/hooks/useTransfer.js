@@ -66,7 +66,11 @@ const ERC20_IFACE = new ethers.Interface(TRANSFER_ABI)
 
 export function useTransfer() {
   const { address, chainId, signer, provider, loginMethod, sendCalls } = useWallet()
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
+  const {
+    isVault: operatingAsVault, canActAsVault,
+    isLegacy: operatingAsLegacy, canActAsLegacy,
+    submit: submitAsActive,
+  } = useActiveAccount()
   const tokens = useChainTokens()
   const isPasskey = loginMethod === 'passkey'
 
@@ -262,6 +266,32 @@ export function useTransfer() {
         }
       }
 
+      // Spec 062: when acting as a recovered legacy account, the transfer must be
+      // signed by that account's unlocked key — NOT the connected wallet. Route it
+      // through the active-account seam (submit uses the in-memory legacySigner and
+      // re-checks the chain), mirroring the vault branch. Never falls through to the
+      // connected signer below.
+      if (operatingAsLegacy) {
+        if (!canActAsLegacy) throw new Error('Unlock the recovered account on its network to send from it.')
+        const payload = a.isNative
+          ? { to, value, data: '0x' }
+          : { to: a.address, value: 0n, data: ERC20_IFACE.encodeFunctionData('transfer', [to, value]) }
+        setError(null)
+        setStatus('submitting')
+        try {
+          const res = await submitAsActive(payload)
+          setStatus('success')
+          const result = { sent: true, txHash: res.txHash, route: 'legacy', id: null }
+          setLastResult(result)
+          return result
+        } catch (err) {
+          const message = err?.shortMessage || err?.message || 'Could not send from the recovered account.'
+          setError(message)
+          setStatus('error')
+          throw err
+        }
+      }
+
       const gasless = passkeySponsored || (a.isNetworkStable && stableDomainVersion != null && hasRelayer)
       const entry = recordTransfer(address, {
         chainId,
@@ -382,7 +412,7 @@ export function useTransfer() {
         throw err
       }
     },
-    [signer, isPasskey, meta, isNetworkStableAsset, tokens.stableName, tokens.nativeDecimals, passkeySponsored, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, submitAsActive]
+    [signer, isPasskey, meta, isNetworkStableAsset, tokens.stableName, tokens.nativeDecimals, passkeySponsored, address, chainId, sendCalls, stableDomainVersion, hasRelayer, refreshBalances, operatingAsVault, canActAsVault, operatingAsLegacy, canActAsLegacy, submitAsActive]
   )
 
   return useMemo(

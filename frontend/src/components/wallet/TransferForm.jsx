@@ -6,10 +6,12 @@ import QRScanner from '../ui/QRScanner'
 import SensitiveValue from '../common/SensitiveValue'
 import TransferAssetSelect from './TransferAssetSelect'
 import TransferFromSelect from './TransferFromSelect'
+import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
+import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
 import { useAccountAssets } from '../../hooks/useAccountAssets'
 import usePortfolio from '../../hooks/usePortfolio'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
@@ -36,13 +38,17 @@ export default function TransferForm({ onSent }) {
     send, status, error, quoteGaslessForAsset, balanceOf, refreshBalances, tokens, isPasskey,
   } = useTransfer()
   const { address, chainId } = useWallet()
-  const { identity, isVault, operateAsPersonal, operateAsVault } = useActiveAccount()
+  const { identity, isVault, isLegacy, operateAsPersonal, operateAsVault, operateAsLegacy } = useActiveAccount()
   const { vaults } = useCustodyVaults()
+  const legacyAccounts = useLegacyAccounts()
+  const [unlockEntry, setUnlockEntry] = useState(null)
   const portfolio = usePortfolio()
-  // When operating as a vault, source the asset list + balances from the vault's own on-chain holdings
-  // (it lives on the connected chain and isn't part of the personal wallet's portfolio scan).
+  // Assets + balances come from whichever account we're ACTING AS — a vault or a
+  // recovered legacy account — not the connected wallet (each holds its own funds
+  // on the connected chain and isn't part of the personal portfolio scan).
   const vaultAddress = isVault && identity?.vaultAddress ? identity.vaultAddress : null
-  const vaultAssets = useAccountAssets(vaultAddress)
+  const actingAddress = vaultAddress || (isLegacy && identity?.address ? identity.address : null)
+  const actingAssets = useAccountAssets(actingAddress)
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
@@ -90,7 +96,7 @@ export default function TransferForm({ onSent }) {
         name: tokens.nativeName,
         decimals: tokens.nativeDecimals,
         networkName: tokens.networkName,
-        balance: isVault ? null : toNum(balanceOf(TRANSFER_KIND.NATIVE)),
+        balance: actingAddress ? null : toNum(balanceOf(TRANSFER_KIND.NATIVE)),
       })
     }
     if (tokens.stableAddress) {
@@ -103,14 +109,14 @@ export default function TransferForm({ onSent }) {
         name: tokens.stableName,
         decimals: tokens.stableDecimals,
         networkName: tokens.networkName,
-        balance: isVault ? null : toNum(balanceOf(TRANSFER_KIND.STABLE)),
+        balance: actingAddress ? null : toNum(balanceOf(TRANSFER_KIND.STABLE)),
       })
     }
 
     // Native Bitcoin — personal wallet only (custody vaults are EVM Safes and
     // can never hold BTC). Balance is the SPENDABLE amount: what a send can
     // actually move (protected/pending value is disclosed in the panel).
-    if (!isVault && btc.status === 'ready') {
+    if (!actingAddress && btc.status === 'ready') {
       put({
         key: 'bitcoin:native',
         chainId: btc.networkId,
@@ -124,7 +130,7 @@ export default function TransferForm({ onSent }) {
       })
     }
 
-    const source = isVault ? vaultAssets.holdings : portfolio.holdings
+    const source = actingAddress ? actingAssets.holdings : portfolio.holdings
     for (const h of source || []) {
       if (h.asset.kind !== 'native' && h.asset.kind !== 'erc20') continue // no NFTs in a value transfer
       const keepZero = h.asset.kind === 'native' || isConnectedStableAddr(h.asset.address)
@@ -148,7 +154,7 @@ export default function TransferForm({ onSent }) {
       if (ac !== bc) return ac - bc
       return (b.balance ?? 0) - (a.balance ?? 0)
     })
-  }, [isVault, vaultAssets.holdings, portfolio.holdings, tokens, connectedChainId, balanceOf, isConnectedStableAddr, btc.status, btc.networkId, btc.balances.spendableSats])
+  }, [actingAddress, actingAssets.holdings, portfolio.holdings, tokens, connectedChainId, balanceOf, isConnectedStableAddr, btc.status, btc.networkId, btc.balances.spendableSats])
 
   // Default to the connected chain's stablecoin, then its native coin, then whatever's first.
   const defaultKey = useMemo(() => {
@@ -189,10 +195,14 @@ export default function TransferForm({ onSent }) {
         chainId: Number(v.chainId),
       })
     }
-    return list
-  }, [address, vaults, connectedChainId])
+    return list.concat(legacyAccounts)
+  }, [address, vaults, connectedChainId, legacyAccounts])
 
-  const fromValue = isVault && identity?.vaultAddress ? `vault:${identity.vaultAddress}` : 'personal'
+  const fromValue = isVault && identity?.vaultAddress
+    ? `vault:${identity.vaultAddress}`
+    : identity?.mode === 'legacy' && identity.address
+      ? `legacy:${String(identity.address).toLowerCase()}`
+      : 'personal'
 
   const handleFromChange = useCallback(
     (account) => {
@@ -200,11 +210,23 @@ export default function TransferForm({ onSent }) {
       setFormError(null)
       if (account.kind === 'vault') {
         operateAsVault({ address: account.address, chainId: account.chainId, label: account.label })
+      } else if (account.kind === 'legacy') {
+        setUnlockEntry(account.entry) // unlock (biometric/passphrase) → operateAsLegacy on success
       } else {
         operateAsPersonal()
       }
     },
     [operateAsVault, operateAsPersonal],
+  )
+
+  const handleLegacyUnlocked = useCallback(
+    (signer) => {
+      if (unlockEntry) {
+        operateAsLegacy({ address: unlockEntry.address, chainId: connectedChainId, kind: unlockEntry.kind, label: short(unlockEntry.address), signer })
+      }
+      setUnlockEntry(null)
+    },
+    [unlockEntry, connectedChainId, operateAsLegacy],
   )
 
   // Advisory sanctions pre-check on the resolved recipient, against the SELECTED asset's chain.
@@ -332,6 +354,12 @@ export default function TransferForm({ onSent }) {
               value={fromValue}
               onChange={handleFromChange}
               disabled={busy}
+            />
+            <LegacyUnlockDialog
+              open={Boolean(unlockEntry)}
+              entry={unlockEntry}
+              onClose={() => setUnlockEntry(null)}
+              onUnlocked={handleLegacyUnlocked}
             />
             {isVault && (
               <span className="pt-hint">

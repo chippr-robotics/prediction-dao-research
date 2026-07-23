@@ -35,6 +35,8 @@ vi.mock('../hooks', () => ({ useWallet: mockUseWallet }))
 vi.mock('../hooks/useChainTokens', () => ({ useChainTokens: mockUseChainTokens }))
 vi.mock('../hooks/useActiveAccount', () => ({ useActiveAccount: mockUseActiveAccount }))
 vi.mock('../hooks/useCustodyVaults', () => ({ useCustodyVaults: mockUseCustodyVaults }))
+vi.mock('../hooks/useLegacyAccounts', () => ({ useLegacyAccounts: () => [] }))
+vi.mock('../components/account/LegacyUnlockDialog', () => ({ default: () => null }))
 
 import TradePanel from '../components/fairwins/TradePanel'
 
