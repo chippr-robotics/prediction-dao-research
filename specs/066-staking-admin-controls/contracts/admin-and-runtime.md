@@ -11,7 +11,7 @@ isGuardian }`. Resolve the contract: `getContractAddressForChain('stakingRouter'
 state).
 
 **Reads (memoized `new ethers.Contract(addr, STAKING_ROUTER_ABI, provider)`):** provider addresses, the
-validator allowlist (`validatorCount`/`validatorAt`), `paused()`, and the current `earn.stake` rate (via
+validator allowlist (`validatorCount`/`validatorAt`), `paused()`, and the current `stake.lido`/`stake.polygon` rate (via
 `fetchFeeQuote`, shown read-only with a pointer to the Fees tab). A `safe(p)=p.catch(()=>undefined)` wrapper
 keeps one missing getter from blanking the panel.
 
@@ -42,7 +42,7 @@ newest-first table with a Blockscout fallback link — identical to FeesTab’s 
 
 Resolve `getContractAddressForChain('stakingRouter', chainId)`:
 - **present** → overlay the router’s provider addresses + validator allowlist + `paused` onto the options,
-  and read the `earn.stake` fee via `fetchFeeQuote`. When `paused`, the Stake area hides **new**-stake and
+  and read the `stake.lido`/`stake.polygon` fee via `fetchFeeQuote`. When `paused`, the Stake area hides **new**-stake and
   shows the honest unavailable state (exits stay available).
 - **absent/unreachable** → keep the spec-065 build-time constants verbatim (fee-free, direct staking,
   availability as configured). A present-but-unreadable router blocks only the fee-bearing path (never

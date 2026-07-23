@@ -8,7 +8,7 @@ breakdown in `tasks.md` (Phase 2).
 - Spec 065 staking merged (it is). The spec-060 `FeeRouter` deployed on the target network with a `treasury`
   set.
 - `StakingRouter` deployed on the target network (`scripts/deploy/deploy-staking-router.js`) and
-  `earn.stake` registered on the FeeRouter; `npm run sync:frontend-contracts` run so
+  `stake.lido` + `stake.polygon` registered on the FeeRouter; `npm run sync:frontend-contracts` run so
   `getContractAddressForChain('stakingRouter', chainId)` resolves.
 - A `STAKING_ADMIN_ROLE` and `GUARDIAN_ROLE` grantee; a `FEE_ADMIN_ROLE` grantee (existing) to set the rate.
 
@@ -22,7 +22,7 @@ breakdown in `tasks.md` (Phase 2).
 
 ## Scenario 1 — Treasury grows on a liquid stake (US1)
 
-1. As `FEE_ADMIN`, set the `earn.stake` rate (e.g. 50 bps) in the AdminPanel **Fees** tab.
+1. As `FEE_ADMIN`, set the `stake.lido` (or `stake.polygon`) rate (e.g. 50 bps) in the AdminPanel **Fees** tab.
 2. As a member, open Earn → Stake, pick the Lido (ETH) or sPOL (POL) option. **Expect** a fee line showing
    the rate and the net amount to be staked, before signing.
 3. Confirm. **Expect** (fork/manual): the treasury balance increased by exactly the disclosed fee, the net

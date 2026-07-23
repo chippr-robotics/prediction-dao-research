@@ -11,6 +11,20 @@ manage staking activities — contract-address management and the lifecycle even
 need to manage a change in service, and the ability to pause staking on a network in an emergency. We
 also need to route staking through the platform fee mechanics so the treasury can grow."
 
+## Clarifications
+
+### Session 2026-07-23
+
+- Q: Should delegated staking (Polygon validator delegation) charge a platform fee in v1? → A: No — v1
+  charges the enforced fee on **liquid** staking (Lido/sPOL) only; delegated ships **fee-free** and is
+  revisited later. This keeps every charged fee contract-enforced and atomic for all wallet types.
+- Q: How should the staking fee rate be modeled in the FeeRouter? → A: **Per-provider** services —
+  `stake.lido` and `stake.polygon` (sPOL) — each read and charged independently (not one `earn.stake`).
+- Q: What immutable cap should the staking fee service(s) carry? → A: **250 bps (2.5%)** each; the rate
+  ships at 0 and is set later by fee administration.
+- Q: How should the StakingRouter admin (config) and guardian (pause) authority be held? → A: **Multisig
+  (Safe) roles, no on-chain timelock** — config via multisig; the emergency pause stays instant.
+
 ## User Scenarios & Testing *(mandatory)*
 
 Staking (spec 065) shipped **fee-free** and with its provider addresses and curated validator
@@ -204,8 +218,10 @@ attributable in the audit history.
   flight can never overcharge (the quoted rate is a hard ceiling on the transaction).
 - **Zero fee is invisible and identical**: a zero/unset fee produces no fee line and byte-identical
   behavior to fee-free staking.
-- **Fee cap enforced**: the staking fee can never be set above the configured maximum for the service;
-  an attempt to exceed it is rejected.
+- **Fee cap enforced**: the staking fee can never be set above the configured maximum (250 bps) for a
+  service; an attempt to exceed it is rejected.
+- **Delegated is fee-free (v1)**: delegated staking charges no platform fee in v1; its stake path stays
+  the member's direct call (no router custody), and the treasury grows only from liquid staking for now.
 - **Pause never traps funds**: a pause blocks only *new* stakes/delegations; unstake, withdraw, and
   reward-claim remain available so members can always exit.
 - **Control surface undeployed/unreachable**: when the control surface (or the fee configuration) is
@@ -234,18 +250,21 @@ attributable in the audit history.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST charge a platform fee on staking (the value-in action) that is routed to
-  the FairWins treasury, taken from the staked amount with the net remainder staked with the provider,
-  executed atomically so a member signs once and is never left in a partial state.
+- **FR-001**: The system MUST charge a platform fee on **liquid** staking (the value-in action) that is
+  routed to the FairWins treasury, taken from the staked amount with the net remainder staked with the
+  provider, executed atomically so a member signs once and is never left in a partial state.
+  **Delegated staking is fee-free in v1** (see FR-004).
 - **FR-002**: The staking fee rate MUST come from the single platform-fee configuration used across
-  FairWins services (the same source of truth as other service fees), MUST be capped at a configured
-  maximum for the service, and MUST be settable to zero; a zero/unset fee MUST produce no fee line and
-  behavior identical to fee-free staking.
+  FairWins services (the same source of truth as other service fees), modeled as **per-provider
+  services (`stake.lido`, `stake.polygon`)** each with its own immutable **250 bps** cap and each
+  settable to zero (rate ships at 0); a zero/unset fee MUST produce no fee line and behavior identical
+  to fee-free staking.
 - **FR-003**: The member MUST see the staking fee as its own line — with its rate and the resulting
   net amount to be staked — before any signature, and MUST be charged no more than the rate they were
   shown (the quoted rate is a hard ceiling for that transaction).
-- **FR-004**: The platform fee MUST apply only to staking (value-in); unstake, withdraw, and reward
-  claim MUST never be fee-gated so members can always exit an existing position.
+- **FR-004**: The platform fee MUST apply only to **liquid** staking (value-in); **delegated staking is
+  fee-free in v1**; and unstake, withdraw, and reward claim MUST never be fee-gated so members can
+  always exit an existing position.
 - **FR-005**: The system MUST provide an authorized operator a control surface, within the app's admin
   area, to review and manage staking configuration, the fee rate, and availability per network,
   without requiring an app redeploy for changes to take effect.
@@ -290,6 +309,10 @@ attributable in the audit history.
 - **FR-017**: Operator documentation MUST describe the staking control surface — how the fee works and
   how to set it, how to pause/resume, change addresses, curate validators, who is authorized, and how
   the audit history works — including the emergency runbook for pausing in an incident.
+- **FR-018**: The staking-configuration and emergency/guardian authorizations SHOULD be held by a
+  **multisig** (not a single key), with **no on-chain timelock** on any action — the emergency pause
+  MUST take effect instantly, and configuration changes rely on multi-party approval rather than a
+  delay.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -312,9 +335,9 @@ attributable in the audit history.
 
 ### Measurable Outcomes
 
-- **SC-001**: With a configured non-zero staking fee, 100% of stakes route the fee to the treasury and
-  stake the net remainder in a single member confirmation; the measured treasury increase equals the
-  disclosed fee for every stake.
+- **SC-001**: With a configured non-zero staking fee, 100% of **liquid** stakes route the fee to the
+  treasury and stake the net remainder in a single member confirmation; the measured treasury increase
+  equals the disclosed fee for every liquid stake. (Delegated staking is fee-free in v1.)
 - **SC-002**: 100% of fee-bearing stakes disclose the fee (rate + net) before signature, and 0 members
   are ever charged more than the rate they were shown.
 - **SC-003**: With the staking fee set to zero, the staking experience is byte-for-byte identical to
@@ -340,8 +363,14 @@ attributable in the audit history.
 
 - **Fee routing reuses the single platform-fee configuration**: the staking fee is expressed through
   the same platform-fee configuration and treasury routing every other FairWins service uses (the
-  spec-060 fee mechanism), registered as a staking service with its own hard cap — not a new,
-  parallel fee store. This resolves the fee-router path that spec 065 deferred (065 research R6).
+  spec-060 fee mechanism), registered as **per-provider staking services (`stake.lido`, `stake.polygon`),
+  each capped at 250 bps** — not a new, parallel fee store. This resolves the fee-router path that spec
+  065 deferred (065 research R6). Only **liquid** staking is charged in v1; **delegated staking is
+  fee-free** (its fee would be app-applied and non-atomic for classic wallets — deferred rather than
+  ship a weaker guarantee).
+- **Governance**: the on-chain admin (config) and guardian (pause) roles are granted to a **multisig
+  (Safe)** at deployment; there is **no on-chain timelock** — the emergency pause is instant and
+  configuration changes rely on multi-party approval.
 - **Authoritative, on-chain control surface (a staking router)**: per the product decision, staking
   configuration, the fee, and the pause switch are held in an authoritative, auditable, on-chain
   control surface (one per network) that member staking flows route through so the fee can be charged

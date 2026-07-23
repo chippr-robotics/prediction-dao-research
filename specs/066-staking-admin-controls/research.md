@@ -6,10 +6,11 @@ the spec-065 staking libs).
 
 ## R1 — Charge the platform fee by reading FeeRouter, not via a new entrypoint
 
-**Decision**: `StakingRouter` charges the spec-060 fee by reading `FeeRouter.quoteFee(earn.stake, gross)
+**Decision**: `StakingRouter` charges the spec-060 fee by reading `FeeRouter.quoteFee(serviceId, gross)
 → (feeAmount, netAmount)` and `FeeRouter.treasury()`, transferring `feeAmount` to the treasury and
-`netAmount` to the provider itself. `earn.stake` is registered on the FeeRouter as **ConfigOnly**, cap 250
-bps, rate 0 until enabled.
+`netAmount` to the provider itself. The rate is **per-provider** (clarified 2026-07-23): register **two**
+services on the FeeRouter — `stake.lido` and `stake.polygon` (sPOL) — each **ConfigOnly**, cap **250 bps**,
+rate 0 until enabled. The router picks the serviceId by the liquid provider being staked.
 
 **Rationale**: `FeeRouter.depositToVaultWithFee` is strictly ERC-4626 (it hard-codes `IERC4626(vault).asset()`
 and `.deposit(...)`), so it cannot forward native ETH/POL to a Lido/sPOL staking call, and there is **no
@@ -17,20 +18,20 @@ generic “charge a fee and send the net somewhere” entrypoint**. FeeRouter de
 `feeBps(id)`, and `quoteFee(id, gross)` (which already implements the floor-in-member’s-favor split and the
 treasury-unset skip) so a sibling contract can reproduce the exact spec-060 charge **without modifying the
 deployed router**. ConfigOnly is the honest kind because FeeRouter itself never moves the funds here — the
-StakingRouter (liquid) and the client batch (delegated) do.
+StakingRouter (liquid) does; delegated is fee-free in v1 (R2).
 
 **Alternatives considered**: **Add a generic `chargeAndForward` entrypoint to FeeRouter** — rejected: a
 larger surface change to an already-live value-bearing router that spec-060 deliberately scoped to the
 ERC-4626 wrapper + ConfigOnly registry. **Register `earn.stake` Wrapped** — rejected: Wrapped implies
 FeeRouter itself charges it via `depositToVaultWithFee`, which doesn’t apply.
 
-## R2 — Liquid staking is router-enforced; delegated staking is a direct member call with a client-composed fee
+## R2 — Liquid staking is router-enforced; delegated staking is fee-free in v1
 
 **Decision**: **Liquid** staking (Lido ETH→wstETH, sPOL POL→sPOL) routes through `StakingRouter`:
-transiently hold the asset, skim the fee to treasury, forward the net to the provider, return the LST to the
-member — atomic + `nonReentrant` + `whenNotPaused`. **Delegated** staking (Polygon `ValidatorShare`) keeps
-the member as the **direct `buyVoucherPOL` caller**; the fee rides as a **client-composed treasury transfer**
-in the same stake batch, computed from the same `earn.stake` rate.
+transiently hold the asset, skim the per-provider fee to treasury, forward the net to the provider, return
+the LST to the member — atomic + `nonReentrant` + `whenNotPaused`. **Delegated** staking (Polygon
+`ValidatorShare`) keeps the member as the **direct `buyVoucherPOL` caller** and is **fee-free in v1**
+(clarified 2026-07-23); the router still governs its config (allowlist + pause).
 
 **Rationale**: Polygon `buyVoucherPOL` mints the delegation shares to `msg.sender`, so if the router called
 it, the **router** would own the delegation — custodial and un-exitable by the member, violating FR-016 and
@@ -39,20 +40,32 @@ risking trapped funds. Liquid LSTs are transferable, so the router can forward t
 that keeps delegation non-custodial while still contributing fees. Exits never touch the router in either
 model (members hold the LST / own the delegation), so a pause/router change can never trap funds.
 
-**Trade-off (documented, not hidden)**: the delegated fee is **app-applied**, not contract-enforced, and is
-truly atomic only on the passkey rail (one UserOp); a classic wallet performs a disclosed fee-first
-two-step. This is the same trust model as ConfigOnly fees (spec-057 Polymarket) and is accepted because
-non-custody is non-negotiable for delegation.
+**Rationale for fee-free delegated (v1)**: a contract-enforced delegated fee is impossible without the
+router owning the delegation (custodial, un-exitable — violates FR-016); a client-composed fee is
+app-applied (unenforced) and non-atomic for classic wallets (fee paid, stake could fail). Rather than ship
+that weaker guarantee, v1 charges only where the fee is enforced and atomic (liquid). The treasury still
+grows from liquid staking (the larger volume: ETH via Lido, POL via sPOL).
 
-**Alternatives considered**: **Router-owned pooled delegation with per-member accounting** — rejected: a
-custodial staking-vault system, massive scope + risk, out of the non-custodial charter. **Ship delegated
-fee-free** — viable fallback, but the treasury goal favors charging where we safely can; kept as the
-degradation if the client batch proves problematic.
+**Alternatives considered**: **Charge delegated via a client-composed batch** — rejected for v1 (weaker,
+non-atomic guarantee); revisit if a robust path emerges. **Router-owned pooled delegation with per-member
+accounting** — rejected: a custodial staking-vault system, out of the non-custodial charter.
+
+## R2b — Governance: multisig roles, no timelock (clarified 2026-07-23)
+
+**Decision**: grant `STAKING_ADMIN_ROLE` (config) and `GUARDIAN_ROLE` (pause) to a **multisig (Safe)** at
+deployment; **no on-chain timelock** on any action. The emergency pause takes effect instantly; config
+changes rely on multi-party approval.
+
+**Rationale**: multi-party control of a value-bearing control surface without a single-key point of failure,
+while keeping incident response immediate. Matches how the repo’s registries grant guardian/admin roles.
+
+**Alternatives considered**: **Single EOA admin** — rejected (single point of failure). **Timelock on
+config** — rejected: slows routine ops and incident-adjacent config fixes; the pause needs zero delay.
 
 ## R3 — The fee rate stays the single FeeRouter source of truth
 
-**Decision**: the staking fee **rate** lives only in `FeeRouter` (`earn.stake`) and is edited via the
-**existing Fees tab** (`FEE_ADMIN_ROLE`). The new Staking tab surfaces the current staking fee **read-only**
+**Decision**: the staking fee **rate** lives only in `FeeRouter` (`stake.lido` / `stake.polygon`) and is
+edited via the **existing Fees tab** (`FEE_ADMIN_ROLE`). The new Staking tab surfaces the current staking fee **read-only**
 with a pointer to the Fees tab; it does not store or set the rate. `StakingRouter` holds a **reference** to
 the FeeRouter and reads the rate at stake time.
 
@@ -80,13 +93,13 @@ an event), stake entrypoints `nonReentrant whenNotPaused`, and append-only stora
 
 **Alternatives considered**: **Non-upgradeable contract** — rejected: every other registry is UUPS; staking
 config/providers will evolve. **Config-only (no fund handling) registry + purely client fee** — rejected for
-liquid (loses atomicity/enforcement — see Complexity Tracking), though it is exactly what delegated uses.
+liquid (loses atomicity/enforcement — see Complexity Tracking); delegated instead ships fee-free in v1 (R2).
 
 ## R5 — Member app reads the router at runtime with a safe build-time fallback
 
 **Decision**: `useStakingOptions` resolves `getContractAddressForChain('stakingRouter', chainId)`; when
 present it overlays the router’s provider addresses / validator allowlist / per-network `paused` onto the
-options (and the app reads the `earn.stake` fee via `fetchFeeQuote`); when `undefined` or unreachable it
+options (and the app reads the `stake.lido`/`stake.polygon` fee via `fetchFeeQuote`); when `undefined` or unreachable it
 keeps the spec-065 build-time constants verbatim (fee-free, direct staking, availability as configured).
 
 **Rationale**: backwards-compatible, honest-state rollout — staking keeps working before/if the router is
@@ -126,7 +139,7 @@ isn’t on-chain). Add `ROLES.STAKING_ADMIN` (+ `ROLE_INFO` + `ADMIN_ROLES`), a 
 
 **Decision**: `deploy-staking-router.js` uses `deployProxy({name:'StakingRouter', initArgs:[admin,
 feeRouter, providers…]})`, records `stakingRouter`/`stakingRouterImpl` immediately (append, never overwrite),
-then registers `earn.stake` on the **existing** FeeRouter (idempotent). Add `earn.stake` to
+then registers `stake.lido` + `stake.polygon` on the **existing** FeeRouter (idempotent). Add both to
 `feeServices.js`; add `stakingRouter` to the `sync-frontend-contracts` key mapping and the `contracts.js`
 per-chain maps; add `{name:'StakingRouter', deploymentsKey:'stakingRouter'}` to `check-storage-layout.js`.
 Ship as a fresh deploy; future logic changes are in-place `upgradeProxy` UUPS upgrades.
@@ -138,10 +151,10 @@ gate protects upgrade safety.
 
 - Confirm the **FeeRouter address per network** to pass to `StakingRouter.initialize` (read from the
   network’s `deployments/` record).
-- Decide the **initial `earn.stake` rate** (ships at 0 bps; enabled later from the Fees tab) and confirm the
+- Decide the **initial `stake.lido`/`stake.polygon` rates** (ship at 0 bps; enabled later from the Fees tab) and confirm the
   **cap** (proposed 250 bps).
 - Confirm the **treasury address per network** is set on the FeeRouter (fee is skipped, never lost, if unset).
 - Validate the exact **Lido/sPOL forward legs inside the router** on a fork (submit→wrap→transfer;
   buySPOL→transfer) including the reentrancy/CEI ordering and the no-residual-funds invariant.
-- Confirm whether **delegated staking charges a fee in v1** (client-composed) or ships fee-free pending the
+- (RESOLVED 2026-07-23) Delegated staking is **fee-free in v1**; revisit a robust charged path later. The
   batch UX review (R2 degradation path).

@@ -17,9 +17,10 @@ contract StakingRouter is UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgra
 
 `initialize(address admin, address feeRouter, LidoContracts, SpolContracts, PolygonContracts)`:
 `__UUPSManaged_init(admin)` **first**, then `__ReentrancyGuard_init()`, `__Pausable_init()`; grant
-`STAKING_ADMIN_ROLE` + `GUARDIAN_ROLE` to `admin`; store `feeRouter`, `stakeServiceId =
-keccak256("earn.stake")`, and the provider addresses. Constructor calls `_disableInitializers()`
-(via UUPSManaged).
+`STAKING_ADMIN_ROLE` + `GUARDIAN_ROLE` to `admin` (in production these are held by a **multisig**, no
+timelock — research R2b); store `feeRouter`, the per-provider service ids
+`stakeLidoServiceId = keccak256("stake.lido")` / `stakeSpolServiceId = keccak256("stake.polygon")`, and the
+provider addresses. Constructor calls `_disableInitializers()` (via UUPSManaged).
 
 ## Config setters — `onlyRole(STAKING_ADMIN_ROLE)`, each emits an event
 
@@ -50,8 +51,8 @@ the end. The fee is read live from the FeeRouter (R1) with a member consent ceil
 // ETH → wstETH
 function stakeLido(uint16 maxFeeBps) external payable nonReentrant whenNotPaused returns (uint256 wstOut) {
   uint256 gross = msg.value; require(gross > 0, ZeroAmount());
-  (uint256 fee, uint256 net) = IFeeRouter(feeRouter).quoteFee(stakeServiceId, gross);
-  require(IFeeRouter(feeRouter).feeBps(stakeServiceId) <= maxFeeBps, FeeAboveQuoted()); // consent ceiling
+  (uint256 fee, uint256 net) = IFeeRouter(feeRouter).quoteFee(stakeLidoServiceId, gross);
+  require(IFeeRouter(feeRouter).feeBps(stakeLidoServiceId) <= maxFeeBps, FeeAboveQuoted()); // consent ceiling
   address treasury = IFeeRouter(feeRouter).treasury();
   if (fee > 0 && treasury != address(0)) { (bool ok,) = treasury.call{value: fee}(""); require(ok); }
   else net = gross; // treasury unset ⇒ fee skipped, never lost (mirrors FeeRouter)
@@ -69,8 +70,8 @@ function stakeLido(uint16 maxFeeBps) external payable nonReentrant whenNotPaused
 function stakeSpol(uint256 amount, uint16 maxFeeBps) external nonReentrant whenNotPaused returns (uint256 spolOut) {
   require(amount > 0, ZeroAmount());
   IERC20(polToken).safeTransferFrom(msg.sender, address(this), amount);
-  (uint256 fee, uint256 net) = IFeeRouter(feeRouter).quoteFee(stakeServiceId, amount);
-  require(IFeeRouter(feeRouter).feeBps(stakeServiceId) <= maxFeeBps, FeeAboveQuoted());
+  (uint256 fee, uint256 net) = IFeeRouter(feeRouter).quoteFee(stakeSpolServiceId, amount);
+  require(IFeeRouter(feeRouter).feeBps(stakeSpolServiceId) <= maxFeeBps, FeeAboveQuoted());
   address treasury = IFeeRouter(feeRouter).treasury();
   if (fee > 0 && treasury != address(0)) IERC20(polToken).safeTransfer(treasury, fee); else net = amount;
   IERC20(polToken).forceApprove(spolController, net);
@@ -87,9 +88,9 @@ function stakeSpol(uint256 amount, uint16 maxFeeBps) external nonReentrant whenN
 ## Delegated staking is intentionally NOT here
 
 Polygon `buyVoucherPOL` binds the delegation to `msg.sender`; a router call would make the router the
-delegator (custodial, un-exitable). The member calls `ValidatorShare` directly and the fee is a
-client-composed transfer to `treasury()` (fee-integration.md). The router still governs delegated **config**
-(the validator allowlist + pause the member app honors).
+delegator (custodial, un-exitable). The member calls `ValidatorShare` directly, and **delegated staking is
+fee-free in v1** (clarified 2026-07-23 — no fee leg; research R2). The router still governs delegated
+**config** (the validator allowlist + pause the member app honors).
 
 ## Storage discipline & upgrades
 
