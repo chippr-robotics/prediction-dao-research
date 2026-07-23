@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Staking Admin Controls & Emergency Pause
+# Specification Quality Checklist: Staking Fee Router, Admin Controls & Emergency Pause
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-23
@@ -39,5 +39,10 @@
   first-class requirement (FR-003) and success criterion (SC-002), not an afterthought.
 - Least-privilege is split intentionally: configuration (addresses/allowlist) vs. emergency pause, so
   an incident responder can stop staking without holding configuration rights (FR-008).
-- Backwards-compatible with spec 065: the member app keeps a safe built-in default so staking still
-  works if the control surface is undeployed/unreachable (FR-006), avoiding a hard cutover.
+- Backwards-compatible with spec 065: the member app keeps a safe built-in default (fee-free, direct
+  staking) so staking still works if the control surface is undeployed/unreachable (FR-009), avoiding a
+  hard cutover.
+- Platform fee → treasury (US1) reuses the spec-060 single fee configuration + treasury routing rather
+  than a parallel fee store; it resolves the fee-router path 065 deferred (065 research R6). The fee is
+  stated at the capability level (disclosed rate, hard ceiling, cap, zero = identical to fee-free) — the
+  atomic fee-and-forward router mechanics are for `/speckit-plan` and its security review.
