@@ -21,7 +21,7 @@ differential oracle before any mainnet path.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Add deps in `frontend/package.json`: `@solana/kit` (dep) and `@bitgo/utxo-lib` (devDependency, test oracle); promote transitive `@scure/bip39` + `@scure/base` to direct deps; run install.
+- [~] T001 `@scure/bip39` + `@scure/base` promoted to direct deps (lockfile synced). `@solana/kit` (US3) and `@bitgo/utxo-lib` (US4 oracle) still to add when those stories start.
 - [ ] T002 [P] Create `frontend/src/config/solanaNetworks.js` (string ids `solana`/`solana-devnet`, `isSolanaNetworkId`) mirroring `bitcoinNetworks.js`, with unit test `frontend/src/test/config/solanaNetworks.test.js`.
 - [ ] T003 [P] Create `frontend/src/config/zcashNetworks.js` (string ids `zcash`/`zcash-testnet`, `isZcashNetworkId`, mainnet coin type 133 + testnet dual 1/133, address prefixes) with unit test `frontend/src/test/config/zcashNetworks.test.js`.
 - [ ] T004 [P] Add a shared non-EVM boundary guard helper (extend the existing `isBitcoinNetworkId` pattern) so string ids never reach `getContractAddressForChain`/wagmi; unit test the guard.
@@ -61,7 +61,7 @@ actions, and dashboard stats all resolve to it; switching to personal resets the
 
 - [X] T014 [US1] Extend `frontend/src/hooks/usePortfolio.js` with a backward-compatible `{accountAddress}` override so acting-account surfaces scope to the selected account (personal passes none → byte-identical).
 - [~] T015 [P] [US1] `frontend/src/components/wallet/PortfolioPanel.jsx` now sources from the effective account. (`usePredictPortfolio.js` still to wire.)
-- [~] T016 [P] [US1] Receive in `frontend/src/components/wallet/WalletButton.jsx` passes the effective address to `AddressQRModal`. (`Dashboard.jsx` receive + explicit "no address on this chain" disclosure still to add.)
+- [~] T016 [P] [US1] Receive in `frontend/src/components/wallet/WalletButton.jsx` AND `frontend/src/components/fairwins/Dashboard.jsx` pass the effective address to `AddressQRModal`. (Explicit "no address on this chain" disclosure for non-EVM-incapable accounts still to add.)
 - [X] T017 [P] [US1] `frontend/src/components/fairwins/RequestPanel.jsx` addresses the request to the effective account and discloses the receiving account.
 - [ ] T018 [P] [US1] Update Home/dashboard: `frontend/src/components/fairwins/HomeScreen.jsx`, `frontend/src/components/account/AccountDashboard.jsx` quick actions + stats follow the effective account.
 - [ ] T019 [US1] Ensure switching the acting account re-targets/resets any open send/request form (FR-008) across the above surfaces.
@@ -79,14 +79,14 @@ correctly; a send broadcasts; the frozen passkey vectors still pass (SC-003, SC-
 
 ### Tests for User Story 2 (write first, must fail)
 
-- [ ] T020 [P] [US2] Vector test `frontend/src/test/bitcoin/legacyDerivation.vectors.test.js` — zero-mnemonic addresses per purpose (BIP44 `1…`, BIP49 `3…`, BIP84 `bc1q…`, BIP86 `bc1p…`) and account index >0.
-- [ ] T021 [P] [US2] Regression test asserting the **frozen** passkey BTC derivation (`fairwins-btc-seed-v1`, existing BIP84/86 account-0 vectors) is byte-for-byte unchanged (SC-007) — extend `frontend/src/lib/bitcoin/__tests__/derivation.test.js`.
+- [X] T020 [P] [US2] Vector test `frontend/src/lib/bitcoin/__tests__/legacyDerivation.test.js` — pinned addresses per purpose (BIP44 `1…`, BIP49 `3…`, BIP84 `bc1q…` + BIP86 `bc1p…` matching PUBLISHED spec vectors), account index >0, external/change chains, testnet prefixes, validation (13 tests).
+- [X] T021 [P] [US2] Frozen-path guard: the legacy module is separate from `derivation.js`; the vector test asserts the `fairwins-btc-seed-v1` constant is unchanged and the existing `derivation.test.js` (23 tests) still passes untouched (SC-007).
 - [ ] T022 [P] [US2] Integration test `frontend/src/test/bitcoin/legacyDiscoverySend.test.js` — account-level gap scan finds funded account >0; no-history mnemonic ⇒ "no funds found" (not phantom); send builds a valid tx with fee ceiling enforced (testnet/regtest).
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Extend `frontend/src/lib/bitcoin/derivation.js` with an **additive, HKDF-free** seed entry `deriveAccountFromSeed(seed, {purpose, coinType, account, network})` — leaving `deriveBtcSeed`/frozen path untouched (FR-019).
-- [ ] T024 [P] [US2] Extend `frontend/src/lib/bitcoin/addresses.js` with `p2pkh` (BIP44) + `p2sh-p2wpkh` (BIP49) encoders (`@scure/btc-signer`).
+- [X] T023 [US2] New additive `frontend/src/lib/bitcoin/legacyDerivation.js` — HKDF-free `seedFromMnemonic` + `deriveLegacyAccount`/`legacyAddressAt`/`legacySigningKeyAt` across BIP44/49/84/86 + account/chain indices; frozen `derivation.js` untouched (FR-019). Memory-only.
+- [X] T024 [P] [US2] New additive `frontend/src/lib/bitcoin/legacyAddresses.js` — `encodeLegacyAddress` adds `p2pkh` (BIP44) + `p2sh-p2wpkh` (BIP49), delegates segwit/taproot to the frozen encoder (`@scure/btc-signer`).
 - [ ] T025 [US2] Add account-level + address gap-limit scanning to the Bitcoin discovery path; wire into `crossChainDerive` (`bitcoin`) and `useCrossChainDiscovery`.
 - [ ] T026 [US2] Wire the recovered BTC account into the portfolio (derived-account ledger namespace) and make it selectable as an acting account (Part A) so US1 surfaces show/send it; reuse existing UTXO/stamp fail-safe (FR-020), coin selection, PSBT sign, broadcast.
 - [ ] T027 [US2] Raw-private-key path: expose the single BTC address, UI states it isn't scannable (FR-013).
