@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
+// Spec 064: stub the stake-asset data hook so this provider-light test stays isolated.
+vi.mock('../../hooks/useSelectableAssets', async () => await import('../helpers/selectableAssetsMock'))
+
 // Mock the flow hooks so the modal renders without chain/IPFS; the vault uses real crypto + localStorage.
 const createOpenChallenge = vi.fn()
 vi.mock('../../hooks/useOpenChallengeCreate', async (importOriginal) => {

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
+// Spec 064: the create panel's stake selector needs the portfolio graph; stub the
+// data hook so this provider-light test stays isolated (real selector still renders).
+vi.mock('../../../hooks/useSelectableAssets', async () => await import('../../../test/helpers/selectableAssetsMock'))
+
 // The modal renders MakerPanel by default; mock its create hook so it renders without a chain.
 vi.mock('../../../hooks/useOpenChallengeCreate', async (importOriginal) => {
   const actual = await importOriginal()

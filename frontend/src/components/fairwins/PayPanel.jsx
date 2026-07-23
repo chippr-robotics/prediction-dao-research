@@ -5,11 +5,17 @@ import AmountKeypad from '../ui/AmountKeypad'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
+import UniversalAssetSelect from '../ui/UniversalAssetSelect'
+import BitcoinSendPanel from '../wallet/BitcoinSendPanel'
 import { useWallet } from '../../hooks'
-import { useTransfer, TRANSFER_KIND } from '../../hooks/useTransfer'
+import { useTransfer } from '../../hooks/useTransfer'
+import { useSelectableAssets } from '../../hooks/useSelectableAssets'
+import { useActiveAccount } from '../../hooks/useActiveAccount'
+import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useNotification } from '../../hooks/useUI'
 import { getNetwork } from '../../config/networks'
+import { ASSET_ACTIVITIES } from '../../lib/assets/assetActivity'
 import { getDefaultCurrencyKind } from '../../utils/homePreference'
 import { parsePaymentRequest, NOTE_MAX_LENGTH } from '../../lib/payments/paymentRequest'
 
@@ -23,63 +29,109 @@ function formatUnitsForKeypad(units, decimals) {
 }
 
 /**
- * PayPanel (spec 058 US1) — the home surface's default mode: send value to a
- * recipient with the same amount-hero + numpad layout as the wager create
- * view. Composes the standard recipient stack (AddressInput + address book +
- * QR scanner) and submits through the existing useTransfer engine — the
- * screening, gasless routing, honest lifecycle, and never-stranded fallbacks
- * are all inherited, not reimplemented (FR-004/FR-018).
+ * PayPanel (spec 058 US1 + spec 064 US1) — the home surface's default mode: send
+ * value to a recipient with the payments-style amount-hero + numpad layout.
  *
- * Contract: specs/058-send-request-home/contracts/home-mode-components.md
+ * The currency control under the amount is the UNIVERSAL asset selector (spec 064):
+ * a member can pay with ANY platform-supported asset the acting account holds across
+ * every configured network — each shown with its nested asset logo (glyph + network
+ * sub-badge) — not just the connected network's native coin and stablecoin. Non-EVM
+ * Bitcoin is supported here and routes through the existing Bitcoin send panel; an
+ * asset on another network is gated behind a "Switch to {network}" step. All routing
+ * (screening, gasless, honest lifecycle, never-stranded fallbacks) is inherited from
+ * the useTransfer engine via `send({ asset })`, never reimplemented.
+ *
+ * Contract: specs/064-universal-asset-selector/contracts/universal-asset-selector.md
  */
 function PayPanel({ onSuccess }) {
   const { isConnected, chainId, openConnectModal } = useWallet()
-  const { send, status, error: sendError, quoteGasless, balanceOf, refreshBalances, tokens } = useTransfer()
+  const { send, status, error: sendError, refreshBalances } = useTransfer()
+  const { identity, isVault, isLegacy } = useActiveAccount()
   const { screenOne } = useAddressScreening()
   const { showNotification } = useNotification()
   const { switchChainAsync, isPending: switching } = useSwitchChain()
+  const btc = useBitcoinWallet()
 
-  const [kind, setKind] = useState(getDefaultCurrencyKind)
+  // Assets + balances come from whichever account we're ACTING AS (a vault or a
+  // recovered legacy account), else the personal portfolio — consistent with the
+  // Transfer form (FR-014).
+  const actingAddress = isVault && identity?.vaultAddress
+    ? identity.vaultAddress
+    : isLegacy && identity?.address
+      ? identity.address
+      : null
+  const { options, defaultKey, isGasless } = useSelectableAssets({ activity: ASSET_ACTIVITIES.PAY, actingAddress })
+
+  const [selectedKey, setSelectedKey] = useState(null)
   const [amount, setAmount] = useState('')
   const [toRaw, setToRaw] = useState('')
   const [toResolved, setToResolved] = useState('')
   const [note, setNote] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
   const [scanNotice, setScanNotice] = useState(null)
-  // Advisory screening result, remembered WITH the address it was for — the
-  // status is derived by matching, so a recipient edit never shows a stale
-  // verdict and the effect needs no synchronous reset.
+  // Advisory screening result, remembered WITH the address it was for.
   const [screeningResult, setScreeningResult] = useState(null) // { addr, status } | null
   const [formError, setFormError] = useState(null)
   const [confirming, setConfirming] = useState(false)
-  // A scanned request payable on another network pins that chain until the
-  // user switches — the Pay action is replaced by a switch affordance (FR-016).
+  // A scanned request payable on another network pins that chain until the user
+  // switches, even when we hold no matching asset to preselect (FR-007).
   const [pinnedChainId, setPinnedChainId] = useState(null)
 
-  const connectedChainId = Number(tokens.chainId ?? chainId)
+  const connectedChainId = Number(chainId)
   const busy = status === 'signing' || status === 'submitting' || status === 'pending'
-  const symbol = kind === TRANSFER_KIND.STABLE ? tokens.stable : tokens.native
-  const gasless = quoteGasless(kind)
-  const bal = balanceOf(kind)
+
+  // Preference-aware default (spec 058): the home currency preference still picks
+  // the STARTING asset — 'native' preselects the connected native coin, otherwise
+  // the activity default (connected stablecoin) — before generalizing to any held
+  // asset (spec 064). The member's own pick always overrides once made (FR-013).
+  const preferredDefaultKey = useMemo(() => {
+    if (getDefaultCurrencyKind() === 'native') {
+      const nativeOpt = options.find((o) => Number(o.chainId) === connectedChainId && o.kind === 'native')
+      if (nativeOpt) return nativeOpt.key
+    }
+    return defaultKey
+  }, [options, connectedChainId, defaultKey])
+
+  // Selection with fallback: keep the member's pick while it's valid, else the
+  // preference-aware activity default. (FR-013)
+  const activeKey = selectedKey && options.some((o) => o.key === selectedKey) ? selectedKey : preferredDefaultKey
+  const selectedAsset = options.find((o) => o.key === activeKey) || null
+
+  const isBitcoin = selectedAsset?.kind === 'btc-native'
+  const symbol = selectedAsset?.symbol || ''
+  const bal = selectedAsset?.balance ?? null
+  const gasless = selectedAsset ? isGasless(selectedAsset) : false
 
   useEffect(() => { refreshBalances() }, [refreshBalances])
 
-  // Derived, not synced: the pin stays with the draft (a scanned request is
-  // payable on ITS network), and the mismatch simply computes false once the
-  // user has switched onto that network.
-  const chainMismatch = pinnedChainId != null && Number(pinnedChainId) !== connectedChainId
-  const pinnedNetworkName = chainMismatch ? (getNetwork(pinnedChainId)?.name || `network ${pinnedChainId}`) : null
+  // Wrong-chain: the selected EVM asset lives on a network the wallet isn't on, or
+  // a scanned request pinned another chain. Bitcoin is non-EVM and never gated here.
+  const assetChainId = selectedAsset && !isBitcoin ? Number(selectedAsset.chainId) : connectedChainId
+  // Only claim a mismatch when the connected chain is actually known (honest state:
+  // never gate on an unknown/NaN chain).
+  const knownConnectedChain = Number.isFinite(connectedChainId)
+  const chainMismatch =
+    !isBitcoin && knownConnectedChain &&
+    ((pinnedChainId != null && Number(pinnedChainId) !== connectedChainId) ||
+      (Boolean(selectedAsset) && assetChainId !== connectedChainId))
+  const switchTargetChainId = pinnedChainId != null && Number(pinnedChainId) !== connectedChainId
+    ? Number(pinnedChainId)
+    : chainMismatch
+      ? assetChainId
+      : null
+  const switchTargetName = switchTargetChainId != null
+    ? getNetwork(switchTargetChainId)?.name || `network ${switchTargetChainId}`
+    : null
 
-  // Advisory sanctions pre-check on the resolved recipient (on-chain guards
-  // remain the enforcement).
+  // Advisory sanctions pre-check on the resolved recipient (on-chain guards enforce).
   useEffect(() => {
     let cancelled = false
     if (!toResolved) return undefined
-    Promise.resolve(screenOne(toResolved, connectedChainId))
+    Promise.resolve(screenOne(toResolved, assetChainId))
       .then((s) => { if (!cancelled) setScreeningResult({ addr: toResolved, status: s }) })
       .catch(() => { if (!cancelled) setScreeningResult({ addr: toResolved, status: 'uncertain' }) })
     return () => { cancelled = true }
-  }, [toResolved, screenOne, connectedChainId])
+  }, [toResolved, screenOne, assetChainId])
 
   const screening = screeningResult && screeningResult.addr === toResolved ? screeningResult.status : null
 
@@ -93,11 +145,9 @@ function PayPanel({ onSuccess }) {
     return Number(amount) > Number(bal)
   }, [bal, amount, amountValid])
 
-  const stableUnavailable = kind === TRANSFER_KIND.STABLE && !tokens.stableAddress
-
   const canPay =
-    isConnected && !chainMismatch && Boolean(toResolved) && amountValid && !overBalance &&
-    screening !== 'restricted' && !stableUnavailable && !busy
+    isConnected && Boolean(selectedAsset) && !chainMismatch && Boolean(toResolved) && amountValid &&
+    !overBalance && screening !== 'restricted' && !busy
 
   const applyAddress = useCallback((addr) => {
     setToRaw(addr)
@@ -111,12 +161,19 @@ function PayPanel({ onSuccess }) {
     setConfirming(false); setPinnedChainId(null)
   }, [])
 
+  const handleSelectAsset = useCallback((option) => {
+    setSelectedKey(option.key)
+    setPinnedChainId(null)
+    setConfirming(false)
+    setFormError(null)
+  }, [])
+
   /**
    * A scan is either a payment request (full prefill), a bare address
-   * (recipient-only prefill, FR-009), or unusable. A request denominated in
-   * a token that is not its network's stablecoin prefills NOTHING — never a
-   * wrong-asset send (edge case). A request on another network pins that
-   * chain and surfaces the switch before any send (FR-016).
+   * (recipient-only prefill), or unusable. A request denominated in a token that is
+   * not its network's stablecoin prefills NOTHING — never a wrong-asset send. A
+   * request on another network preselects the held asset when we have it, else pins
+   * that chain and surfaces the switch (FR-007).
    */
   const handleScan = useCallback((decodedText) => {
     setScanOpen(false)
@@ -129,7 +186,7 @@ function PayPanel({ onSuccess }) {
     const targetChainId = parsed.chainId ?? connectedChainId
     const targetNetwork = getNetwork(targetChainId)
 
-    let nextKind = kind
+    let wantAddress = null // null ⇒ native
     let decimals = null
     if (parsed.tokenAddress) {
       const stableAddr = targetNetwork?.stablecoin?.address
@@ -137,33 +194,39 @@ function PayPanel({ onSuccess }) {
         setScanNotice("This request asks for a token FairWins doesn't send on that network, so nothing was filled in.")
         return
       }
-      nextKind = TRANSFER_KIND.STABLE
+      wantAddress = stableAddr
       decimals = targetNetwork.stablecoin.decimals ?? 6
     } else if (parsed.amountUnits != null) {
-      nextKind = TRANSFER_KIND.NATIVE
       decimals = targetNetwork?.nativeCurrency?.decimals ?? 18
     }
 
     applyAddress(parsed.to)
-    setKind(nextKind)
+    const match = options.find(
+      (o) =>
+        Number(o.chainId) === Number(targetChainId) &&
+        (wantAddress ? o.address && o.address.toLowerCase() === wantAddress.toLowerCase() : o.kind === 'native'),
+    )
+    if (match) setSelectedKey(match.key)
     if (parsed.amountUnits != null && decimals != null) setAmount(formatUnitsForKeypad(parsed.amountUnits, decimals))
     if (parsed.note) setNote(parsed.note)
     setPinnedChainId(parsed.chainId != null && Number(parsed.chainId) !== connectedChainId ? Number(parsed.chainId) : null)
-  }, [applyAddress, connectedChainId, kind])
+  }, [applyAddress, connectedChainId, options])
 
   const handleSwitch = useCallback(async () => {
     setFormError(null)
+    if (switchTargetChainId == null) return
     try {
-      await switchChainAsync({ chainId: Number(pinnedChainId) })
+      await switchChainAsync({ chainId: Number(switchTargetChainId) })
+      setPinnedChainId(null)
     } catch (err) {
       setFormError(err?.shortMessage || err?.message || 'Could not switch network.')
     }
-  }, [switchChainAsync, pinnedChainId])
+  }, [switchChainAsync, switchTargetChainId])
 
   const handleSend = useCallback(async () => {
     setFormError(null)
     try {
-      const res = await send({ kind, to: toResolved, amount })
+      const res = await send({ asset: selectedAsset, to: toResolved, amount })
       if (res?.proposed) {
         showNotification(
           `Proposed sending ${amount} ${symbol} to ${short(toResolved)} from the vault — its signers must approve it.`,
@@ -183,17 +246,45 @@ function PayPanel({ onSuccess }) {
       setConfirming(false)
       setFormError(err?.shortMessage || err?.message || 'Transfer failed.')
     }
-  }, [send, kind, toResolved, amount, symbol, showNotification, resetDraft, onSuccess])
+  }, [send, selectedAsset, toResolved, amount, symbol, showNotification, resetDraft, onSuccess])
 
-  // The restricted-screening case is NOT repeated here — it already renders
-  // as its own alert banner under the recipient field.
   const blockReason = !amountValid
-    ? null // an untouched form needs no error banner; the disabled button is enough
+    ? null
     : overBalance
       ? `That's more ${symbol} than you have.`
-      : stableUnavailable
-        ? `No ${symbol} is configured on this network.`
-        : null
+      : null
+
+  const assetSelect = (
+    <UniversalAssetSelect
+      label="Currency"
+      options={options}
+      value={activeKey}
+      onChange={handleSelectAsset}
+      isGasless={isGasless}
+      disabled={busy}
+    />
+  )
+
+  // Bitcoin (spec 061) has its own amount/fee/send surface — swap the EVM body for
+  // the Bitcoin send panel, keeping the asset selector so the member can switch back.
+  if (isBitcoin) {
+    return (
+      <div className="fm-form fm-pay-form pay-panel">
+        <div className="fm-pay-hero fm-pay-hero-asset">
+          {assetSelect}
+        </div>
+        {!isConnected ? (
+          <div className="fm-success-actions">
+            <button type="button" className="fm-btn-primary" onClick={() => openConnectModal()}>
+              Connect wallet
+            </button>
+          </div>
+        ) : (
+          <BitcoinSendPanel btc={btc} usdPerBtc={null} onSent={onSuccess} />
+        )}
+      </div>
+    )
+  }
 
   if (confirming) {
     return (
@@ -201,10 +292,10 @@ function PayPanel({ onSuccess }) {
         <div className="pay-confirm" aria-live="polite">
           <div className="pay-confirm-amount">{amount} {symbol}</div>
           <div className="pay-confirm-row"><span className="k">To</span><span className="v">{short(toResolved)}</span></div>
-          <div className="pay-confirm-row"><span className="k">Network</span><span className="v">{tokens.networkName}</span></div>
+          <div className="pay-confirm-row"><span className="k">Network</span><span className="v">{selectedAsset?.networkName}</span></div>
           <div className="pay-confirm-row">
             <span className="k">Fee</span>
-            <span className="v">{gasless ? 'Gasless — no network fee' : `You pay the ${tokens.native} network fee`}</span>
+            <span className="v">{gasless ? 'Gasless — no network fee' : 'You pay the network fee'}</span>
           </div>
           {note && <div className="pay-confirm-row"><span className="k">Note</span><span className="v">{note}</span></div>}
         </div>
@@ -227,10 +318,9 @@ function PayPanel({ onSuccess }) {
 
   return (
     <div className="fm-form fm-pay-form pay-panel">
-      {/* Amount hero — the shared payments-style keypad; the currency dropdown
-          sits directly under the amount (in place of a static pill) and shows
-          the network's REAL symbols (honest state — no fake "USDC" on networks
-          without it). */}
+      {/* Amount hero — the shared payments-style keypad; the universal asset selector
+          sits directly under the amount (in place of the old native/stable pill) and
+          shows every held asset with its nested logo. */}
       <div className="fm-pay-hero">
         <AmountKeypad
           value={amount}
@@ -239,17 +329,8 @@ function PayPanel({ onSuccess }) {
           token={symbol}
           tokenSlot={(
             <>
-              <label className="sr-only" htmlFor="pay-token">Currency</label>
-              <select
-                id="pay-token"
-                className="fm-token-select fm-pay-token-select"
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-                disabled={busy}
-              >
-                <option value={TRANSFER_KIND.STABLE}>{tokens.stable}</option>
-                <option value={TRANSFER_KIND.NATIVE}>{tokens.native}</option>
-              </select>
+              <span className="sr-only">Currency</span>
+              {assetSelect}
             </>
           )}
           disabled={busy}
@@ -263,14 +344,12 @@ function PayPanel({ onSuccess }) {
         <label className="fm-label" htmlFor="pay-to">To</label>
         <div className="fm-input-with-action">
           <div className="fm-address-input-wrap">
-            {/* No inline address-book addon — the icon button beside the field
-                is the single address-book affordance (design feedback). */}
             <AddressInput
               id="pay-to"
               value={toRaw}
               onChange={(e) => setToRaw(e.target.value)}
               onResolvedChange={(addr) => setToResolved(addr || '')}
-              chainId={connectedChainId}
+              chainId={assetChainId}
               placeholder="0x…, %callsign, or ENS name"
               disabled={busy}
             />
@@ -336,7 +415,7 @@ function PayPanel({ onSuccess }) {
           </button>
         ) : chainMismatch ? (
           <button type="button" className="fm-btn-primary" onClick={handleSwitch} disabled={switching || busy}>
-            {switching ? 'Switching…' : `Switch to ${pinnedNetworkName} to pay this request`}
+            {switching ? 'Switching…' : `Switch to ${switchTargetName} to pay`}
           </button>
         ) : (
           <button type="button" className="fm-btn-primary" onClick={() => setConfirming(true)} disabled={!canPay}>

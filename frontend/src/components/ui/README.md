@@ -340,6 +340,43 @@ import { HelperText } from '@/components/ui'
 
 ---
 
+### UniversalAssetSelect
+
+The single reusable asset picker for the home **Pay / Request / Wager** surfaces and
+the wallet **Transfer** ("trade") view (spec 064). Each option renders the Earn-page
+nested `AssetLogo` (asset glyph + network sub-badge), the symbol, its network, the held
+balance, and a ⚡ marker when the asset is gasless on its network — so a member can
+distinguish two same-symbol assets on different networks at a glance.
+
+Purely presentational: it renders whatever activity-scoped `options` it is given and
+never derives the asset list, eligibility, or routing.
+
+**Props:**
+- `options` (SelectableAsset[]): already activity-scoped list (from `useSelectableAssets`)
+- `value` (string): selected option `key`
+- `onChange` (fn): called with the full selected option
+- `isGasless` (fn): `(option) => boolean` for the per-row ⚡ marker (Bitcoin always false)
+- `disabled` (bool), `label` (string, default `'Asset'`), `size` (number, logo px)
+
+**Data + activity scoping:**
+- `hooks/useSelectableAssets({ activity, actingAddress })` builds the option list from the
+  acting account's cross-network portfolio (personal / vault / recovered legacy).
+- `lib/assets/assetActivity.js` holds the **activity capability profiles**: `pay`,
+  `request`, and `transfer` allow every asset kind **including non-EVM Bitcoin**; `wager`
+  is EVM **ERC-20 only** (the escrow pulls the stake via `transferFrom`, so the native
+  coin and Bitcoin are excluded by list construction — never a submit-time failure).
+- An asset on a network other than the connected one is **switch-gated** by the consuming
+  panel; the component itself stays presentational.
+
+**Accessibility Features:**
+- `role="listbox"` / `role="option"` with `aria-selected`; keyboard operable
+  (Enter/Space to toggle, Escape and outside-click to close)
+- The nested logo is decorative (`aria-hidden`); symbol + network text always carry the
+  meaning, so the logo is never the sole information channel
+- Balances still loading render a pending indicator, never a fake `0`
+
+---
+
 ## Design System Integration
 
 All components use CSS custom properties from the brand design system:

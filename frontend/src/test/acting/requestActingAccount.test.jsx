@@ -5,6 +5,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+
+// Spec 064: stub the asset-selector data hook so this provider-light test stays isolated.
+vi.mock('../../hooks/useSelectableAssets', async () => await import('../helpers/selectableAssetsMock'))
+vi.mock('../../hooks/useBitcoinWallet', () => ({
+  useBitcoinWallet: () => ({ status: 'idle', receive: { nextReceiveAddress: () => null } }),
+}))
 import { ethers } from 'ethers'
 import { CustodyContext } from '../../contexts/CustodyContext'
 
