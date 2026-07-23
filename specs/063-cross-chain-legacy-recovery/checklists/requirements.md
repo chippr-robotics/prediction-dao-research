@@ -31,14 +31,13 @@
 
 ## Notes
 
-- Scope decisions were confirmed with the requester before drafting: full hardware-wallet Bitcoin
-  scan (BIP44/49/84/86 + multi-account gap scan), all four non-EVM chains (Bitcoin, Solana, Zcash,
-  Monero), and a spec-first process. These are recorded as Assumptions rather than clarification
-  markers.
-- Two areas are intentionally bounded in Assumptions and disclosed to the member at runtime rather
-  than left ambiguous: **Zcash is transparent-only** this version (shielded out of scope), and
-  **Monero (P5)** is the heaviest new surface and may land after US1–US4. `/speckit-clarify` can
-  tighten these further before planning if desired.
+- Scope decisions were confirmed with the requester: full hardware-wallet Bitcoin scan
+  (BIP44/49/84/86 + multi-account gap scan), a spec-first process, and — after research surfaced its
+  view-key/FR-021 privacy tension and 10 MB WASM signer — **Monero was deferred** to a follow-up
+  spec at the requester's direction. Active scope is Bitcoin, Solana, and Zcash (transparent).
+- One area is intentionally bounded in Assumptions and disclosed to the member at runtime rather than
+  left ambiguous: **Zcash is transparent-only** this version (shielded out of scope). Deferring
+  Monero removed the only open constitution/FR tension.
 - No smart-contract changes; this is a client-side (frontend) feature, so the constitution's
   contract-security gates are N/A while the Test-First, Honest-State, Fail-Loud-CI, and
   Accessibility gates fully apply.

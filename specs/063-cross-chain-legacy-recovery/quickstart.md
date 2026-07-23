@@ -5,11 +5,10 @@ details live in `tasks.md` / the code; this is the run-and-verify guide.
 
 ## Prerequisites
 
-- Frontend deps installed (`cd frontend && npm ci`), including new deps `@solana/kit`,
-  `@mymonero/mymonero-lws-client`, and dev/test-only `@bitgo/utxo-lib`; `@scure/bip39` + `@scure/base`
-  promoted to direct deps.
-- Optional gateway modules configured only for live/testnet runs (`SOLANA_*`, `ZCASH_*`, `MONERO_*`);
-  unit tests need none.
+- Frontend deps installed (`cd frontend && npm ci`), including new dep `@solana/kit` and dev/test-only
+  `@bitgo/utxo-lib`; `@scure/bip39` + `@scure/base` promoted to direct deps.
+- Optional gateway modules configured only for live/testnet runs (`SOLANA_*`, `ZCASH_*`); unit tests
+  need none. (Monero is deferred — no `MONERO_*`.)
 - Run tests: `frontend/node_modules/.bin/vitest run --root frontend`.
 
 ## Scenario A — Acting account applies everywhere (US1, no new chains)
@@ -52,17 +51,9 @@ details live in `tasks.md` / the code; this is the run-and-verify guide.
    `@bitgo/utxo-lib` differential cross-check (identical sighash/serialization) — CI-enforced.
 4. **Verify** shielded-only funds ⇒ honest "shielded not recovered this version" disclosure (FR-016).
 
-## Scenario E — Monero (US5, phased)
-
-1. **Phase 1**: recover a mnemonic; **verify** derived primary address matches a pinned vector for
-   each supported origin-wallet convention; balance shown via the (self-hosted) LWS. Confirm the
-   member sees the view-key disclosure before scanning (escalated FR-021 decision).
-2. **Verify** the wrong-scheme trap is avoided: derivation tries both conventions and probes activity.
-3. **Phase 2 (follow-up)**: WASM-backed send builds+submits with fee disclosure.
-
 ## Security validation (all scenarios, SC-005)
 
 - Grep/scan storage, network payloads, logs, and the activity ledger across the full matrix: **no
-  seed, private key, or xprv ever appears** (the Monero view key appears only in the LWS balance
-  request, per the escalated decision, and never in logs/ledger).
+  seed, private key, or xprv ever appears** (with Monero deferred, no private key of any kind — not
+  even a view key — reaches a gateway).
 - Lock/relock, account switch, disconnect → derived keys dropped from memory (FR-018).

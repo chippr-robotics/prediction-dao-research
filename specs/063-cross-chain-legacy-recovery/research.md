@@ -131,9 +131,13 @@ shipping signer (kept as fallback/oracle — heavier, foreign to `@scure`); shie
 
 ---
 
-## E. Monero (US5) — heaviest, phased, with a spec decision required
+## E. Monero — DEFERRED to a follow-up spec
 
-**Decision**: **Phase Monero into two deliverables** (matches its P5 priority):
+> **Status: out of scope for feature 063** (deferred at the requester's direction). The FR-021
+> view-key tension and the ~10 MB WASM signer make it its own feature. The full research below is
+> **retained for that future spec** so it doesn't have to be re-done; it is not a work item here.
+
+**Decision (for the future spec)**: **Phase Monero into two deliverables**:
 - **Phase 1 (view + balance, no WASM)**: derive the primary address + private view key with
   `@noble/curves` ed25519 + `@noble/hashes` keccak_256 + a ~50-line Monero base58 (block-based, NOT
   Bitcoin base58). Show balance via a **mymonero-compatible Light Wallet Server (LWS)**.
@@ -200,9 +204,9 @@ Already present (promote transitive `@scure/bip39`, `@scure/base` to direct deps
 New (justify in plan under Additional Constraints — new core tech):
 - `@solana/kit` (Solana tx assembly/RPC; tree-shakeable, no polyfills).
 - `micro-ed25519-hdkey` *(optional — only if not hand-rolling SLIP-0010)*.
-- `@mymonero/mymonero-lws-client` (Monero balance, Phase 1) and later `mymonero-core`/`monero-ts`
-  WASM (Monero send, Phase 2).
 - `@bitgo/utxo-lib` *(test/oracle only — differential check for the Zcash sighash; not shipped)*.
+- *(Monero deps — `@mymonero/mymonero-lws-client`, `mymonero-core`/`monero-ts` WASM — deferred with
+  Monero.)*
 
-Gateway (`services/relay-gateway`) gains optional per-chain proxy modules (`solana/`, `zcash/`,
-`monero-lws/`) mirroring `bitcoin/`, each honestly hiding/degrading when unconfigured.
+Gateway (`services/relay-gateway`) gains optional per-chain proxy modules (`solana/`, `zcash/`)
+mirroring `bitcoin/`, each honestly hiding/degrading when unconfigured. *(`monero-lws/` deferred.)*

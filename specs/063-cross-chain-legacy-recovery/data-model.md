@@ -47,8 +47,8 @@ A per-chain account derived from a recovered mnemonic.
 | Field | Type | Notes |
 |-------|------|-------|
 | `sourceLegacyAddress` | string | The EVM address of the recovering secret — namespaces this account so it never collides with the passkey-derived wallet |
-| `chain` | `'bitcoin' \| 'solana' \| 'zcash' \| 'monero'` | |
-| `scheme` | string | e.g. `bip84`/`bip44`/`bip49`/`bip86` (BTC/ZEC), `bip44Change`/`bip44`/`bareSeed` (SOL), `keccak-screduce`/`slip10` (XMR) |
+| `chain` | `'bitcoin' \| 'solana' \| 'zcash'` | (`monero` deferred to a follow-up spec) |
+| `scheme` | string | e.g. `bip84`/`bip44`/`bip49`/`bip86` (BTC/ZEC), `bip44Change`/`bip44`/`bareSeed` (SOL) |
 | `accountIndex` | integer | BIP44 account (where applicable) |
 | `addresses` | `DerivedAddress[]` | Discovered/used receive addresses |
 | `balance` | `{ confirmed, spendable, unit }` | Per-chain units (sats, lamports, zats, atomic XMR) |
@@ -84,7 +84,8 @@ Non-EVM networks are **string ids**, parallel to the numeric EVM `NETWORKS` map,
 |----|------|-----------|----------|
 | `solana` | solana | `solana-devnet` | 501 |
 | `zcash` | zcash | `zcash-testnet` | 133 (and 1 on testnet, dual) |
-| `monero` | monero | `monero-stagenet` | 128 |
+
+*(`monero` / coin type 128 deferred to a follow-up spec.)*
 
 **Invariant**: string ids MUST NEVER be passed to `getContractAddressForChain`, wagmi, or subgraph
 code (all numeric-chainId typed). Guard every boundary with `isEvmChainId` / the per-chain predicate.
@@ -96,7 +97,7 @@ code (all numeric-chainId typed). Guard every boundary with `isEvmChainId` / the
 | Field | Type | Notes |
 |-------|------|-------|
 | `sourceAccount` | DerivedExternalAccount \| EffectiveAccount | |
-| `destination` | string | Validated per chain (base58 32-byte for SOL; t-addr for ZEC; XMR base58; BTC address) |
+| `destination` | string | Validated per chain (base58 32-byte for SOL; t-addr for ZEC; BTC address) |
 | `amount` | bigint | Atomic units |
 | `feeQuote` | `{ fee, unit, payer: 'member' }` | Disclosed before signing (FR-012) |
 | `feeCeiling` | bigint | Hard ceiling — signing refuses if actual > ceiling (FR-012, edge case) |

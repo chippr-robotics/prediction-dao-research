@@ -3,8 +3,8 @@
 **Feature**: 063 | New optional modules under `services/relay-gateway/src/`, mirroring the spec-061
 Bitcoin module. Each is **optional**: when its env is unset/unreachable, the corresponding frontend
 surface hides or degrades honestly (never-stranded). Every endpoint receives **only public
-addresses and already-signed raw transactions** — except the single escalated Monero view-key case
-below.
+addresses and already-signed raw transactions** — no private key ever reaches a gateway. (Monero,
+whose balance path would have required the view key, is deferred to a follow-up spec.)
 
 Trust boundary (FR-021): keys/seeds NEVER reach these endpoints. Providers behind the proxy are
 untrusted for confidentiality; the proxy hides provider API keys and applies the shared
@@ -31,22 +31,10 @@ Client sends: base58 addresses, base64 signed txs. Never: secret keys.
 
 Client sends: t-addresses, signed raw tx hex. Never: private keys.
 
-## Monero — `services/relay-gateway/src/monero-lws/` (`MONERO_*` env)
+## Monero — DEFERRED
 
-**⚠ Escalated FR-021 exception (pending `/speckit-clarify`)**: the Monero balance path transmits the
-private **view key** to the scanner. Recommended posture: the LWS is **self-hosted, first-party**
-infra behind this proxy, and the member is explicitly told "your view key is shared with FairWins'
-scanner to read your balance; it cannot move funds." The alternative (in-browser monero-ts WASM,
-view key stays local) removes this endpoint entirely at a 10 MB cost.
-
-| Endpoint | Input | Output | Notes |
-|----------|-------|--------|-------|
-| `POST /v1/monero/login` | `{ address, view_key }` | ok | mymonero/OpenMonero LWS protocol |
-| `POST /v1/monero/get_address_info` | `{ address, view_key }` | balance/outputs | **view key only** — cannot spend |
-| `POST /v1/monero/get_address_txs` | `{ address, view_key }` | tx history | |
-| `POST /v1/monero/sendrawtransaction` | signed tx blob (Phase 2) | status | WASM-signed client-side |
-
-Client sends: address + **view key** (the exception) + signed tx blobs. NEVER: the spend key/seed.
+The Monero LWS proxy (which would have transmitted the private view key) is deferred to a follow-up
+spec. No Monero gateway module ships in feature 063.
 
 ---
 
@@ -56,5 +44,4 @@ Client sends: address + **view key** (the exception) + signed tx blobs. NEVER: t
   contract), no crash.
 - Responses distinguish "empty" from "error" so the client can honor FR-014 (nothing-found vs
   unreachable).
-- No endpoint persists request bodies containing the Monero view key beyond the scan session; this
-  is documented in `docs/runbooks/` per the escalated decision.
+- No endpoint ever receives a seed or private key.

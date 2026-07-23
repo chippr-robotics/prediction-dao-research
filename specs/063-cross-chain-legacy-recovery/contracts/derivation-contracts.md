@@ -12,8 +12,8 @@ seed or private key (FR-017/021). Signatures are illustrative (JS, no types).
 deriveCrossChainAccounts(seedBytes, { network, chains, accountRange, gapLimit }) -> {
   bitcoin?:  DerivedExternalAccount[],   // one per (purpose, accountIndex) with used addresses
   solana?:   DerivedExternalAccount[],   // per scheme+account
-  zcash?:    DerivedExternalAccount[],   // transparent only
-  monero?:   DerivedExternalAccount      // Phase 1: address + view key (balance via LWS)
+  zcash?:    DerivedExternalAccount[]    // transparent only
+  // monero deferred to a follow-up spec
 }
 ```
 - `seedBytes` = BIP-39 seed from the recovered mnemonic (memory-only).
@@ -52,24 +52,17 @@ signZcashInput(sighash, privkey) -> ecdsaSig
 - `zip244TransparentSighash` MUST pass official ZIP-244 vectors + a `@bitgo/utxo-lib` differential
   check before mainnet use (test gate).
 
-## Monero — Phase 1 (frontend/src/lib/monero/)
+## Monero — DEFERRED
 
-```
-deriveMonero(seedBytes, { scheme: 'keccak-screduce'|'slip10', account, network }) -> {
-  privSpend, privView, pubSpend, pubView, address     // address = Monero base58, 95 chars
-}
-encodeMoneroAddress(pubSpend, pubView, network) -> base58Monero(prefix || pubSpend || pubView || keccak[0:4])
-```
-- Phase 1 exposes `privView` to the LWS balance path ONLY (see gateway contract — escalated FR-021
-  exception). `privSpend` NEVER leaves the device in Phase 1.
-- Phase 2 (send) adds WASM-backed `buildMoneroTx`/`signMoneroTx` (`mymonero-core`/`monero-ts`).
-- MUST NOT reuse the wrong `floppy-keystore/chains.js` scheme.
+Deferred to a follow-up spec (view-key privacy decision + WASM signer). No Monero derivation contract
+ships in feature 063. The completed research lives in `research.md`; do NOT reuse the wrong
+`floppy-keystore/chains.js` scheme when it is eventually built.
 
 ---
 
 ## Invariants (all modules)
 
 - No function returns a value that is logged, persisted, or sent to a gateway if it contains a
-  seed or private key (Monero view key is the single escalated exception, Phase 1 balance only).
+  seed or private key. (With Monero deferred, there is no view-key exception in this feature.)
 - Derivation is deterministic and vector-pinned per chain/scheme (test-first).
 - Testnet vs mainnet derivation/encoding never mix (FR-015).

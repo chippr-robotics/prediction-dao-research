@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Universal acting-account + cross-chain legacy recovery. Wire the selected 'acting as' account into every surface (portfolio, home actions, receive, request), and derive cross-chain keys (Bitcoin full hardware-wallet scan, Solana, Zcash, Monero) from a recovered legacy BIP-39 seed so members can see and move funds those seeds control."
+**Input**: User description: "Universal acting-account + cross-chain legacy recovery. Wire the selected 'acting as' account into every surface (portfolio, home actions, receive, request), and derive cross-chain keys (Bitcoin full hardware-wallet scan, Solana, Zcash) from a recovered legacy BIP-39 seed so members can see and move funds those seeds control." *(Monero was considered and is deferred to a later version — see Assumptions.)*
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -78,21 +78,12 @@ A member's recovered seed controls Zcash held on transparent addresses. The app 
 
 ---
 
-### User Story 5 - Recover Monero funds from a legacy seed (Priority: P5)
-
-A member's recovered seed controls Monero. The app derives the Monero account, shows its balance, and lets the member send, disclosing Monero's inherent privacy and fee characteristics.
-
-**Why this priority**: Monero is the most architecturally distinct (its own key model and private-by-default scanning), the least common holding, and the heaviest new surface, so it lands last. Depends on US1.
-
-**Independent Test**: Import a seed that maps to a funded Monero account; verify the primary address is derived, the balance is discovered through the supported scanning path, and a send can be constructed and submitted.
-
-**Acceptance Scenarios**:
-
-1. **Given** a recovered seed that maps to a funded Monero account, **When** discovery runs, **Then** the Monero primary address is derived and its balance is shown.
-2. **Given** a discovered Monero balance, **When** the member sends, **Then** a valid transaction is constructed and submitted with honest disclosure that the member pays the network fee.
-3. **Given** a seed with no Monero activity, **When** discovery runs, **Then** no Monero row is shown.
-
----
+> **Deferred — Monero (was P5)**: Monero recovery was scoped and researched, then **deferred to a
+> later version** at the requester's direction. It is intentionally out of scope here because (a)
+> reading a Monero balance requires transmitting the private view key to a scanner, which conflicts
+> with the "gateways see only public addresses + signed txs" rule (FR-021) and needs a dedicated
+> privacy decision, and (b) sending requires a ~10 MB in-browser WASM signer. The research is retained
+> in `research.md` for the future spec.
 
 ### Edge Cases
 
@@ -124,7 +115,7 @@ A member's recovered seed controls Monero. The app derives the Monero account, s
 
 #### Part B — Cross-chain derivation & recovery
 
-- **FR-009**: When a member recovers a legacy account from a BIP-39 word list, the app MUST be able to derive keys and addresses for additional chains that seed can control — Bitcoin, Solana, Zcash, and Monero — in addition to the default Ethereum/EVM address.
+- **FR-009**: When a member recovers a legacy account from a BIP-39 word list, the app MUST be able to derive keys and addresses for additional chains that seed can control — Bitcoin, Solana, and Zcash (transparent) — in addition to the default Ethereum/EVM address. (Monero is deferred to a later version.)
 - **FR-010**: Bitcoin discovery MUST cover the common derivation schemes real wallets use — legacy (P2PKH `1…`), wrapped-segwit (P2SH `3…`), native segwit (`bc1q…`), and taproot (`bc1p…`) — across multiple account indices (not only account 0), using gap-limit scanning to find previously used addresses.
 - **FR-011**: The app MUST surface each chain's discovered balance in the portfolio as a derived account, and each derived account MUST be selectable as an acting account (Part A) so its funds can be viewed and moved.
 - **FR-012**: For each supported chain, the member MUST be able to send discovered funds from the derived account, with honest disclosure of who pays the network fee and the confirmed fee treated as a hard ceiling.
@@ -147,7 +138,7 @@ A member's recovered seed controls Monero. The app derives the Monero account, s
 
 - **Acting Account (active identity)**: The single account the app currently acts as. Attributes: type (personal | vault | recovered-legacy | derived-external), display label, the address(es) it controls per chain, the set of chains/networks it can transact on, and whether it can currently sign (unlocked) on the active network.
 - **Recovered Legacy Secret**: The imported secret behind a recovered account. Attributes: kind (mnemonic — re-derivable; or raw private key — single key), encrypted-at-rest ciphertext, protection method (biometric/passphrase). The cleartext exists only transiently in memory.
-- **Derived External Account**: A per-chain account derived from a recovered mnemonic. Attributes: chain (Bitcoin/Solana/Zcash/Monero), derivation scheme and account index (where applicable), discovered address(es), and balance. Keys are memory-only.
+- **Derived External Account**: A per-chain account derived from a recovered mnemonic. Attributes: chain (Bitcoin/Solana/Zcash), derivation scheme and account index (where applicable), discovered address(es), and balance. Keys are memory-only.
 - **Chain Discovery Result**: The outcome of scanning a seed against a chain. Attributes: chain, list of used/funded addresses and their balances, scan completeness (scanned-to-gap-limit vs. source-unreachable), and any disclosed limitation (e.g., transparent-only).
 - **Send Request (per chain)**: A pending outbound transfer from a derived/acting account. Attributes: source account, destination, amount, quoted fee (ceiling), and payer-of-fee disclosure.
 
@@ -158,7 +149,7 @@ A member's recovered seed controls Monero. The app derives the Monero account, s
 - **SC-001**: With any non-personal account selected, 100% of the money-and-identity surfaces (portfolio, Receive, Request, Home actions, dashboard stats) show that account — verified by an automated check across every surface for each account type.
 - **SC-002**: A member never receives to, or sends from, an account other than the one displayed as active: zero mismatches between the displayed acting account and the address used by Receive/Request/Send across the test matrix.
 - **SC-003**: For a seed with Bitcoin funds placed on non-default paths/accounts, the app discovers and totals the funds across BIP44/49/84/86 and at least the first several account indices, matching a known-good reference wallet's total.
-- **SC-004**: For each supported chain (Bitcoin, Solana, Zcash-transparent, Monero), a member can go from "recovered seed" to a broadcast send of discovered funds, with the network-fee payer disclosed before signing.
+- **SC-004**: For each supported chain (Bitcoin, Solana, Zcash-transparent), a member can go from "recovered seed" to a broadcast send of discovered funds, with the network-fee payer disclosed before signing.
 - **SC-005**: Across the full test matrix, no seed, private key, or extended private key ever appears in storage, network payloads, logs, or the activity ledger (verified by inspection/automated scanning of those sinks).
 - **SC-006**: Discovery of a seed with no activity on a chain produces a clear "no funds found" result (not an error, not a phantom account) 100% of the time when the balance source is reachable.
 - **SC-007**: The existing passkey-derived Bitcoin wallet is byte-for-byte unchanged — the frozen derivation test vectors still pass with no modification.
@@ -171,7 +162,7 @@ A member's recovered seed controls Monero. The app derives the Monero account, s
 - **Bitcoin scope**: "Full hardware-wallet scan" means BIP44/BIP49/BIP84/BIP86 across a bounded range of account indices with gap-limit address scanning per account. Change-address chains are included in balance/spend accounting as needed for correctness.
 - **Zcash scope (this version)**: Transparent addresses only. Shielded (private) balances are explicitly out of scope for this version and are disclosed as such rather than implied empty.
 - **Solana scope (this version)**: Native SOL discovery and send. SPL token discovery/send is a candidate for a later version unless trivially included.
-- **Monero scope (this version)**: Primary account balance discovery and native send via a supported scanning/broadcast path. Monero's distinct key model and private-by-default scanning are accepted as the heaviest new surface and are the lowest priority (P5); the feature may ship US1–US4 first and land US5 subsequently.
+- **Monero (deferred)**: Out of scope for this version. Deferred because reading a Monero balance requires transmitting the private view key to a scanner (conflicts with FR-021 and needs a dedicated privacy decision) and sending requires a ~10 MB in-browser WASM signer. It will be its own follow-up spec; the completed research is kept in `research.md`.
 - **Balance/UTXO/broadcast data**: Discovering balances, fetching UTXOs, and broadcasting transactions for non-EVM chains rely on external data sources (indexers/explorers/gateways). These are treated as untrusted for confidentiality: they receive only public addresses and signed transactions. The specific providers are a planning/implementation decision, not part of this spec.
 - **No smart-contract changes**: This is a client-side feature. No `contracts/` changes are expected; escrow/registry contracts are not involved.
 - **Testnet support**: Each chain's testnet is used for automated/integration testing where a public testnet + faucet exists; mainnet/testnet balances are never combined.
