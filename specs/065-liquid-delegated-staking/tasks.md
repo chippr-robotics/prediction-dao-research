@@ -57,40 +57,40 @@ ValidatorShare (delegated POL). Staking is a **view inside the existing Earn tab
 **Purpose**: provider libraries + shared validation/state that every story needs. **No user story work
 begins until this phase is complete.**
 
-- [ ] T008 [P] Implement `frontend/src/lib/staking/lidoStaking.js` — stake (submit→wstETH share
+- [X] T008 [P] Implement `frontend/src/lib/staking/lidoStaking.js` — stake (submit→wstETH share
       accounting), `buildStakeCalls`, `requestWithdrawal` (requestWithdrawalsWstETH), status detection
       (`getWithdrawalStatus` → `isFinalized && !isClaimed`), `buildClaimCalls` (findCheckpointHints +
       claimWithdrawals), APR fetch from the Lido SMA endpoint, read-position helpers per
       contracts/lido-liquid-staking.md
-- [ ] T009 [P] Implement `frontend/src/lib/staking/spolStaking.js` — `buildStakeCalls` (approve POL +
+- [X] T009 [P] Implement `frontend/src/lib/staking/spolStaking.js` — `buildStakeCalls` (approve POL +
       buySPOL), exchange-rate/APR via `convertSPOLtoPOL` drift, TVL via `totalsPOLBalance`,
       `sellSPOL`→nonce, ready detection via `getUserOpenNonces`, `withdrawPOL`, live `rewardFee` read
       for disclosure, per contracts/spol-liquid-staking.md
-- [ ] T010 [P] Implement `frontend/src/lib/staking/polygonDelegation.js` — `buildDelegateCalls`
+- [X] T010 [P] Implement `frontend/src/lib/staking/polygonDelegation.js` — `buildDelegateCalls`
       (approve POL + buyVoucherPOL with `_minSharesToMint` slippage), `buildUndelegateCalls`
       (sellVoucherPOL → unbond nonce), unbond claimable math
       (`withdrawEpoch + withdrawalDelay() <= epoch()`), `unstakeClaimTokens_newPOL`, rewards
       read/claim (getLiquidRewards/withdrawRewardsPOL), validator-list fetch decorating **only**
       allowlisted entries, per contracts/polygon-delegation.md
-- [ ] T011 Implement `frontend/src/lib/staking/stakingActions.js` — shared amount validation
+- [X] T011 Implement `frontend/src/lib/staking/stakingActions.js` — shared amount validation
       (zero/dust/> balance/below-min/above-cap), native-coin gas reserve, and a dispatcher keyed on
       `option.providerKind` (`lido`|`spol`|`validator-share`) returning build-calls for the unified
       send rail
-- [ ] T012 [P] Implement `frontend/src/lib/staking/pendingUnbonds.js` — account+chain-scoped persistence
+- [X] T012 [P] Implement `frontend/src/lib/staking/pendingUnbonds.js` — account+chain-scoped persistence
       of Lido request ids and sPOL/Polygon unbond nonces (add/list/prune, idempotent) per data-model.md
       UnstakeRequest
-- [ ] T013 [P] Create `frontend/src/lib/staking/stakingCopy.js` — InfoTip copy (staking, APR, liquid
+- [X] T013 [P] Create `frontend/src/lib/staking/stakingCopy.js` — InfoTip copy (staking, APR, liquid
       staking token, delegation, validator, unbonding, lock-up, slashing, approval two-prompt,
       instant-DEX-exit) + the risk disclosure (smart-contract, slashing, variable rewards, illiquidity)
       + unavailable-state copy referencing `getStakingNetworks()`
-- [ ] T014 [P] Create `frontend/src/lib/staking/stakingActivityBuffer.js` — queue/drain/peek for the
+- [X] T014 [P] Create `frontend/src/lib/staking/stakingActivityBuffer.js` — queue/drain/peek for the
       notification source (mirrors `earnActivityBuffer`, account+chain-scoped)
-- [ ] T015 Unit tests `frontend/src/test/staking/lidoStaking.test.js`,
+- [X] T015 Unit tests `frontend/src/test/staking/lidoStaking.test.js`,
       `frontend/src/test/staking/spolStaking.test.js`,
       `frontend/src/test/staking/polygonDelegation.test.js` (build-calls; withdrawal-status/unbond
       claimable detection; APR/rate normalizers; allowlist-decoration-not-expansion) with mocked
       contracts/fetch
-- [ ] T016 [P] Unit tests `frontend/src/test/staking/stakingActions.test.js` (validators incl. gas
+- [X] T016 [P] Unit tests `frontend/src/test/staking/stakingActions.test.js` (validators incl. gas
       reserve; provider dispatch) and `frontend/src/test/staking/pendingUnbonds.test.js` (add/prune,
       idempotency)
 
