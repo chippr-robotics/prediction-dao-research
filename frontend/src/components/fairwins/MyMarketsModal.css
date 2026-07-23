@@ -17,7 +17,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Modal tier — must sit above the mobile bottom nav (.section-icon-nav, 1200)
+     and the nav drawer (1401) so the sheet is never occluded by the Pay/Request/
+     Wager bar on mobile. Matches the shared full-screen modal tier used by the
+     asset/collectible detail sheets. The nested sub-modal backdrop (1100) is
+     scoped to this stacking context, so it still layers above the sheet. */
+  z-index: 2000;
   padding: 1rem;
   animation: mmFadeIn 0.2s ease-out;
 }
