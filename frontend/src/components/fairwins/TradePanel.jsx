@@ -14,6 +14,8 @@ import { useWallet } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
+import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
+import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
 import './TradePanel.css'
@@ -60,8 +62,10 @@ function TradePanel() {
   // Account selection (spec 043): trade as the personal wallet or as one of the
   // member's saved multisig vaults. Selecting a vault turns every order into a
   // threshold-gated proposal; balances shown below always follow the selection.
-  const { identity, isVault, operateAsVault, operateAsPersonal } = useActiveAccount()
+  const { identity, isVault, operateAsVault, operateAsPersonal, operateAsLegacy } = useActiveAccount()
   const { vaults } = useCustodyVaults()
+  const legacyAccounts = useLegacyAccounts()
+  const [unlockEntry, setUnlockEntry] = useState(null)
 
   // Session rails: passkey accounts transact through their smart account —
   // gasless (FairWins-sponsored) where the network has a sponsor paymaster
@@ -210,9 +214,21 @@ function TradePanel() {
       operateAsPersonal()
       return
     }
+    if (value.startsWith('legacy:')) {
+      const acc = legacyAccounts.find((l) => l.id === value)
+      if (acc) setUnlockEntry(acc.entry) // unlock (biometric/passphrase) → operateAsLegacy
+      return
+    }
     const vault = vaults.find((v) => v.address === value)
     if (vault) operateAsVault(vault)
   }
+
+  const handleLegacyUnlocked = useCallback((signer) => {
+    if (unlockEntry) {
+      operateAsLegacy({ address: unlockEntry.address, chainId, kind: unlockEntry.kind, label: shortAddress(unlockEntry.address), signer })
+    }
+    setUnlockEntry(null)
+  }, [unlockEntry, chainId, operateAsLegacy])
 
   // A Limit order's floor: limit price (output per 1 unit paid) × quantity,
   // enforced on-chain as the swap's minimum received.
@@ -321,7 +337,11 @@ function TradePanel() {
         ? `1 ${quote.tokenOutSymbol} = ${quote.executionPriceInverted} ${quote.tokenInSymbol}`
         : null
 
-  const accountValue = isVault ? identity.vaultAddress : 'personal'
+  const accountValue = isVault
+    ? identity.vaultAddress
+    : identity.mode === 'legacy' && identity.address
+      ? `legacy:${String(identity.address).toLowerCase()}`
+      : 'personal'
   const feeBadge = isVault
     ? { className: 'trade-badge-proposal', text: 'Multisig proposal' }
     : passkeySponsored
@@ -365,7 +385,18 @@ function TradePanel() {
               {(v.label || shortAddress(v.address)) + ' · Multisig'}
             </option>
           ))}
+          {legacyAccounts.map((l) => (
+            <option key={l.id} value={l.id}>
+              {(l.label || shortAddress(l.address)) + ' · Recovered'}
+            </option>
+          ))}
         </select>
+        <LegacyUnlockDialog
+          open={Boolean(unlockEntry)}
+          entry={unlockEntry}
+          onClose={() => setUnlockEntry(null)}
+          onUnlocked={handleLegacyUnlocked}
+        />
         <dl className="trade-account-rows">
           <div className="trade-account-row">
             <dt>Available to trade ({symbolFor(fromToken)})</dt>
