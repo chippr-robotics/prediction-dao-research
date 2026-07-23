@@ -75,14 +75,14 @@ the smart-contract security review.**
       and leave no residual; treasury balance grows by exactly the disclosed fee
 - [X] T013 [P] Storage-layout test + run: `npm run check:storage-layout` passes for `StakingRouter`
       (append-only + `__gap`); document the layout baseline
-- [ ] T014 Run Slither + Medusa on `contracts/staking/` — resolve or document (with rationale) any
+- [X] T014 Run Slither + Medusa on `contracts/staking/` — resolve or document (with rationale) any
       high/critical findings; ensure the CI security jobs cover the new contract
-- [ ] T015 Smart-contract security-agent review of `StakingRouter.sol`
+- [X] T015 Smart-contract security-agent review of `StakingRouter.sol`
       (`.github/agents/smart-contract-security.agent.md`) — address findings; **gate for all downstream merges**
-- [ ] T016 Author `scripts/deploy/deploy-staking-router.js` — `deployProxy(StakingRouter, [admin, feeRouter,
+- [X] T016 Author `scripts/deploy/deploy-staking-router.js` — `deployProxy(StakingRouter, [admin, feeRouter,
       providers…])`, record `stakingRouter`/`stakingRouterImpl` (append, never overwrite), then register
       `stake.lido` + `stake.polygon` on the existing FeeRouter (idempotent); admin/guardian = the multisig
-- [ ] T017 Implement `frontend/src/lib/staking/stakingRouter.js` — read the router's provider addresses,
+- [X] T017 Implement `frontend/src/lib/staking/stakingRouter.js` — read the router's provider addresses,
       validator allowlist, and `paused()` over a read provider; build the liquid router stake calls
       (`stakeLido` native `value`; `stakeSpol` approve-router + call); safe-degrade to null when the router
       is undeployed/unreadable, per contracts/admin-and-runtime.md

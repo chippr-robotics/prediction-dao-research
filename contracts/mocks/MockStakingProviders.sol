@@ -60,3 +60,25 @@ contract MintableToken is ERC20 {
         _mint(to, amount);
     }
 }
+
+/// @dev Force-sends its balance to `target` via selfdestruct — used to prove the router's
+///      relative residual invariant can't be griefed by donated/forced ETH.
+contract ForceSend {
+    constructor(address payable target) payable {
+        selfdestruct(target);
+    }
+}
+
+/// @dev wstETH whose `wrap` mints zero — exercises the router's `ProviderCallFailed` guard.
+contract MockZeroWstETH is ERC20 {
+    ERC20 public immutable steth;
+
+    constructor(address steth_) ERC20("Zero wstETH", "z-wstETH") {
+        steth = ERC20(steth_);
+    }
+
+    function wrap(uint256 stETHAmount) external returns (uint256) {
+        steth.transferFrom(msg.sender, address(this), stETHAmount);
+        return 0; // mints nothing → router must revert
+    }
+}

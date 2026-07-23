@@ -105,3 +105,16 @@ funds left after any tx — FR-016); `maxFeeBps` consent ceiling (`FeeAboveQuote
 reset to 0; provider/validator targets from curated config only; least-privilege UUPS upgrade gate; targets
 EthTrust-SL L2+; Slither + Medusa clean; smart-contract security-agent review before merge; unit + **fork**
 tests for the real submit/wrap/buySPOL legs.
+
+### Security review (2026-07-23)
+
+Smart-contract security-agent review completed — **no Critical/High findings; approved for integration**.
+Fixes applied: **L1** — sweep stETH share-rounding dust to the member after `wrap` (no dust accrues in the
+router); **L2** — the `FeeAboveQuoted` consent ceiling only bites when a fee is actually charged, so a
+treasury-unset network (fee 0) never spuriously reverts a zero-fee stake. Added unit coverage: forced/donated
+ETH cannot brick the relative residual invariant; zero-LST provider output reverts `ProviderCallFailed`.
+**Accepted/documented (L3/Info):** `stakeSpol` fails **closed** for a non-standard `polToken`
+(fee-on-transfer/rebasing) — the residual check reverts rather than mis-accounting (same assumption
+`FeeRouter` documents); the treasury destination + consent ceiling are only as trustworthy as the
+`STAKING_ADMIN` multisig that can `setFeeRouter` (ops-doc note). Slither + Medusa run in CI (whole-repo scan
+covers `contracts/staking/`).

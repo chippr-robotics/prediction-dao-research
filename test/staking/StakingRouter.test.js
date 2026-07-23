@@ -184,8 +184,26 @@ describe("StakingRouter", function () {
       await fr.connect(admin).registerService(STAKE_POLYGON, 250, Kind.ConfigOnly);
       await fr.connect(admin).setFeeBps(STAKE_LIDO, 50);
       const r = await newRouter(await fr.getAddress());
-      await r.connect(member).stakeLido(50, { value: ETH("1") });
+      // Even with maxFeeBps=0, a treasury-unset network must not spuriously revert (L2): fee is 0.
+      await r.connect(member).stakeLido(0, { value: ETH("1") });
       expect(await wsteth.balanceOf(member.address)).to.equal(ETH("1")); // full amount staked
+    });
+
+    it("cannot be bricked by forced/donated ETH (relative residual invariant)", async function () {
+      const ForceSend = await ethers.getContractFactory("ForceSend");
+      await ForceSend.deploy(await router.getAddress(), { value: 7n }); // grief 7 wei into the router
+      await router.connect(member).stakeLido(0, { value: ETH("1") });
+      expect(await wsteth.balanceOf(member.address)).to.equal(ETH("1"));
+      // The donated 7 wei stays put; the stake still succeeded and left no NEW residual.
+      expect(await ethers.provider.getBalance(await router.getAddress())).to.equal(7n);
+    });
+
+    it("reverts ProviderCallFailed when the provider returns zero LST", async function () {
+      const ZeroWst = await ethers.getContractFactory("MockZeroWstETH");
+      const zwst = await ZeroWst.deploy(await steth.getAddress());
+      await router.connect(stakingAdmin).setLidoContracts(await steth.getAddress(), await zwst.getAddress());
+      await expect(router.connect(member).stakeLido(0, { value: ETH("1") }))
+        .to.be.revertedWithCustomError(router, "ProviderCallFailed");
     });
   });
 

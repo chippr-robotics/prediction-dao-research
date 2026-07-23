@@ -182,9 +182,11 @@ contract StakingRouter is
         uint256 startBalance = address(this).balance - gross;
 
         IFeeRouter router = IFeeRouter(feeRouter);
-        // Consent ceiling BEFORE any movement — the quoted rate is a hard cap (FR-003).
-        if (router.feeBps(stakeLidoServiceId) > maxFeeBps) revert FeeAboveQuoted();
         (uint256 fee, uint256 net) = router.quoteFee(stakeLidoServiceId, gross);
+        // Consent ceiling — the quoted rate is a hard cap (FR-003). Only meaningful when a fee is
+        // actually charged: a treasury-unset network quotes fee 0, so a zero-fee stake is never
+        // blocked by a stale configured rate.
+        if (fee > 0 && router.feeBps(stakeLidoServiceId) > maxFeeBps) revert FeeAboveQuoted();
 
         if (fee > 0) {
             (bool ok, ) = router.treasury().call{value: fee}("");
@@ -201,7 +203,12 @@ contract StakingRouter is
         IERC20(lidoWsteth).safeTransfer(msg.sender, wstOut);
         IERC20(lidoSteth).forceApprove(lidoWsteth, 0);
 
-        // No member funds may remain in the router after the action (FR-016).
+        // stETH is share-based: `wrap` can leave 1–2 wei of stETH dust from rounding. Sweep any
+        // stETH we still hold above the starting balance to the member so none accrues here (FR-016).
+        uint256 stethResidual = IERC20(lidoSteth).balanceOf(address(this)) - stethBefore;
+        if (stethResidual > 0) IERC20(lidoSteth).safeTransfer(msg.sender, stethResidual);
+
+        // No member native funds may remain in the router after the action (FR-016).
         if (address(this).balance != startBalance) revert ResidualFunds();
         emit LiquidStaked(lidoWsteth, msg.sender, gross, fee, net, wstOut);
     }
@@ -220,13 +227,15 @@ contract StakingRouter is
     {
         if (amount == 0) revert ZeroAmount();
         IERC20 pol = IERC20(polToken);
-        uint256 polBefore = pol.balanceOf(address(this));
-
         IFeeRouter router = IFeeRouter(feeRouter);
-        if (router.feeBps(stakeSpolServiceId) > maxFeeBps) revert FeeAboveQuoted();
 
-        pol.safeTransferFrom(msg.sender, address(this), amount);
+        // Quote + consent ceiling BEFORE pulling funds (fail early). The ceiling only bites when a
+        // fee is actually charged (treasury-unset ⇒ fee 0 ⇒ a zero-fee stake is never blocked).
         (uint256 fee, uint256 net) = router.quoteFee(stakeSpolServiceId, amount);
+        if (fee > 0 && router.feeBps(stakeSpolServiceId) > maxFeeBps) revert FeeAboveQuoted();
+
+        uint256 polBefore = pol.balanceOf(address(this));
+        pol.safeTransferFrom(msg.sender, address(this), amount);
 
         if (fee > 0) pol.safeTransfer(router.treasury(), fee);
 
