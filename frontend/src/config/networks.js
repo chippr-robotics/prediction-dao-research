@@ -29,6 +29,11 @@
 // imports from this file (indirectly, via NETWORK_CONFIG-style lookups) and a
 // hard import would create a cycle.
 
+// Staking (spec 065). Per-network like earn — only chains with a real,
+// deposits-open provider get a block. `staking.js` imports nothing from here,
+// so there is no cycle. Launch: chain 1 only.
+import { ethereumStakingConfig } from './staking'
+
 // PRIMARY_CHAIN_ID is the app's home/default network (used as the default chain
 // when VITE_NETWORK_ID is unset and as the wallet auto-switch target for
 // unsupported chains). TESTNET_CHAIN_ID is the testnet side of the user-facing
@@ -152,6 +157,7 @@ const NETWORKS = {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
@@ -232,6 +238,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: false,
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
@@ -301,6 +308,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: false,
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
@@ -368,6 +376,7 @@ const NETWORKS = {
         polymarketSidebets: true,
         dex: Boolean(this.dex),
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
@@ -410,6 +419,9 @@ const NETWORKS = {
     dex: null,
     // Earn / lending (spec 050): Morpho's home chain — vaults + data API live.
     earn: earnConfig(),
+    // Staking (spec 065): Lido (liquid ETH), sPOL (liquid POL), and Polygon
+    // validator delegation (POL) all mint/execute on Ethereum L1. Launch chain.
+    staking: ethereumStakingConfig(),
     contracts: {}, // no wager/membership deployment — ClearPath needs none (registry-optional)
     polymarket: null,
     // Passkey smart accounts are not enabled on this ClearPath-only network in this cut.
@@ -421,6 +433,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: false,
         passkeyAccounts: false,
         // The single enabled capability: ClearPath DAO governance (ENS, Uniswap, …).
@@ -461,6 +474,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: false,
         passkeyAccounts: false,
         clearpath: false,
@@ -500,6 +514,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: false,
         passkeyAccounts: false,
         clearpath: false,
@@ -532,6 +547,7 @@ const NETWORKS = {
         polymarketSidebets: false,
         dex: false,
         earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // Local Hardhat sandbox is not a ClearPath governance network.
@@ -597,6 +613,34 @@ export function getEarnNetworks() {
   return listSupportedChainIds()
     .map((id) => NETWORKS[id])
     .filter((net) => net?.earn)
+}
+
+/**
+ * Whether staking (spec 065) is available on `chainId` — the presence of a
+ * `staking` block. Launch: chain 1 only.
+ */
+export function isStakingAvailable(chainId) {
+  const net = chainId != null ? NETWORKS[chainId] : null
+  return Boolean(net?.staking)
+}
+
+/**
+ * The staking config block (`{ liquid: [...], delegated: {...} }`) for
+ * `chainId`, or null when staking is not available there.
+ */
+export function getStakingConfig(chainId) {
+  const net = chainId != null ? NETWORKS[chainId] : null
+  return net?.staking ?? null
+}
+
+/**
+ * The networks where staking is live — used by the honest unavailable-state
+ * copy ("Staking is available on Ethereum") and by tests.
+ */
+export function getStakingNetworks() {
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net?.staking)
 }
 
 /**

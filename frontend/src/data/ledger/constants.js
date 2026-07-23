@@ -9,6 +9,7 @@ export const LEDGER_CLASS = Object.freeze({
   WAGER: 'wager',
   TRANSFER: 'transfer',
   EARN: 'earn',
+  STAKING: 'staking',
   POOL: 'pool',
   MEMBERSHIP: 'membership',
 })

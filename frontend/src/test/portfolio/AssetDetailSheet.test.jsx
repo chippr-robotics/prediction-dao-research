@@ -147,11 +147,12 @@ describe('AssetDetailSheet actions', () => {
     expect(screen.getByText(/collectibles cannot be lent/i)).toBeInTheDocument()
   })
 
-  it('always shows Stake as honestly unavailable (no staking surface yet)', () => {
+  it('enables Stake for ETH on Ethereum and deep-links to the stake view (spec 065)', () => {
     renderSheet(ETH_AGG)
     const stake = screen.getByRole('button', { name: 'Stake' })
-    expect(stake).toBeDisabled()
-    expect(screen.getByText(/staking is not available in the app yet/i)).toBeInTheDocument()
+    expect(stake).toBeEnabled()
+    fireEvent.click(stake)
+    expect(mockNavigate).toHaveBeenCalledWith('/wallet?tab=earn&view=stake&chain=1&token=ETH')
   })
 
   it('offers no trading for collectibles', () => {

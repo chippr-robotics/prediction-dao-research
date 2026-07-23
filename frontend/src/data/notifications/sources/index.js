@@ -12,7 +12,8 @@ import { membershipSource } from './membershipSource'
 import { poolsSource } from './poolsSource'
 import { custodySource } from './custodySource'
 import { earnSource } from './earnSource'
+import { stakingSource } from './stakingSource'
 
-export const activitySources = [wagerSource, daoSource, tokenSource, membershipSource, poolsSource, custodySource, earnSource]
+export const activitySources = [wagerSource, daoSource, tokenSource, membershipSource, poolsSource, custodySource, earnSource, stakingSource]
 
 export default activitySources

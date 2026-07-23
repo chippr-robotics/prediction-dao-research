@@ -15,6 +15,8 @@ export const DOMAIN_META = {
   intents: { label: 'Gasless' },
   // Spec 050 earn (lending & rewards) events.
   earn: { label: 'Earn' },
+  // Spec 065 staking (liquid & delegated) events.
+  staking: { label: 'Staking' },
 }
 
 /** Display label for a domain key (falls back to the key itself for an unknown/future domain). */
