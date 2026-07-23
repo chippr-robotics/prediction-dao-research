@@ -82,3 +82,45 @@ contract MockZeroWstETH is ERC20 {
         return 0; // mints nothing → router must revert
     }
 }
+
+/// @dev wstETH whose `wrap` pulls 1 wei LESS stETH than offered (share rounding) — leaves stETH
+///      dust in the router, exercising the dust-sweep-to-member branch.
+contract MockDustWstETH is ERC20 {
+    ERC20 public immutable steth;
+
+    constructor(address steth_) ERC20("Dust wstETH", "d-wstETH") {
+        steth = ERC20(steth_);
+    }
+
+    function wrap(uint256 stETHAmount) external returns (uint256) {
+        uint256 pulled = stETHAmount - 1; // leave 1 wei of stETH behind in the caller (router)
+        steth.transferFrom(msg.sender, address(this), pulled);
+        _mint(msg.sender, pulled);
+        return pulled;
+    }
+}
+
+/// @dev sPOL controller that pulls 1 wei LESS POL than offered — leaves POL residual in the
+///      router, exercising the `ResidualFunds` invariant.
+contract MockLeakySpolController {
+    ERC20 public immutable pol;
+    MintableToken public immutable spol;
+
+    constructor(address pol_, address spol_) {
+        pol = ERC20(pol_);
+        spol = MintableToken(spol_);
+    }
+
+    function buySPOL(uint256 amount) external returns (uint256) {
+        pol.transferFrom(msg.sender, address(this), amount - 1); // under-pull → residual left behind
+        spol.mint(msg.sender, amount);
+        return amount;
+    }
+}
+
+/// @dev A treasury that rejects incoming ETH — exercises the router's native-fee `ProviderCallFailed`.
+contract MockRejectETH {
+    receive() external payable {
+        revert("no eth");
+    }
+}

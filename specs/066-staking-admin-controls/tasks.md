@@ -130,13 +130,13 @@ the smart-contract security review.**
 
 **Independent test**: quickstart.md Scenario 2.
 
-- [ ] T024 [US2] Add pause/resume controls to `frontend/src/components/admin/StakingTab.jsx` — GUARDIAN-gated
+- [X] T024 [US2] Add pause/resume controls to `frontend/src/components/admin/StakingTab.jsx` — GUARDIAN-gated
       `pause()`/`unpause()` via the shared `runTx`, showing the live `paused()` state (mirrors the Emergency
       tab handlers)
-- [ ] T025 [US2] Honor the router `paused` flag in the member app: overlay it in
+- [X] T025 [US2] Honor the router `paused` flag in the member app: overlay it in
       `frontend/src/hooks/useStakingOptions.js` and hide **new**-stake in `StakeView`/`StakeSheet` behind the
       existing honest unavailable state (exits/unstake/withdraw stay available)
-- [ ] T026 [P] [US2] Tests `frontend/src/test/staking-admin/StakingTab.pause.test.jsx` (guardian-only
+- [X] T026 [P] [US2] Tests `frontend/src/test/staking-admin/StakingTab.pause.test.jsx` (guardian-only
       pause/resume; non-guardian cannot) and `frontend/src/test/staking-admin/pausedMember.test.jsx` (paused ⇒
       new-stake hidden with the unavailable state; exits still offered)
 
@@ -150,13 +150,13 @@ the smart-contract security review.**
 
 **Independent test**: quickstart.md Scenario 3 (addresses).
 
-- [ ] T027 [US3] Add provider-address controls to `frontend/src/components/admin/StakingTab.jsx` —
+- [X] T027 [US3] Add provider-address controls to `frontend/src/components/admin/StakingTab.jsx` —
       STAKING_ADMIN-gated `setLidoContracts`/`setSpolContracts`/`setPolygonContracts`/`setFeeRouter` with
       current-value display and `ethers.isAddress` + non-zero validation before send (mirror ProtocolConfigTab)
-- [ ] T028 [US3] Ensure `frontend/src/hooks/useStakingOptions.js` overlays the router's provider addresses
+- [X] T028 [US3] Ensure `frontend/src/hooks/useStakingOptions.js` overlays the router's provider addresses
       onto the options when the router is deployed (member flow resolves the updated addresses), with the
       spec-065 constants as the fallback
-- [ ] T029 [P] [US3] Tests `frontend/src/test/staking-admin/StakingTab.addresses.test.jsx` (current value
+- [X] T029 [P] [US3] Tests `frontend/src/test/staking-admin/StakingTab.addresses.test.jsx` (current value
       shown; invalid/zero rejected pre-send; setter dispatched) and an overlay test (member reads router
       address over the constant)
 
@@ -170,13 +170,13 @@ the smart-contract security review.**
 
 **Independent test**: quickstart.md Scenario 3 (validator lifecycle).
 
-- [ ] T030 [US4] Add validator allowlist controls to `frontend/src/components/admin/StakingTab.jsx` —
+- [X] T030 [US4] Add validator allowlist controls to `frontend/src/components/admin/StakingTab.jsx` —
       STAKING_ADMIN-gated `addValidator`/`removeValidator` with the current list (`validatorCount`/`validatorAt`)
       and address validation (contract rejects dup/absent)
-- [ ] T031 [US4] Overlay the router's validator allowlist in `frontend/src/hooks/useStakingOptions.js` so a
+- [X] T031 [US4] Overlay the router's validator allowlist in `frontend/src/hooks/useStakingOptions.js` so a
       removed validator drops from **new**-delegation options while an existing delegated position stays
       visible/exitable (via `useStakingPositions`), falling back to `CURATED_POLYGON_VALIDATORS`
-- [ ] T032 [P] [US4] Tests `frontend/src/test/staking-admin/StakingTab.validators.test.jsx` (add/remove;
+- [X] T032 [P] [US4] Tests `frontend/src/test/staking-admin/StakingTab.validators.test.jsx` (add/remove;
       dup/absent rejected) and `frontend/src/test/staking-admin/allowlistOverlay.test.jsx` (removed validator
       not offered for new delegation; existing position still exitable)
 
@@ -190,13 +190,13 @@ the smart-contract security review.**
 
 **Independent test**: quickstart.md Scenario 4.
 
-- [ ] T033 [US5] Add the STAKING_ADMIN grantable-role `<option>` to the admin-roles select in
+- [X] T033 [US5] Add the STAKING_ADMIN grantable-role `<option>` to the admin-roles select in
       `frontend/src/components/AdminPanel.jsx` (grant/revoke via the `stakingRouter` home contract) and confirm
       the least-privilege split: config = STAKING_ADMIN, pause = GUARDIAN, fee rate = FEE_ADMIN (Fees tab)
-- [ ] T034 [US5] Render the on-chain audit history in `frontend/src/components/admin/StakingTab.jsx` —
+- [X] T034 [US5] Render the on-chain audit history in `frontend/src/components/admin/StakingTab.jsx` —
       `queryFilter` the router's setter/pause events (+ FeeRouter `FeeBpsChanged` for the rate), newest-first
       table with a Blockscout fallback link (mirror FeesTab history), showing actor + before/after + time
-- [ ] T035 [P] [US5] Tests `frontend/src/test/staking-admin/StakingTab.roles.test.jsx` (no-role sees nothing;
+- [X] T035 [P] [US5] Tests `frontend/src/test/staking-admin/StakingTab.roles.test.jsx` (no-role sees nothing;
       guardian-only = pause only; staking-admin = config only; fee rate read-only) and
       `StakingTab.history.test.jsx` (events → rows; range-limited RPC degrades gracefully) + axe on the full tab
 
