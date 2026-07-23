@@ -149,18 +149,18 @@ rewards claim, with the "ready to withdraw" state driven by real on-chain status
 
 **Independent test**: quickstart.md Scenarios 2 (exit), 3.
 
-- [ ] T026 [US2] Extend `frontend/src/hooks/useStakingPositions.js` — read pending unbonds from
+- [X] T026 [US2] Extend `frontend/src/hooks/useStakingPositions.js` — read pending unbonds from
       `pendingUnbonds` + on-chain status, compute per-request `ready` (Lido `isFinalized && !isClaimed`;
       sPOL/Polygon epoch/nonce maturity) and `hasReadyWithdrawal`, and delegated `rewardsClaimableRaw`
       via `getLiquidRewards`
-- [ ] T027 [US2] Extend `frontend/src/hooks/useStakingActions.js` — unstake, withdraw, and claim paths
+- [X] T027 [US2] Extend `frontend/src/hooks/useStakingActions.js` — unstake, withdraw, and claim paths
       (Lido requestWithdrawal/claim; sPOL sellSPOL/withdrawPOL; Polygon sellVoucher/unstakeClaimTokens
       + withdrawRewardsPOL), persisting/pruning unbond handles via `pendingUnbonds`
-- [ ] T028 [US2] Build `frontend/src/components/earn/StakeSheet.jsx` **unstake/withdraw/claim modes** —
+- [X] T028 [US2] Build `frontend/src/components/earn/StakeSheet.jsx` **unstake/withdraw/claim modes** —
       unbonding wait disclosed with required acknowledgement before the prompt (FR-006); sPOL surfaces
       the instant-DEX-swap alternative with its price-impact caveat; a clear "ready to withdraw" action
       when matured; delegated Claim action (liquid options show no Claim)
-- [ ] T029 [P] [US2] Component/hook tests `frontend/src/test/staking/StakeSheetExit.test.jsx` and
+- [X] T029 [P] [US2] Component/hook tests `frontend/src/test/staking/StakeSheetExit.test.jsx` and
       `frontend/src/test/staking/useStakingPositions.test.jsx` (unbonding disclosure + ack gate, ready
       detection per provider, delegated claim present / liquid claim absent, honest "not instant" copy)
 
@@ -186,11 +186,11 @@ notification feed + financial ledger; completed-unbonding is an actionable break
       ActivitySource: drain `stakingActivityBuffer` into precise stake/unstake/withdraw/claim entries +
       snapshot-diff positions as a backstop + emit an **actionable** `unbond-ready` entry when a pending
       unbond matures) and register it in `frontend/src/data/notifications/sources/index.js`
-- [ ] T033 [US3] Add `STAKING` to `LEDGER_CLASS` in `frontend/src/data/ledger/constants.js`, implement
+- [X] T033 [US3] Add `STAKING` to `LEDGER_CLASS` in `frontend/src/data/ledger/constants.js`, implement
       `frontend/src/data/ledger/sources/stakingLedgerSource.js` (`captureStakingAction` +
       `createStakingLedgerSource`), and register the source + export the capture in
       `frontend/src/data/ledger/index.js`
-- [ ] T034 [US3] Wire the double-write into the stake/unstake/withdraw/claim flows (StakeSheet +
+- [X] T034 [US3] Wire the double-write into the stake/unstake/withdraw/claim flows (StakeSheet +
       useStakingActions): `queueStakingAction(...)` (notifications) + `captureStakingAction(...)`
       (ledger) with the real txHash + `activity?.refresh?.()`, using stable ids so the poll dedups
       (per data-model.md)

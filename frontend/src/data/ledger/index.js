@@ -7,6 +7,7 @@ import { createLedgerRepository } from './ledgerRepository'
 import { createWagerLedgerSource } from './sources/wagerLedgerSource'
 import { createTransferLedgerSource } from './sources/transferLedgerSource'
 import { createEarnLedgerSource } from './sources/earnLedgerSource'
+import { createStakingLedgerSource } from './sources/stakingLedgerSource'
 import { createPoolLedgerSource } from './sources/poolLedgerSource'
 import { createMembershipLedgerSource } from './sources/membershipLedgerSource'
 import { getPrunedBefore } from './ledgerClientStore'
@@ -16,6 +17,7 @@ export { createLedgerRepository, defaultEnrich } from './ledgerRepository'
 export { createWagerLedgerSource } from './sources/wagerLedgerSource'
 export { createTransferLedgerSource, transferRecordToEntry } from './sources/transferLedgerSource'
 export { createEarnLedgerSource, captureEarnAction } from './sources/earnLedgerSource'
+export { createStakingLedgerSource, captureStakingAction } from './sources/stakingLedgerSource'
 export { createPoolLedgerSource } from './sources/poolLedgerSource'
 export { createMembershipLedgerSource } from './sources/membershipLedgerSource'
 export * from './constants'
@@ -38,6 +40,7 @@ export function getDefaultLedgerRepository() {
       createWagerLedgerSource(),
       createTransferLedgerSource(),
       createEarnLedgerSource(),
+      createStakingLedgerSource(),
       createPoolLedgerSource(),
       createMembershipLedgerSource(),
     ],

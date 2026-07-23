@@ -15,6 +15,13 @@ import { NETWORKS } from '../config/networks'
 import { POL_TOKEN_L1 } from '../config/staking'
 import { makeReadProvider } from '../utils/rpcProvider'
 import { buildStakeForOption } from '../lib/staking/stakingActions'
+import { buildWithdrawalRequestCalls, buildLidoClaimCalls } from '../lib/staking/lidoStaking'
+import { buildUnstakeCalls as buildSpolUnstake, buildWithdrawCalls as buildSpolWithdraw } from '../lib/staking/spolStaking'
+import {
+  buildUndelegateCalls,
+  buildDelegationWithdrawCalls,
+  buildDelegationClaimCalls,
+} from '../lib/staking/polygonDelegation'
 
 async function submitBatch({ sendOnChain, chainId, calls }) {
   const sent = await sendOnChain(chainId, calls)
@@ -48,7 +55,54 @@ export function useStakingActions() {
     [address, send],
   )
 
-  return { stake, address, ...send }
+  // Begin an unstake. On success the next positions poll detects the new exit
+  // on-chain (no receipt parsing needed). Returns { txHash, txUrl }.
+  const requestUnstake = useCallback(
+    async (option, amount, { onState } = {}) => {
+      if (!address) throw new Error('This session cannot send transactions right now — please reconnect.')
+      const provider = makeReadProvider(NETWORKS[option.chainId].rpcUrl, option.chainId)
+      let calls
+      if (option.providerKind === 'lido') {
+        ;({ calls } = await buildWithdrawalRequestCalls({ contracts: option.contracts, account: address, amount, provider }))
+      } else if (option.providerKind === 'spol') {
+        ;({ calls } = buildSpolUnstake({ contracts: option.contracts, amount }))
+      } else {
+        ;({ calls } = buildUndelegateCalls({ validatorShare: option.validatorShare, amount }))
+      }
+      return submitBatch({ sendOnChain: (id, c) => send.sendOnChain(id, c, { onState }), chainId: option.chainId, calls })
+    },
+    [address, send],
+  )
+
+  // Withdraw a matured exit. `exit` = { handle: { requestId } | { unbondNonce } }.
+  const withdraw = useCallback(
+    async (option, exit, { onState } = {}) => {
+      if (!address) throw new Error('This session cannot send transactions right now — please reconnect.')
+      const provider = makeReadProvider(NETWORKS[option.chainId].rpcUrl, option.chainId)
+      let calls
+      if (option.providerKind === 'lido') {
+        ;({ calls } = await buildLidoClaimCalls({ contracts: option.contracts, provider, requestIds: [exit.handle.requestId] }))
+      } else if (option.providerKind === 'spol') {
+        ;({ calls } = buildSpolWithdraw({ contracts: option.contracts }))
+      } else {
+        ;({ calls } = buildDelegationWithdrawCalls({ validatorShare: option.validatorShare, unbondNonce: exit.handle.unbondNonce }))
+      }
+      return submitBatch({ sendOnChain: (id, c) => send.sendOnChain(id, c, { onState }), chainId: option.chainId, calls })
+    },
+    [address, send],
+  )
+
+  // Claim separately-distributed delegation rewards (delegated only).
+  const claimRewards = useCallback(
+    async (option, { onState } = {}) => {
+      if (!address) throw new Error('This session cannot send transactions right now — please reconnect.')
+      const { calls } = buildDelegationClaimCalls({ validatorShare: option.validatorShare })
+      return submitBatch({ sendOnChain: (id, c) => send.sendOnChain(id, c, { onState }), chainId: option.chainId, calls })
+    },
+    [address, send],
+  )
+
+  return { stake, requestUnstake, withdraw, claimRewards, address, ...send }
 }
 
 export default useStakingActions

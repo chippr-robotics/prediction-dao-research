@@ -14,11 +14,9 @@ import { useWallet } from './useWalletManagement'
 import { NETWORKS } from '../config/networks'
 import { STAKING_POLL_MS, POL_TOKEN_L1 } from '../config/staking'
 import { makeReadProvider } from '../utils/rpcProvider'
-import { readLidoPosition } from '../lib/staking/lidoStaking'
-import { readSpolPosition } from '../lib/staking/spolStaking'
+import { readLidoPosition, readLidoWithdrawalStatuses } from '../lib/staking/lidoStaking'
+import { readSpolPosition, readSpolOpenNonces } from '../lib/staking/spolStaking'
 import { readDelegationPosition, readStakeManagerTiming, readLatestUnbond } from '../lib/staking/polygonDelegation'
-import { readSpolOpenNonces } from '../lib/staking/spolStaking'
-import { listPendingUnbonds } from '../lib/staking/pendingUnbonds'
 
 const ERC20_BALANCE_ABI = ['function balanceOf(address) view returns (uint256)']
 
@@ -34,17 +32,39 @@ async function readWalletBalance({ option, account, provider }) {
 
 async function readOptionState({ option, account, provider, timingByChain }) {
   const walletBalanceRaw = await readWalletBalance({ option, account, provider }).catch(() => null)
+  const timing = timingByChain.get(option.chainId)
+
   if (option.providerKind === 'lido') {
     const pos = await readLidoPosition({ account, provider, contracts: option.contracts })
-    return { ...pos, walletBalanceRaw, rewardsClaimableRaw: null }
+    // Open Lido withdrawal requests, read straight from the queue (ready =
+    // finalized && !claimed). US2 exit surface.
+    const statuses = await readLidoWithdrawalStatuses({ contracts: option.contracts, account, provider })
+      .catch(() => [])
+    const openExits = statuses
+      .filter((s) => !s.claimed)
+      .map((s) => ({ handle: { requestId: s.requestId }, amountRaw: s.amountRaw, ready: s.ready }))
+    return { ...pos, walletBalanceRaw, rewardsClaimableRaw: null, openExits }
   }
+
   if (option.providerKind === 'spol') {
     const pos = await readSpolPosition({ account, provider, contracts: option.contracts })
-    return { ...pos, walletBalanceRaw, rewardsClaimableRaw: null }
+    const nonces = await readSpolOpenNonces({
+      contracts: option.contracts,
+      account,
+      provider,
+      currentEpoch: timing?.epoch,
+      withdrawalDelay: timing?.withdrawalDelay,
+    }).catch(() => [])
+    const openExits = nonces.map((n) => ({
+      handle: { unbondNonce: n.unbondNonce },
+      amountRaw: n.amountRaw,
+      ready: n.ready,
+    }))
+    return { ...pos, walletBalanceRaw, rewardsClaimableRaw: null, openExits }
   }
+
   // delegated
   const pos = await readDelegationPosition({ validatorShare: option.validatorShare, account, provider })
-  const timing = timingByChain.get(option.chainId)
   const unbond = await readLatestUnbond({
     validatorShare: option.validatorShare,
     account,
@@ -52,12 +72,16 @@ async function readOptionState({ option, account, provider, timingByChain }) {
     epoch: timing?.epoch,
     withdrawalDelay: timing?.withdrawalDelay,
   }).catch(() => null)
+  const openExits = unbond
+    ? [{ handle: { unbondNonce: unbond.unbondNonce }, amountRaw: null, ready: unbond.ready }]
+    : []
   return {
     stakedRaw: pos.stakedRaw,
     lstBalanceRaw: null,
     walletBalanceRaw,
     rewardsClaimableRaw: pos.rewardsClaimableRaw,
     latestUnbond: unbond,
+    openExits,
   }
 }
 
@@ -145,16 +169,16 @@ export function useStakingPositions(options) {
       for (const option of options) {
         const state = states.get(option.id)
         if (!state) continue
-        const pending = address ? listPendingUnbonds(address, option.chainId).filter((r) => r.optionId === option.id) : []
-        const hasReady = Boolean(state.latestUnbond?.ready)
+        const openExits = state.openExits || []
+        const hasReady = openExits.some((e) => e.ready)
         const hasStake = (state.stakedRaw ?? 0n) > 0n
-        if (!hasStake && pending.length === 0 && !hasReady) continue
+        if (!hasStake && openExits.length === 0) continue
         positions.push({
           option,
           stakedRaw: state.stakedRaw ?? 0n,
           lstBalanceRaw: state.lstBalanceRaw ?? null,
           rewardsClaimableRaw: state.rewardsClaimableRaw ?? null,
-          pendingUnbonds: pending,
+          pendingUnbonds: openExits,
           latestUnbond: state.latestUnbond ?? null,
           hasReadyWithdrawal: hasReady,
         })
