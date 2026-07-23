@@ -218,7 +218,9 @@ the smart-contract security review.**
       StakeSheet/AdminPanel/RoleContext tests affected by the new surfaces)
 - [ ] T039 Validate the automatable quickstart.md scenarios (fee disclosure + zero-fee identical; paused
       new-stake hidden while exits work; address/validator overlay; role gating; undeployed-router fallback)
-      and update `specs/066-staking-admin-controls/checklists`
+      and **assert per-network isolation (FR-012/SC-009): router config/fee/pause/paused read for one
+      chainId never bleeds into another and never crosses the testnet/mainnet boundary** (add the assertion
+      to the `useStakingOptions` overlay test), then update `specs/066-staking-admin-controls/checklists`
 
 ## Dependencies
 

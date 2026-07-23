@@ -204,8 +204,8 @@ with a build-time fallback, deploy/sync/storage-check wiring, and ops docs. The 
    `{available:false}` fallback). Pause hides new-stake honestly; exits always available.
 6. **Stake routing branch (R6)**: `buildStakeForOption` mirrors `lib/earn/vaultActions.buildDepositCalls` —
    fee applies ⇒ approve/route through the router `stake…WithFee`; else the byte-identical spec-065 direct
-   path. Native ETH uses `value` (no approve leg); delegated composes the fee-transfer + direct
-   `buyVoucherPOL` batch.
+   path. Native ETH uses `value` (no approve leg); **delegated stays the spec-065 direct `buyVoucherPOL`
+   call with no fee leg (fee-free in v1 — R2)**.
 7. **Admin tab + role (R7)**: new `StakingTab.jsx` mirrors `ProtocolConfigTab`/`FeesTab` (resolve address,
    read live state, validate-before-send, `runTx`, on-chain `queryFilter` history); `STAKING_ADMIN` added
    to `ROLES`/`ROLE_INFO`/`ADMIN_ROLES`, `ROLE_HASHES`, `roleHomeContract → stakingRouter`, nav item, render

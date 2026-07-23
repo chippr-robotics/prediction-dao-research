@@ -51,9 +51,10 @@ Resolve `getContractAddressForChain('stakingRouter', chainId)`:
 ## Member stake routing (`lib/staking/stakingActions.js` + `useStakingActions.js` + `StakeSheet.jsx`)
 
 `buildStakeForOption` branches like `lib/earn/vaultActions.buildDepositCalls`:
-- **fee applies + router available** → route through the router: Lido `stakeLido{value:net?gross}` (native,
-  no approve leg) / sPOL approve-router + `stakeSpol(amount, maxFeeBps)`; delegated composes the fee-transfer
-  + direct `buyVoucherPOL(net)` batch.
+- **fee applies + router available** → route the **liquid** options through the router: Lido
+  `stakeLido{value:net?gross}` (native, no approve leg) / sPOL approve-router + `stakeSpol(amount, maxFeeBps)`.
+  **Delegated always stays the direct `buyVoucherPOL` call with no fee leg (fee-free in v1)** — it never
+  routes through the router.
 - **else** → the byte-identical spec-065 direct provider calls.
 
 `useStakingActions.stake` threads the `feeQuote` (with `maxFeeBps`) into the ctx; `StakeSheet` discloses the

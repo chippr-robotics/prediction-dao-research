@@ -115,8 +115,9 @@ without a deployed router and breaks the never-stranded rule.
 **Decision**: extend `stakingActions.buildStakeForOption` to branch like
 `lib/earn/vaultActions.buildDepositCalls`: when a staking fee applies and a router is available, approve/route
 through the router’s `stake…WithFee` entrypoint (native ETH via `value`, ERC-20 via approve-router); else
-emit the byte-identical spec-065 direct provider calls. Delegated composes the fee-transfer + direct
-`buyVoucherPOL(net)` batch. Thread the `feeQuote` into `useStakingActions.stake`’s ctx.
+emit the byte-identical spec-065 direct provider calls. **Delegated stays the spec-065 direct
+`buyVoucherPOL` call with no fee leg (fee-free in v1 — R2);** only liquid options take the router path.
+Thread the `feeQuote` into `useStakingActions.stake`’s ctx.
 
 **Rationale**: reuses the proven lending fee-branch pattern, keeps the fee-free path byte-identical (SC-003),
 and preserves the passkey/classic dual-rail via `useEarnSend`.

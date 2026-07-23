@@ -182,18 +182,22 @@ and confirm it appears; verify both changes are in the audit history.
 
 ### User Story 5 - Least-privilege operator access and audit (Priority: P3)
 
-Not everyone may touch staking controls. Configuration changes (addresses, allowlist) and the fee rate
-require a staking-configuration operator; the emergency pause/resume may be exercised by the broader
-emergency role so an incident responder can act even without configuration rights. Unauthorized
-accounts do not see the controls at all, and no privileged action can be taken without the appropriate
-authorization. The full history of staking control actions is reviewable so changes are accountable.
+Not everyone may touch staking controls. Configuration changes (addresses, allowlist) require a
+staking-configuration operator; the emergency pause/resume may be exercised by the broader emergency role
+so an incident responder can act even without configuration rights. The **fee rate is governed by the
+existing fee-administration authorization on the single platform-fee configuration** (the same role that
+sets every other FairWins service fee), not the staking-configuration role — the Staking controls surface
+it read-only with a pointer to the Fees controls. Unauthorized accounts do not see the controls at all,
+and no privileged action can be taken without the appropriate authorization. The full history of staking
+control actions is reviewable so changes are accountable.
 
 **Why this priority**: Access separation and auditability are essential for a financial control surface
 but layer onto the functional stories above.
 
 **Independent Test**: Confirm an account without any staking-operator authorization sees no staking
 controls and cannot perform any control action; confirm the configuration role can change
-addresses/allowlist/fee; confirm the emergency role can pause/resume; confirm every action is
+addresses/allowlist (but sees the fee rate read-only); confirm the fee-administration role sets the fee
+rate in the Fees controls; confirm the emergency role can pause/resume; confirm every action is
 attributable in the audit history.
 
 **Acceptance Scenarios**:
@@ -203,9 +207,12 @@ attributable in the audit history.
 2. **Given** an account with only the emergency authorization, **When** they open the Staking controls,
    **Then** they can pause/resume but cannot change addresses, the allowlist, or the fee.
 3. **Given** an account with the staking-configuration authorization, **When** they open the Staking
-   controls, **Then** they can change addresses, the allowlist, and the fee rate (bounded by the
-   configured cap).
-4. **Given** any staking control action by any operator, **When** the audit history is reviewed,
+   controls, **Then** they can change addresses and the allowlist; the fee rate is shown read-only (it is
+   set in the Fees controls by the fee-administration role, bounded by the configured cap).
+4. **Given** an account with the fee-administration authorization, **When** they open the Fees controls,
+   **Then** they can set each staking service's fee rate (bounded by its configured 250 bps cap), and the
+   Staking controls reflect the new rate read-only.
+5. **Given** any staking control action by any operator, **When** the audit history is reviewed,
    **Then** the action is attributable to the acting operator with a timestamp.
 
 ---
@@ -277,9 +284,10 @@ attributable in the audit history.
   staking token), with the current value shown for each and obviously-invalid input rejected before it
   takes effect.
 - **FR-008**: Operators MUST be able to curate the delegation validator allowlist per network — add,
-  remove, or replace a validator — with duplicates and malformed/unresolvable entries rejected;
-  removing a validator MUST stop it being offered for new delegations while leaving existing positions
-  visible and exitable.
+  remove, or replace a validator (**replace is realized as a remove followed by an add — two audit
+  records; there is no distinct on-chain replace operation**) — with duplicates and
+  malformed/unresolvable entries rejected; removing a validator MUST stop it being offered for new
+  delegations while leaving existing positions visible and exitable.
 - **FR-009**: The member-facing staking experience MUST source its provider addresses, validator
   allowlist, availability, and fee rate from the managed control surface at runtime, and MUST fall
   back safely to an honest default (fee-free, direct staking, availability as configured — never a
@@ -287,8 +295,10 @@ attributable in the audit history.
 - **FR-010**: Every staking control action (fee-rate change, pause, resume, address change, allowlist
   add/remove/replace) MUST be recorded in an auditable history that captures the action, the affected
   network, the before/after value where applicable, the acting operator, and the time.
-- **FR-011**: Access MUST be least-privilege: configuration changes (addresses, allowlist, fee rate)
-  require a staking-configuration authorization; the emergency pause/resume may be exercised by the
+- **FR-011**: Access MUST be least-privilege: configuration changes (addresses, allowlist) require a
+  staking-configuration authorization; the **fee rate is set by the existing fee-administration
+  authorization on the single platform-fee configuration** (not the staking-configuration role — the
+  Staking controls surface it read-only); the emergency pause/resume may be exercised by the
   emergency/guardian authorization; accounts without any staking-operator authorization MUST NOT see
   the controls or be able to perform any control action.
 - **FR-012**: All staking control state, fee, and history MUST be scoped per network; an action on one
