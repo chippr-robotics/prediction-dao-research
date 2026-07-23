@@ -145,7 +145,15 @@ export default function StakeView({ tokenFilter: initialTokenFilter = null }) {
       )}
 
       <p className="earn-disclosure" role="note">
-        {STAKING_DISCLOSURE}
+        {STAKING_DISCLOSURE}{' '}
+        <a
+          className="earn-docs-link"
+          href="https://docs.FairWins.app/user-guide/staking/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Learn about staking ↗
+        </a>
       </p>
 
       {selected && (

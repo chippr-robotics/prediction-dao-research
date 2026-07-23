@@ -205,18 +205,18 @@ notification feed + financial ledger; completed-unbonding is an actionable break
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T036 [P] Write member docs `docs/user-guide/staking.md` (what staking is; liquid vs delegated;
+- [X] T036 [P] Write member docs `docs/user-guide/staking.md` (what staking is; liquid vs delegated;
       step-by-step stake/unstake; unbonding + the sPOL instant-DEX exit; delegated rewards; slashing
       risk; fees — plain language mirroring in-app copy) and register under User Guide in `mkdocs.yml`;
       link it from the Stake area (FR-016)
-- [ ] T037 [P] Write `docs/developer-guide/staking-integration.md` (architecture; config contract;
+- [X] T037 [P] Write `docs/developer-guide/staking-integration.md` (architecture; config contract;
       Lido/sPOL/Polygon endpoints + addresses; the curated validator allowlist + **build-time
       revalidation** procedure; how to add a network/provider; deferred on-chain fee router per
       research.md R6) and register under Developer Guide in `mkdocs.yml`
-- [ ] T038 Run `npm run test:frontend`, `npm run lint --workspace frontend`, and
+- [X] T038 Run `npm run test:frontend`, `npm run lint --workspace frontend`, and
       `npm run build --workspace frontend`; fix regressions (incl. existing EarnPanel / AssetDetailSheet
       / notification / ledger tests affected by the new surfaces)
-- [ ] T039 Validate the automatable quickstart.md items (Stake area live, honest unavailable states,
+- [X] T039 Validate the automatable quickstart.md items (Stake area live, honest unavailable states,
       deep links, notification category present) and update `specs/065-liquid-delegated-staking/checklists`
 
 ## Dependencies

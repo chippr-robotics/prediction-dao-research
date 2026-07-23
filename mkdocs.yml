@@ -92,6 +92,7 @@ nav:
     - Open Challenges: user-guide/open-challenges.md
     - Membership Vouchers: user-guide/membership-vouchers.md
     - Earn (Lending & Rewards): user-guide/earn.md
+    - Staking (Liquid & Delegated): user-guide/staking.md
     - Platform Fees: user-guide/platform-fees.md
     - Resolving a Wager: user-guide/resolve-wager.md
     - Private Wager Encryption: user-guide/private-market-encryption.md
@@ -105,6 +106,7 @@ nav:
     - Frontend Development: developer-guide/frontend.md
     - ClearPath Multi-Network DAOs: developer-guide/clearpath-multi-network.md
     - Earn Integration: developer-guide/earn-integration.md
+    - Staking Integration: developer-guide/staking-integration.md
     - Platform Fees (FeeRouter): developer-guide/platform-fees.md
     - Encryption Architecture: developer-guide/encryption-architecture.md
     - Envelope Encryption Spec: developer-guide/envelope-encryption-spec.md

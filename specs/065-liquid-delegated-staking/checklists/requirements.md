@@ -29,6 +29,15 @@
 - [x] Feature meets measurable outcomes defined in Success Criteria
 - [x] No implementation details leak into specification
 
+## Implementation status
+
+- [x] Implemented via `/speckit-implement` (all 39 tasks in tasks.md). Frontend-only, no
+  `contracts/` changes. Launch: Ethereum mainnet — Lido (liquid ETH), sPOL (liquid POL), Polygon
+  validator delegation (delegated POL). Wired into notifications (domain + category + source), the
+  activity ledger (STAKING class + capture), and the portfolio Stake action.
+- [x] `npm run build` passes; lint clean on new/edited files; staking + earn + portfolio + ledger +
+  notification suites pass (389 tests across the touched surface).
+
 ## Notes
 
 - Both staking models (liquid and delegated) are explicitly in scope and presented distinctly, per the

@@ -185,7 +185,7 @@ export function useStakingPositions(options) {
       }
     }
     return { positions, states, status, refresh: load }
-  }, [states, options, status, load, address])
+  }, [states, options, status, load])
 }
 
 export { readSpolOpenNonces }
