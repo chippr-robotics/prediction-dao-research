@@ -18,6 +18,7 @@ import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import AddressQRModal from '../ui/AddressQRModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import AccountSwitcher from '../account/AccountSwitcher'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
@@ -37,6 +38,9 @@ function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showAddressQR, setShowAddressQR] = useState(false)
   const { address, isConnected } = useAccount()
+  // Spec 063 (US1): Receive shows the account the member is ACTING AS (a vault or recovered
+  // account), not always the connected wallet, so funds are received into the selected account.
+  const { address: receiveAddress } = useEffectiveAccount()
   const { openConnectModal, disconnectWallet } = useWallet()
   const chainId = useChainId()
   const navigate = useNavigate()
@@ -336,7 +340,7 @@ function WalletButton({ className = '' }) {
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
-          address={address}
+          address={receiveAddress || address}
           variant="quick"
         />
       )}

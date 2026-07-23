@@ -296,3 +296,38 @@
 .lkr-outcome--failed .lkr-outcome__status {
   color: var(--danger-color, #dc2626);
 }
+
+/* Spec 063 — cross-chain recovery ("Other chains") panel. */
+.lkr-crosschain {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 4%, transparent);
+}
+.lkr-crosschain h4 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  color: var(--text-primary, #1f2933);
+}
+.lkr-crosschain__results { display: flex; flex-direction: column; gap: 10px; }
+.lkr-asset-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 10%, transparent);
+}
+.lkr-asset-row__chain { font-weight: 600; color: var(--text-primary, #1f2933); }
+.lkr-asset-row__amount { color: var(--text-primary, #1f2933); font-variant-numeric: tabular-nums; }
+.lkr-asset-row__muted { color: var(--text-muted, #8a959e); font-size: 0.85rem; }
+.lkr-asset-row__addr {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  color: var(--text-muted, #8a959e);
+  margin: 0 8px;
+}
+.lkr-asset-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lkr-asset-list li { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.lkr-send-form { margin-top: 10px; }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import usePortfolio from '../../hooks/usePortfolio'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
 import AssetDetailSheet from './AssetDetailSheet'
@@ -181,7 +182,10 @@ function CollectiblesEstimateRow({ valuationState, priceMap }) {
  * Preferences → Portfolio settings.
  */
 export default function PortfolioPanel() {
-  const portfolio = usePortfolio()
+  // Spec 063 (US1): the portfolio shows the account the member is acting as (a vault or recovered
+  // account), not always the connected wallet. Personal mode passes its own address → unchanged.
+  const { address: actingAddress, isActingAccount } = useEffectiveAccount()
+  const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
   // Decided HERE (not inside the row) so the Digital Collectibles section keeps
   // its honest "No assets in this category." message when the row is absent.
   const collectiblesValuation = useCollectiblesValuation()

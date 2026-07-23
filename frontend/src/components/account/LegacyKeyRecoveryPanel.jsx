@@ -26,6 +26,7 @@ import { captureLegacyRecovery } from '../../data/ledger/sources/legacyRecoveryS
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import ActionSheet from './ActionSheet'
+import CrossChainRecoveryPanel from './CrossChainRecoveryPanel'
 import {
   classifySecret,
   encryptLegacySecret,
@@ -66,6 +67,8 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const [phase, setPhase] = useState('idle') // idle | encrypting | quoting | sweeping
   const [notice, setNotice] = useState(null)
   const [stored, setStored] = useState(() => vault.list())
+  // Spec 063: which stored account (if any) has its cross-chain "Other chains" scan expanded.
+  const [scanAddr, setScanAddr] = useState(null)
 
   // Import working state.
   const [rawSecret, setRawSecret] = useState('')
@@ -379,6 +382,16 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
                 <button type="button" className="btn btn-small" onClick={() => startTransferStored(e)}>
                   Move funds
                 </button>
+                {e.kind === 'mnemonic' && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    onClick={() => setScanAddr(scanAddr === e.address ? null : e.address)}
+                    aria-expanded={scanAddr === e.address}
+                  >
+                    Other chains
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-small lkr-stored__remove"
@@ -388,6 +401,9 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
                   Remove
                 </button>
               </div>
+              {scanAddr === e.address && e.kind === 'mnemonic' && (
+                <CrossChainRecoveryPanel entry={e} />
+              )}
             </li>
           ))}
         </ul>

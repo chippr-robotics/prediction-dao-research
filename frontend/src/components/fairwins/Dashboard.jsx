@@ -17,6 +17,7 @@ import MyMarketsModal from './MyMarketsModal'
 import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import QRScanner from '../ui/QRScanner'
 import AddressQRModal from '../ui/AddressQRModal'
+import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import Badge from '../ui/Badge'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
@@ -458,6 +459,9 @@ function WelcomeView({ onConnect }) {
 
 function Dashboard() {
   const { isConnected, account } = useWallet()
+  // Spec 063 (US1): Share/Receive shows the acting account's address (vault/recovered), not always
+  // the connected wallet, so shared receive addresses match the selected account.
+  const { address: receiveAddress } = useEffectiveAccount()
   const { connectWallet } = useWalletConnection()
   const { preferences: _preferences } = useUserPreferences()
   const { hasRole, blockchainSynced } = useWalletRoles()
@@ -754,7 +758,7 @@ function Dashboard() {
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
-          address={account}
+          address={receiveAddress || account}
           variant="quick"
         />
       )}
