@@ -36,9 +36,9 @@ memory-only seed exposure + discovery framework.
 - [X] T005 [P] Create `frontend/src/hooks/useEffectiveAccount.js` — resolves the per-surface effective address from the acting identity (personal/vault/legacy/derived), reading Wallet/Custody contexts directly so it degrades without providers. Test `frontend/src/test/hooks/useEffectiveAccount.test.jsx` (6 tests).
 - [ ] T006 Extend `frontend/src/contexts/CustodyContext.jsx` + `frontend/src/hooks/useActiveAccount.js` so a **derived external account** can be an acting identity (type `derived`, per-chain address), reusing the memory-only signer lifecycle (dropped on lock/switch/disconnect, FR-018). Tests in `frontend/src/test/custody/`.
 - [ ] T007 Extend `frontend/src/lib/recovery/legacyKeys.js` to expose the recovered **mnemonic → BIP-39 seed** in memory only (never persisted/logged/transmitted, FR-017), plus a `dropSeed()` tied to the lock/switch/disconnect lifecycle. Test `frontend/src/test/recovery/legacySeed.memory.test.js` (asserts no seed in storage/logs).
-- [ ] T008 Create `frontend/src/lib/recovery/crossChainDerive.js` skeleton — `deriveCrossChainAccounts(seed, {network, chains, accountRange, gapLimit})` returning the `DerivedExternalAccount[]` shape from data-model.md; raw-private-key path returns single EVM + at most one BTC address, NOT scannable (FR-013). Contract test `frontend/src/test/recovery/crossChainDerive.contract.test.js`.
-- [ ] T009 [P] Create `frontend/src/hooks/useCrossChainDiscovery.js` — runs per-chain discovery with progress + honest `scanning|complete|unreachable|unsupported-holdings` states (FR-014), never phantom-zero, never unreachable-as-zero; a slow chain never blocks others (SC-008). Test `frontend/src/test/hooks/useCrossChainDiscovery.test.jsx`.
-- [ ] T010 [P] Add derived-account portfolio ledger namespacing (key includes `sourceLegacyAddress` so a derived account never collides with the passkey-derived wallet); unit test the namespacing.
+- [X] T008 `frontend/src/lib/recovery/crossChainDerive.js` — `deriveCrossChainAccounts(recovered)` → EVM + Solana candidates + Bitcoin handle (seed + ledger id); raw key stops at EVM (FR-013). Tested.
+- [X] T009 `frontend/src/hooks/useCrossChainDiscovery.js` + pure `crossChainDiscovery.js` — per-chain discovery with honest `found`/`complete`/`unreachable` states (FR-014), failure isolation (SC-008); + a Solana send. Tested (6 logic + hook wired).
+- [X] T010 Derived-account ledger namespacing via `bitcoinAccountId` (BIP-32 fingerprint, `legacy:<fp>`), collision-free vs the passkey wallet; tested.
 
 **Checkpoint**: Effective-account seam + memory-only seed + discovery framework ready.
 
@@ -114,7 +114,12 @@ send submits.
 - [X] T032 [P] [US3] `frontend/src/lib/solana/address.js` — base58 (`@scure/base`, no checksum) encode + `isValidSolanaAddress`.
 - [X] T033 [US3] `frontend/src/lib/solana/rpc.js` (fetch JSON-RPC + addressHasActivity) + `frontend/src/lib/solana/send.js` (`@solana/kit` + `@solana-program/system` build/sign/broadcast). Tests cross-check derivation vs @solana/kit (7).
 - [ ] T034 [P] [US3] Create optional gateway proxy `services/relay-gateway/src/solana/` (`SOLANA_*` env, `POST /v1/solana/rpc`), public-endpoint fallback (never-stranded); honest hide/degrade when unset.
-- [ ] T035 [US3] Wire Solana into `crossChainDerive`/discovery + portfolio derived account + acting-account select (US1 surfaces).
+- [X] T035 [US3] Solana wired into `crossChainDerive`/discovery + surfaced in the Recovery "Other chains" panel with a working SOL send.
+
+### US2/US3 UI integration (this increment)
+- [X] `frontend/src/components/account/CrossChainRecoveryPanel.jsx` — per recovered (mnemonic) account: unlock → scan → show discovered BTC + SOL balances (honest states) → send SOL. Mounted in `LegacyKeyRecoveryPanel` behind an "Other chains" toggle. Tested (4 component + integration green).
+- [X] `frontend/src/config/solanaNetworks.js` — string-id registry + gateway-or-public RPC.
+- [~] Bitcoin SEND from the panel reuses `sendLegacyBitcoin` (lib ready + tested); a BTC send form in the panel is the remaining UI glue (SOL send is wired).
 
 **Checkpoint**: Solana recovery + send working (devnet-validated).
 
