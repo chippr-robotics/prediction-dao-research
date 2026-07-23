@@ -53,27 +53,27 @@ reads it. Member app reads the router at runtime with a safe fallback to the mer
 layer + admin-tab shell that EVERY user story rides on. **⚠️ No user story may merge until this phase passes
 the smart-contract security review.**
 
-- [ ] T008 Author `contracts/staking/IStakingRouter.sol` — structs, events (`FeeRouterUpdated`,
+- [X] T008 Author `contracts/staking/IStakingRouter.sol` — structs, events (`FeeRouterUpdated`,
       `LidoContractsUpdated`, `SpolContractsUpdated`, `PolygonContractsUpdated`, `ValidatorAdded`,
       `ValidatorRemoved`, `LiquidStaked`), and errors (`ZeroAmount`, `ZeroAddress`, `FeeAboveQuoted`,
       `ResidualFunds`, `ProviderCallFailed`, `AlreadyListed`, `NotListed`) per contracts/staking-router.md
-- [ ] T009 Implement `contracts/staking/StakingRouter.sol` — `UUPSManaged + ReentrancyGuardUpgradeable +
+- [X] T009 Implement `contracts/staking/StakingRouter.sol` — `UUPSManaged + ReentrancyGuardUpgradeable +
       PausableUpgradeable`; `STAKING_ADMIN_ROLE` + `GUARDIAN_ROLE`; `initialize(admin, feeRouter, providers…)`
       storing per-provider service ids (`stake.lido`/`stake.polygon`); config setters + `EnumerableSet`
       validator allowlist (each `onlyRole(STAKING_ADMIN_ROLE)` + event); `pause()/unpause()` (`GUARDIAN_ROLE`);
       append-only storage + `__gap` per contracts/staking-router.md
-- [ ] T010 Implement the liquid fee-and-forward entrypoints in `StakingRouter.sol` — `stakeLido(maxFeeBps)`
+- [X] T010 Implement the liquid fee-and-forward entrypoints in `StakingRouter.sol` — `stakeLido(maxFeeBps)`
       (ETH→wstETH) and `stakeSpol(amount, maxFeeBps)` (POL→sPOL), each `nonReentrant whenNotPaused`, reading
       `quoteFee`/`feeBps`/`treasury()` from the FeeRouter, CEI ordering, exact-amount `forceApprove`→0, the
       `FeeAboveQuoted` consent guard, and the `ResidualFunds` no-leftover assertion (FR-016)
-- [ ] T011 Hardhat unit tests `test/staking/StakingRouter.test.js` — every setter + role gate + pause/unpause;
+- [X] T011 Hardhat unit tests `test/staking/StakingRouter.test.js` — every setter + role gate + pause/unpause;
       fee split to treasury + net forward; `FeeAboveQuoted` on rate-above-quote; zero-fee = passthrough;
       treasury-unset skip; `whenNotPaused` blocks stake while exits are untouched; `EnumerableSet` add/remove
       (dup/absent revert); `ResidualFunds`/reentrancy guard; unauthorized-caller reverts
-- [ ] T012 [P] Fork tests `test/fork/StakingRouterFork.test.js` — against real Lido + sPOL on a mainnet fork:
+- [X] T012 [P] Fork tests `test/fork/StakingRouterFork.test.js` — against real Lido + sPOL on a mainnet fork:
       `stakeLido`/`stakeSpol` skim the fee to the treasury, forward the net, return wstETH/sPOL to the member,
       and leave no residual; treasury balance grows by exactly the disclosed fee
-- [ ] T013 [P] Storage-layout test + run: `npm run check:storage-layout` passes for `StakingRouter`
+- [X] T013 [P] Storage-layout test + run: `npm run check:storage-layout` passes for `StakingRouter`
       (append-only + `__gap`); document the layout baseline
 - [ ] T014 Run Slither + Medusa on `contracts/staking/` — resolve or document (with rationale) any
       high/critical findings; ensure the CI security jobs cover the new contract
