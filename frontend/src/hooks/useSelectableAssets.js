@@ -6,6 +6,8 @@ import { useBitcoinWallet } from './useBitcoinWallet'
 import usePortfolio from './usePortfolio'
 import { useAccountAssets } from './useAccountAssets'
 import { getBitcoinNetwork } from '../config/bitcoinNetworks'
+import { NETWORKS } from '../config/networks'
+import { getPortfolioRegistry, getPortfolioChainIds } from '../config/assetTaxonomy'
 import { filterAssetsForActivity, defaultAssetKey } from '../lib/assets/assetActivity'
 
 const toNum = (v) => (v == null || v === '' ? null : Number(v))
@@ -32,10 +34,19 @@ const toNum = (v) => (v == null || v === '' ? null : Number(v))
  * Routing is NOT re-derived here: `isGasless(option)` delegates to the send engine's
  * per-asset quote (Bitcoin forced false — never gasless, FR-005).
  *
- * @param {{ activity: 'pay'|'request'|'wager'|'transfer', actingAddress?: string|null }} params
+ * `catalog` mode (spec 064 follow-up) — for RECEIVING, a member should be able to
+ * request ANY platform-supported asset, not just what they currently hold. When
+ * `catalog` is true the list is unioned with the full bundled asset registry
+ * (`getPortfolioRegistry`) across every configured network (mainnets + the connected
+ * chain), so an unheld-but-supported asset appears (balance 0). Held balances are
+ * preserved where known. Non-catalog callers (Pay/Wager/Transfer, which SPEND) keep
+ * the held-only list. The default selection is unchanged either way (connected
+ * stablecoin ⇒ USDC).
+ *
+ * @param {{ activity: 'pay'|'request'|'wager'|'transfer', actingAddress?: string|null, catalog?: boolean }} params
  * @returns {{ options: object[], defaultKey: string|null, isGasless: (o:object)=>boolean }}
  */
-export function useSelectableAssets({ activity, actingAddress = null } = {}) {
+export function useSelectableAssets({ activity, actingAddress = null, catalog = false } = {}) {
   const { chainId } = useWallet()
   const { balanceOf, quoteGaslessForAsset } = useTransfer()
   const tokens = useChainTokens()
@@ -115,15 +126,47 @@ export function useSelectableAssets({ activity, actingAddress = null } = {}) {
       })
     }
 
+    // Catalog union (receive-any): add every bundled-registry asset across all
+    // configured networks so an unheld-but-supported asset can still be requested.
+    // A held option already in the map wins (its real balance is preserved); a
+    // catalog-only asset lands at balance 0 (honest — you hold none yet).
+    if (catalog) {
+      const catalogChainIds = new Set(getPortfolioChainIds())
+      if (Number.isFinite(connectedChainId)) catalogChainIds.add(connectedChainId)
+      for (const cid of catalogChainIds) {
+        const net = NETWORKS[cid]
+        if (!net) continue
+        for (const entry of getPortfolioRegistry(cid)) {
+          if (entry.kind !== 'native' && entry.kind !== 'erc20') continue // no NFTs in a value action
+          const key = `${cid}:${entry.kind === 'native' ? 'native' : String(entry.address).toLowerCase()}`
+          const existing = byKey.get(key)
+          byKey.set(key, {
+            key,
+            chainId: cid,
+            kind: entry.kind,
+            address: entry.address || null,
+            symbol: entry.symbol,
+            name: entry.name,
+            decimals: entry.decimals,
+            networkName: net.name,
+            balance: 0,
+            ...(existing || {}), // a held row (real balance) always wins
+          })
+        }
+      }
+    }
+
     return [...byKey.values()].sort((a, b) => {
       const ac = a.chainId === connectedChainId ? 0 : 1
       const bc = b.chainId === connectedChainId ? 0 : 1
       if (ac !== bc) return ac - bc
-      return (b.balance ?? 0) - (a.balance ?? 0)
+      const bal = (b.balance ?? 0) - (a.balance ?? 0)
+      if (bal !== 0) return bal
+      return (a.symbol || '').localeCompare(b.symbol || '') // stable, readable tiebreak
     })
   }, [
     actingAddress, actingAssets.holdings, portfolio.holdings, tokens, connectedChainId,
-    balanceOf, isConnectedStableAddr, btc.status, btc.networkId, btc.balances?.spendableSats,
+    balanceOf, isConnectedStableAddr, btc.status, btc.networkId, btc.balances?.spendableSats, catalog,
   ])
 
   const options = useMemo(() => filterAssetsForActivity(activity, allOptions), [activity, allOptions])

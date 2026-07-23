@@ -33,7 +33,13 @@ function RequestPanel() {
   const address = effectiveAddress || connectedAddress
 
   const actingAddress = isActingAccount ? effectiveAddress : null
-  const { options, defaultKey } = useSelectableAssets({ activity: ASSET_ACTIVITIES.REQUEST, actingAddress })
+  // Request RECEIVES value, so it offers the full catalog of platform-supported
+  // assets (not just held ones) — a member can request anything. Default stays USDC.
+  const { options, defaultKey } = useSelectableAssets({
+    activity: ASSET_ACTIVITIES.REQUEST,
+    actingAddress,
+    catalog: true,
+  })
   const btc = useBitcoinWallet()
 
   const [selectedKey, setSelectedKey] = useState(null)

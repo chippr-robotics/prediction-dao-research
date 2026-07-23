@@ -130,3 +130,35 @@ describe('useSelectableAssets — acting account + gasless + default', () => {
     expect(result.current.defaultKey).toBe(`137:${USDC.toLowerCase()}`)
   })
 })
+
+describe('useSelectableAssets — catalog mode (receive-any)', () => {
+  it('held-only (no catalog) lists just the connected defaults when nothing is held', () => {
+    const { result } = renderHook(() => useSelectableAssets({ activity: ASSET_ACTIVITIES.REQUEST }))
+    // Only the connected chain's native + stablecoin defaults.
+    expect(result.current.options.every((o) => o.chainId === 137)).toBe(true)
+    expect(result.current.options.some((o) => o.symbol === 'WBTC')).toBe(false)
+  })
+
+  it('catalog mode unions the full bundled registry so unheld supported assets appear', () => {
+    const { result } = renderHook(() => useSelectableAssets({ activity: ASSET_ACTIVITIES.REQUEST, catalog: true }))
+    const syms = result.current.options.map((o) => o.symbol)
+    // Polygon (connected) curated registry includes WBTC/WETH even with zero holdings.
+    expect(syms).toContain('WBTC')
+    expect(syms).toContain('WETH')
+    // Cross-network assets are present too (mainnets are in the catalog).
+    expect(result.current.options.some((o) => o.chainId !== 137)).toBe(true)
+    // Default is still the connected stablecoin (USDC), unchanged by catalog mode.
+    expect(result.current.defaultKey).toBe(`137:${USDC.toLowerCase()}`)
+  })
+
+  it('catalog mode preserves a held asset’s real balance (held row wins over the 0 catalog row)', () => {
+    // Canonical Polygon WBTC — same address the bundled registry uses, so the held
+    // row and the catalog row share a key and merge into one.
+    const POLY_WBTC = '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6'
+    portfolioHoldings = [holding({ address: POLY_WBTC, symbol: 'WBTC', decimals: 8, chainId: 137, balance: 0.5 })]
+    const { result } = renderHook(() => useSelectableAssets({ activity: ASSET_ACTIVITIES.REQUEST, catalog: true }))
+    const wbtc = result.current.options.filter((o) => o.symbol === 'WBTC' && o.chainId === 137)
+    expect(wbtc).toHaveLength(1)
+    expect(wbtc[0].balance).toBe(0.5)
+  })
+})
