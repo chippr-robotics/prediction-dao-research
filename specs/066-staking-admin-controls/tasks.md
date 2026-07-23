@@ -24,22 +24,22 @@ reads it. Member app reads the router at runtime with a safe fallback to the mer
 
 **Purpose**: fee-service + contract-address + ABI plumbing all stories depend on. No contract logic yet.
 
-- [ ] T001 [P] Add the per-provider staking fee services to `scripts/deploy/lib/feeServices.js`
+- [X] T001 [P] Add the per-provider staking fee services to `scripts/deploy/lib/feeServices.js`
       `LAUNCH_FEE_SERVICES`: `{ label: 'stake.lido', capBps: 250, kind: ConfigOnly }` and
       `{ label: 'stake.polygon', capBps: 250, kind: ConfigOnly }` (rate 0 until set) per contracts/fee-integration.md
-- [ ] T002 [P] Add `FEE_SERVICES.STAKE_LIDO` / `STAKE_POLYGON` (keccak of `stake.lido`/`stake.polygon`) to
+- [X] T002 [P] Add `FEE_SERVICES.STAKE_LIDO` / `STAKE_POLYGON` (keccak of `stake.lido`/`stake.polygon`) to
       `frontend/src/lib/fees/feeQuote.js`
-- [ ] T003 [P] Add the staking service ids + a `stakingRouterServiceIdFor(providerKind)` helper to
+- [X] T003 [P] Add the staking service ids + a `stakingRouterServiceIdFor(providerKind)` helper to
       `frontend/src/config/staking.js` (keep the existing constants as the fee-free fallback default)
-- [ ] T004 [P] Add a `stakingRouter` contract key to the per-chain maps in `frontend/src/config/contracts.js`
+- [X] T004 [P] Add a `stakingRouter` contract key to the per-chain maps in `frontend/src/config/contracts.js`
       (+ `VITE_STAKING_ROUTER_ADDRESS` env override), resolving `undefined` until deployed
-- [ ] T005 [P] Add `{ name: 'StakingRouter', deploymentsKey: 'stakingRouter' }` to the `UPGRADEABLE_CONTRACTS`
+- [X] T005 [P] Add `{ name: 'StakingRouter', deploymentsKey: 'stakingRouter' }` to the `UPGRADEABLE_CONTRACTS`
       list in `scripts/deploy/check-storage-layout.js`, and add `stakingRouter` to the copied-keys mapping in
       `scripts/utils/sync-frontend-contracts.js`
-- [ ] T006 [P] Add `frontend/src/abis/StakingRouter.js` — minimal ABI (config setters, getters,
+- [X] T006 [P] Add `frontend/src/abis/StakingRouter.js` — minimal ABI (config setters, getters,
       validator enumeration, pause/unpause, `stakeLido`/`stakeSpol`, and the setter/pause/`LiquidStaked` events)
       per contracts/staking-router.md
-- [ ] T007 Unit tests `frontend/src/test/staking-admin/feeServices.test.js` (service-id keccak values,
+- [X] T007 Unit tests `frontend/src/test/staking-admin/feeServices.test.js` (service-id keccak values,
       `stakingRouterServiceIdFor` mapping, `contracts.js` returns undefined pre-deploy) and a deploy-lib test
       asserting `feeServices.js` carries both staking services at cap 250
 

@@ -19,6 +19,10 @@ export const FEE_SERVICES = {
   EARN_LEND: keccakId('earn.lend'),
   POLYMARKET_TAKER: keccakId('polymarket.taker'),
   POLYMARKET_MAKER: keccakId('polymarket.maker'),
+  // Staking (spec 066) — per-provider LIQUID-staking rates the StakingRouter reads.
+  // Delegated staking is fee-free in v1 (no service id).
+  STAKE_LIDO: keccakId('stake.lido'),
+  STAKE_POLYGON: keccakId('stake.polygon'),
 }
 
 const BPS_DENOMINATOR = 10_000n
