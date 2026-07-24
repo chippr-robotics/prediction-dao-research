@@ -18,6 +18,7 @@ import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
 import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
+import TradeTokenSelect from './TradeTokenSelect'
 import './TradePanel.css'
 
 // Price impact bands used to color the trade summary, mirroring the thresholds
@@ -558,18 +559,13 @@ function TradePanel() {
               inputMode="decimal"
               className="trade-amount-input"
             />
-            <select
-              aria-label="Token to sell"
+            <TradeTokenSelect
+              ariaLabel="Token to sell"
+              assets={assets}
               value={fromToken}
-              onChange={(e) => handlePairChange('from', e.target.value)}
-              className="trade-token-select"
-            >
-              {assets.map((t) => (
-                <option key={t.address} value={t.address}>
-                  {t.symbol}
-                </option>
-              ))}
-            </select>
+              onChange={(addr) => handlePairChange('from', addr)}
+              chainId={chainId}
+            />
             <button type="button" onClick={handleSetMax} className="trade-max-btn">
               MAX
             </button>
@@ -599,18 +595,13 @@ function TradePanel() {
             <div className="trade-receive-value" aria-live="polite">
               <SensitiveValue>{receiveValue}</SensitiveValue>
             </div>
-            <select
-              aria-label="Token to buy"
+            <TradeTokenSelect
+              ariaLabel="Token to buy"
+              assets={assets}
               value={toToken}
-              onChange={(e) => handlePairChange('to', e.target.value)}
-              className="trade-token-select"
-            >
-              {assets.map((t) => (
-                <option key={t.address} value={t.address}>
-                  {t.symbol}
-                </option>
-              ))}
-            </select>
+              onChange={(addr) => handlePairChange('to', addr)}
+              chainId={chainId}
+            />
           </div>
         </div>
       </div>
