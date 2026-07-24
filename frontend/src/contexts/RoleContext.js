@@ -22,6 +22,7 @@ export const ROLES = {
   ROLE_MANAGER: 'ROLE_MANAGER',            // ROLE_MANAGER_ROLE — grant/revoke memberships
   SANCTIONS_ADMIN: 'SANCTIONS_ADMIN',      // SANCTIONS_ADMIN_ROLE — deny-list (on SanctionsGuard)
   FEE_ADMIN: 'FEE_ADMIN',                  // FEE_ADMIN_ROLE — platform-fee rates (on FeeRouter, spec 060)
+  STAKING_ADMIN: 'STAKING_ADMIN',          // STAKING_ADMIN_ROLE — staking provider addrs + validator allowlist (on StakingRouter, spec 066)
 }
 
 export const ROLE_INFO = {
@@ -67,6 +68,12 @@ export const ROLE_INFO = {
     premium: false,
     isAdminRole: true
   },
+  [ROLES.STAKING_ADMIN]: {
+    name: 'Staking Administrator',
+    description: 'Manage staking provider addresses and the curated validator allowlist on the StakingRouter (the fee rate is set by the Fee Administrator)',
+    premium: false,
+    isAdminRole: true
+  },
 }
 
 /**
@@ -80,6 +87,7 @@ export const ADMIN_ROLES = [
   ROLES.ROLE_MANAGER,
   ROLES.SANCTIONS_ADMIN,
   ROLES.FEE_ADMIN,
+  ROLES.STAKING_ADMIN,
 ]
 
 export function isAdminRole(role) {

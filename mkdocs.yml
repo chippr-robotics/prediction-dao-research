@@ -142,6 +142,7 @@ nav:
     - Paymaster Operations: runbooks/paymaster-operations.md
     - Callsign Operations: runbooks/callsigns-operations.md
     - Fee Operations: runbooks/fee-operations.md
+    - Staking Operations: runbooks/staking-operations.md
     - Contract Upgrades: runbooks/contract-upgrades.md
     - Relayer Mordor Deploy: runbooks/relayer-mordor-deploy.md
     - Wager Pools Deploy: runbooks/zk-wager-pools-deploy.md

@@ -24,6 +24,7 @@ import { STAKING_TIPS } from '../../lib/staking/stakingCopy'
 import { queueStakingAction } from '../../lib/staking/stakingActivityBuffer'
 import { captureStakingAction } from '../../data/ledger'
 import { validateStakeAmount, maxStakeable, optionIsNative } from '../../lib/staking/stakingActions'
+import { splitFee, bpsToPercent } from '../../lib/fees/feeQuote'
 
 function fmt(raw, decimals, symbol) {
   if (raw == null) return '—'
@@ -175,9 +176,12 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
       maxStakeRaw: option.maxStakeRaw ?? null,
     })
     if (!check.ok) return setInputError(check.reason)
+    if (stakingPaused) return setInputError('New staking is paused on this network right now. You can still unstake and withdraw.')
+    if (feeBlocked) return setInputError("New staking is temporarily unavailable — the current platform fee can't be read, so we won't stake to avoid charging you an unknown rate. Please try again shortly.")
     setInputError(null)
     if (!guard()) return
-    await runTx((opts) => stake(option, amount, opts), {
+    // Pass the disclosed quote so the router charges no more than the rate shown (maxFeeBps ceiling).
+    await runTx((opts) => stake(option, amount, { ...opts, feeQuote }), {
       type: 'stake',
       kindNoun: isDelegated ? 'Delegated' : 'Staked',
       doneKind: 'stake',
@@ -210,6 +214,16 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
 
   const busy = txState.step === 'confirming' || txState.step === 'switching'
   const titleId = 'staking-sheet-title'
+
+  // spec 066: LIQUID staking fee disclosure (delegated is fee-free in v1). A present-but-unreadable
+  // router blocks the fee-bearing path (never proceed on an assumed rate); a paused network hides
+  // new stakes (exits still work). Zero/unavailable ⇒ no fee line, byte-identical to fee-free.
+  const feeQuote = isDelegated ? null : option.feeQuote
+  const feeApplies = Boolean(feeQuote?.available && feeQuote.bps > 0)
+  const feeBlocked = !isDelegated && Boolean(option.feeBlocked)
+  const stakingPaused = Boolean(option.stakingPaused)
+  const feeSplit = feeApplies && amount != null && amount > 0n ? splitFee(amount, feeQuote.bps) : null
+  const stakeDisabled = busy || !canTransact || (mode === 'stake' && (feeBlocked || stakingPaused))
 
   return (
     <div className="asset-sheet-backdrop">
@@ -433,6 +447,31 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
               </>
             )}
 
+            {/* spec 066: LIQUID platform-fee disclosure — its own line, before signing (US1). */}
+            {mode === 'stake' && feeApplies && (
+              <dl className="earn-vault-sheet-facts staking-fee-facts">
+                <div>
+                  <dt>FairWins platform fee ({bpsToPercent(feeQuote.bps)})</dt>
+                  <dd>{feeSplit ? fmt(feeSplit.feeAmount, decimals, symbol) : '—'}</dd>
+                </div>
+                <div>
+                  <dt>You stake</dt>
+                  <dd>{feeSplit ? fmt(feeSplit.netAmount, decimals, symbol) : fmt(amount, decimals, symbol)}</dd>
+                </div>
+              </dl>
+            )}
+            {mode === 'stake' && stakingPaused && (
+              <p className="earn-summary" role="note">
+                New staking is paused on this network right now. You can still unstake and withdraw.
+              </p>
+            )}
+            {mode === 'stake' && feeBlocked && !stakingPaused && (
+              <p className="earn-input-error" role="alert">
+                New staking is temporarily unavailable — the current platform fee can’t be read, so we
+                won’t stake to avoid charging you an unknown rate. Please try again shortly.
+              </p>
+            )}
+
             {txState.step === 'error' && (
               <p className="earn-input-error" role="alert">
                 {txState.error}
@@ -448,7 +487,7 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
               type="button"
               className="earn-btn primary earn-submit"
               onClick={mode === 'stake' ? submitStake : submitUnstake}
-              disabled={busy || !canTransact}
+              disabled={mode === 'stake' ? stakeDisabled : busy || !canTransact}
               title={canTransact ? undefined : cannotTransactReason(option.chainId)}
             >
               {txState.step === 'switching'

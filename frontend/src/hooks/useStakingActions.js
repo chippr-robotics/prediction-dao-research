@@ -37,14 +37,17 @@ export function useStakingActions() {
   const send = useEarnSend()
 
   const stake = useCallback(
-    async (option, amount, { onState } = {}) => {
+    async (option, amount, { onState, feeQuote } = {}) => {
       if (!address) throw new Error('This session cannot send transactions right now — please reconnect.')
       const provider = makeReadProvider(NETWORKS[option.chainId].rpcUrl, option.chainId)
+      // spec 066: thread the disclosed fee quote (with its bps as the maxFeeBps ceiling) so the
+      // router path charges no more than the member was shown. Falls back to the option's overlay.
       const { calls } = await buildStakeForOption(option, {
         account: address,
         amount,
         provider,
         polToken: POL_TOKEN_L1,
+        feeQuote: feeQuote || option.feeQuote,
       })
       return submitBatch({
         sendOnChain: (chainId, c) => send.sendOnChain(chainId, c, { onState }),
