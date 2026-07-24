@@ -263,15 +263,23 @@ describe('TradePanel — SDK-driven trade read-out', () => {
     expect(screen.queryByRole('tab', { name: 'Unwrap' })).toBeNull()
   })
 
-  it('lists every tradeable portfolio asset in both selectors', () => {
+  it('lists every tradeable portfolio asset, with its icon, in both selectors', () => {
     mockUseDex.mockReturnValue(polygonDex())
     render(<TradePanel />)
 
-    const sell = screen.getByLabelText('Token to sell')
-    const buy = screen.getByLabelText('Token to buy')
+    fireEvent.click(screen.getByRole('button', { name: 'Token to sell' }))
+    const sellList = screen.getByRole('listbox')
     for (const symbol of ['WPOL', 'USDC', 'WETH', 'WBTC', 'LINK', 'USDT']) {
-      expect(within(sell).getByRole('option', { name: symbol })).toBeInTheDocument()
-      expect(within(buy).getByRole('option', { name: symbol })).toBeInTheDocument()
+      const option = within(sellList).getByRole('option', { name: symbol })
+      expect(option).toBeInTheDocument()
+      expect(option.querySelector('.asset-logo')).toBeInTheDocument()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Token to sell' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Token to buy' }))
+    const buyList = screen.getByRole('listbox')
+    for (const symbol of ['WPOL', 'USDC', 'WETH', 'WBTC', 'LINK', 'USDT']) {
+      expect(within(buyList).getByRole('option', { name: symbol })).toBeInTheDocument()
     }
   })
 })
@@ -352,12 +360,14 @@ describe('TradePanel — order & price types', () => {
 
     fireEvent.change(screen.getByLabelText(/Order Type/), { target: { value: 'buy' } })
     // Buy pays the stablecoin to receive the wrapped-native asset.
-    expect(screen.getByLabelText('Token to sell').value).toBe(POLYGON_ADDRESSES.STABLECOIN)
-    expect(screen.getByLabelText('Token to buy').value).toBe(POLYGON_ADDRESSES.WNATIVE)
+    expect(screen.getByRole('button', { name: 'Token to sell' })).toHaveTextContent('USDC')
+    expect(screen.getByRole('button', { name: 'Token to buy' })).toHaveTextContent('WPOL')
 
     // Flipping the pair back flips the order type too.
-    fireEvent.change(screen.getByLabelText('Token to sell'), { target: { value: POLYGON_ADDRESSES.WNATIVE } })
-    fireEvent.change(screen.getByLabelText('Token to buy'), { target: { value: POLYGON_ADDRESSES.STABLECOIN } })
+    fireEvent.click(screen.getByRole('button', { name: 'Token to sell' }))
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'WPOL' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Token to buy' }))
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'USDC' }))
     expect(screen.getByLabelText(/Order Type/).value).toBe('sell')
   })
 

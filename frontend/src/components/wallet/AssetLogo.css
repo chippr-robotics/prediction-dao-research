@@ -9,10 +9,21 @@
   border: 2px solid var(--surface-color, var(--bg-secondary, #fff));
   border-radius: 50%;
   bottom: -2px;
-  height: 45%;
+  height: 48%;
+  min-width: 14px;
+  min-height: 14px;
   position: absolute;
   right: -2px;
-  width: 45%;
+  width: 48%;
+}
+/* The badge's <svg> is inline by default, so the browser reserves descender
+   space below its baseline inside the span — pushing the circle down and
+   right within its own box. That shows up as the badge rendering off-center
+   (clipped at the bottom, a crescent of the ring showing at the top) and
+   looking smaller than its true size. display: block removes the inline
+   line-box math so the svg fills the badge box exactly, centered. */
+.asset-logo-badge svg {
+  display: block;
 }
 .asset-logo-badge-testnet {
   border-style: dashed;
