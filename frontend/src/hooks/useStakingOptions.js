@@ -23,7 +23,12 @@ import { fetchValidatorDecoration, unbondingLabel, readStakeManagerTiming } from
 import { readStakingRouterConfig } from '../lib/staking/stakingRouter'
 import { fetchFeeQuote } from '../lib/fees/feeQuote'
 
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const sameAddr = (a, b) => a && b && a.toLowerCase() === b.toLowerCase()
+// A router provider slot is only usable if it's a real, non-zero address. A router deployed with a
+// provider not yet configured returns the zero address (truthy) — overlaying that over the known-good
+// spec-065 constant would silently break staking, so we keep the constant instead.
+const isSetAddr = (a) => typeof a === 'string' && /^0x[0-9a-fA-F]{40}$/.test(a) && a.toLowerCase() !== ZERO_ADDR
 
 /**
  * Overlay the on-chain StakingRouter config onto the spec-065 base options for one
@@ -47,10 +52,10 @@ export async function overlayRouterConfig(options, { chainId, provider }) {
   for (const opt of options) {
     opt.stakingRouterAddress = cfg.routerAddress
     opt.stakingPaused = cfg.paused
-    if (opt.providerKind === 'lido' && cfg.providers.lido?.steth && cfg.providers.lido?.wsteth) {
+    if (opt.providerKind === 'lido' && isSetAddr(cfg.providers.lido?.steth) && isSetAddr(cfg.providers.lido?.wsteth)) {
       opt.contracts = { ...opt.contracts, steth: cfg.providers.lido.steth, wsteth: cfg.providers.lido.wsteth }
     }
-    if (opt.providerKind === 'spol' && cfg.providers.spol?.controller && cfg.providers.spol?.token) {
+    if (opt.providerKind === 'spol' && isSetAddr(cfg.providers.spol?.controller) && isSetAddr(cfg.providers.spol?.token)) {
       opt.contracts = { ...opt.contracts, controller: cfg.providers.spol.controller, token: cfg.providers.spol.token }
     }
     // Delegated: the on-chain allowlist is the source of truth for NEW delegations. A validator

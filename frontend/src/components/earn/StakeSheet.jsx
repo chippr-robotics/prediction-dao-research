@@ -177,7 +177,7 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
     })
     if (!check.ok) return setInputError(check.reason)
     if (stakingPaused) return setInputError('New staking is paused on this network right now. You can still unstake and withdraw.')
-    if (feeBlocked) return setInputError("The staking fee can't be read right now — staking is paused so you're never charged an unknown rate. Please try again shortly.")
+    if (feeBlocked) return setInputError("New staking is temporarily unavailable — the current platform fee can't be read, so we won't stake to avoid charging you an unknown rate. Please try again shortly.")
     setInputError(null)
     if (!guard()) return
     // Pass the disclosed quote so the router charges no more than the rate shown (maxFeeBps ceiling).
@@ -467,8 +467,8 @@ export default function StakeSheet({ option, userState, position, onClose, onAct
             )}
             {mode === 'stake' && feeBlocked && !stakingPaused && (
               <p className="earn-input-error" role="alert">
-                The staking fee can’t be read right now, so staking is paused to avoid charging you an
-                unknown rate. Please try again shortly.
+                New staking is temporarily unavailable — the current platform fee can’t be read, so we
+                won’t stake to avoid charging you an unknown rate. Please try again shortly.
               </p>
             )}
 
