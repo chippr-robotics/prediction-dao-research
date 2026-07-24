@@ -206,17 +206,17 @@ the smart-contract security review.**
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T036 [P] Write `docs/runbooks/staking-operations.md` — operator guide + the **emergency pause runbook**
+- [X] T036 [P] Write `docs/runbooks/staking-operations.md` — operator guide + the **emergency pause runbook**
       (who is authorized, how to pause/resume, set the fee in the Fees tab, change addresses, curate
       validators, read the audit history) and register it under Runbooks in `mkdocs.yml`
-- [ ] T037 [P] Extend `docs/developer-guide/staking-integration.md` (spec 065 doc) with the StakingRouter +
+- [X] T037 [P] Extend `docs/developer-guide/staking-integration.md` (spec 065 doc) with the StakingRouter +
       fee + admin architecture, the per-provider fee services, the delegated-fee-free decision, and the
       multisig/no-timelock governance
-- [ ] T038 Run the full gate: `npm run compile` + `npm test` + `npm run test:fork` + Slither/Medusa +
+- [X] T038 Run the full gate: `npm run compile` + `npm test` + `npm run test:fork` + Slither/Medusa +
       `npm run check:storage-layout` (contracts) and `npm run test:frontend` + `npm run lint --workspace
       frontend` + `npm run build --workspace frontend` (frontend); fix regressions (incl. existing
       StakeSheet/AdminPanel/RoleContext tests affected by the new surfaces)
-- [ ] T039 Validate the automatable quickstart.md scenarios (fee disclosure + zero-fee identical; paused
+- [X] T039 Validate the automatable quickstart.md scenarios (fee disclosure + zero-fee identical; paused
       new-stake hidden while exits work; address/validator overlay; role gating; undeployed-router fallback)
       and **assert per-network isolation (FR-012/SC-009): router config/fee/pause/paused read for one
       chainId never bleeds into another and never crosses the testnet/mainnet boundary** (add the assertion
