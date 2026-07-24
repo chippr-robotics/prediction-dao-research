@@ -100,6 +100,12 @@ export default function StakeView({ tokenFilter: initialTokenFilter = null }) {
                       <span className={`staking-badge ${option.model}`}>
                         {option.model === 'delegated' ? 'Delegated' : 'Liquid'}
                       </span>
+                      {/* spec 066 US2: honest paused indicator — new stakes are off; exits still work. */}
+                      {option.stakingPaused && (
+                        <span className="staking-badge paused" title="New staking is paused on this network; you can still unstake and withdraw.">
+                          Paused
+                        </span>
+                      )}
                     </span>
                     <span className="earn-vault-asset">
                       Stakes {option.asset.symbol} · on {NETWORKS[option.chainId]?.name || 'unknown network'}

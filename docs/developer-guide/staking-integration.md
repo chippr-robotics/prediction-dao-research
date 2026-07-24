@@ -56,15 +56,44 @@ commission; each `validatorShare` is run through `getAddress()` at load. Verify
 the Lido/sPOL/POL/StakeManager addresses against the Lido deployed-contracts page
 and `0xPolygon/spol-contracts` too.
 
-## Fees
+## Fees & admin controls (spec 066 — StakingRouter)
 
-FairWins charges **no** platform fee on staking in this release (byte-identical
-to fee-free). None of Lido `submit`, sPOL `buySPOL`, or Polygon `buyVoucher` are
-ERC-4626 deposits, so the spec-060 FeeRouter `depositToVaultWithFee` entrypoint
-does not fit; a fee-on-input staking router is a new value-bearing contract and
-is **deferred to its own spec** (research.md R6). Provider protocol fees (Lido's
-~10% of rewards, sPOL's on-chain `rewardFee`) are the provider's and disclosed as
-such.
+Spec 066 adds the **StakingRouter** — a per-network UUPS control surface
+(`contracts/staking/StakingRouter.sol`, deployment keys `stakingRouter` /
+`stakingRouterImpl`) — that both governs the staking service and charges the
+platform fee on **liquid** staking.
+
+**Fee (liquid only).** The fee **rate** stays the single spec-060 `FeeRouter`
+source of truth: per-provider services `stake.lido` / `stake.polygon`
+(`FEE_SERVICES.STAKE_LIDO` / `STAKE_POLYGON`), each ConfigOnly, cap **250 bps**,
+rate 0 until set from the Fees tab (`FEE_ADMIN_ROLE`). None of Lido `submit` /
+sPOL `buySPOL` are ERC-4626 deposits, so the FeeRouter's `depositToVaultWithFee`
+doesn't fit; instead the StakingRouter reads `quoteFee` / `feeBps` / `treasury()`
+and does the fee-and-forward itself — skim to the treasury, forward the net to the
+provider, return the LST — atomically, with a `maxFeeBps` consent ceiling
+(`FeeAboveQuoted`) and a no-residual invariant (`ResidualFunds`). A zero/unset rate
+is byte-identical to fee-free (SC-003).
+
+**Delegated is fee-free in v1.** Polygon `buyVoucherPOL` binds the delegation to
+`msg.sender`, so a router call would make the router the (custodial, un-exitable)
+delegator. Delegated staying a direct member call is the only non-custodial option,
+so it ships **fee-free**; the router still governs its allowlist + pause. Provider
+protocol fees (Lido's ~10% of rewards, sPOL's `rewardFee`) are the provider's and
+disclosed as such.
+
+**Runtime read + fallback.** `useStakingOptions` overlays the router's provider
+addresses, validator allowlist, `paused` flag, and the per-provider fee onto the
+spec-065 options (`lib/staking/stakingRouter.js`, `overlayRouterConfig`). When the
+router is undeployed or unreadable it keeps the spec-065 build-time constants
+verbatim — fee-free, direct staking — never a broken or fee-guessing screen
+(FR-009). `stakingActions.buildStakeForOption` routes through the router only when a
+fee applies; otherwise it emits the byte-identical direct calls.
+
+**Governance & ops.** `STAKING_ADMIN_ROLE` (provider addresses + validator
+allowlist) and `GUARDIAN_ROLE` (emergency pause) are held by a **multisig** with
+**no timelock** (FR-018). Operators drive it from the AdminPanel **Staking** tab;
+the fee rate is read-only there and edited in the **Fees** tab. See
+`docs/runbooks/staking-operations.md`.
 
 ## Adding a network or provider
 

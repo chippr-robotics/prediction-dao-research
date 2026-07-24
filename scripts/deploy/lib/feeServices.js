@@ -12,6 +12,11 @@ const LAUNCH_FEE_SERVICES = [
   { label: "earn.lend", capBps: 250, kind: ServiceKind.Wrapped }, // Earn/Morpho vault deposits (spec 050)
   { label: "polymarket.taker", capBps: 100, kind: ServiceKind.ConfigOnly }, // relay-gateway reads; spec-057 cap
   { label: "polymarket.maker", capBps: 50, kind: ServiceKind.ConfigOnly }, // relay-gateway reads; spec-057 cap
+  // Staking (spec 066): per-provider LIQUID-staking fees the StakingRouter reads + charges itself
+  // (ConfigOnly — the FeeRouter never moves staking funds; the router skims + forwards). Delegated
+  // staking is fee-free in v1, so it has no service. Rate ships at 0, set later from the Fees tab.
+  { label: "stake.lido", capBps: 250, kind: ServiceKind.ConfigOnly }, // Lido ETH→wstETH liquid staking
+  { label: "stake.polygon", capBps: 250, kind: ServiceKind.ConfigOnly }, // sPOL POL→sPOL liquid staking
 ];
 
 module.exports = { LAUNCH_FEE_SERVICES, ServiceKind };

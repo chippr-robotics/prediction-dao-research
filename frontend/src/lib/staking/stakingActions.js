@@ -10,6 +10,7 @@
 import { buildStakeCalls as buildLidoStake } from './lidoStaking'
 import { buildStakeCalls as buildSpolStake } from './spolStaking'
 import { buildDelegateCalls } from './polygonDelegation'
+import { buildLidoRouterStakeCalls, buildSpolRouterStakeCalls } from './stakingRouter'
 
 // Reserve left behind when staking a NATIVE coin so the member can still pay
 // network fees (Max never strands them). Generous flat reserve in wei.
@@ -53,16 +54,30 @@ export function maxStakeable({ walletBalance, isNative }) {
 
 /**
  * Build the stake calls for an option, dispatching on providerKind.
- * `ctx` carries { account, amount, provider, polToken }.
+ * `ctx` carries { account, amount, provider, polToken, feeQuote }.
+ *
+ * spec 066: when a LIQUID staking fee applies (a StakingRouter is deployed AND its
+ * per-provider rate is > 0), route through the router's fee-and-forward entrypoint so
+ * the fee reaches the treasury atomically; otherwise emit the byte-identical spec-065
+ * direct provider calls (SC-003). Delegated staking is fee-free in v1 and ALWAYS uses
+ * the direct `ValidatorShare` call.
  * Returns { calls, requiresApproval }.
  */
 export async function buildStakeForOption(option, ctx) {
   const { account, amount, provider, polToken } = ctx
+  const feeQuote = ctx.feeQuote || option.feeQuote
+  const routerAddress = option.stakingRouterAddress
+  const feeApplies = Boolean(feeQuote?.available && feeQuote.bps > 0 && routerAddress)
+
   switch (option.providerKind) {
     case 'lido':
-      return buildLidoStake({ contracts: option.contracts, amount })
+      return feeApplies
+        ? buildLidoRouterStakeCalls({ routerAddress, amount, maxFeeBps: feeQuote.bps })
+        : buildLidoStake({ contracts: option.contracts, amount })
     case 'spol':
-      return buildSpolStake({ contracts: option.contracts, polToken, account, amount, provider })
+      return feeApplies
+        ? buildSpolRouterStakeCalls({ routerAddress, polToken, amount, maxFeeBps: feeQuote.bps })
+        : buildSpolStake({ contracts: option.contracts, polToken, account, amount, provider })
     case 'validator-share':
       return buildDelegateCalls({
         validatorShare: option.validatorShare,

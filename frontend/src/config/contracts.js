@@ -44,6 +44,9 @@ const MORDOR_CONTRACTS = {
   // Callsigns (spec 054) — %callsign naming registry. Empty until `deploy-callsign-registry.js` runs;
   // populated by `npm run sync:frontend-contracts`.
   callsignRegistry: '',
+  // Staking control surface (spec 066). Empty until `deploy-staking-router.js` runs; sync populates it.
+  // Undeployed ⇒ the member app falls back to spec-065 fee-free direct staking.
+  stakingRouter: '',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -61,6 +64,7 @@ const HARDHAT_CONTRACTS = {
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
@@ -84,6 +88,7 @@ const AMOY_CONTRACTS = {
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -117,6 +122,7 @@ const POLYGON_CONTRACTS = {
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
+  stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
 }
 
 const NETWORK_CONTRACTS = {

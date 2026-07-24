@@ -25,6 +25,7 @@ const UPGRADEABLE_CONTRACTS = [
   { name: "WagerPoolFactory", deploymentsKey: "wagerPoolFactory" }, // spec 034 — WagerPools factory (address-based)
   { name: "CallsignRegistry", deploymentsKey: "callsignRegistry" }, // spec 054 — in-house %callsign naming registry
   { name: "FeeRouter", deploymentsKey: "feeRouter" }, // spec 060 — unified platform-fee registry + wrapper
+  { name: "StakingRouter", deploymentsKey: "stakingRouter" }, // spec 066 — staking control surface + liquid fee router
 ];
 
 function loadDeployedImpl(deploymentsKey) {

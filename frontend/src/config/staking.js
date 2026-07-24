@@ -14,10 +14,31 @@
  * VERIFY every address at build time (Lido deployed-contracts page,
  * 0xPolygon/spol-contracts, and the live Polygon staking API).
  */
-import { getAddress } from 'ethers'
+import { getAddress, id as keccakId } from 'ethers'
 
 // Position refresh cadence — aligned with usePortfolio / useEarnPositions.
 export const STAKING_POLL_MS = 60_000
+
+/**
+ * Map a liquid-staking option `kind` to the spec-066 FeeRouter service id the
+ * StakingRouter reads to charge that provider's platform fee. Returns `null` for
+ * anything that carries no fee — the Polygon validator `delegated` path (fee-free
+ * in v1) and any unknown kind — so callers show no fee line and take the direct
+ * spec-065 path. The constants above stay the fee-free fallback default.
+ *
+ * The ids are computed locally (keccak of the label) rather than imported from
+ * feeQuote to avoid a config↔lib import cycle; they equal `FEE_SERVICES.STAKE_*`.
+ */
+export function stakingRouterServiceIdFor(kind) {
+  switch (kind) {
+    case 'lido':
+      return keccakId('stake.lido')
+    case 'spol':
+      return keccakId('stake.polygon')
+    default:
+      return null // delegated + unknown kinds are fee-free
+  }
+}
 
 // Lido APR (7-day SMA) — public, no auth. `data.smaApr` is a PERCENTAGE
 // (e.g. 3.2 means 3.2%); fetchLidoApr normalizes it to a fraction (÷100).

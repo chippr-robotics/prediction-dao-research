@@ -167,11 +167,29 @@ async function deployFeeRouter(initArgs) {
   return Impl.attach(await proxy.getAddress());
 }
 
+/// Deploy StakingRouter behind an ERC1967 UUPS proxy (spec 066). `initArgs` is
+/// `[admin, feeRouter, steth, wsteth, spolController, spolToken, polToken, polygonStakeManager]`.
+/// Same manual-proxy rationale as deployFeeRouter; storage-layout safety is validated by
+/// `npm run check:storage-layout`.
+async function deployStakingRouter(initArgs) {
+  const Impl = await ethers.getContractFactory("StakingRouter");
+  const impl = await Impl.deploy();
+  await impl.waitForDeployment();
+
+  const initData = Impl.interface.encodeFunctionData("initialize", initArgs);
+  const Proxy = await ethers.getContractFactory("ERC1967Proxy");
+  const proxy = await Proxy.deploy(await impl.getAddress(), initData);
+  await proxy.waitForDeployment();
+
+  return Impl.attach(await proxy.getAddress());
+}
+
 module.exports = {
   mergeAbis,
   deployWagerRegistry,
   deployMembershipManager,
   deployFeeRouter,
+  deployStakingRouter,
   deployTokenTemplates,
   deployTokenFactory,
   deployTokenTemplatesV2,

@@ -18,6 +18,7 @@ export const ADMIN_TAB_ICONS = {
   members: 'users',
   treasury: 'bank',
   fees: 'coin',
+  staking: 'trending',
   'protocol-config': 'settings',
   'oracle-adapters': 'broadcast',
   maintenance: 'sliders',
@@ -33,6 +34,7 @@ export function buildAdminNavGroups({
   isRoleManager,
   isSanctionsAdmin,
   isFeeAdmin,
+  isStakingAdmin,
 }) {
   const item = (id, label) => ({ id, label, icon: ADMIN_TAB_ICONS[id] })
 
@@ -67,6 +69,9 @@ export function buildAdminNavGroups({
     {
       label: 'Protocol Config',
       items: [
+        // Staking control surface (spec 066): STAKING_ADMIN manages provider addrs +
+        // validator allowlist; GUARDIAN pauses; both enter, as does ADMIN.
+        (isAdmin || isStakingAdmin || isGuardian) && item('staking', 'Staking'),
         isAdmin && item('protocol-config', 'Wiring & Tokens'),
         isAdmin && item('oracle-adapters', 'Oracle Adapters'),
         // Maintenance calls are permissionless on-chain; any operator may run them.

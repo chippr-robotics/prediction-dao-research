@@ -17,6 +17,7 @@ import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
 import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import ProtocolConfigTab from './admin/ProtocolConfigTab'
 import FeesTab from './admin/FeesTab'
+import StakingTab from './admin/StakingTab'
 import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
@@ -35,6 +36,7 @@ const ROLE_HASHES = {
   ROLE_MANAGER: ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
   SANCTIONS_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
   TOKEN_ISSUER: ethers.keccak256(ethers.toUtf8Bytes('TOKEN_ISSUER_ROLE')),
+  STAKING_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('STAKING_ADMIN_ROLE')),
   DEFAULT_ADMIN: ethers.ZeroHash,
 }
 
@@ -91,6 +93,7 @@ function AdminPanel() {
   const isRoleManager = hasRole(ROLES.ROLE_MANAGER)
   const isSanctionsAdmin = hasRole(ROLES.SANCTIONS_ADMIN)
   const isFeeAdmin = hasRole(ROLES.FEE_ADMIN)
+  const isStakingAdmin = hasRole(ROLES.STAKING_ADMIN)
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
   const [activeTab, setActiveTab] = useState('overview')
@@ -141,6 +144,7 @@ function AdminPanel() {
   const membershipManagerAddr = getContractAddressForChain('membershipManager', chainId)
   const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', chainId)
   const tokenFactoryAddr = getContractAddressForChain('tokenFactory', chainId)
+  const stakingRouterAddr = getContractAddressForChain('stakingRouter', chainId)
 
   // Each grantable role lives on a specific contract; grants must be sent
   // to the contract that defines the role, not blanket-sent to the registry.
@@ -148,6 +152,7 @@ function AdminPanel() {
     if (role === 'ROLE_MANAGER') return membershipManagerAddr
     if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
     if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
+    if (role === 'STAKING_ADMIN') return stakingRouterAddr
     return wagerRegistryAddr
   }
 
@@ -317,6 +322,7 @@ function AdminPanel() {
     isRoleManager,
     isSanctionsAdmin,
     isFeeAdmin,
+    isStakingAdmin,
   })
   const adminTabs = flattenNavGroups(navGroups)
 
@@ -664,6 +670,7 @@ function AdminPanel() {
                     <option value="ROLE_MANAGER">Role Manager — grant/revoke memberships</option>
                     <option value="SANCTIONS_ADMIN">Compliance Officer — deny-list (SanctionsGuard)</option>
                     <option value="TOKEN_ISSUER">Token Issuer — token creation (TokenFactory)</option>
+                    <option value="STAKING_ADMIN">Staking Administrator — provider addrs + validator allowlist (StakingRouter)</option>
                     <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
                   </select>
                 </label>
@@ -760,6 +767,19 @@ function AdminPanel() {
             pendingTx={pendingTx}
             isAdmin={isAdmin}
             isFeeAdmin={isFeeAdmin}
+          />
+        )}
+
+        {activeTab === 'staking' && (isAdmin || isStakingAdmin || isGuardian) && (
+          <StakingTab
+            signer={signer}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+            isAdmin={isAdmin}
+            isStakingAdmin={isStakingAdmin}
+            isGuardian={isGuardian}
           />
         )}
 
