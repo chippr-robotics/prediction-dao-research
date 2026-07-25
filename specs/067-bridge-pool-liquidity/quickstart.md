@@ -12,9 +12,25 @@ cp .env.example .env        # set RPC URLs for all five mainnets:
 npm run compile
 ```
 
-Fork tests need archive-capable RPC endpoints for all five mainnets — Ethereum (1), Polygon (137),
-Arbitrum (42161), Base (8453), Optimism (10). Never put a private key in `.env` for these — fork tests
-impersonate accounts.
+Fork tests need RPC endpoints for all five mainnets. **The browser's RPCs and the fork tests' RPCs are
+not interchangeable**: the app only makes plain reads, which `publicnode` serves everywhere, but
+hardhat's fork engine additionally needs state methods that the `publicnode` **L2** endpoints answer
+with HTTP 403. These keyless endpoints were verified by actually forking each chain (2026-07-25):
+
+```
+MAINNET_RPC_URL=https://ethereum-rpc.publicnode.com
+POLYGON_RPC_URL=<keyed archive endpoint preferred>
+OPTIMISM_RPC_URL=https://mainnet.optimism.io
+BASE_RPC_URL=https://mainnet.base.org
+ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+```
+
+Known-bad for forking: any `*-rpc.publicnode.com` **L2** endpoint (403), `eth.llamarpc.com` (521), and
+`1rpc.io/*` — that last one hard-crashes hardhat's native fork engine with a Rust panic rather than
+returning a catchable error. Keyless endpoints are rate-limited and serve recent state only; that is
+enough for this suite (it forks at head) but a keyed archive endpoint is required to pin a fork block.
+
+Never put a private key in `.env` for these — fork tests impersonate accounts.
 
 ---
 
