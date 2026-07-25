@@ -15,10 +15,19 @@
  *   - Ethereum Classic (61) + Mordor (63) — ETCswap V3 swap surface + ClearPath
  *     (specs 033 / 042).
  *   - Ethereum family (spec 048) — value networks for select + portfolio +
- *     send/receive: Ethereum Mainnet (1, also ClearPath), Hoodi (560048) and
- *     Sepolia (11155111) testnets. No wager/DEX/passkey infra is deployed here;
- *     those capabilities self-disclose as unavailable (honest-state).
+ *     send/receive: Ethereum Mainnet (1, also ClearPath + Uniswap swap/liquidity
+ *     as of spec 067), Hoodi (560048) and Sepolia (11155111) testnets. No
+ *     wager/passkey infra is deployed here; those capabilities self-disclose as
+ *     unavailable (honest-state).
+ *   - Arbitrum One (42161), Base (8453), Optimism (10) — spec 067 bridge +
+ *     liquidity networks, first-class for select/portfolio/send-receive. Each
+ *     carries an Across SpokePool and a Uniswap V3 deployment.
  *   - Hardhat (1337) — local dev.
+ *
+ * Spec 067 note: `capabilities.dex` (in-app swapping) is an EXPLICIT allow-list
+ * (SWAP_CHAIN_IDS) and `capabilities.liquidity` is derived separately. Adding
+ * `dex` addresses to a network no longer switches swapping on by itself — see
+ * the SWAP_CHAIN_IDS comment.
  *
  * The user-facing Testnet/Mainnet toggle switches between 80002 (testnet) and
  * 137 (mainnet) via wagmi.switchChain; every network with `selectable: true`
@@ -59,12 +68,61 @@ const COLLECTIBLES_CHAIN_IDS = new Set([1, 137])
 // Polymarket runs nowhere else. Everywhere else the capability is false and the Predict tab hides
 // entirely (FR-018 soft-fail), mirroring COLLECTIBLES_CHAIN_IDS.
 const PREDICT_CHAIN_IDS = new Set([137])
+// In-app token swapping (spec 033 / 067 FR-016a). An EXPLICIT allow-list, not
+// `Boolean(this.dex)`.
+//
+// Why explicit: `capabilities.dex` gates the Trade surface, the portfolio asset
+// sheet's Swap action, and DEX spot pricing. Deriving it from the presence of
+// `dex` addresses means adding those addresses for a DIFFERENT reason — spec
+// 067 needs `positionManager` for liquidity supply — silently switches token
+// swapping on as a side effect. That is exactly how Ethereum ended up
+// swap-less: it had no `dex` block, so the capability was false by accident of
+// configuration rather than by decision (research R4a).
+//
+// Liquidity supply is a SEPARATE capability derived from `dex.positionManager`
+// plus a deployed `liquidityRouter`, so the two can move independently: a
+// network may have pools worth supplying before FairWins exposes swapping
+// there, or the reverse.
+//
+// Membership here is a POLICY gate, not a claim that the network is ready: the
+// capability also requires real `dex` config, because ETC/Mordor/Amoy build
+// theirs from env vars and yield null when unset.
+const SWAP_CHAIN_IDS = new Set([1, 10, 61, 63, 137, 8453, 42161])
 
 const earnConfig = () => ({
   provider: { name: 'Morpho', url: 'https://app.morpho.org' },
   merklDistributor: MERKL_DISTRIBUTOR,
   legacyRewardsUrl: 'https://rewards-legacy.morpho.org/',
 })
+
+// Cross-chain bridge + liquidity supply (spec 067).
+//
+// `bridge` is a BUILD-TIME DISPLAY FALLBACK only (FR-051): the authoritative
+// SpokePool/HubPool addresses, route availability, limits, and pause state are
+// read from the on-chain BridgeRouter/LiquidityRouter at runtime. A network with
+// no `bridge` block has no Across deployment and the Bridge surface hides there
+// honestly (FR-006c) — ETC/Mordor have neither protocol.
+//
+// `hubPool` is non-null on Ethereum ONLY: Across's HubPool is an L1 contract by
+// design, so bridge-liquidity supply is Ethereum-only while trading liquidity
+// spans every Uniswap network (research R8). Do not "fix" this by copying the
+// address elsewhere — there is no HubPool on an L2.
+const bridgeConfig = (spokePool, hubPool = null) => ({ spokePool, hubPool })
+
+// Uniswap V3 deployment per network (spec 067, research R4b).
+//
+// ⚠️ Addresses are NOT identical across chains. Uniswap's own docs warn
+// integrators not to assume they are, and BASE genuinely differs (its factory
+// and position manager live at different addresses than the set Ethereum,
+// Polygon, Arbitrum and Optimism share). Every address here was verified to
+// carry bytecode on its own chain; `scripts/ops/verify-protocol-addresses.js`
+// re-checks that in CI/ops. Never copy an address from one chain to another.
+const CANONICAL_UNISWAP = {
+  factory: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+  swapRouter: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+  quoter: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  positionManager: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+}
 
 // Passkey smart-account submission config (spec 041, data-model
 // "SubmissionRoute"). Parses a comma-separated ERC-4337 bundler URL list
@@ -155,7 +213,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
-        dex: Boolean(this.dex),
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
@@ -236,7 +301,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: Boolean(this.dex),
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
@@ -306,7 +378,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: Boolean(this.dex),
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
@@ -361,6 +440,9 @@ const NETWORKS = {
       name: 'Uniswap',
       url: 'https://app.uniswap.org/swap?chain=polygon',
     },
+    // Across SpokePool (spec 067). No HubPool — bridge-liquidity supply is
+    // Ethereum-only because Across's HubPool is an L1 contract.
+    bridge: bridgeConfig('0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096'),
     // Earn / lending (spec 050): Morpho vaults + data API are live on Polygon PoS.
     earn: earnConfig(),
     // Passkey smart accounts (spec 041) — production network: RIP-7212
@@ -374,13 +456,158 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: true,
-        dex: Boolean(this.dex),
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
         passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — network-agnostic; runs wherever a read RPC exists,
         // independent of whether an ExternalDAORegistry is deployed (registry-optional).
+        clearpath: true,
+      }
+    },
+  },
+  // ── Spec 067 bridge/supply networks ──────────────────────────────────────
+  // Arbitrum, Base and Optimism are added as FIRST-CLASS value networks
+  // (FR-006b), not bridge-only stubs: selectable, in the portfolio, and usable
+  // for send/receive. Bridging a member's assets to a network the app could not
+  // then display or spend would be worse than not offering the route at all.
+  // All three carry both an Across SpokePool and a Uniswap V3 deployment, which
+  // is why they were chosen over the rest of Across's ~17 chains.
+  42161: {
+    chainId: 42161,
+    name: 'Arbitrum One',
+    isTestnet: false,
+    isPrimary: false,
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_ARBITRUM || 'https://arbitrum-one-rpc.publicnode.com',
+    explorer: { name: 'Arbiscan', baseUrl: 'https://arbiscan.io' },
+    // No FairWins wager subgraph on this network.
+    subgraphUrl: null,
+    // Native Circle USDC on Arbitrum One (not USDC.e, the bridged variant).
+    stablecoin: {
+      address: import.meta.env?.VITE_ARBITRUM_USDC || '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      domainVersion: '2',
+    },
+    dex: { ...CANONICAL_UNISWAP, wnative: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1' },
+    dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=arbitrum' },
+    bridge: bridgeConfig('0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A'),
+    earn: null,
+    contracts: {},
+    polymarket: null,
+    passkey: null,
+    get capabilities() {
+      return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        polymarketSidebets: false,
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
+        earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
+        friendMarkets: false,
+        passkeyAccounts: false,
+        clearpath: true,
+      }
+    },
+  },
+  8453: {
+    chainId: 8453,
+    name: 'Base',
+    isTestnet: false,
+    isPrimary: false,
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_BASE || 'https://base-rpc.publicnode.com',
+    explorer: { name: 'Basescan', baseUrl: 'https://basescan.org' },
+    subgraphUrl: null,
+    stablecoin: {
+      address: import.meta.env?.VITE_BASE_USDC || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      domainVersion: '2',
+    },
+    // ⚠️ Base does NOT share the canonical Uniswap addresses (research R4b) —
+    // these are Base's own factory/positionManager/quoter/router. Spreading
+    // CANONICAL_UNISWAP here would point the router at a non-contract.
+    dex: {
+      factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+      swapRouter: '0x2626664c2603336E57B271c5C0b26F421741e481',
+      quoter: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+      positionManager: '0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1',
+      wnative: '0x4200000000000000000000000000000000000006',
+    },
+    dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=base' },
+    bridge: bridgeConfig('0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64'),
+    earn: null,
+    contracts: {},
+    polymarket: null,
+    passkey: null,
+    get capabilities() {
+      return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        polymarketSidebets: false,
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
+        earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
+        friendMarkets: false,
+        passkeyAccounts: false,
+        clearpath: true,
+      }
+    },
+  },
+  10: {
+    chainId: 10,
+    name: 'Optimism',
+    isTestnet: false,
+    isPrimary: false,
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_OPTIMISM || 'https://optimism-rpc.publicnode.com',
+    explorer: { name: 'Etherscan', baseUrl: 'https://optimistic.etherscan.io' },
+    subgraphUrl: null,
+    stablecoin: {
+      address: import.meta.env?.VITE_OPTIMISM_USDC || '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      domainVersion: '2',
+    },
+    dex: { ...CANONICAL_UNISWAP, wnative: '0x4200000000000000000000000000000000000006' },
+    dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=optimism' },
+    bridge: bridgeConfig('0x6f26Bf09B1C792e3228e5467807a900A503c0281'),
+    earn: null,
+    contracts: {},
+    polymarket: null,
+    passkey: null,
+    get capabilities() {
+      return {
+        collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
+        predict: PREDICT_CHAIN_IDS.has(this.chainId),
+        polymarketSidebets: false,
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
+        earn: Boolean(this.earn),
+        staking: Boolean(this.staking),
+        friendMarkets: false,
+        passkeyAccounts: false,
         clearpath: true,
       }
     },
@@ -415,8 +642,17 @@ const NETWORKS = {
       decimals: 6,
       domainVersion: '2',
     },
-    // No in-app DEX/swap on this network in this cut (ClearPath-only).
-    dex: null,
+    // Canonical Uniswap V3 on Ethereum mainnet. Spec 067 enables BOTH in-app
+    // swapping and liquidity supply here, superseding spec 048's ClearPath-only
+    // cut (which reflected the absence of a `dex` block, not a decision).
+    dex: { ...CANONICAL_UNISWAP, wnative: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' },
+    dexProvider: { name: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=mainnet' },
+    // Across: SpokePool for bridging + the HubPool for bridge-liquidity supply.
+    // Ethereum is the ONLY network with a HubPool — it is an L1 contract.
+    bridge: bridgeConfig(
+      '0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5',
+      '0xc186fA914353c44b2E33eBE05f21846F1048bEda'
+    ),
     // Earn / lending (spec 050): Morpho's home chain — vaults + data API live.
     earn: earnConfig(),
     // Staking (spec 065): Lido (liquid ETH), sPOL (liquid POL), and Polygon
@@ -431,7 +667,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: false,
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
@@ -472,7 +715,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: false,
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
@@ -512,7 +762,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: false,
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
@@ -545,7 +802,14 @@ const NETWORKS = {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
         predict: PREDICT_CHAIN_IDS.has(this.chainId),
         polymarketSidebets: false,
-        dex: false,
+        // Swap needs BOTH the policy gate (SWAP_CHAIN_IDS) AND real router config.
+        // The allow-list alone is not enough: ETC/Mordor/Amoy build `dex` from env
+        // vars and yield null when unset, so a list-only check would advertise a
+        // Trade surface with no router behind it. See SWAP_CHAIN_IDS (R4a).
+        dex: SWAP_CHAIN_IDS.has(this.chainId) && Boolean(this.dex),
+        // Liquidity supply (spec 067) is independent of swapping.
+        liquidity: Boolean(this.dex?.positionManager),
+        bridge: Boolean(this.bridge?.spokePool),
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,

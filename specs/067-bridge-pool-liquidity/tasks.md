@@ -42,19 +42,19 @@ builds on.
 across chains, and Base's differ (research R4b). Take every address from that chain's own official
 deployment record. Never copy a canonical address across networks.
 
-- [ ] T001 Add Arbitrum One (42161) as a full network entry in `frontend/src/config/networks.js` — RPC, explorer, native currency, stablecoin, portfolio wiring — so it is first-class for select/view/send (FR-006b)
-- [ ] T002 Add Base (8453) as a full network entry in `frontend/src/config/networks.js`
-- [ ] T003 Add Optimism (10) as a full network entry in `frontend/src/config/networks.js`
-- [ ] T004 Add a per-network `dex` block (factory, positionManager, quoter, swapRouter, wnative) for Ethereum, Arbitrum, Base, and Optimism in `frontend/src/config/networks.js`, each address taken from that chain's own Uniswap deployment record
-- [ ] T005 (SC-018) Split `capabilities.dex` into an explicit per-network swap flag and add derived `capabilities.liquidity` (`dex.positionManager` present AND `liquidityRouter` deployed) in `frontend/src/config/networks.js` per research R4a
-- [ ] T006 Add a per-network `bridge` block (`{ spokePool, hubPool | null }`) as build-time display fallback in `frontend/src/config/networks.js` — authoritative values are read from the router at runtime (FR-051)
-- [ ] T007 [P] Add `bridgeRouter` and `liquidityRouter` address keys (empty until synced) to every network in `frontend/src/config/contracts.js`
-- [ ] T008 [P] Add RPC env vars for Arbitrum, Base, and Optimism to `.env.example` with comments — never real values
-- [ ] T009 [P] Create minimal `contracts/interfaces/external/IAcrossSpokePool.sol` exposing only `depositV3` (no vendored SDK)
-- [ ] T010 [P] Create minimal `contracts/interfaces/external/IAcrossHubPool.sol` exposing `addLiquidity`, `removeLiquidity`, `exchangeRateCurrent` for reads and direct member calls
-- [ ] T011 [P] Create minimal `contracts/interfaces/external/INonfungiblePositionManager.sol` exposing `mint`, `increaseLiquidity`, `decreaseLiquidity`, `collect`, `positions`
-- [ ] T012 Create `scripts/ops/verify-protocol-addresses.js` asserting every configured SpokePool / HubPool / NFPM / factory has non-empty bytecode **on that chain** — the R4b guard
-- [ ] T013 [P] Update `frontend/src/config/assetTaxonomy.js` and asset-logo artwork so the three new networks resolve logos and network badges (required by FR-059's cross-network lists)
+- [X] T001 Add Arbitrum One (42161) as a full network entry in `frontend/src/config/networks.js` — RPC, explorer, native currency, stablecoin, portfolio wiring — so it is first-class for select/view/send (FR-006b)
+- [X] T002 Add Base (8453) as a full network entry in `frontend/src/config/networks.js`
+- [X] T003 Add Optimism (10) as a full network entry in `frontend/src/config/networks.js`
+- [X] T004 Add a per-network `dex` block (factory, positionManager, quoter, swapRouter, wnative) for Ethereum, Arbitrum, Base, and Optimism in `frontend/src/config/networks.js`, each address taken from that chain's own Uniswap deployment record
+- [X] T005 (SC-018) Split `capabilities.dex` into an explicit per-network swap flag and add derived `capabilities.liquidity` (`dex.positionManager` present AND `liquidityRouter` deployed) in `frontend/src/config/networks.js` per research R4a
+- [X] T006 Add a per-network `bridge` block (`{ spokePool, hubPool | null }`) as build-time display fallback in `frontend/src/config/networks.js` — authoritative values are read from the router at runtime (FR-051)
+- [X] T007 [P] Add `bridgeRouter` and `liquidityRouter` address keys (empty until synced) to every network in `frontend/src/config/contracts.js`
+- [X] T008 [P] Add RPC env vars for Arbitrum, Base, and Optimism to `.env.example` with comments — never real values
+- [X] T009 [P] Create minimal `contracts/interfaces/external/IAcrossSpokePool.sol` exposing only `depositV3` (no vendored SDK)
+- [X] T010 [P] Create minimal `contracts/interfaces/external/IAcrossHubPool.sol` exposing `addLiquidity`, `removeLiquidity`, `exchangeRateCurrent` for reads and direct member calls
+- [X] T011 [P] Create minimal `contracts/interfaces/external/INonfungiblePositionManager.sol` exposing `mint`, `increaseLiquidity`, `decreaseLiquidity`, `collect`, `positions`
+- [X] T012 Create `scripts/ops/verify-protocol-addresses.js` asserting every configured SpokePool / HubPool / NFPM / factory has non-empty bytecode **on that chain** — the R4b guard
+- [X] T013 [P] Update `frontend/src/config/assetTaxonomy.js` and asset-logo artwork so the three new networks resolve logos and network badges (required by FR-059's cross-network lists)
 
 **Checkpoint**: config is complete and every configured protocol address is proven to exist on its chain.
 

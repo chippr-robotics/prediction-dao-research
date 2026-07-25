@@ -161,12 +161,20 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
     await waitFor(() => expect(latest.status).toBe('ready'))
 
     const eth = aggFor('ETH')
-    expect(eth.instances).toHaveLength(3)
     expect(eth.balance).toBeCloseTo(1.75)
     expect(eth.usd).toBeCloseTo(3500)
     // Home native first, wrapped and cross-chain instances after.
     expect(eth.instances[0].asset.kind).toBe('native')
-    expect(eth.instances.map((h) => h.asset.chainId)).toEqual([1, 1, 137])
+    // Assert the FUNDED instances rather than a raw count: ETH/WETH now exist on every
+    // spec-067 network (1, 10, 8453, 42161), so an exact instance count would break each
+    // time a network is added without telling us anything about the aggregation itself.
+    const funded = eth.instances.filter((h) => h.balance > 0)
+    expect(funded).toHaveLength(3)
+    expect(funded.map((h) => [h.asset.chainId, h.asset.kind])).toEqual([
+      [1, 'native'],
+      [1, 'erc20'],
+      [137, 'erc20'],
+    ])
     // The main list shows ONE ETH row — instances live in the sheet.
     expect(latest.aggregates.filter((a) => a.underlying === 'ETH')).toHaveLength(1)
   })
