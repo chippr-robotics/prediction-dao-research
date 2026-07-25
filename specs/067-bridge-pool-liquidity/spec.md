@@ -110,6 +110,15 @@ destination-chain transaction. Delivers the full cross-chain move.
 8. **Given** a member is on a Bitcoin network (spec 061), **When** they open Transfer, **Then** the
    Bridge tab is absent or honestly explains that Bitcoin bridging is not offered, and Bitcoin
    send/receive is unaffected.
+9. **Given** a member opens the Bridge tab while the app's active network is Polygon, **When** they open
+   the asset selector, **Then** they see their assets across **every** supported network, each with its
+   asset logo and network badge, and can pick one on Arbitrum without switching networks first.
+10. **Given** a member has selected the asset they are sending, **When** they open the destination
+    selector, **Then** it offers **the same asset on other networks only** — never the same network, and
+    never a different asset — and the source network is clearly shown as pinned.
+11. **Given** a member types into the asset selector's search field, **When** they enter part of a
+    symbol, asset name, or network name, **Then** the list narrows to matches and remains fully
+    operable by keyboard.
 
 ---
 
@@ -168,6 +177,15 @@ supply-earn-withdraw loop.
 8. **Given** a member is on a network with no curated pools, **When** they open Earn → Supply, **Then**
    the area explains honestly that pooling is not available on this network and names the networks
    where it is.
+9. **Given** a member is building a Uniswap pair, **When** they select the first asset, **Then** its
+   network is pinned and visibly shown, and the second asset's list contains **only** assets on that
+   same network — a pair can never span networks.
+10. **Given** a member changes the first asset to one on a different network, **When** the pin moves,
+    **Then** the second selection is revalidated and cleared if it is no longer on the pinned network,
+    rather than silently forming an impossible pair.
+11. **Given** a pinned network has no valid counterpart asset for the member, **When** they open the
+    second selector, **Then** the surface says so plainly and names what would change it — not an empty
+    dropdown.
 
 ---
 
@@ -446,10 +464,11 @@ resolving.
 - **FR-016**: Uniswap positions at launch MUST be **full-range** positions only — supply a pair, earn a
   share of the pool's trading fees, with no member-managed price range, no rebalancing prompts, and no
   out-of-range state.
-- **FR-016a**: Trading liquidity MUST be offered on **every supported network where Uniswap is
-  deployed** — not one privileged network. Enabling it on a network MUST NOT, by itself, switch on
-  unrelated in-app capabilities (notably token swapping, which some networks deliberately ship
-  without): supplying liquidity and swapping MUST be independently controllable per network.
+- **FR-016a**: Trading liquidity **and in-app token swapping** MUST both be offered on **every
+  supported network where Uniswap is deployed** — including Ethereum, which previously shipped without
+  in-app swapping. This supersedes that earlier decision. The two MUST remain **independently
+  controllable per network** (a network may gain one before the other), so neither is derived from the
+  mere presence of protocol addresses.
 - **FR-016b**: Protocol contract addresses MUST be resolved per network from that network's own
   authoritative deployment record. The system MUST NOT assume a protocol uses the same address on
   every chain — several do not.
@@ -582,6 +601,31 @@ resolving.
 - **FR-054**: Neither surface may present mock, placeholder, or invented data in a shipped path;
   unavailable information MUST be shown as unavailable.
 
+#### Cross-network asset selection (applies to Bridge, Supply, and Trade)
+
+- **FR-059**: Every asset choice on these surfaces MUST present the member's assets from **all**
+  supported networks in a single list. A member MUST NOT have to switch the app's network to find,
+  select, or act on an asset.
+- **FR-060**: Each option MUST carry the platform's existing nested asset artwork — the asset's own logo
+  with its network badge — so it is always clear at a glance what the asset is and which network it is
+  on. This MUST reuse the existing universal asset selector rather than introducing a second one.
+- **FR-061**: Any required network switch MUST happen automatically at signing time, disclosed to the
+  member — never as a prerequisite step they must find and perform before the surface becomes usable.
+- **FR-062**: For **pair** contexts (a liquidity pair, a swap), selecting the first asset MUST **pin**
+  its network, and the second asset's list MUST be restricted to assets on that same network — a pair
+  cannot span networks. The pinned network MUST be visible, and changing the first asset MUST re-pin and
+  revalidate the second.
+- **FR-063**: The **Bridge** surface is the explicit inverse and MUST NOT apply FR-062: selecting the
+  source asset MUST restrict the destination list to **the same asset on other networks**. Applying the
+  same-network rule to a bridge would reduce it to a same-chain transfer.
+- **FR-064**: The asset selector MUST offer a **search/filter** that narrows the list by asset symbol,
+  asset name, and network name, operable by keyboard and screen reader.
+- **FR-065**: Where a pin leaves no valid counterpart, the surface MUST say so plainly and name what
+  would change it — never an empty dropdown with no explanation, and never a silently disabled control.
+- **FR-066**: Assets an activity genuinely cannot use (for example a non-EVM asset in an EVM-only pair
+  or bridge) MUST be excluded or disabled **with a stated reason**, following the platform's existing
+  treatment rather than being silently dropped.
+
 #### Publication
 
 - **FR-055**: A member-facing feature announcement MUST be added to the feature-announcement series
@@ -669,6 +713,15 @@ resolving.
 - **SC-018**: Trading liquidity is offered on every supported network where Uniswap is deployed, and
   enabling it on a network changes no unrelated capability on that network (verified specifically for
   networks that deliberately ship without in-app swapping).
+- **SC-020**: A member can complete a bridge, a liquidity supply, and a swap involving an asset on a
+  network other than the app's active one **without ever opening the network switcher** — the switch, if
+  any, occurs at signing and is disclosed.
+- **SC-021**: In pair contexts, 100% of offered counterpart assets are on the pinned network; in the
+  Bridge surface, 100% of offered destinations are the same asset on a different network. Neither rule
+  ever leaks into the other surface.
+- **SC-022**: With assets across five networks in one list, a member can locate a specific asset by
+  typing part of its symbol, name, or network in under 5 seconds, and the search is fully operable by
+  keyboard and screen reader.
 - **SC-019**: Every newly added network is usable end to end — selectable, visible in the portfolio,
   and able to send and receive — so no member can bridge to a network where the asset then becomes
   invisible or unspendable.

@@ -144,10 +144,32 @@ npm run frontend                # dev server
 13. **New networks are first-class** (SC-019). For Arbitrum, Base, and Optimism: each is selectable in
     the network switcher, its balances appear in the portfolio, and send/receive works. A member must
     never be able to bridge to a network where the asset then becomes invisible or unspendable.
-14. **LP did not switch on swapping** (SC-018). On Ethereum, confirm Uniswap supply works **and** that
-    the Trade surface and the portfolio asset-sheet Swap action remain absent — spec 048's deliberate
-    no-in-app-swap decision must survive this feature untouched. Repeat on any other network that ships
-    without in-app swap.
+14. **Swap and LP both live on all five** (SC-018). On Ethereum, confirm **both** Uniswap supply and the
+    Trade surface / portfolio asset-sheet Swap action now work — this supersedes spec 048. Then confirm
+    the two capabilities are independently flagged: forcing `capabilities.liquidity` off on one network
+    leaves swapping there working, and vice versa.
+
+### Cross-network selection checks
+
+14d. **No chain switching** (SC-020). With the app's active network set to Polygon, open Bridge, Supply,
+    and Trade. **Expected**: each asset selector lists holdings across **all five** networks with the
+    nested asset+network logo. Select an asset on Arbitrum and complete the flow — the network switch
+    happens at signing, disclosed, and the network switcher is never needed.
+14e. **Pair pinning** (SC-021). In Supply, pick the first asset of a Uniswap pair. **Expected**: its
+    network is pinned and visibly shown, and the second list contains **only** that network's assets.
+    Change the first asset to a different network: the second selection is revalidated and cleared, not
+    left forming an impossible pair.
+14f. **Bridge is the inverse** (SC-021, research R11b). In Bridge, pick the source asset. **Expected**:
+    the destination list offers **the same asset on other networks only** — never the same network. This
+    is the check that catches the same-network rule being copy-pasted onto the bridge, which would
+    silently reduce it to a same-chain transfer that still quotes and still signs.
+14g. **Search** (SC-022). Type a partial symbol, asset name, and network name into the selector.
+    **Expected**: the list narrows for each, is operable by keyboard alone, and a matched-but-ineligible
+    asset still shows its disabled reason rather than vanishing.
+14h. **Empty counterpart** (FR-065). Pin an asset with no valid counterpart on its network. **Expected**:
+    a plain statement of why and what would change it — never an empty dropdown.
+14i. **Shared component regression.** Open home Pay, Request, Wager, and wallet Transfer. **Expected**:
+    all four still work and have gained the same search field — `UniversalAssetSelect` is shared.
 
 ### Honest-degradation checks
 

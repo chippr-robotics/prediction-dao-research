@@ -1,6 +1,6 @@
 # Phase 0 Research: Cross-Chain Bridge & Supply Liquidity (spec 067)
 
-All spec-level unknowns resolved. **Five** findings materially changed the design and are called out as
+All spec-level unknowns resolved. **Six** findings materially changed the design and are called out as
 **DESIGN-CHANGING**; each is verified against protocol source or repository source, not documentation prose.
 
 ---
@@ -115,7 +115,8 @@ that is building a custodial vault, which is out of scope and contrary to the sp
 
 **Decision**: **Uniswap V3** full-range positions via each network's `NonfungiblePositionManager`, on
 **every supported network where Uniswap V3 is deployed** (Ethereum, Polygon, Arbitrum, Base, Optimism,
-plus Sepolia for testing), fee charged through a new **`LiquidityRouter`**.
+plus Sepolia for testing), fee charged through a new **`LiquidityRouter`**. In-app **swapping** is
+enabled on the same five networks (R4a).
 
 **Rationale**:
 
@@ -130,24 +131,34 @@ plus Sepolia for testing), fee charged through a new **`LiquidityRouter`**.
 **Alternatives considered**: Uniswap V4 — rejected for v1; new config, new position-accounting model,
 and no benefit for full-range positions. V2-style pairs — not the configured deployment.
 
-### R4a — Enabling LP must not enable swapping — DESIGN-CHANGING
+### R4a — Swap and LP are separate capabilities, and BOTH ship everywhere Uniswap is
 
 `networks.js` derives `capabilities.dex` as `Boolean(this.dex)`, and that capability gates the **Trade**
 surface, the portfolio asset sheet's Swap action (`AssetDetailSheet.jsx:62`), and DEX spot pricing
-(`lib/portfolio/prices.js`). Ethereum is deliberately `dex: null` — spec 048 shipped it as a
-value/ClearPath network with **no in-app swap**.
+(`lib/portfolio/prices.js`). Ethereum was `dex: null` — spec 048 shipped it as a value/ClearPath network
+with no in-app swap.
 
-So the obvious move — "add a `dex` block to Ethereum so LP works" — would silently switch on token
-swapping there, reversing a prior product decision as a side effect of an unrelated feature.
+**Decision (revised 2026-07-25 at the requester's direction): enable the DEX on Ethereum too.** In-app
+swapping and liquidity supply are both offered on **every network where Uniswap V3 is deployed** —
+Ethereum, Polygon, Arbitrum, Base, Optimism. This **supersedes spec 048's no-in-app-swap-on-Ethereum
+decision**, which was a consequence of no `dex` config existing at the time rather than a standing
+product constraint.
 
-**Resolution**: split the capability. The `dex` block stays pure address config, and:
+The capability is still **split** into two explicit flags rather than one derived boolean:
 
-- `capabilities.dex` (swap/Trade) becomes an **explicit per-network flag**, not derived from address
-  presence — preserving every current network's existing behavior exactly.
-- `capabilities.liquidity` (Earn → Supply) is derived from `dex.positionManager` presence **plus** a
-  deployed `liquidityRouter`.
+- `capabilities.dex` — in-app swapping (Trade surface, asset-sheet Swap action, DEX spot pricing).
+- `capabilities.liquidity` — Earn → Supply, derived from `dex.positionManager` **plus** a deployed
+  `liquidityRouter`.
 
-This is what FR-016a requires, and it is why adding Uniswap addresses to four more networks is safe.
+Keeping them separate is still correct even though both are on for all five networks: they have
+genuinely different prerequisites (LP additionally needs the router deployed), and a future network may
+have Uniswap pools worth supplying before FairWins chooses to expose swapping there — or the reverse.
+Deriving both from `Boolean(this.dex)` would make those states unrepresentable and would mean a routine
+config edit silently changes two product surfaces at once.
+
+**Recorded for reviewers**: enabling swap on Ethereum is a deliberate product change beyond the two
+surfaces this spec names. It is called out here, in FR-016a, and in the plan's Complexity Tracking so it
+is not mistaken for an accident of configuration.
 
 ### R4b — Addresses differ per chain — DESIGN-CHANGING
 
@@ -301,6 +312,58 @@ so a gateway outage can never strand an in-flight transfer.
 
 ---
 
+## R11 — Cross-network asset selection (no in-app chain switching)
+
+**Decision**: reuse **spec 064's `UniversalAssetSelect`** verbatim for every asset choice these surfaces
+make, extend it with a **search field**, and add a **network-pinning** rule for pair contexts. Members
+never switch networks to find an asset; the wallet's network switch happens only at signing.
+
+**Rationale — almost all of this already exists.** `frontend/src/components/ui/UniversalAssetSelect.jsx`
+(spec 064) is already the one dropdown behind home Pay, Request, Wager, and the wallet Transfer view. It
+is purely presentational, renders the nested `AssetLogo` (asset glyph + network sub-badge), and takes
+activity-scoped options from `useSelectableAssets`. Those options already carry everything the new rules
+need:
+
+```js
+{ key: '137:0x3c49…', chainId: 137, symbol: 'USDC', networkName: 'Polygon', balance, … }
+```
+
+So "show every network's assets with a network badge" is not new work — it is the component's existing
+behavior. Two additions are genuinely new:
+
+### R11a — Search
+
+`UniversalAssetSelect` has **no filter today**. With five networks' assets in one list the option count
+grows several-fold, so a search input is added to the shared component, matching on symbol, asset name,
+and network name. Because the component is shared, home Pay/Request/Wager and Transfer get search too —
+a strict improvement to four surfaces that already suffer the same list-length problem.
+
+### R11b — Network pinning, and the bridge exception — DESIGN-CHANGING
+
+A Uniswap pair and a swap both exist **within one network**. So once the member picks the "you pay"
+asset, its `chainId` **pins** the pair and the counterpart list is filtered to that same chain. This is a
+one-line predicate on the existing option shape (`o.chainId === pinnedChainId`), not a new data model.
+
+**The bridge is the exact inverse and must not inherit this rule.** A bridge's whole purpose is that the
+destination is a *different* network. Its second selector filters to **the same asset on other
+networks** (`o.symbol === pinned.symbol && o.chainId !== pinned.chainId`).
+
+Both rules are the same mechanism — pin on first selection, filter the second list — with opposite
+predicates. Implementing them as one shared "pinning" helper parameterized by predicate keeps them
+visibly paired, so nobody applies the same-network rule to the bridge and quietly breaks it into a
+same-chain transfer. Getting this backwards is a plausible copy-paste error, which is why it is recorded
+as design-changing rather than left implicit.
+
+**Empty-counterpart honesty**: pinning can produce an empty second list (an asset with no curated pair
+on its network, or one held on only one network). The selector states that plainly and names what would
+change it — it never renders an empty dropdown with no explanation (constitution III).
+
+**Non-EVM**: Bitcoin options carry a string `chainId` and are excluded from both pair and bridge
+contexts with a stated reason, reusing spec 064's existing disabled-with-explanation treatment rather
+than hiding them (FR-006).
+
+---
+
 ## Resolved unknowns summary
 
 | # | Unknown | Resolution |
@@ -308,10 +371,11 @@ so a gateway outage can never strand an in-flight transfer.
 | R1 | Bridge protocol | Across V3 |
 | R2 | Bridge fee path | `BridgeRouter`, `depositor = member` (refund safety) |
 | R3 | Bridge-pool LP fee | **Fee-free v1** — `addLiquidity` has no recipient param |
-| R4 | Uniswap version/coverage | V3 NFPM full-range on all 5 mainnets, fee-charged; LP capability split from swap (R4a); per-chain addresses (R4b) |
+| R4 | Uniswap version/coverage | V3 NFPM full-range on all 5 mainnets, fee-charged; swap AND LP enabled on all 5, kept as separate flags (R4a); per-chain addresses (R4b) |
 | R5 | Control surface location | On-chain, in the two routers |
 | R6 | Naming | Earn area = **Supply**; classes `bridge` + `liquidity`; relabel wager `Pool` → `Wager Pool` |
 | R7 | In-flight persistence | Client ledger store + API poll + on-chain fallback |
 | R8 | Availability | +Arbitrum/Base/Optimism ⇒ 5 mainnets, 20 bridge routes, Uniswap LP on all 5; Across LP still ETH-only |
 | R9 | Fee ceiling | `maxFeeBps` guard reused from spec 066 |
 | R10 | Degraded mode | Bridge hides without gateway; in-flight still resolves |
+| R11 | Asset selection | Reuse spec 064 `UniversalAssetSelect`; add search (R11a); pin network on first pick — same-chain for pairs, **other-chain for bridge** (R11b) |

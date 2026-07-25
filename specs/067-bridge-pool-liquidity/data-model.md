@@ -182,6 +182,45 @@ cached across the validity window.
 | `estimatedFillSeconds` | From the route's `expectedFillSeconds` and the quote. |
 | `destinationGasWarning` | Set when the member's destination-chain native balance is zero (FR-012). |
 
+### `SelectableAsset` and `NetworkPin` (reused + extended, spec 064)
+
+The selector's option shape already exists in `useSelectableAssets` and needs **no new fields**:
+
+```js
+{ key: '137:0x3c49…', chainId: 137, symbol: 'USDC', networkName: 'Polygon', balance, … }
+```
+
+`chainId` is a **number for EVM networks and a string for Bitcoin** (spec 061), which is exactly the
+discriminator needed to exclude non-EVM assets from pair and bridge contexts with a stated reason
+(FR-066) — no separate flag required.
+
+**`NetworkPin`** — transient UI state, never persisted:
+
+| Field | Notes |
+|---|---|
+| `pinnedChainId` | Set when the first asset of a pair, or the bridge source, is chosen. |
+| `pinnedSymbol` | Only meaningful for the bridge predicate. |
+| `mode` | `'same-network'` (pairs: swap, liquidity) \| `'other-network-same-asset'` (bridge). |
+
+One helper, two predicates (`lib/assets/networkPin.js`):
+
+```js
+// pairs — a swap or an LP position lives on ONE network
+samePair      = (o, pin) => o.chainId === pin.pinnedChainId
+// bridge — the whole point is that the destination is a DIFFERENT network
+bridgeDest    = (o, pin) => o.symbol === pin.pinnedSymbol && o.chainId !== pin.pinnedChainId
+```
+
+Keeping both in one module is deliberate: they are opposite rules over the same mechanism, and applying
+`samePair` to the bridge would silently downgrade it to a same-chain transfer that still quotes and
+still signs. Co-locating them makes the inversion visible at the point of use (research R11b).
+
+**Re-pinning**: changing the first asset moves the pin and **revalidates** the second selection, clearing
+it when it no longer satisfies the predicate (FR-062) rather than leaving an impossible pair assembled.
+
+**Search** (FR-064) is a pure view-layer filter over `symbol`, asset name, and `networkName` — it never
+alters eligibility, so a searched-for asset that is not selectable still shows its disabled reason.
+
 ### `PoolOption` / `LiquidityPosition`
 
 `PoolOption` merges the on-chain `PoolListing` with live protocol reads (estimated return, total
@@ -201,18 +240,19 @@ sourced from the underlying protocol, never a guarantee (spec Assumptions).
 
 1. **Three new networks**: Arbitrum (42161), Base (8453), Optimism (10), each a full entry (RPC,
    explorer, native currency, stablecoin, portfolio wiring) so they are first-class for select, view,
-   and send/receive (FR-006b) — not bridge-only stubs.
+   and send/receive (FR-006b) — not bridge-only stubs. Because every surface lists all networks'
+   assets together (FR-059), each new network's assets must also resolve logos and network badges.
 2. **A per-network `bridge` block** (`{ spokePool, hubPool | null }`) used only as the build-time
    fallback for display; authoritative values are read from the router at runtime (FR-051).
-3. **A per-network `dex` block** on the four networks that lack one, with addresses taken from each
-   chain's own deployment record — **Base's differ from the canonical set** (research R4b).
+3. **A per-network `dex` block** on the four networks that lack one — **including Ethereum**, which
+   enables in-app swap there — with addresses taken from each chain's own deployment record; **Base's
+   differ from the canonical set** (research R4b).
 
 **Capability split** (FR-016a, research R4a): `capabilities.dex` stops being `Boolean(this.dex)` and
-becomes an explicit per-network flag, preserving every existing network's current behavior — notably
-Ethereum, which deliberately ships without in-app swap (spec 048). A new
-`capabilities.liquidity` is derived from `dex.positionManager` presence **plus** a deployed
-`liquidityRouter`. Adding Uniswap addresses for LP therefore cannot switch on the Trade surface, the
-portfolio Swap action, or DEX spot pricing as a side effect.
+becomes an explicit per-network flag; `capabilities.liquidity` is derived from `dex.positionManager`
+presence **plus** a deployed `liquidityRouter`. Both are **on for all five mainnets** — Ethereum now
+gains in-app swap, superseding spec 048. The split is kept because the two have different prerequisites
+and a config edit must never toggle two product surfaces at once.
 
 **Boundary guard**: every entry point into bridge and liquidity code paths asserts a numeric chain id
 via the existing `isBitcoinNetworkId` check, so Bitcoin string ids can never reach

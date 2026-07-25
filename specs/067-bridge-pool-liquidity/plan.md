@@ -148,6 +148,10 @@ test/
 
 frontend/src/
 ├── components/
+│   ├── ui/
+│   │   └── UniversalAssetSelect.jsx      # EDIT — add search/filter + `pin` predicate support
+│   │                                     #        (spec 064 component; benefits Pay/Request/Wager/
+│   │                                     #         Transfer too — all get search)
 │   ├── wallet/
 │   │   ├── BridgeView.jsx                # NEW — Transfer → Bridge tab
 │   │   ├── BridgeQuoteCard.jsx           # NEW — itemized costs + staleness
@@ -168,6 +172,10 @@ frontend/src/
 │   │   ├── acrossQuotes.js               # NEW — gateway quote client + staleness
 │   │   ├── bridgeStatus.js               # NEW — state machine + reconciliation
 │   │   └── bridgeCopy.js                 # NEW — InfoTips + disclosures
+│   ├── assets/
+│   │   └── networkPin.js                 # NEW — shared pin helper; ONE mechanism, two predicates:
+│   │                                     #       samePair (o.chainId === pin) vs bridgeDest
+│   │                                     #       (o.symbol === pin.symbol && o.chainId !== pin.chainId)
 │   ├── liquidity/
 │   │   ├── liquidityRouter.js            # NEW — router reads + mint call builder
 │   │   ├── uniswapPositions.js           # NEW — full-range ticks, position reads
@@ -224,7 +232,9 @@ dependency surface and the audit surface small.
 | **Across HubPool LP left outside the router** (fee-free, direct member call) | `addLiquidity(address,uint256)` has no recipient parameter, so any wrapper receives the LP tokens and becomes custodian of a position the member could then never exit (research R3). | Routing it for fee symmetry would violate FR-021/FR-023 and repeat exactly what spec 066 already rejected for delegated staking. Shipping the fee here is not worth making a position un-exitable. |
 
 | **Adding three networks** (Arbitrum, Base, Optimism) inside a feature nominally about two surfaces | A bridge with one route is not a bridge. Only Ethereum and Polygon qualified among the existing chain set, so maximizing coverage — the explicit product requirement (FR-006a) — is impossible without them. All three carry both protocols and are the highest-volume bridge destinations, taking launch from 2 routes to 20. FR-006b makes them first-class rather than bridge-only, because delivering a member's assets to a network the app cannot display or spend would be worse than not offering the route. | Shipping Ethereum ↔ Polygon alone was offered and rejected: it makes the headline capability a single route, and the network work would land later anyway with the same cost plus a migration. |
-| **Splitting `capabilities.dex`** into an explicit swap flag and a derived `capabilities.liquidity` | `capabilities.dex` is currently `Boolean(this.dex)`, and it gates the Trade surface, the portfolio Swap action, and DEX spot pricing. Adding Uniswap addresses to Ethereum to enable LP would silently switch on in-app swapping there — reversing spec 048's deliberate decision as a side effect of an unrelated feature (research R4a, FR-016a). | Leaving the derivation alone and accepting the swap surface would be a product change nobody asked for, made invisibly. Adding a parallel address block instead would duplicate addresses and invite them to drift. |
+| **Enabling in-app swap on Ethereum**, superseding spec 048 | Requested directly: the DEX ships on every network where Uniswap is deployed. Spec 048's no-swap-on-Ethereum state reflected the absence of `dex` config at the time, not a standing constraint (research R4a, FR-016a). | Leaving Ethereum swap-less while shipping Ethereum LP would have been an arbitrary split of one protocol integration across two surfaces. |
+| **Splitting `capabilities.dex`** into an explicit swap flag and a derived `capabilities.liquidity` | Swap and LP have different prerequisites — LP additionally needs `liquidityRouter` deployed — so a single `Boolean(this.dex)` cannot represent "pools worth supplying, swap not yet exposed" or the reverse, and makes a routine config edit change two product surfaces at once. | Keeping the derived boolean would mean every future network config edit silently toggles both surfaces, which is how the Ethereum situation arose in the first place. |
+| **Extending the shared `UniversalAssetSelect`** (spec 064) rather than building a selector for these surfaces | Members must reach assets on all five networks without switching networks (FR-059). The spec-064 component already renders nested asset+network logos over the full cross-network holdings, and its option shape already carries `chainId` and `networkName`. Adding search and a pin predicate there costs less than a new component and upgrades Pay/Request/Wager/Transfer at the same time. | A bespoke selector would fork the nested-logo treatment, duplicate `useSelectableAssets` wiring, and leave the four existing surfaces without search — three costs for no benefit. |
 
 **Not a violation, recorded for reviewers**: one asymmetry survives the expansion — bridge liquidity
 (Across HubPool) is **Ethereum-only** because that contract is L1 by design, while trading liquidity is

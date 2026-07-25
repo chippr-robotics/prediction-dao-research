@@ -67,6 +67,23 @@
    because Uniswap explicitly warns its addresses are not identical across chains (Base's differ).
    SC-017 – SC-019 added to make all three testable.
 
+**Iteration 4 — post-planning revision (2026-07-25):** three further requester decisions; re-validated,
+all items still pass.
+
+1. *Ethereum gets the DEX* — FR-016a revised: in-app swapping ships on every network where Uniswap is
+   deployed, Ethereum included. This **supersedes spec 048's** no-in-app-swap decision and is recorded
+   as a deliberate product change in research R4a and the plan's Complexity Tracking, not an accident of
+   configuration. The swap/liquidity capability split is kept (different prerequisites), but both flags
+   are on for all five mainnets.
+2. *No in-app chain switching* — FR-059 – FR-061 added: every asset choice lists holdings across all
+   supported networks with the existing nested asset+network logo, reusing spec 064's
+   `UniversalAssetSelect` rather than adding a second selector; any network switch happens at signing.
+3. *Pair pinning, search* — FR-062 – FR-066 added. **FR-063 is the one to watch**: the Bridge surface is
+   the deliberate inverse of the same-network pair rule, and applying FR-062 to it would silently reduce
+   a bridge to a same-chain transfer that still quotes and still signs. Both predicates live in one
+   helper so the inversion is visible at the point of use (research R11b), and quickstart 14f tests it
+   directly. SC-020 – SC-022 added.
+
 **Iteration 2 — re-validation:** all items pass. Remaining watch-items for `/speckit-plan`:
 
 - SC-005's usability target (8 in 10 participants can explain impermanent loss) requires a real
