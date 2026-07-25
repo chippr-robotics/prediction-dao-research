@@ -11,7 +11,7 @@ import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 // Main flow
-import LandingPage from './components/LandingPage'
+import LandingRoute from './components/LandingRoute'
 import HomeScreen from './components/fairwins/HomeScreen'
 import WagersPage from './components/fairwins/WagersPage'
 import Header from './components/Header'
@@ -24,6 +24,7 @@ import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import PoolPage from './pages/PoolPage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
+import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
 import { ActivityProvider } from './contexts/ActivityProvider.jsx'
 import { NavDrawerProvider } from './contexts/NavDrawerContext.jsx'
 import ActivityNotificationBridge from './components/notifications/ActivityNotificationBridge'
@@ -65,6 +66,9 @@ function AppLayout() {
         <ActivityNotificationBridge />
         {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
         <EntryGate />
+        {/* Entering the app with no account opens the unlock dialog by itself —
+            every surface below is inert until one is connected. */}
+        <AutoConnectPrompt />
         <Outlet />
         {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
             drawer carries its own copy; /wallet relies on that to avoid duplication. */}
@@ -128,7 +132,7 @@ function AppContent() {
       <Routes>
         <Route
           path="/"
-          element={<LandingPage />}
+          element={<LandingRoute />}
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />

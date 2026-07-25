@@ -668,8 +668,13 @@ export function WalletProvider({ children }) {
     address,
     account: address, // Alias for backwards compatibility
     isConnected,
+    // wagmi's raw account status ('connecting' | 'reconnecting' | 'connected' |
+    // 'disconnected'). Surfaces that act on "definitely signed out" — the
+    // auto-connect prompt, the landing forward — must wait for it to SETTLE so
+    // they never race the eager reconnect of a stored session (spec 045 FR-004).
+    connectionStatus: accountStatus,
     chainId,
-    
+
     // Available connectors
     connectors,
     
