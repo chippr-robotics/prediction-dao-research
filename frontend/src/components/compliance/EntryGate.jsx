@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentDocument } from '../../utils/legalDocs'
+import { readAck, writeAck } from '../../utils/entryGateAck'
+import { keepOnLanding } from '../../utils/appEntry'
 import './EntryGate.css'
 
 /**
@@ -15,16 +17,6 @@ import './EntryGate.css'
  *
  * WCAG 2.1 AA: role="dialog" + aria-modal, focus moved in and trapped, labelled controls.
  */
-
-const ACK_KEY = 'fairwins.entryGate.ack.v1'
-
-function readAck() {
-  try {
-    return JSON.parse(localStorage.getItem(ACK_KEY) || 'null')
-  } catch {
-    return null
-  }
-}
 
 export default function EntryGate() {
   const navigate = useNavigate()
@@ -59,11 +51,22 @@ export default function EntryGate() {
   const risk = getCurrentDocument('risk')
 
   const onEnter = () => {
-    const record = { terms: terms?.hash || null, risk: risk?.hash || null, at: new Date().toISOString() }
-    try { localStorage.setItem(ACK_KEY, JSON.stringify(record)) } catch { /* storage disabled */ }
+    // writeAck broadcasts, so the auto-connect prompt can open the unlock
+    // dialog the moment the gate clears — same visit, no reload.
+    const record = writeAck({
+      terms: terms?.hash || null,
+      risk: risk?.hash || null,
+      at: new Date().toISOString(),
+    })
     setAck(record)
   }
-  const onLeave = () => navigate('/')
+  // Leaving is a deliberate request for the marketing page: pin it for this tab
+  // session so the landing route does not forward a returning visitor straight
+  // back into the app they just stepped out of.
+  const onLeave = () => {
+    keepOnLanding()
+    navigate('/')
+  }
 
   return (
     <div className="entry-gate-overlay" role="presentation">

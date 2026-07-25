@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { useWallet } from '../hooks/useWalletManagement'
 import { useVouchers } from '../hooks/useVouchers'
@@ -24,7 +24,7 @@ const MAX_QUANTITY = 50
  * ABIs come from synced config (Principle V); privacy is disclosed honestly.
  */
 export default function VouchersPage() {
-  const { account, isConnected } = useWallet()
+  const { account, isConnected, openConnectModal } = useWallet()
   const { getPrice, ROLE_HASHES, TIER_IDS, usingFallbackPrices } = useTierPrices()
   const {
     status, error, lastTxHash, voucherAvailable, batchMintAvailable,
@@ -93,7 +93,20 @@ export default function VouchersPage() {
     refreshVouchers()
   }, [refreshVouchers])
 
-  if (!isConnected) return <Navigate to="/" replace />
+  // Disconnected members stay HERE rather than being bounced to the landing
+  // page: the app's unlock dialog is already opening over this route, and
+  // connecting drops them straight into the vouchers they came for.
+  if (!isConnected) {
+    return (
+      <div className="vch-page">
+        <header className="vch-header">
+          <h1>Membership Vouchers</h1>
+          <p className="vch-sub">Connect an account to buy, gift, or redeem a membership voucher.</p>
+        </header>
+        <Button onClick={openConnectModal}>Connect</Button>
+      </div>
+    )
+  }
 
   // Resolve the gift recipient: prefer the ENS-resolved address, else accept a
   // directly-typed hex address. Empty when neither is valid yet.

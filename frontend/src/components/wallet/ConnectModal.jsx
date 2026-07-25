@@ -10,9 +10,15 @@
  * won't reliably offer the choice, and even a lone recorded passkey must not
  * silently pin the member to index 0) → ceremony pinned to the chosen
  * credential, or a discoverable request for a passkey not yet in the book.
+ *
+ * Returning members open STRAIGHT on that chooser: when this browser already
+ * knows a usable passkey there is nothing to decide on the methods list, so the
+ * dialog opens as an unlock prompt (one tap to sign in) instead of methods →
+ * Passkey → chooser. The choice itself is untouched — #849's "never guess which
+ * account" still holds — and "More sign-in options" reaches every connector.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useConnectorAvailability } from '../../hooks/useConnectorAvailability'
 import { getWalletLabel, getWalletIcon } from '../../utils/walletLabel'
@@ -38,17 +44,24 @@ function ConnectModal() {
 function ConnectModalDialog() {
   const { isConnectModalOpen, closeConnectModal, connectWallet, connectors, isConnected } = useWallet()
   const availability = useConnectorAvailability()
-  const [step, setStep] = useState('methods') // methods | explainer | picker
+  // Computed once per opening (the dialog only mounts while open): the passkeys
+  // this browser can sign in with right now.
+  const knownAccounts = useMemo(() => knownCredentials().filter(isTransactComplete), [])
+  const unlockFirst = knownAccounts.length > 0
+  const [step, setStep] = useState(unlockFirst ? 'picker' : 'methods') // methods | explainer | picker
   const [pendingId, setPendingId] = useState(null)
   const [error, setError] = useState(null)
-  const [pickerAccounts, setPickerAccounts] = useState([])
+  const [pickerAccounts, setPickerAccounts] = useState(knownAccounts)
   const dialogRef = useRef(null)
 
+  // "Back to where this opened" — the methods list normally, the unlock chooser
+  // for a returning member (who would otherwise be dropped a step BACKWARDS
+  // after a cancelled ceremony).
   const reset = useCallback(() => {
-    setStep('methods')
+    setStep(unlockFirst ? 'picker' : 'methods')
     setPendingId(null)
     setError(null)
-  }, [])
+  }, [unlockFirst])
 
   const close = useCallback(() => {
     reset()
@@ -101,8 +114,9 @@ function ConnectModalDialog() {
         await connectWallet(connectorId, opts)
       } catch (err) {
         if (err?.name === 'CeremonyCancelled') {
-          // Clean abort — back to an immediately re-attemptable idle state.
-          setStep('methods')
+          // Clean abort — back to an immediately re-attemptable idle state:
+          // the unlock chooser for a returning member, the methods list otherwise.
+          setStep(unlockFirst ? 'picker' : 'methods')
         } else {
           setError(err?.message || 'Connection failed. Please try again.')
         }
@@ -110,7 +124,7 @@ function ConnectModalDialog() {
         setPendingId(null)
       }
     },
-    [connectWallet]
+    [connectWallet, unlockFirst]
   )
 
   const startPasskey = useCallback(() => {
@@ -205,7 +219,13 @@ function ConnectModalDialog() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="connect-modal__header">
-          <h3>{step === 'picker' ? 'Choose an account' : 'Connect to FairWins'}</h3>
+          <h3>
+            {step !== 'picker'
+              ? 'Connect to FairWins'
+              : unlockFirst
+                ? 'Unlock your account'
+                : 'Choose an account'}
+          </h3>
           <button type="button" className="connect-modal__close" onClick={close} aria-label="Close">
             ×
           </button>
@@ -302,8 +322,11 @@ function ConnectModalDialog() {
             >
               Create a new account
             </button>
-            <button type="button" className="connect-modal__back" onClick={reset}>
-              Back
+            {/* Always reaches the full connector list — a returning member who
+                opened straight on the chooser can still pick WalletConnect or a
+                browser wallet from here. */}
+            <button type="button" className="connect-modal__back" onClick={() => setStep('methods')}>
+              {unlockFirst ? 'More sign-in options' : 'Back'}
             </button>
           </div>
         )}

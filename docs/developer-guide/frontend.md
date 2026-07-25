@@ -40,13 +40,41 @@ frontend/src/
 
 | Route | Page | Notes |
 |-------|------|-------|
-| `/` | LandingPage | public marketing page |
+| `/` | LandingRoute | public marketing page — forwards returning visitors to `/app` (see below) |
 | `/terms`, `/risk`, `/privacy` | LegalDocPage | versioned, hash-linked legal documents |
 | `/app` (aliases `/main`, `/fairwins`) | Dashboard | main workspace, inside `AppLayout` (Header + EntryGate + Footer) |
 | `/wallet` | WalletPage | Account Center: Account / Membership / Security / Preferences / Swap tabs |
 | `/friend-market/accept` | MarketAcceptancePage | QR / deep-link wager acceptance (`?marketId=N`) |
 | `/admin` | AdminPanel | the operations control plane, grouped by operator area; role-gated (Admin / Guardian / Account Moderator / Role Manager / Compliance Officer) — see `docs/runbooks/operations-control-plane.md` |
 | `*` | redirect to `/` | |
+
+### Getting to a connected account
+
+Nothing in the app works without a connected account, so the path to one is
+kept as short as it can honestly be:
+
+1. **`/` forwards returning visitors** (`components/LandingRoute.jsx`). Any
+   browser that has attached an account before — a recorded passkey, or a wagmi
+   `recentConnectorId` — and has acknowledged the entry gate goes straight to
+   `/app`. First-time visitors still get the marketing page. Escape hatches,
+   both remembered for the tab session: **Leave** on the entry gate, and
+   `/?stay=1`.
+2. **Entering the app prompts to unlock** (`components/wallet/AutoConnectPrompt.jsx`,
+   mounted in `AppLayout`). It opens the shared ConnectModal once, after the
+   eligibility gate is acknowledged and after wagmi's eager reconnect has
+   **settled** (`connectionStatus` on the wallet context) — a restored session
+   is never interrupted, and a deliberate sign-out is never undone by a
+   re-prompt. Dismissing it leaves the member disconnected with the header and
+   in-panel Connect buttons intact.
+3. **The dialog opens where the member can act** (`components/wallet/ConnectModal.jsx`).
+   When this browser already knows a usable passkey it opens on the account
+   chooser — unlock in one tap instead of methods → Passkey → chooser. The
+   choice itself is unchanged (issue #849: the app never guesses which account),
+   and *More sign-in options* reaches every connector. A browser with no
+   recorded passkey still opens on the methods list.
+
+Spec 045 FR-001 still holds throughout: these surfaces *open* the one shared
+ConnectModal, they never render connector choices of their own.
 
 ## Getting started
 
