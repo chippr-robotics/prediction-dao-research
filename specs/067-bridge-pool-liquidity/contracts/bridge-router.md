@@ -4,7 +4,8 @@
 **Precedent**: `contracts/staking/StakingRouter.sol` (spec 066) — same shape, 252 lines.
 
 The per-network control surface for Transfer → Bridge, and the path a member's bridge takes so the
-`bridge.transfer` platform fee reaches the treasury atomically.
+`bridge.transfer` platform fee reaches the treasury atomically. Deployed to all five mainnet networks
+(Ethereum, Polygon, Arbitrum, Base, Optimism), giving 20 directed routes per asset.
 
 ---
 
@@ -137,7 +138,9 @@ produces no treasury transfer and byte-identical downstream behavior (FR-029); p
 
 **Fork** (`test/fork/bridgeRouter.fork.test.js`) — against real Across contracts:
 
-1. Happy path: Polygon → Ethereum USDC bridge; assert fee at treasury, net deposited, router balance zero.
+1. Happy path: Polygon → Ethereum USDC bridge; assert fee at treasury, net deposited, router balance
+   zero. Repeat across a representative sample of the five-network mesh, including an L2 → L2 route
+   (Base → Arbitrum) that never touches L1 from the member's perspective.
 2. **Expiry refund (MANDATORY, blocks merge)**: submit with a near `fillDeadline`, let it expire, and
    assert the refund lands on the **member's** address and **not** the router's. This is the only test
    that can catch the `depositor` bug class; the happy path passes either way.

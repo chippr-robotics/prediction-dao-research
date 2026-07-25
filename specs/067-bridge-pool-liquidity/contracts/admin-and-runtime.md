@@ -16,12 +16,12 @@ are member-value surfaces with their own killswitches, not protocol wiring, so t
   label: 'Liquidity',
   items: [
     (isAdmin || isLiquidityAdmin || isGuardian) && item('bridge', 'Bridge'),
-    (isAdmin || isLiquidityAdmin || isGuardian) && item('pool',   'Pool'),
+    (isAdmin || isLiquidityAdmin || isGuardian) && item('supply', 'Supply'),
   ].filter(Boolean),
 }
 ```
 
-`ADMIN_TAB_ICONS`: `bridge: 'transfer'`, `pool: 'sprout'`. `buildAdminNavGroups` takes a new
+`ADMIN_TAB_ICONS`: `bridge: 'transfer'`, `supply: 'sprout'`. `buildAdminNavGroups` takes a new
 `isLiquidityAdmin` flag, resolved from `LIQUIDITY_ADMIN_ROLE` on either router.
 
 An operator holding none of admin / liquidity-admin / guardian sees neither tab and cannot reach either
@@ -36,7 +36,7 @@ Modeled on `StakingTab.jsx` (366 lines) and `ProtocolConfigTab.jsx`.
 | Section | Controls | Role |
 |---|---|---|
 | **Status** | Paused banner; `pause` / `unpause` | `GUARDIAN_ROLE` |
-| **Routes** | Table (asset, origin → destination, enabled, max amount, expected fill). Add / edit / enable / disable / remove | `LIQUIDITY_ADMIN_ROLE` |
+| **Routes** | Table (asset, origin → destination, enabled, max amount, expected fill) across the 20 directed mainnet routes. Add / edit / enable / disable / remove; bulk enable/disable per network pair | `LIQUIDITY_ADMIN_ROLE` |
 | **Addresses** | `spokePool`, `feeRouter` — current value shown beside the input; invalid input rejected with a reason before submit (FR-042) | `LIQUIDITY_ADMIN_ROLE` |
 | **Fee** | `bridge.transfer` live rate + 250 bps cap, **read-only**, with a link to the Fees tab | read-only |
 | **Operations** (FR-047) | In-flight bridges; transfers past `expectedBy` needing attention; recent deliveries and refunds; gateway health | read-only |
@@ -49,12 +49,12 @@ not in that path. The tab should say so, so nobody goes looking for a rescue but
 
 ---
 
-## Pool tab (`PoolTab.jsx`)
+## Supply tab (`SupplyTab.jsx`)
 
 | Section | Controls | Role |
 |---|---|---|
-| **Status** | Paused banner; `pause` / `unpause` — **labelled as affecting Uniswap supplies only** | `GUARDIAN_ROLE` |
-| **Pools** | Table (kind, pair/asset, protocol, network, enabled, cap, supplied total, position count). List / edit / retire / set cap | `LIQUIDITY_ADMIN_ROLE` |
+| **Status** | Paused banner; `pause` / `unpause` — **labelled as affecting Uniswap supplies only**. Shown per network across all five deployments | `GUARDIAN_ROLE` |
+| **Pools** | Table (kind, pair/asset, protocol, network, enabled, cap, supplied total, position count) spanning all five networks. List / edit / retire / set cap | `LIQUIDITY_ADMIN_ROLE` |
 | **Addresses** | `positionManager`, `feeRouter` | `LIQUIDITY_ADMIN_ROLE` |
 | **Fee** | `liquidity.deposit` live rate + cap, read-only; an explicit note that bridge-LP pools are fee-free by design with a link to the rationale | read-only |
 | **History** | Decoded router events | read-only |
@@ -100,11 +100,17 @@ absence with a stated reason.
 
 ## Deployment & sync
 
-1. Deploy both UUPS proxies per network (`scripts/deploy/deploy-bridge-liquidity.js`) using
-   `scripts/deploy/lib/upgradeable.js` — never a fresh redeploy on upgrade.
+0. Add Arbitrum (42161), Base (8453), and Optimism (10) to `networks.js` as full networks, and split
+   `capabilities.dex` (explicit swap flag) from `capabilities.liquidity` (derived) — research R4a.
+   Verify each chain's Uniswap and Across addresses against that chain's own deployment record;
+   **Base's Uniswap addresses differ from the canonical set** (R4b).
+1. Deploy both UUPS proxies to each of the five networks (`scripts/deploy/deploy-bridge-liquidity.js`)
+   using `scripts/deploy/lib/upgradeable.js` — never a fresh redeploy on upgrade. The script MUST assert
+   non-empty bytecode at every configured protocol address before writing a deployment record.
 2. Register `bridge.transfer` and `liquidity.deposit` on the network's `FeeRouter` (cap 250 bps, rate 0).
-3. Seed routes and pools per the R8 availability matrix — Ethereum ↔ Polygon bridge routes; Across
-   HubPool `BRIDGE_LP` listings on Ethereum; Uniswap `TRADING_LP` listings on Polygon.
+3. Seed routes and pools per the R8 availability matrix — all 20 directed bridge routes across the five
+   mainnets; Across HubPool `BRIDGE_LP` listings on Ethereum only; Uniswap `TRADING_LP` listings on all
+   five.
 4. Record `bridgeRouter` / `bridgeRouterImpl` / `liquidityRouter` / `liquidityRouterImpl` in
    `deployments/<network>-chain<id>-v2.json`.
 5. `npm run sync:frontend-contracts` — addresses and ABIs reach the frontend only through the generated

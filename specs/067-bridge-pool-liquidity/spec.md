@@ -1,4 +1,4 @@
-# Feature Specification: Transfer — Cross-Chain Bridge & Earn — Pool Liquidity
+# Feature Specification: Transfer — Cross-Chain Bridge & Earn — Supply Liquidity
 
 **Feature Branch**: `067-bridge-pool-liquidity`
 
@@ -32,7 +32,7 @@ This feature closes both gaps with one coherent story about moving and pooling l
    wallet; and then watches the transfer progress truthfully across two chains — source submitted,
    source confirmed, in flight, delivered — never shown as done before the destination chain says so.
 
-2. **Earn → Pool.** The disabled "Bridges" tile becomes a live **Pool** area. A member can supply
+2. **Earn → Supply.** The disabled "Bridges" tile becomes a live **Supply** area. A member can supply
    assets to two kinds of liquidity pools and earn a share of the fees they generate: **bridge
    liquidity pools** (the same third-party bridge networks that settle the Transfer → Bridge flow —
    supplying them is what makes fast bridging possible, and suppliers earn a share of the bridge fees)
@@ -47,9 +47,12 @@ profiles, the platform-fee source of truth, and the sanctions/deny-list guard �
 control surfaces in the admin control panel so availability, routes, curated pools, addresses, rates,
 and emergency stops can be managed without an app redeploy.
 
-**Naming note (member-facing vs. internal):** the Earn area is called **Pool** for members, but
-FairWins already has an unrelated **Wager Pools** system (spec 034) that owns the `pool` vocabulary in
-the activity ledger and notification categories. This feature MUST NOT reuse or overload that
+**Naming note (resolved):** an earlier draft called the Earn area "Pool". It is named **Supply**
+instead. FairWins already has an unrelated **Wager Pools** system (spec 034) — a shared-funds wager
+among a group — which owns the `pool` vocabulary in the activity ledger, the notification categories,
+and the activity feed, where wager-pool events are already tagged with the literal label "Pool".
+"Supply" also matches the verb register of its siblings (Lend, Stake, Supply) and is the verb the
+underlying protocols use for the action itself. This feature MUST NOT reuse or overload the wager-pool
 vocabulary — see FR-039.
 
 ---
@@ -110,9 +113,9 @@ destination-chain transaction. Delivers the full cross-chain move.
 
 ---
 
-### User Story 2 - Supply liquidity to a bridge or Uniswap pool from Earn → Pool (Priority: P1)
+### User Story 2 - Supply liquidity to a bridge or Uniswap pool from Earn → Supply (Priority: P1)
 
-A member opens **Earn** and finds that the greyed-out "Bridges" tile is now a live **Pool** area
+A member opens **Earn** and finds that the greyed-out "Bridges" tile is now a live **Supply** area
 alongside Lend, Rewards, and Stake. Opening it shows a curated list of pools in the same card layout
 as the lending vaults, grouped into two clearly-labelled kinds: **Bridge liquidity** (supply one asset
 to a bridge network so other people's transfers can settle instantly; earn a share of the bridge fees)
@@ -126,21 +129,21 @@ its own line with the net that will be supplied, confirms in their wallet, and s
 position with its current value and earnings to date. They can add to or withdraw a position at any
 time, and withdrawal is never fee-gated.
 
-**Why this priority**: Pooling is the second half of the user's request and the revenue-bearing half.
-It is independently shippable — the Pool area works whether or not a member ever uses Transfer →
+**Why this priority**: Supplying liquidity is the second half of the user's request and the revenue-bearing half.
+It is independently shippable — the Supply area works whether or not a member ever uses Transfer →
 Bridge — and it is what turns the long-dead "Bridges" placeholder into a real feature.
 
-**Independent Test**: With a connected account holding a supported asset, open Earn → Pool, supply to
+**Independent Test**: With a connected account holding a supported asset, open Earn → Supply, supply to
 one bridge pool and one Uniswap pool, and confirm both positions appear with current value and
 earnings; then withdraw from each and confirm the assets return to the wallet. Delivers the full
 supply-earn-withdraw loop.
 
 **Acceptance Scenarios**:
 
-1. **Given** a connected member, **When** they open Earn, **Then** **Pool** appears as a live,
+1. **Given** a connected member, **When** they open Earn, **Then** **Supply** appears as a live,
    selectable area (not a disabled "coming later" tile), and the word "Bridges" no longer labels an
    Earn area.
-2. **Given** a member opens Earn → Pool, **When** the list loads, **Then** each pool card shows the
+2. **Given** a member opens Earn → Supply, **When** the list loads, **Then** each pool card shows the
    pool kind (bridge liquidity or trading liquidity), the asset or asset pair, the protocol and
    network, the estimated return, the total already supplied, and the pool-specific risk summary —
    each concept explained by an info bubble.
@@ -152,17 +155,17 @@ supply-earn-withdraw loop.
    **Then** they see the single asset and amount, the platform fee line and net amount, and an
    explicit disclosure that the supplied asset may be rebalanced across chains and that withdrawals
    depend on available inventory.
-5. **Given** a member holds an open pool position, **When** they open Earn → Pool, **Then** the
+5. **Given** a member holds an open pool position, **When** they open Earn → Supply, **Then** the
    position shows the current value, the earnings accrued so far, and — for trading pools — the
    current asset composition, each labelled as an estimate that moves with the market.
 6. **Given** a member withdraws from a pool, **When** they confirm, **Then** the withdrawal executes
    with **no platform fee**, the position updates or closes, and the returned assets appear in the
    member's balance.
 7. **Given** a pool's underlying protocol is unreachable or the pool has been retired by an operator,
-   **When** the member opens Earn → Pool, **Then** existing positions remain visible and withdrawable
+   **When** the member opens Earn → Supply, **Then** existing positions remain visible and withdrawable
    and the pool is honestly marked as closed to new deposits — never hidden with a member's money
    inside it.
-8. **Given** a member is on a network with no curated pools, **When** they open Earn → Pool, **Then**
+8. **Given** a member is on a network with no curated pools, **When** they open Earn → Supply, **Then**
    the area explains honestly that pooling is not available on this network and names the networks
    where it is.
 
@@ -170,7 +173,7 @@ supply-earn-withdraw loop.
 
 ### User Story 3 - Auxiliary service wiring: ledger, reporting, notifications, fees, sanctions (Priority: P2)
 
-Everything a member does in Bridge and Pool behaves like a first-class FairWins activity rather than a
+Everything a member does in Bridge and Supply behaves like a first-class FairWins activity rather than a
 bolt-on. Bridges and pool actions appear in the unified activity ledger and flow into reporting with
 correct value, direction, and network attribution — including the awkward cases a cross-chain move
 creates, where value leaves one network and arrives on another and must not be double-counted as
@@ -229,12 +232,12 @@ configuration; (d) a wallet on the deny-list is refused at both surfaces before 
 
 ### User Story 4 - Operator control surfaces in the admin control panel (Priority: P2)
 
-An authorized operator opens the admin control panel and finds a **Bridge** view and a **Pool** view
+An authorized operator opens the admin control panel and finds a **Bridge** view and a **Supply** view
 covering every member-facing surface this feature adds. From them they can see live state and change
 it without an app redeploy: which routes and networks are enabled, which protocols and contract
 addresses the flows use, which pools are curated into the member list, what the platform fee rates are
 (read-only here, edited through the platform-fee controls by the fee authorization), what limits apply,
-and what has recently happened. They can **pause and resume** bridging per route and pooling per pool
+and what has recently happened. They can **pause and resume** bridging per route and supplying per pool
 or network in an emergency, with the guarantee that pausing stops new value going in while never
 trapping value that is already in — existing bridges continue to settle and existing positions stay
 withdrawable. Every control action is recorded in an auditable history showing what changed, from what
@@ -255,13 +258,13 @@ nor actionable.
 **Acceptance Scenarios**:
 
 1. **Given** an authorized operator, **When** they open the admin control panel, **Then** a **Bridge**
-   view and a **Pool** view appear in the navigation, gated by the authorizations that permit their
+   view and a **Supply** view appear in the navigation, gated by the authorizations that permit their
    use, and are absent for operators holding none of them.
 2. **Given** an operator with bridge-configuration authorization, **When** they enable or disable a
    route (asset + source network + destination network), **Then** the member-facing Bridge surface
    reflects the change within one member refresh, offering or honestly withholding that route.
 3. **Given** an operator with pool-configuration authorization, **When** they add, edit, or retire a
-   curated pool, **Then** the member-facing Pool list reflects the change within one member refresh;
+   curated pool, **Then** the member-facing Supply list reflects the change within one member refresh;
    a retired pool stops accepting new deposits while existing positions remain visible and
    withdrawable.
 4. **Given** an operator updates a protocol contract address or endpoint used by either flow, **When**
@@ -277,7 +280,7 @@ nor actionable.
 7. **Given** an operator opens the Bridge view, **When** it loads, **Then** they see operational state:
    in-flight bridges, transfers past their expected delivery window needing attention, recent
    completions and refunds, and the health of any supporting service the flow depends on.
-8. **Given** an operator opens the Pool view, **When** it loads, **Then** they see per-pool supplied
+8. **Given** an operator opens the Supply view, **When** it loads, **Then** they see per-pool supplied
    totals, position counts, the live platform fee rate for the pool services with its cap, and the
    pools' current enabled/retired state.
 9. **Given** an operator without the relevant authorization, **When** they attempt any control action
@@ -368,7 +371,7 @@ resolving.
   notifications, and reports must remain unambiguously distinguishable.
 - **The device is closed mid-bridge.** In-flight bridges must be recoverable and resume their true
   status on the next visit — tracking cannot depend on the tab staying open.
-- **An operator retires the last pool on a network.** The Pool area shows the honest empty state, and
+- **An operator retires the last pool on a network.** The Supply area shows the honest empty state, and
   members with positions there can still see and withdraw them.
 
 ## Requirements *(mandatory)*
@@ -384,8 +387,9 @@ resolving.
   and saved routes to the section MUST continue to resolve to it, and any stable internal identifier
   the section is addressed by MUST be preserved rather than renamed.
 - **FR-003**: The Earn section's disabled **"Bridges"** area MUST be replaced by a live area named
-  **Pool**, selectable like Lend, Rewards, and Stake, and the word "Bridges" MUST no longer label an
-  Earn area anywhere.
+  **Supply**, selectable like Lend, Rewards, and Stake, and the word "Bridges" MUST no longer label an
+  Earn area anywhere. The area MUST NOT be named "Pool" — that word belongs to the Wager Pools feature
+  (FR-039).
 - **FR-004**: The Bridge surface MUST live inside the Transfer section alongside the existing send and
   activity surfaces, be reachable by a direct link, and MUST NOT displace or degrade the existing
   same-chain send flow.
@@ -398,6 +402,17 @@ resolving.
 - **FR-006**: Launch coverage MUST be EVM networks only, spanning stablecoins and major native/wrapped
   assets on the supported EVM networks where routes exist; Bitcoin networks MUST be excluded from the
   Bridge surface and their existing send/receive behavior MUST be unaffected.
+- **FR-006a**: Bridging MUST be offered on **every supported EVM network where the settlement protocol
+  is deployed**, in both directions between each such pair — not a single privileged route. Reaching
+  this requires adding **Arbitrum, Base, and Optimism** as supported networks (see FR-006b); together
+  with Ethereum and Polygon they give five mainnet endpoints and twenty directed routes per asset.
+- **FR-006b**: Adding those three networks MUST make them first-class in the app to the same standard as
+  the existing value networks — selectable in the network switcher, included in the portfolio, and
+  usable for send/receive — so a member who bridges to a network can then actually use what arrived.
+  A network MUST NOT be offered as a bridge destination unless the app can display and spend the asset
+  there.
+- **FR-006c**: Networks where the settlement protocol is absent (Ethereum Classic, Mordor) MUST be
+  excluded from the Bridge surface and MUST say so honestly rather than being silently missing.
 - **FR-007**: Before any signature the member MUST see a single quote showing the exact amount expected
   to arrive, every cost as a separately labelled line (bridge protocol fee, destination delivery cost,
   and the FairWins platform fee where one applies), the total cost, and an estimated arrival time.
@@ -423,14 +438,21 @@ resolving.
   quote and in the activity record, with a risk disclosure explaining that settlement depends on that
   third party.
 
-#### Liquidity pools (Earn → Pool)
+#### Liquidity supply (Earn → Supply)
 
-- **FR-015**: The Pool area MUST present a curated list of pools of two kinds, each clearly labelled:
+- **FR-015**: The Supply area MUST present a curated list of pools of two kinds, each clearly labelled:
   **bridge liquidity pools** (single asset supplied to a third-party bridge network) and **trading
   liquidity pools** (an asset pair supplied to Uniswap).
 - **FR-016**: Uniswap positions at launch MUST be **full-range** positions only — supply a pair, earn a
   share of the pool's trading fees, with no member-managed price range, no rebalancing prompts, and no
   out-of-range state.
+- **FR-016a**: Trading liquidity MUST be offered on **every supported network where Uniswap is
+  deployed** — not one privileged network. Enabling it on a network MUST NOT, by itself, switch on
+  unrelated in-app capabilities (notably token swapping, which some networks deliberately ship
+  without): supplying liquidity and swapping MUST be independently controllable per network.
+- **FR-016b**: Protocol contract addresses MUST be resolved per network from that network's own
+  authoritative deployment record. The system MUST NOT assume a protocol uses the same address on
+  every chain — several do not.
 - **FR-017**: Each pool card MUST show the pool kind, the asset or asset pair, the protocol and
   network, the estimated return, the total already supplied, and a pool-kind-specific risk summary,
   with every unfamiliar term explained by an info bubble in the same plain register as the Lend area.
@@ -448,12 +470,12 @@ resolving.
 - **FR-022**: Where a withdrawal cannot be filled in full from available inventory, the member MUST be
   able to withdraw what is available now and be told plainly that the remainder can be withdrawn
   later.
-- **FR-023**: Pooling MUST be non-custodial: the member's wallet is the only signer and FairWins MUST
+- **FR-023**: Supplying liquidity MUST be non-custodial: the member's wallet is the only signer and FairWins MUST
   NOT hold pooled assets between transactions.
 - **FR-024**: A pool retired by an operator, or whose underlying protocol becomes unavailable, MUST
   stop accepting new deposits while remaining visible and withdrawable for members holding a position
   in it — a pool MUST never be hidden while a member's money is inside it.
-- **FR-025**: On a network with no curated pools, the Pool area MUST state that honestly and name the
+- **FR-025**: On a network with no curated pools, the Supply area MUST state that honestly and name the
   networks where pooling is available, with no mock data and no dead controls.
 
 #### Platform fees
@@ -501,14 +523,17 @@ resolving.
   notification category with an independently settable delivery mode, and a newly-added category MUST
   default to being delivered rather than silently off.
 - **FR-039**: The vocabulary these features introduce MUST NOT collide with the existing **Wager
-  Pools** feature: the activity class, notification category, and any identifier used for liquidity
-  pools MUST be distinct from those already used for wager pools, so a member and an auditor can
-  always tell the two apart. The member-facing label "Pool" in Earn is permitted; reusing the
-  underlying identifiers is not.
+  Pools** feature: the member-facing area name, the activity class, the notification category, and any
+  identifier used for liquidity supply MUST all be distinct from those already used for wager pools, so
+  a member and an auditor can always tell the two apart. "Pool" remains reserved for wager pools — a
+  shared-funds wager among a group.
+- **FR-039a**: Where an existing surface already labels wager-pool activity ambiguously as "Pool", that
+  label MUST be disambiguated (e.g. to "Wager Pool") so the two features never appear under one word in
+  the same list.
 
 #### Operator control surfaces
 
-- **FR-040**: The admin control panel MUST provide a **Bridge** control view and a **Pool** control
+- **FR-040**: The admin control panel MUST provide a **Bridge** control view and a **Supply** control
   view covering every member-facing surface this feature adds, each gated by the authorizations that
   permit its use and absent for operators holding none of them.
 - **FR-041**: Operators MUST be able to enable and disable individual bridge routes (asset + source
@@ -518,7 +543,7 @@ resolving.
   depend on, with the current value shown and obviously-invalid input rejected with a clear reason
   before it takes effect.
 - **FR-043**: Operators holding the emergency authorization MUST be able to **pause and resume**
-  bridging per route and pooling per pool or network. A pause MUST stop new bridges and new deposits
+  bridging per route and supplying per pool or network. A pause MUST stop new bridges and new deposits
   while allowing in-flight bridges to settle and existing positions to be withdrawn — a pause MUST
   never trap member value.
 - **FR-044**: The emergency pause MUST remain exercisable while optional supporting services are
@@ -532,7 +557,7 @@ resolving.
 - **FR-047**: The Bridge control view MUST surface operational state: in-flight bridges, transfers past
   their expected delivery window needing attention, recent completions and refunds, and the health of
   any supporting service the flow depends on.
-- **FR-048**: The Pool control view MUST surface per-pool supplied totals, position counts, current
+- **FR-048**: The Supply control view MUST surface per-pool supplied totals, position counts, current
   enabled/retired state, and the live platform fee rate with its cap — **read-only** for the fee, which
   is edited through the existing platform-fee controls by the fee authorization.
 - **FR-049**: Access MUST be least-privilege: route and pool configuration require a bridge/liquidity
@@ -612,7 +637,7 @@ resolving.
 - **SC-005**: A member who has never provided liquidity can supply to a curated pool in under 2
   minutes and, in usability testing, can correctly state in their own words what impermanent loss means
   for their trading position — at a rate of at least 8 in 10 participants.
-- **SC-006**: Pool withdrawal is available and free of platform fees for 100% of open positions,
+- **SC-006**: Supply withdrawal is available and free of platform fees for 100% of open positions,
   including positions in pools that have been retired or whose underlying protocol has become
   unavailable.
 - **SC-007**: 100% of member actions on both surfaces appear in the unified activity ledger and in
@@ -638,6 +663,15 @@ resolving.
   Transfer section, with zero broken links introduced by the rename.
 - **SC-016**: Each of the three content series contains a new, indexed entry for this feature whose
   description of fees, risks, timing, and availability matches the shipped behavior.
+- **SC-017**: Bridging is available in both directions between **every** pair of supported networks
+  where the settlement protocol is deployed — at launch, five mainnet networks and twenty directed
+  routes per supported asset — with zero pairs silently missing.
+- **SC-018**: Trading liquidity is offered on every supported network where Uniswap is deployed, and
+  enabling it on a network changes no unrelated capability on that network (verified specifically for
+  networks that deliberately ship without in-app swapping).
+- **SC-019**: Every newly added network is usable end to end — selectable, visible in the portfolio,
+  and able to send and receive — so no member can bridge to a network where the asset then becomes
+  invisible or unspendable.
 
 ## Assumptions
 
@@ -650,15 +684,23 @@ resolving.
   Concentrated-liquidity ranges, range presets, rebalancing, and auto-managed LP vaults are explicitly
   out of scope for this feature.
 - **Asset and chain coverage (decided)**: launch covers **EVM networks only** — stablecoins plus major
-  native/wrapped assets on the supported EVM networks where routes exist. Bitcoin (spec 061) remains
-  send/receive-only and is out of scope for both Bridge and Pool.
+  native/wrapped assets. Bitcoin (spec 061) remains send/receive-only and is out of scope for both
+  Bridge and Supply.
+- **Network expansion (decided)**: coverage is maximized rather than minimal. **Arbitrum, Base, and
+  Optimism are added as supported networks** alongside Ethereum and Polygon, because both underlying
+  protocols are deployed on all five and a bridge with one route is not a bridge. This is deliberate
+  scope growth beyond the two surfaces: the three new networks become first-class for portfolio,
+  send/receive, and network switching (FR-006b). Ethereum Classic and Mordor support neither protocol
+  and stay excluded.
+- **Earn area name (decided)**: the area is **Supply**, not "Pool". "Pool" stays with the Wager Pools
+  feature, where it accurately describes a shared-funds wager among a group.
 - The section rename is **label-only**: the section's stable internal identifier and its existing
   routes are preserved so deep links, saved links, and tests keep working — the same approach already
   used elsewhere where a section's display name differs from its identifier.
 - Fee rates for both new services **ship at zero** and are raised deliberately by the fee
   authorization, so launch behavior is fee-free and identical to the pre-feature flows until an
   operator acts.
-- Pool positions are held by the member's own wallet in the underlying protocol; FairWins reads and
+- Supply positions are held by the member's own wallet in the underlying protocol; FairWins reads and
   displays them. Any protocol-issued position token belongs to the member.
 - Estimated returns, position values, and earnings are **estimates sourced from the underlying
   protocols** and are refreshed on those protocols' own schedules; they are labelled as estimates and
@@ -686,7 +728,7 @@ resolving.
   surfaces.
 - **Reporting** — consumes the new ledger entries.
 - **Admin control panel and its role-gated navigation** — hosts the two new control views.
-- **Earn section (spec 050)** — hosts the Pool area and supplies the card and disclosure patterns to
+- **Earn section (spec 050)** — hosts the Supply area and supplies the card and disclosure patterns to
   match.
 - **Transfer section** — hosts the Bridge surface alongside the existing send and activity flows.
 - **Wager Pools (spec 034)** — not a functional dependency, but the owner of the existing `pool`

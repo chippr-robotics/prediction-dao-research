@@ -13,7 +13,9 @@ contract, or gateway code (FR-026, FR-027).
 | `BRIDGE_TRANSFER` | `"bridge.transfer"` | A bridge submission (value-out) | **250 bps** | **0 bps** | wrapped |
 | `LIQUIDITY_DEPOSIT` | `"liquidity.deposit"` | A Uniswap full-range supply (value-in) | **250 bps** | **0 bps** | wrapped |
 
-Registration happens once at deploy via `registerService(serviceId, capBps, kind)`. The cap is immutable
+Registration happens once at deploy via `registerService(serviceId, capBps, kind)`, **per network** —
+the `FeeRouter` is per-network, so both services are registered on each of the five deployments and a
+rate can differ per network if operators ever choose. The cap is immutable
 after registration — a later `setFeeBps` above it reverts inside `FeeRouter`, which is the protection
 that makes "capped at 250 bps" a member guarantee rather than a policy statement.
 
@@ -70,9 +72,11 @@ Estimated arrival             ~2 minutes
 
 **Pool supply confirm step** — fee line plus net per token, and the kind-specific disclosure gate:
 
-- `TRADING_LP`: impermanent-loss disclosure rendered **inline and visible**, not behind a tooltip, and
+- `TRADING_LP` (available on all five networks): impermanent-loss disclosure rendered **inline and
+  visible**, not behind a tooltip, and
   the confirm control stays disabled until it has been shown (FR-018).
-- `BRIDGE_LP`: rebalancing + inventory disclosure, same treatment (FR-019), and **no fee line at all**
+- `BRIDGE_LP` (Ethereum only — the HubPool is an L1 contract): rebalancing + inventory disclosure, same
+  treatment (FR-019), and **no fee line at all**
   — it is fee-free, and showing a `0.00` line would imply a fee that could later appear.
 
 **Zero-rate rule** (FR-029): a zero or unset rate renders **no fee line whatsoever** — not a line

@@ -2,8 +2,8 @@
 
 **Path**: `contracts/liquidity/LiquidityRouter.sol` · **Pattern**: UUPS proxy via `UUPSManaged`
 
-Two jobs: (1) the fee-charging path for **Uniswap V3 full-range** supplies, and (2) the per-network
-registry and killswitch for **both** curated pool kinds — including the Across bridge pools whose
+Deployed to all five mainnet networks. Two jobs: (1) the fee-charging path for **Uniswap V3
+full-range** supplies, and (2) the per-network registry and killswitch for **both** curated pool kinds — including the Across bridge pools whose
 deposits do *not* pass through it.
 
 ---
@@ -18,7 +18,7 @@ deposits do *not* pass through it.
 This mirrors spec 066's ruling on delegated staking: a fee is charged only where it can be charged
 atomically **without taking custody**. See [research.md](../research.md) R3.
 
-Consequence the admin tab must state honestly: for `BRIDGE_LP`, `enabled = false` is respected by the
+Consequence the Supply admin tab must state honestly: for `BRIDGE_LP`, `enabled = false` is respected by the
 **app**, not enforced by a contract. It is a listing flag, not a chain-level stop. Do not present it as
 an on-chain killswitch.
 
@@ -135,6 +135,8 @@ treasury transfer and identical behavior (FR-029); pause blocks supply only; no 
 1. Full-range mint on a live pool; assert both fee legs at treasury, **NFT owned by the member**, router
    balances zero, approvals zeroed.
 2. Tick bounds correct for each of the three fee tiers.
+2a. Run the mint case on **each** of the five networks — in particular Base, whose Uniswap addresses
+   differ from the canonical set (research R4b); a copied address would revert or hit a foreign contract.
 3. Unspent-amount refund returns to the member.
 4. Member exits directly via `decreaseLiquidity` + `collect` **without touching the router**, including
    while the router is paused and while the pool is retired.

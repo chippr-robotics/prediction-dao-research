@@ -1,4 +1,4 @@
-# Implementation Plan: Transfer — Cross-Chain Bridge & Earn — Pool Liquidity
+# Implementation Plan: Transfer — Cross-Chain Bridge & Earn — Supply Liquidity
 
 **Branch**: `claude/fairwins-bridge-liquidity-c5yq38` | **Date**: 2026-07-25 | **Spec**: [spec.md](./spec.md)
 
@@ -17,16 +17,18 @@ proved.
   `bridge.transfer` fee to the treasury and calls `SpokePool.depositV3` with **`depositor` set to the
   member** so an unfilled deposit refunds to *them*, not to the router. In-flight state lives in the
   client ledger store and reconciles on load.
-- **Earn → Pool.** Replace the disabled "Bridges" tile with a live **Pool** area listing two curated
+- **Earn → Supply.** Replace the disabled "Bridges" tile with a live **Supply** area listing two curated
   kinds. Uniswap full-range positions mint through **`LiquidityRouter.mintFullRangeWithFee`** (fee
-  charged; the NFT goes straight to the member via `MintParams.recipient`). Across HubPool deposits go
+  charged; the NFT goes straight to the member via `MintParams.recipient`), on all five mainnet
+  networks. Across HubPool deposits go
   **direct and fee-free** — `addLiquidity` has no recipient parameter, so routing them would take
   custody of the LP tokens.
 
-Three research findings shaped this plan more than the spec anticipated, and each is a safety property
-rather than a preference: the **`depositor` refund address** (R2), the **absent `recipient` on
-`addLiquidity`** (R3), and the **existing wager-pool feed label already reading "Pool"** (R6). See
-[research.md](./research.md).
+Five research findings shaped this plan more than the spec anticipated, and each is a correctness or
+safety property rather than a preference: the **`depositor` refund address** (R2), the **absent
+`recipient` on `addLiquidity`** (R3), **enabling LP must not enable swapping** (R4a), **Uniswap
+addresses differ per chain** (R4b), and the **existing wager-pool feed label already reading "Pool"**
+(R6). See [research.md](./research.md).
 
 Both routers hold their surface's route/pool curation, limits, and emergency pause on-chain, gated by a
 new `LIQUIDITY_ADMIN_ROLE` (config) and the existing `GUARDIAN_ROLE` (pause), emitting an event per
@@ -41,7 +43,8 @@ back to honest-unavailable — never invented availability — when a router is 
 **Primary Dependencies**: OpenZeppelin upgradeable (`UUPSManaged`, `PausableUpgradeable`,
 `ReentrancyGuardUpgradeable`, `EnumerableSet`); spec-060 `FeeRouter` (rate + treasury source of truth);
 Across V3 `SpokePool` + `HubPool` (external, per-network addresses held in router config); Uniswap V3
-`NonfungiblePositionManager` + `UniswapV3Factory` (already in `networks.js` `dex` config); the existing
+`NonfungiblePositionManager` + `UniswapV3Factory` (Polygon already configured; four networks to add,
+with **per-chain** addresses — Base's differ from the canonical set, research R4b); the existing
 AdminPanel role model, unified activity ledger (spec 051), notification profiles (spec 059), and
 `ISanctionsGuard`. **No new npm or Solidity dependencies** — Across and Uniswap are reached through
 minimal local interfaces, not vendored SDKs.
@@ -56,8 +59,10 @@ spec-032 encrypted backup. No new backend datastore — the gateway stays statel
 new contracts; Vitest + Testing Library + vitest-axe for the two member surfaces, the two admin tabs,
 fee disclosure, and honest-unavailable states; relay-gateway tests for the bridge quote module.
 
-**Target Platform**: Ethereum mainnet (1) and Polygon (137) at launch — see the availability matrix in
-[research.md](./research.md) R8. Every other configured network self-discloses unavailable.
+**Target Platform**: five EVM mainnets at launch — Ethereum (1), Polygon (137), **Arbitrum (42161)**,
+**Base (8453)**, and **Optimism (10)**; the last three are added by this feature (FR-006a/FR-006b).
+See the availability matrix in [research.md](./research.md) R8. Every other configured network
+self-discloses unavailable.
 
 **Project Type**: Solidity contracts + web frontend + Node service module + deploy/ops scripts + docs.
 
@@ -72,10 +77,11 @@ duplicated, never hardcoded); `maxFeeBps` is a hard ceiling; honest state everyw
 network ids must never reach EVM-only code paths; WCAG 2.1 AA; addresses/ABIs from generated sync
 artifacts only.
 
-**Scale/Scope**: 2 new UUPS contracts (~250–350 lines each, modeled on the 252-line `StakingRouter`);
-1 new role; 2 new AdminPanel tabs; 2 new member surfaces (~1 tab + ~1 Earn view); 1 new gateway module;
-2 new ledger classes + 2 notification domains + 1 label correction; deploy + fee-service registration +
-sync + storage-check wiring; 3 content pieces + 2 docs.
+**Scale/Scope**: 2 new UUPS contracts (~250–350 lines each, modeled on the 252-line `StakingRouter`)
+deployed to **5 networks each**; 1 new role; 2 new AdminPanel tabs; 2 new member surfaces; 1 new
+gateway module; 2 new ledger classes + 2 notification domains + 1 label correction; **3 new networks**
+added to `networks.js` with RPC/explorer/token/portfolio wiring and a `capabilities.dex` split; deploy +
+fee-service registration + sync + storage-check wiring; 3 content pieces + 2 docs.
 
 ## Constitution Check
 
@@ -148,13 +154,13 @@ frontend/src/
 │   │   ├── BridgeStatusList.jsx          # NEW — in-flight / delivered / refunded / attention
 │   │   └── PayTransferPanel.jsx          # EDIT — add Bridge tab, relabel section copy
 │   ├── earn/
-│   │   ├── PoolView.jsx                  # NEW — Earn → Pool area (both kinds)
-│   │   ├── PoolCard.jsx                  # NEW
-│   │   ├── PoolSupplySheet.jsx           # NEW — fee line + IL / rebalance disclosure gate
-│   │   └── EarnPanel.jsx                 # EDIT — "Bridges" disabled tile → live "Pool" area
+│   │   ├── SupplyView.jsx                # NEW — Earn → Supply area (both kinds)
+│   │   ├── PoolCard.jsx                  # NEW — one curated pool option
+│   │   ├── SupplySheet.jsx               # NEW — fee line + IL / rebalance disclosure gate
+│   │   └── EarnPanel.jsx                 # EDIT — "Bridges" disabled tile → live "Supply" area
 │   └── admin/
 │       ├── BridgeTab.jsx                 # NEW — routes, addresses, limits, pause, in-flight ops
-│       ├── PoolTab.jsx                   # NEW — curated pools, caps, pause, fee (read-only)
+│       ├── SupplyTab.jsx                 # NEW — curated pools, caps, pause, fee (read-only)
 │       └── adminNav.js                   # EDIT — add both under a "Liquidity" group
 ├── lib/
 │   ├── bridge/
@@ -217,6 +223,10 @@ dependency surface and the audit surface small.
 | **Two new UUPS routers** (`BridgeRouter`, `LiquidityRouter`) rather than one combined router | The two surfaces have disjoint call shapes (single-token `depositV3` with a cross-chain refund address vs. two-token Uniswap mint returning an NFT), disjoint fee services with independent rates, disjoint admin views (spec FR-040), and disjoint blast radii. Separating them means a bridge pause or a bridge upgrade cannot affect member LP positions, and vice versa. | A single router would put two unrelated external protocol integrations behind one upgrade authority and one pause, so any bridge incident would also freeze pool deposits. It also pushes toward the 24 KB code limit that already forced `WagerRegistry` into a two-facet proxy — paying that complexity here to save one contract is a bad trade. |
 | **Across HubPool LP left outside the router** (fee-free, direct member call) | `addLiquidity(address,uint256)` has no recipient parameter, so any wrapper receives the LP tokens and becomes custodian of a position the member could then never exit (research R3). | Routing it for fee symmetry would violate FR-021/FR-023 and repeat exactly what spec 066 already rejected for delegated staking. Shipping the fee here is not worth making a position un-exitable. |
 
-**Not a violation, recorded for reviewers**: the launch availability matrix is asymmetric (Across LP is
-Ethereum-only, Uniswap LP is Polygon-only). This is external-protocol reality, surfaced honestly per
-constitution III, not a gap to be papered over with a "coming soon" tile.
+| **Adding three networks** (Arbitrum, Base, Optimism) inside a feature nominally about two surfaces | A bridge with one route is not a bridge. Only Ethereum and Polygon qualified among the existing chain set, so maximizing coverage — the explicit product requirement (FR-006a) — is impossible without them. All three carry both protocols and are the highest-volume bridge destinations, taking launch from 2 routes to 20. FR-006b makes them first-class rather than bridge-only, because delivering a member's assets to a network the app cannot display or spend would be worse than not offering the route. | Shipping Ethereum ↔ Polygon alone was offered and rejected: it makes the headline capability a single route, and the network work would land later anyway with the same cost plus a migration. |
+| **Splitting `capabilities.dex`** into an explicit swap flag and a derived `capabilities.liquidity` | `capabilities.dex` is currently `Boolean(this.dex)`, and it gates the Trade surface, the portfolio Swap action, and DEX spot pricing. Adding Uniswap addresses to Ethereum to enable LP would silently switch on in-app swapping there — reversing spec 048's deliberate decision as a side effect of an unrelated feature (research R4a, FR-016a). | Leaving the derivation alone and accepting the swap surface would be a product change nobody asked for, made invisibly. Adding a parallel address block instead would duplicate addresses and invite them to drift. |
+
+**Not a violation, recorded for reviewers**: one asymmetry survives the expansion — bridge liquidity
+(Across HubPool) is **Ethereum-only** because that contract is L1 by design, while trading liquidity is
+available on all five networks. This is external-protocol reality, surfaced honestly per constitution
+III, not a gap to be papered over with a "coming soon" tile.

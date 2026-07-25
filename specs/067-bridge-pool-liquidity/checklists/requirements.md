@@ -53,6 +53,20 @@
    FR-039 was added to forbid reusing those identifiers, and the collision is called out in the
    narrative so it cannot be missed at planning time.
 
+**Iteration 3 — post-planning revision (2026-07-25):** two requester decisions revised the spec after
+`/speckit-plan`; re-validated, all items still pass.
+
+1. *Earn area renamed* — the area is **Supply**, not "Pool". "Pool" stays with Wager Pools (spec 034),
+   where it accurately names a shared-funds wager among a group. FR-003 and FR-039 updated; FR-039a
+   added to require disambiguating the existing wager-pool feed label, which already reads "Pool".
+2. *Coverage maximized* — FR-006a/b/c added: bridging on every supported network where the settlement
+   protocol is deployed, which required **adding Arbitrum, Base, and Optimism** as first-class networks
+   (five mainnets, 20 directed routes). FR-016a added: trading liquidity on every Uniswap network, and
+   enabling it must not switch on unrelated capabilities — `capabilities.dex` currently gates in-app
+   swapping and Ethereum deliberately ships without it. FR-016b added: per-chain address resolution,
+   because Uniswap explicitly warns its addresses are not identical across chains (Base's differ).
+   SC-017 – SC-019 added to make all three testable.
+
 **Iteration 2 — re-validation:** all items pass. Remaining watch-items for `/speckit-plan`:
 
 - SC-005's usability target (8 in 10 participants can explain impermanent loss) requires a real

@@ -1,4 +1,4 @@
-# Phase 1 Data Model: Cross-Chain Bridge & Pool Liquidity (spec 067)
+# Phase 1 Data Model: Cross-Chain Bridge & Supply Liquidity (spec 067)
 
 Entities are grouped by where they live: **on-chain** (router state, the operator source of truth),
 **client** (the activity ledger and in-flight tracking), and **derived** (assembled at read time for
@@ -72,7 +72,7 @@ the only retirement mechanism.
 
 | Field | Type | Notes |
 |---|---|---|
-| `positionManager` | `address` | Uniswap V3 NFPM. `address(0)` on networks without Uniswap. |
+| `positionManager` | `address` | Uniswap V3 NFPM **for this network** — resolved per chain, never copied across chains (research R4b). `address(0)` on networks without Uniswap. |
 | `feeRouter` | `address` | Spec-060 `FeeRouter`. |
 | `paused` | `bool` | Guardian killswitch. Blocks new `TRADING_LP` deposits. |
 
@@ -159,6 +159,7 @@ pools:     { label: 'Wager Pool' },    // CHANGED from 'Pool' — research R6
 { domain: 'liquidity', label: 'Liquidity', description: 'Pools closed to deposits and positions affected by protocol events' },
 ```
 
+The Earn area itself is named **Supply**, so no member-facing surface competes for the word "Pool".
 The `pools` label change is the one edit to an existing surface. It makes the wager-pool feed tag
 accurate on its own terms and is what keeps FR-039 true in the activity feed, where the collision would
 otherwise be invisible until a member had both kinds of activity.
@@ -196,9 +197,22 @@ sourced from the underlying protocol, never a guarantee (spec Assumptions).
 `frontend/src/config/contracts.js` — two address keys per network, empty until synced:
 `bridgeRouter`, `liquidityRouter` (plus `bridgeRouterImpl`, `liquidityRouterImpl` in `deployments/`).
 
-`frontend/src/config/networks.js` — a per-network `bridge` block (`{ spokePool, hubPool | null }`) used
-only as the build-time fallback for display; the authoritative values are read from the router at
-runtime (FR-051). Polygon's existing `dex` block is reused unchanged for Uniswap.
+`frontend/src/config/networks.js` — three changes:
+
+1. **Three new networks**: Arbitrum (42161), Base (8453), Optimism (10), each a full entry (RPC,
+   explorer, native currency, stablecoin, portfolio wiring) so they are first-class for select, view,
+   and send/receive (FR-006b) — not bridge-only stubs.
+2. **A per-network `bridge` block** (`{ spokePool, hubPool | null }`) used only as the build-time
+   fallback for display; authoritative values are read from the router at runtime (FR-051).
+3. **A per-network `dex` block** on the four networks that lack one, with addresses taken from each
+   chain's own deployment record — **Base's differ from the canonical set** (research R4b).
+
+**Capability split** (FR-016a, research R4a): `capabilities.dex` stops being `Boolean(this.dex)` and
+becomes an explicit per-network flag, preserving every existing network's current behavior — notably
+Ethereum, which deliberately ships without in-app swap (spec 048). A new
+`capabilities.liquidity` is derived from `dex.positionManager` presence **plus** a deployed
+`liquidityRouter`. Adding Uniswap addresses for LP therefore cannot switch on the Trade surface, the
+portfolio Swap action, or DEX spot pricing as a side effect.
 
 **Boundary guard**: every entry point into bridge and liquidity code paths asserts a numeric chain id
 via the existing `isBitcoinNetworkId` check, so Bitcoin string ids can never reach

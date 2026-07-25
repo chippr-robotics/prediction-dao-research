@@ -1,7 +1,7 @@
-# Phase 0 Research: Cross-Chain Bridge & Pool Liquidity (spec 067)
+# Phase 0 Research: Cross-Chain Bridge & Supply Liquidity (spec 067)
 
-All spec-level unknowns resolved. Three findings materially changed the design and are called out as
-**DESIGN-CHANGING**; each is verified against protocol source, not documentation prose.
+All spec-level unknowns resolved. **Five** findings materially changed the design and are called out as
+**DESIGN-CHANGING**; each is verified against protocol source or repository source, not documentation prose.
 
 ---
 
@@ -18,8 +18,8 @@ All spec-level unknowns resolved. Three findings materially changed the design a
 - **One protocol serves both halves of the feature.** Across is simultaneously the bridge (SpokePool)
   and the liquidity venue (HubPool). The spec's story — "supply the same bridge network that settles
   your transfers" (User Story 2) — is literally true rather than a marketing framing.
-- **Both launch networks are live.** SpokePools are deployed on Ethereum and Polygon (Polygon SpokePool
-  `0x9295ee1d8c5b022be115a2ad3c30c72e34e7f096`).
+- **Broad network coverage.** SpokePools are deployed on ~17 chains including all five FairWins
+  mainnet targets (Ethereum, Polygon, Arbitrum, Base, Optimism) — see R8.
 - **A blessed wrapper pattern exists.** Across ships its own `SpokePoolV3Periphery` / SwapAndBridge
   contract that pulls a token from a user, transforms it, and deposits *on behalf of* that user. Our
   fee-skimming router is the same shape, not a novel integration.
@@ -103,7 +103,7 @@ charged only where it can be charged atomically without taking custody.**
 
 **Consequence**: the `liquidity.deposit` fee service applies to **Uniswap trading pools only** in v1.
 Spec FR-026 is satisfied (the service exists, capped, read from the one source of truth); FR-030 is
-satisfied more strongly than written. The Pool control view still governs Across pool **curation and
+satisfied more strongly than written. The Supply control view still governs Across pool **curation and
 pause** on-chain — only the fee path is absent.
 
 **Alternatives considered**: router holds LP tokens and tracks member shares internally — rejected;
@@ -111,33 +111,60 @@ that is building a custodial vault, which is out of scope and contrary to the sp
 
 ---
 
-## R4 — Uniswap position mechanics
+## R4 — Uniswap position mechanics and coverage
 
-**Decision**: **Uniswap V3** full-range positions via the already-configured
-`NonfungiblePositionManager`, **Polygon only**, fee charged through a new **`LiquidityRouter`**.
+**Decision**: **Uniswap V3** full-range positions via each network's `NonfungiblePositionManager`, on
+**every supported network where Uniswap V3 is deployed** (Ethereum, Polygon, Arbitrum, Base, Optimism,
+plus Sepolia for testing), fee charged through a new **`LiquidityRouter`**.
 
 **Rationale**:
 
-- `frontend/src/config/networks.js` already carries a canonical Uniswap V3 `dex` block for Polygon
-  (`positionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88`). No new network config is required —
-  the plan reuses `dex.positionManager` and `dex.factory`.
-- `NonfungiblePositionManager.mint(MintParams)` **does** carry a `recipient` field, so the router can
-  skim the fee from both tokens and mint the position NFT straight to the member — atomic, and
-  non-custodial across transactions. This is the structural difference from R3 that makes a fee
-  chargeable here and not there.
-- Full-range is expressed as `tickLower`/`tickUpper` at the min/max usable ticks for the pool's tick
-  spacing (`±887272` floored/ceiled to spacing — e.g. `±887220` at spacing 60). No range UI, no
-  out-of-range state, no rebalancing — exactly the spec's FR-016 bound.
-- Ethereum mainnet is `dex: null` in the network config (spec 048 shipped it as a ClearPath/value
-  network with no in-app DEX). Uniswap LP is therefore **not offered on Ethereum** at launch — an
-  honest-availability outcome, not an omission.
+- `NonfungiblePositionManager.mint(MintParams)` carries a `recipient` field, so the router can skim the
+  fee from both tokens and mint the position NFT straight to the member — atomic and non-custodial.
+  This is the structural difference from R3 that makes a fee chargeable here and not there.
+- Full-range is `tickLower`/`tickUpper` at the min/max usable ticks for the pool's tick spacing
+  (`±887272` floored/ceiled to spacing — e.g. `±887220` at spacing 60). No range UI, no out-of-range
+  state, no rebalancing — spec FR-016.
+- Polygon already carries a canonical `dex` block in `networks.js`; the other four need one added.
 
-**Alternatives considered**: Uniswap V4 (newer, hooks, singleton `PoolManager`) — rejected for v1: it
-would require new network config, a new position-accounting model, and buys nothing for full-range
-positions. V2-style pairs — rejected: not the configured deployment, and V3 full-range is economically
-equivalent for this use case while reusing config that already exists.
+**Alternatives considered**: Uniswap V4 — rejected for v1; new config, new position-accounting model,
+and no benefit for full-range positions. V2-style pairs — not the configured deployment.
 
----
+### R4a — Enabling LP must not enable swapping — DESIGN-CHANGING
+
+`networks.js` derives `capabilities.dex` as `Boolean(this.dex)`, and that capability gates the **Trade**
+surface, the portfolio asset sheet's Swap action (`AssetDetailSheet.jsx:62`), and DEX spot pricing
+(`lib/portfolio/prices.js`). Ethereum is deliberately `dex: null` — spec 048 shipped it as a
+value/ClearPath network with **no in-app swap**.
+
+So the obvious move — "add a `dex` block to Ethereum so LP works" — would silently switch on token
+swapping there, reversing a prior product decision as a side effect of an unrelated feature.
+
+**Resolution**: split the capability. The `dex` block stays pure address config, and:
+
+- `capabilities.dex` (swap/Trade) becomes an **explicit per-network flag**, not derived from address
+  presence — preserving every current network's existing behavior exactly.
+- `capabilities.liquidity` (Earn → Supply) is derived from `dex.positionManager` presence **plus** a
+  deployed `liquidityRouter`.
+
+This is what FR-016a requires, and it is why adding Uniswap addresses to four more networks is safe.
+
+### R4b — Addresses differ per chain — DESIGN-CHANGING
+
+Uniswap's own deployment docs warn: *"integrators should no longer assume that they are deployed to the
+same addresses across chains and be extremely careful to confirm mappings."*
+
+Ethereum, Polygon, Arbitrum, and Optimism share the canonical factory
+`0x1F98431c8aD98523631AE4a59f267346ea31F984` and position manager
+`0xC36442b4a4522E871399CD717aBDD847Ab11FE88` — **Base does not** (its factory is
+`0x33128a8fC17869897dcE68Ed026d694621f6FDfD`). Copying the canonical pair to all five would produce a
+router pointed at a non-contract on Base: deposits revert at best, and a same-address contract belonging
+to something else at worst.
+
+**Resolution** (FR-016b): addresses are taken per network from that chain's own official deployment
+page at deploy time, recorded in `deployments/`, and reach the frontend only through
+`sync:frontend-contracts`. No address is hand-copied across chains, and the deploy script asserts each
+configured address has non-empty bytecode before writing the record.
 
 ## R5 — Where the operator control surface lives
 
@@ -162,9 +189,10 @@ by repo doctrine and is optional infrastructure, so a killswitch living there wo
 
 ## R6 — Vocabulary collision with Wager Pools — DESIGN-CHANGING
 
-**Decision**: liquidity activity uses the class **`liquidity`** and the notification/feed domain
-**`liquidity`**; bridging uses class **`bridge`** and domain **`bridge`**. Additionally, the existing
-wager-pool feed label is **relabelled** from `Pool` to `Wager Pool`.
+**Decision**: the Earn area is named **Supply**, not "Pool". Liquidity activity uses the class
+**`liquidity`** and the notification/feed domain **`liquidity`**; bridging uses class **`bridge`** and
+domain **`bridge`**. Additionally, the existing wager-pool feed label is **relabelled** from `Pool` to
+`Wager Pool`.
 
 **Rationale**: the collision is worse than the spec anticipated. Three separate registries already use
 `pool` for *wager* pools:
@@ -174,9 +202,15 @@ wager-pool feed label is **relabelled** from `Pool` to `Wager Pool`.
 - `frontend/src/data/notifications/domains.js` — `pools: { label: 'Pool' }` ← **already reads "Pool"**
 
 That last one is the sharp edge: the activity feed today tags wager-pool events with the literal label
-**"Pool"**. Shipping an Earn area called "Pool" without touching it would put two unrelated features
-under one word in the same feed, which is what FR-039 exists to prevent. The label change is a
-one-line, member-visible clarification that makes the wager surface *more* accurate on its own terms.
+**"Pool"**. Shipping an Earn area called "Pool" would put two unrelated features under one word in the
+same feed, which is what FR-039 exists to prevent.
+
+**"Pool" therefore stays with wager pools**, where it accurately names a shared-funds wager among a
+group, and the Earn area is called **Supply** — which matches the verb register of its siblings (Lend,
+Stake, Supply) and is the verb both Uniswap and Across use for the action itself. The word "liquidity"
+then lives in the area's description and InfoTip, where the app already explains its DeFi terms. The
+`pools` feed label is still corrected to "Wager Pool", which makes that surface more accurate on its own
+terms regardless.
 
 New enum values are additive (`LEDGER_CLASS.BRIDGE`, `LEDGER_CLASS.LIQUIDITY`); no existing entry is
 reclassified, so historical ledger data and the encrypted backup are unaffected.
@@ -202,22 +236,40 @@ Ethereum has `subgraphUrl: null` in config.
 
 ---
 
-## R8 — Launch availability matrix
+## R8 — Launch availability matrix (expanded)
 
-Derived from R1/R3/R4 and the existing network config. This drives every honest-unavailable surface:
+The binding constraint was never the protocols — Across covers ~17 chains and Uniswap V3 ~15. It was
+FairWins' own chain set, of which only Ethereum and Polygon qualified. **Arbitrum (42161), Base (8453),
+and Optimism (10) are therefore added as supported networks** (FR-006a/FR-006b): all three carry both an
+Across SpokePool and a canonical Uniswap V3 deployment, and they are the highest-volume bridge
+destinations.
 
-| Surface | Ethereum (1) | Polygon (137) | ETC / Mordor | Bitcoin | Testnets |
-|---|---|---|---|---|---|
-| Transfer → Bridge | ✅ ↔ Polygon | ✅ ↔ Ethereum | ❌ no routes | ❌ out of scope (FR-006) | ❌ |
-| Pool → Bridge liquidity (Across HubPool) | ✅ **fee-free** | ❌ L1-only protocol | ❌ | ❌ | ❌ |
-| Pool → Trading liquidity (Uniswap V3) | ❌ `dex: null` | ✅ fee-charged | ❌ no Uniswap | ❌ | ❌ |
+| Network | Bridge (Across) | Trading liquidity (Uniswap V3) | Bridge liquidity (Across HubPool) |
+|---|---|---|---|
+| Ethereum (1) | ✅ | ✅ | ✅ **only chain** — HubPool is L1-only |
+| Polygon (137) | ✅ | ✅ | ❌ |
+| Arbitrum (42161) | ✅ **new** | ✅ **new** | ❌ |
+| Base (8453) | ✅ **new** | ✅ **new** (distinct addresses — R4b) | ❌ |
+| Optimism (10) | ✅ **new** | ✅ **new** | ❌ |
+| Ethereum Classic (61) / Mordor (63) | ❌ neither protocol | ❌ | ❌ |
+| Amoy (80002) | ❌ no Across, no official V3 | ❌ | ❌ |
+| Hoodi (560048) | ❌ | ❌ | ❌ |
+| Sepolia (11155111) | ✅ testnet SpokePool | ✅ official V3 deployment | ❌ |
+| Bitcoin | ❌ out of scope (FR-006) | ❌ | ❌ |
 
-The two Pool kinds are available on **opposite networks** at launch. This is a genuine product wrinkle,
-not a bug: the Pool list spans networks transparently (the Earn section already renders cross-network
-with badges and auto-switches on submit via `useEarnSend`), so a member sees both kinds in one list and
-the network switch happens at signing time. Copy must not imply either kind is available everywhere.
+**Result**: five mainnet endpoints ⇒ **20 directed bridge routes per asset**, and trading liquidity on
+all five. Bridge liquidity stays Ethereum-only because Across's HubPool is an L1 contract by design —
+this is the one remaining asymmetry and the copy must state it plainly rather than implying every
+network offers both kinds.
 
----
+**Scope consequence** (recorded honestly): adding three networks is real work beyond the two surfaces —
+RPC config, portfolio scanning, network switcher, send/receive, and per-chain token and address
+records. FR-006b makes it a requirement rather than a side effect, because bridging a member's assets to
+a network the app cannot then display or spend would be a worse outcome than not offering the route.
+
+**Testnet note**: Sepolia has both an Across SpokePool and Uniswap V3, but a bridge needs two endpoints
+and Amoy has neither. End-to-end testnet bridging therefore requires a second Across testnet (Base
+Sepolia); until one is configured, bridge testing is fork-based against mainnet state.
 
 ## R9 — Fee consent ceiling
 
@@ -256,10 +308,10 @@ so a gateway outage can never strand an in-flight transfer.
 | R1 | Bridge protocol | Across V3 |
 | R2 | Bridge fee path | `BridgeRouter`, `depositor = member` (refund safety) |
 | R3 | Bridge-pool LP fee | **Fee-free v1** — `addLiquidity` has no recipient param |
-| R4 | Uniswap version/coverage | V3 NFPM full-range, Polygon only, fee-charged |
+| R4 | Uniswap version/coverage | V3 NFPM full-range on all 5 mainnets, fee-charged; LP capability split from swap (R4a); per-chain addresses (R4b) |
 | R5 | Control surface location | On-chain, in the two routers |
-| R6 | Ledger/notification naming | `bridge` + `liquidity`; relabel wager `Pool` → `Wager Pool` |
+| R6 | Naming | Earn area = **Supply**; classes `bridge` + `liquidity`; relabel wager `Pool` → `Wager Pool` |
 | R7 | In-flight persistence | Client ledger store + API poll + on-chain fallback |
-| R8 | Availability | Bridge: ETH↔Polygon; Across LP: ETH only; Uniswap LP: Polygon only |
+| R8 | Availability | +Arbitrum/Base/Optimism ⇒ 5 mainnets, 20 bridge routes, Uniswap LP on all 5; Across LP still ETH-only |
 | R9 | Fee ceiling | `maxFeeBps` guard reused from spec 066 |
 | R10 | Degraded mode | Bridge hides without gateway; in-flight still resolves |

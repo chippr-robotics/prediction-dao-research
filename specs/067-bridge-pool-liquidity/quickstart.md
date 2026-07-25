@@ -1,4 +1,4 @@
-# Quickstart: Validating Bridge & Pool Liquidity (spec 067)
+# Quickstart: Validating Bridge & Supply Liquidity (spec 067)
 
 Runnable checks that prove the feature works end to end. Ordered so the safety-critical properties are
 verified first — the two that can strand member funds if wrong come before any UI work is exercised.
@@ -7,12 +7,14 @@ verified first — the two that can strand member funds if wrong come before any
 
 ```bash
 npm install
-cp .env.example .env        # set MAINNET_RPC_URL and POLYGON_RPC_URL for fork tests
+cp .env.example .env        # set RPC URLs for all five mainnets:
+                            # MAINNET, POLYGON, ARBITRUM, BASE, OPTIMISM
 npm run compile
 ```
 
-Fork tests need archive-capable RPC endpoints for Ethereum (1) and Polygon (137). Never put a private
-key in `.env` for these — fork tests impersonate accounts.
+Fork tests need archive-capable RPC endpoints for all five mainnets — Ethereum (1), Polygon (137),
+Arbitrum (42161), Base (8453), Optimism (10). Never put a private key in `.env` for these — fork tests
+impersonate accounts.
 
 ---
 
@@ -76,6 +78,16 @@ npx hardhat run scripts/deploy/deploy-bridge-liquidity.js --network localhost
 npm run sync:frontend-contracts
 ```
 
+**Address sanity gate** (research R4b — Uniswap addresses are NOT identical across chains):
+
+```bash
+npx hardhat run scripts/ops/verify-protocol-addresses.js --network base
+# asserts every configured SpokePool / NFPM / factory has non-empty bytecode on THIS chain
+```
+
+Run it per network before seeding routes and pools. A copied canonical address on Base points at a
+non-contract at best and something unrelated at worst.
+
 **Expected**: `deployments/localhost-*.json` gains `bridgeRouter`, `bridgeRouterImpl`,
 `liquidityRouter`, `liquidityRouterImpl`; both fee services registered at cap 250 bps / rate 0; frontend
 artifacts regenerate with the new addresses and ABIs.
@@ -111,16 +123,31 @@ npm run frontend                # dev server
 6. **Close the tab entirely and reopen.** **Expected**: the in-flight bridge is still there with its
    true status (FR-010) — this is the check that catches state living only in React.
 
-### Manual walkthrough — Earn → Pool
+### Manual walkthrough — Earn → Supply
 
-7. Open **Earn**. **Expected**: **Pool** is a live, selectable area; no tile reads "Bridges".
-8. Open Pool. **Expected**: both kinds listed with network badges — Uniswap pools on Polygon, Across
-   pools on Ethereum (the R8 asymmetry is real; copy must not imply either is available everywhere).
+7. Open **Earn**. **Expected**: **Supply** is a live, selectable area; no tile reads "Bridges", and
+   no Earn area is named "Pool" (that word stays with Wager Pools).
+8. Open Supply. **Expected**: both kinds listed with network badges — Uniswap pools on **all five**
+   mainnets, Across bridge pools on **Ethereum only** (the HubPool is L1-only; copy must not imply
+   bridge liquidity is available everywhere).
 9. Start a Uniswap supply. **Expected**: the impermanent-loss disclosure is **visible inline**, not
    behind a tooltip, and confirm stays disabled until it has been shown (FR-018).
 10. Start an Across bridge-LP supply. **Expected**: the rebalancing/inventory disclosure appears, and
     **no fee line at all** — this path is fee-free by design (research R3).
 11. Withdraw from a position. **Expected**: no platform fee, position updates or closes.
+
+### Network coverage checks
+
+12. **All routes present.** Open the Bridge tab on each of Ethereum, Polygon, Arbitrum, Base, and
+    Optimism. **Expected**: every other mainnet appears as a destination — 20 directed routes per
+    supported asset (SC-017), with none silently missing.
+13. **New networks are first-class** (SC-019). For Arbitrum, Base, and Optimism: each is selectable in
+    the network switcher, its balances appear in the portfolio, and send/receive works. A member must
+    never be able to bridge to a network where the asset then becomes invisible or unspendable.
+14. **LP did not switch on swapping** (SC-018). On Ethereum, confirm Uniswap supply works **and** that
+    the Trade surface and the portfolio asset-sheet Swap action remain absent — spec 048's deliberate
+    no-in-app-swap decision must survive this feature untouched. Repeat on any other network that ships
+    without in-app swap.
 
 ### Honest-degradation checks
 
@@ -128,29 +155,29 @@ npm run frontend                # dev server
 VITE_RELAY_GATEWAY_URL= npm run frontend      # gateway unset
 ```
 
-12. **Expected**: the Bridge surface hides or states unavailability — it never shows an invented quote
+15. **Expected**: the Bridge surface hides or states unavailability — it never shows an invented quote
     (FR-054). Any **already in-flight** bridge still resolves via the on-chain fallback (FR-053). The
-    Pool area is unaffected.
-13. Switch to ETC/Mordor. **Expected**: Bridge absent; Pool states honestly that pooling is unavailable
-    here and names where it is (FR-025).
-14. Switch to a Bitcoin network. **Expected**: no Bridge tab; Bitcoin send/receive unaffected; no
+    Supply area is unaffected.
+16. Switch to ETC/Mordor. **Expected**: Bridge absent; Supply states honestly that supplying is
+    unavailable here and names where it is (FR-025).
+17. Switch to a Bitcoin network. **Expected**: no Bridge tab; Bitcoin send/receive unaffected; no
     Bitcoin network id reaches `getContractAddressForChain` (FR-006).
 
 ---
 
 ## 5. Auxiliary wiring
 
-15. After one bridge and one pool supply, open the activity ledger.
+18. After one bridge and one pool supply, open the activity ledger.
     **Expected**: the bridge is **one** entry naming both networks and both transactions — not two
     (FR-035); the pool entry is class `liquidity`, clearly distinct from any wager-pool activity.
-16. Open the activity feed with both wager-pool and liquidity activity present.
+19. Open the activity feed with both wager-pool and liquidity activity present.
     **Expected**: wager-pool entries now tag **"Wager Pool"**, liquidity entries tag "Liquidity". This
     is the FR-039 check — before this change both would have read "Pool".
-17. Open notification settings. **Expected**: **Bridge** and **Liquidity** appear as their own
+20. Open notification settings. **Expected**: **Bridge** and **Liquidity** appear as their own
     categories with independently settable delivery, defaulting to delivered (FR-038).
-18. Generate a report covering the period. **Expected**: the bridge appears with only its platform fee
+21. Generate a report covering the period. **Expected**: the bridge appears with only its platform fee
     as a cost — not as income and not as a disposal (FR-036).
-19. Screen a deny-listed wallet at both surfaces. **Expected**: refused before any signature (FR-031).
+22. Screen a deny-listed wallet at both surfaces. **Expected**: refused before any signature (FR-031).
 
 ---
 
@@ -160,16 +187,16 @@ VITE_RELAY_GATEWAY_URL= npm run frontend      # gateway unset
 npm run frontend    # sign in as an operator holding LIQUIDITY_ADMIN_ROLE
 ```
 
-20. **Expected**: **Bridge** and **Pool** tabs appear under a **Liquidity** group.
-21. Disable a route. **Expected**: it stops being offered in the member app within one refresh, with no
+23. **Expected**: **Bridge** and **Supply** tabs appear under a **Liquidity** group.
+24. Disable a route. **Expected**: it stops being offered in the member app within one refresh, with no
     redeploy (FR-041).
-22. Retire a pool that has a member position. **Expected**: closed to new deposits, still visible and
+25. Retire a pool that has a member position. **Expected**: closed to new deposits, still visible and
     withdrawable, position count shown (FR-024).
-23. Pause on the Pool tab. **Expected**: the control is labelled **"Pauses new Uniswap supplies"** —
+26. Pause on the Supply tab. **Expected**: the control is labelled **"Pauses new Uniswap supplies"** —
     bridge-LP deposits do not pass through the router and the tab must not imply otherwise.
-24. Check the History section. **Expected**: every action above appears with before → after, operator,
+27. Check the History section. **Expected**: every action above appears with before → after, operator,
     and time (FR-046).
-25. Sign in as an operator with none of the roles. **Expected**: neither tab is visible, and direct URL
+28. Sign in as an operator with none of the roles. **Expected**: neither tab is visible, and direct URL
     access is refused (FR-049).
 
 ---
@@ -182,8 +209,8 @@ ls docs/blog/features/*bridge* docs/blog/posts/*cross-chain* docs/blog/knowledge
 
 **Expected**: each of the three series has a new numbered entry with its index table updated and
 internal links resolving (FR-055 – FR-057). Cross-check every fee, risk, timing, and availability claim
-against the R8 matrix and the zero-rate launch state — a post promising Uniswap pools on Ethereum, or
-implying a platform fee that ships at zero, fails FR-058.
+against the R8 matrix and the zero-rate launch state — a post implying **bridge liquidity is available
+on more than Ethereum**, or implying a platform fee where the rate ships at zero, fails FR-058.
 
 ---
 
