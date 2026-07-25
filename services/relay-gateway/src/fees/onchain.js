@@ -20,7 +20,16 @@ const FEE_BPS_IFACE = new ethers.Interface(['function feeBps(bytes32 serviceId) 
 export const FEE_SERVICE_IDS = {
   polymarketTaker: ethers.id('polymarket.taker'),
   polymarketMaker: ethers.id('polymarket.maker'),
+  // Spec 067. The gateway only ever READS these — the bridge and liquidity fees are charged
+  // on-chain by BridgeRouter/LiquidityRouter, which read the same FeeRouter at call time. The
+  // gateway never becomes a second source of truth for a rate.
+  bridgeTransfer: ethers.id('bridge.transfer'),
+  liquidityDeposit: ethers.id('liquidity.deposit'),
 }
+
+// Spec-067 caps, re-applied at read time like the spec-057 ones above (defense in depth).
+export const BRIDGE_TRANSFER_CAP_BPS = 250
+export const LIQUIDITY_DEPOSIT_CAP_BPS = 250
 
 // Spec-057 hard caps, re-applied at read time (defense in depth).
 const TAKER_CAP_BPS = 100

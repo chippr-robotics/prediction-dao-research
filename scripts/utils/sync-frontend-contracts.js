@@ -194,6 +194,8 @@ function main() {
         callsignRegistry: deployed.callsignRegistry, // spec 054 — %callsign naming registry (only where deployed)
         feeRouter: deployed.feeRouter, // spec 060 — unified platform-fee registry + wrapper (only where deployed)
         stakingRouter: deployed.stakingRouter, // spec 066 — staking control surface + liquid fee router (only where deployed)
+        bridgeRouter: deployed.bridgeRouter, // spec 067 — cross-chain bridge control surface + fee router (only where deployed)
+        liquidityRouter: deployed.liquidityRouter, // spec 067 — liquidity-supply control surface + fee router (only where deployed)
         safeProposalHub: deployed.safeProposalHub, // spec 043 — Safe custody proposal broadcaster (only where deployed)
         safePolicyGuard: deployed.safePolicyGuard, // spec 049 — multisig policy engine guard (only where deployed)
         policyGuardSetup: deployed.policyGuardSetup, // spec 049 — Safe.setup policy attach helper (only where deployed)

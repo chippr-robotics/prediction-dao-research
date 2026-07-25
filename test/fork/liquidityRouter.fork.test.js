@@ -145,7 +145,7 @@ for (const [name, cfg] of Object.entries(CHAINS)) {
       const FeeRouter = await ethers.getContractFactory("FeeRouter");
       feeRouter = await upgrades.deployProxy(FeeRouter, [admin.address, admin.address], { kind: "uups" });
       await feeRouter.waitForDeployment();
-      await feeRouter.registerService(LIQUIDITY_SERVICE, FEE_CAP_BPS, 1 /* Wrapped */);
+      await feeRouter.registerService(LIQUIDITY_SERVICE, FEE_CAP_BPS, 2 /* ConfigOnly — see deploy-bridge-liquidity.js */);
 
       const LiquidityRouter = await ethers.getContractFactory("LiquidityRouter");
       router = await upgrades.deployProxy(

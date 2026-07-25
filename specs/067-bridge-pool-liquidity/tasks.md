@@ -69,60 +69,60 @@ depend on all of it.
 
 ### Contracts
 
-- [ ] T014 Create `contracts/bridge/IBridgeRouter.sol` with the `Route` struct, events, and custom errors from [contracts/bridge-router.md](./contracts/bridge-router.md)
-- [ ] T015 Implement `contracts/bridge/BridgeRouter.sol` — UUPS via `UUPSManaged`, `LIQUIDITY_ADMIN_ROLE` + `GUARDIAN_ROLE`, route registry (`EnumerableSet.Bytes32Set`), `spokePool`/`feeRouter` refs, `paused`, trailing `__gap`
-- [ ] T016 Implement `BridgeRouter.bridgeWithFee` in `contracts/bridge/BridgeRouter.sol` following checks-effects-interactions: validate route → `quoteFee` + `maxFeeBps` ceiling → emit → pull, skim to treasury, approve, `depositV3`
-- [ ] T017 **Set `depositor = msg.sender` (the member), never `address(this)`,** in the `depositV3` call in `contracts/bridge/BridgeRouter.sol`, with an inline comment stating why — Across refunds unfilled deposits to `depositor` on the origin chain (research R2)
-- [ ] T018 Add route config setters (`setRoute`, `setRouteEnabled`, `setRouteLimit`, `removeRoute`, `setSpokePool`, `setFeeRouter`) with validation and one event each in `contracts/bridge/BridgeRouter.sol`
-- [ ] T019 Add `pause`/`unpause` (GUARDIAN only) plus enumeration reads (`getRoute`, `routeCount`, `routeAt`) to `contracts/bridge/BridgeRouter.sol`
-- [ ] T020 [P] Create `contracts/liquidity/ILiquidityRouter.sol` with the `PoolListing` struct, `PoolKind` enum, events, and errors from [contracts/liquidity-router.md](./contracts/liquidity-router.md)
-- [ ] T021 Implement `contracts/liquidity/LiquidityRouter.sol` — UUPS, same roles, pool registry, `positionManager`/`feeRouter` refs, `paused`, trailing `__gap`
-- [ ] T022 Implement `LiquidityRouter.mintFullRangeWithFee` in `contracts/liquidity/LiquidityRouter.sol`: reject non-`TRADING_LP` pools, enforce cap, per-token fee skim, `mint` with **`recipient = msg.sender`**, refund unspent remainder, zero approvals
-- [ ] T023 Implement full-range tick derivation from the pool's own `tickSpacing` (±887272 floored/ceiled) in `contracts/liquidity/LiquidityRouter.sol` — no member-facing range control (FR-016)
-- [ ] T024 Add pool registry setters (`listPool`, `setPoolEnabled`, `setPoolCap`, `setPositionManager`, `setFeeRouter`) and `pause`/`unpause` to `contracts/liquidity/LiquidityRouter.sol` — deliberately **no `removePool`** (FR-024)
-- [ ] T025 [P] Wire `ISanctionsGuard` screening of `msg.sender` into both routers' value paths (`contracts/bridge/BridgeRouter.sol`, `contracts/liquidity/LiquidityRouter.sol`) per FR-031/FR-032
+- [X] T014 Create `contracts/bridge/IBridgeRouter.sol` with the `Route` struct, events, and custom errors from [contracts/bridge-router.md](./contracts/bridge-router.md)
+- [X] T015 Implement `contracts/bridge/BridgeRouter.sol` — UUPS via `UUPSManaged`, `LIQUIDITY_ADMIN_ROLE` + `GUARDIAN_ROLE`, route registry (`EnumerableSet.Bytes32Set`), `spokePool`/`feeRouter` refs, `paused`, trailing `__gap`
+- [X] T016 Implement `BridgeRouter.bridgeWithFee` in `contracts/bridge/BridgeRouter.sol` following checks-effects-interactions: validate route → `quoteFee` + `maxFeeBps` ceiling → emit → pull, skim to treasury, approve, `depositV3`
+- [X] T017 **Set `depositor = msg.sender` (the member), never `address(this)`,** in the `depositV3` call in `contracts/bridge/BridgeRouter.sol`, with an inline comment stating why — Across refunds unfilled deposits to `depositor` on the origin chain (research R2)
+- [X] T018 Add route config setters (`setRoute`, `setRouteEnabled`, `setRouteLimit`, `removeRoute`, `setSpokePool`, `setFeeRouter`) with validation and one event each in `contracts/bridge/BridgeRouter.sol`
+- [X] T019 Add `pause`/`unpause` (GUARDIAN only) plus enumeration reads (`getRoute`, `routeCount`, `routeAt`) to `contracts/bridge/BridgeRouter.sol`
+- [X] T020 [P] Create `contracts/liquidity/ILiquidityRouter.sol` with the `PoolListing` struct, `PoolKind` enum, events, and errors from [contracts/liquidity-router.md](./contracts/liquidity-router.md)
+- [X] T021 Implement `contracts/liquidity/LiquidityRouter.sol` — UUPS, same roles, pool registry, `positionManager`/`feeRouter` refs, `paused`, trailing `__gap`
+- [X] T022 Implement `LiquidityRouter.mintFullRangeWithFee` in `contracts/liquidity/LiquidityRouter.sol`: reject non-`TRADING_LP` pools, enforce cap, per-token fee skim, `mint` with **`recipient = msg.sender`**, refund unspent remainder, zero approvals
+- [X] T023 Implement full-range tick derivation from the pool's own `tickSpacing` (±887272 floored/ceiled) in `contracts/liquidity/LiquidityRouter.sol` — no member-facing range control (FR-016)
+- [X] T024 Add pool registry setters (`listPool`, `setPoolEnabled`, `setPoolCap`, `setPositionManager`, `setFeeRouter`) and `pause`/`unpause` to `contracts/liquidity/LiquidityRouter.sol` — deliberately **no `removePool`** (FR-024)
+- [X] T025 [P] Wire `ISanctionsGuard` screening of `msg.sender` into both routers' value paths (`contracts/bridge/BridgeRouter.sol`, `contracts/liquidity/LiquidityRouter.sol`) per FR-031/FR-032
 
 ### Contract tests
 
-- [ ] T026 [P] Unit tests for role gating on every `BridgeRouter` setter in `test/bridge/BridgeRouter.test.js`
-- [ ] T027 [P] Unit tests for route validation (reject `destinationChainId == block.chainid` and `0`, bounds on `expectedFillSeconds`) in `test/bridge/BridgeRouter.test.js`
-- [ ] T028 [P] Unit tests for `maxAmount` enforcement and `FeeAboveQuoted` revert in `test/bridge/BridgeRouter.test.js`
-- [ ] T029 [P] Unit test asserting a zero fee rate performs no treasury transfer and leaves downstream behavior identical (FR-029) in `test/bridge/BridgeRouter.test.js`
-- [ ] T030 [P] Unit tests asserting pause blocks `bridgeWithFee` and nothing else, plus reentrancy guard, in `test/bridge/BridgeRouter.test.js`
-- [ ] T031 [P] Unit test asserting zero residual token balance and zero leftover allowance after every `BridgeRouter` call in `test/bridge/BridgeRouter.test.js`
-- [ ] T032 [P] Unit tests for role gating and `BRIDGE_LP`-poolId rejection in `test/liquidity/LiquidityRouter.test.js`
-- [ ] T033 [P] Unit tests for retired-pool rejection, cap enforcement, and `FeeAboveQuoted` in `test/liquidity/LiquidityRouter.test.js`
-- [ ] T034 [P] Unit test asserting no `removePool` function exists on `LiquidityRouter` in `test/liquidity/LiquidityRouter.test.js`
-- [ ] T035 [P] Unit test asserting zero residual balances and allowances after `mintFullRangeWithFee` in `test/liquidity/LiquidityRouter.test.js`
-- [ ] T036 Create `test/fork/bridgeRouter.fork.test.js` with the happy-path case: Polygon → Ethereum USDC, asserting fee at treasury, net deposited, router balance zero
-- [ ] T037 Add an L2 → L2 fork case (Base → Arbitrum) to `test/fork/bridgeRouter.fork.test.js` proving the mesh works without touching L1 from the member's perspective
-- [ ] T038 **MERGE-BLOCKING** — add the expiry-refund case to `test/fork/bridgeRouter.fork.test.js`: submit with a near `fillDeadline`, let it expire, assert the refund lands on the **member's** address and **not** the router's, and that the `FundsDeposited` event carried `depositor == member`. Do not skip or quarantine this test
-- [ ] T039 [P] Add fork cases for a fee-rate change between quote and submit (asserting `FeeAboveQuoted`) and a native-asset route via `msg.value` to `test/fork/bridgeRouter.fork.test.js`
-- [ ] T040 Create `test/fork/liquidityRouter.fork.test.js` asserting a full-range mint leaves the **position NFT owned by the member**, both fee legs at treasury, router balances zero, approvals zeroed
-- [ ] T041 Add per-network fork mint cases to `test/fork/liquidityRouter.fork.test.js` covering all five networks — **especially Base**, whose Uniswap addresses differ from the canonical set (research R4b)
-- [ ] T042 [P] Add fork cases to `test/fork/liquidityRouter.fork.test.js` for correct tick bounds at each fee tier and unspent-amount refund to the member
-- [ ] T043 Add a fork case to `test/fork/liquidityRouter.fork.test.js` asserting the member can exit via `decreaseLiquidity` + `collect` **while the router is paused and the pool retired** (FR-021/FR-024/FR-043)
-- [ ] T044 Add a fork case to `test/fork/liquidityRouter.fork.test.js` for the Across `HubPool.addLiquidity`/`removeLiquidity` round trip from the member's own address, asserting the router is never an intermediary (research R3)
+- [X] T026 [P] Unit tests for role gating on every `BridgeRouter` setter in `test/bridge/BridgeRouter.test.js`
+- [X] T027 [P] Unit tests for route validation (reject `destinationChainId == block.chainid` and `0`, bounds on `expectedFillSeconds`) in `test/bridge/BridgeRouter.test.js`
+- [X] T028 [P] Unit tests for `maxAmount` enforcement and `FeeAboveQuoted` revert in `test/bridge/BridgeRouter.test.js`
+- [X] T029 [P] Unit test asserting a zero fee rate performs no treasury transfer and leaves downstream behavior identical (FR-029) in `test/bridge/BridgeRouter.test.js`
+- [X] T030 [P] Unit tests asserting pause blocks `bridgeWithFee` and nothing else, plus reentrancy guard, in `test/bridge/BridgeRouter.test.js`
+- [X] T031 [P] Unit test asserting zero residual token balance and zero leftover allowance after every `BridgeRouter` call in `test/bridge/BridgeRouter.test.js`
+- [X] T032 [P] Unit tests for role gating and `BRIDGE_LP`-poolId rejection in `test/liquidity/LiquidityRouter.test.js`
+- [X] T033 [P] Unit tests for retired-pool rejection, cap enforcement, and `FeeAboveQuoted` in `test/liquidity/LiquidityRouter.test.js`
+- [X] T034 [P] Unit test asserting no `removePool` function exists on `LiquidityRouter` in `test/liquidity/LiquidityRouter.test.js`
+- [X] T035 [P] Unit test asserting zero residual balances and allowances after `mintFullRangeWithFee` in `test/liquidity/LiquidityRouter.test.js`
+- [X] T036 Create `test/fork/bridgeRouter.fork.test.js` with the happy-path case: Polygon → Ethereum USDC, asserting fee at treasury, net deposited, router balance zero
+- [X] T037 Add an L2 → L2 fork case (Base → Arbitrum) to `test/fork/bridgeRouter.fork.test.js` proving the mesh works without touching L1 from the member's perspective
+- [X] T038 **MERGE-BLOCKING** — add the expiry-refund case to `test/fork/bridgeRouter.fork.test.js`: submit with a near `fillDeadline`, let it expire, assert the refund lands on the **member's** address and **not** the router's, and that the `FundsDeposited` event carried `depositor == member`. Do not skip or quarantine this test
+- [X] T039 [P] Add fork cases for a fee-rate change between quote and submit (asserting `FeeAboveQuoted`) and a native-asset route via `msg.value` to `test/fork/bridgeRouter.fork.test.js`
+- [X] T040 Create `test/fork/liquidityRouter.fork.test.js` asserting a full-range mint leaves the **position NFT owned by the member**, both fee legs at treasury, router balances zero, approvals zeroed
+- [X] T041 Add per-network fork mint cases to `test/fork/liquidityRouter.fork.test.js` covering all five networks — **especially Base**, whose Uniswap addresses differ from the canonical set (research R4b)
+- [X] T042 [P] Add fork cases to `test/fork/liquidityRouter.fork.test.js` for correct tick bounds at each fee tier and unspent-amount refund to the member
+- [X] T043 Add a fork case to `test/fork/liquidityRouter.fork.test.js` asserting the member can exit via `decreaseLiquidity` + `collect` **while the router is paused and the pool retired** (FR-021/FR-024/FR-043)
+- [X] T044 Add a fork case to `test/fork/liquidityRouter.fork.test.js` for the Across `HubPool.addLiquidity`/`removeLiquidity` round trip from the member's own address, asserting the router is never an intermediary (research R3)
 
 ### Deploy, gating, sync
 
-- [ ] T045 Register both routers with `scripts/check-storage-layout.js` so the CI gate covers them before any upgrade
-- [ ] T046 [P] Add both routers to the Slither and Medusa CI targets in `.github/workflows/security.yml` and `medusa.json` — no new high/critical findings permitted
-- [ ] T047 Create `scripts/deploy/deploy-bridge-liquidity.js` deploying both UUPS proxies via `scripts/deploy/lib/upgradeable.js`, asserting non-empty bytecode at every configured protocol address before writing any record
-- [ ] T048 Extend `scripts/deploy/deploy-bridge-liquidity.js` to register `bridge.transfer` and `liquidity.deposit` on that network's `FeeRouter` at cap 250 bps, rate 0
-- [ ] T049 Record `bridgeRouter` / `bridgeRouterImpl` / `liquidityRouter` / `liquidityRouterImpl` per network in `deployments/<network>-chain<id>-v2.json` and verify `npm run sync:frontend-contracts` propagates them
-- [ ] T050 [P] Add `BRIDGE_TRANSFER` and `LIQUIDITY_DEPOSIT` service ids to `frontend/src/lib/fees/feeQuote.js`
-- [ ] T051 [P] Add the two service ids to `services/relay-gateway/src/fees/onchain.js` with env bps as documented fallback only
+- [X] T045 Register both routers with `scripts/check-storage-layout.js` so the CI gate covers them before any upgrade
+- [X] T046 [P] Add both routers to the Slither and Medusa CI targets in `.github/workflows/security.yml` and `medusa.json` — no new high/critical findings permitted
+- [X] T047 Create `scripts/deploy/deploy-bridge-liquidity.js` deploying both UUPS proxies via `scripts/deploy/lib/upgradeable.js`, asserting non-empty bytecode at every configured protocol address before writing any record
+- [X] T048 Extend `scripts/deploy/deploy-bridge-liquidity.js` to register `bridge.transfer` and `liquidity.deposit` on that network's `FeeRouter` at cap 250 bps, rate 0
+- [X] T049 Record `bridgeRouter` / `bridgeRouterImpl` / `liquidityRouter` / `liquidityRouterImpl` per network in `deployments/<network>-chain<id>-v2.json` and verify `npm run sync:frontend-contracts` propagates them
+- [X] T050 [P] Add `BRIDGE_TRANSFER` and `LIQUIDITY_DEPOSIT` service ids to `frontend/src/lib/fees/feeQuote.js`
+- [X] T051 [P] Add the two service ids to `services/relay-gateway/src/fees/onchain.js` with env bps as documented fallback only
 
 ### Shared selector primitives
 
-- [ ] T052 Create `frontend/src/lib/assets/networkPin.js` exporting **both** predicates side by side — `samePair` (`o.chainId === pin.pinnedChainId`) and `bridgeDest` (`o.symbol === pin.pinnedSymbol && o.chainId !== pin.pinnedChainId`) — with a comment stating that applying `samePair` to a bridge silently reduces it to a same-chain transfer (research R11b)
-- [ ] T053 [P] Unit tests for both predicates, re-pin revalidation, and non-EVM (string `chainId`) exclusion in `frontend/src/lib/assets/__tests__/networkPin.test.js`
-- [ ] T054 (SC-022) Add a search/filter input to `frontend/src/components/ui/UniversalAssetSelect.jsx` matching on symbol, asset name, and network name, keyboard and screen-reader operable (FR-064)
-- [ ] T055 Add an optional `pin` + `pinPredicate` prop to `frontend/src/components/ui/UniversalAssetSelect.jsx` so callers filter the list without the component deriving eligibility (it stays presentational per spec 064 FR-001), **and render the empty-counterpart state** — a plain statement of why the list is empty and what would change it, never a bare empty dropdown (FR-065)
-- [ ] T056 [P] Extend `frontend/src/components/ui/__tests__/UniversalAssetSelect.test.jsx` with search, pin-filtering, empty-counterpart messaging, and vitest-axe coverage
-- [ ] T057 [P] Regression-test the four existing consumers (home Pay/Request/Wager, wallet Transfer) still work and gained search, in `frontend/src/test/home.axe.test.jsx` and the relevant panel tests
-- [ ] T058 [P] Add `LEDGER_CLASS.BRIDGE = 'bridge'` and `LEDGER_CLASS.LIQUIDITY = 'liquidity'` additively to `frontend/src/data/ledger/constants.js` — no existing entry reclassified
+- [X] T052 Create `frontend/src/lib/assets/networkPin.js` exporting **both** predicates side by side — `samePair` (`o.chainId === pin.pinnedChainId`) and `bridgeDest` (`o.symbol === pin.pinnedSymbol && o.chainId !== pin.pinnedChainId`) — with a comment stating that applying `samePair` to a bridge silently reduces it to a same-chain transfer (research R11b)
+- [X] T053 [P] Unit tests for both predicates, re-pin revalidation, and non-EVM (string `chainId`) exclusion in `frontend/src/lib/assets/__tests__/networkPin.test.js`
+- [X] T054 (SC-022) Add a search/filter input to `frontend/src/components/ui/UniversalAssetSelect.jsx` matching on symbol, asset name, and network name, keyboard and screen-reader operable (FR-064)
+- [X] T055 Add an optional `pin` + `pinPredicate` prop to `frontend/src/components/ui/UniversalAssetSelect.jsx` so callers filter the list without the component deriving eligibility (it stays presentational per spec 064 FR-001), **and render the empty-counterpart state** — a plain statement of why the list is empty and what would change it, never a bare empty dropdown (FR-065)
+- [X] T056 [P] Extend `frontend/src/components/ui/__tests__/UniversalAssetSelect.test.jsx` with search, pin-filtering, empty-counterpart messaging, and vitest-axe coverage
+- [X] T057 [P] Regression-test the four existing consumers (home Pay/Request/Wager, wallet Transfer) still work and gained search, in `frontend/src/test/home.axe.test.jsx` and the relevant panel tests
+- [X] T058 [P] Add `LEDGER_CLASS.BRIDGE = 'bridge'` and `LEDGER_CLASS.LIQUIDITY = 'liquidity'` additively to `frontend/src/data/ledger/constants.js` — no existing entry reclassified
 
 **Checkpoint**: both routers deployed, all safety invariants proven by fork tests, selector primitives
 ready. User stories may now proceed in parallel.

@@ -34,7 +34,11 @@ import {ILiquidityRouter, IUniswapV3PoolTickSpacing} from "./ILiquidityRouter.so
 ///            fee-free, and `pause()` therefore stops Uniswap supplies ONLY (research R3).
 ///
 ///         3. It has no `removePool`. Retirement is `setPoolEnabled(false)` — a retired pool must
-///            stay visible and withdrawable (FR-024).
+///            stay visible and withdrawable (FR-024).///
+///         NON-STANDARD TOKENS: as with BridgeRouter, the paired residual checks make this fail
+///         CLOSED. A fee-on-transfer or rebasing leg leaves the contract's balance different from
+///         `start0`/`start1` and reverts `ResidualFunds` rather than stranding dust or short-changing
+///         the position. Such tokens are not curatable as trading pools.
 ///         ──────────────────────────────────────────────────────────────────────────────────────
 contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -102,10 +106,12 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         if (pool.kind == PoolKind.Unlisted) revert PoolUnknown();
         if (pool.poolAddress == address(0) || pool.token0 == address(0)) revert ZeroAddress();
         // A trading pool needs both legs and a real fee tier; a bridge pool has exactly one asset.
+        // These are shape errors, not zero-address errors — reverting ZeroAddress for a missing fee
+        // tier told the operator to check an address that was perfectly fine.
         if (pool.kind == PoolKind.TradingLp) {
-            if (pool.token1 == address(0) || pool.feeTier == 0) revert ZeroAddress();
-        } else if (pool.token1 != address(0)) {
-            revert ZeroAddress();
+            if (pool.token1 == address(0) || pool.feeTier == 0) revert InvalidPoolListing();
+        } else if (pool.token1 != address(0) || pool.feeTier != 0) {
+            revert InvalidPoolListing();
         }
 
         bytes32 poolId = computePoolId(pool.kind, pool.poolAddress, pool.token0, pool.token1);

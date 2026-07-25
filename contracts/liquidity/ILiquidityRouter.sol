@@ -95,6 +95,8 @@ interface ILiquidityRouter {
     error NotTradingPool();
     error AmountAbovePoolLimit();
     error PositionManagerUnset();
+    /// @dev A TradingLp listing with no fee tier, or a BridgeLp listing carrying a second token.
+    error InvalidPoolListing();
     error MintFailed();
 
     // --- reads ---

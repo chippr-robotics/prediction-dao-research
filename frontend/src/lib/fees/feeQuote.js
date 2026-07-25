@@ -23,6 +23,14 @@ export const FEE_SERVICES = {
   // Delegated staking is fee-free in v1 (no service id).
   STAKE_LIDO: keccakId('stake.lido'),
   STAKE_POLYGON: keccakId('stake.polygon'),
+  // Cross-chain bridge + liquidity supply (spec 067). Both cap at 250 bps and ship at 0.
+  //
+  // There is deliberately NO bridge-LP service: Across's HubPool.addLiquidity has no recipient
+  // parameter, so a fee-taking wrapper would own the member's LP position and they could never
+  // exit it. Registering a rate we cannot charge would put a settable control in the admin panel
+  // that silently does nothing — worse than no control (research R3).
+  BRIDGE_TRANSFER: keccakId('bridge.transfer'),
+  LIQUIDITY_DEPOSIT: keccakId('liquidity.deposit'),
 }
 
 const BPS_DENOMINATOR = 10_000n

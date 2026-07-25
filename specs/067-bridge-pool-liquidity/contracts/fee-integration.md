@@ -10,8 +10,17 @@ contract, or gateway code (FR-026, FR-027).
 
 | Service id | `keccak256` of | Charged on | Cap | Ships at | Kind |
 |---|---|---|---|---|---|
-| `BRIDGE_TRANSFER` | `"bridge.transfer"` | A bridge submission (value-out) | **250 bps** | **0 bps** | wrapped |
-| `LIQUIDITY_DEPOSIT` | `"liquidity.deposit"` | A Uniswap full-range supply (value-in) | **250 bps** | **0 bps** | wrapped |
+| `BRIDGE_TRANSFER` | `"bridge.transfer"` | A bridge submission (value-out) | **250 bps** | **0 bps** | **config-only** |
+| `LIQUIDITY_DEPOSIT` | `"liquidity.deposit"` | A Uniswap full-range supply (value-in) | **250 bps** | **0 bps** | **config-only** |
+
+**Why config-only, not wrapped** (corrected during implementation): `Wrapped` means chargeable via
+`FeeRouter.depositToVaultWithFee`, which deposits into an ERC-4626 vault. Neither router uses that
+path — both read `quoteFee`/`feeBps`/`treasury` and skim the fee themselves, exactly as spec 066's
+`StakingRouter` does (and `deploy-staking-router.js` registers `stake.lido` config-only for the same
+reason). Registering these as wrapped would let anyone call
+`depositToVaultWithFee("bridge.transfer", someVault, …)` and pass FeeRouter's kind check, treating a
+bridge fee as a vault deposit; config-only makes that revert `ServiceNotWrapped`. `quoteFee`,
+`feeBps` and the 250 bps `capBps` ceiling behave identically either way.
 
 Registration happens once at deploy via `registerService(serviceId, capBps, kind)`, **per network** —
 the `FeeRouter` is per-network, so both services are registered on each of the five deployments and a

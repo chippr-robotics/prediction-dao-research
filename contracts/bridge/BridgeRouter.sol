@@ -40,7 +40,12 @@ import {IBridgeRouter} from "./IBridgeRouter.sol";
 ///
 ///         The router is NEVER in the exit path: fills and refunds settle directly to the member, so
 ///         a pause or upgrade here can never trap an in-flight bridge (FR-043). There is deliberately
-///         no rescue/claim function — see IBridgeRouter.
+///         no rescue/claim function — see IBridgeRouter.///
+///         NON-STANDARD TOKENS (traced, not merely asserted): the residual checks make this contract
+///         fail CLOSED rather than lose funds. A fee-on-transfer token delivers less than
+///         `inputAmount`, so the SpokePool's own pull of `net` reverts for insufficient balance; a
+///         rebasing token that moves the balance mid-call trips `ResidualFunds`. Neither can silently
+///         under-deliver or leave value behind. Such tokens are simply not curatable as routes.
 contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.Bytes32Set;

@@ -136,7 +136,7 @@ async function deployStack(cfg, admin) {
   // Real FeeRouter (spec 060) so the fee path is exercised end to end, not stubbed.
   const FeeRouter = await ethers.getContractFactory("FeeRouter");
   const feeRouter = await upgradeProxy(FeeRouter, [admin.address, admin.address]);
-  await feeRouter.registerService(ethers.id("bridge.transfer"), FEE_CAP_BPS, 1 /* Wrapped */);
+  await feeRouter.registerService(ethers.id("bridge.transfer"), FEE_CAP_BPS, 2 /* ConfigOnly — see deploy-bridge-liquidity.js */);
 
   const BridgeRouter = await ethers.getContractFactory("BridgeRouter");
   const router = await upgradeProxy(BridgeRouter, [

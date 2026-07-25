@@ -74,7 +74,6 @@ interface IBridgeRouter {
     error ResidualFunds();
     error RouteUnknown();
     error RouteDisabled();
-    error RouteAlreadyListed();
     error AmountAboveRouteLimit();
     error InvalidDestinationChain();
     error InvalidFillWindow();

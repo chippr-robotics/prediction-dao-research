@@ -47,7 +47,7 @@ function mintFullRangeWithFee(
     uint256 amount1Min,
     uint256 deadline,
     uint16  maxFeeBps
-) external payable nonReentrant whenNotPaused
+) external nonReentrant whenNotPaused
   returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1);
 ```
 
@@ -57,10 +57,18 @@ function mintFullRangeWithFee(
    `positionManager != address(0)`.
 2. **Fee read** — `quoteFee(LIQUIDITY_DEPOSIT_SERVICE_ID, amountN)` **per token**; revert
    `FeeAboveQuoted` if `bps > maxFeeBps`.
-3. **Effects** — emit `LiquiditySupplied`.
-4. **Interactions** — pull both tokens; send both fee legs to `feeRouter.treasury()`; approve NFPM for
+3. **Interactions** — pull both tokens; send both fee legs to `feeRouter.treasury()`; approve NFPM for
    the net; `mint` with **`recipient = msg.sender`**; refund any unspent remainder to the member and
    zero the approvals.
+4. **Event** — emit `LiquiditySupplied`.
+
+Two corrections made during implementation:
+
+- The entrypoint is **non-payable**. Both legs are ERC-20 and the router never forwards `msg.value`,
+  so accepting native would only create a way to strand it.
+- The event is emitted **after** the mint, not before it as an "effects" step. `tokenId`, `amount0`
+  and `amount1` are outputs of the mint, so the ordering above is not achievable — and it costs
+  nothing, because the call writes no persistent state for a reentrant caller to observe.
 
 ### Full-range ticks
 
