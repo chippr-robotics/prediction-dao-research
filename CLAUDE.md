@@ -211,5 +211,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/067-bridge-pool-liquidity/plan.md
+at specs/067-protect-multi-chain-policies/plan.md
 <!-- SPECKIT END -->
