@@ -312,9 +312,10 @@ still opens the Protect panel.
   priority number (001, 002, …) reflecting enforcement order; renumbering follows automatically
   from reordering.
 - **FR-009**: Members MUST be able to compose rules of the following kinds, in any combination:
-  - (a) **Approver-set rules**: a named set of one or more vault owners who must ALL approve,
-    with an optional amount limit and optional token scope. Multiple rules express alternatives —
-    e.g. rule "A and B up to L" plus rule "C up to L" realizes "a + b / c".
+  - (a) **Approver-set rules**: a named set of one or more vault owners, with an optional amount
+    limit and optional token scope. A set may require ALL of its listed owners or any K of them
+    (so "A or B" is one rule, not two). Multiple rules express alternatives — e.g. rule "A and B
+    up to L" plus rule "C up to L" realizes "a + b / c".
   - (b) **Tiered limits**: expressible as ordered approver-set rules with different limits — e.g.
     "A or B alone up to X" (two single-approver rules or one any-of set) followed by "A and B
     together up to Y > X".
@@ -328,7 +329,12 @@ still opens the Protect panel.
   and transactions governed by it MUST NOT execute until the policy is amended.
 - **FR-011**: When a transaction is evaluated, the lowest-numbered rule whose scope matches
   (token, amount, destination/contract as applicable) MUST govern it; later rules MUST NOT be
-  consulted for a governed transaction. If no rule matches, the transaction MUST NOT execute.
+  consulted for a governed transaction, with exactly one exception: if the governing rule's
+  approver requirement is not met, evaluation MAY continue to the next rule with strictly
+  identical scope (same token scope, amount band, and destination set) — this is what makes
+  adjacent rules read as "otherwise, allow if…" alternatives (e.g. "A + B up to L" / "C up to
+  L"). Limit and destination failures MUST never fall through. If no rule matches, the
+  transaction MUST NOT execute.
 - **FR-012**: A transaction MUST execute only when (a) a governing rule exists, (b) the rule's
   required approvers have all approved, (c) the amount is within the rule's limit(s), and (d) the
   destination/contract is permitted; on any violation the member MUST be told which rule blocked
@@ -416,14 +422,19 @@ still opens the Protect panel.
 
 - **First-match semantics**: "rule 001 is enforced before 002 if both apply" is interpreted as
   first-match-governs: the lowest-numbered rule whose scope matches a transaction decides its
-  fate, and later rules are not consulted for that transaction. This is the simplest model that
-  makes ordering meaningful and matches the requester's example.
+  fate. The only fall-through is the same-scope alternative in FR-011 (an unmet approver
+  requirement continues to the next rule with identical scope), which is required for
+  "a + b / c" alternatives to be expressible. This is the simplest model that makes ordering
+  meaningful and matches the requester's example.
 - **Policy silence is denial**: once a vault has an ordered policy, a transaction no rule matches
   cannot execute. This is the safe default for shared funds (families/teams add rules to open
   paths, not to close an otherwise-open field). Owners who want a fallback can add a final
   catch-all rule (e.g. "all owners together, any amount").
 - **Approvers are owners**: rule approver sets are chosen from the vault's owners; the feature
   does not introduce non-owner approvers.
+- **Vault creation targets the connected chain**: the creation flow states the chain and offers a
+  network switch for other custody chains, rather than embedding its own chain picker — switching
+  networks IS the chain choice. (US1's "choosing (or confirming)" is satisfied via confirmation.)
 - **Supported chains** are the platform's existing supported base chains where the custody stack
   (vault deployment + policy enforcement) is deployed; this feature adds no new chains by itself,
   it removes the single-chain assumption from Protect's UX and records.
