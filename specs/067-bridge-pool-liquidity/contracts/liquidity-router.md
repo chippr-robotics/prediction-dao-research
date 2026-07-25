@@ -28,7 +28,7 @@ an on-chain killswitch.
 
 | Role | Grants |
 |---|---|
-| `LIQUIDITY_ADMIN_ROLE` | Pool list add/update/retire, caps, `positionManager` / `feeRouter` addresses. |
+| `LIQUIDITY_ADMIN_ROLE` | Supply list add/update/retire, caps, `positionManager` / `feeRouter` addresses. |
 | `GUARDIAN_ROLE` | `pause()` / `unpause()`. |
 | `UPGRADER_ROLE` | Inherited. |
 

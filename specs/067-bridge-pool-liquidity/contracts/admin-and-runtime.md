@@ -7,7 +7,7 @@ a member sees — including what happens when any of it is missing.
 
 ## AdminPanel navigation
 
-`frontend/src/components/admin/adminNav.js` gains a group. Placement is deliberate: bridging and pooling
+`frontend/src/components/admin/adminNav.js` gains a group. Placement is deliberate: bridging and supplying
 are member-value surfaces with their own killswitches, not protocol wiring, so they do not belong under
 "Protocol Config" beside oracle adapters.
 
@@ -77,12 +77,12 @@ not in that path. The tab should say so, so nobody goes looking for a rescue but
 `lib/staking/stakingRouter.js` shape: read the router, return `null` on any core read failure, and let
 callers decide the honest fallback.
 
-| Condition | Bridge surface | Pool surface |
+| Condition | Bridge surface | Supply surface |
 |---|---|---|
 | Router deployed, reachable, routes/pools enabled | Full function | Full function |
 | Router **paused** | New bridges refused with the paused reason; in-flight tracking unaffected | New Uniswap supplies refused; positions still visible and withdrawable |
 | Route / pool **disabled** | Route not offered; selecting the pair explains why (FR-007 honest unavailable) | Pool shown as **closed to new deposits**, still visible + withdrawable |
-| Router **undeployed** on this network | Bridge tab absent; Transfer works exactly as before | Pool area shows the honest per-network empty state |
+| Router **undeployed** on this network | Bridge tab absent; Transfer works exactly as before | Supply area shows the honest per-network empty state |
 | Router deployed but **unreachable** | Surface disabled with "as of last read" framing (FR-052) — never invented availability | Same; existing positions still read directly from the protocol |
 | `FeeRouter` unreachable | Fee-bearing path **blocked** (never assume a lower rate) | Same |
 | **Gateway** unset/unreachable | Quoting impossible ⇒ Bridge surface hides. **In-flight bridges still resolve** via on-chain fallback | Unaffected — Pool reads are direct RPC |

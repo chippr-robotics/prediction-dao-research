@@ -84,11 +84,34 @@ all items still pass.
    helper so the inversion is visible at the point of use (research R11b), and quickstart 14f tests it
    directly. SC-020 – SC-022 added.
 
+**Iteration 5 — `/speckit-analyze` remediation (2026-07-25):** analysis found 1 CRITICAL, 3 HIGH,
+5 MEDIUM, 3 LOW across spec/plan/tasks. All CRITICAL, HIGH, and MEDIUM findings are resolved.
+
+- **C1 (CRITICAL)** FR-061 had zero implementation tasks — the signing-time network switch the whole
+  cross-network selector depends on. Added T151/T152 (Bridge) and T153 (Supply), and listed them among
+  the non-waivable gates.
+- **C2 (HIGH)** FR-033 restricted-account view/exit had zero tasks → T154/T155.
+- **C3 (HIGH)** FR-044 pause-during-degradation had no verifying task → T156.
+- **C4 (HIGH)** SC-005 was unverifiable as written and had survived two review passes without an owner.
+  Re-cut: the build-gate half is now the automatically verifiable disclosure gate (T096); the moderated
+  comprehension check remains as an explicit **launch** gate with an owner (T158).
+- **C5 (MEDIUM)** FR-050 per-network control-state isolation → T157.
+- **C6 (MEDIUM)** FR-065 empty-counterpart had a test but no implementation → folded into T055.
+- **C7 (MEDIUM)** No task cited a Success Criterion; 12 SC ids are now cited on the tasks that satisfy
+  them, so SC→task traceability is checkable rather than inferred.
+- **A1 (MEDIUM)** `NN-` placeholders resolved against the live series: posts → **35**, knowledge → **21**.
+- **I1 (MEDIUM)** Stale "Pool" naming removed from `contracts/admin-and-runtime.md` and
+  `contracts/liquidity-router.md` after the Supply rename.
+- **I2 (LOW)** SC-019 restored to numeric position. **U1 (LOW)** `PoolCard.jsx` → `LiquidityPoolCard.jsx`.
+- **D1 (LOW)** FR-026/FR-027 overlap judged complementary; no change.
+
+Post-remediation: 72 FRs, **100% with ≥1 task**; 158 tasks; 0 format violations; no constitution
+violations.
+
 **Iteration 2 — re-validation:** all items pass. Remaining watch-items for `/speckit-plan`:
 
-- SC-005's usability target (8 in 10 participants can explain impermanent loss) requires a real
-  usability test to verify; the plan should say who runs it and when, or the criterion should be
-  re-cut as a comprehension check embedded in the flow.
+- ~~SC-005's usability target requires a real usability test to verify~~ — **resolved in iteration 5**:
+  re-cut into an automatically verifiable build gate plus an owned launch gate (T158).
 - The spec deliberately does **not** name the bridge protocol(s) or the Uniswap deployment version.
   Both are plan-level research items constrained by the decided model (third-party LP, full-range
   positions, EVM-only).

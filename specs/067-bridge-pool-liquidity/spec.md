@@ -678,9 +678,12 @@ resolving.
   outcomes.
 - **SC-004**: 100% of in-flight bridges resume their true status after the member closes and reopens
   the app, with no reliance on a session having stayed open.
-- **SC-005**: A member who has never provided liquidity can supply to a curated pool in under 2
-  minutes and, in usability testing, can correctly state in their own words what impermanent loss means
-  for their trading position — at a rate of at least 8 in 10 participants.
+- **SC-005**: A member who has never provided liquidity can supply to a curated pool in under 2 minutes,
+  and **cannot reach the confirm control on a trading pool without the impermanent-loss disclosure
+  having been displayed** — verifiable automatically in every build. Additionally, before mainnet
+  launch, at least 8 in 10 participants in a moderated check can state in their own words what
+  impermanent loss means for their position; that check has a named owner and is a launch gate, not a
+  build gate.
 - **SC-006**: Supply withdrawal is available and free of platform fees for 100% of open positions,
   including positions in pools that have been retired or whose underlying protocol has become
   unavailable.
@@ -713,6 +716,9 @@ resolving.
 - **SC-018**: Trading liquidity is offered on every supported network where Uniswap is deployed, and
   enabling it on a network changes no unrelated capability on that network (verified specifically for
   networks that deliberately ship without in-app swapping).
+- **SC-019**: Every newly added network is usable end to end — selectable, visible in the portfolio,
+  and able to send and receive — so no member can bridge to a network where the asset then becomes
+  invisible or unspendable.
 - **SC-020**: A member can complete a bridge, a liquidity supply, and a swap involving an asset on a
   network other than the app's active one **without ever opening the network switcher** — the switch, if
   any, occurs at signing and is disclosed.
@@ -722,9 +728,6 @@ resolving.
 - **SC-022**: With assets across five networks in one list, a member can locate a specific asset by
   typing part of its symbol, name, or network in under 5 seconds, and the search is fully operable by
   keyboard and screen reader.
-- **SC-019**: Every newly added network is usable end to end — selectable, visible in the portfolio,
-  and able to send and receive — so no member can bridge to a network where the asset then becomes
-  invisible or unspendable.
 
 ## Assumptions
 

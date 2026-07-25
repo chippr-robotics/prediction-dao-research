@@ -159,7 +159,7 @@ frontend/src/
 │   │   └── PayTransferPanel.jsx          # EDIT — add Bridge tab, relabel section copy
 │   ├── earn/
 │   │   ├── SupplyView.jsx                # NEW — Earn → Supply area (both kinds)
-│   │   ├── PoolCard.jsx                  # NEW — one curated pool option
+│   │   ├── LiquidityPoolCard.jsx        # NEW — one curated pool option
 │   │   ├── SupplySheet.jsx               # NEW — fee line + IL / rebalance disclosure gate
 │   │   └── EarnPanel.jsx                 # EDIT — "Bridges" disabled tile → live "Supply" area
 │   └── admin/
@@ -209,8 +209,8 @@ docs/
 ├── runbooks/bridge-liquidity-operations.md   # NEW
 └── blog/
     ├── features/02-bridge-and-pool/{blog.md,social.md}  # NEW (FR-055)
-    ├── posts/NN-cross-chain-intents-and-lp/{...}        # NEW (FR-056)
-    └── knowledge/NN-bridges-and-liquidity/{...}         # NEW (FR-057)
+    ├── posts/35-cross-chain-intents-and-lp/{...}        # NEW (FR-056)
+    └── knowledge/21-bridges-and-liquidity/{...}         # NEW (FR-057)
 ```
 
 **Structure Decision**: follows the repo's existing per-domain layout — contracts under a feature

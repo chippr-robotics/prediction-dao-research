@@ -21,6 +21,10 @@ routers. **T038 is merge-blocking**: it is the only test that can detect the `de
 
 - **[P]**: parallelizable — different files, no dependency on incomplete work
 - **[Story]**: US1–US5, on user-story phases only
+- **Task IDs are stable identifiers assigned in creation order, not an ordering index.** Execution order
+  is given by phase and position. T151+ were added by `/speckit-analyze` remediation and sit in their
+  correct phases; existing IDs were deliberately not renumbered so references to them (notably the
+  merge-blocking **T038**) stay valid.
 
 ## Path Conventions
 
@@ -42,7 +46,7 @@ deployment record. Never copy a canonical address across networks.
 - [ ] T002 Add Base (8453) as a full network entry in `frontend/src/config/networks.js`
 - [ ] T003 Add Optimism (10) as a full network entry in `frontend/src/config/networks.js`
 - [ ] T004 Add a per-network `dex` block (factory, positionManager, quoter, swapRouter, wnative) for Ethereum, Arbitrum, Base, and Optimism in `frontend/src/config/networks.js`, each address taken from that chain's own Uniswap deployment record
-- [ ] T005 Split `capabilities.dex` into an explicit per-network swap flag and add derived `capabilities.liquidity` (`dex.positionManager` present AND `liquidityRouter` deployed) in `frontend/src/config/networks.js` per research R4a
+- [ ] T005 (SC-018) Split `capabilities.dex` into an explicit per-network swap flag and add derived `capabilities.liquidity` (`dex.positionManager` present AND `liquidityRouter` deployed) in `frontend/src/config/networks.js` per research R4a
 - [ ] T006 Add a per-network `bridge` block (`{ spokePool, hubPool | null }`) as build-time display fallback in `frontend/src/config/networks.js` — authoritative values are read from the router at runtime (FR-051)
 - [ ] T007 [P] Add `bridgeRouter` and `liquidityRouter` address keys (empty until synced) to every network in `frontend/src/config/contracts.js`
 - [ ] T008 [P] Add RPC env vars for Arbitrum, Base, and Optimism to `.env.example` with comments — never real values
@@ -114,8 +118,8 @@ depend on all of it.
 
 - [ ] T052 Create `frontend/src/lib/assets/networkPin.js` exporting **both** predicates side by side — `samePair` (`o.chainId === pin.pinnedChainId`) and `bridgeDest` (`o.symbol === pin.pinnedSymbol && o.chainId !== pin.pinnedChainId`) — with a comment stating that applying `samePair` to a bridge silently reduces it to a same-chain transfer (research R11b)
 - [ ] T053 [P] Unit tests for both predicates, re-pin revalidation, and non-EVM (string `chainId`) exclusion in `frontend/src/lib/assets/__tests__/networkPin.test.js`
-- [ ] T054 Add a search/filter input to `frontend/src/components/ui/UniversalAssetSelect.jsx` matching on symbol, asset name, and network name, keyboard and screen-reader operable (FR-064)
-- [ ] T055 Add an optional `pin` + `pinPredicate` prop to `frontend/src/components/ui/UniversalAssetSelect.jsx` so callers filter the list without the component deriving eligibility (it stays presentational per spec 064 FR-001)
+- [ ] T054 (SC-022) Add a search/filter input to `frontend/src/components/ui/UniversalAssetSelect.jsx` matching on symbol, asset name, and network name, keyboard and screen-reader operable (FR-064)
+- [ ] T055 Add an optional `pin` + `pinPredicate` prop to `frontend/src/components/ui/UniversalAssetSelect.jsx` so callers filter the list without the component deriving eligibility (it stays presentational per spec 064 FR-001), **and render the empty-counterpart state** — a plain statement of why the list is empty and what would change it, never a bare empty dropdown (FR-065)
 - [ ] T056 [P] Extend `frontend/src/components/ui/__tests__/UniversalAssetSelect.test.jsx` with search, pin-filtering, empty-counterpart messaging, and vitest-axe coverage
 - [ ] T057 [P] Regression-test the four existing consumers (home Pay/Request/Wager, wallet Transfer) still work and gained search, in `frontend/src/test/home.axe.test.jsx` and the relevant panel tests
 - [ ] T058 [P] Add `LEDGER_CLASS.BRIDGE = 'bridge'` and `LEDGER_CLASS.LIQUIDITY = 'liquidity'` additively to `frontend/src/data/ledger/constants.js` — no existing entry reclassified
@@ -162,7 +166,7 @@ progress view reaches delivered backed by a destination-chain transaction.
 - [ ] T073 [US1] Implement cross-session reconciliation in `frontend/src/lib/bridge/bridgeStatus.js`: poll the gateway status endpoint, fall back to on-chain `FundsDeposited`/`FilledV3Relay` reads (FR-010)
 - [ ] T074 [US1] Implement the `needs_attention` transition past `expectedBy` in `frontend/src/lib/bridge/bridgeStatus.js`, non-terminal and still resolvable to delivered or refunded (FR-011)
 - [ ] T075 [P] [US1] Unit tests covering the full state matrix including delayed, refunded, and partial outcomes in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js`
-- [ ] T076 [P] [US1] Test that an in-flight bridge resumes its true status after a simulated app restart in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js` (FR-010)
+- [ ] T076 [P] [US1] (SC-004) Test that an in-flight bridge resumes its true status after a simulated app restart in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js` (FR-010)
 
 ### UI
 
@@ -173,8 +177,10 @@ progress view reaches delivered backed by a destination-chain transaction.
 - [ ] T081 [US1] Create `frontend/src/components/wallet/BridgeStatusList.jsx` showing in-flight, delivered, refunded, and needs-attention transfers with both transaction links
 - [ ] T082 [US1] Add the Bridge tab to `frontend/src/components/wallet/PayTransferPanel.jsx` beside Send and Activity, without displacing the existing same-chain send flow (FR-004)
 - [ ] T083 [US1] Implement honest-unavailable states in `frontend/src/components/wallet/BridgeView.jsx` for paused routes, undeployed/unreachable routers, missing gateway, ETC/Mordor, and Bitcoin networks (FR-051/FR-052/FR-053)
-- [ ] T084 [P] [US1] Component tests for quote rendering, stale-quote gating, honest-unavailable states, and vitest-axe in `frontend/src/test/bridge/BridgeView.test.jsx`
-- [ ] T085 [P] [US1] Test that the destination selector offers **only the same asset on other networks** — never the same network — in `frontend/src/test/bridge/BridgeView.test.jsx` (FR-063, the R11b inversion check)
+- [ ] T084 [P] [US1] (SC-014) Component tests for quote rendering, stale-quote gating, honest-unavailable states, and vitest-axe in `frontend/src/test/bridge/BridgeView.test.jsx`
+- [ ] T085 [P] [US1] Test that the destination selector offers **only the same asset on other networks** — never the same network — in `frontend/src/test/bridge/BridgeView.test.jsx` (FR-063, SC-021, the R11b inversion check)
+- [ ] T151 [US1] Implement the **signing-time network switch** in `frontend/src/components/wallet/BridgeView.jsx` — when the selected source asset is on a network other than the wallet's active one, switch automatically at submit and disclose the switch before signature, reusing the `useEarnSend` pattern (FR-061, SC-020). Without this the cross-network selector produces failed transactions for every asset off the active chain
+- [ ] T152 [P] [US1] Test that selecting an off-chain asset triggers a disclosed automatic switch at signing and that the network switcher is never required, in `frontend/src/test/bridge/BridgeView.test.jsx` (SC-020)
 
 **Checkpoint**: US1 is fully functional and independently testable. MVP reached.
 
@@ -196,7 +202,7 @@ current value and earnings, then withdraw from each and confirm assets return to
 - [ ] T091 [P] [US2] Unit tests for tick derivation, position valuation, and the honest-null fallback in `frontend/src/lib/liquidity/__tests__/uniswapPositions.test.js`
 - [ ] T092 [P] [US2] Unit test asserting the Across LP path never routes through `liquidityRouter` in `frontend/src/lib/liquidity/__tests__/acrossLpPositions.test.js`
 - [ ] T093 [US2] Create `frontend/src/components/earn/SupplyView.jsx` listing both pool kinds together across networks with network badges, in the Lend card layout
-- [ ] T094 [P] [US2] Create `frontend/src/components/earn/PoolCard.jsx` showing kind, asset/pair, protocol, network, estimated return, total supplied, and the kind-specific risk summary with InfoTips (FR-017)
+- [ ] T094 [P] [US2] Create `frontend/src/components/earn/LiquidityPoolCard.jsx` showing kind, asset/pair, protocol, network, estimated return, total supplied, and the kind-specific risk summary with InfoTips (FR-017)
 - [ ] T095 [US2] Create `frontend/src/components/earn/SupplySheet.jsx` — amount entry, fee line with net amounts, and the confirm step
 - [ ] T096 [US2] Gate the confirm control in `frontend/src/components/earn/SupplySheet.jsx` behind a **visible inline** impermanent-loss disclosure for trading pools (FR-018) and the rebalancing/inventory disclosure for bridge pools (FR-019) — never tooltip-only
 - [ ] T097 [US2] Apply the **`samePair`** predicate to the second asset selector in `frontend/src/components/earn/SupplySheet.jsx`, showing the pinned network and revalidating on re-pin (FR-062)
@@ -204,9 +210,10 @@ current value and earnings, then withdraw from each and confirm assets return to
 - [ ] T099 [US2] Implement add-to and withdraw flows in `frontend/src/components/earn/SupplyView.jsx` with **no platform fee on exit** and partial-withdrawal messaging when inventory is short (FR-021/FR-022)
 - [ ] T100 [US2] Implement retired-pool and unreachable-protocol states in `frontend/src/components/earn/SupplyView.jsx`: closed to new deposits, still visible and withdrawable, never hidden with member funds inside (FR-024)
 - [ ] T101 [US2] Implement the honest per-network empty state naming where supplying is available in `frontend/src/components/earn/SupplyView.jsx` (FR-025)
-- [ ] T102 [P] [US2] Component tests for the disclosure gate, fee line, retired-pool behavior, empty state, and vitest-axe in `frontend/src/test/earn/SupplyView.test.jsx`
-- [ ] T103 [P] [US2] Test that a pair can never span networks and that re-pinning clears an invalidated second selection in `frontend/src/test/earn/SupplyView.test.jsx` (FR-062)
+- [ ] T102 [P] [US2] (SC-014) Component tests for the disclosure gate, fee line, retired-pool behavior, empty state, and vitest-axe in `frontend/src/test/earn/SupplyView.test.jsx`
+- [ ] T103 [P] [US2] (SC-021) Test that a pair can never span networks and that re-pinning clears an invalidated second selection in `frontend/src/test/earn/SupplyView.test.jsx` (FR-062)
 - [ ] T104 [P] [US2] Create `frontend/src/data/ledger/sources/liquidityLedgerSource.js` capturing supply, withdraw, and fee-claim actions with class `liquidity`
+- [ ] T153 [US2] Implement the **signing-time network switch** in `frontend/src/components/earn/SupplySheet.jsx` for pairs pinned to a network other than the wallet's active one, disclosed before signature (FR-061, SC-020)
 
 **Checkpoint**: US1 and US2 both work independently.
 
@@ -236,7 +243,9 @@ matches what was charged; a deny-listed wallet is refused at both surfaces befor
 - [ ] T117 [P] [US3] Ledger consistency tests for bridge single-entry representation and liquidity/wager-pool distinguishability in `frontend/src/test/ledger/ledgerConsistency.test.js`
 - [ ] T118 [P] [US3] Tests asserting the two new notification categories are independently controllable and that no bridge or liquidity notification is attributed to the wager-pool category, in `frontend/src/test/notifications/`
 - [ ] T119 [P] [US3] Tests asserting the quoted rate is a hard ceiling and that a zero rate renders no fee line, in `frontend/src/test/fees/`
-- [ ] T120 [P] [US3] Tests asserting a deny-listed wallet is refused at both surfaces before signature, including a listing that lands between quote and submission, in `frontend/src/test/`
+- [ ] T120 [P] [US3] Tests asserting a deny-listed wallet is refused at both surfaces before signature, including a listing that lands between quote and submission, in `frontend/src/test/` (SC-013)
+- [ ] T154 [US3] Implement the platform's existing **restricted-account policy** for view and exit on both surfaces in `frontend/src/components/wallet/BridgeView.jsx` and `frontend/src/components/earn/SupplyView.jsx` — a restricted member must still see existing positions and in-flight bridges and still be able to exit, following the established treatment rather than a new one (FR-033)
+- [ ] T155 [P] [US3] Test that a restricted account can still view and exit existing positions while being refused new value-in, in `frontend/src/test/` (FR-033)
 
 **Checkpoint**: both surfaces are fully wired into the shared services.
 
@@ -254,7 +263,7 @@ actor and timestamp. As an unauthorized operator, confirm the controls are neith
 - [ ] T121 [US4] Add the **Liquidity** group with `bridge` and `supply` items, the `isLiquidityAdmin` flag, and both tab icons to `frontend/src/components/admin/adminNav.js`
 - [ ] T122 [P] [US4] Resolve `LIQUIDITY_ADMIN_ROLE` membership and pass `isLiquidityAdmin` into `buildAdminNavGroups`, in `frontend/src/hooks/useAdminRoles.js`
 - [ ] T123 [US4] Create `frontend/src/components/admin/BridgeTab.jsx` with Status, Routes, Addresses, Fee (read-only), Operations, and History sections per [contracts/admin-and-runtime.md](./contracts/admin-and-runtime.md)
-- [ ] T124 [US4] Implement route add/edit/enable/disable/remove plus bulk per-network-pair toggles across the 20 directed routes in `frontend/src/components/admin/BridgeTab.jsx` (FR-041)
+- [ ] T124 [US4] (SC-017) Implement route add/edit/enable/disable/remove plus bulk per-network-pair toggles across the 20 directed routes in `frontend/src/components/admin/BridgeTab.jsx` (FR-041)
 - [ ] T125 [US4] Implement address editing with the current value shown and invalid input rejected with a reason before submit, in `frontend/src/components/admin/BridgeTab.jsx` (FR-042)
 - [ ] T126 [US4] Implement the Operations panel (in-flight, past-`expectedBy`, recent completions/refunds, gateway health) in `frontend/src/components/admin/BridgeTab.jsx`, stating plainly that it is observational — no operator action can touch an in-flight bridge (FR-047)
 - [ ] T127 [US4] Create `frontend/src/components/admin/SupplyTab.jsx` with Status, Pools, Addresses, Fee (read-only), and History sections spanning all five networks
@@ -263,9 +272,11 @@ actor and timestamp. As an unauthorized operator, confirm the controls are neith
 - [ ] T130 [P] [US4] Implement per-transaction bridge maximum editing in `frontend/src/components/admin/BridgeTab.jsx` and per-pool deposit cap editing in `frontend/src/components/admin/SupplyTab.jsx`, each honoured and explained in the member flows (FR-045)
 - [ ] T131 [P] [US4] Implement decoded event history (action, target, before → after, operator, time) in `frontend/src/components/admin/BridgeTab.jsx` and `frontend/src/components/admin/SupplyTab.jsx` (FR-046)
 - [ ] T132 [P] [US4] Show the live fee rate and cap read-only with a link to the Fees tab, and state plainly when `FeeRouter` is undeployed or unreachable while keeping other controls usable, in both admin tabs (FR-048/FR-051)
-- [ ] T133 [P] [US4] Tests asserting least-privilege — an operator with none of admin/liquidity-admin/guardian sees neither tab and can perform no control action by any route — in `frontend/src/test/admin/`
+- [ ] T133 [P] [US4] (SC-011) Tests asserting least-privilege — an operator with none of admin/liquidity-admin/guardian sees neither tab and can perform no control action by any route — in `frontend/src/test/admin/`
 - [ ] T134 [P] [US4] Tests asserting pause stops new value in while in-flight bridges settle and existing positions stay withdrawable, in `frontend/src/test/admin/`
-- [ ] T135 [P] [US4] vitest-axe coverage for both admin tabs in `frontend/src/test/admin/`
+- [ ] T135 [P] [US4] vitest-axe coverage for both admin tabs in `frontend/src/test/admin/` (SC-014)
+- [ ] T156 [P] [US4] Test that **pause and resume still work with every optional service unavailable** — gateway unset and unreachable — for both routers, in `test/bridge/BridgeRouter.test.js` and `test/liquidity/LiquidityRouter.test.js` (FR-044). A killswitch that depends on optional infrastructure is not a killswitch
+- [ ] T157 [P] [US4] Test that control state and history are **scoped per network** and that no testnet control state reaches a mainnet surface, in `frontend/src/test/admin/` (FR-050)
 
 **Checkpoint**: every member-facing surface has a working operator control.
 
@@ -281,11 +292,11 @@ index table updated and internal links resolving.
 - [ ] T136 [P] [US5] Write the member feature announcement in `docs/blog/features/02-bridge-and-supply/blog.md` — benefit-first, with the exact confirm-step flow
 - [ ] T137 [P] [US5] Write the promotion kit (X post, LinkedIn post, 16:9 image prompt) in `docs/blog/features/02-bridge-and-supply/social.md`
 - [ ] T138 [P] [US5] Add the announcement row to the index table in `docs/blog/features/README.md`
-- [ ] T139 [P] [US5] Write the engineering post on cross-chain intents and pooled liquidity in `docs/blog/posts/NN-cross-chain-intents-and-lp/blog.md`, covering the `depositor` refund invariant and the no-custody fee rule
-- [ ] T140 [P] [US5] Write its promotion kit in `docs/blog/posts/NN-cross-chain-intents-and-lp/social.md` and add the index row in `docs/blog/posts/README.md`
-- [ ] T141 [P] [US5] Write the knowledge-base article explaining bridges, liquidity provision, and impermanent loss in plain language in `docs/blog/knowledge/NN-bridges-and-liquidity/blog.md`
+- [ ] T139 [P] [US5] Write the engineering post on cross-chain intents and pooled liquidity in `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, covering the `depositor` refund invariant and the no-custody fee rule
+- [ ] T140 [P] [US5] Write its promotion kit in `docs/blog/posts/35-cross-chain-intents-and-lp/social.md` and add the index row in `docs/blog/posts/README.md`
+- [ ] T141 [P] [US5] Write the knowledge-base article explaining bridges, liquidity provision, and impermanent loss in plain language in `docs/blog/knowledge/21-bridges-and-liquidity/blog.md`
 - [ ] T142 [P] [US5] Write its promotion kit and add the index row in `docs/blog/knowledge/README.md`
-- [ ] T143 [US5] Fact-check `docs/blog/features/02-bridge-and-supply/blog.md`, `docs/blog/posts/NN-cross-chain-intents-and-lp/blog.md`, and `docs/blog/knowledge/NN-bridges-and-liquidity/blog.md` against the R8 availability matrix and the zero-rate launch state — a piece implying bridge liquidity beyond Ethereum, or a platform fee that ships at zero, fails FR-058
+- [ ] T143 [US5] Fact-check `docs/blog/features/02-bridge-and-supply/blog.md`, `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, and `docs/blog/knowledge/21-bridges-and-liquidity/blog.md` against the R8 availability matrix and the zero-rate launch state — a piece implying bridge liquidity beyond Ethereum, or a platform fee that ships at zero, fails FR-058
 
 **Checkpoint**: all five user stories complete.
 
@@ -297,9 +308,10 @@ index table updated and internal links resolving.
 - [ ] T145 [P] Write the operator runbook in `docs/runbooks/bridge-liquidity-operations.md` covering pause/resume, route and pool curation, stuck-bridge triage, and the limits of operator action
 - [ ] T146 [P] Add the spec-067 summary block to `CLAUDE.md` following the existing per-spec guardrail format
 - [ ] T147 Run `npm run compile && npm test && npm run test:frontend && npm run check:storage-layout` and confirm all green
-- [ ] T148 Run the full `quickstart.md` walkthrough end to end, including the honest-degradation and cross-network selection checks
+- [ ] T148 (SC-012, SC-019, SC-020) Run the full `quickstart.md` walkthrough end to end, including the honest-degradation and cross-network selection checks
 - [ ] T149 [P] Confirm no `continue-on-error` was added to any lint/test/build/security step in `.github/workflows/`
 - [ ] T150 Request the smart-contract security review required by constitution I (`.github/agents/smart-contract-security.agent.md`) for `contracts/bridge/BridgeRouter.sol` and `contracts/liquidity/LiquidityRouter.sol`
+- [ ] T158 Run the moderated impermanent-loss comprehension check behind SC-005 before mainnet launch and record the result in `specs/067-bridge-pool-liquidity/checklists/requirements.md` — the in-flow gate (T096) proves the disclosure is *shown*, this proves it is *understood*
 
 ---
 
@@ -376,6 +388,8 @@ cross-chain feature, not padding.
 ### Gates that must not be waived
 
 - **T038** (expiry refund to the member) blocks merge. The happy path cannot detect that bug class.
+- **T151 / T153** (signing-time network switch) are correctness, not polish. Without them the
+  cross-network selector reaches signing on the wrong chain for any asset off the active network.
 - **T045** (storage layout) must pass before any subsequent router upgrade.
 - **T150** (security review) is required by constitution I for both new value-bearing contracts.
 - **US4** must land before mainnet, whatever the story priority says.
