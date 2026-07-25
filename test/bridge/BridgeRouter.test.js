@@ -116,9 +116,9 @@ describe("BridgeRouter", function () {
     await router.connect(admin).grantRole(await router.GUARDIAN_ROLE(), guardian.address);
 
     await router.connect(liquidityAdmin).setRoute(route());
-    routeId = await router.computeRouteId(usdcAddr, DEST_CHAIN);
+    routeId = await router.computeRouteId(usdcAddr, usdcDest, DEST_CHAIN);
     await router.connect(liquidityAdmin).setRoute(route({ inputToken: wnativeAddr, nativeInput: true }));
-    nativeRouteId = await router.computeRouteId(wnativeAddr, DEST_CHAIN);
+    nativeRouteId = await router.computeRouteId(wnativeAddr, usdcDest, DEST_CHAIN);
 
     await usdc.mint(member.address, AMT("1000000"));
     await usdc.connect(member).approve(routerAddr, ethers.MaxUint256);
@@ -207,7 +207,7 @@ describe("BridgeRouter", function () {
 
     it("lets a LIQUIDITY_ADMIN holder call every setter, each emitting its audit event", async function () {
       const newRoute = route({ destinationChainId: 10n, maxAmount: AMT("5") });
-      const newId = await router.computeRouteId(usdcAddr, 10n);
+      const newId = await router.computeRouteId(usdcAddr, usdcDest, 10n);
       await expect(router.connect(liquidityAdmin).setRoute(newRoute))
         .to.emit(router, "RouteSet")
         .withArgs(newId, usdcAddr, 10n, usdcDest, AMT("5"), 1800, false, liquidityAdmin.address);
@@ -298,16 +298,18 @@ describe("BridgeRouter", function () {
       await expect(router.connect(liquidityAdmin).setRoute(route({ destinationChainId: 42161n, expectedFillSeconds: 5 })))
         .to.be.revertedWithCustomError(router, "InvalidFillWindow");
       expect(await router.routeCount()).to.equal(before);
-      expect((await router.getRoute(await router.computeRouteId(usdcAddr, 42161n))).inputToken)
+      expect((await router.getRoute(await router.computeRouteId(usdcAddr, usdcDest, 42161n))).inputToken)
         .to.equal(ethers.ZeroAddress);
     });
 
-    it("keys routes on (inputToken, this chain, destinationChainId) and updates in place", async function () {
+    it("keys routes on (inputToken, outputToken, this chain, destinationChainId) and updates in place", async function () {
+      // outputToken is part of the identity so that changing the DELIVERED asset produces a
+      // different route rather than silently overwriting the existing one in place.
       expect(routeId).to.equal(
         ethers.keccak256(
           ethers.AbiCoder.defaultAbiCoder().encode(
-            ["address", "uint256", "uint256"],
-            [usdcAddr, LOCAL_CHAIN, DEST_CHAIN]
+            ["address", "address", "uint256", "uint256"],
+            [usdcAddr, usdcDest, LOCAL_CHAIN, DEST_CHAIN]
           )
         )
       );
@@ -468,7 +470,7 @@ describe("BridgeRouter", function () {
     it("blocks nothing else: every config setter and read still works while paused", async function () {
       await router.connect(guardian).pause();
 
-      const otherId = await router.computeRouteId(usdcAddr, 8453n);
+      const otherId = await router.computeRouteId(usdcAddr, usdcDest, 8453n);
       await router.connect(liquidityAdmin).setRoute(route({ destinationChainId: 8453n }));
       await router.connect(liquidityAdmin).setRouteEnabled(otherId, false);
       await router.connect(liquidityAdmin).setRouteLimit(otherId, AMT("2"));
@@ -483,7 +485,7 @@ describe("BridgeRouter", function () {
       expect(await router.routeCount()).to.equal(2);
       expect((await router.getRoute(routeId)).inputToken).to.equal(usdcAddr);
       expect(await router.routeAt(0)).to.equal(routeId);
-      expect(await router.computeRouteId(usdcAddr, DEST_CHAIN)).to.equal(routeId);
+      expect(await router.computeRouteId(usdcAddr, usdcDest, DEST_CHAIN)).to.equal(routeId);
       expect(await router.paused()).to.equal(true);
     });
 

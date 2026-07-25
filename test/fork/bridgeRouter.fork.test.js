@@ -192,7 +192,7 @@ for (const [name, cfg] of Object.entries(CHAINS)) {
     });
 
     async function bridge({ amount, maxFeeBps = FEE_CAP_BPS, from = member }) {
-      const routeId = await router.computeRouteId(cfg.usdc, cfg.destinationChainId);
+      const routeId = await router.computeRouteId(cfg.usdc, cfg.destinationUsdc, cfg.destinationChainId);
       await dealErc20(cfg.usdc, from.address, amount);
       await usdc.connect(from).approve(await router.getAddress(), amount);
       const block = await ethers.provider.getBlock("latest");

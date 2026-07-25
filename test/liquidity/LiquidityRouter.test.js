@@ -48,7 +48,8 @@ describe("LiquidityRouter", function () {
       token0: token0.target,
       token1: token1.target,
       poolAddress: pool.target,
-      maxDepositPerTx: 0,
+      maxDeposit0PerTx: 0,
+      maxDeposit1PerTx: 0,
       ...overrides,
     };
   }
@@ -115,7 +116,8 @@ describe("LiquidityRouter", function () {
       token0: token0.target,
       token1: ethers.ZeroAddress,
       poolAddress: stranger.address, // stands in for the HubPool address
-      maxDepositPerTx: 0,
+      maxDeposit0PerTx: 0,
+      maxDeposit1PerTx: 0,
     });
     bridgePoolId = await router.computePoolId(
       PoolKind.BridgeLp,
@@ -156,7 +158,7 @@ describe("LiquidityRouter", function () {
       expect(listing.poolAddress).to.equal(pool.target);
 
       // Re-listing the same pool updates it without growing the set.
-      await expect(router.connect(liquidityAdmin).listPool(tradingListing({ maxDepositPerTx: ETH("5") })))
+      await expect(router.connect(liquidityAdmin).listPool(tradingListing({ maxDeposit0PerTx: ETH("5"), maxDeposit1PerTx: ETH("5") })))
         .to.emit(router, "PoolListed")
         .withArgs(
           tradingPoolId,
@@ -165,11 +167,11 @@ describe("LiquidityRouter", function () {
           token0.target,
           token1.target,
           FEE_TIER,
-          ETH("5"),
+          ETH("5"), ETH("5"),
           liquidityAdmin.address
         );
       expect(await router.poolCount()).to.equal(2);
-      expect((await router.getPool(tradingPoolId)).maxDepositPerTx).to.equal(ETH("5"));
+      expect((await router.getPool(tradingPoolId)).maxDeposit0PerTx).to.equal(ETH("5"));
     });
 
     it("derives full-range ticks from the pool's own tick spacing", async function () {
@@ -192,7 +194,7 @@ describe("LiquidityRouter", function () {
         .to.be.revertedWithCustomError(router, unauthorized);
       await expect(router.connect(stranger).setPoolEnabled(tradingPoolId, false))
         .to.be.revertedWithCustomError(router, unauthorized);
-      await expect(router.connect(stranger).setPoolLimit(tradingPoolId, ETH("1")))
+      await expect(router.connect(stranger).setPoolLimit(tradingPoolId, ETH("1"), ETH("1")))
         .to.be.revertedWithCustomError(router, unauthorized);
       await expect(router.connect(stranger).setPositionManager(stranger.address))
         .to.be.revertedWithCustomError(router, unauthorized);
@@ -205,9 +207,9 @@ describe("LiquidityRouter", function () {
       await expect(router.connect(liquidityAdmin).setPoolEnabled(tradingPoolId, false))
         .to.emit(router, "PoolEnabledChanged")
         .withArgs(tradingPoolId, false, liquidityAdmin.address);
-      await expect(router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, ETH("1")))
+      await expect(router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, ETH("1"), ETH("1")))
         .to.emit(router, "PoolLimitChanged")
-        .withArgs(tradingPoolId, 0, ETH("1"), liquidityAdmin.address);
+        .withArgs(tradingPoolId, ETH("1"), ETH("1"), liquidityAdmin.address);
       await expect(router.connect(liquidityAdmin).setSanctionsGuard(stranger.address))
         .to.emit(router, "SanctionsGuardUpdated")
         .withArgs(ethers.ZeroAddress, stranger.address, liquidityAdmin.address);
@@ -274,8 +276,8 @@ describe("LiquidityRouter", function () {
       expect(await nfpm.ownerOf(1)).to.equal(member.address);
     });
 
-    it("enforces maxDepositPerTx on each leg with AmountAbovePoolLimit", async function () {
-      await router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, ETH("100"));
+    it("enforces the per-leg deposit ceilings with AmountAbovePoolLimit", async function () {
+      await router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, ETH("100"), ETH("100"));
 
       await expect(supply({ amount0: ETH("101"), amount1: ETH("1") }))
         .to.be.revertedWithCustomError(router, "AmountAbovePoolLimit");
@@ -285,7 +287,7 @@ describe("LiquidityRouter", function () {
       await supply({ amount0: ETH("100"), amount1: ETH("100") }); // exactly at the ceiling passes
 
       // 0 means uncapped, not "no deposits".
-      await router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, 0);
+      await router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, 0, 0);
       await supply({ amount0: ETH("1000"), amount1: ETH("1000") });
       expect(await nfpm.ownerOf(2)).to.equal(member.address);
     });
@@ -295,7 +297,14 @@ describe("LiquidityRouter", function () {
       await expect(supply({ maxFeeBps: 50 })).to.be.revertedWithCustomError(router, "FeeAboveQuoted");
 
       await supply({ maxFeeBps: 60 }); // at the quoted rate it goes through
-      expect(await token0.balanceOf(treasury.address)).to.equal((ETH("100") * 60n) / 10_000n);
+
+      // The fee lands on capital actually deployed, not on the 100 offered. The router approves the
+      // net (100 - 0.6) to Uniswap, the mock consumes all of it, and the fee is 60 bps of THAT. The
+      // few wei neither deployed nor charged are refunded, so the member is never billed for capital
+      // that did not become a position.
+      const gross = ETH("100");
+      const deployed = gross - (gross * 60n) / 10_000n;
+      expect(await token0.balanceOf(treasury.address)).to.equal((deployed * 60n) / 10_000n);
     });
   });
 
@@ -348,16 +357,23 @@ describe("LiquidityRouter", function () {
       expect(await token0.balanceOf(nfpmAddr)).to.be.greaterThan(0);
     });
 
-    it("skims both fee legs to the treasury and refunds every unspent wei to the member", async function () {
-      await feeRouter.connect(admin).setFeeBps(LIQUIDITY_DEPOSIT, 50);
-      await nfpm.setConsumeBps(6_000);
+    it("charges the fee ONLY on capital Uniswap actually consumed, not on what was offered", async function () {
+      // Regression test for the overcharge found by adversarial review and reproduced on a live
+      // fork by four independent reviewers. The router used to skim the fee from the GROSS desired
+      // amounts BEFORE the mint; Uniswap then consumed only part of the net and the remainder was
+      // refunded — so the member had paid a fee on capital that was handed straight back to them.
+      await feeRouter.connect(admin).setFeeBps(LIQUIDITY_DEPOSIT, 50); // 0.5%
+      await nfpm.setConsumeBps(6_000); // Uniswap takes 60% of what it is offered
 
       const gross0 = ETH("100");
       const gross1 = ETH("200");
-      const fee0 = (gross0 * 50n) / 10_000n;
-      const fee1 = (gross1 * 50n) / 10_000n;
-      const spent0 = ((gross0 - fee0) * 6_000n) / 10_000n;
-      const spent1 = ((gross1 - fee1) * 6_000n) / 10_000n;
+      const net0 = gross0 - (gross0 * 50n) / 10_000n;
+      const net1 = gross1 - (gross1 * 50n) / 10_000n;
+      const spent0 = (net0 * 6_000n) / 10_000n;
+      const spent1 = (net1 * 6_000n) / 10_000n;
+      // The fee follows the capital that actually became the position.
+      const fee0 = (spent0 * 50n) / 10_000n;
+      const fee1 = (spent1 * 50n) / 10_000n;
 
       const before0 = await token0.balanceOf(member.address);
       const before1 = await token1.balanceOf(member.address);
@@ -368,9 +384,28 @@ describe("LiquidityRouter", function () {
 
       expect(await token0.balanceOf(treasury.address)).to.equal(fee0);
       expect(await token1.balanceOf(treasury.address)).to.equal(fee1);
-      // The member is out exactly fee + spent: the unspent remainder came back.
-      expect(await token0.balanceOf(member.address)).to.equal(before0 - fee0 - spent0);
-      expect(await token1.balanceOf(member.address)).to.equal(before1 - fee1 - spent1);
+
+      // The member is out exactly (deployed + fee-on-deployed). Everything else came back whole.
+      expect(before0 - (await token0.balanceOf(member.address))).to.equal(spent0 + fee0);
+      expect(before1 - (await token1.balanceOf(member.address))).to.equal(spent1 + fee1);
+
+      // And the router kept nothing.
+      expect(await token0.balanceOf(routerAddr)).to.equal(0);
+      expect(await token1.balanceOf(routerAddr)).to.equal(0);
+    });
+
+    it("charges strictly less than a fee on the gross would have (the overcharge is gone)", async function () {
+      await feeRouter.connect(admin).setFeeBps(LIQUIDITY_DEPOSIT, 50);
+      await nfpm.setConsumeBps(6_000);
+      const gross0 = ETH("100");
+      const feeOnGross0 = (gross0 * 50n) / 10_000n; // what the old, buggy path took
+
+      await supply();
+
+      const actual = await token0.balanceOf(treasury.address);
+      expect(actual).to.be.lessThan(feeOnGross0);
+      // Specifically: no fee at all on the refunded 40%.
+      expect(actual).to.be.greaterThan(0);
     });
 
     it("mints the position NFT to the MEMBER with full-range ticks, never to the router", async function () {

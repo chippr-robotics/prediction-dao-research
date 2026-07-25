@@ -50,6 +50,14 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
     /// @notice FeeRouter service id for the liquidity fee. Read at supply time for the live rate.
     bytes32 public constant liquidityDepositServiceId = keccak256("liquidity.deposit");
 
+    /// @notice Hard ceiling this router will charge, whatever the FeeRouter reports.
+    /// @dev FeeRouter enforces its own MAX_WRAPPED_FEE_BPS only for `Wrapped` services, and these are
+    ///      registered `ConfigOnly` (so that FeeRouter.depositToVaultWithFee cannot be pointed at
+    ///      them). Enforcing the 250 bps cap here as well makes it a property of the charging contract
+    ///      rather than of a registration argument, and bounds the damage if `feeRouter` is ever
+    ///      repointed at a hostile implementation.
+    uint16 public constant MAX_FEE_BPS = 250;
+
     /// @dev Uniswap V3's absolute tick bounds. Full range is these, aligned to the pool's spacing.
     int24 private constant MIN_TICK = -887272;
     int24 private constant MAX_TICK = 887272;
@@ -110,6 +118,14 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         // tier told the operator to check an address that was perfectly fine.
         if (pool.kind == PoolKind.TradingLp) {
             if (pool.token1 == address(0) || pool.feeTier == 0) revert InvalidPoolListing();
+            // Cross-check the listing against the pool it actually names. Without this, listing a
+            // 0.3% pool's address with feeTier 500 was ACCEPTED and the mint then SUCCEEDED against a
+            // DIFFERENT pool than the one curated — reproduced on a Polygon fork during adversarial
+            // review. The listing metadata is what the member is shown, so it has to be true.
+            IUniswapV3PoolTickSpacing p = IUniswapV3PoolTickSpacing(pool.poolAddress);
+            if (p.token0() != pool.token0 || p.token1() != pool.token1 || p.fee() != pool.feeTier) {
+                revert PoolListingMismatch();
+            }
         } else if (pool.token1 != address(0) || pool.feeTier != 0) {
             revert InvalidPoolListing();
         }
@@ -125,7 +141,8 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
             pool.token0,
             pool.token1,
             pool.feeTier,
-            pool.maxDepositPerTx,
+            pool.maxDeposit0PerTx,
+            pool.maxDeposit1PerTx,
             msg.sender
         );
     }
@@ -138,11 +155,14 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         emit PoolEnabledChanged(poolId, enabled, msg.sender);
     }
 
-    function setPoolLimit(bytes32 poolId, uint256 maxDepositPerTx) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    function setPoolLimit(bytes32 poolId, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx)
+        external
+        onlyRole(LIQUIDITY_ADMIN_ROLE)
+    {
         if (!_poolIds.contains(poolId)) revert PoolUnknown();
-        uint256 old = _pools[poolId].maxDepositPerTx;
-        _pools[poolId].maxDepositPerTx = maxDepositPerTx;
-        emit PoolLimitChanged(poolId, old, maxDepositPerTx, msg.sender);
+        _pools[poolId].maxDeposit0PerTx = maxDeposit0PerTx;
+        _pools[poolId].maxDeposit1PerTx = maxDeposit1PerTx;
+        emit PoolLimitChanged(poolId, maxDeposit0PerTx, maxDeposit1PerTx, msg.sender);
     }
 
     function setPositionManager(address newManager) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
@@ -227,10 +247,11 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         if (pool.kind != PoolKind.TradingLp) revert NotTradingPool();
         if (!pool.enabled) revert PoolRetired();
         if (amount0Desired == 0 && amount1Desired == 0) revert ZeroAmount();
-        if (pool.maxDepositPerTx != 0) {
-            if (amount0Desired > pool.maxDepositPerTx || amount1Desired > pool.maxDepositPerTx) {
-                revert AmountAbovePoolLimit();
-            }
+        if (pool.maxDeposit0PerTx != 0 && amount0Desired > pool.maxDeposit0PerTx) {
+            revert AmountAbovePoolLimit();
+        }
+        if (pool.maxDeposit1PerTx != 0 && amount1Desired > pool.maxDeposit1PerTx) {
+            revert AmountAbovePoolLimit();
         }
         address nfpm = positionManager;
         if (nfpm == address(0)) revert PositionManagerUnset();
@@ -238,18 +259,22 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         _screen(msg.sender);
 
         IFeeRouter router = IFeeRouter(feeRouter);
-        (uint256 fee0, uint256 net0) = router.quoteFee(liquidityDepositServiceId, amount0Desired);
-        (uint256 fee1, uint256 net1) = router.quoteFee(liquidityDepositServiceId, amount1Desired);
-        if ((fee0 > 0 || fee1 > 0) && router.feeBps(liquidityDepositServiceId) > maxFeeBps) {
-            revert FeeAboveQuoted();
-        }
+        (uint256 quoted0, uint256 net0) = router.quoteFee(liquidityDepositServiceId, amount0Desired);
+        (uint256 quoted1, uint256 net1) = router.quoteFee(liquidityDepositServiceId, amount1Desired);
+        // Consent ceiling on the RATE, checked before any funds move. The amounts the fee is finally
+        // charged on are settled after the mint (see _supply), but always at this same rate.
+        uint16 liveBps = router.feeBps(liquidityDepositServiceId);
+        if (liveBps > MAX_FEE_BPS) revert FeeAboveCap();
+        if ((quoted0 > 0 || quoted1 > 0) && liveBps > maxFeeBps) revert FeeAboveQuoted();
 
         // ---------------- interactions ----------------
-        (tokenId, liquidity, amount0, amount1) = _supply(
+        uint256 fee0;
+        uint256 fee1;
+        (tokenId, liquidity, amount0, amount1, fee0, fee1) = _supply(
             pool,
             nfpm,
             router.treasury(),
-            [amount0Desired, amount1Desired, net0, net1, fee0, fee1, amount0Min, amount1Min],
+            [amount0Desired, amount1Desired, net0, net1, amount0Min, amount1Min],
             deadline
         );
 
@@ -259,14 +284,31 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
     // ---------------------------------------------------------------- internals
 
     /// @dev Split out to stay under the stack limit. `a` packs the amounts:
-    ///      [0]=gross0 [1]=gross1 [2]=net0 [3]=net1 [4]=fee0 [5]=fee1 [6]=min0 [7]=min1.
+    ///      [0]=gross0 [1]=gross1 [2]=net0 [3]=net1 [4]=min0 [5]=min1.
+    ///
+    /// @dev THE FEE IS CHARGED ON WHAT UNISWAP ACTUALLY CONSUMED, NOT ON WHAT WAS OFFERED.
+    ///
+    ///      An earlier version skimmed the fee from the member's GROSS desired amounts BEFORE the
+    ///      mint. Uniswap almost never consumes both legs exactly — it takes whatever the current
+    ///      price ratio needs and leaves the rest — so the member was charged a fee on capital that
+    ///      was then handed straight back to them, unsupplied. Adversarial review reproduced this on
+    ///      a live fork; four independent reviewers found it.
+    ///
+    ///      So the fee now lands after the mint, quoted against `amount0`/`amount1` — the amounts
+    ///      that actually became the position. The member pays the disclosed rate on the capital
+    ///      they actually deployed and nothing on the remainder, which is refunded whole. Quoting
+    ///      through the same `quoteFee` keeps the rate identical to the one the consent ceiling was
+    ///      checked against earlier in this same transaction.
     function _supply(
         PoolListing memory pool,
         address nfpm,
         address treasury,
-        uint256[8] memory a,
+        uint256[6] memory a,
         uint256 deadline
-    ) private returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
+    )
+        private
+        returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1)
+    {
         IERC20 t0 = IERC20(pool.token0);
         IERC20 t1 = IERC20(pool.token1);
         uint256 start0 = t0.balanceOf(address(this));
@@ -274,11 +316,11 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
 
         if (a[0] > 0) t0.safeTransferFrom(msg.sender, address(this), a[0]);
         if (a[1] > 0) t1.safeTransferFrom(msg.sender, address(this), a[1]);
-        if (a[4] > 0) t0.safeTransfer(treasury, a[4]);
-        if (a[5] > 0) t1.safeTransfer(treasury, a[5]);
 
         (int24 tickLower, int24 tickUpper) = fullRangeTicks(pool.poolAddress);
 
+        // Approve only the NET so the position is sized to what the member was shown, and the fee
+        // can never be silently deployed as liquidity.
         t0.forceApprove(nfpm, a[2]);
         t1.forceApprove(nfpm, a[3]);
 
@@ -291,8 +333,8 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
                 tickUpper: tickUpper,
                 amount0Desired: a[2],
                 amount1Desired: a[3],
-                amount0Min: a[6],
-                amount1Min: a[7],
+                amount0Min: a[4],
+                amount1Min: a[5],
                 // THE MEMBER owns the position. Never address(this) — a router-owned NFT would make
                 // this custodial and leave the member unable to decreaseLiquidity/collect.
                 recipient: msg.sender,
@@ -301,12 +343,21 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         );
         if (liquidity == 0) revert MintFailed();
 
-        // Uniswap rarely consumes both desired amounts exactly. Return every unspent wei to the
-        // member and zero the approvals, so the router keeps nothing (FR-023).
         t0.forceApprove(nfpm, 0);
         t1.forceApprove(nfpm, 0);
-        if (a[2] > amount0) t0.safeTransfer(msg.sender, a[2] - amount0);
-        if (a[3] > amount1) t1.safeTransfer(msg.sender, a[3] - amount1);
+
+        // Fee on capital actually deployed.
+        IFeeRouter router = IFeeRouter(feeRouter);
+        (fee0, ) = router.quoteFee(liquidityDepositServiceId, amount0);
+        (fee1, ) = router.quoteFee(liquidityDepositServiceId, amount1);
+        if (fee0 > 0) t0.safeTransfer(treasury, fee0);
+        if (fee1 > 0) t1.safeTransfer(treasury, fee1);
+
+        // Everything the position did not take and the fee did not claim goes back, whole.
+        uint256 back0 = a[0] - amount0 - fee0;
+        uint256 back1 = a[1] - amount1 - fee1;
+        if (back0 > 0) t0.safeTransfer(msg.sender, back0);
+        if (back1 > 0) t1.safeTransfer(msg.sender, back1);
 
         if (t0.balanceOf(address(this)) != start0 || t1.balanceOf(address(this)) != start1) {
             revert ResidualFunds();

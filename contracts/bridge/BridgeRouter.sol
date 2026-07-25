@@ -58,6 +58,13 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
     /// @notice FeeRouter service id for the bridge fee. Read at submit time for the live rate.
     bytes32 public constant bridgeTransferServiceId = keccak256("bridge.transfer");
 
+    /// @notice Hard ceiling this router will charge, whatever the FeeRouter reports.
+    /// @dev See the twin constant on LiquidityRouter: `bridge.transfer` is registered `ConfigOnly`,
+    ///      and FeeRouter applies its own MAX_WRAPPED_FEE_BPS only to `Wrapped` services. Enforcing
+    ///      the cap here makes 250 bps a property of the charging contract rather than of a
+    ///      registration argument.
+    uint16 public constant MAX_FEE_BPS = 250;
+
     /// @dev Bounds on a route's advisory delivery window: one minute to one day.
     uint32 private constant MIN_FILL_SECONDS = 60;
     uint32 private constant MAX_FILL_SECONDS = 86_400;
@@ -104,10 +111,22 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
 
     // ---------------------------------------------------------------- route id
 
-    /// @notice Deterministic route id. Includes THIS chain so the same (asset, destination) pair on a
-    ///         different origin chain is a different id — ids are never portable across deployments.
-    function computeRouteId(address inputToken, uint256 destinationChainId) public view returns (bytes32) {
-        return keccak256(abi.encode(inputToken, block.chainid, destinationChainId));
+    /// @notice Deterministic route id.
+    /// @dev Includes THIS chain so the same (asset, destination) pair on a different origin chain is
+    ///      a different id — ids are never portable across deployments.
+    ///
+    ///      `outputToken` is part of the identity too, and that is deliberate. It was originally
+    ///      omitted, which meant re-running `setRoute` with a different delivered asset overwrote the
+    ///      existing route IN PLACE under the same id: a member's quote and confirmation could name
+    ///      one asset while the deposit delivered another, with no new route appearing anywhere an
+    ///      operator or indexer would notice. Binding it to the id turns that silent substitution
+    ///      into a visibly different route (adversarial review, reproduced on a Polygon fork).
+    function computeRouteId(address inputToken, address outputToken, uint256 destinationChainId)
+        public
+        view
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(inputToken, outputToken, block.chainid, destinationChainId));
     }
 
     // ---------------------------------------------------------------- config (LIQUIDITY_ADMIN_ROLE)
@@ -122,7 +141,7 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
             revert InvalidFillWindow();
         }
 
-        bytes32 routeId = computeRouteId(route.inputToken, route.destinationChainId);
+        bytes32 routeId = computeRouteId(route.inputToken, route.outputToken, route.destinationChainId);
         _routes[routeId] = route;
         _routeIds.add(routeId); // idempotent: re-setting an existing route updates it in place
 
@@ -247,7 +266,9 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
         (uint256 fee, uint256 net) = router.quoteFee(bridgeTransferServiceId, inputAmount);
         // Consent ceiling. Only bites when a fee is actually charged: a treasury-unset network quotes
         // fee 0, so a zero-fee bridge is never blocked by a stale configured rate (mirrors spec 066).
-        if (fee > 0 && router.feeBps(bridgeTransferServiceId) > maxFeeBps) revert FeeAboveQuoted();
+        uint16 liveBps = router.feeBps(bridgeTransferServiceId);
+        if (liveBps > MAX_FEE_BPS) revert FeeAboveCap();
+        if (fee > 0 && liveBps > maxFeeBps) revert FeeAboveQuoted();
 
         // ---------------- effects ----------------
         // `depositor` is msg.sender — see the contract-level note. Recorded in the event so the

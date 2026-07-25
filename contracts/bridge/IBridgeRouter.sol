@@ -71,6 +71,8 @@ interface IBridgeRouter {
     error ZeroAddress();
     error ZeroAmount();
     error FeeAboveQuoted();
+    /// @dev The live rate exceeds this router's own immutable ceiling, whatever FeeRouter reports.
+    error FeeAboveCap();
     error ResidualFunds();
     error RouteUnknown();
     error RouteDisabled();
@@ -86,10 +88,14 @@ interface IBridgeRouter {
     function spokePool() external view returns (address);
     function sanctionsGuard() external view returns (address);
     function bridgeTransferServiceId() external view returns (bytes32);
+    function MAX_FEE_BPS() external view returns (uint16);
     function getRoute(bytes32 routeId) external view returns (Route memory);
     function routeCount() external view returns (uint256);
     function routeAt(uint256 index) external view returns (bytes32);
-    function computeRouteId(address inputToken, uint256 destinationChainId) external view returns (bytes32);
+    function computeRouteId(address inputToken, address outputToken, uint256 destinationChainId)
+        external
+        view
+        returns (bytes32);
 
     // --- config (LIQUIDITY_ADMIN_ROLE) ---
     function setRoute(Route calldata route) external;

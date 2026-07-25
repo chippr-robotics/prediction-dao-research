@@ -7,6 +7,9 @@ pragma solidity ^0.8.24;
 ///      cannot silently produce misaligned ticks (`mint` would revert, but late and opaquely).
 interface IUniswapV3PoolTickSpacing {
     function tickSpacing() external view returns (int24);
+    function fee() external view returns (uint24);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
 }
 
 /// @title ILiquidityRouter
@@ -42,9 +45,12 @@ interface ILiquidityRouter {
     /// @param poolAddress `TradingLp`: the Uniswap V3 pool. `BridgeLp`: the Across HubPool.
     /// @param feeTier Uniswap fee tier (500/3000/10000). 0 for `BridgeLp`.
     /// @param enabled false = RETIRED: closed to new deposits, still listed and still withdrawable.
-    /// @param maxDepositPerTx PER-TRANSACTION ceiling (FR-045). 0 = uncapped.
-    ///        Named for what it actually enforces: it is NOT a cumulative TVL cap, and calling it
-    ///        `depositCap` would imply an aggregate limit this contract does not track.
+    /// @param maxDeposit0PerTx PER-TRANSACTION ceiling for token0 (FR-045). 0 = uncapped.
+    /// @param maxDeposit1PerTx PER-TRANSACTION ceiling for token1. 0 = uncapped.
+    ///        Two ceilings, not one: a pair's legs routinely differ in decimals (USDC 6, WETH 18), so
+    ///        a single scalar compared against both is meaningless — 1e6 is 1 USDC but a millionth of
+    ///        a millionth of a WETH. Named for what they enforce: these are per-transaction limits,
+    ///        NOT a cumulative TVL cap, which this contract does not track.
     struct PoolListing {
         PoolKind kind;
         bool enabled;
@@ -52,7 +58,8 @@ interface ILiquidityRouter {
         address token0;
         address token1;
         address poolAddress;
-        uint256 maxDepositPerTx;
+        uint256 maxDeposit0PerTx;
+        uint256 maxDeposit1PerTx;
     }
 
     // --- events: config (the on-chain audit history, FR-046) ---
@@ -63,11 +70,17 @@ interface ILiquidityRouter {
         address token0,
         address token1,
         uint24 feeTier,
-        uint256 maxDepositPerTx,
+        uint256 maxDeposit0PerTx,
+        uint256 maxDeposit1PerTx,
         address actor
     );
     event PoolEnabledChanged(bytes32 indexed poolId, bool enabled, address indexed actor);
-    event PoolLimitChanged(bytes32 indexed poolId, uint256 oldMax, uint256 newMax, address indexed actor);
+    event PoolLimitChanged(
+        bytes32 indexed poolId,
+        uint256 newMax0,
+        uint256 newMax1,
+        address indexed actor
+    );
     event PositionManagerUpdated(address oldManager, address newManager, address indexed actor);
     event FeeRouterUpdated(address oldRouter, address newRouter, address indexed actor);
     event SanctionsGuardUpdated(address oldGuard, address newGuard, address indexed actor);
@@ -89,6 +102,8 @@ interface ILiquidityRouter {
     error ZeroAddress();
     error ZeroAmount();
     error FeeAboveQuoted();
+    /// @dev The live rate exceeds this router's own immutable ceiling, whatever FeeRouter reports.
+    error FeeAboveCap();
     error ResidualFunds();
     error PoolUnknown();
     error PoolRetired();
@@ -97,6 +112,8 @@ interface ILiquidityRouter {
     error PositionManagerUnset();
     /// @dev A TradingLp listing with no fee tier, or a BridgeLp listing carrying a second token.
     error InvalidPoolListing();
+    /// @dev A TradingLp listing whose tokens or fee tier disagree with the pool it names.
+    error PoolListingMismatch();
     error MintFailed();
 
     // --- reads ---
@@ -104,6 +121,7 @@ interface ILiquidityRouter {
     function positionManager() external view returns (address);
     function sanctionsGuard() external view returns (address);
     function liquidityDepositServiceId() external view returns (bytes32);
+    function MAX_FEE_BPS() external view returns (uint16);
     function getPool(bytes32 poolId) external view returns (PoolListing memory);
     function poolCount() external view returns (uint256);
     function poolAt(uint256 index) external view returns (bytes32);
@@ -120,7 +138,7 @@ interface ILiquidityRouter {
     // hiding a pool while a member's money is inside it is exactly what the requirement forbids.
     function listPool(PoolListing calldata pool) external;
     function setPoolEnabled(bytes32 poolId, bool enabled) external;
-    function setPoolLimit(bytes32 poolId, uint256 maxDepositPerTx) external;
+    function setPoolLimit(bytes32 poolId, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx) external;
     function setPositionManager(address newManager) external;
     function setFeeRouter(address newFeeRouter) external;
     function setSanctionsGuard(address newGuard) external;

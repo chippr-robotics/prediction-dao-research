@@ -162,7 +162,8 @@ for (const [name, cfg] of Object.entries(CHAINS)) {
         token0: token0.address,
         token1: token1.address,
         poolAddress,
-        maxDepositPerTx: 0,
+        maxDeposit0PerTx: 0,
+        maxDeposit1PerTx: 0,
       });
 
       nfpm = new ethers.Contract(cfg.positionManager, NFPM_ABI, ethers.provider);
@@ -218,9 +219,20 @@ for (const [name, cfg] of Object.entries(CHAINS)) {
       expect(await nfpm.ownerOf(supplied.args.tokenId)).to.equal(member.address);
       expect(supplied.args.owner).to.equal(member.address);
 
-      // Fee reached the treasury on both legs.
-      expect(await t0.balanceOf(admin.address)).to.equal(treas0Before + amt0 / 200n);
-      expect(await t1.balanceOf(admin.address)).to.equal(treas1Before + amt1 / 200n);
+      // Fee reached the treasury on both legs — charged on the capital Uniswap ACTUALLY consumed,
+      // not on what was offered. Against a live pool the two legs are consumed in the pool's current
+      // price ratio, so one leg is typically consumed almost entirely and the other barely at all;
+      // asserting a fee on the gross would be asserting the overcharge this router was fixed to
+      // avoid. The event reports both the consumed amounts and the fees, so the invariant is checked
+      // against reality rather than against a guess.
+      expect(await t0.balanceOf(admin.address)).to.equal(treas0Before + supplied.args.fee0);
+      expect(await t1.balanceOf(admin.address)).to.equal(treas1Before + supplied.args.fee1);
+      // And each fee really is the disclosed rate on the deployed amount (50 bps here).
+      expect(supplied.args.fee0).to.equal((supplied.args.amount0 * 50n) / 10_000n);
+      expect(supplied.args.fee1).to.equal((supplied.args.amount1 * 50n) / 10_000n);
+      // The member is never billed for capital that did not become a position.
+      expect(supplied.args.fee0).to.be.lessThanOrEqual(amt0 / 200n);
+      expect(supplied.args.fee1).to.be.lessThanOrEqual(amt1 / 200n);
 
       // Router keeps nothing, and leaves no standing approval.
       expect(await t0.balanceOf(await router.getAddress())).to.equal(0n);
