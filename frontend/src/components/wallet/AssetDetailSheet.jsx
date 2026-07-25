@@ -67,7 +67,7 @@ function actionsFor(instance) {
       id: 'transfer',
       label: 'Transfer',
       enabled: asset.kind === 'native' || asset.categoryId === 'payment-stablecoins',
-      reason: 'Pay & Transfer supports native and stablecoin sends',
+      reason: 'Transfer supports native and stablecoin sends',
       to: `/wallet?tab=paytransfer&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
     {

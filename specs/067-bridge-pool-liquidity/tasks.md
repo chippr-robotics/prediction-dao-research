@@ -140,47 +140,47 @@ progress view reaches delivered backed by a destination-chain transaction.
 
 ### Section rename
 
-- [ ] T059 [P] [US1] Rename the section label "Pay & Transfer" → "Transfer" in `frontend/src/config/appNav.js`, keeping the `paytransfer` tab id unchanged (FR-001/FR-002)
-- [ ] T060 [P] [US1] Update the section heading, intro copy, and `aria-label`s from "Pay & Transfer" to "Transfer" in `frontend/src/components/wallet/PayTransferPanel.jsx`
-- [ ] T061 [P] [US1] Sweep remaining "Pay & Transfer" occurrences in page/document titles and in-app link text across `frontend/src/`, leaving every identifier and route intact
-- [ ] T062 [P] [US1] Test that every previously-working entry point still resolves to the renamed section, including `/wallet?tab=paytransfer`, in `frontend/src/test/PortalNav.test.jsx`
+- [X] T059 [P] [US1] Rename the section label "Pay & Transfer" → "Transfer" in `frontend/src/config/appNav.js`, keeping the `paytransfer` tab id unchanged (FR-001/FR-002)
+- [X] T060 [P] [US1] Update the section heading, intro copy, and `aria-label`s from "Pay & Transfer" to "Transfer" in `frontend/src/components/wallet/PayTransferPanel.jsx`
+- [X] T061 [P] [US1] Sweep remaining "Pay & Transfer" occurrences in page/document titles and in-app link text across `frontend/src/`, leaving every identifier and route intact
+- [X] T062 [P] [US1] Test that every previously-working entry point still resolves to the renamed section, including `/wallet?tab=paytransfer`, in `frontend/src/test/PortalNav.test.jsx`
 
 ### Quote + gateway
 
-- [ ] T063 [US1] Create `services/relay-gateway/src/bridge/quotes.js` proxying Across suggested-fees, reusing the existing screening, quota, and killswitch middleware
-- [ ] T064 [US1] Create `services/relay-gateway/src/bridge/status.js` proxying Across deposit status
-- [ ] T065 [P] [US1] Gateway tests for the bridge quote and status modules in `services/relay-gateway/test/bridge.test.js`, including the disabled/unconfigured path
-- [ ] T066 [US1] Create `frontend/src/lib/bridge/acrossQuotes.js` — quote fetch, itemized cost lines, validity window, and staleness detection (FR-007/FR-008)
-- [ ] T067 [P] [US1] Unit tests for quote itemization and staleness in `frontend/src/lib/bridge/__tests__/acrossQuotes.test.js`
+- [X] T063 [US1] Create `services/relay-gateway/src/bridge/quotes.js` proxying Across suggested-fees, reusing the existing screening, quota, and killswitch middleware
+- [X] T064 [US1] Create `services/relay-gateway/src/bridge/status.js` proxying Across deposit status
+- [X] T065 [P] [US1] Gateway tests for the bridge quote and status modules in `services/relay-gateway/test/bridge.test.js`, including the disabled/unconfigured path
+- [X] T066 [US1] Create `frontend/src/lib/bridge/acrossQuotes.js` — quote fetch, itemized cost lines, validity window, and staleness detection (FR-007/FR-008)
+- [X] T067 [P] [US1] Unit tests for quote itemization and staleness in `frontend/src/lib/bridge/__tests__/acrossQuotes.test.js`
 
 ### Router client + submission
 
-- [ ] T068 [US1] Create `frontend/src/lib/bridge/bridgeRouter.js` — router config reads returning `null` on failure (the `lib/staking/stakingRouter.js` shape) plus the `bridgeWithFee` call builder passing the quoted bps as `maxFeeBps`
-- [ ] T069 [P] [US1] Unit tests for router reads, honest-null fallback, and call-builder arguments in `frontend/src/lib/bridge/__tests__/bridgeRouter.test.js`
-- [ ] T070 [US1] Guard every bridge entry point with the numeric-chain assertion so Bitcoin string ids never reach `getContractAddressForChain` or wagmi, in `frontend/src/lib/bridge/bridgeRouter.js` (FR-006)
+- [X] T068 [US1] Create `frontend/src/lib/bridge/bridgeRouter.js` — router config reads returning `null` on failure (the `lib/staking/stakingRouter.js` shape) plus the `bridgeWithFee` call builder passing the quoted bps as `maxFeeBps`
+- [X] T069 [P] [US1] Unit tests for router reads, honest-null fallback, and call-builder arguments in `frontend/src/lib/bridge/__tests__/bridgeRouter.test.js`
+- [X] T070 [US1] Guard every bridge entry point with the numeric-chain assertion so Bitcoin string ids never reach `getContractAddressForChain` or wagmi, in `frontend/src/lib/bridge/bridgeRouter.js` (FR-006)
 
 ### Status tracking
 
-- [ ] T071 [US1] Create `frontend/src/data/ledger/sources/bridgeLedgerSource.js` capturing one entry per bridge keyed by origin chain + `depositId`, with `direction: 'none'` (FR-035/FR-036)
-- [ ] T072 [US1] Create `frontend/src/lib/bridge/bridgeStatus.js` implementing the state machine — `delivered` reachable **only** from confirmed destination-side evidence (FR-009)
-- [ ] T073 [US1] Implement cross-session reconciliation in `frontend/src/lib/bridge/bridgeStatus.js`: poll the gateway status endpoint, fall back to on-chain `FundsDeposited`/`FilledV3Relay` reads (FR-010)
-- [ ] T074 [US1] Implement the `needs_attention` transition past `expectedBy` in `frontend/src/lib/bridge/bridgeStatus.js`, non-terminal and still resolvable to delivered or refunded (FR-011)
-- [ ] T075 [P] [US1] Unit tests covering the full state matrix including delayed, refunded, and partial outcomes in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js`
-- [ ] T076 [P] [US1] (SC-004) Test that an in-flight bridge resumes its true status after a simulated app restart in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js` (FR-010)
+- [X] T071 [US1] Create `frontend/src/data/ledger/sources/bridgeLedgerSource.js` capturing one entry per bridge keyed by origin chain + `depositId`, with `direction: 'none'` (FR-035/FR-036)
+- [X] T072 [US1] Create `frontend/src/lib/bridge/bridgeStatus.js` implementing the state machine — `delivered` reachable **only** from confirmed destination-side evidence (FR-009)
+- [X] T073 [US1] Implement cross-session reconciliation in `frontend/src/lib/bridge/bridgeStatus.js`: poll the gateway status endpoint, fall back to on-chain `FundsDeposited`/`FilledV3Relay` reads (FR-010)
+- [X] T074 [US1] Implement the `needs_attention` transition past `expectedBy` in `frontend/src/lib/bridge/bridgeStatus.js`, non-terminal and still resolvable to delivered or refunded (FR-011)
+- [X] T075 [P] [US1] Unit tests covering the full state matrix including delayed, refunded, and partial outcomes in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js`
+- [X] T076 [P] [US1] (SC-004) Test that an in-flight bridge resumes its true status after a simulated app restart in `frontend/src/lib/bridge/__tests__/bridgeStatus.test.js` (FR-010)
 
 ### UI
 
-- [ ] T077 [P] [US1] Create `frontend/src/lib/bridge/bridgeCopy.js` — InfoTip text and the third-party settlement risk disclosure (FR-014)
-- [ ] T078 [US1] Create `frontend/src/components/wallet/BridgeView.jsx` — asset selector (all networks, nested logos), destination selector using the **`bridgeDest`** predicate, amount field with Max
-- [ ] T079 [US1] Create `frontend/src/components/wallet/BridgeQuoteCard.jsx` rendering each cost on its own labelled line with InfoTips, total, arrival estimate, and stale-quote refresh (FR-007/FR-008)
-- [ ] T080 [US1] Add the destination-gas disclosure to `frontend/src/components/wallet/BridgeQuoteCard.jsx` when the member's destination-chain native balance is zero (FR-012)
-- [ ] T081 [US1] Create `frontend/src/components/wallet/BridgeStatusList.jsx` showing in-flight, delivered, refunded, and needs-attention transfers with both transaction links
-- [ ] T082 [US1] Add the Bridge tab to `frontend/src/components/wallet/PayTransferPanel.jsx` beside Send and Activity, without displacing the existing same-chain send flow (FR-004)
-- [ ] T083 [US1] Implement honest-unavailable states in `frontend/src/components/wallet/BridgeView.jsx` for paused routes, undeployed/unreachable routers, missing gateway, ETC/Mordor, and Bitcoin networks (FR-051/FR-052/FR-053)
-- [ ] T084 [P] [US1] (SC-014) Component tests for quote rendering, stale-quote gating, honest-unavailable states, and vitest-axe in `frontend/src/test/bridge/BridgeView.test.jsx`
-- [ ] T085 [P] [US1] Test that the destination selector offers **only the same asset on other networks** — never the same network — in `frontend/src/test/bridge/BridgeView.test.jsx` (FR-063, SC-021, the R11b inversion check)
-- [ ] T151 [US1] Implement the **signing-time network switch** in `frontend/src/components/wallet/BridgeView.jsx` — when the selected source asset is on a network other than the wallet's active one, switch automatically at submit and disclose the switch before signature, reusing the `useEarnSend` pattern (FR-061, SC-020). Without this the cross-network selector produces failed transactions for every asset off the active chain
-- [ ] T152 [P] [US1] Test that selecting an off-chain asset triggers a disclosed automatic switch at signing and that the network switcher is never required, in `frontend/src/test/bridge/BridgeView.test.jsx` (SC-020)
+- [X] T077 [P] [US1] Create `frontend/src/lib/bridge/bridgeCopy.js` — InfoTip text and the third-party settlement risk disclosure (FR-014)
+- [X] T078 [US1] Create `frontend/src/components/wallet/BridgeView.jsx` — asset selector (all networks, nested logos), destination selector using the **`bridgeDest`** predicate, amount field with Max
+- [X] T079 [US1] Create `frontend/src/components/wallet/BridgeQuoteCard.jsx` rendering each cost on its own labelled line with InfoTips, total, arrival estimate, and stale-quote refresh (FR-007/FR-008)
+- [X] T080 [US1] Add the destination-gas disclosure to `frontend/src/components/wallet/BridgeQuoteCard.jsx` when the member's destination-chain native balance is zero (FR-012)
+- [X] T081 [US1] Create `frontend/src/components/wallet/BridgeStatusList.jsx` showing in-flight, delivered, refunded, and needs-attention transfers with both transaction links
+- [X] T082 [US1] Add the Bridge tab to `frontend/src/components/wallet/PayTransferPanel.jsx` beside Send and Activity, without displacing the existing same-chain send flow (FR-004)
+- [X] T083 [US1] Implement honest-unavailable states in `frontend/src/components/wallet/BridgeView.jsx` for paused routes, undeployed/unreachable routers, missing gateway, ETC/Mordor, and Bitcoin networks (FR-051/FR-052/FR-053)
+- [X] T084 [P] [US1] (SC-014) Component tests for quote rendering, stale-quote gating, honest-unavailable states, and vitest-axe in `frontend/src/test/bridge/BridgeView.test.jsx`
+- [X] T085 [P] [US1] Test that the destination selector offers **only the same asset on other networks** — never the same network — in `frontend/src/test/bridge/BridgeView.test.jsx` (FR-063, SC-021, the R11b inversion check)
+- [X] T151 [US1] Implement the **signing-time network switch** in `frontend/src/components/wallet/BridgeView.jsx` — when the selected source asset is on a network other than the wallet's active one, switch automatically at submit and disclose the switch before signature, reusing the `useEarnSend` pattern (FR-061, SC-020). Without this the cross-network selector produces failed transactions for every asset off the active chain
+- [X] T152 [P] [US1] Test that selecting an off-chain asset triggers a disclosed automatic switch at signing and that the network switcher is never required, in `frontend/src/test/bridge/BridgeView.test.jsx` (SC-020)
 
 **Checkpoint**: US1 is fully functional and independently testable. MVP reached.
 

@@ -1,0 +1,199 @@
+/* Transfer → Bridge status list + honest-unavailable notice (spec 067, US1).
+   Theme-aware, on the shared app CSS variables, matching PayTransfer.css. */
+
+/* The Bridge tab body: availability notice (or the form) above the in-flight list. */
+.bridge-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bridge-status-state {
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  padding: 1.25rem 0.25rem;
+  text-align: center;
+}
+
+.bridge-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bridge-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.bridge-status-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 1rem;
+  margin: 0.5rem 0 0;
+  color: var(--color-text, var(--text-primary, #111827));
+}
+
+.bridge-refresh {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border-radius: 999px;
+  color: var(--color-text, var(--text-primary, #111827));
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.8rem;
+}
+.bridge-refresh:focus-visible {
+  outline: 2px solid var(--color-primary, #6d28d9);
+  outline-offset: 2px;
+}
+
+.bridge-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.bridge-status-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 0.25rem;
+  border-bottom: 1px solid var(--color-border, #eee);
+}
+
+.bridge-status-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.bridge-status-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.bridge-status-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+}
+.bridge-status-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary, #6d28d9);
+}
+
+.bridge-status-route {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--color-text, var(--text-primary, #374151));
+}
+.bridge-status-arrow {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+.bridge-status-detail,
+.bridge-status-recourse,
+.bridge-status-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+}
+.bridge-status-meta {
+  font-size: 0.78rem;
+  color: var(--color-text-tertiary, #9ca3af);
+}
+.bridge-status-recourse {
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  border-radius: 10px;
+  color: #b45309;
+  padding: 0.6rem 0.75rem;
+}
+
+.bridge-status-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.85rem;
+}
+.bridge-tx-link {
+  color: var(--color-primary, #6d28d9);
+  text-decoration: none;
+}
+.bridge-tx-link:hover,
+.bridge-tx-link:focus-visible {
+  text-decoration: underline;
+}
+.bridge-status-nolink {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+/* Status dots — one per displayed state, never a colour that implies delivery
+   before the destination network delivered. */
+.bridge-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
+}
+.bridge-dot.moving { background: #d97706; }
+.bridge-dot.attention { background: #b45309; }
+.bridge-dot.delivered { background: var(--color-success, #16a34a); }
+.bridge-dot.returned { background: var(--color-text-tertiary, #9ca3af); }
+.bridge-dot.failed { background: var(--color-error, #dc2626); }
+
+/* Honest-unavailable notice — the Earn `earn-unavailable` pattern, in the
+   Transfer section's spacing. */
+.bridge-notice {
+  border: 1px solid var(--color-border, var(--border-color, #e5e7eb));
+  border-left: 4px solid #d97706;
+  border-radius: 12px;
+  background: var(--color-surface-secondary, var(--bg-secondary, #f9fafb));
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.bridge-notice-title {
+  font-weight: 700;
+  color: var(--color-text, var(--text-primary, #111827));
+  margin: 0;
+}
+.bridge-notice p {
+  margin: 0;
+  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
+  font-size: 0.9rem;
+}
+.bridge-notice-asof {
+  font-size: 0.78rem;
+  color: var(--color-text-tertiary, #9ca3af);
+}
+.bridge-notice-action {
+  appearance: none;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 999px;
+  color: var(--color-text, var(--text-primary, #111827));
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 1rem;
+}
+.bridge-notice-action:focus-visible {
+  outline: 2px solid var(--color-primary, #6d28d9);
+  outline-offset: 2px;
+}

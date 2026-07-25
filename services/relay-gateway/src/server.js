@@ -12,6 +12,7 @@
  *   POST /v1/engine/webhook   engine status callback           (shared-secret)
  *   GET  /healthz             liveness/readiness               (origin-lock EXEMPT)
  *   GET  /v1/opensea/*        read-only collectibles proxy     (origin-locked; spec 055)
+ *   GET  /v1/bridge/*         read-only Across quote/status    (origin-locked; spec 067)
  */
 import crypto from 'node:crypto'
 import express from 'express'
@@ -35,6 +36,8 @@ import { createPolymarketClient } from './polymarket/client.js'
 import { createPolymarketRouter } from './polymarket/routes.js'
 import { createEsploraClient, createStampsClient } from './bitcoin/client.js'
 import { createBitcoinRouter } from './bitcoin/routes.js'
+import { createAcrossClient } from './bridge/quotes.js'
+import { createBridgeRouter } from './bridge/routes.js'
 import { createAuditLogger } from './audit/log.js'
 import { GatewayError, EngineUnavailableError } from './errors.js'
 import { getHash, packPaymasterAndData, stubPaymasterAndData } from './paymaster/build.js'
@@ -661,6 +664,35 @@ export function createApp(config, deps = {}) {
       writeQuotas: btcWriteQuotas,
       killSwitch,
       now: nowMs,
+    })
+  )
+
+  // ---- GET /v1/bridge/* (spec 067 cross-chain bridge; origin-locked via middleware) ------------
+  // Across suggested-fees + deposit-status reads. Quotas are keyed per caller IP (nothing to sign on
+  // a GET); there is no write route — the member's wallet submits the deposit itself (FR-013), so
+  // the gateway is a quoting and status convenience only. Mounting is unconditional so a disabled
+  // module answers 503 bridge_disabled with a machine-readable code the SPA can hide on, rather
+  // than a bare 404 (FR-053).
+  const bridgeQuotas = createQuotas({
+    signerPerWindow: config.bridge.quotaPerIp,
+    globalPerWindow: config.bridge.quotaGlobal,
+    windowMs: config.bridge.quotaWindowMs,
+    now: nowMs,
+  })
+  const acrossClient =
+    deps.acrossClient ??
+    createAcrossClient({
+      baseUrl: config.bridge.apiUrl,
+      timeoutMs: config.bridge.timeoutMs,
+      retries: config.bridge.retries,
+      ...(deps.bridgeFetch ? { fetchImpl: deps.bridgeFetch } : {}),
+    })
+  app.use(
+    createBridgeRouter(config, {
+      client: acrossClient,
+      cache: deps.bridgeCache ?? createTtlCache({ now: nowMs }),
+      quotas: bridgeQuotas,
+      killSwitch,
     })
   )
 

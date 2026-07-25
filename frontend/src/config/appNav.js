@@ -44,7 +44,9 @@ export const NAV_GROUPS = [
       // networks without the capability (Polygon-only, FR-018); consumers filter via visibleNavGroups
       // with { predict: capabilities.predict && predictGatewayUrl() !== '' }.
       { id: 'predict', label: 'Predict', icon: 'predict' },
-      { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
+      // 'paytransfer' tab id preserved (deep links / saved routes keep resolving,
+      // spec 067 FR-002); surfaced to users as "Transfer".
+      { id: 'paytransfer', label: 'Transfer', icon: 'transfer' },
       // 'custody' tab id preserved; surfaced to users as "Protect".
       { id: 'custody', label: 'Protect', icon: 'shield' },
     ],
