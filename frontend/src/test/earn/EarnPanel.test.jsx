@@ -134,15 +134,38 @@ describe('EarnPanel hub (US1)', () => {
     expect(screen.getByText(LIQUIDITY_AREA_DESC)).toBeInTheDocument()
   })
 
-  it('displays protocol attribution, risk disclosure, and the docs link (FR-012/FR-014)', () => {
+  it('shows the docs link on the hub, with no Morpho attribution or risk disclosure yet', () => {
     renderPanel()
-    const attribution = screen.getByRole('link', { name: /powered by morpho/i })
-    expect(attribution).toHaveAttribute('href', 'https://app.morpho.org')
-    expect(screen.getByText(/not guaranteed/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /powered by morpho/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/not guaranteed/i)).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /earn guide/i })).toHaveAttribute(
       'href',
       expect.stringContaining('docs.FairWins.app'),
     )
+  })
+
+  it('displays protocol attribution and risk disclosure on the Lend view (FR-012)', () => {
+    renderPanel('/wallet?tab=earn&view=lend')
+    const attribution = screen.getByRole('link', { name: /powered by morpho/i })
+    expect(attribution).toHaveAttribute('href', 'https://app.morpho.org')
+    expect(screen.getByText(/not guaranteed/i)).toBeInTheDocument()
+  })
+
+  it('displays protocol attribution and risk disclosure on the Rewards view (FR-012)', () => {
+    renderPanel('/wallet?tab=earn&view=rewards')
+    const attribution = screen.getByRole('link', { name: /powered by morpho/i })
+    expect(attribution).toHaveAttribute('href', 'https://app.morpho.org')
+    expect(screen.getByText(/not guaranteed/i)).toBeInTheDocument()
+  })
+
+  it('does not brand the Stake or Supply views with Morpho attribution', () => {
+    renderPanel('/wallet?tab=earn&view=stake')
+    expect(screen.queryByRole('link', { name: /powered by morpho/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(earnCopy.EARN_DISCLOSURE.risk)).not.toBeInTheDocument()
+
+    renderPanel('/wallet?tab=earn&view=supply')
+    expect(screen.queryByRole('link', { name: /powered by morpho/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(earnCopy.EARN_DISCLOSURE.risk)).not.toBeInTheDocument()
   })
 })
 
