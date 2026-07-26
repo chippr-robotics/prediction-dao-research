@@ -1,10 +1,17 @@
 // Spec 043 — vault list + create/load orchestration for the Custody On chain section (US1). Reads the
 // member's saved vault references, enriches each with live on-chain state, and exposes create/load actions
 // that persist a reference. Honest state: on-chain reads are the source of truth; references are just labels.
+//
+// Spec 068 (US1) makes the list MULTI-CHAIN: every saved vault is listed with its own chain identity
+// regardless of which network the wallet is on, each enriched through a read provider for ITS chain.
+// Enrichment failures are isolated per vault — one unreachable network must never blank the list —
+// and `onVaultChain` gates every state-changing action so nothing can be submitted to the wrong chain.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '.'
 import { isCustodySupported } from '../config/safeContracts'
+import { NETWORKS } from '../config/networks'
+import { getProvider } from '../utils/blockchainService'
 import {
   createVault as createVaultTx,
   buildCreateVaultTx,
@@ -16,22 +23,40 @@ import {
   upsertVaultReference,
   removeVaultReference,
 } from '../lib/custody/vaultReferences'
-import { getPolicyStatus, readPolicy, summarizeRules, isPolicySupported } from '../lib/custody/policy'
+import { readPolicy, summarizeRules } from '../lib/custody/policy'
+import { getPolicyStatus as getPolicyStatusV2, readPolicyV2 } from '../lib/custody/policyV2'
 
 /**
  * Spec 049 (US2/FR-006) — per-vault policy badge data for the list. Resilient by design: any
  * failure yields `{}` so the row simply renders without a badge; custody itself is unaffected.
+ * Spec 068 adds the ordered engine: a `managed-v2` vault carries its rule count instead of a v1
+ * rule summary.
  */
 async function readPolicyBadge(vaultAddress, chainId, provider) {
   try {
-    if (!isPolicySupported(chainId)) return { policyStatus: 'unsupported' }
-    const policyStatus = await getPolicyStatus(vaultAddress, chainId, provider)
+    const policyStatus = await getPolicyStatusV2(vaultAddress, chainId, provider)
+    if (policyStatus === 'managed-v2') {
+      const policy = await readPolicyV2(vaultAddress, chainId, provider)
+      const count = policy?.rules?.length ?? 0
+      return { policyStatus, policySummary: `${count} ordered rule${count === 1 ? '' : 's'}` }
+    }
     if (policyStatus !== 'managed') return { policyStatus }
     const policy = await readPolicy(vaultAddress, chainId, provider)
     return { policyStatus, policySummary: summarizeRules(policy) }
   } catch {
     return {}
   }
+}
+
+/**
+ * Chain identity for a saved vault (FR-002). Strict lookup only: `getNetwork()` falls back to the
+ * default network for unknown ids, which would label a vault with the wrong chain — for custody
+ * that is exactly the confusion this feature exists to prevent.
+ */
+function chainIdentity(chainId) {
+  const net = NETWORKS[Number(chainId)]
+  if (!net) return { chainName: `Chain ${Number(chainId)}`, isTestnet: false, chainKnown: false }
+  return { chainName: net.name, isTestnet: Boolean(net.isTestnet), chainKnown: true }
 }
 
 export function useCustodyVaults() {
@@ -48,7 +73,7 @@ export function useCustodyVaults() {
   const refresh = useCallback(async () => {
     // Bump first so any in-flight request is invalidated even on the early-return path.
     const myReq = ++reqId.current
-    if (!address || !chainId || !supported) {
+    if (!address) {
       setVaults([])
       setLoading(false)
       return
@@ -56,15 +81,42 @@ export function useCustodyVaults() {
     setLoading(true)
     setError(null)
     try {
-      const refs = loadVaultReferences(address).filter((r) => r.chainId === Number(chainId))
+      // Every saved vault, on every chain (FR-003) — the list is the member's whole custody estate,
+      // not a view of the connected network.
+      const refs = loadVaultReferences(address)
       const enriched = await Promise.all(
         refs.map(async (ref) => {
+          const refChainId = Number(ref.chainId)
+          const onVaultChain = Number(chainId) === refChainId
+          const identity = chainIdentity(refChainId)
           try {
-            const state = await loadVault(ref.address, chainId, provider)
-            const badge = state.isSafe ? await readPolicyBadge(ref.address, chainId, provider) : {}
-            return { ...ref, ...state, owner: isVaultOwner(state, address), ...badge }
+            // Read through a provider for the VAULT's chain. The connected wallet provider is only
+            // usable when it is already on that chain; otherwise fall back to the chain's own RPC.
+            const reader = onVaultChain ? provider : getProvider(refChainId)
+            const state = await loadVault(ref.address, refChainId, reader)
+            const badge = state.isSafe ? await readPolicyBadge(ref.address, refChainId, reader) : {}
+            return {
+              ...ref,
+              ...identity,
+              ...state,
+              chainId: refChainId,
+              onVaultChain,
+              reachable: true,
+              owner: isVaultOwner(state, address),
+              ...badge,
+            }
           } catch (e) {
-            return { ...ref, isSafe: undefined, loadError: e?.message || 'load failed' }
+            // Per-vault isolation (FR-003): an unreachable chain degrades ONE row, honestly, and
+            // never blanks the rest of the estate.
+            return {
+              ...ref,
+              ...identity,
+              chainId: refChainId,
+              onVaultChain,
+              reachable: false,
+              isSafe: undefined,
+              loadError: e?.message || 'load failed',
+            }
           }
         }),
       )
@@ -74,7 +126,7 @@ export function useCustodyVaults() {
     } finally {
       if (myReq === reqId.current) setLoading(false)
     }
-  }, [address, chainId, provider, supported])
+  }, [address, chainId, provider])
 
   useEffect(() => {
     refresh()
@@ -154,8 +206,11 @@ export function useCustodyVaults() {
   )
 
   const forget = useCallback(
-    async (vaultAddress) => {
-      removeVaultReference(address, chainId, vaultAddress)
+    async (vaultAddress, vaultChainId) => {
+      // References are keyed (chainId, address); with a cross-chain list the caller's vault may not
+      // live on the connected chain, so accept its chain explicitly and fall back to the connected
+      // one for legacy call sites.
+      removeVaultReference(address, vaultChainId ?? chainId, vaultAddress)
       if (activeAddress === vaultAddress) setActiveAddress(null)
       await refresh()
     },

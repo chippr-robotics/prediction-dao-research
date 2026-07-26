@@ -2,11 +2,30 @@
 // Spec 049 (US1) — the optional policy step: skipped ⇒ payload/initializer unchanged (FR-010);
 // configured ⇒ policySetup threads through and the initializer's setup() decodes with
 // setupTo = the chain's PolicyGuardSetup.
+// Spec 068 (US1/US5) — owner rows now use the shared CustodyAddressField, and the flow states the
+// deployment chain (FR-001). The field's own address-book/QR wiring is covered by
+// CustodyAddressField.test.jsx; here the platform inputs are stubbed (repo convention) so this
+// suite stays a unit test of the wizard.
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { Interface, getAddress } from 'ethers'
+
+vi.mock('../../components/ui/AddressInput', () => ({
+  default: ({ id, value, onChange, placeholder, disabled }) => (
+    <input id={id} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} />
+  ),
+}))
+vi.mock('../../components/ui/AddressBookButton', () => ({
+  default: ({ onSelect }) => (
+    <button type="button" onClick={() => onSelect?.({ address: '0x3333333333333333333333333333333333333333' })}>
+      Address book
+    </button>
+  ),
+}))
+vi.mock('../../components/ui/QRScanner', () => ({ default: () => null }))
+
 import CreateVaultWizard from '../../components/custody/CreateVaultWizard'
 import { buildCreateVaultCalldata } from '../../lib/custody/safeVault'
 import { getContractAddressForChain } from '../../config/contracts'
@@ -32,7 +51,7 @@ describe('CreateVaultWizard', () => {
     const onPreview = vi.fn().mockResolvedValue('0xABCdef0000000000000000000000000000000123')
     render(<CreateVaultWizard connectedAddress={OWNER} onCreate={vi.fn()} onPreview={onPreview} />)
     fireEvent.click(screen.getByRole('button', { name: /add owner/i }))
-    const inputs = screen.getAllByPlaceholderText('0x…')
+    const inputs = screen.getAllByPlaceholderText(/^0x…/)
     fireEvent.change(inputs[1], { target: { value: OWNER2 } })
     fireEvent.change(screen.getByLabelText(/threshold/i), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: /preview address/i }))
