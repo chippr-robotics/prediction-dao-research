@@ -8,6 +8,8 @@
 // offered for a vault the wallet cannot act on (FR-004).
 
 import PolicyPanel from './PolicyPanel'
+import PolicyPanelV2 from './PolicyPanelV2'
+import { isPolicyV2Supported } from '../../lib/custody/policyV2'
 
 export default function VaultDetail({
   vault,
@@ -16,6 +18,7 @@ export default function VaultDetail({
   isActiveIdentity,
   onProposePolicy,
   onSwitchNetwork,
+  proposalQueue = [],
 }) {
   if (!vault) return null
   const chainLabel = vault.chainName ? `${vault.chainName} (${vault.chainId})` : String(vault.chainId)
@@ -111,8 +114,19 @@ export default function VaultDetail({
           </li>
         ))}
       </ul>
-      {/* Policy changes are state-changing, so they are only proposable on the vault's own chain. */}
-      <PolicyPanel vault={vault} onPropose={onVaultChain ? onProposePolicy : undefined} />
+      {/* Policy changes are state-changing, so they are only proposable on the vault's own chain.
+          Where the ordered engine (spec 068) is deployed it owns this section — it renders legacy
+          v1 policies read-only with an upgrade path, so nothing is hidden from members still on v1;
+          elsewhere the v1 panel keeps serving unchanged. */}
+      {isPolicyV2Supported(vault.chainId) ? (
+        <PolicyPanelV2
+          vault={vault}
+          onPropose={onVaultChain ? onProposePolicy : undefined}
+          queue={proposalQueue}
+        />
+      ) : (
+        <PolicyPanel vault={vault} onPropose={onVaultChain ? onProposePolicy : undefined} />
+      )}
       <div className="custody-actions">
         {vault.owner && onOperateAs && onVaultChain && (
           <button type="button" onClick={() => onOperateAs(vault)} disabled={isActiveIdentity}>

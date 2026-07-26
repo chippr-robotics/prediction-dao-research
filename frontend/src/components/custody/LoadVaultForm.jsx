@@ -2,8 +2,11 @@
 // real Safe (owned vs view-only is derived after load). Delegates the chain read to onLoad.
 
 import { useState } from 'react'
+import CustodyAddressField from './CustodyAddressField'
 
-export default function LoadVaultForm({ onLoad, onDone }) {
+// Spec 068 (US5) — address entry goes through the shared Protect field (paste, address book, QR).
+
+export default function LoadVaultForm({ onLoad, onDone, chainId }) {
   const [address, setAddress] = useState('')
   const [label, setLabel] = useState('')
   const [busy, setBusy] = useState(false)
@@ -27,16 +30,13 @@ export default function LoadVaultForm({ onLoad, onDone }) {
 
   return (
     <form className="custody-load" onSubmit={(e) => e.preventDefault()} aria-label="Load a vault by address">
-      <div className="custody-field">
-        <label htmlFor="load-address">Vault address</label>
-        <input
-          id="load-address"
-          type="text"
-          placeholder="0x…"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-        />
-      </div>
+      <CustodyAddressField
+        id="load-address"
+        label="Vault address"
+        value={address}
+        onChange={setAddress}
+        chainId={chainId}
+      />
       <div className="custody-field">
         <label htmlFor="load-label">Label (private, on this device)</label>
         <input id="load-label" type="text" value={label} onChange={(e) => setLabel(e.target.value)} />

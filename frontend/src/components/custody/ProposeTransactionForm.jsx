@@ -4,9 +4,14 @@
 // own previewTransaction and any violation is surfaced (rule + values) WITHOUT blocking submission: the
 // chain remains the enforcer, the warning just saves co-owners from approving a doomed transaction.
 
+// Spec 068 (US2/US5) — the ordered engine previews through its own guard and names the governing
+// rule; recipient/token entry uses the shared Protect address field (paste, book, QR).
+
 import { useState, useMemo, useEffect } from 'react'
 import { buildTransferPayload } from '../../lib/custody/transfers'
-import { getPolicyStatus, previewPolicy } from '../../lib/custody/policy'
+import { previewPolicy } from '../../lib/custody/policy'
+import { getPolicyStatus, previewPolicyV2 } from '../../lib/custody/policyV2'
+import CustodyAddressField from './CustodyAddressField'
 import './Policy.css'
 
 const RULE_LABELS = {
@@ -58,8 +63,9 @@ export default function ProposeTransactionForm({ onPropose, onDone, vault }) {
   // Pre-flight the draft whenever it changes (debounced). Failures stay silent — the preview is
   // advisory; the chain enforces (FR-012).
   const [violation, setViolation] = useState(null)
+  const managed = policyStatus === 'managed' || policyStatus === 'managed-v2'
   useEffect(() => {
-    if (policyStatus !== 'managed' || validationError) return undefined
+    if (!managed || validationError) return undefined
     let on = true
     const timer = setTimeout(async () => {
       try {
@@ -69,8 +75,15 @@ export default function ProposeTransactionForm({ onPropose, onDone, vault }) {
           tokenAddress: assetType === 'token' ? tokenAddress.trim() : null,
           decimals,
         })
-        const res = await previewPolicy(vault.address, vault.chainId, payload)
-        if (on) setViolation(res.ok ? null : res.violation)
+        if (policyStatus === 'managed-v2') {
+          // Spec 068 — scope/limit preview only: the real transaction hash depends on a future
+          // nonce, so approvals cannot be evaluated here (disclosed in the warning copy below).
+          const res = await previewPolicyV2(vault.address, vault.chainId, payload)
+          if (on) setViolation(res.ok ? null : { v2: true, ...res.reason })
+        } else {
+          const res = await previewPolicy(vault.address, vault.chainId, payload)
+          if (on) setViolation(res.ok ? null : res.violation)
+        }
       } catch {
         if (on) setViolation(null)
       }
@@ -79,9 +92,9 @@ export default function ProposeTransactionForm({ onPropose, onDone, vault }) {
       on = false
       clearTimeout(timer)
     }
-  }, [policyStatus, validationError, recipient, amount, tokenAddress, decimals, assetType, vault?.address, vault?.chainId])
+  }, [managed, policyStatus, validationError, recipient, amount, tokenAddress, decimals, assetType, vault?.address, vault?.chainId])
   // Only surface the warning while the draft is valid and the vault is actually policy-managed.
-  const activeViolation = policyStatus === 'managed' && !validationError ? violation : null
+  const activeViolation = managed && !validationError ? violation : null
 
   const submit = async () => {
     setError(null)
@@ -128,10 +141,13 @@ export default function ProposeTransactionForm({ onPropose, onDone, vault }) {
 
       {assetType === 'token' && (
         <>
-          <div className="custody-field">
-            <label htmlFor="propose-token">Token address</label>
-            <input id="propose-token" type="text" placeholder="0x…" value={tokenAddress} onChange={(e) => setTokenAddress(e.target.value)} />
-          </div>
+          <CustodyAddressField
+            id="propose-token"
+            label="Token address"
+            value={tokenAddress}
+            onChange={setTokenAddress}
+            chainId={vault?.chainId}
+          />
           <div className="custody-field">
             <label htmlFor="propose-decimals">Token decimals</label>
             <input id="propose-decimals" type="number" min={0} max={36} value={decimals} onChange={(e) => setDecimals(e.target.value)} />
@@ -139,21 +155,31 @@ export default function ProposeTransactionForm({ onPropose, onDone, vault }) {
         </>
       )}
 
-      <div className="custody-field">
-        <label htmlFor="propose-recipient">Recipient</label>
-        <input id="propose-recipient" type="text" placeholder="0x…" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-      </div>
+      <CustodyAddressField
+        id="propose-recipient"
+        label="Recipient"
+        value={recipient}
+        onChange={setRecipient}
+        chainId={vault?.chainId}
+      />
       <div className="custody-field">
         <label htmlFor="propose-amount">Amount</label>
         <input id="propose-amount" type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </div>
 
-      {activeViolation && (
-        <p className="custody-warning" role="alert">
-          Policy warning — {RULE_LABELS[activeViolation.rule] || 'vault policy'}: {activeViolation.message}. You can
-          still propose this transaction, but the vault will block it at execution.
-        </p>
-      )}
+      {activeViolation &&
+        (activeViolation.v2 ? (
+          <p className="custody-warning" role="alert">
+            Policy warning — {activeViolation.message} You can still propose this transaction, but the vault will
+            block it at execution. This check covers amounts and destinations only; who has approved is checked
+            when the transaction runs.
+          </p>
+        ) : (
+          <p className="custody-warning" role="alert">
+            Policy warning — {RULE_LABELS[activeViolation.rule] || 'vault policy'}: {activeViolation.message}. You can
+            still propose this transaction, but the vault will block it at execution.
+          </p>
+        ))}
 
       {validationError && (
         <p className="custody-error" role="alert">

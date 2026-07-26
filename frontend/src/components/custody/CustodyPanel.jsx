@@ -90,7 +90,9 @@ function OnChainSection() {
           onDone={() => setMode(null)}
         />
       )}
-      {canCreateHere && mode === 'load' && <LoadVaultForm onLoad={loadByAddress} onDone={() => setMode(null)} />}
+      {canCreateHere && mode === 'load' && (
+        <LoadVaultForm onLoad={loadByAddress} chainId={chainId} onDone={() => setMode(null)} />
+      )}
 
       {loading && <p className="custody-hint">Loading vaults…</p>}
       {error && (
@@ -110,6 +112,8 @@ function OnChainSection() {
               isActiveIdentity={active.mode === 'vault' && active.vaultAddress === activeVault.address}
               onProposePolicy={activeVault.owner && onVaultChain ? proposals.propose : undefined}
               onSwitchNetwork={switchNetwork}
+              // FR-019 — the policy panel needs the live queue to refuse a second pending change.
+              proposalQueue={proposals.queue}
             />
             <VaultProposalsPanel vault={activeVault} proposals={proposals} />
           </div>
