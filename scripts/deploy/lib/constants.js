@@ -304,7 +304,30 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 // MAINNET CHAIN IDS (for safety checks)
 // =============================================================================
 
-const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum, Ethereum Classic, Polygon mainnets
+/**
+ * Chains that hold real money. Deploy scripts treat membership in this list as
+ * "mainnet" and tighten up accordingly — today that means:
+ *   1. `deploy.js` refuses to run without CONFIRM_MAINNET=true, so a mainnet deploy is
+ *      always a deliberate act and never the result of a mistyped --network.
+ *   2. `deploy.js` refuses to substitute a MockERC20 for a missing stake token. On a
+ *      testnet a missing TOKENS[network] entry quietly mints a mock; on a mainnet that
+ *      would allowlist a worthless token as real stake, so it aborts instead.
+ *
+ * Optimism (10), Base (8453) and Arbitrum One (42161) were added for the spec 060 /
+ * spec 067 control-plane rollout. Before that they were ABSENT, which meant those three
+ * production chains were silently classified as testnets and got the loose treatment —
+ * exactly backwards. Anything gating on "is this mainnet" belongs here, not in a
+ * per-script list (see scripts/deploy/archive/deploy-deterministic.js for the stale
+ * copy this list exists to replace).
+ */
+const MAINNET_CHAIN_IDS = [
+  1,      // Ethereum
+  10,     // Optimism
+  61,     // Ethereum Classic
+  137,    // Polygon
+  8453,   // Base
+  42161,  // Arbitrum One
+];
 
 // =============================================================================
 // PER-NETWORK DEPLOY FLAGS

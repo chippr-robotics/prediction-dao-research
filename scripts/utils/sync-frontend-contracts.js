@@ -134,18 +134,88 @@ function updateObjectLiteralValue(source, key, newValueLiteral, blockName = null
 }
 
 /**
- * Map chainId to the corresponding contracts block name in contracts.js.
- * Returns null if no block is known for this chain (caller falls back to whole-file update).
+ * chainId → the name of that chain's contracts block in contracts.js.
+ *
+ * This table MUST cover every chain in `NETWORK_CONTRACTS` (frontend/src/config/contracts.js).
+ * An unmapped chain is not a harmless gap — it is a silent cross-chain corruption. With a null
+ * blockName, `updateObjectLiteralValue` rewrites the FIRST `key:` line anywhere in the file, and
+ * the first block in contracts.js is MORDOR_CONTRACTS. So before this table covered chain 1,
+ * syncing an Ethereum-mainnet record wrote Ethereum's `bridgeRouter`/`liquidityRouter` addresses
+ * into the MORDOR block and left ETHEREUM_CONTRACTS empty: the frontend then handed Mordor users
+ * a contract address that only exists on chain 1, and the chain it was actually deployed on still
+ * read as undeployed. Nothing failed; the sync printed "Synced".
+ *
+ * Hence `resolveBlockName()` below refuses instead of falling back whenever the file uses the
+ * per-chain layout. Add a chain here AND add its block to contracts.js — one without the other is
+ * caught, loudly, at sync time.
  */
+const CHAIN_BLOCK_NAMES = {
+  1: 'ETHEREUM_CONTRACTS', // spec 067 — router-only control-plane network
+  10: 'OPTIMISM_CONTRACTS', // spec 067 — router-only control-plane network
+  61: 'ETC_CONTRACTS', // Ethereum Classic mainnet (hardhat network `etc`)
+  63: 'MORDOR_CONTRACTS',
+  137: 'POLYGON_CONTRACTS',
+  8453: 'BASE_CONTRACTS', // spec 067 — router-only control-plane network
+  42161: 'ARBITRUM_CONTRACTS', // spec 067 — router-only control-plane network
+  80002: 'AMOY_CONTRACTS',
+  1337: 'HARDHAT_CONTRACTS',
+  31337: 'HARDHAT_CONTRACTS',
+}
+
 function blockNameForChain(chainId) {
-  const map = {
-    63: 'MORDOR_CONTRACTS',
-    80002: 'AMOY_CONTRACTS',
-    137: 'POLYGON_CONTRACTS',
-    1337: 'HARDHAT_CONTRACTS',
-    31337: 'HARDHAT_CONTRACTS',
+  return CHAIN_BLOCK_NAMES[chainId] || null
+}
+
+/**
+ * Does this contracts file use the per-chain block layout, or the older flat single-network one
+ * (`export const DEPLOYED_CONTRACTS = { ... }`)?
+ *
+ * Only the flat layout has an unambiguous "the whole file is the block" meaning, so it is the one
+ * and only case where a whole-file update is safe. Detection is by NAME, not by shape: a loose
+ * `[A-Z_]+_CONTRACTS` pattern also matches the flat file's own `DEPLOYED_CONTRACTS`, which would
+ * misread the legacy layout as multi-network and refuse to sync it at all.
+ */
+function usesPerChainBlocks(source) {
+  if (/(?:const|let|var)\s+NETWORK_CONTRACTS\s*=\s*\{/.test(source)) return true
+  return Object.values(CHAIN_BLOCK_NAMES).some((name) =>
+    new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*\\{`).test(source)
+  )
+}
+
+/**
+ * Decide which named block this deployment record may write into — or refuse.
+ *
+ * Refusing is the point. Every alternative to a correct block name writes the addresses of one
+ * chain into another chain's map (see blockNameForChain above), and a wrong address in
+ * contracts.js is indistinguishable from a right one until someone sends funds to it.
+ */
+function resolveBlockName(source, chainId, contractsFile) {
+  if (!usesPerChainBlocks(source)) {
+    // Flat legacy/fixture layout: one network per file, so there is nothing to target wrongly.
+    return null
   }
-  return map[chainId] || null
+
+  const blockName = blockNameForChain(chainId)
+  if (!blockName) {
+    throw new Error(
+      `No contracts block is mapped for chainId ${chainId}. ${contractsFile} uses the per-chain ` +
+        `layout, so writing without a target block would rewrite whichever block happens to be ` +
+        `first in the file (currently MORDOR_CONTRACTS) with this chain's addresses. ` +
+        `Add the chain to blockNameForChain() in ${path.relative(process.cwd(), __filename)} and ` +
+        `add its block + NETWORK_CONTRACTS entry to contracts.js, then re-run.`
+    )
+  }
+
+  const hasBlock = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`).test(source)
+  if (!hasBlock) {
+    throw new Error(
+      `chainId ${chainId} maps to block ${blockName}, but ${contractsFile} has no such block. ` +
+        `Add "const ${blockName} = { ... }" and register it in NETWORK_CONTRACTS (contracts.js) ` +
+        `before syncing this network — otherwise these addresses land in another chain's map.`
+    )
+  }
+
+  return blockName
 }
 
 function main() {
@@ -174,7 +244,19 @@ function main() {
 
   const deployment = readJson(deploymentFile)
   const deployed = deployment.contracts || {}
-  const isV2 = Boolean(deployed.wagerRegistry || deployed.membershipManager && deployed.keyRegistry)
+
+  // Which mapping applies. The old test — "does the record have a wagerRegistry?" — assumed every
+  // v2 record contains the core escrow, which stopped being true with the spec-067 control-plane
+  // networks: Ethereum/Optimism/Base/Arbitrum host ONLY feeRouter + bridgeRouter + liquidityRouter
+  // and have no wagerRegistry at all. Such a record fell through to the v1 mapping, which carries
+  // none of those keys, so the sync copied nothing and still printed "Synced" — the exact silent
+  // no-op this file must not produce. The `-v2.json` filename and the v2 salt prefix are both
+  // written by the v2 deploy tooling, so either one is a positive statement of the record's shape;
+  // the contract probe stays as a fallback for hand-written records that predate both.
+  const isV2 =
+    /-v2\.json$/.test(deploymentFile) ||
+    String(deployment.saltPrefix || '').startsWith('FairWins-P2P-v2') ||
+    Boolean(deployed.wagerRegistry || (deployed.membershipManager && deployed.keyRegistry))
 
   let source = fs.readFileSync(contractsFile, 'utf8')
 
@@ -234,15 +316,11 @@ function main() {
         nullifierRegistry: deployed.nullifierRegistry,
       }
 
-  // Determine target block in contracts.js (multi-network layout). If the file
-  // doesn't have a per-chain block, blockName stays null and we update globally
-  // (preserves backwards compatibility with the test fixture).
+  // Determine the target block in contracts.js. Null means (and now ONLY means) the flat
+  // single-network layout, where a whole-file update is unambiguous; anything else refuses
+  // rather than writing this chain's addresses into another chain's block.
   const deploymentChainId = Number(deployment.chainId) || chainId
-  let blockName = blockNameForChain(deploymentChainId)
-  if (blockName) {
-    const hasBlock = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`).test(source)
-    if (!hasBlock) blockName = null
-  }
+  const blockName = resolveBlockName(source, deploymentChainId, contractsFile)
 
   for (const [key, value] of Object.entries(mapping)) {
     if (!value) continue
