@@ -59,7 +59,13 @@ function actionsFor(instance) {
     {
       id: 'trade',
       label: 'Trade',
-      enabled: asset.kind !== 'nft' && Boolean(net?.dex),
+      // `capabilities.dex`, NOT the raw `net.dex` block. The raw block is only "this network has
+      // DEX addresses configured"; the capability additionally requires the network to be in
+      // SWAP_CHAIN_IDS, which is the FR-016a allow-list deciding where in-app swapping is actually
+      // offered. Reading the raw block bypasses that allow-list, so a network whose addresses are
+      // configured but which is deliberately not allow-listed would show an enabled Trade action
+      // leading to a surface that will not serve it.
+      enabled: asset.kind !== 'nft' && Boolean(net?.capabilities?.dex),
       reason: asset.kind === 'nft' ? 'Collectibles cannot be traded here' : 'No in-app trading on this network',
       to: `/wallet?tab=trade&chain=${asset.chainId}&token=${encodeURIComponent(asset.symbol)}`,
     },
