@@ -18,6 +18,8 @@ import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import ProtocolConfigTab from './admin/ProtocolConfigTab'
 import FeesTab from './admin/FeesTab'
 import StakingTab from './admin/StakingTab'
+import BridgeTab from './admin/BridgeTab'
+import SupplyTab from './admin/SupplyTab'
 import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
@@ -37,6 +39,19 @@ const ROLE_HASHES = {
   SANCTIONS_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
   TOKEN_ISSUER: ethers.keccak256(ethers.toUtf8Bytes('TOKEN_ISSUER_ROLE')),
   STAKING_ADMIN: ethers.keccak256(ethers.toUtf8Bytes('STAKING_ADMIN_ROLE')),
+  // LIQUIDITY_ADMIN_ROLE (spec 067) is the same role id on two separate
+  // AccessControl contracts — the BridgeRouter and the LiquidityRouter — so it
+  // is granted/revoked once per router. The picker therefore offers the two
+  // targets explicitly instead of one option that would quietly authorize only
+  // half of what the operator asked for.
+  LIQUIDITY_ADMIN_BRIDGE: ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
+  LIQUIDITY_ADMIN_LIQUIDITY: ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
+  // GUARDIAN_ROLE is per-contract for the same reason, and the spec-067 routers were unreachable:
+  // the bare `GUARDIAN` option above grants on the WagerRegistry, so there was NO in-app way to give
+  // anyone the routers' killswitch. The routers grant it only to their `initialize` admin, which
+  // meant the emergency lever could not be delegated to an on-call operator at all.
+  GUARDIAN_BRIDGE: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  GUARDIAN_LIQUIDITY: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
   DEFAULT_ADMIN: ethers.ZeroHash,
 }
 
@@ -94,7 +109,19 @@ function AdminPanel() {
   const isSanctionsAdmin = hasRole(ROLES.SANCTIONS_ADMIN)
   const isFeeAdmin = hasRole(ROLES.FEE_ADMIN)
   const isStakingAdmin = hasRole(ROLES.STAKING_ADMIN)
+  // LIQUIDITY_ADMIN_ROLE lives on BOTH spec-067 routers (BridgeRouter and
+  // LiquidityRouter). It resolves to true when the operator holds it on at
+  // least one router deployed on the connected network — an undeployed router
+  // is skipped, never read as a denial (see hasRoleOnChain). Entry to the tab
+  // is deliberately generous; each tab re-checks authority per router and per
+  // network before offering a write, and the control state the tabs read is
+  // per-network regardless of which network the wallet sits on (FR-050).
+  const isLiquidityAdmin = hasRole(ROLES.LIQUIDITY_ADMIN)
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
+  // The Bridge/Supply fee cards link across to where a rate is actually editable — but only for
+  // an operator who can open that tab. Offering the link to someone the Fees tab is closed to
+  // would send them to a blank panel, so they get the same sentence without a dead control.
+  const canOpenFees = isAdmin || isFeeAdmin
 
   const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -145,6 +172,8 @@ function AdminPanel() {
   const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', chainId)
   const tokenFactoryAddr = getContractAddressForChain('tokenFactory', chainId)
   const stakingRouterAddr = getContractAddressForChain('stakingRouter', chainId)
+  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', chainId)
+  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', chainId)
 
   // Each grantable role lives on a specific contract; grants must be sent
   // to the contract that defines the role, not blanket-sent to the registry.
@@ -153,6 +182,8 @@ function AdminPanel() {
     if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
     if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
     if (role === 'STAKING_ADMIN') return stakingRouterAddr
+    if (role === 'LIQUIDITY_ADMIN_BRIDGE' || role === 'GUARDIAN_BRIDGE') return bridgeRouterAddr
+    if (role === 'LIQUIDITY_ADMIN_LIQUIDITY' || role === 'GUARDIAN_LIQUIDITY') return liquidityRouterAddr
     return wagerRegistryAddr
   }
 
@@ -193,17 +224,31 @@ function AdminPanel() {
     return () => clearInterval(interval)
   }, [fetchContractState])
 
+  /**
+   * Send one admin transaction, reporting the outcome to the operator.
+   *
+   * RESOLVES `true` on success and `false` on any failure — including a rejected wallet prompt —
+   * rather than resolving `undefined` either way. Callers that send a SEQUENCE need that: the
+   * spec-067 bulk route toggles promised "a failed or rejected signature stops the rest", and with a
+   * signal-free result the loop could not observe a revert, so rejecting the first prompt still
+   * queued the remaining four. Never rejects, so the existing `.then(refresh)` callers are unchanged.
+   */
   const runTx = useCallback(async (fn, successMsg) => {
-    if (!signer) return showNotification('Connect your wallet first', 'error')
+    if (!signer) {
+      showNotification('Connect your wallet first', 'error')
+      return false
+    }
     setPendingTx(true)
     try {
       const tx = await fn()
       await tx.wait()
       showNotification(successMsg, 'success')
       fetchContractState()
+      return true
     } catch (err) {
       console.error(err)
       showNotification(err.shortMessage || err.message, 'error')
+      return false
     } finally {
       setPendingTx(false)
     }
@@ -323,6 +368,7 @@ function AdminPanel() {
     isSanctionsAdmin,
     isFeeAdmin,
     isStakingAdmin,
+    isLiquidityAdmin,
   })
   const adminTabs = flattenNavGroups(navGroups)
 
@@ -348,12 +394,22 @@ function AdminPanel() {
         <div className="admin-panel-header-content">
           <div className="admin-panel-title-section">
             <h1>Operations</h1>
+            {/*
+              The fallback used to be the literal 'Admin', so an operator whose only authority was
+              LIQUIDITY_ADMIN (or FEE_ADMIN, or STAKING_ADMIN) was badged as an administrator while
+              the permissions card below showed × on every row — the screen asserting both that they
+              were an Admin and that they held nothing. Every role that can open this panel now names
+              itself, and the last resort says what it means: something got you in, not "Admin".
+            */}
             <span className="admin-badge">
               {isAdmin ? 'Administrator' :
                 isGuardian ? 'Guardian' :
                   isAccountModerator ? 'Moderator' :
                     isRoleManager ? 'Role Manager' :
-                      isSanctionsAdmin ? 'Compliance Officer' : 'Admin'}
+                      isSanctionsAdmin ? 'Compliance Officer' :
+                        isFeeAdmin ? 'Fee Administrator' :
+                          isStakingAdmin ? 'Staking Administrator' :
+                            isLiquidityAdmin ? 'Liquidity Administrator' : 'Operator'}
             </span>
           </div>
           <p className="admin-panel-subtitle">
@@ -447,7 +503,36 @@ function AdminPanel() {
                     <span className="permission-icon">{isSanctionsAdmin ? '✓' : '×'}</span>
                     <span className="permission-name">Compliance Officer (deny-list on SanctionsGuard)</span>
                   </div>
+                  {/*
+                    These three were in ROLES, in ADMIN_ROLES and in the nav, but not in this card —
+                    so an operator holding one of them read a list of five × and concluded their grant
+                    had not landed. A permissions card that omits a role it let you in on is worse
+                    than no card.
+                  */}
+                  <div className={`permission-item ${isFeeAdmin ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isFeeAdmin ? '✓' : '×'}</span>
+                    <span className="permission-name">Fee Administrator (platform fee rates on the FeeRouter)</span>
+                  </div>
+                  <div className={`permission-item ${isStakingAdmin ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isStakingAdmin ? '✓' : '×'}</span>
+                    <span className="permission-name">Staking Administrator (provider addresses + validator allowlist)</span>
+                  </div>
+                  <div className={`permission-item ${isLiquidityAdmin ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isLiquidityAdmin ? '✓' : '×'}</span>
+                    <span className="permission-name">Liquidity Administrator (bridge routes + curated pools, per router)</span>
+                  </div>
                 </div>
+                {/*
+                  Every row above is resolved on the CONNECTED network. The spec-067 routers exist on
+                  five, and their roles are per-contract — so this card is a summary, not a verdict:
+                  the Bridge and Supply tabs each ask the router in scope directly before offering a
+                  control. Saying so here stops the summary being read as the authority.
+                */}
+                <p className="card-info">
+                  Read on {NETWORK_CONFIG.name}. Roles are per-contract and per-network, so the
+                  Bridge and Supply tabs re-check the specific router for the network you select —
+                  what they offer there is the authoritative answer.
+                </p>
               </div>
 
               <ServiceHealthCard />
@@ -651,6 +736,21 @@ function AdminPanel() {
                 Only the holder of <code>DEFAULT_ADMIN_ROLE</code> can grant other admin roles.
                 Grant sparingly: each role is a distinct privilege and a foothold.
               </p>
+              <p>
+                <strong>Liquidity Administrator is per-router.</strong> The bridge and
+                liquidity routers each carry their own <code>LIQUIDITY_ADMIN_ROLE</code>;
+                granting one does not grant the other. Grant both if the operator is meant
+                to curate bridge routes <em>and</em> supplied pools.
+              </p>
+              <p>
+                <strong>So is Guardian.</strong> The plain “Guardian” option above grants on the
+                WagerRegistry and does <em>not</em> carry to the bridge or liquidity routers — those
+                check their own role registry, so an on-call operator needs the router-specific
+                Guardian grant to reach the Bridge or Supply killswitch. Note also that the routers
+                keep protocol-wiring changes (SpokePool, position manager, FeeRouter, sanctions guard)
+                at <code>DEFAULT_ADMIN_ROLE</code>: those addresses decide where member funds go, so
+                curating routes and pools does not carry the power to redirect them.
+              </p>
               <div className="admin-form">
                 <label>
                   Account (address or ENS)
@@ -665,12 +765,16 @@ function AdminPanel() {
                   Role
                   <select value={adminRoleForm.role}
                     onChange={(e) => setAdminRoleForm({ ...adminRoleForm, role: e.target.value })}>
-                    <option value="GUARDIAN">Guardian — pause/unpause</option>
+                    <option value="GUARDIAN">Guardian — pause/unpause (WagerRegistry)</option>
                     <option value="ACCOUNT_MODERATOR">Account Moderator — freeze/unfreeze</option>
                     <option value="ROLE_MANAGER">Role Manager — grant/revoke memberships</option>
                     <option value="SANCTIONS_ADMIN">Compliance Officer — deny-list (SanctionsGuard)</option>
                     <option value="TOKEN_ISSUER">Token Issuer — token creation (TokenFactory)</option>
                     <option value="STAKING_ADMIN">Staking Administrator — provider addrs + validator allowlist (StakingRouter)</option>
+                    <option value="LIQUIDITY_ADMIN_BRIDGE">Liquidity Administrator — bridge routes + limits (BridgeRouter only)</option>
+                    <option value="LIQUIDITY_ADMIN_LIQUIDITY">Liquidity Administrator — curated pools + caps (LiquidityRouter only)</option>
+                    <option value="GUARDIAN_BRIDGE">Guardian — pause new bridges (BridgeRouter only)</option>
+                    <option value="GUARDIAN_LIQUIDITY">Guardian — pause new Uniswap supplies (LiquidityRouter only)</option>
                     <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
                   </select>
                 </label>
@@ -780,6 +884,37 @@ function AdminPanel() {
             isAdmin={isAdmin}
             isStakingAdmin={isStakingAdmin}
             isGuardian={isGuardian}
+          />
+        )}
+
+        {/*
+          Bridge + Supply (spec 067). Same gate as the nav group, so a tab id
+          typed by hand renders nothing for an operator who holds none of
+          admin / liquidity-admin / guardian (FR-040 / FR-049). Neither tab is
+          gated on the wallet's active chain: control state is per-network and
+          each tab reads all five networks (FR-050).
+        */}
+        {activeTab === 'bridge' && (isAdmin || isLiquidityAdmin || isGuardian) && (
+          <BridgeTab
+            signer={signer}
+            account={account}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+            onOpenFees={canOpenFees ? () => setActiveTab('fees') : null}
+          />
+        )}
+
+        {activeTab === 'supply' && (isAdmin || isLiquidityAdmin || isGuardian) && (
+          <SupplyTab
+            signer={signer}
+            account={account}
+            chainId={chainId}
+            provider={provider || getProvider(chainId)}
+            runTx={runTx}
+            pendingTx={pendingTx}
+            onOpenFees={canOpenFees ? () => setActiveTab('fees') : null}
           />
         )}
 

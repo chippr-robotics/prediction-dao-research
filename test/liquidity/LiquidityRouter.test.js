@@ -196,30 +196,52 @@ describe("LiquidityRouter", function () {
         .to.be.revertedWithCustomError(router, unauthorized);
       await expect(router.connect(stranger).setPoolLimit(tradingPoolId, ETH("1"), ETH("1")))
         .to.be.revertedWithCustomError(router, unauthorized);
-      await expect(router.connect(stranger).setPositionManager(stranger.address))
-        .to.be.revertedWithCustomError(router, unauthorized);
-      await expect(router.connect(stranger).setFeeRouter(stranger.address))
-        .to.be.revertedWithCustomError(router, unauthorized);
-      await expect(router.connect(stranger).setSanctionsGuard(stranger.address))
-        .to.be.revertedWithCustomError(router, unauthorized);
 
-      // The role holder passes on every one of them, and each emits its audit event (FR-046).
+      // The role holder passes on every CURATION setter, and each emits its audit event (FR-046).
       await expect(router.connect(liquidityAdmin).setPoolEnabled(tradingPoolId, false))
         .to.emit(router, "PoolEnabledChanged")
         .withArgs(tradingPoolId, false, liquidityAdmin.address);
       await expect(router.connect(liquidityAdmin).setPoolLimit(tradingPoolId, ETH("1"), ETH("1")))
         .to.emit(router, "PoolLimitChanged")
         .withArgs(tradingPoolId, ETH("1"), ETH("1"), liquidityAdmin.address);
-      await expect(router.connect(liquidityAdmin).setSanctionsGuard(stranger.address))
+    });
+
+    // The protocol-wiring setters are DEFAULT_ADMIN_ROLE, a role ABOVE curation. `positionManager` is
+    // approved and mints the member's position and `feeRouter` names the treasury the fee is
+    // transferred to, so whoever can write them can redirect where member capital goes — that is not
+    // the same authority as deciding which pools are curated. A LIQUIDITY_ADMIN holder is rejected
+    // here on purpose; these assertions are the privilege boundary, not incidental coverage.
+    it("gates the protocol-wiring setters to DEFAULT_ADMIN_ROLE, above LIQUIDITY_ADMIN", async function () {
+      const unauthorized = "AccessControlUnauthorizedAccount";
+      for (const caller of [stranger, liquidityAdmin, guardian]) {
+        await expect(router.connect(caller).setPositionManager(caller.address))
+          .to.be.revertedWithCustomError(router, unauthorized);
+        await expect(router.connect(caller).setFeeRouter(caller.address))
+          .to.be.revertedWithCustomError(router, unauthorized);
+        await expect(router.connect(caller).setSanctionsGuard(caller.address))
+          .to.be.revertedWithCustomError(router, unauthorized);
+      }
+      expect(await router.positionManager()).to.equal(nfpmAddr);
+      expect(await router.feeRouter()).to.equal(await feeRouter.getAddress());
+      expect(await router.sanctionsGuard()).to.equal(ethers.ZeroAddress);
+
+      await expect(router.connect(admin).setSanctionsGuard(stranger.address))
         .to.emit(router, "SanctionsGuardUpdated")
-        .withArgs(ethers.ZeroAddress, stranger.address, liquidityAdmin.address);
-      await expect(router.connect(liquidityAdmin).setPositionManager(stranger.address))
+        .withArgs(ethers.ZeroAddress, stranger.address, admin.address);
+      await expect(router.connect(admin).setPositionManager(stranger.address))
         .to.emit(router, "PositionManagerUpdated")
-        .withArgs(nfpmAddr, stranger.address, liquidityAdmin.address);
-      await expect(router.connect(liquidityAdmin).setFeeRouter(stranger.address))
+        .withArgs(nfpmAddr, stranger.address, admin.address);
+      await expect(router.connect(admin).setFeeRouter(stranger.address))
         .to.emit(router, "FeeRouterUpdated")
-        .withArgs(await feeRouter.getAddress(), stranger.address, liquidityAdmin.address);
+        .withArgs(await feeRouter.getAddress(), stranger.address, admin.address);
       expect(await router.feeRouter()).to.equal(stranger.address);
+
+      // Zero is refused on both fund-path references — the supply path reaches an unset manager
+      // through `PositionManagerUnset`, so there is no reason to allow writing that state on purpose.
+      await expect(router.connect(admin).setPositionManager(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(router, "ZeroAddress");
+      await expect(router.connect(admin).setFeeRouter(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(router, "ZeroAddress");
     });
 
     it("gates pause/unpause to GUARDIAN_ROLE and pause blocks new supplies", async function () {
@@ -240,6 +262,28 @@ describe("LiquidityRouter", function () {
       expect(await router.paused()).to.equal(false);
       await supply(); // supplies resume
       expect(await nfpm.ownerOf(1)).to.equal(member.address);
+    });
+
+    it("remains pausable with every optional service unreachable (FR-044)", async function () {
+      // A killswitch that needs the FeeRouter, the position manager or the sanctions guard to be
+      // healthy is not a killswitch. Point all three at code-less addresses and pause anyway —
+      // the emergency authority must not depend on optional infrastructure being up.
+      await router.connect(admin).setFeeRouter(stranger.address);
+      await router.connect(admin).setPositionManager(stranger.address);
+      await router.connect(admin).setSanctionsGuard(stranger.address);
+
+      await router.connect(guardian).pause();
+      expect(await router.paused()).to.equal(true);
+      await expect(supply()).to.be.revertedWithCustomError(router, "EnforcedPause");
+
+      // Retirement stays exercisable in the same degraded state — and it has to, because it is the
+      // ONLY thing that withholds a BRIDGE pool: those deposits never touch this contract, so the
+      // pause cannot reach them (research R3).
+      await router.connect(liquidityAdmin).setPoolEnabled(bridgePoolId, false);
+      expect((await router.getPool(bridgePoolId)).enabled).to.equal(false);
+
+      await router.connect(guardian).unpause();
+      expect(await router.paused()).to.equal(false);
     });
 
     it("rejects a BridgeLp poolId with NotTradingPool — curated, but not routable", async function () {
@@ -433,9 +477,24 @@ describe("LiquidityRouter", function () {
 
     it("reverts PositionManagerUnset on a network with no Uniswap deployment", async function () {
       // Bridge pools can still be curated on such a network, so this must fail explicitly rather
-      // than opaquely against address(0).
-      await router.connect(liquidityAdmin).setPositionManager(ethers.ZeroAddress);
-      await expect(supply()).to.be.revertedWithCustomError(router, "PositionManagerUnset");
+      // than opaquely against address(0). Reached by DEPLOYING into that state rather than by
+      // writing it: `setPositionManager` refuses zero, so `initialize` is the only way in — which is
+      // also the only way it happens in production (a chain with no Uniswap deployment to point at).
+      const bare = await deployLiquidityRouter([
+        admin.address,
+        await feeRouter.getAddress(),
+        ethers.ZeroAddress, // no Uniswap on this network
+        ethers.ZeroAddress,
+      ]);
+      await bare.connect(admin).listPool(tradingListing());
+      for (const t of [token0, token1]) {
+        await t.connect(member).approve(await bare.getAddress(), ethers.MaxUint256);
+      }
+      await expect(
+        bare
+          .connect(member)
+          .mintFullRangeWithFee(tradingPoolId, ETH("100"), ETH("200"), 0, 0, DEADLINE, 250)
+      ).to.be.revertedWithCustomError(bare, "PositionManagerUnset");
     });
 
     it("reverts ZeroAmount when both legs are zero", async function () {
@@ -460,10 +519,53 @@ describe("LiquidityRouter", function () {
       expect(await nfpm.ownerOf(1)).to.equal(member.address);
     });
 
+    // ---- the ceiling binds the fee TAKEN, not the rate the fee router claims ----
+    //
+    // The consent ceiling is checked before the mint against `feeBps()` — the FeeRouter's own account
+    // of its rate. But the fee is finally quoted AFTER the mint, against amounts nobody knew in
+    // advance, and that second quote was unbounded. So a FeeRouter reporting 0 bps and quoting 99%
+    // passed every pre-mint check and then took the member's deployed capital. The bound is on the
+    // amounts themselves, which is the only thing a lying router cannot restate.
+    it("refuses a FeeRouter that under-reports its rate and over-quotes the post-mint fee", async function () {
+      const Lying = await ethers.getContractFactory("MockLyingFeeRouter");
+      const lying = await Lying.deploy(stranger.address, 0, 9_900); // admits 0 bps, takes 99%
+      await router.connect(admin).setFeeRouter(await lying.getAddress());
+
+      const before0 = await token0.balanceOf(member.address);
+      await expect(supply({ maxFeeBps: 0 })).to.be.revertedWithCustomError(router, "FeeAboveCap");
+      // Nothing moved: the whole supply reverted, so the mint is undone with it.
+      expect(await token0.balanceOf(member.address)).to.equal(before0);
+      expect(await token0.balanceOf(stranger.address)).to.equal(0n);
+
+      // At the cap it goes through — the bound is MAX_FEE_BPS, not honesty.
+      const atCap = await Lying.deploy(treasury.address, 0, 250);
+      await router.connect(admin).setFeeRouter(await atCap.getAddress());
+      await supply({ maxFeeBps: 0 });
+      // 250 bps of what Uniswap CONSUMED, not of the 100 offered — the bound is checked against the
+      // same post-mint amounts the fee is quoted on, so it does not reintroduce the gross-basis
+      // overcharge this router was fixed for.
+      const consumed0 = await token0.balanceOf(nfpmAddr);
+      expect(await token0.balanceOf(treasury.address)).to.equal((consumed0 * 250n) / 10_000n);
+      expect(await token0.balanceOf(treasury.address)).to.be.lessThan((ETH("100") * 250n) / 10_000n);
+      expect(await nfpm.ownerOf(1)).to.equal(member.address);
+    });
+
+    it("refuses a FeeRouter whose fee and net do not add back to the gross", async function () {
+      const Lying = await ethers.getContractFactory("MockLyingFeeRouter");
+      const lying = await Lying.deploy(treasury.address, 100, 100);
+      await lying.setSplitShort(true); // withholds a unit from `net`
+      await router.connect(admin).setFeeRouter(await lying.getAddress());
+
+      // `net0`/`net1` are what get approved to the position manager, so an under-reported net would
+      // silently shrink the member's position. Caught before any funds move.
+      await expect(supply()).to.be.revertedWithCustomError(router, "FeeSplitMismatch");
+      expect(await token0.balanceOf(routerAddr)).to.equal(0n);
+    });
+
     it("screens the member and rejects a denied address (FR-031)", async function () {
       const Guard = await ethers.getContractFactory("SanctionsGuard");
       const guard = await Guard.deploy(admin.address, ethers.ZeroAddress); // deny-list only
-      await router.connect(liquidityAdmin).setSanctionsGuard(await guard.getAddress());
+      await router.connect(admin).setSanctionsGuard(await guard.getAddress());
 
       await guard.connect(admin).setDenied(member.address, true, "test");
       await expect(supply())

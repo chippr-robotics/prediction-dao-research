@@ -165,18 +165,33 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         emit PoolLimitChanged(poolId, maxDeposit0PerTx, maxDeposit1PerTx, msg.sender);
     }
 
-    function setPositionManager(address newManager) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    // ------------------------------------------- protocol wiring (DEFAULT_ADMIN_ROLE)
+    //
+    // These three are NOT curation, and deliberately sit a role above it.
+    //
+    // `positionManager` is approved and mints the member's position; `feeRouter` names both the rate
+    // and the `treasury()` the fee is transferred to; `sanctionsGuard` is the compliance gate. Whoever
+    // can write them can redirect where member funds go, so they are DEFAULT_ADMIN_ROLE while
+    // LIQUIDITY_ADMIN_ROLE stays what its name says — which pools are curated, at what ceiling.
+    // Curating a pool badly is recoverable by retiring it; pointing the router at a hostile contract
+    // is not. The amount-bound in `_supply` is the second half of this: even an admin cannot configure
+    // a FeeRouter that takes more than MAX_FEE_BPS of a member's capital.
+
+    /// @dev Zero is rejected: an unset manager is reached through `PositionManagerUnset` on the supply
+    ///      path, so there is no reason to allow writing the router into that state deliberately.
+    function setPositionManager(address newManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newManager == address(0)) revert ZeroAddress();
         emit PositionManagerUpdated(positionManager, newManager, msg.sender);
         positionManager = newManager;
     }
 
-    function setFeeRouter(address newFeeRouter) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    function setFeeRouter(address newFeeRouter) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newFeeRouter == address(0)) revert ZeroAddress();
         emit FeeRouterUpdated(feeRouter, newFeeRouter, msg.sender);
         feeRouter = newFeeRouter;
     }
 
-    function setSanctionsGuard(address newGuard) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    function setSanctionsGuard(address newGuard) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit SanctionsGuardUpdated(sanctionsGuard, newGuard, msg.sender);
         sanctionsGuard = newGuard;
     }
@@ -266,6 +281,13 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         uint16 liveBps = router.feeBps(liquidityDepositServiceId);
         if (liveBps > MAX_FEE_BPS) revert FeeAboveCap();
         if ((quoted0 > 0 || quoted1 > 0) && liveBps > maxFeeBps) revert FeeAboveQuoted();
+        // Exact-split, checked before any funds move: `net0`/`net1` are what get approved to the
+        // position manager, so a FeeRouter that under-reports them would shrink the member's position
+        // by the difference. See the amount-bound in `_supply` for the other half of not trusting the
+        // configured FeeRouter's account of itself.
+        if (quoted0 + net0 != amount0Desired || quoted1 + net1 != amount1Desired) {
+            revert FeeSplitMismatch();
+        }
 
         // ---------------- interactions ----------------
         uint256 fee0;
@@ -350,6 +372,15 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
         IFeeRouter router = IFeeRouter(feeRouter);
         (fee0, ) = router.quoteFee(liquidityDepositServiceId, amount0);
         (fee1, ) = router.quoteFee(liquidityDepositServiceId, amount1);
+        // THE CAP BINDS THE FEE ACTUALLY TAKEN, NOT ONLY THE RATE THE ROUTER REPORTS ABOUT ITSELF.
+        // The ceiling checked before the mint reads `feeBps()`, which is the FeeRouter's own claim. A
+        // FeeRouter reporting feeBps() = 0 while quoteFee() hands back most of the amount passes that
+        // check, and these two transfers would then send the member's capital to its treasury. This
+        // re-quote is also the one the member never consented to directly — it happens after the mint,
+        // against amounts nobody knew in advance — so it is bounded here on the amounts themselves.
+        if (
+            fee0 > (amount0 * MAX_FEE_BPS) / 10_000 || fee1 > (amount1 * MAX_FEE_BPS) / 10_000
+        ) revert FeeAboveCap();
         if (fee0 > 0) t0.safeTransfer(treasury, fee0);
         if (fee1 > 0) t1.safeTransfer(treasury, fee1);
 
