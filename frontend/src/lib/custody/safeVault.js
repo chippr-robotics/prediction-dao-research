@@ -188,6 +188,39 @@ export async function loadVault(address, chainId, provider) {
   }
 }
 
+/**
+ * Spec 068 — find a vault by address across EVERY custody chain, in parallel.
+ *
+ * A member holding a vault address does not necessarily know which chain it lives on, and asking
+ * them to guess (by switching networks until one sticks) is a bad way to find out. Loading by
+ * address therefore searches all custody chains rather than only the connected one.
+ *
+ * Crucially this distinguishes "not there" from "could not look": a chain whose RPC fails is
+ * reported as `unreachable`, never as absent — otherwise a single dead endpoint would tell a member
+ * their vault does not exist.
+ *
+ * @returns {{matches: Array, unreachable: Array<{chainId:number, error:string}>, searched: number[]}}
+ */
+export async function findVaultAcrossChains(address, chainIds, { providerFor, load = loadVault } = {}) {
+  const addr = getAddress(address)
+  const results = await Promise.all(
+    chainIds.map(async (chainId) => {
+      try {
+        const reader = providerFor ? providerFor(chainId) : undefined
+        const state = await load(addr, chainId, reader)
+        return { chainId: Number(chainId), state }
+      } catch (e) {
+        return { chainId: Number(chainId), error: e?.message || 'read failed' }
+      }
+    }),
+  )
+  return {
+    matches: results.filter((r) => r.state?.isSafe).map((r) => r.state),
+    unreachable: results.filter((r) => r.error).map((r) => ({ chainId: r.chainId, error: r.error })),
+    searched: chainIds.map(Number),
+  }
+}
+
 /** Read a vault's native-asset balance (token balances are layered in by the vault detail hook). */
 export async function readVaultNativeBalance(address, chainId, provider) {
   const reader = provider || getProvider(chainId)

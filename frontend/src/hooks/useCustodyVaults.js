@@ -9,13 +9,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '.'
-import { isCustodySupported } from '../config/safeContracts'
+import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../config/safeContracts'
 import { NETWORKS } from '../config/networks'
 import { getProvider } from '../utils/blockchainService'
 import {
   createVault as createVaultTx,
   buildCreateVaultTx,
   loadVault,
+  findVaultAcrossChains,
   isVaultOwner,
 } from '../lib/custody/safeVault'
 import {
@@ -132,26 +133,56 @@ export function useCustodyVaults() {
     refresh()
   }, [refresh])
 
-  /** Load a vault by address, classify it, and (if it is a Safe) persist a reference. */
+  /**
+   * Load a vault by address and persist a reference.
+   *
+   * Spec 068 — searches EVERY custody chain, not just the connected one. A member with a vault
+   * address rarely knows (or should have to know) which chain it is on; making them switch networks
+   * until one sticks is not a discovery mechanism. `preferredChainId` pins the choice when the same
+   * address is a Safe on more than one chain.
+   *
+   * The error distinguishes "no Safe anywhere we could reach" from "some chains were unreachable",
+   * so a dead RPC never reads as "your vault does not exist".
+   */
   const loadByAddress = useCallback(
-    async (rawAddress, label = '', nowMs = 0) => {
+    async (rawAddress, label = '', nowMs = 0, { preferredChainId } = {}) => {
       setError(null)
-      const state = await loadVault(rawAddress, chainId, provider)
-      if (!state.isSafe) {
-        const reason = state.reason === 'no-contract' ? 'No contract at this address.' : 'Not a Safe vault.'
-        const err = new Error(reason)
-        err.classification = state.reason
+      const { matches, unreachable, searched } = await findVaultAcrossChains(
+        rawAddress,
+        CUSTODY_SUPPORTED_CHAIN_IDS,
+        { providerFor: (id) => (Number(id) === Number(chainId) ? provider : getProvider(id)) },
+      )
+
+      if (matches.length === 0) {
+        const names = searched.map((id) => chainIdentity(id).chainName).join(', ')
+        const err = new Error(
+          unreachable.length > 0
+            ? `No Safe vault found at this address on ${names}. ` +
+              `${unreachable.map((u) => chainIdentity(u.chainId).chainName).join(', ')} could not be reached, ` +
+              `so it may exist there — try again shortly.`
+            : `No Safe vault found at this address on any supported network (${names}).`,
+        )
+        err.classification = 'not-found-anywhere'
+        err.unreachable = unreachable
         throw err
       }
-      const owner = isVaultOwner(state, address)
+
+      // Same address, multiple chains: honour an explicit choice, else prefer the connected chain,
+      // else the first hit. All matches are returned so the caller can offer the rest.
+      const picked =
+        matches.find((m) => Number(m.chainId) === Number(preferredChainId)) ||
+        matches.find((m) => Number(m.chainId) === Number(chainId)) ||
+        matches[0]
+
+      const owner = isVaultOwner(picked, address)
       upsertVaultReference(
         address,
-        { chainId: Number(chainId), address: state.address, label, role: owner ? 'owner' : 'watch' },
+        { chainId: Number(picked.chainId), address: picked.address, label, role: owner ? 'owner' : 'watch' },
         nowMs || Date.now(),
       )
       await refresh()
-      setActiveAddress(state.address)
-      return { ...state, owner }
+      setActiveAddress(picked.address)
+      return { ...picked, owner, matches, unreachable }
     },
     [address, chainId, provider, refresh],
   )
