@@ -11,7 +11,7 @@
 
 import { NETWORKS } from './networks'
 import { getContractAddressForChain } from './contracts'
-import { getStakingConfig } from './staking'
+import { LIDO_CONTRACTS } from './staking'
 
 const isAddress = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value)
 
@@ -58,14 +58,14 @@ export function getServiceCatalog(chainId) {
     )
   }
 
-  // Staking (spec 065) — the contracts a vault would touch to stake or unstake.
-  const staking = getStakingConfig?.(id)
-  if (staking?.contracts) {
+  // Staking (spec 065) — the contracts a vault would touch to stake or unstake. Read from the
+  // network's own staking block so a chain without staking offers nothing.
+  if (network.staking) {
     out.push(
       entry(
         'staking.lido',
-        `${staking.provider?.name || 'Staking'} — stake`,
-        [staking.contracts.steth, staking.contracts.wsteth, staking.contracts.withdrawalQueue],
+        `${network.staking.provider?.name || 'Staking'} — stake`,
+        [LIDO_CONTRACTS.steth, LIDO_CONTRACTS.wsteth, LIDO_CONTRACTS.withdrawalQueue],
         'staking',
         'Stake, wrap, and queue withdrawals.',
       ),
