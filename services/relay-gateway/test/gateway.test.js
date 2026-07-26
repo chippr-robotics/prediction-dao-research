@@ -5,6 +5,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import request from 'supertest'
 import { ethers } from 'ethers'
 import { createApp } from '../src/server.js'
@@ -61,10 +64,19 @@ describe('config / startup consistency check (FR-025)', () => {
     expect(config.chains[137].targetsByKey.wagerRegistry).toBe('0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89')
     expect(config.chains[63].gasType).toBe('legacy')
     expect(config.chains[63].paymentSupported).toBe(false)
-    // ETC mainnet (61) has no deployments record yet -> enabling it must throw.
+    // A chain with no deployment record at all must refuse to start (FR-025).
+    // Use an empty deployments dir: every supported chain now has SOME record
+    // in the real deployments/ (61 gained one with the spec-068 custody deploy).
+    const emptyDeployments = fs.mkdtempSync(path.join(os.tmpdir(), 'rg-no-deployments-'))
+    expect(() =>
+      loadConfig({ ENABLED_CHAIN_IDS: '61' }, { deploymentsDir: emptyDeployments })
+    ).toThrow(/no deployment record/)
+    // ETC mainnet (61) has a record (custody contracts) but no wagerRegistry yet —
+    // enabling it must still fail loudly until the full target set is pinned.
+    // (If this starts passing, 61 became fully pinned: update the test, not the guard.)
     expect(() =>
       loadConfig({ ENABLED_CHAIN_IDS: '61' }, { deploymentsDir: DEPLOYMENTS_DIR })
-    ).toThrow(/no deployment record/)
+    ).toThrow(/chain 61/)
   })
 })
 
