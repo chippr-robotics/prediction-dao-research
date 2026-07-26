@@ -359,11 +359,20 @@ const CATALOG = {
     args: () => [],
   },
 
-  // --- Custody (specs 043 + 049) -------------------------------------------------------
+  // --- Custody (specs 043 + 049 + 068) --------------------------------------------------
   safePolicyGuard: {
     kind: "contract",
     label: "SafePolicyGuard",
     fqn: "contracts/custody/SafePolicyGuard.sol:SafePolicyGuard",
+    args: () => [],
+  },
+  // Spec 068's ordered engine. Deployed alongside v1 on six chains — without an entry here the
+  // recorded address lands in UNVERIFIABLE and `npm run verify:<net>` exits 1 on every chain that
+  // has it, which would mask a genuine verification failure behind a cataloguing gap.
+  safePolicyGuardV2: {
+    kind: "contract",
+    label: "SafePolicyGuardV2",
+    fqn: "contracts/custody/SafePolicyGuardV2.sol:SafePolicyGuardV2",
     args: () => [],
   },
   policyGuardSetup: {
