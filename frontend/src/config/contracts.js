@@ -68,7 +68,11 @@ const HARDHAT_CONTRACTS = {
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
+  // Spec 068 ordered rule engine; deployed alongside v1 (both guards stay live — vaults adopt V2
+  // through a threshold-approved setGuard, never a forced migration).
+  safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
@@ -199,10 +203,20 @@ export const DEPLOYED_CONTRACTS =
  * v1 used friendGroupMarketFactory; v2 uses wagerRegistry. Both kept here to
  * support legacy Mordor reads while Amoy migrates.
  */
+// NOTE (spec 068): `safeProposalHub` MUST carry a deployment block on every custody chain —
+// `useVaultProposals` refuses to scan without one, so a missing entry silently disables custody
+// proposal discovery on that chain even when the hub itself is deployed.
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 89717915, membershipVoucher: 89717915, wagerPoolFactory: 89720731 },
+  137: {
+    friendGroupMarketFactory: 0,
+    wagerRegistry: 89717915,
+    membershipVoucher: 89717915,
+    wagerPoolFactory: 89720731,
+    safeProposalHub: 90120743,
+  },
+  1337: { safeProposalHub: 4, safePolicyGuardV2: 2 },
 }
 
 export const DEPLOYMENT_BLOCKS =

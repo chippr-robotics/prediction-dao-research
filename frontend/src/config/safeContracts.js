@@ -18,9 +18,10 @@ const SAFE_V1_4_1 = {
   version: '1.4.1',
 }
 
-// chainId → Safe contract set. Add 61 (ETC mainnet) here once the app gains an ETC network block; the address
-// set is already correct (identical canonical addresses).
+// chainId → Safe contract set. ETC mainnet (61) joined in spec 068 once the app gained its network block; the
+// canonical v1.4.1 addresses are identical there and verified on-chain (spec 043 research, Decision 1).
 export const SAFE_CONTRACTS = {
+  61: SAFE_V1_4_1, // Ethereum Classic
   63: SAFE_V1_4_1, // Mordor (Ethereum Classic testnet)
   137: SAFE_V1_4_1, // Polygon
 }
