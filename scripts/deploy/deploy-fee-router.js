@@ -38,7 +38,7 @@ const path = require("path");
 
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
 const { deployProxy, getImplementation } = require("./lib/upgradeable");
-const { LAUNCH_FEE_SERVICES } = require("./lib/feeServices");
+const { LAUNCH_FEE_SERVICES, SERVICE_KIND_LABELS } = require("./lib/feeServices");
 const { MAINNET_CHAIN_IDS } = require("./lib/constants");
 
 /**
@@ -60,7 +60,8 @@ if (UNGATED.length) {
   );
 }
 
-const KIND_LABELS = { 0: "Unregistered", 1: "Wrapped", 2: "ConfigOnly" };
+// Shared with deploy-bridge-liquidity.js via lib/feeServices — see the note there.
+const KIND_LABELS = SERVICE_KIND_LABELS;
 
 async function main() {
   const network = await ethers.provider.getNetwork();

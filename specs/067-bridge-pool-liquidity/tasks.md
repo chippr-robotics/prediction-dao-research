@@ -344,14 +344,23 @@ call for the maintainer.
 **Independent Test**: each series contains a new numbered entry in its established structure, with its
 index table updated and internal links resolving.
 
-- [ ] T136 [P] [US5] Write the member feature announcement in `docs/blog/features/02-bridge-and-supply/blog.md` — benefit-first, with the exact confirm-step flow
-- [ ] T137 [P] [US5] Write the promotion kit (X post, LinkedIn post, 16:9 image prompt) in `docs/blog/features/02-bridge-and-supply/social.md`
-- [ ] T138 [P] [US5] Add the announcement row to the index table in `docs/blog/features/README.md`
-- [ ] T139 [P] [US5] Write the engineering post on cross-chain intents and pooled liquidity in `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, covering the `depositor` refund invariant and the no-custody fee rule
-- [ ] T140 [P] [US5] Write its promotion kit in `docs/blog/posts/35-cross-chain-intents-and-lp/social.md` and add the index row in `docs/blog/posts/README.md`
-- [ ] T141 [P] [US5] Write the knowledge-base article explaining bridges, liquidity provision, and impermanent loss in plain language in `docs/blog/knowledge/21-bridges-and-liquidity/blog.md`
-- [ ] T142 [P] [US5] Write its promotion kit and add the index row in `docs/blog/knowledge/README.md`
-- [ ] T143 [US5] Fact-check `docs/blog/features/02-bridge-and-supply/blog.md`, `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, and `docs/blog/knowledge/21-bridges-and-liquidity/blog.md` against the R8 availability matrix and the zero-rate launch state — a piece implying bridge liquidity beyond Ethereum, or a platform fee that ships at zero, fails FR-058
+- [X] T136 [P] [US5] Write the member feature announcement in `docs/blog/features/02-bridge-and-supply/blog.md` — benefit-first, with the exact confirm-step flow
+- [X] T137 [P] [US5] Write the promotion kit (X post, LinkedIn post, 16:9 image prompt) in `docs/blog/features/02-bridge-and-supply/social.md`
+- [X] T138 [P] [US5] Add the announcement row to the index table in `docs/blog/features/README.md`
+- [X] T139 [P] [US5] Write the engineering post on cross-chain intents and pooled liquidity in `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, covering the `depositor` refund invariant and the no-custody fee rule
+- [X] T140 [P] [US5] Write its promotion kit in `docs/blog/posts/35-cross-chain-intents-and-lp/social.md` and add the index row in `docs/blog/posts/README.md`
+- [X] T141 [P] [US5] Write the knowledge-base article explaining bridges, liquidity provision, and impermanent loss in plain language in `docs/blog/knowledge/21-bridges-and-liquidity/blog.md`
+- [X] T142 [P] [US5] Write its promotion kit and add the index row in `docs/blog/knowledge/README.md`
+- [X] T143 [US5] Fact-check `docs/blog/features/02-bridge-and-supply/blog.md`, `docs/blog/posts/35-cross-chain-intents-and-lp/blog.md`, and `docs/blog/knowledge/21-bridges-and-liquidity/blog.md` against the R8 availability matrix and the zero-rate launch state — a piece implying bridge liquidity beyond Ethereum, or a platform fee that ships at zero, fails FR-058
+      **DONE.** Both named failure modes clear. Bridge liquidity is stated ETHEREUM-ONLY in all
+      three pieces with the L1-HubPool reason; Uniswap trading pools on all five EVM mainnets. Both
+      fee services ship at ZERO — the pieces say a zero rate renders no fee line at all and that
+      there is no revenue to FairWins here today, with 250 bps appearing only as the cap that would
+      apply if a rate were raised. Across relayer fees and network gas are disclosed as real and
+      explicitly not ours. The impermanent-loss worked example was recomputed against the
+      constant-product formula rather than taken on trust: 0.5 ETH + 1,000 USDC at ETH $2,000, ETH
+      doubles → 0.3536 ETH + 1,414.21 USDC = $2,828.43 against $3,000 held = $171.57 short = 5.72%;
+      the article's rounded 0.354 / 1,414 / $2,828 / $172 / 5.7% are correct.
 
 **Checkpoint**: all five user stories complete.
 
@@ -362,7 +371,14 @@ index table updated and internal links resolving.
 - [X] T144 [P] Write the developer guide in `docs/developer-guide/bridge-and-liquidity.md` covering both routers, the two fee services, and the R11b predicate inversion
 - [X] T145 [P] Write the operator runbook in `docs/runbooks/bridge-liquidity-operations.md` covering pause/resume, route and pool curation, stuck-bridge triage, and the limits of operator action
 - [X] T146 [P] Add the spec-067 summary block to `CLAUDE.md` following the existing per-spec guardrail format
-- [ ] T147 Run `npm run compile && npm test && npm run test:frontend && npm run check:storage-layout` and confirm all green
+- [X] T147 Run `npm run compile && npm test && npm run test:frontend && npm run check:storage-layout` and confirm all green
+      **DONE on merged main (69d683d5).** compile clean; `npm test` 979 passing with 2 known
+      environmental fork failures (Chainalysis oracle, native-USDC ERC-1271 — both verified
+      identical on a clean tree via git stash); `check:storage-layout` upgrade-safe; frontend 4,487
+      passing / 4 failing, those 4 being the pre-existing ProposalBuilder ×3, UnifiedLookupModal ×1
+      and the useTransfer.balances file error. Failure IDENTITIES confirmed, not just counts, and
+      stable across four full runs — the run that first flagged this was what surfaced the stale
+      `fetchBridgePools` read fixed in #971.
 - [ ] T148 (SC-012, SC-019, SC-020) Run the full `quickstart.md` walkthrough end to end, including the honest-degradation and cross-network selection checks
 - [X] T149 [P] Confirm no `continue-on-error` was added to any lint/test/build/security step in `.github/workflows/`
 - [X] T150 Request the smart-contract security review required by constitution I (`.github/agents/smart-contract-security.agent.md`) for `contracts/bridge/BridgeRouter.sol` and `contracts/liquidity/LiquidityRouter.sol`

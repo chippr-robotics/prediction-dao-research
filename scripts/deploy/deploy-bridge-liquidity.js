@@ -5,8 +5,8 @@
  * the network (both routers read the rate + treasury from it). APPENDS the new addresses to
  * `deployments/<net>-chain<id>-v2.json` (never overwrites) and registers the two fee services on the
  * EXISTING FeeRouter (idempotent, rate 0 — enabled later from the AdminPanel Fees tab):
- *   bridge.transfer    Wrapped  cap 250 bps  (charged on a bridge submission, value-out)
- *   liquidity.deposit  Wrapped  cap 250 bps  (charged on a Uniswap full-range supply, value-in)
+ *   bridge.transfer    ConfigOnly  cap 250 bps  (charged on a bridge submission, value-out)
+ *   liquidity.deposit  ConfigOnly  cap 250 bps  (charged on a Uniswap full-range supply, value-in)
  *
  * ── THE GUARD THIS SCRIPT EXISTS TO RUN (research R4b) ──────────────────────────────────────────
  * Uniswap's own docs warn integrators not to assume a protocol sits at the same address on every
@@ -36,7 +36,7 @@ const path = require("path");
 
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
 const { deployProxy } = require("./lib/upgradeable");
-const { ServiceKind } = require("./lib/feeServices");
+const { ServiceKind, SERVICE_KIND_LABELS } = require("./lib/feeServices");
 
 /**
  * External protocol addresses per chain, each taken from that chain's own official deployment record
@@ -418,7 +418,13 @@ async function main() {
         continue;
       }
       await (await router.registerService(id, svc.capBps, svc.kind)).wait();
-      console.log(`  ✓ registered ${svc.label} (cap ${svc.capBps} bps, Wrapped, rate 0)`);
+      // Interpolated, not hardcoded. This line used to print "Wrapped" while the call above
+      // registers ConfigOnly — contradicting the paragraph at the top of this file explaining why
+      // these two services must NOT be Wrapped. It is also the line an operator pastes into a
+      // deployment record.
+      console.log(
+        `  ✓ registered ${svc.label} (cap ${svc.capBps} bps, ${SERVICE_KIND_LABELS[svc.kind] || svc.kind}, rate 0)`
+      );
     }
   }
 
