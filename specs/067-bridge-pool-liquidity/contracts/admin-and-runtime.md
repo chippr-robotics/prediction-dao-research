@@ -22,7 +22,8 @@ are member-value surfaces with their own killswitches, not protocol wiring, so t
 ```
 
 `ADMIN_TAB_ICONS`: `bridge: 'transfer'`, `supply: 'sprout'`. `buildAdminNavGroups` takes a new
-`isLiquidityAdmin` flag, resolved from `LIQUIDITY_ADMIN_ROLE` on either router.
+`isLiquidityAdmin` flag, resolved from `LIQUIDITY_ADMIN_ROLE` on either router. That flag gates ENTRY
+only; each control is gated by a `hasRole` read against the router in scope (see corrections below).
 
 An operator holding none of admin / liquidity-admin / guardian sees neither tab and cannot reach either
 by direct URL (FR-040, FR-049).
@@ -37,7 +38,7 @@ Modeled on `StakingTab.jsx` (366 lines) and `ProtocolConfigTab.jsx`.
 |---|---|---|
 | **Status** | Paused banner; `pause` / `unpause` | `GUARDIAN_ROLE` |
 | **Routes** | Table (asset, origin → destination, enabled, max amount, expected fill) across the 20 directed mainnet routes. Add / edit / enable / disable / remove; bulk enable/disable per network pair | `LIQUIDITY_ADMIN_ROLE` |
-| **Addresses** | `spokePool`, `feeRouter` — current value shown beside the input; invalid input rejected with a reason before submit (FR-042) | `LIQUIDITY_ADMIN_ROLE` |
+| **Addresses** | `spokePool`, `feeRouter` — current value shown beside the input; invalid input rejected with a reason before submit (FR-042) | `DEFAULT_ADMIN_ROLE` — fund-path, see corrections below |
 | **Fee** | `bridge.transfer` live rate + 250 bps cap, **read-only**, with a link to the Fees tab | read-only |
 | **Operations** (FR-047) | In-flight bridges; transfers past `expectedBy` needing attention; recent deliveries and refunds; gateway health | read-only |
 | **History** (FR-046) | Decoded router events — action, route, before → after, operator, time | read-only |
@@ -55,7 +56,7 @@ not in that path. The tab should say so, so nobody goes looking for a rescue but
 |---|---|---|
 | **Status** | Paused banner; `pause` / `unpause` — **labelled as affecting Uniswap supplies only**. Shown per network across all five deployments | `GUARDIAN_ROLE` |
 | **Pools** | Table (kind, pair/asset, protocol, network, enabled, cap, supplied total, position count) spanning all five networks. List / edit / retire / set cap | `LIQUIDITY_ADMIN_ROLE` |
-| **Addresses** | `positionManager`, `feeRouter` | `LIQUIDITY_ADMIN_ROLE` |
+| **Addresses** | `positionManager`, `feeRouter` | `DEFAULT_ADMIN_ROLE` — fund-path, see corrections below |
 | **Fee** | `liquidity.deposit` live rate + cap, read-only; an explicit note that bridge-LP pools are fee-free by design with a link to the rationale | read-only |
 | **History** | Decoded router events | read-only |
 
@@ -122,6 +123,33 @@ absence with a stated reason.
 ## Role provisioning
 
 `LIQUIDITY_ADMIN_ROLE = keccak256("LIQUIDITY_ADMIN_ROLE")`, granted on both routers at initialize to the
-admin and thereafter managed from the existing **Admin Roles** tab, which enumerates roles generically —
-no new role-management UI is needed. `GUARDIAN_ROLE` reuses the existing guardian set so the emergency
-pause is exercisable by the operators who already hold incident authority (FR-044).
+admin and thereafter managed from the existing **Admin Roles** tab.
+
+### Corrections found in the US4 security audit
+
+Three assumptions above were wrong in ways that mattered, and the implementation differs from them:
+
+1. **Protocol-wiring addresses are `DEFAULT_ADMIN_ROLE`, not `LIQUIDITY_ADMIN_ROLE`** (the Addresses rows
+   in both tables). `spokePool` is approved and handed the member's net amount; `positionManager` is
+   approved and mints the member's position; `feeRouter` names both the rate and the `treasury()` the fee
+   is transferred to. Whoever can write them can redirect where member funds go, which is not the same
+   authority as deciding which routes and pools are offered. Curating badly is reversible by a toggle;
+   pointing a router at a hostile contract is not.
+
+2. **`GUARDIAN_ROLE` does NOT reuse the existing guardian set.** It cannot: each router checks
+   `GUARDIAN_ROLE` on its own AccessControl instance, and holding it on the WagerRegistry carries no
+   authority over a router. As written, the emergency pause was grantable to nobody but each router's
+   `initialize` admin — an undelegable killswitch. The Admin Roles tab now offers `GUARDIAN_BRIDGE` and
+   `GUARDIAN_LIQUIDITY` alongside the two per-router liquidity-admin targets, and FR-044 is satisfied by
+   granting those, not by inheriting the wager guardians.
+
+3. **The role flags in `useRoles()` are an entry signal only, never a control gate.** They are resolved
+   on the WALLET's chain against a candidate contract list; four of the five spec-067 networks (Ethereum,
+   Optimism, Base, Arbitrum) carry no WagerRegistry at all, so `isAdmin`/`isGuardian` were false there for
+   every account including each router's real admin. Both tabs read `hasRole` on the specific router for
+   the specific network in scope (`readRouterAuthority`). An unreadable answer is reported as unconfirmed
+   and the controls stay offered — the contract is the gate, and withdrawing a killswitch because an RPC
+   timed out is the FR-044 failure it exists to prevent.
+
+Both routers additionally bound the fee they will pay out to `MAX_FEE_BPS` **of the amount**, and require
+`quoteFee` to split exactly, rather than trusting the configured FeeRouter's `feeBps()` report of itself.

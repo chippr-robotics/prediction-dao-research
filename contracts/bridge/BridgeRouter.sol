@@ -180,20 +180,32 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
         emit RouteRemoved(routeId, msg.sender);
     }
 
-    function setSpokePool(address newSpokePool) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    // ------------------------------------------- protocol wiring (DEFAULT_ADMIN_ROLE)
+    //
+    // These three are NOT curation, and deliberately sit a role above it.
+    //
+    // `spokePool` is approved and handed the member's net amount; `feeRouter` names both the rate and
+    // the `treasury()` the fee is transferred to; `sanctionsGuard` is the compliance gate. Whoever can
+    // write them can redirect where member funds go, so they are DEFAULT_ADMIN_ROLE while
+    // LIQUIDITY_ADMIN_ROLE stays what its name says — which routes are offered, at what ceiling.
+    // Curating a route badly is recoverable by toggling it; pointing the router at a hostile contract
+    // is not. The amount-bound in `bridgeWithFee` is the second half of this: even an admin cannot
+    // configure a FeeRouter that takes more than MAX_FEE_BPS of a member's principal.
+
+    function setSpokePool(address newSpokePool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newSpokePool == address(0)) revert ZeroAddress();
         emit SpokePoolUpdated(spokePool, newSpokePool, msg.sender);
         spokePool = newSpokePool;
     }
 
-    function setFeeRouter(address newFeeRouter) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    function setFeeRouter(address newFeeRouter) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newFeeRouter == address(0)) revert ZeroAddress();
         emit FeeRouterUpdated(feeRouter, newFeeRouter, msg.sender);
         feeRouter = newFeeRouter;
     }
 
     /// @notice Set or clear (zero) the sanctions guard.
-    function setSanctionsGuard(address newGuard) external onlyRole(LIQUIDITY_ADMIN_ROLE) {
+    function setSanctionsGuard(address newGuard) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit SanctionsGuardUpdated(sanctionsGuard, newGuard, msg.sender);
         sanctionsGuard = newGuard;
     }
@@ -269,6 +281,16 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
         uint16 liveBps = router.feeBps(bridgeTransferServiceId);
         if (liveBps > MAX_FEE_BPS) revert FeeAboveCap();
         if (fee > 0 && liveBps > maxFeeBps) revert FeeAboveQuoted();
+        // THE CAP BINDS THE FEE ACTUALLY TAKEN, NOT ONLY THE RATE THE ROUTER REPORTS ABOUT ITSELF.
+        // Both checks above read `feeBps()`, which is the FeeRouter's own claim. A FeeRouter reporting
+        // feeBps() = 0 while quoteFee() hands back most of the amount satisfies both — the rate is
+        // under the ceiling and `liveBps > maxFeeBps` is false — and the transfer below would then
+        // send that "fee" to its treasury. Bounding the AMOUNT makes MAX_FEE_BPS true regardless of
+        // what the router says, so pointing this contract at a hostile FeeRouter cannot redirect a
+        // member's principal. Exact-split is required for the same reason: `net` is what reaches
+        // Across, so a router that under-reports `net` would strand the difference here.
+        if (fee + net != inputAmount) revert FeeSplitMismatch();
+        if (fee > (inputAmount * MAX_FEE_BPS) / 10_000) revert FeeAboveCap();
 
         // ---------------- effects ----------------
         // `depositor` is msg.sender — see the contract-level note. Recorded in the event so the

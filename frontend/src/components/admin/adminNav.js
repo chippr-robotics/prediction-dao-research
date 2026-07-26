@@ -19,6 +19,8 @@ export const ADMIN_TAB_ICONS = {
   treasury: 'bank',
   fees: 'coin',
   staking: 'trending',
+  bridge: 'transfer',
+  supply: 'sprout',
   'protocol-config': 'settings',
   'oracle-adapters': 'broadcast',
   maintenance: 'sliders',
@@ -35,6 +37,7 @@ export function buildAdminNavGroups({
   isSanctionsAdmin,
   isFeeAdmin,
   isStakingAdmin,
+  isLiquidityAdmin,
 }) {
   const item = (id, label) => ({ id, label, icon: ADMIN_TAB_ICONS[id] })
 
@@ -64,6 +67,19 @@ export function buildAdminNavGroups({
         isAdmin && item('treasury', 'Treasury'),
         // Unified platform-fee management (spec 060): FEE_ADMIN edits rates; ADMIN also enters.
         (isAdmin || isFeeAdmin) && item('fees', 'Fees'),
+      ].filter(Boolean),
+    },
+    {
+      // Cross-chain bridging + Uniswap supplying (spec 067). These are
+      // member-value surfaces with their own killswitches — routes, curated
+      // pools, limits and pauses that move member money — not protocol
+      // wiring, so they get their own group rather than living under Protocol
+      // Config. LIQUIDITY_ADMIN configures, GUARDIAN pauses, ADMIN enters
+      // (FR-040 / FR-049).
+      label: 'Liquidity',
+      items: [
+        (isAdmin || isLiquidityAdmin || isGuardian) && item('bridge', 'Bridge'),
+        (isAdmin || isLiquidityAdmin || isGuardian) && item('supply', 'Supply'),
       ].filter(Boolean),
     },
     {

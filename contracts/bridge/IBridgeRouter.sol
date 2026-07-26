@@ -73,6 +73,10 @@ interface IBridgeRouter {
     error FeeAboveQuoted();
     /// @dev The live rate exceeds this router's own immutable ceiling, whatever FeeRouter reports.
     error FeeAboveCap();
+    /// @dev `quoteFee` returned a fee/net pair that does not add back to the gross it was quoted on.
+    ///      A conforming FeeRouter always splits exactly; a router that does not is not trusted to
+    ///      report its own rate either, so the bridge refuses rather than moving funds on its word.
+    error FeeSplitMismatch();
     error ResidualFunds();
     error RouteUnknown();
     error RouteDisabled();

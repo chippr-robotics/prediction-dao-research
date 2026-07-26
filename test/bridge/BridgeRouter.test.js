@@ -173,22 +173,38 @@ describe("BridgeRouter", function () {
       expect(await router.routeCount()).to.equal(2);
     });
 
-    it("rejects setSpokePool from a caller without LIQUIDITY_ADMIN_ROLE", async function () {
-      await expect(router.connect(stranger).setSpokePool(stranger.address))
-        .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
+    // The protocol-wiring setters are DEFAULT_ADMIN_ROLE, a role ABOVE curation. `spokePool` is
+    // approved and handed the member's net amount and `feeRouter` names the treasury the fee is
+    // transferred to, so whoever can write them can redirect where member funds go — that is not the
+    // same authority as deciding which routes are offered. A LIQUIDITY_ADMIN holder is rejected here
+    // on purpose; the assertions below are the privilege boundary, not incidental coverage.
+    it("rejects the protocol-wiring setters from LIQUIDITY_ADMIN and from a stranger", async function () {
+      for (const caller of [stranger, liquidityAdmin]) {
+        await expect(router.connect(caller).setSpokePool(caller.address))
+          .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
+        await expect(router.connect(caller).setFeeRouter(caller.address))
+          .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
+        await expect(router.connect(caller).setSanctionsGuard(caller.address))
+          .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
+      }
       expect(await router.spokePool()).to.equal(spokeAddr);
-    });
-
-    it("rejects setFeeRouter from a caller without LIQUIDITY_ADMIN_ROLE", async function () {
-      await expect(router.connect(stranger).setFeeRouter(stranger.address))
-        .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
       expect(await router.feeRouter()).to.equal(await feeRouter.getAddress());
+      expect(await router.sanctionsGuard()).to.equal(ethers.ZeroAddress);
     });
 
-    it("rejects setSanctionsGuard from a caller without LIQUIDITY_ADMIN_ROLE", async function () {
-      await expect(router.connect(stranger).setSanctionsGuard(stranger.address))
-        .to.be.revertedWithCustomError(router, "AccessControlUnauthorizedAccount");
-      expect(await router.sanctionsGuard()).to.equal(ethers.ZeroAddress);
+    it("lets DEFAULT_ADMIN_ROLE write the protocol wiring, each emitting its audit event", async function () {
+      await expect(router.connect(admin).setSpokePool(stranger.address))
+        .to.emit(router, "SpokePoolUpdated")
+        .withArgs(spokeAddr, stranger.address, admin.address);
+      expect(await router.spokePool()).to.equal(stranger.address);
+
+      await expect(router.connect(admin).setFeeRouter(stranger.address))
+        .to.emit(router, "FeeRouterUpdated")
+        .withArgs(await feeRouter.getAddress(), stranger.address, admin.address);
+
+      await expect(router.connect(admin).setSanctionsGuard(stranger.address))
+        .to.emit(router, "SanctionsGuardUpdated")
+        .withArgs(ethers.ZeroAddress, stranger.address, admin.address);
     });
 
     it("rejects pause and unpause from a caller without GUARDIAN_ROLE", async function () {
@@ -205,7 +221,7 @@ describe("BridgeRouter", function () {
       expect(await router.paused()).to.equal(true);
     });
 
-    it("lets a LIQUIDITY_ADMIN holder call every setter, each emitting its audit event", async function () {
+    it("lets a LIQUIDITY_ADMIN holder curate routes, each emitting its audit event", async function () {
       const newRoute = route({ destinationChainId: 10n, maxAmount: AMT("5") });
       const newId = await router.computeRouteId(usdcAddr, usdcDest, 10n);
       await expect(router.connect(liquidityAdmin).setRoute(newRoute))
@@ -219,19 +235,6 @@ describe("BridgeRouter", function () {
       await expect(router.connect(liquidityAdmin).setRouteLimit(newId, AMT("9")))
         .to.emit(router, "RouteLimitChanged")
         .withArgs(newId, AMT("5"), AMT("9"), liquidityAdmin.address);
-
-      await expect(router.connect(liquidityAdmin).setSpokePool(stranger.address))
-        .to.emit(router, "SpokePoolUpdated")
-        .withArgs(spokeAddr, stranger.address, liquidityAdmin.address);
-      expect(await router.spokePool()).to.equal(stranger.address);
-
-      await expect(router.connect(liquidityAdmin).setFeeRouter(stranger.address))
-        .to.emit(router, "FeeRouterUpdated")
-        .withArgs(await feeRouter.getAddress(), stranger.address, liquidityAdmin.address);
-
-      await expect(router.connect(liquidityAdmin).setSanctionsGuard(stranger.address))
-        .to.emit(router, "SanctionsGuardUpdated")
-        .withArgs(ethers.ZeroAddress, stranger.address, liquidityAdmin.address);
 
       await expect(router.connect(liquidityAdmin).removeRoute(newId))
         .to.emit(router, "RouteRemoved")
@@ -252,9 +255,9 @@ describe("BridgeRouter", function () {
         .to.be.revertedWithCustomError(router, "RouteUnknown");
       await expect(router.connect(liquidityAdmin).removeRoute(unknown))
         .to.be.revertedWithCustomError(router, "RouteUnknown");
-      await expect(router.connect(liquidityAdmin).setSpokePool(ethers.ZeroAddress))
+      await expect(router.connect(admin).setSpokePool(ethers.ZeroAddress))
         .to.be.revertedWithCustomError(router, "ZeroAddress");
-      await expect(router.connect(liquidityAdmin).setFeeRouter(ethers.ZeroAddress))
+      await expect(router.connect(admin).setFeeRouter(ethers.ZeroAddress))
         .to.be.revertedWithCustomError(router, "ZeroAddress");
     });
   });
@@ -356,10 +359,49 @@ describe("BridgeRouter", function () {
       const fr = await deployFeeRouter([admin.address, ethers.ZeroAddress]);
       await fr.connect(admin).registerService(BRIDGE_TRANSFER, 250, Kind.ConfigOnly);
       await fr.connect(admin).setFeeBps(BRIDGE_TRANSFER, 250);
-      await router.connect(liquidityAdmin).setFeeRouter(await fr.getAddress());
+      await router.connect(admin).setFeeRouter(await fr.getAddress());
 
       await bridge(member, await args({ maxFeeBps: 0 }));
       expect(await spoke.lastInputAmount()).to.equal(AMT("1000")); // whole amount bridged, fee skipped
+    });
+
+    // ---- the ceiling binds the fee TAKEN, not the rate the fee router claims ----
+    //
+    // Adversarial review found that both ceiling checks read `feeBps()` — the FeeRouter's own account
+    // of its rate — while the amount transferred to the treasury came from `quoteFee()`, unbounded. A
+    // FeeRouter reporting 0 bps and quoting 99% therefore passed `liveBps > MAX_FEE_BPS` (0 > 250 is
+    // false) AND `fee > 0 && liveBps > maxFeeBps` (0 > anything is false), and sent the member's
+    // principal to its own treasury. These two tests are that scenario.
+    it("refuses a FeeRouter that under-reports its rate and over-quotes the fee", async function () {
+      const Lying = await ethers.getContractFactory("MockLyingFeeRouter");
+      // Admits to 0 bps; actually takes 99%.
+      const lying = await Lying.deploy(stranger.address, 0, 9_900);
+      await router.connect(admin).setFeeRouter(await lying.getAddress());
+
+      const before = await usdc.balanceOf(member.address);
+      // maxFeeBps 0 — the member consented to no fee at all, and the router reports none.
+      await expect(bridge(member, await args({ maxFeeBps: 0 })))
+        .to.be.revertedWithCustomError(router, "FeeAboveCap");
+      expect(await usdc.balanceOf(member.address)).to.equal(before);
+      expect(await usdc.balanceOf(stranger.address)).to.equal(0n);
+
+      // Exactly at the cap it is allowed through — the bound is on MAX_FEE_BPS, not on honesty.
+      const atCap = await Lying.deploy(treasury.address, 0, 250);
+      await router.connect(admin).setFeeRouter(await atCap.getAddress());
+      await bridge(member, await args({ maxFeeBps: 0 }));
+      expect(await usdc.balanceOf(treasury.address)).to.equal((AMT("1000") * 250n) / BPS);
+    });
+
+    it("refuses a FeeRouter whose fee and net do not add back to the gross", async function () {
+      const Lying = await ethers.getContractFactory("MockLyingFeeRouter");
+      const lying = await Lying.deploy(treasury.address, 100, 100);
+      await lying.setSplitShort(true); // withholds a unit from `net`
+      await router.connect(admin).setFeeRouter(await lying.getAddress());
+
+      // `net` is what reaches Across, so an under-reported net would strand the difference in this
+      // contract — caught before any funds move rather than by the residual-funds guard afterwards.
+      await expect(bridge(member, await args())).to.be.revertedWithCustomError(router, "FeeSplitMismatch");
+      expect(await usdc.balanceOf(routerAddr)).to.equal(0n);
     });
 
     it("charges the fee to the treasury and forwards only the net", async function () {
@@ -474,9 +516,9 @@ describe("BridgeRouter", function () {
       await router.connect(liquidityAdmin).setRoute(route({ destinationChainId: 8453n }));
       await router.connect(liquidityAdmin).setRouteEnabled(otherId, false);
       await router.connect(liquidityAdmin).setRouteLimit(otherId, AMT("2"));
-      await router.connect(liquidityAdmin).setSpokePool(stranger.address);
-      await router.connect(liquidityAdmin).setFeeRouter(stranger.address);
-      await router.connect(liquidityAdmin).setSanctionsGuard(stranger.address);
+      await router.connect(admin).setSpokePool(stranger.address);
+      await router.connect(admin).setFeeRouter(stranger.address);
+      await router.connect(admin).setSanctionsGuard(stranger.address);
       await router.connect(liquidityAdmin).removeRoute(otherId);
 
       expect(await router.spokePool()).to.equal(stranger.address);
@@ -492,8 +534,8 @@ describe("BridgeRouter", function () {
     it("remains pausable with every optional service unreachable (FR-044)", async function () {
       // A killswitch that needs the SpokePool, the FeeRouter, or the gateway to be healthy is not a
       // killswitch: point both references at code-less addresses and pause anyway.
-      await router.connect(liquidityAdmin).setSpokePool(stranger.address);
-      await router.connect(liquidityAdmin).setFeeRouter(stranger.address);
+      await router.connect(admin).setSpokePool(stranger.address);
+      await router.connect(admin).setFeeRouter(stranger.address);
 
       await router.connect(guardian).pause();
       expect(await router.paused()).to.equal(true);
@@ -506,7 +548,7 @@ describe("BridgeRouter", function () {
     it("rejects a SpokePool that re-enters bridgeWithFee mid-deposit", async function () {
       const Evil = await ethers.getContractFactory("MockReentrantSpokePool");
       const evil = await Evil.deploy();
-      await router.connect(liquidityAdmin).setSpokePool(await evil.getAddress());
+      await router.connect(admin).setSpokePool(await evil.getAddress());
 
       const a = await args({ inputAmount: AMT("10") });
       const callback = router.interface.encodeFunctionData("bridgeWithFee", [
@@ -576,7 +618,7 @@ describe("BridgeRouter", function () {
     it("reverts ResidualFunds when the SpokePool under-pulls the approved net", async function () {
       const Leaky = await ethers.getContractFactory("MockLeakySpokePool");
       const leaky = await Leaky.deploy();
-      await router.connect(liquidityAdmin).setSpokePool(await leaky.getAddress());
+      await router.connect(admin).setSpokePool(await leaky.getAddress());
 
       await expect(bridge(member, await args()))
         .to.be.revertedWithCustomError(router, "ResidualFunds");
@@ -646,7 +688,7 @@ describe("BridgeRouter", function () {
       const oracle = await Oracle.deploy();
       const Guard = await ethers.getContractFactory("SanctionsGuard");
       guard = await Guard.deploy(admin.address, await oracle.getAddress());
-      await router.connect(liquidityAdmin).setSanctionsGuard(await guard.getAddress());
+      await router.connect(admin).setSanctionsGuard(await guard.getAddress());
     });
 
     it("refuses a deny-listed wallet BEFORE any transfer is attempted", async function () {
@@ -679,7 +721,7 @@ describe("BridgeRouter", function () {
     });
 
     it("skips screening entirely when the guard is unset", async function () {
-      await router.connect(liquidityAdmin).setSanctionsGuard(ethers.ZeroAddress);
+      await router.connect(admin).setSanctionsGuard(ethers.ZeroAddress);
       await guard.connect(admin).setDenied(member.address, true, "ignored once the guard is cleared");
       await bridge(member, await args());
       expect(await spoke.depositCount()).to.equal(1);

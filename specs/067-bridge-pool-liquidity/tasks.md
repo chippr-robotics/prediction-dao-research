@@ -260,23 +260,78 @@ admin control panel without a redeploy.
 availability, and pause/resume — each visible to members within one refresh and recorded in history with
 actor and timestamp. As an unauthorized operator, confirm the controls are neither visible nor actionable.
 
-- [ ] T121 [US4] Add the **Liquidity** group with `bridge` and `supply` items, the `isLiquidityAdmin` flag, and both tab icons to `frontend/src/components/admin/adminNav.js`
-- [ ] T122 [P] [US4] Resolve `LIQUIDITY_ADMIN_ROLE` membership and pass `isLiquidityAdmin` into `buildAdminNavGroups`, in `frontend/src/hooks/useAdminRoles.js`
-- [ ] T123 [US4] Create `frontend/src/components/admin/BridgeTab.jsx` with Status, Routes, Addresses, Fee (read-only), Operations, and History sections per [contracts/admin-and-runtime.md](./contracts/admin-and-runtime.md)
-- [ ] T124 [US4] (SC-017) Implement route add/edit/enable/disable/remove plus bulk per-network-pair toggles across the 20 directed routes in `frontend/src/components/admin/BridgeTab.jsx` (FR-041)
-- [ ] T125 [US4] Implement address editing with the current value shown and invalid input rejected with a reason before submit, in `frontend/src/components/admin/BridgeTab.jsx` (FR-042)
-- [ ] T126 [US4] Implement the Operations panel (in-flight, past-`expectedBy`, recent completions/refunds, gateway health) in `frontend/src/components/admin/BridgeTab.jsx`, stating plainly that it is observational — no operator action can touch an in-flight bridge (FR-047)
-- [ ] T127 [US4] Create `frontend/src/components/admin/SupplyTab.jsx` with Status, Pools, Addresses, Fee (read-only), and History sections spanning all five networks
-- [ ] T128 [US4] Label the Supply pause control **"Pauses new Uniswap supplies"** in `frontend/src/components/admin/SupplyTab.jsx` — bridge-LP deposits bypass the router, so the contract cannot stop them and the tab must not imply otherwise (research R3)
-- [ ] T129 [US4] Show retired pools as **retired, not gone**, with their position count, in `frontend/src/components/admin/SupplyTab.jsx` (FR-024)
-- [ ] T130 [P] [US4] Implement per-transaction bridge maximum editing in `frontend/src/components/admin/BridgeTab.jsx` and per-pool deposit cap editing in `frontend/src/components/admin/SupplyTab.jsx`, each honoured and explained in the member flows (FR-045)
-- [ ] T131 [P] [US4] Implement decoded event history (action, target, before → after, operator, time) in `frontend/src/components/admin/BridgeTab.jsx` and `frontend/src/components/admin/SupplyTab.jsx` (FR-046)
-- [ ] T132 [P] [US4] Show the live fee rate and cap read-only with a link to the Fees tab, and state plainly when `FeeRouter` is undeployed or unreachable while keeping other controls usable, in both admin tabs (FR-048/FR-051)
-- [ ] T133 [P] [US4] (SC-011) Tests asserting least-privilege — an operator with none of admin/liquidity-admin/guardian sees neither tab and can perform no control action by any route — in `frontend/src/test/admin/`
-- [ ] T134 [P] [US4] Tests asserting pause stops new value in while in-flight bridges settle and existing positions stay withdrawable, in `frontend/src/test/admin/`
-- [ ] T135 [P] [US4] vitest-axe coverage for both admin tabs in `frontend/src/test/admin/` (SC-014)
-- [ ] T156 [P] [US4] Test that **pause and resume still work with every optional service unavailable** — gateway unset and unreachable — for both routers, in `test/bridge/BridgeRouter.test.js` and `test/liquidity/LiquidityRouter.test.js` (FR-044). A killswitch that depends on optional infrastructure is not a killswitch
-- [ ] T157 [P] [US4] Test that control state and history are **scoped per network** and that no testnet control state reaches a mainnet surface, in `frontend/src/test/admin/` (FR-050)
+- [X] T121 [US4] Add the **Liquidity** group with `bridge` and `supply` items, the `isLiquidityAdmin` flag, and both tab icons to `frontend/src/components/admin/adminNav.js`
+- [X] T122 [P] [US4] Resolve `LIQUIDITY_ADMIN_ROLE` membership and pass `isLiquidityAdmin` into `buildAdminNavGroups` — **path corrected**: there is no `frontend/src/hooks/useAdminRoles.js` in this codebase and none was invented. Role flags are resolved in `frontend/src/components/AdminPanel.jsx` (the `isStakingAdmin` precedent), with the role declared in `contexts/RoleContext.js`, synced in `contexts/WalletContext.jsx`, and read from BOTH routers in `utils/blockchainService.js#hasRoleOnChain`
+- [X] T123 [US4] Create `frontend/src/components/admin/BridgeTab.jsx` with Status, Routes, Addresses, Fee (read-only), Operations, and History sections per [contracts/admin-and-runtime.md](./contracts/admin-and-runtime.md)
+- [X] T124 [US4] (SC-017) Implement route add/edit/enable/disable/remove plus bulk per-network-pair toggles across the 20 directed routes in `frontend/src/components/admin/BridgeTab.jsx` (FR-041)
+- [X] T125 [US4] Implement address editing with the current value shown and invalid input rejected with a reason before submit, in `frontend/src/components/admin/BridgeTab.jsx` (FR-042)
+- [X] T126 [US4] Implement the Operations panel (in-flight, past-`expectedBy`, recent completions/refunds, gateway health) in `frontend/src/components/admin/BridgeTab.jsx`, stating plainly that it is observational — no operator action can touch an in-flight bridge (FR-047)
+- [X] T127 [US4] Create `frontend/src/components/admin/SupplyTab.jsx` with Status, Pools, Addresses, Fee (read-only), and History sections spanning all five networks
+- [X] T128 [US4] Label the Supply pause control **"Pauses new Uniswap supplies"** in `frontend/src/components/admin/SupplyTab.jsx` — bridge-LP deposits bypass the router, so the contract cannot stop them and the tab must not imply otherwise (research R3)
+- [X] T129 [US4] Show retired pools as **retired, not gone**, with their position count, in `frontend/src/components/admin/SupplyTab.jsx` (FR-024)
+- [X] T130 [P] [US4] Implement per-transaction bridge maximum editing in `frontend/src/components/admin/BridgeTab.jsx` and per-pool deposit cap editing in `frontend/src/components/admin/SupplyTab.jsx`, each honoured and explained in the member flows (FR-045)
+- [X] T131 [P] [US4] Implement decoded event history (action, target, before → after, operator, time) in `frontend/src/components/admin/BridgeTab.jsx` and `frontend/src/components/admin/SupplyTab.jsx` (FR-046)
+- [X] T132 [P] [US4] Show the live fee rate and cap read-only with a link to the Fees tab, and state plainly when `FeeRouter` is undeployed or unreachable while keeping other controls usable, in both admin tabs (FR-048/FR-051)
+- [X] T133 [P] [US4] (SC-011) Tests asserting least-privilege — an operator with none of admin/liquidity-admin/guardian sees neither tab and can perform no control action by any route — in `frontend/src/test/admin/`
+- [X] T134 [P] [US4] Tests asserting pause stops new value in while in-flight bridges settle and existing positions stay withdrawable, in `frontend/src/test/admin/`
+- [X] T135 [P] [US4] vitest-axe coverage for both admin tabs in `frontend/src/test/admin/` (SC-014)
+- [X] T156 [P] [US4] Test that **pause and resume still work with every optional service unavailable** — gateway unset and unreachable — for both routers, in `test/bridge/BridgeRouter.test.js` and `test/liquidity/LiquidityRouter.test.js` (FR-044). A killswitch that depends on optional infrastructure is not a killswitch
+- [X] T157 [P] [US4] Test that control state and history are **scoped per network** and that no testnet control state reaches a mainnet surface, in `frontend/src/test/admin/` (FR-050)
+
+### US4 audit remediation (post-build, three adversarial lenses)
+
+An operator-honesty / least-privilege / regression audit of the finished US4 surfaces returned 23
+findings; 1 critical, 6 high. These were fixed in the same phase — the critical one made the emergency
+pause structurally unreachable on 4 of the 5 networks, which is the opposite of what US4 exists for.
+
+- [X] T157a [US4] **Contracts — the fee ceiling now binds the fee TAKEN, not the rate the FeeRouter
+      reports about itself.** Both routers checked `MAX_FEE_BPS` against `feeBps()` and then transferred
+      whatever `quoteFee()` returned, unbounded: a FeeRouter reporting 0 bps while quoting 99% passed
+      every check and drained the member. Both now bound the returned amount and require an exact
+      fee/net split (`FeeSplitMismatch`). `contracts/mocks/MockLyingFeeRouter.sol` is the regression.
+- [X] T157b [US4] **Contracts — protocol-wiring setters moved to `DEFAULT_ADMIN_ROLE`.**
+      `setSpokePool` / `setPositionManager` / `setFeeRouter` / `setSanctionsGuard` were
+      `LIQUIDITY_ADMIN_ROLE`, the same role as "enable a route" — so a route curator could redirect
+      member funds. `setPositionManager` also now rejects the zero address.
+- [X] T157c [US4] **(CRITICAL) Authority is read from the router in scope, not from the app-wide role
+      flags.** `hasRole(ADMIN|GUARDIAN)` resolved only against `wagerRegistry`/`membershipManager`,
+      which do not exist on Ethereum / Optimism / Base / Arbitrum — so `canPause` was false for EVERY
+      account on four of five networks, including each router's real guardian, and the pause card
+      rendered nothing at all. Added `readRouterAuthority` + `authorityGates`; both tabs now ask the
+      specific router for the specific network. An unreadable answer keeps the controls offered and
+      says it is unconfirmed (FR-044); a definite "no" renders the card with the reason and where the
+      role comes from, never an empty space.
+- [X] T157d [US4] **`GUARDIAN_ROLE` is grantable per router.** The Roles tab could only grant it on the
+      WagerRegistry, so the routers' killswitch was undelegable — held by the `initialize` admin alone.
+- [X] T157e [US4] **The fee card quotes the FeeRouter the router actually holds**, and says plainly when
+      that disagrees with the app config (members are then quoted by a contract that is not charging
+      them, and the member path refuses rather than overcharging).
+- [X] T157f [US4] **`applyCaps` no longer deletes the untouched leg's ceiling.** `setPoolLimit` writes
+      both legs and 0 means uncapped, so typing one cap silently removed the other and reported success.
+- [X] T157g [US4] **No false zeros.** A failed deposit scan stored `byPool: {}` and the cells fell through
+      to `?? 0`, printing "0 positions" for a pool members still hold LP in — the one claim FR-024 exists
+      to prevent. Bridge-pool SIZE is now read from the HubPool (it was withheld as "not observable"
+      while the member view read exactly that); only the per-member COUNT genuinely needs an indexer.
+- [X] T157h [US4] **Bulk route toggles actually stop on the first refusal.** `runTx` swallowed every
+      error and resolved with no signal, so rejecting the first prompt to abort still fired the rest;
+      `runTx` now resolves a boolean and the loop honours it.
+- [X] T157i [US4] **Operations panel: late outranks recent**, so a stuck transfer is not evicted by ten
+      newer ones that are fine; a route whose curation was removed reports its window as UNKNOWN rather
+      than not-late; `removeRoute` confirms first and names that consequence; and the panel states what
+      it could not show.
+- [X] T157j [US4] **Scope switches clear state first**, so the previous network's pause banner cannot
+      render under the newly-selected network's name (FR-050/FR-052).
+- [X] T157k [US4] **History no longer claims a route/pool went live when it did not.** `RouteSet` and
+      `PoolListed` carry no `enabled` field, so `args.enabled === false` was always false.
+- [X] T157l [US4] **The permissions card and header badge name every role that can open the panel** —
+      `FEE_ADMIN`, `STAKING_ADMIN` and `LIQUIDITY_ADMIN` were missing, so holders read a list of × and
+      concluded their grant had not landed while being badged "Admin".
+
+**Still open, reported not fixed:** `test/WagerRegistry.coverage.test.js` and
+`test/intent/WagerRegistryIntents.coverage.test.js` (1,043 lines of spec-035/046 coverage) were untracked
+scratch work swept into PR #961 by a `git add -A`. They pass (56 tests) and are legitimate coverage, but
+they shipped under a bridge/liquidity PR and were reviewed as such. Left in place; re-attribution is a
+call for the maintainer.
 
 **Checkpoint**: every member-facing surface has a working operator control.
 

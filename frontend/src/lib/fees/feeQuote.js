@@ -109,9 +109,16 @@ export function bpsToPercent(bps) {
  * Throws `FeeQuoteUnavailable` when a router IS configured and no rate we can
  * stand behind came back — callers must treat that as "cannot quote" and block
  * the fee-bearing action (FR-015 / FR-051), never fall back to assuming zero.
+ *
+ * `routerAddress` overrides which FeeRouter is asked. It exists for the spec-067 operator surfaces,
+ * which read the `feeRouter` a wrapping router ACTUALLY holds and quote from that rather than from
+ * this build's config. The two can differ — someone repoints a router before the config ships, or
+ * ships config before the transaction lands — and in that window the config address answers for a
+ * contract that is not the one charging. An operator deciding whether members are being charged
+ * correctly needs the live answer, not the built one. Member surfaces keep the default.
  */
-export async function fetchFeeQuote({ serviceId, chainId, provider }) {
-  const routerAddress = getContractAddressForChain('feeRouter', chainId)
+export async function fetchFeeQuote({ serviceId, chainId, provider, routerAddress: routerOverride }) {
+  const routerAddress = routerOverride || getContractAddressForChain('feeRouter', chainId)
   if (!routerAddress) {
     return { available: false, bps: 0, capBps: 0, routerAddress: null }
   }

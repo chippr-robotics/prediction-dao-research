@@ -657,6 +657,7 @@ const ROLE_NAME_TO_HASH = {
   'ROLE_MANAGER': ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
   'SANCTIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('SANCTIONS_ADMIN_ROLE')),
   'FEE_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('FEE_ADMIN_ROLE')),
+  'LIQUIDITY_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('LIQUIDITY_ADMIN_ROLE')),
 }
 
 // Minimal ABI for role manager contract
@@ -1027,12 +1028,43 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
     // FEE_ADMIN lives on the FeeRouter (spec 060); no router deployed => nobody holds it here.
     const addr = resolveAddress('feeRouter')
     if (addr) candidates.push(addr)
+  } else if (roleName === 'LIQUIDITY_ADMIN') {
+    // LIQUIDITY_ADMIN_ROLE (spec 067) is defined independently on BOTH the
+    // BridgeRouter and the LiquidityRouter, so it is resolved as "holds it on
+    // at least one deployed router": undeployed routers are skipped rather
+    // than treated as a denial (the loop below is an OR), and if neither is
+    // deployed on this network nobody holds it here. The admin tabs then
+    // re-check per-router before offering a write, so an operator who holds
+    // the role on one router cannot be shown a control the other would revert.
+    const bridge = resolveAddress('bridgeRouter')
+    if (bridge) candidates.push(bridge)
+    const liquidity = resolveAddress('liquidityRouter')
+    if (liquidity) candidates.push(liquidity)
   } else {
     const wager = resolveAddress('wagerRegistry')
     if (wager) candidates.push(wager)
     if (roleName === 'ADMIN') {
       const mm = resolveAddress('membershipManager')
       if (mm) candidates.push(mm)
+    }
+    if (roleName === 'ADMIN' || roleName === 'GUARDIAN') {
+      // The spec-067 routers define DEFAULT_ADMIN_ROLE and GUARDIAN_ROLE on THEMSELVES, and they
+      // are deployed on networks that have no WagerRegistry at all — Ethereum, Optimism, Base and
+      // Arbitrum carry the two routers and nothing else. Resolving these two roles only against the
+      // WagerRegistry therefore returned false for EVERY account on four of the five spec-067
+      // networks, including the account that actually holds the routers' killswitch, which hid the
+      // Bridge/Supply tabs and their emergency pause from the one operator who could use them.
+      //
+      // As with LIQUIDITY_ADMIN above, this is an OR across deployed contracts and is a COARSE
+      // entry signal only — "you are an admin/guardian of something here". It is not authority to
+      // act on a particular router: the Bridge and Supply tabs read `hasRole` on the specific
+      // router for the specific network in scope before offering any control (see
+      // `readRouterAuthority`), because holding GUARDIAN on the WagerRegistry is not holding it on
+      // the BridgeRouter.
+      const bridge = resolveAddress('bridgeRouter')
+      if (bridge) candidates.push(bridge)
+      const liquidity = resolveAddress('liquidityRouter')
+      if (liquidity) candidates.push(liquidity)
     }
   }
   for (const addr of candidates) {
