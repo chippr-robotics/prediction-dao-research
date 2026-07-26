@@ -4,8 +4,11 @@
  * A member-friendly gateway to passive earning. Every area is now live: Lend
  * (Morpho vaults), Rewards (Merkl), Stake (spec 065), and Supply (spec 067 —
  * liquidity pools, which replaced the disabled "Bridges" tile per FR-003).
- * Plus protocol attribution + risk disclosure and a link to the user guide.
- * Every DeFi term carries an InfoTip (FR-011).
+ * Plus a link to the user guide. Every DeFi term carries an InfoTip (FR-011).
+ *
+ * Protocol attribution + risk disclosure (FR-012) render only on the Lend and
+ * Rewards views — the two that actually show Morpho markets. Stake and Supply
+ * don't touch Morpho, so they stay unbranded; the hub itself is unbranded too.
  *
  * NAMING (spec 067 FR-003/FR-039): the liquidity area is **Supply**. It is not
  * "Bridges" — bridging itself lives in Transfer → Bridge and is a payment, not
@@ -122,7 +125,11 @@ export default function EarnPanel() {
       {view === 'supply' && <SupplyView tokenFilter={tokenFilter} />}
 
       <footer className="earn-footer">
-        {earnConfig?.provider && (
+        {/* Protocol attribution + risk disclosure (FR-012) only apply where the
+            protocol's own markets are on screen — Lend and Rewards. Stake,
+            Supply, and the hub itself don't touch Morpho, so they don't carry
+            its branding. */}
+        {(view === 'lend' || view === 'rewards') && earnConfig?.provider && (
           <a
             className="earn-attribution"
             href={earnConfig.provider.url}
@@ -132,7 +139,9 @@ export default function EarnPanel() {
             {EARN_DISCLOSURE.attribution}
           </a>
         )}
-        <p className="earn-risk">{EARN_DISCLOSURE.risk}</p>
+        {(view === 'lend' || view === 'rewards') && (
+          <p className="earn-risk">{EARN_DISCLOSURE.risk}</p>
+        )}
         <a className="earn-docs-link" href={EARN_DOCS_URL} target="_blank" rel="noopener noreferrer">
           Learn more in the Earn guide ↗
         </a>
