@@ -194,26 +194,26 @@ position and earnings, and can exit at any time free of platform fees.
 **Independent Test**: supply to one bridge pool and one Uniswap pool, confirm both positions appear with
 current value and earnings, then withdraw from each and confirm assets return to the wallet.
 
-- [ ] T086 [P] [US2] Replace the disabled "Bridges" tile with a live **Supply** area in `frontend/src/components/earn/EarnPanel.jsx`, add the `?view=supply` route, and remove the `bridges` entry from `EARN_AREAS_FUTURE` in `frontend/src/lib/earn/earnCopy.js`
-- [ ] T087 [P] [US2] Create `frontend/src/lib/liquidity/liquidityCopy.js` — InfoTips plus the impermanent-loss and cross-chain-rebalancing disclosures
-- [ ] T088 [US2] Create `frontend/src/lib/liquidity/liquidityRouter.js` — pool-listing reads with honest-null fallback and the `mintFullRangeWithFee` call builder passing `maxFeeBps`
-- [ ] T089 [US2] Create `frontend/src/lib/liquidity/uniswapPositions.js` — full-range tick helpers, position reads, current value, earnings, and composition (FR-020)
-- [ ] T090 [US2] Create `frontend/src/lib/liquidity/acrossLpPositions.js` — **direct** `HubPool.addLiquidity`/`removeLiquidity` calls and LP-token position reads, with no router in the path (research R3)
-- [ ] T091 [P] [US2] Unit tests for tick derivation, position valuation, and the honest-null fallback in `frontend/src/lib/liquidity/__tests__/uniswapPositions.test.js`
-- [ ] T092 [P] [US2] Unit test asserting the Across LP path never routes through `liquidityRouter` in `frontend/src/lib/liquidity/__tests__/acrossLpPositions.test.js`
-- [ ] T093 [US2] Create `frontend/src/components/earn/SupplyView.jsx` listing both pool kinds together across networks with network badges, in the Lend card layout
-- [ ] T094 [P] [US2] Create `frontend/src/components/earn/LiquidityPoolCard.jsx` showing kind, asset/pair, protocol, network, estimated return, total supplied, and the kind-specific risk summary with InfoTips (FR-017)
-- [ ] T095 [US2] Create `frontend/src/components/earn/SupplySheet.jsx` — amount entry, fee line with net amounts, and the confirm step
-- [ ] T096 [US2] Gate the confirm control in `frontend/src/components/earn/SupplySheet.jsx` behind a **visible inline** impermanent-loss disclosure for trading pools (FR-018) and the rebalancing/inventory disclosure for bridge pools (FR-019) — never tooltip-only
-- [ ] T097 [US2] Apply the **`samePair`** predicate to the second asset selector in `frontend/src/components/earn/SupplySheet.jsx`, showing the pinned network and revalidating on re-pin (FR-062)
-- [ ] T098 [US2] Render open positions with current value, earnings to date, and composition — each labelled an estimate — in `frontend/src/components/earn/SupplyView.jsx` (FR-020)
-- [ ] T099 [US2] Implement add-to and withdraw flows in `frontend/src/components/earn/SupplyView.jsx` with **no platform fee on exit** and partial-withdrawal messaging when inventory is short (FR-021/FR-022)
-- [ ] T100 [US2] Implement retired-pool and unreachable-protocol states in `frontend/src/components/earn/SupplyView.jsx`: closed to new deposits, still visible and withdrawable, never hidden with member funds inside (FR-024)
-- [ ] T101 [US2] Implement the honest per-network empty state naming where supplying is available in `frontend/src/components/earn/SupplyView.jsx` (FR-025)
-- [ ] T102 [P] [US2] (SC-014) Component tests for the disclosure gate, fee line, retired-pool behavior, empty state, and vitest-axe in `frontend/src/test/earn/SupplyView.test.jsx`
-- [ ] T103 [P] [US2] (SC-021) Test that a pair can never span networks and that re-pinning clears an invalidated second selection in `frontend/src/test/earn/SupplyView.test.jsx` (FR-062)
-- [ ] T104 [P] [US2] Create `frontend/src/data/ledger/sources/liquidityLedgerSource.js` capturing supply, withdraw, and fee-claim actions with class `liquidity`
-- [ ] T153 [US2] Implement the **signing-time network switch** in `frontend/src/components/earn/SupplySheet.jsx` for pairs pinned to a network other than the wallet's active one, disclosed before signature (FR-061, SC-020)
+- [X] T086 [P] [US2] Replace the disabled "Bridges" tile with a live **Supply** area in `frontend/src/components/earn/EarnPanel.jsx`, add the `?view=supply` route, and remove the `bridges` entry from `EARN_AREAS_FUTURE` in `frontend/src/lib/earn/earnCopy.js`
+- [X] T087 [P] [US2] Create `frontend/src/lib/liquidity/liquidityCopy.js` — InfoTips plus the impermanent-loss and cross-chain-rebalancing disclosures
+- [X] T088 [US2] Create `frontend/src/lib/liquidity/liquidityRouter.js` — pool-listing reads with honest-null fallback and the `mintFullRangeWithFee` call builder passing `maxFeeBps`
+- [X] T089 [US2] Create `frontend/src/lib/liquidity/uniswapPositions.js` — full-range tick helpers, position reads, current value, earnings, and composition (FR-020)
+- [X] T090 [US2] Create `frontend/src/lib/liquidity/acrossLpPositions.js` — **direct** `HubPool.addLiquidity`/`removeLiquidity` calls and LP-token position reads, with no router in the path (research R3)
+- [X] T091 [P] [US2] Unit tests for tick derivation, position valuation, and the honest-null fallback in `frontend/src/lib/liquidity/__tests__/uniswapPositions.test.js`
+- [X] T092 [P] [US2] Unit test asserting the Across LP path never routes through `liquidityRouter` in `frontend/src/lib/liquidity/__tests__/acrossLpPositions.test.js`
+- [X] T093 [US2] Create `frontend/src/components/earn/SupplyView.jsx` listing both pool kinds together across networks with network badges, in the Lend card layout
+- [X] T094 [P] [US2] Create `frontend/src/components/earn/LiquidityPoolCard.jsx` showing kind, asset/pair, protocol, network, estimated return, total supplied, and the kind-specific risk summary with InfoTips (FR-017)
+- [X] T095 [US2] Create `frontend/src/components/earn/SupplySheet.jsx` — amount entry, fee line with net amounts, and the confirm step
+- [X] T096 [US2] Gate the confirm control in `frontend/src/components/earn/SupplySheet.jsx` behind a **visible inline** impermanent-loss disclosure for trading pools (FR-018) and the rebalancing/inventory disclosure for bridge pools (FR-019) — never tooltip-only
+- [X] T097 [US2] Apply the **`samePair`** predicate to the second asset selector in `frontend/src/components/earn/SupplySheet.jsx`, showing the pinned network and revalidating on re-pin (FR-062)
+- [X] T098 [US2] Render open positions with current value, earnings to date, and composition — each labelled an estimate — in `frontend/src/components/earn/SupplyView.jsx` (FR-020)
+- [X] T099 [US2] Implement add-to and withdraw flows in `frontend/src/components/earn/SupplyView.jsx` with **no platform fee on exit** and partial-withdrawal messaging when inventory is short (FR-021/FR-022)
+- [X] T100 [US2] Implement retired-pool and unreachable-protocol states in `frontend/src/components/earn/SupplyView.jsx`: closed to new deposits, still visible and withdrawable, never hidden with member funds inside (FR-024)
+- [X] T101 [US2] Implement the honest per-network empty state naming where supplying is available in `frontend/src/components/earn/SupplyView.jsx` (FR-025)
+- [X] T102 [P] [US2] (SC-014) Component tests for the disclosure gate, fee line, retired-pool behavior, empty state, and vitest-axe in `frontend/src/test/earn/SupplyView.test.jsx`
+- [X] T103 [P] [US2] (SC-021) Test that a pair can never span networks and that re-pinning clears an invalidated second selection in `frontend/src/test/earn/SupplyView.test.jsx` (FR-062)
+- [X] T104 [P] [US2] Create `frontend/src/data/ledger/sources/liquidityLedgerSource.js` capturing supply, withdraw, and fee-claim actions with class `liquidity`
+- [X] T153 [US2] Implement the **signing-time network switch** in `frontend/src/components/earn/SupplySheet.jsx` for pairs pinned to a network other than the wallet's active one, disclosed before signature (FR-061, SC-020)
 
 **Checkpoint**: US1 and US2 both work independently.
 

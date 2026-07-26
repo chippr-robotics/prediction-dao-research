@@ -38,8 +38,11 @@ export const EARN_DISCLOSURE = {
   risk: 'Lending happens through Morpho, a third-party on-chain lending protocol, from your own wallet. Returns are variable and not guaranteed, and smart contracts carry risk. FairWins never holds your deposit; if a FairWins platform fee applies to a deposit, it is always shown before you confirm.',
 }
 
-/** Honest "not yet" copy for future earning areas (FR-002). */
-export const EARN_AREAS_FUTURE = {
-  staking: 'Staking is not available in the app yet.',
-  bridges: 'Bridge earning is not available in the app yet.',
-}
+// EARN_AREAS_FUTURE is gone. It held the honest "not yet available" copy for
+// the two placeholder Earn areas; both have since shipped — Staking in spec 065
+// and Supply (which replaced the disabled "Bridges" tile) in spec 067 FR-003 —
+// so every area on the hub is now live. A map of "not available yet" strings
+// with nothing left to describe would be a false statement waiting to be
+// rendered; the honest unavailable copy for each live area lives with that area
+// (`stakingUnavailableCopy`, `liquidityUnavailableCopy`), where it can be
+// derived from real config instead of asserted.

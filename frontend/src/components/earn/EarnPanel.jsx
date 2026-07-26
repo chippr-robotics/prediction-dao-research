@@ -1,10 +1,17 @@
 /**
  * EarnPanel (spec 050, issue #861) — the Finance → Earn section hub.
  *
- * A member-friendly gateway to passive earning: live areas (Lend via Morpho
- * vaults, Rewards via Merkl) plus honest "not yet available" areas (Staking,
- * Bridges), protocol attribution + risk disclosure, and a link to the user
- * guide. Every DeFi term carries an InfoTip (FR-011).
+ * A member-friendly gateway to passive earning. Every area is now live: Lend
+ * (Morpho vaults), Rewards (Merkl), Stake (spec 065), and Supply (spec 067 —
+ * liquidity pools, which replaced the disabled "Bridges" tile per FR-003).
+ * Plus protocol attribution + risk disclosure and a link to the user guide.
+ * Every DeFi term carries an InfoTip (FR-011).
+ *
+ * NAMING (spec 067 FR-003/FR-039): the liquidity area is **Supply**. It is not
+ * "Bridges" — bridging itself lives in Transfer → Bridge and is a payment, not
+ * an earning activity — and it is emphatically not "Pool", a word that belongs
+ * to Wager Pools. Supplying liquidity and joining a wager pool are unrelated,
+ * and a member must never have to work out which "Pool" a screen means.
  *
  * Network selection is TRANSPARENT, like the portfolio: vaults, positions,
  * and rewards from every earn-enabled network render together with network
@@ -12,7 +19,7 @@
  * transaction switches networks automatically when needed (useEarnSend).
  * There is no "switch network" banner and no per-network gating here.
  *
- * Deep links: /wallet?tab=earn[&view=lend|rewards][&token=<sym>] — `token`
+ * Deep links: /wallet?tab=earn[&view=lend|rewards|stake|supply][&token=<sym>] — `token`
  * prefilters the vault list (used by the portfolio's Earn action). A legacy
  * `chain` param is accepted and ignored: the list already spans all earn
  * networks.
@@ -24,12 +31,14 @@ import InfoTip from '../ui/InfoTip'
 import EarnLendView from './EarnLendView'
 import EarnRewardsView from './EarnRewardsView'
 import StakeView from './StakeView'
-import { EARN_TIPS, EARN_DISCLOSURE, EARN_AREAS_FUTURE } from '../../lib/earn/earnCopy'
+import SupplyView from './SupplyView'
+import { EARN_TIPS, EARN_DISCLOSURE } from '../../lib/earn/earnCopy'
 import { STAKING_AREA_DESC } from '../../lib/staking/stakingCopy'
+import { LIQUIDITY_AREA_DESC } from '../../lib/liquidity/liquidityCopy'
 import './Earn.css'
 
 const EARN_DOCS_URL = 'https://docs.FairWins.app/user-guide/earn/'
-const VIEWS = ['home', 'lend', 'rewards', 'stake']
+const VIEWS = ['home', 'lend', 'rewards', 'stake', 'supply']
 
 export default function EarnPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -89,17 +98,14 @@ export default function EarnPanel() {
             <span className="earn-area-desc">{STAKING_AREA_DESC}</span>
           </button>
 
-          {/* Bridges remains an honest "not yet available" area (constitution
-              III: no dead buttons without a reason, no pretend features). */}
-          <button
-            type="button"
-            className="earn-area-card"
-            disabled
-            title={EARN_AREAS_FUTURE.bridges}
-          >
-            <span className="earn-area-name">Bridges</span>
-            <span className="earn-area-desc">{EARN_AREAS_FUTURE.bridges}</span>
-            <span className="earn-area-flag">Coming later</span>
+          {/* Supply (spec 067) replaced the disabled "Bridges" tile — a live
+              area, not a placeholder. Availability is per-POOL, not per active
+              network, so this entry is never gated on the wallet's chain: the
+              pool list spans every network and the wallet switches at signing
+              (FR-059/FR-061). */}
+          <button type="button" className="earn-area-card" onClick={() => openView('supply')}>
+            <span className="earn-area-name">Supply</span>
+            <span className="earn-area-desc">{LIQUIDITY_AREA_DESC}</span>
           </button>
         </div>
       )}
@@ -113,6 +119,7 @@ export default function EarnPanel() {
       {view === 'lend' && <EarnLendView tokenFilter={tokenFilter} />}
       {view === 'rewards' && <EarnRewardsView />}
       {view === 'stake' && <StakeView tokenFilter={tokenFilter} />}
+      {view === 'supply' && <SupplyView tokenFilter={tokenFilter} />}
 
       <footer className="earn-footer">
         {earnConfig?.provider && (
