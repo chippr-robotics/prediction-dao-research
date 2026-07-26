@@ -74,9 +74,17 @@ describe('config / startup consistency check (FR-025)', () => {
     // ETC mainnet (61) has a record (custody contracts) but no wagerRegistry yet —
     // enabling it must still fail loudly until the full target set is pinned.
     // (If this starts passing, 61 became fully pinned: update the test, not the guard.)
+    // Assert the REASON, not just that chain 61 appears in some error: a loose match would keep
+    // passing if 61 later failed for an unrelated cause, quietly retiring this guarantee.
     expect(() =>
       loadConfig({ ENABLED_CHAIN_IDS: '61' }, { deploymentsDir: DEPLOYMENTS_DIR })
-    ).toThrow(/chain 61/)
+    ).toThrow(/missing a valid "wagerRegistry" address/)
+
+    // A chain id the gateway does not support at all is refused earlier, by network id — a
+    // different branch from "supported but unpinned", and worth pinning separately.
+    expect(() =>
+      loadConfig({ ENABLED_CHAIN_IDS: '424242' }, { deploymentsDir: DEPLOYMENTS_DIR })
+    ).toThrow(/not a supported network/)
   })
 })
 
