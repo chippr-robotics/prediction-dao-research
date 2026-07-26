@@ -18,12 +18,17 @@ const SAFE_V1_4_1 = {
   version: '1.4.1',
 }
 
-// chainId → Safe contract set. ETC mainnet (61) joined in spec 068 once the app gained its network block; the
-// canonical v1.4.1 addresses are identical there and verified on-chain (spec 043 research, Decision 1).
+// chainId → Safe contract set. A chain belongs here only once Safe v1.4.1 AND our own custody
+// contracts (safeProposalHub + the policy engine) are verified live on it — otherwise Protect would
+// offer vaults on a chain where proposals cannot be discovered. Every entry below was checked
+// on-chain by scripts/ops/preflight-policy-guard-v2.js and deployed in spec 068.
 export const SAFE_CONTRACTS = {
+  10: SAFE_V1_4_1, // Optimism
   61: SAFE_V1_4_1, // Ethereum Classic
   63: SAFE_V1_4_1, // Mordor (Ethereum Classic testnet)
   137: SAFE_V1_4_1, // Polygon
+  8453: SAFE_V1_4_1, // Base
+  42161: SAFE_V1_4_1, // Arbitrum One
 }
 
 /** Supported custody chain ids (those with a Safe deployment configured above). */

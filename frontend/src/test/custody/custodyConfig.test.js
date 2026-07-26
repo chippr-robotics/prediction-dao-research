@@ -9,12 +9,38 @@ import { SAFE_CONTRACTS, CUSTODY_SUPPORTED_CHAIN_IDS, isCustodySupported } from 
 // discovery on EVERY chain, including the one where the hub was actually deployed.
 
 describe('custody chain configuration', () => {
-  it('offers custody on ETC mainnet alongside Mordor and Polygon (FR-001)', () => {
-    expect(CUSTODY_SUPPORTED_CHAIN_IDS).toEqual(expect.arrayContaining([61, 63, 137]))
-    expect(isCustodySupported(61)).toBe(true)
-    // Canonical Safe v1.4.1 addresses are identical across Safe-Singleton-Factory chains.
-    expect(SAFE_CONTRACTS[61]).toEqual(SAFE_CONTRACTS[137])
-    expect(SAFE_CONTRACTS[61].version).toBe('1.4.1')
+  it('offers custody on every chain where the stack is deployed (FR-001)', () => {
+    // ETC + Mordor + Polygon, plus the L2s the app gained with spec 067's bridge work.
+    expect(CUSTODY_SUPPORTED_CHAIN_IDS).toEqual(expect.arrayContaining([10, 61, 63, 137, 8453, 42161]))
+    for (const chainId of [10, 61, 8453, 42161]) {
+      expect(isCustodySupported(chainId)).toBe(true)
+      // Canonical Safe v1.4.1 addresses are identical across Safe-Singleton-Factory chains.
+      expect(SAFE_CONTRACTS[chainId]).toEqual(SAFE_CONTRACTS[137])
+      expect(SAFE_CONTRACTS[chainId].version).toBe('1.4.1')
+    }
+  })
+
+  // A custody chain without a deployed hub would offer vaults whose proposals can never be
+  // discovered. Every entry in SAFE_CONTRACTS must therefore carry both the hub address and its
+  // deployment block — this is the invariant that broke silently once already.
+  it('has the proposal hub wired, with a scan block, on every custody chain', () => {
+    for (const chainId of CUSTODY_SUPPORTED_CHAIN_IDS) {
+      expect(
+        getContractAddressForChain('safeProposalHub', chainId),
+        `chain ${chainId} is offered for custody but has no safeProposalHub address`,
+      ).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(
+        getDeploymentBlockForChain('safeProposalHub', chainId),
+        `chain ${chainId} has a hub address but no deployment block — proposal discovery would be dead`,
+      ).toBeGreaterThan(0)
+    }
+  })
+
+  it('has the ordered policy engine on every custody chain', () => {
+    for (const chainId of CUSTODY_SUPPORTED_CHAIN_IDS) {
+      expect(getContractAddressForChain('safePolicyGuardV2', chainId)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(getContractAddressForChain('policyGuardSetup', chainId)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    }
   })
 
   it('does not offer custody on chains without a Safe deployment', () => {

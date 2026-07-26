@@ -370,10 +370,22 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   console.log(`  ✓ Deployed in tx: ${receipt.hash}`);
   console.log(`  ✓ Gas used: ${receipt.gasUsed.toString()}`);
 
-  // Verify deployment
-  const deployedCode = await ethers.provider.getCode(deterministicAddress);
+  // Verify deployment. Poll rather than read once: a load-balanced RPC can serve the receipt from a
+  // node that has the block and then serve `getCode` from one that does not yet, so a single read
+  // can report "no code" for a deployment that in fact succeeded. Seen on Base, where it aborted a
+  // multi-contract run midway and left the deployment record unwritten for a live contract.
+  let deployedCode = "0x";
+  for (let attempt = 0; attempt < 10; attempt++) {
+    deployedCode = await ethers.provider.getCode(deterministicAddress);
+    if (deployedCode !== "0x") break;
+    if (attempt === 0) console.log("  … code not visible yet; waiting for the RPC to catch up");
+    await new Promise((r) => setTimeout(r, 3000));
+  }
   if (deployedCode === "0x") {
-    throw new Error("Deployment failed - no code at expected address");
+    throw new Error(
+      `Deployment failed - no code at ${deterministicAddress} after ${receipt.hash} (status ${receipt.status}). ` +
+        `If the receipt succeeded, re-check the address on an explorer before redeploying.`,
+    );
   }
 
   return {

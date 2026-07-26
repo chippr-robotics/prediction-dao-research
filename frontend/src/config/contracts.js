@@ -180,16 +180,25 @@ const ETHEREUM_CONTRACTS = {
 const OPTIMISM_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const BASE_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const ARBITRUM_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const NETWORK_CONTRACTS = {
@@ -232,8 +241,12 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
     wagerPoolFactory: 16495564,
     safeProposalHub: 16645531,
   },
-  // Ethereum Classic — custody only (spec 068).
-  61: { safeProposalHub: 25026893 },
+  // Custody-only chains (spec 068). `safeProposalHub` MUST carry a block on every custody chain or
+  // useVaultProposals refuses to scan and proposal discovery is silently dead there.
+  61: { safeProposalHub: 25026893 }, // Ethereum Classic
+  10: { safeProposalHub: 154753770 }, // Optimism
+  8453: { safeProposalHub: 49158472 }, // Base
+  42161: { safeProposalHub: 488059169 }, // Arbitrum One
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
   137: {
     friendGroupMarketFactory: 0,
