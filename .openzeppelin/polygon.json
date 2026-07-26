@@ -520,7 +520,7 @@
             "label": "membershipManager",
             "offset": 0,
             "slot": "50",
-            "type": "t_contract(IMembershipManager)22026",
+            "type": "t_contract(IMembershipManager)37179",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:59"
           },
@@ -528,7 +528,7 @@
             "label": "polymarketAdapter",
             "offset": 0,
             "slot": "51",
-            "type": "t_contract(IOracleAdapter)23174",
+            "type": "t_contract(IOracleAdapter)45791",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:60"
           },
@@ -536,7 +536,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "52",
-            "type": "t_contract(ISanctionsGuard)22128",
+            "type": "t_contract(ISanctionsGuard)37336",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:64"
           },
@@ -544,7 +544,7 @@
             "label": "oracleAdapters",
             "offset": 0,
             "slot": "53",
-            "type": "t_mapping(t_enum(ResolutionType)22598,t_contract(IOracleAdapter)23174)",
+            "type": "t_mapping(t_enum(ResolutionType)37806,t_contract(IOracleAdapter)45791)",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:68"
           },
@@ -560,7 +560,7 @@
             "label": "_wagers",
             "offset": 0,
             "slot": "55",
-            "type": "t_mapping(t_uint256,t_struct(Wager)22641_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Wager)37849_storage)",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:71"
           },
@@ -600,7 +600,7 @@
             "label": "_userWagerIds",
             "offset": 0,
             "slot": "60",
-            "type": "t_mapping(t_address,t_struct(UintSet)13554_storage)",
+            "type": "t_mapping(t_address,t_struct(UintSet)20767_storage)",
             "contract": "WagerRegistryCore",
             "src": "contracts/wagers/WagerRegistryCore.sol:96"
           },
@@ -678,7 +678,7 @@
             "label": "mapping(address => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+          "t_mapping(t_bytes32,t_struct(RoleData)973_storage)": {
             "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
             "numberOfBytes": "32"
           },
@@ -686,19 +686,19 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(AccessControlStorage)36_storage": {
+          "t_struct(AccessControlStorage)983_storage": {
             "label": "struct AccessControlUpgradeable.AccessControlStorage",
             "members": [
               {
                 "label": "_roles",
-                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(EIP712Storage)425_storage": {
+          "t_struct(EIP712Storage)2321_storage": {
             "label": "struct EIP712Upgradeable.EIP712Storage",
             "members": [
               {
@@ -728,7 +728,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)1258_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -746,7 +746,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)298_storage": {
+          "t_struct(PausableStorage)2194_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -758,7 +758,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)362_storage": {
+          "t_struct(ReentrancyGuardStorage)2258_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -770,7 +770,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(RoleData)26_storage": {
+          "t_struct(RoleData)973_storage": {
             "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
@@ -808,19 +808,19 @@
             "label": "uint256[50]",
             "numberOfBytes": "1600"
           },
-          "t_contract(IMembershipManager)22026": {
+          "t_contract(IMembershipManager)37179": {
             "label": "contract IMembershipManager",
             "numberOfBytes": "20"
           },
-          "t_contract(IOracleAdapter)23174": {
+          "t_contract(IOracleAdapter)45791": {
             "label": "contract IOracleAdapter",
             "numberOfBytes": "20"
           },
-          "t_contract(ISanctionsGuard)22128": {
+          "t_contract(ISanctionsGuard)37336": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
-          "t_enum(ResolutionType)22598": {
+          "t_enum(ResolutionType)37806": {
             "label": "enum IWagerRegistryTypes.ResolutionType",
             "members": [
               "Either",
@@ -834,7 +834,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_enum(Status)22606": {
+          "t_enum(Status)37814": {
             "label": "enum IWagerRegistryTypes.Status",
             "members": [
               "None",
@@ -847,7 +847,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_mapping(t_address,t_struct(UintSet)13554_storage)": {
+          "t_mapping(t_address,t_struct(UintSet)20767_storage)": {
             "label": "mapping(address => struct EnumerableSet.UintSet)",
             "numberOfBytes": "32"
           },
@@ -859,7 +859,7 @@
             "label": "mapping(bytes32 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_enum(ResolutionType)22598,t_contract(IOracleAdapter)23174)": {
+          "t_mapping(t_enum(ResolutionType)37806,t_contract(IOracleAdapter)45791)": {
             "label": "mapping(enum IWagerRegistryTypes.ResolutionType => contract IOracleAdapter)",
             "numberOfBytes": "32"
           },
@@ -871,7 +871,7 @@
             "label": "mapping(uint256 => bytes32)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Wager)22641_storage)": {
+          "t_mapping(t_uint256,t_struct(Wager)37849_storage)": {
             "label": "mapping(uint256 => struct IWagerRegistryTypes.Wager)",
             "numberOfBytes": "32"
           },
@@ -879,7 +879,7 @@
             "label": "mapping(uint256 => uint8)",
             "numberOfBytes": "32"
           },
-          "t_struct(Set)12862_storage": {
+          "t_struct(Set)20075_storage": {
             "label": "struct EnumerableSet.Set",
             "members": [
               {
@@ -897,19 +897,19 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(UintSet)13554_storage": {
+          "t_struct(UintSet)20767_storage": {
             "label": "struct EnumerableSet.UintSet",
             "members": [
               {
                 "label": "_inner",
-                "type": "t_struct(Set)12862_storage",
+                "type": "t_struct(Set)20075_storage",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Wager)22641_storage": {
+          "t_struct(Wager)37849_storage": {
             "label": "struct IWagerRegistryTypes.Wager",
             "members": [
               {
@@ -962,13 +962,13 @@
               },
               {
                 "label": "resolutionType",
-                "type": "t_enum(ResolutionType)22598",
+                "type": "t_enum(ResolutionType)37806",
                 "offset": 16,
                 "slot": "5"
               },
               {
                 "label": "status",
-                "type": "t_enum(Status)22606",
+                "type": "t_enum(Status)37814",
                 "offset": 17,
                 "slot": "5"
               },
@@ -1079,7 +1079,7 @@
             {
               "contract": "AccessControlUpgradeable",
               "label": "_roles",
-              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
               "offset": 0,
               "slot": "0"
@@ -1124,7 +1124,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "50",
-            "type": "t_contract(ISanctionsGuard)22831",
+            "type": "t_contract(ISanctionsGuard)37336",
             "contract": "TokenFactory",
             "src": "contracts/tokens/TokenFactory.sol:36"
           },
@@ -1164,7 +1164,7 @@
             "label": "_tokens",
             "offset": 0,
             "slot": "55",
-            "type": "t_mapping(t_uint256,t_struct(TokenRecord)31504_storage)",
+            "type": "t_mapping(t_uint256,t_struct(TokenRecord)57008_storage)",
             "contract": "TokenFactory",
             "src": "contracts/tokens/TokenFactory.sol:46"
           },
@@ -1318,11 +1318,11 @@
             "label": "uint256[]",
             "numberOfBytes": "32"
           },
-          "t_contract(ISanctionsGuard)22831": {
+          "t_contract(ISanctionsGuard)37336": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
-          "t_enum(TokenStandard)31468": {
+          "t_enum(TokenStandard)56972": {
             "label": "enum ITokenFactory.TokenStandard",
             "members": [
               "OPEN_ERC20",
@@ -1340,7 +1340,7 @@
             "label": "mapping(address => uint256)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(TokenRecord)31504_storage)": {
+          "t_mapping(t_uint256,t_struct(TokenRecord)57008_storage)": {
             "label": "mapping(uint256 => struct ITokenFactory.TokenRecord)",
             "numberOfBytes": "32"
           },
@@ -1348,7 +1348,7 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(TokenRecord)31504_storage": {
+          "t_struct(TokenRecord)57008_storage": {
             "label": "struct ITokenFactory.TokenRecord",
             "members": [
               {
@@ -1359,7 +1359,7 @@
               },
               {
                 "label": "standard",
-                "type": "t_enum(TokenStandard)31468",
+                "type": "t_enum(TokenStandard)56972",
                 "offset": 0,
                 "slot": "1"
               },
@@ -1407,7 +1407,7 @@
               },
               {
                 "label": "suite",
-                "type": "t_struct(TrexSuiteRef)31478_storage",
+                "type": "t_struct(TrexSuiteRef)56982_storage",
                 "offset": 0,
                 "slot": "7"
               },
@@ -1420,7 +1420,7 @@
             ],
             "numberOfBytes": "384"
           },
-          "t_struct(TrexSuiteRef)31478_storage": {
+          "t_struct(TrexSuiteRef)56982_storage": {
             "label": "struct ITokenFactory.TrexSuiteRef",
             "members": [
               {
@@ -1511,7 +1511,7 @@
             "label": "_tiers",
             "offset": 0,
             "slot": "50",
-            "type": "t_mapping(t_bytes32,t_mapping(t_enum(Tier)21879,t_struct(TierConfig)21894_storage))",
+            "type": "t_mapping(t_bytes32,t_mapping(t_enum(Tier)37032,t_struct(TierConfig)37047_storage))",
             "contract": "MembershipManager",
             "src": "contracts/access/MembershipManager.sol:43"
           },
@@ -1519,7 +1519,7 @@
             "label": "_memberships",
             "offset": 0,
             "slot": "51",
-            "type": "t_mapping(t_address,t_mapping(t_bytes32,t_struct(Membership)21906_storage))",
+            "type": "t_mapping(t_address,t_mapping(t_bytes32,t_struct(Membership)37059_storage))",
             "contract": "MembershipManager",
             "src": "contracts/access/MembershipManager.sol:44"
           },
@@ -1535,7 +1535,7 @@
             "label": "paymentToken",
             "offset": 0,
             "slot": "53",
-            "type": "t_contract(IERC20)3600",
+            "type": "t_contract(IERC20)9417",
             "contract": "MembershipManager",
             "src": "contracts/access/MembershipManager.sol:47"
           },
@@ -1559,7 +1559,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "56",
-            "type": "t_contract(ISanctionsGuard)22128",
+            "type": "t_contract(ISanctionsGuard)37336",
             "contract": "MembershipManager",
             "src": "contracts/access/MembershipManager.sol:53"
           },
@@ -1637,7 +1637,7 @@
             "label": "mapping(bytes32 => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+          "t_mapping(t_bytes32,t_struct(RoleData)973_storage)": {
             "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
             "numberOfBytes": "32"
           },
@@ -1645,19 +1645,19 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(AccessControlStorage)36_storage": {
+          "t_struct(AccessControlStorage)983_storage": {
             "label": "struct AccessControlUpgradeable.AccessControlStorage",
             "members": [
               {
                 "label": "_roles",
-                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(EIP712Storage)425_storage": {
+          "t_struct(EIP712Storage)2321_storage": {
             "label": "struct EIP712Upgradeable.EIP712Storage",
             "members": [
               {
@@ -1687,7 +1687,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)1258_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -1705,7 +1705,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(RoleData)26_storage": {
+          "t_struct(RoleData)973_storage": {
             "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
@@ -1723,7 +1723,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(SignerIntentStorage)9887_storage": {
+          "t_struct(SignerIntentStorage)20825_storage": {
             "label": "struct SignerIntentBase.SignerIntentStorage",
             "members": [
               {
@@ -1747,15 +1747,15 @@
             "label": "uint256[50]",
             "numberOfBytes": "1600"
           },
-          "t_contract(IERC20)3600": {
+          "t_contract(IERC20)9417": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
-          "t_contract(ISanctionsGuard)22128": {
+          "t_contract(ISanctionsGuard)37336": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
-          "t_enum(Tier)21879": {
+          "t_enum(Tier)37032": {
             "label": "enum IMembershipManager.Tier",
             "members": [
               "None",
@@ -1770,7 +1770,7 @@
             "label": "mapping(address => mapping(bytes32 => bytes32))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_mapping(t_bytes32,t_struct(Membership)21906_storage))": {
+          "t_mapping(t_address,t_mapping(t_bytes32,t_struct(Membership)37059_storage))": {
             "label": "mapping(address => mapping(bytes32 => struct IMembershipManager.Membership))",
             "numberOfBytes": "32"
           },
@@ -1778,19 +1778,19 @@
             "label": "mapping(bytes32 => bytes32)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_mapping(t_enum(Tier)21879,t_struct(TierConfig)21894_storage))": {
+          "t_mapping(t_bytes32,t_mapping(t_enum(Tier)37032,t_struct(TierConfig)37047_storage))": {
             "label": "mapping(bytes32 => mapping(enum IMembershipManager.Tier => struct IMembershipManager.TierConfig))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(Membership)21906_storage)": {
+          "t_mapping(t_bytes32,t_struct(Membership)37059_storage)": {
             "label": "mapping(bytes32 => struct IMembershipManager.Membership)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_enum(Tier)21879,t_struct(TierConfig)21894_storage)": {
+          "t_mapping(t_enum(Tier)37032,t_struct(TierConfig)37047_storage)": {
             "label": "mapping(enum IMembershipManager.Tier => struct IMembershipManager.TierConfig)",
             "numberOfBytes": "32"
           },
-          "t_struct(Limits)21884_storage": {
+          "t_struct(Limits)37037_storage": {
             "label": "struct IMembershipManager.Limits",
             "members": [
               {
@@ -1808,12 +1808,12 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(Membership)21906_storage": {
+          "t_struct(Membership)37059_storage": {
             "label": "struct IMembershipManager.Membership",
             "members": [
               {
                 "label": "tier",
-                "type": "t_enum(Tier)21879",
+                "type": "t_enum(Tier)37032",
                 "offset": 0,
                 "slot": "0"
               },
@@ -1844,7 +1844,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(TierConfig)21894_storage": {
+          "t_struct(TierConfig)37047_storage": {
             "label": "struct IMembershipManager.TierConfig",
             "members": [
               {
@@ -1867,7 +1867,7 @@
               },
               {
                 "label": "limits",
-                "type": "t_struct(Limits)21884_storage",
+                "type": "t_struct(Limits)37037_storage",
                 "offset": 0,
                 "slot": "1"
               }
@@ -1936,7 +1936,7 @@
             {
               "contract": "AccessControlUpgradeable",
               "label": "_roles",
-              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
               "offset": 0,
               "slot": "0"
@@ -1988,7 +1988,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "51",
-            "type": "t_contract(ISanctionsGuard)9081",
+            "type": "t_contract(ISanctionsGuard)37336",
             "contract": "WagerPoolFactory",
             "src": "contracts/pools/WagerPoolFactory.sol:63"
           },
@@ -1996,7 +1996,7 @@
             "label": "membershipManager",
             "offset": 0,
             "slot": "52",
-            "type": "t_contract(IMembershipManager)9015",
+            "type": "t_contract(IMembershipManager)37179",
             "contract": "WagerPoolFactory",
             "src": "contracts/pools/WagerPoolFactory.sol:66"
           },
@@ -2090,7 +2090,7 @@
             "label": "mapping(bytes32 => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+          "t_mapping(t_bytes32,t_struct(RoleData)973_storage)": {
             "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
             "numberOfBytes": "32"
           },
@@ -2098,19 +2098,19 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(AccessControlStorage)36_storage": {
+          "t_struct(AccessControlStorage)983_storage": {
             "label": "struct AccessControlUpgradeable.AccessControlStorage",
             "members": [
               {
                 "label": "_roles",
-                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(EIP712Storage)363_storage": {
+          "t_struct(EIP712Storage)2321_storage": {
             "label": "struct EIP712Upgradeable.EIP712Storage",
             "members": [
               {
@@ -2140,7 +2140,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)1258_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -2158,7 +2158,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)300_storage": {
+          "t_struct(ReentrancyGuardStorage)2258_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -2170,7 +2170,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(RoleData)26_storage": {
+          "t_struct(RoleData)973_storage": {
             "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
@@ -2188,7 +2188,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(SignerIntentStorage)4346_storage": {
+          "t_struct(SignerIntentStorage)20825_storage": {
             "label": "struct SignerIntentBase.SignerIntentStorage",
             "members": [
               {
@@ -2220,11 +2220,11 @@
             "label": "uint32[4]",
             "numberOfBytes": "32"
           },
-          "t_contract(IMembershipManager)9015": {
+          "t_contract(IMembershipManager)37179": {
             "label": "contract IMembershipManager",
             "numberOfBytes": "20"
           },
-          "t_contract(ISanctionsGuard)9081": {
+          "t_contract(ISanctionsGuard)37336": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
@@ -2308,7 +2308,7 @@
             {
               "contract": "AccessControlUpgradeable",
               "label": "_roles",
-              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)973_storage)",
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
               "offset": 0,
               "slot": "0"
@@ -2807,7 +2807,7 @@
             "label": "membershipManager",
             "offset": 0,
             "slot": "50",
-            "type": "t_contract(IMembershipManager)31978",
+            "type": "t_contract(IMembershipManager)37179",
             "contract": "CallsignRegistry",
             "src": "contracts/naming/CallsignRegistry.sol:71"
           },
@@ -2815,7 +2815,7 @@
             "label": "sanctionsGuard",
             "offset": 0,
             "slot": "51",
-            "type": "t_contract(ISanctionsGuard)32135",
+            "type": "t_contract(ISanctionsGuard)37336",
             "contract": "CallsignRegistry",
             "src": "contracts/naming/CallsignRegistry.sol:72"
           },
@@ -2831,7 +2831,7 @@
             "label": "minTier",
             "offset": 0,
             "slot": "53",
-            "type": "t_enum(Tier)31831",
+            "type": "t_enum(Tier)37032",
             "contract": "CallsignRegistry",
             "src": "contracts/naming/CallsignRegistry.sol:74"
           },
@@ -2887,7 +2887,7 @@
             "label": "_records",
             "offset": 0,
             "slot": "55",
-            "type": "t_mapping(t_bytes32,t_struct(CallsignRecord)34248_storage)",
+            "type": "t_mapping(t_bytes32,t_struct(CallsignRecord)42589_storage)",
             "contract": "CallsignRegistry",
             "src": "contracts/naming/CallsignRegistry.sol:83"
           },
@@ -3051,7 +3051,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(SignerIntentStorage)17745_storage": {
+          "t_struct(SignerIntentStorage)20825_storage": {
             "label": "struct SignerIntentBase.SignerIntentStorage",
             "members": [
               {
@@ -3075,15 +3075,15 @@
             "label": "uint256[50]",
             "numberOfBytes": "1600"
           },
-          "t_contract(IMembershipManager)31978": {
+          "t_contract(IMembershipManager)37179": {
             "label": "contract IMembershipManager",
             "numberOfBytes": "20"
           },
-          "t_contract(ISanctionsGuard)32135": {
+          "t_contract(ISanctionsGuard)37336": {
             "label": "contract ISanctionsGuard",
             "numberOfBytes": "20"
           },
-          "t_enum(Tier)31831": {
+          "t_enum(Tier)37032": {
             "label": "enum IMembershipManager.Tier",
             "members": [
               "None",
@@ -3102,7 +3102,7 @@
             "label": "mapping(address => uint64)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(CallsignRecord)34248_storage)": {
+          "t_mapping(t_bytes32,t_struct(CallsignRecord)42589_storage)": {
             "label": "mapping(bytes32 => struct CallsignRegistry.CallsignRecord)",
             "numberOfBytes": "32"
           },
@@ -3110,7 +3110,7 @@
             "label": "mapping(bytes32 => uint64)",
             "numberOfBytes": "32"
           },
-          "t_struct(CallsignRecord)34248_storage": {
+          "t_struct(CallsignRecord)42589_storage": {
             "label": "struct CallsignRegistry.CallsignRecord",
             "members": [
               {
