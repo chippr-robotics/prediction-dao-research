@@ -53,6 +53,9 @@ const MORDOR_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -151,6 +154,19 @@ const POLYGON_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+}
+
+// Ethereum Classic mainnet (chainId 61) — CUSTODY ONLY. ETC hosts no FairWins wager/membership
+// deployment; it gained a contracts block with spec 068 so Protect vaults can live there (Safe
+// v1.4.1 is canonical on ETC). Every other lookup honestly resolves empty.
+//   npx hardhat run scripts/deploy/custody/deploy-policy-guard-v2.js --network etc
+//   npm run sync:frontend-contracts -- --network etc --chainId 61
+const ETC_CONTRACTS = {
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 // Spec 067 bridge/liquidity networks. These chains host NO FairWins wager/membership
@@ -181,6 +197,8 @@ const NETWORK_CONTRACTS = {
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
+  // Spec 068 — custody only (Protect vaults + policy engine; no wager/membership here).
+  61: ETC_CONTRACTS,        // Ethereum Classic mainnet
   // Spec 067 — routers only (no wager/membership deployment on these chains).
   1: ETHEREUM_CONTRACTS,    // Ethereum mainnet
   10: OPTIMISM_CONTRACTS,   // Optimism
@@ -207,7 +225,15 @@ export const DEPLOYED_CONTRACTS =
 // `useVaultProposals` refuses to scan without one, so a missing entry silently disables custody
 // proposal discovery on that chain even when the hub itself is deployed.
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
+  63: {
+    friendGroupMarketFactory: 15658191,
+    wagerRegistry: 0,
+    membershipVoucher: 16404315,
+    wagerPoolFactory: 16495564,
+    safeProposalHub: 16645531,
+  },
+  // Ethereum Classic — custody only (spec 068).
+  61: { safeProposalHub: 25026893 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
   137: {
     friendGroupMarketFactory: 0,

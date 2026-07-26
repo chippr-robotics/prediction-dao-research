@@ -10,10 +10,12 @@
  * PolicyGuardSetup is guard-AGNOSTIC (it takes the guard address as a parameter and ERC-165-checks
  * it), so it is reused as-is; this script only deploys it on chains where it is missing.
  *
- * Rollout follows custody support: Mordor (63) → ETC (61) → Polygon (137); hardhat/localhost (1337)
- * is wired for the local quickstart. Neither contract has admin or funds, so only the deploy signs.
+ * Rollout follows custody support: Mordor (63) → ETC (61) → Polygon (137) → the L2s the app gained
+ * with spec 067's bridge work, Base (8453) / Optimism (10) / Arbitrum (42161); hardhat/localhost
+ * (1337) is wired for the local quickstart. Neither contract has admin or funds, so only the deploy
+ * signs. Addresses are deterministic (CREATE2), so the guard lands on the SAME address everywhere.
  *
- * Usage: npx hardhat run scripts/deploy/custody/deploy-policy-guard-v2.js --network <localhost|mordor|etc|polygon>
+ * Usage: npx hardhat run scripts/deploy/custody/deploy-policy-guard-v2.js --network <localhost|mordor|etc|polygon|base|optimism|arbitrum>
  * Next:  npm run sync:frontend-contracts -- --network <net> --chainId <id>
  */
 const fs = require("fs");
@@ -28,15 +30,28 @@ const TARGETS = [
   { contract: "PolicyGuardSetup", key: "policyGuardSetup" },
 ];
 
-// Custody chains (see frontend/src/config/safeContracts.js SAFE_CONTRACTS) plus local.
+// Custody chains (see frontend/src/config/safeContracts.js SAFE_CONTRACTS) plus local. Safe v1.4.1
+// and the Safe Singleton Factory are verified present on every entry here — run
+// scripts/ops/preflight-policy-guard-v2.js before adding a chain.
 const FILE_BY_CHAIN = {
+  10: "optimism-chain10-v2.json",
   61: "etc-chain61-v2.json",
   63: "mordor-chain63-v2.json",
   137: "polygon-chain137-v2.json",
+  8453: "base-chain8453-v2.json",
+  42161: "arbitrum-chain42161-v2.json",
   1337: "hardhat-chain1337-v2.json",
 };
 
-const NETWORK_LABEL = { 61: "etc", 63: "mordor", 137: "polygon", 1337: "hardhat" };
+const NETWORK_LABEL = {
+  10: "optimism",
+  61: "etc",
+  63: "mordor",
+  137: "polygon",
+  8453: "base",
+  42161: "arbitrum",
+  1337: "hardhat",
+};
 
 async function main() {
   const net = await ethers.provider.getNetwork();
@@ -46,7 +61,7 @@ async function main() {
   const fileName = FILE_BY_CHAIN[chainId];
   if (!fileName) {
     throw new Error(
-      `SafePolicyGuardV2 deploys to custody-supported chains (61, 63, 137) or local 1337; got ${chainId}`,
+      `SafePolicyGuardV2 deploys to custody-supported chains (10, 61, 63, 137, 8453, 42161) or local 1337; got ${chainId}`,
     );
   }
   const recordPath = path.join(deploymentsDir, fileName);

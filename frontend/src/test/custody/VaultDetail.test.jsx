@@ -16,6 +16,11 @@ vi.mock('../../lib/custody/policy', () => ({
   NATIVE_ASSET: '0x0000000000000000000000000000000000000000',
   shortAddress: (a) => String(a),
 }))
+// Spec 068 — VaultDetail picks the policy panel by whether the ordered engine is DEPLOYED on the
+// vault's chain. Pin that here so this suite tests VaultDetail rather than the live deployment
+// state: a real deploy to any test chain must never flip a component unit test. The routing itself
+// is covered by CustodyPanel/PolicyPanelV2's suites.
+vi.mock('../../lib/custody/policyV2', () => ({ isPolicyV2Supported: () => false }))
 
 import VaultDetail from '../../components/custody/VaultDetail'
 import VaultList from '../../components/custody/VaultList'

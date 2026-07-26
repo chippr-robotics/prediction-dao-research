@@ -24,10 +24,23 @@ const TARGETS = [
 ];
 
 const FILE_BY_CHAIN = {
+  10: "optimism-chain10-v2.json",
   61: "etc-chain61-v2.json",
   63: "mordor-chain63-v2.json",
   137: "polygon-chain137-v2.json",
+  8453: "base-chain8453-v2.json",
+  42161: "arbitrum-chain42161-v2.json",
   1337: "hardhat-chain1337-v2.json",
+};
+
+// Custody is only offered where Safe v1.4.1 itself exists. These canonical addresses are identical
+// on every chain the Safe Singleton Factory reached — but "should be there" is not "is there", so
+// the pre-flight verifies them on-chain before we consider a chain a custody target.
+const SAFE_V1_4_1 = {
+  singleton: "0x41675C099F32341bf84BFc5382aF534df5C7461a",
+  singletonL2: "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+  proxyFactory: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67",
+  fallbackHandler: "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
 };
 
 async function main() {
@@ -57,6 +70,15 @@ async function main() {
 
   const factoryCode = await ethers.provider.getCode(SINGLETON_FACTORY);
   console.log(`Singleton factory ${SINGLETON_FACTORY}: ${factoryCode === "0x" ? "MISSING" : "present"}`);
+
+  // Safe v1.4.1 presence — custody is meaningless on a chain without it.
+  let safeOk = true;
+  for (const [name, addr] of Object.entries(SAFE_V1_4_1)) {
+    const present = (await ethers.provider.getCode(addr)) !== "0x";
+    if (!present) safeOk = false;
+    console.log(`  Safe ${name.padEnd(16)} ${addr}: ${present ? "present" : "MISSING"}`);
+  }
+  console.log(`Safe v1.4.1 usable here: ${safeOk ? "YES" : "NO — do not offer custody on this chain"}`);
 
   const recordPath = path.join(__dirname, "..", "..", "deployments", FILE_BY_CHAIN[chainId] || "");
   const record = FILE_BY_CHAIN[chainId] && fs.existsSync(recordPath)
