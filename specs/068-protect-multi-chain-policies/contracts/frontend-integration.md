@@ -1,6 +1,6 @@
 # Frontend Integration Contracts
 
-Client-side module and component contracts for spec 067. Everything here composes with the
+Client-side module and component contracts for spec 068. Everything here composes with the
 shipped spec 043/049 custody stack; nothing replaces it.
 
 ## `lib/custody/policyV2.js` (new)

@@ -54,7 +54,7 @@ export const NAV_GROUPS = [
     items: [
       // 'custody' tab id preserved; surfaced to users as "Protect". Lives in
       // Tools (not Finance) — it is an account-security tool, not a spending
-      // surface (spec 067 FR-024).
+      // surface (spec 068 FR-024).
       { id: 'custody', label: 'Protect', icon: 'shield' },
       { id: 'addressbook', label: 'Address Book', icon: 'addressbook' },
       // Recovery — data backup, account controllers, legacy key/word-list

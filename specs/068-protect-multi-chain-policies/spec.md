@@ -1,6 +1,6 @@
 # Feature Specification: Protect Multi-Chain Vaults & Advanced Policy Engine
 
-**Feature Branch**: `067-protect-multi-chain-policies`
+**Feature Branch**: `068-protect-multi-chain-policies`
 
 **Created**: 2026-07-25
 

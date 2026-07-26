@@ -1,8 +1,8 @@
 # Implementation Plan: Protect Multi-Chain Vaults & Advanced Policy Engine
 
-**Branch**: `claude/protect-multi-chain-policies-mt82ah` (feature `067-protect-multi-chain-policies`) | **Date**: 2026-07-25 | **Spec**: [spec.md](./spec.md)
+**Branch**: `claude/protect-multi-chain-policies-mt82ah` (feature `068-protect-multi-chain-policies`) | **Date**: 2026-07-25 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/067-protect-multi-chain-policies/spec.md`
+**Input**: Feature specification from `/specs/068-protect-multi-chain-policies/spec.md`
 
 ## Summary
 
@@ -99,7 +99,7 @@ redeploy to new chains only); ~6 new/changed lib modules; ~8 custody components 
 ### Documentation (this feature)
 
 ```text
-specs/067-protect-multi-chain-policies/
+specs/068-protect-multi-chain-policies/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
