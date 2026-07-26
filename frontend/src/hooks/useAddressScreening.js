@@ -36,32 +36,59 @@ export function useAddressScreening() {
   const [, setTick] = useState(0)
   const rerender = useCallback(() => setTick((n) => n + 1), [])
 
+  /**
+   * Screen ONE address.
+   *
+   * Options (both added for spec 067's cross-network value surfaces; omitting
+   * them keeps the address-book behaviour byte-identical):
+   *
+   *   provider  a read provider the CALLER guarantees talks to `chainId`. The
+   *             Bridge and Supply surfaces deliberately act on a network the
+   *             wallet is not currently on — the switch happens at signing — so
+   *             without this they could only ever report 'uncertain' for the
+   *             network the value actually moves on.
+   *   force     skip the cache and re-read. A cached 'clear' is fine for
+   *             browsing, but a submission-time screen has to be a live read:
+   *             a wallet deny-listed since the quote must still be refused
+   *             (FR-032), and the TTL would otherwise hide that for a minute.
+   */
   const screenOne = useCallback(
-    (address, chainId) => {
+    (address, chainId, { provider: providerOverride = null, force = false } = {}) => {
       const key = addressKey(address, chainId)
-      const cached = fresh(key)
-      if (cached) return Promise.resolve(cached)
-      if (inflight.has(key)) return inflight.get(key)
+      if (!force) {
+        const cached = fresh(key)
+        if (cached) return Promise.resolve(cached)
+        if (inflight.has(key)) return inflight.get(key)
+      }
 
-      const promise = (async () => {
+      const run = async () => {
         let status
         // Only screen an entry against a provider that talks to its own chain;
         // otherwise report uncertain rather than screening the wrong network.
-        if (!provider || Number(chainId) !== Number(activeChainId)) {
+        const readProvider =
+          providerOverride || (Number(chainId) === Number(activeChainId) ? provider : null)
+        if (!readProvider) {
           status = 'uncertain'
         } else {
           try {
-            const res = await screenAddress(address, provider)
+            const res = await screenAddress(address, readProvider)
             status = res.available ? (res.allowed ? 'clear' : 'restricted') : 'uncertain'
           } catch {
             status = 'uncertain' // fail-closed (FR-011)
           }
         }
         cache.set(key, { status, ts: Date.now() })
-        inflight.delete(key)
         return status
-      })()
+      }
 
+      // A forced read never joins the shared slot: it must not be handed to a
+      // browsing caller as though it were that caller's own read, and it must
+      // not evict one either.
+      if (force) return run()
+
+      const promise = run().finally(() => {
+        if (inflight.get(key) === promise) inflight.delete(key)
+      })
       inflight.set(key, promise)
       return promise
     },

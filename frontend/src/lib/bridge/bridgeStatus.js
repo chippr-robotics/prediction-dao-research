@@ -40,10 +40,13 @@
  * Everything unknown is reported as unknown. There is no branch in this file that invents progress,
  * and every failure to observe resolves toward the *lower* claim (research R7, FR-054).
  */
-import { Interface, toBeHex } from 'ethers'
+import { Interface, formatUnits, toBeHex } from 'ethers'
 import { bridgeGatewayUrl } from './acrossQuotes'
 import { BRIDGE_STATE, captureBridgeState, listBridgeEntries } from '../../data/ledger/sources/bridgeLedgerSource'
+import { BRIDGE_SETTLEMENT } from './bridgeCopy'
+import { queueBridgeNotification } from './bridgeActivityBuffer'
 import { NETWORKS } from '../../config/networks'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import { makeReadProvider } from '../../utils/rpcProvider'
 
 const FETCH_TIMEOUT_MS = 10_000
@@ -531,6 +534,135 @@ export function deriveBridgeState({ current, evidence = {}, expectedBy = null, n
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * Notifications (T111, FR-037) — telling a member about a transfer they are not watching.
+ *
+ * A bridge is the one FairWins action a member routinely walks away from: it spans two networks and
+ * usually finishes minutes later, on a screen they closed. So the three outcomes that change what
+ * they know — it arrived, it came back, it is late — are announced.
+ *
+ * Three rules, each a direct consequence of a rule already enforced above:
+ *
+ *   1. **The same evidence gate.** `delivered` is announced only with a destination fill hash and
+ *      `refunded` only with a returning-transaction hash. `deriveBridgeState` already refuses to
+ *      name those states without them, so this is the third independent gate on the same claim —
+ *      deliberately, because a false "arrived" push is the worst thing this feature can emit.
+ *   2. **One notification per transition.** The emitter runs only when a new state was actually
+ *      APPLIED to the ledger, and the ledger will not re-apply a state it already holds, so a
+ *      re-poll (or a second poller) cannot produce a duplicate.
+ *   3. **Say what is needed.** Every message ends with the action, including when the action is
+ *      nothing. `needs_attention` is the only one that asks for anything, and what it asks for is
+ *      checking — never "contact support about your missing money", which would be untrue.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The three outcomes worth interrupting a member for (FR-037). Progress states are not. */
+export const BRIDGE_NOTIFIED_STATES = Object.freeze([
+  BRIDGE_STATE.DELIVERED,
+  BRIDGE_STATE.REFUNDED,
+  BRIDGE_STATE.NEEDS_ATTENTION,
+])
+
+/** Network name for a chain id, or an honest placeholder — never a guessed one. */
+function networkName(chainId) {
+  return NETWORKS[chainId]?.name || 'the other network'
+}
+
+/**
+ * `"12.5 USDC"`, or null when the record does not carry both the amount and its decimals. Null
+ * means the message simply omits the amount: a bridge notification never states a figure it
+ * cannot derive, and never falls back to the INPUT amount when describing what ARRIVED (the two
+ * differ by the bridge's own fee).
+ */
+function amountLabel(raw, decimals, symbol) {
+  if (raw == null || decimals == null) return null
+  try {
+    const value = Number(formatUnits(BigInt(raw), decimals))
+    if (!Number.isFinite(value)) return null
+    return `${value.toLocaleString('en-US', { maximumFractionDigits: 6 })}${symbol ? ` ${symbol}` : ''}`
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build the notification for a bridge transition, or null when this transition is not one members
+ * are told about (progress states) or when the evidence for the claim is missing.
+ *
+ * Pure: no clock, no network, no writes — so every branch, including every refusal, is testable.
+ *
+ * @param {object} entry a `readBridgeEntry` view of the bridge
+ * @param {{to: string, from?: string, dstTxHash?: string|null, refundTxHash?: string|null}} transition
+ * @param {{at?: number}} [opts]
+ * @returns {null | {type: string, state: string, refId: string, depositId: string|null,
+ *   message: string, severity: string, actionable: boolean, txHash: string|null,
+ *   txUrl: string|null, at: number|null}}
+ */
+export function bridgeNotification(entry, transition, { at = null } = {}) {
+  const state = transition?.to
+  if (!entry || !BRIDGE_NOTIFIED_STATES.includes(state)) return null
+
+  const refId = entry.bridgeId || entry.entryId || null
+  if (!refId) return null
+
+  const origin = Number(entry.originChainId)
+  const destination = Number(entry.destinationChainId)
+  const dstTxHash = transition?.dstTxHash ?? entry.dstTxHash ?? null
+  const refundTxHash = transition?.refundTxHash ?? entry.refundTxHash ?? null
+  const protocol = entry.settlementProtocol || BRIDGE_SETTLEMENT.protocol
+
+  const base = {
+    state,
+    refId: String(refId),
+    depositId: entry.depositId ?? null,
+    at: at ?? entry.timestamp ?? null,
+  }
+
+  if (state === BRIDGE_STATE.DELIVERED) {
+    // FR-009, third gate: no destination-side transaction, no "arrived".
+    if (!dstTxHash) return null
+    // The amount that ARRIVED is the output amount. When it was never recorded the message says
+    // less rather than quoting the amount that was sent, which is a different (larger) number.
+    const arrived = amountLabel(entry.outputAmountRaw, entry.tokenDecimals, entry.tokenSymbol)
+    return {
+      ...base,
+      type: 'bridge-delivered',
+      message: arrived
+        ? `Your transfer arrived on ${networkName(destination)} — ${arrived} is in your wallet there. Nothing to do.`
+        : `Your transfer arrived on ${networkName(destination)} and is in your wallet there. Nothing to do.`,
+      severity: 'success',
+      actionable: false,
+      txHash: dstTxHash,
+      txUrl: getTransactionUrl(destination, dstTxHash),
+    }
+  }
+
+  if (state === BRIDGE_STATE.REFUNDED) {
+    // Same rule for the other money outcome: money coming back is also a claim about money.
+    if (!refundTxHash) return null
+    return {
+      ...base,
+      type: 'bridge-refunded',
+      message: `Your transfer to ${networkName(destination)} could not be delivered, so ${protocol} returned the asset to your wallet on ${networkName(origin)}. Nothing to do — the network cost of the attempt is not returned.`,
+      severity: 'info',
+      actionable: false,
+      txHash: refundTxHash,
+      txUrl: getTransactionUrl(origin, refundTxHash),
+    }
+  }
+
+  // needs_attention — a statement about the clock, not the outcome (FR-011). It stays live, so the
+  // message says what is known, what is not, and the one useful thing the member can do.
+  return {
+    ...base,
+    type: 'bridge-needs-attention',
+    message: `Your transfer to ${networkName(destination)} is taking longer than this route usually takes. It is not lost and FairWins does not hold it — open Bridge to check the sending transaction and where ${protocol} has it. Transfers that cannot be delivered are returned to the wallet they came from.`,
+    severity: 'warning',
+    actionable: true,
+    txHash: entry.srcTxHash ?? null,
+    txUrl: entry.srcTxHash ? getTransactionUrl(origin, entry.srcTxHash) : null,
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Reconciliation — the FR-010 cross-session path.
  * ---------------------------------------------------------------------------------------------- */
 
@@ -647,13 +779,33 @@ export async function reconcileBridge(account, entry, deps = {}) {
     failureReason: derived.failureReason,
   })
   result.applied = written != null
-  // T111 (US3) hooks its bridge notifications here: one call per APPLIED transition, so a
-  // re-poll that observes the same state never re-notifies.
-  if (result.applied && typeof deps.onTransition === 'function') {
-    try {
-      deps.onTransition(result)
-    } catch {
-      // A notification failure must never break reconciliation.
+  // T111 (US3): one emission per APPLIED transition, so a re-poll that observes the same state
+  // never re-notifies. `deps.notify` is an injection seam for tests and for a caller that wants a
+  // different sink; passing `null` disables buffering. It is deliberately SEPARATE from
+  // `onTransition` so a caller that supplies its own UI hook cannot accidentally silence the
+  // member-facing notification by doing so.
+  if (result.applied) {
+    const notify = deps.notify === undefined ? queueBridgeNotification : deps.notify
+    if (typeof notify === 'function') {
+      try {
+        // The derived hashes, not just the result envelope: the emitter re-checks the evidence
+        // itself, so it has to be handed the evidence.
+        const record = bridgeNotification(
+          entry,
+          { ...result, dstTxHash: derived.dstTxHash, refundTxHash: derived.refundTxHash },
+          { at: now },
+        )
+        if (record) notify(account, originChainId, record)
+      } catch {
+        // A notification failure must never break reconciliation.
+      }
+    }
+    if (typeof deps.onTransition === 'function') {
+      try {
+        deps.onTransition(result)
+      } catch {
+        // Nor may a caller's own hook.
+      }
     }
   }
   return result

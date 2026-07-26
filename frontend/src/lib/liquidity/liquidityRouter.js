@@ -413,6 +413,138 @@ export function buildSupplyCalls({
 }
 
 // ---------------------------------------------------------------------------
+// Protocol events (T112, FR-037) — telling a member when the ground moves under
+// money they have already supplied.
+//
+// A supplied position is long-lived and passive: the member does nothing for weeks, so the only
+// way they learn that a curator retired their pool, delisted it, or paused supplying is if the app
+// tells them. These two functions are the whole emitter — a pure snapshot and a pure diff — so the
+// polling source that calls them holds no logic of its own and there is exactly one definition of
+// "something happened to your pool".
+//
+// The rules that keep this honest:
+//
+//   1. **First sight is a baseline.** No prior snapshot means no events. A member who opens the app
+//      for the first time in a month is not told that a pool "just closed" because this build has
+//      only just looked at it.
+//   2. **Only pools the member has actually supplied.** A curated list changing is operator news,
+//      not member news. What earns an interruption is a change to a pool their money is in.
+//   3. **An incomplete read is never a delisting.** `readLiquidityRouterConfig` reports
+//      `poolsComplete: false` when any `getPool` failed; a pool missing from a partial list has not
+//      been proven gone, so no event is emitted. Silence over a false alarm about their money.
+//   4. **Nothing here claims a position is at risk.** Retiring and delisting close NEW deposits;
+//      withdrawal never routed through this contract in the first place. The copy says exactly that
+//      rather than implying funds are trapped.
+// ---------------------------------------------------------------------------
+
+/** The member-facing protocol events this module emits (FR-037). */
+export const LIQUIDITY_EVENT = Object.freeze({
+  /** A pool the member supplied stopped taking new deposits (FR-024). */
+  POOL_CLOSED: 'liquidity-pool-closed',
+  /** A protocol event changed the ground under a position they already hold. */
+  POSITION_AFFECTED: 'liquidity-position-affected',
+})
+
+/** Why a `POSITION_AFFECTED` event fired — kept machine-readable so a surface can group them. */
+export const LIQUIDITY_EVENT_REASON = Object.freeze({
+  DELISTED: 'delisted',
+  SUPPLY_PAUSED: 'supply-paused',
+})
+
+/**
+ * Reduce a `readLiquidityRouterConfig` result to the small, comparable shape the diff below needs.
+ *
+ * Returns null for a null config — an unreadable router is NOT a snapshot of "nothing is listed",
+ * and recording it as one would make the next successful read look like a mass relisting. The
+ * caller keeps its prior snapshot instead (FR-051/FR-054).
+ *
+ * @param {object|null} config
+ * @returns {null | {paused: boolean, poolsComplete: boolean, pools: Record<string, {enabled: boolean, kind: number}>}}
+ */
+export function snapshotLiquidityProtocolState(config) {
+  if (!config) return null
+  const pools = {}
+  for (const pool of config.pools || []) {
+    if (!pool?.poolId) continue
+    pools[pool.poolId] = { enabled: Boolean(pool.enabled), kind: Number(pool.kind) }
+  }
+  return { paused: Boolean(config.paused), poolsComplete: config.poolsComplete !== false, pools }
+}
+
+/**
+ * Diff two snapshots into the events a member with money in these pools is owed. Pure: no clock,
+ * no network, no writes.
+ *
+ * @param {object} args
+ * @param {object|null} args.prior previous snapshot (null on first sight → no events)
+ * @param {object|null} args.next current snapshot (null when the router could not be read → no events)
+ * @param {string[]} [args.heldPoolIds] pool ids the member has supplied — the scope of every event
+ * @param {(poolId: string) => string} [args.labelFor] display label for a pool id
+ * @param {string} [args.networkName] name of the network, for the pause message
+ * @returns {Array<{type: string, reason: string, poolId: string|null, message: string, severity: string, actionable: boolean}>}
+ */
+export function detectLiquidityProtocolEvents({ prior, next, heldPoolIds = [], labelFor, networkName } = {}) {
+  // No baseline, or nothing new to compare it against: say nothing.
+  if (!prior || !next) return []
+
+  const held = new Set((heldPoolIds || []).filter(Boolean))
+  if (held.size === 0) return []
+
+  const label = (poolId) => {
+    const value = typeof labelFor === 'function' ? labelFor(poolId) : null
+    return value || 'A pool you supplied'
+  }
+  const where = networkName ? ` on ${networkName}` : ''
+  const events = []
+
+  for (const poolId of held) {
+    const before = prior.pools?.[poolId]
+    const after = next.pools?.[poolId]
+    if (!before) continue // first sight of this pool — baseline, not news
+
+    if (!after) {
+      // Absent from a COMPLETE list = actually delisted. Absent from a partial one proves nothing.
+      if (prior.poolsComplete && next.poolsComplete) {
+        events.push({
+          type: LIQUIDITY_EVENT.POSITION_AFFECTED,
+          reason: LIQUIDITY_EVENT_REASON.DELISTED,
+          poolId,
+          message: `${label(poolId)} is no longer listed on FairWins. Your position is unaffected and is still yours — withdrawing never went through FairWins. Open Supply to check it.`,
+          severity: 'warning',
+          actionable: true,
+        })
+      }
+      continue
+    }
+
+    if (before.enabled === true && after.enabled === false) {
+      events.push({
+        type: LIQUIDITY_EVENT.POOL_CLOSED,
+        reason: LIQUIDITY_EVENT.POOL_CLOSED,
+        poolId,
+        message: `${label(poolId)} is closed to new deposits. Nothing has changed for what you already supplied: your share stays there, keeps earning, and can be withdrawn at any time.`,
+        severity: 'info',
+        actionable: false,
+      })
+    }
+  }
+
+  // Network-wide: supplying paused while the member holds a position. Told once, on the change.
+  if (prior.paused === false && next.paused === true) {
+    events.push({
+      type: LIQUIDITY_EVENT.POSITION_AFFECTED,
+      reason: LIQUIDITY_EVENT_REASON.SUPPLY_PAUSED,
+      poolId: null,
+      message: `New pool deposits are paused${where}. What you already supplied is unaffected — it keeps earning and you can still withdraw it. Supplying reopens without any action from you.`,
+      severity: 'warning',
+      actionable: false,
+    })
+  }
+
+  return events
+}
+
+// ---------------------------------------------------------------------------
 // Pair selection — the PAIR rule, which is the exact INVERSE of the bridge's.
 // ---------------------------------------------------------------------------
 

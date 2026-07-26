@@ -325,9 +325,39 @@ export function readBridgeEntry(record) {
 export function listBridgeEntries(account, chainId) {
   const origin = evmChainId(chainId)
   if (!account || origin == null) return []
-  return listClientRecords(account, origin)
+  const records = listClientRecords(account, origin)
     .filter((r) => r.class === LEDGER_CLASS.BRIDGE)
     .map(readBridgeEntry)
+    .filter(Boolean)
+
+  // ONE row per bridge (FR-035), applied HERE and not only in the ledger repository.
+  //
+  // This is the reader behind BridgeStatusList, listLiveBridges and the bridge notification
+  // source, so leaving the collapse to the repository meant the exact fork normalize.js warns
+  // about — a spec-032 backup restored from a second device leaving two divergent tips for one
+  // bridgeId — rendered the member ONE transfer as TWO rows, and could put an already-delivered
+  // bridge back into the live set.
+  //
+  // Ranking mirrors normalize.js#outranks deliberately: a resolved observation beats an
+  // in-flight one, then the more recent wins. Two readers disagreeing about which tip is
+  // authoritative would be its own bug.
+  const TERMINAL = [LEDGER_STATUS.SETTLED, LEDGER_STATUS.CANCELLED, LEDGER_STATUS.FAILED]
+  const rank = (e) => (TERMINAL.includes(e.status) ? 1 : 0)
+  const seen = (e) => Number(e.timestamp ?? 0)
+
+  const winners = new Map()
+  for (const entry of records) {
+    const key = entry.bridgeId || entry.entryId
+    const incumbent = winners.get(key)
+    if (
+      !incumbent ||
+      rank(entry) > rank(incumbent) ||
+      (rank(entry) === rank(incumbent) && seen(entry) > seen(incumbent))
+    ) {
+      winners.set(key, entry)
+    }
+  }
+  return [...winners.values()]
 }
 
 export function createBridgeLedgerSource(deps = {}) {
@@ -335,7 +365,25 @@ export function createBridgeLedgerSource(deps = {}) {
   return {
     class: LEDGER_CLASS.BRIDGE,
     async list({ account, chainId }) {
-      return readClientRecords(account, chainId).filter((r) => r.class === LEDGER_CLASS.BRIDGE)
+      const origin = evmChainId(chainId)
+      return readClientRecords(account, chainId)
+        .filter((r) => r.class === LEDGER_CLASS.BRIDGE)
+        // Drop a stored record that makes a false claim — a "cross-network move" naming one
+        // network on BOTH sides — right here, before it reaches normalizeEntry.
+        //
+        // normalizeEntry throws on it, and the repository degrades per SOURCE, so letting one
+        // damaged record through would mark the whole bridge class stale: every other bridge
+        // vanishes from the ledger and the report, including an in-flight transfer the member is
+        // waiting on. normalize.js makes exactly that argument about hiding someone's money.
+        //
+        // `captureBridgeSubmission` cannot write such a record, so this only ever fires for a
+        // foreign or legacy one — a spec-032 backup restored from an older build, or corrupted
+        // local storage. Filtering here keeps the repository's coarse source-level staleness
+        // meaningful for real SOURCE bugs, which is what it is for.
+        .filter((r) => {
+          const dest = evmChainId(r?.refs?.destinationChainId ?? r?.destinationChainId)
+          return !(dest != null && origin != null && dest === origin)
+        })
     },
   }
 }

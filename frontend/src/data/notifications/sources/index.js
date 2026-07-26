@@ -13,7 +13,23 @@ import { poolsSource } from './poolsSource'
 import { custodySource } from './custodySource'
 import { earnSource } from './earnSource'
 import { stakingSource } from './stakingSource'
+// Spec 067 (T111/T112): cross-chain bridging and pool liquidity. Two SEPARATE sources, each with
+// its own key/domain, so neither is ever filed under `pools` — that key belongs to wager pools and
+// nothing else (FR-039).
+import { bridgeSource } from './bridgeSource'
+import { liquiditySource } from './liquiditySource'
 
-export const activitySources = [wagerSource, daoSource, tokenSource, membershipSource, poolsSource, custodySource, earnSource, stakingSource]
+export const activitySources = [
+  wagerSource,
+  daoSource,
+  tokenSource,
+  membershipSource,
+  poolsSource,
+  custodySource,
+  earnSource,
+  stakingSource,
+  bridgeSource,
+  liquiditySource,
+]
 
 export default activitySources

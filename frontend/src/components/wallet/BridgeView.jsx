@@ -31,6 +31,20 @@
  * offering controls that cannot work, and the route list is shown "as of" its last read.
  * Bitcoin is out of scope (FR-006) and says so — its network ids are STRINGS and are kept
  * away from every chain-keyed call by `isEvmOption`.
+ *
+ * ── SCREENING AND THE RESTRICTED ACCOUNT (FR-032/FR-033, T116/T154) ──────────────────
+ * The acting wallet is screened through `useAddressScreening` — the platform's one
+ * screening path — against the SOURCE network (its own read provider, because the wallet
+ * may still be on another chain until the signing-time switch). The verdict does two
+ * different jobs, and conflating them would be the failure:
+ *   · at DISPLAY it disables the confirm control and states the reason;
+ *   · at SUBMISSION it is read AGAIN, forced past the cache, so a wallet deny-listed
+ *     between the quote and the signature is still refused before anything is signed.
+ * A restricted member is refused new value-in ONLY. Everything already sent stays visible
+ * and keeps settling — the progress list is a sibling of this form and is never gated —
+ * because refusing new money is correct and trapping existing money is not.
+ * `uncertain` is not `restricted`: the guard is not deployed on every bridgeable network,
+ * so an unscreenable wallet is disclosed, never blocked on an assumption.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits } from 'ethers'
@@ -41,6 +55,7 @@ import { useWallet } from '../../hooks/useWalletManagement'
 import { useSelectableAssets } from '../../hooks/useSelectableAssets'
 import usePortfolio from '../../hooks/usePortfolio'
 import { useEarnSend } from '../../hooks/useEarnSend'
+import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { PIN_MODE, bridgeDest, createPin, isEvmOption, revalidateSelection } from '../../lib/assets/networkPin'
 import {
   bridgeGatewayUrl,
@@ -78,6 +93,18 @@ const RECEIPT_POLL_MS = 1_500
 
 /** The Across deposit events, by the two names the SpokePool has used. */
 const DEPOSIT_EVENT_NAMES = ['V3FundsDeposited', 'FundsDeposited']
+
+/**
+ * FR-032/FR-033 — the refusal a flagged wallet gets, and it says what is NOT refused.
+ * A member who cannot start a transfer must not be left believing the transfers they
+ * already have in flight are gone too.
+ */
+const SCREENING_REFUSAL =
+  'This wallet is flagged by sanctions screening, so a new transfer cannot be started. Nothing has been sent. Transfers already on their way are unaffected and still shown below.'
+
+/** Screening could not run here — stated as unknown, never treated as clear or as flagged. */
+const SCREENING_UNAVAILABLE =
+  'Sanctions screening could not be run on this network just now, so this transfer has not been pre-checked here.'
 
 const addrEq = (a, b) => Boolean(a && b && String(a).toLowerCase() === String(b).toLowerCase())
 
@@ -158,6 +185,7 @@ export default function BridgeView({ onRecorded } = {}) {
   const { options } = useSelectableAssets({ activity: 'transfer', catalog: true })
   const portfolio = usePortfolio()
   const { sendOnChain, canTransactOn, cannotTransactReason, isPasskey } = useEarnSend()
+  const { screenOne } = useAddressScreening()
 
   const [sourceKey, setSourceKey] = useState(null)
   const [destKey, setDestKey] = useState(null)
@@ -167,6 +195,8 @@ export default function BridgeView({ onRecorded } = {}) {
   const [quoteState, setQuoteState] = useState({ status: 'idle', quote: null, error: null })
   const [txState, setTxState] = useState({ step: 'idle', txUrl: null, error: null, note: null })
   const [now, setNow] = useState(() => Date.now())
+  // null = not screened yet | 'clear' | 'restricted' | 'uncertain'
+  const [screening, setScreening] = useState(null)
   const quoteSeqRef = useRef(0)
 
   // Quoting is impossible without the gateway and a bridge price cannot be derived
@@ -276,6 +306,30 @@ export default function BridgeView({ onRecorded } = {}) {
       cancelled = true
     }
   }, [source?.chainId, gatewayReady])
+
+  // ── Screening the ACTING wallet (FR-032) ─────────────────────────────────────────
+  // Against the SOURCE network, with that network's own read provider: the wallet may
+  // still be on another chain until the signing-time switch, and screening it against
+  // the wrong network's guard would be worse than not screening at all.
+  useEffect(() => {
+    const originChainId = source?.chainId
+    if (!address || !originChainId) {
+      setScreening(null)
+      return undefined
+    }
+    let cancelled = false
+    setScreening(null)
+    Promise.resolve(screenOne(address, originChainId, { provider: readProviderFor(originChainId) }))
+      .then((status) => {
+        if (!cancelled) setScreening(status)
+      })
+      .catch(() => {
+        if (!cancelled) setScreening('uncertain')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [address, source?.chainId, screenOne])
 
   const decimals = source?.decimals ?? null
   const symbol = source?.symbol || ''
@@ -467,6 +521,19 @@ export default function BridgeView({ onRecorded } = {}) {
 
     setTxState({ step: 'checking', txUrl: null, error: null, note: null })
     try {
+      // FR-032 — the screen BITES HERE, before anything is built or signed, and it is a
+      // forced re-read rather than the cached verdict behind the disabled button. A wallet
+      // deny-listed between the quote and this tap is refused at this line.
+      const verdict = await screenOne(address, source.chainId, {
+        provider: readProviderFor(source.chainId),
+        force: true,
+      })
+      setScreening(verdict)
+      if (verdict === 'restricted') {
+        setTxState({ step: 'error', txUrl: null, error: SCREENING_REFUSAL, note: null })
+        return
+      }
+
       // Re-read the route at signing time: an operator may have disabled or re-limited it
       // since the quote, and the member should learn that here rather than from a revert.
       const fresh = await readBridgeRoute({
@@ -579,7 +646,13 @@ export default function BridgeView({ onRecorded } = {}) {
   const quoteError = quoteState.error
   // Across itself says the amount is under the route's minimum — its word, not our guess.
   const amountTooLow = Boolean(quote?.isAmountTooLow)
-  const canSubmit = Boolean(quote && !stale && !amountTooLow && !busy && !routerPaused && route?.enabled)
+  // FR-033 — a flagged wallet loses the CONFIRM control and nothing else. The asset and
+  // destination selectors, the quote, and the in-flight list below all stay usable, so a
+  // restricted member can still see where their money is and take it out.
+  const screeningBlocked = screening === 'restricted'
+  const canSubmit = Boolean(
+    quote && !stale && !amountTooLow && !busy && !routerPaused && route?.enabled && !screeningBlocked,
+  )
   // The selector's own empty-list message. It never repeats the block below it verbatim —
   // the same sentence twice reads as a glitch — so the router states are summarised here
   // and explained in full there.
@@ -792,6 +865,20 @@ export default function BridgeView({ onRecorded } = {}) {
           {source && !canTransactOn(source.chainId) && (
             <p className="bridge-note" role="note">
               {cannotTransactReason(source.chainId)}
+            </p>
+          )}
+
+          {/* FR-032/FR-033 — the verdict, stated. 'restricted' refuses the transfer and says
+              what is not refused; 'uncertain' is disclosed as an unknown and blocks nothing,
+              because the guard is not deployed on every bridgeable network. */}
+          {screeningBlocked && (
+            <p className="bridge-unavailable" role="alert" data-testid="bridge-screening-refusal">
+              {SCREENING_REFUSAL}
+            </p>
+          )}
+          {screening === 'uncertain' && quote && (
+            <p className="bridge-note" role="note" data-testid="bridge-screening-unavailable">
+              {SCREENING_UNAVAILABLE}
             </p>
           )}
 

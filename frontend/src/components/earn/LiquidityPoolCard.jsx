@@ -97,7 +97,7 @@ export default function LiquidityPoolCard({ pool, position = null, onSupply, onW
   return (
     <article
       className={`supply-card${pool.available ? '' : ' supply-card-closed'}`}
-      aria-label={`${LIQUIDITY_KIND_LABEL[kind] || 'Pool'}: ${label} on ${networkName}`}
+      aria-label={`${LIQUIDITY_KIND_LABEL[kind] || 'Liquidity pool'}: ${label} on ${networkName}`}
     >
       <div className="supply-card-head">
         {/* Nested asset + network artwork, the same the portfolio uses, so where
@@ -118,7 +118,7 @@ export default function LiquidityPoolCard({ pool, position = null, onSupply, onW
           <span className="supply-card-assets">{label}</span>
           <span className="supply-card-kind">
             <span className={`supply-kind-badge ${isTrading ? 'trading' : 'bridge'}`}>
-              {LIQUIDITY_KIND_LABEL[kind] || 'Pool'}
+              {LIQUIDITY_KIND_LABEL[kind] || 'Liquidity pool'}
             </span>
             <InfoTip
               label={isTrading ? 'What is a trading pool?' : 'What is a bridge pool?'}

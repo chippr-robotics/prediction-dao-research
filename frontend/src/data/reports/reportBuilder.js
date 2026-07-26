@@ -23,11 +23,23 @@ import { deriveTransfers } from './transferDerivation'
 import { enrichTransfers } from './receiptEnrichment'
 import { valueTransfer, PAR_VALUATION_NOTE } from './valuation'
 import { resolveTokenMeta } from './tokenMeta'
+import {
+  classLabel,
+  collapseLogical,
+  crossChainOf,
+  isNeutralDirection,
+  isSelfTransfer,
+  platformFeeOf,
+  PLATFORM_FEE_STATUS,
+  SELF_TRANSFER_NOTE,
+} from './activityClassification'
 
 export const REPORT_DISCLAIMER =
   'This is an informational record of your on-chain FairWins activity — wagers, ' +
-  'transfers, pools, earn, and membership — not tax advice. The platform does not ' +
-  'compute tax owed. Consult a qualified professional.'
+  'transfers, bridges, liquidity, wager pools, earn, and membership — not tax advice. ' +
+  'The platform does not compute tax owed. Consult a qualified professional.'
+
+export { SELF_TRANSFER_NOTE }
 
 function eq(a, b) {
   return String(a).toLowerCase() === String(b).toLowerCase()
@@ -39,41 +51,93 @@ function isParty(wager, account) {
 }
 
 /** Sum line items into per-ticker + overall totals (must reconcile, SC-004).
- *  Failed entries are listed but NEVER totaled (spec 051 FR-003). */
+ *  Failed entries are listed but NEVER totaled (spec 051 FR-003).
+ *
+ *  Value whose direction is `none` — a member moving their own assets between
+ *  networks (spec 067 FR-036) — is totaled into its OWN bucket and kept out of
+ *  the income/disposal split and out of `usdValue`. Folding it into either side
+ *  would report a self-transfer as a disposal; folding both legs in would
+ *  double-count it. Only the platform fee actually charged is a cost, and that
+ *  is accumulated separately in `platformFeesUsd`. */
 function computeTotals(lineItems, nativeSymbol) {
   const byTicker = {}
-  // Collate settled activity by class (wager/transfer/earn/pool/membership) so
-  // the multi-use ledger reads as a per-activity breakdown, not one flat list.
+  // Collate settled activity by class (wager/transfer/bridge/liquidity/earn/
+  // wager pool/membership) so the multi-use ledger reads as a per-activity
+  // breakdown, not one flat list.
   const byClass = {}
   let overallUsd = 0
+  let neutralUsd = 0
   let overallFees = 0
+  let platformFeesUsd = 0
+  let platformFeeUnknownCount = 0
   let failedCount = 0
   for (const it of lineItems) {
     if (it.status === 'failed') {
       failedCount += 1
       continue
     }
+    // Prefer the entry's own value direction; the legacy wager-only path has
+    // none and keeps its kind-name heuristic.
+    const vd = it.valueDirection ?? null
+    const neutral = isNeutralDirection(vd)
+    // Two DIFFERENT questions, and conflating them mis-reports:
+    //   neutral      — is this value neither income nor disposal? (keyed on direction)
+    //   selfTransfer — is this specifically a member moving their OWN assets between
+    //                  their OWN networks? (keyed on class, FR-036)
+    // Every bridge is neutral, but not every neutral entry is a bridge — a staking
+    // unstake REQUEST is neutral too. Keying the "moved between your own networks"
+    // bucket on direction therefore reported movements that never happened, to the
+    // member and to an auditor alike.
+    const selfTransfer = isSelfTransfer(it)
     const t = (byTicker[it.tokenTicker] ||= {
-      ticker: it.tokenTicker, deposits: 0, payouts: 0, refunds: 0, usdValue: 0, count: 0,
+      ticker: it.tokenTicker, deposits: 0, payouts: 0, refunds: 0, moved: 0,
+      usdValue: 0, movedUsd: 0, count: 0,
     })
     if (it.direction === 'deposit') t.deposits += it.amountNumber
     else if (it.direction === 'payout') t.payouts += it.amountNumber
     else if (it.direction === 'refund') t.refunds += it.amountNumber
-    t.usdValue += it.usdValue
+    else if (selfTransfer) t.moved += it.amountNumber
+    // Neutral value stays out of the income/disposal total either way; only a real
+    // self-transfer is ATTRIBUTED to cross-network movement.
+    if (selfTransfer) t.movedUsd += it.usdValue
+    else if (!neutral) t.usdValue += it.usdValue
     t.count += 1
 
     const clsKey = it.class || 'wager'
-    const c = (byClass[clsKey] ||= { class: clsKey, count: 0, inUsd: 0, outUsd: 0, usdValue: 0 })
+    const c = (byClass[clsKey] ||= {
+      class: clsKey, label: classLabel(clsKey), count: 0,
+      inUsd: 0, outUsd: 0, movedUsd: 0, usdValue: 0, platformFeesUsd: 0,
+    })
     c.count += 1
-    c.usdValue += it.usdValue
-    // Ledger entries carry a value direction; wager kinds map onto it so the
-    // in/out split stays meaningful across every class.
-    const inward = it.direction === 'in' || it.direction === 'payout' || it.direction === 'refund'
-    if (inward) c.inUsd += it.usdValue
-    else c.outUsd += it.usdValue
+    if (neutral) {
+      // Neither income nor disposal — reported, never netted against either.
+      c.movedUsd += it.usdValue
+      neutralUsd += it.usdValue
+    } else {
+      c.usdValue += it.usdValue
+      overallUsd += it.usdValue
+      // Ledger entries carry a value direction; wager kinds map onto it so the
+      // in/out split stays meaningful across every class.
+      const inward =
+        vd != null ? vd === 'in' : it.direction === 'payout' || it.direction === 'refund'
+      if (inward) c.inUsd += it.usdValue
+      else c.outUsd += it.usdValue
+    }
 
-    overallUsd += it.usdValue
     if (typeof it.feeNative === 'number') overallFees += it.feeNative
+
+    // The platform fee is the only cost a self-transfer carries (FR-036); it is
+    // attributed to its activity class as well as the overall total. A fee that
+    // was never reported is counted as unknown, never as zero.
+    const pf = it.platformFee
+    if (pf && pf.status !== PLATFORM_FEE_STATUS.NOT_APPLICABLE) {
+      if (pf.usd != null) {
+        platformFeesUsd += pf.usd
+        c.platformFeesUsd += pf.usd
+      } else {
+        platformFeeUnknownCount += 1
+      }
+    }
   }
   for (const t of Object.values(byTicker)) {
     t.net = t.payouts + t.refunds - t.deposits
@@ -83,6 +147,11 @@ function computeTotals(lineItems, nativeSymbol) {
     byClass,
     overall: {
       usdValue: overallUsd,
+      // Self-transfers between the member's own networks — disclosed, not summed
+      // into usdValue (FR-036).
+      movedUsd: neutralUsd,
+      platformFeesUsd,
+      platformFeeUnknownCount,
       feesNative: overallFees,
       feesNativeSymbol: nativeSymbol,
       count: lineItems.length,
@@ -105,12 +174,24 @@ const WAGER_DIRECTIONS = new Set(['deposit', 'payout', 'refund'])
  */
 function ledgerEntryToLineItem(entry, { feeNative, feeNativeSymbol, feeUnavailableReason }) {
   const amountNumber = Number(entry.amount) || 0
+  // A bridge is one movement of the member's own money across two networks: the
+  // counterparty is themselves, so from/to name their own addresses rather than
+  // leaving the destination side blank (FR-035/FR-036).
+  const selfTransfer = isSelfTransfer(entry)
+  const cross = crossChainOf(entry)
+  const inbound = entry.direction === 'in'
   return {
     entryId: entry.entryId,
     class: entry.class,
+    classLabel: classLabel(entry.class),
     kind: entry.kind,
     // Legacy direction for wager math; other classes carry their kind.
     direction: WAGER_DIRECTIONS.has(entry.kind) ? entry.kind : entry.kind,
+    // The entry's VALUE direction, which the kind-flavored `direction` above
+    // cannot express: `lp_withdraw` moves value in and `bridge_transfer` moves
+    // it neither way (FR-036). Totals read this; the legacy path has no such
+    // field and keeps its kind-name heuristic.
+    valueDirection: entry.direction,
     status: entry.status,
     failureReason: entry.failureReason ?? null,
     timestamp: entry.timestamp, // may be null — flagged, sorted last (FR-006)
@@ -126,9 +207,22 @@ function ledgerEntryToLineItem(entry, { feeNative, feeNativeSymbol, feeUnavailab
     feeNative,
     feeNativeSymbol,
     feeUnavailableReason,
+    // The FairWins platform fee actually charged — for a self-transfer this is
+    // the only cost the report attributes to it (FR-036).
+    platformFee: platformFeeOf(entry),
     txHash: entry.txHash || '',
-    fromAddress: entry.direction === 'in' ? entry.counterparty || '' : entry.account,
-    toAddress: entry.direction === 'in' ? entry.account : entry.counterparty || '',
+    fromAddress: selfTransfer ? entry.account : inbound ? entry.counterparty || '' : entry.account,
+    toAddress: selfTransfer
+      ? cross?.recipient || entry.account
+      : inbound
+        ? entry.account
+        : entry.counterparty || '',
+    // Cross-chain facts: one entry, both networks, both transactions (FR-035).
+    selfTransfer,
+    destinationChainId: cross?.destinationChainId ?? null,
+    destinationNetworkName: cross?.destinationNetworkName ?? null,
+    destinationTxHash: cross?.dstTxHash ?? null,
+    settlementProtocol: cross?.settlementProtocol ?? null,
     wagerId: entry.refs?.wagerId ?? '',
   }
 }
@@ -165,11 +259,15 @@ export async function buildReport({
   // ---- Spec 051 primary path: the unified activity ledger ----
   if (ledger && typeof ledger.listEntries === 'function') {
     onProgress(0.05, 'Loading your activity ledger…')
-    const { entries, staleClasses, prunedBefore } = await ledger.listEntries({
+    const { entries: rawEntries, staleClasses, prunedBefore } = await ledger.listEntries({
       account,
       chainId,
       period: { fromMs: period.from, toMs: period.to },
     })
+    // One logical entry per movement before anything is totaled: a superseded
+    // status snapshot and a second record for the same bridge are not extra
+    // money (FR-035).
+    const entries = collapseLogical(rawEntries)
 
     onProgress(0.5, 'Fetching transaction fees…')
     const receiptCache = new Map()
@@ -225,6 +323,9 @@ export async function buildReport({
       staleClasses,
       prunedBefore,
       valuationNote: PAR_VALUATION_NOTE,
+      // Stated only when the period actually contains a cross-chain movement, so
+      // the treatment is explained exactly where it applies (FR-036).
+      selfTransferNote: lineItems.some((it) => it.selfTransfer) ? SELF_TRANSFER_NOTE : null,
       disclaimer: REPORT_DISCLAIMER,
     }
   }

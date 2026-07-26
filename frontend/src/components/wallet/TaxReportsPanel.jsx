@@ -9,11 +9,13 @@
 
 import { useTaxReport, REPORT_STATUS } from '../../hooks/useTaxReport'
 import { PERIOD_KINDS } from '../../utils/reportPeriods'
+import { classLabel } from '../../data/reports/activityClassification'
 import ReportPeriodSelector from './ReportPeriodSelector'
 import ReportHistoryList from './ReportHistoryList'
 
 function Totals({ totals, showByClass = false }) {
   const byClass = showByClass && totals.byClass ? Object.values(totals.byClass) : []
+  const overall = totals.overall
   return (
     <div className="report-totals">
       <h4>Totals by token</h4>
@@ -21,20 +23,42 @@ function Totals({ totals, showByClass = false }) {
         {Object.values(totals.byTicker).map((t) => (
           <li key={t.ticker}>
             {t.ticker}: net {t.net} ({t.count} entries) — USD {t.usdValue.toFixed(2)}
+            {t.moved ? ` · moved between your own networks: ${t.moved} (USD ${t.movedUsd.toFixed(2)})` : ''}
           </li>
         ))}
         <li>
-          Overall: USD {totals.overall.usdValue.toFixed(2)} · fees {totals.overall.feesNative}{' '}
-          {totals.overall.feesNativeSymbol}
+          Overall: USD {overall.usdValue.toFixed(2)} · fees {overall.feesNative}{' '}
+          {overall.feesNativeSymbol}
         </li>
+        {/* Reported beside the overall, never inside it: moving your own assets
+            between networks is neither income nor a disposal (spec 067 FR-036). */}
+        {overall.movedUsd > 0 && (
+          <li>
+            Moved between your own networks: USD {overall.movedUsd.toFixed(2)} — not income and not a
+            disposal, so it is excluded from the overall above.
+          </li>
+        )}
+        {(overall.platformFeesUsd > 0 || overall.platformFeeUnknownCount > 0) && (
+          <li>
+            Platform fees charged: USD {(overall.platformFeesUsd || 0).toFixed(2)}
+            {overall.platformFeeUnknownCount > 0
+              ? ` · ${overall.platformFeeUnknownCount} entr${overall.platformFeeUnknownCount === 1 ? 'y' : 'ies'} with a platform fee that could not be valued in USD (shown as “unknown”, excluded from this total)`
+              : ''}
+          </li>
+        )}
       </ul>
       {byClass.length > 0 && (
         <>
           <h4>Totals by activity type</h4>
           <ul>
             {byClass.map((c) => (
+              // The human name, not the raw class: "pool" alone cannot tell a
+              // wager pool from a liquidity pool (FR-039a).
               <li key={c.class}>
-                {c.class}: {c.count} entr{c.count === 1 ? 'y' : 'ies'} — USD {c.usdValue.toFixed(2)}
+                {c.label || classLabel(c.class)}: {c.count} entr{c.count === 1 ? 'y' : 'ies'} — USD{' '}
+                {c.usdValue.toFixed(2)}
+                {c.movedUsd ? ` · moved between your own networks: USD ${c.movedUsd.toFixed(2)}` : ''}
+                {c.platformFeesUsd ? ` · platform fees: USD ${c.platformFeesUsd.toFixed(2)}` : ''}
               </li>
             ))}
           </ul>
@@ -70,9 +94,9 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
     <div className="tax-reports-section">
       <h3>Reporting</h3>
       <p className="tax-reports-intro">
-        Generate a downloadable record of your on-chain activity — wagers, transfers, pools, earn,
-        and membership — for a chosen period on the connected network. This is an informational
-        record, not tax advice.
+        Generate a downloadable record of your on-chain activity — wagers, transfers, bridges,
+        liquidity, wager pools, earn, and membership — for a chosen period on the connected network.
+        This is an informational record, not tax advice.
       </p>
 
       <div className="report-quick-actions">
@@ -118,6 +142,9 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
                 <p className="report-note" role="status">
                   {`Could not refresh: ${report.staleClasses.join(', ')} — entries for these classes may be missing.`}
                 </p>
+              )}
+              {report.selfTransferNote && (
+                <p className="report-note">{report.selfTransferNote}</p>
               )}
               <Totals totals={report.totals} showByClass={report.source === 'ledger'} />
             </>

@@ -14,6 +14,7 @@
  */
 
 import Papa from 'papaparse'
+import { classLabel, formatPlatformFee, PLATFORM_FEE_STATUS } from './activityClassification'
 
 /** Legacy canonical column order (spec 016), shared with the PDF renderer. */
 export const REPORT_COLUMNS = [
@@ -30,10 +31,15 @@ export const REPORT_COLUMNS = [
   'Wager ID',
 ]
 
-/** Spec 051 extended column order (contracts/ledger-entry.md). */
+/**
+ * Spec 051 extended column order (contracts/ledger-entry.md), widened by spec
+ * 067 with the platform fee actually charged and the cross-chain leg of a
+ * bridge — one row naming both networks and both transactions (FR-035/FR-036).
+ */
 export const LEDGER_REPORT_COLUMNS = [
   'Timestamp (UTC)',
   'Class',
+  'Activity',
   'Kind',
   'Direction',
   'Status',
@@ -44,7 +50,11 @@ export const LEDGER_REPORT_COLUMNS = [
   'Valuation',
   'Cost Basis',
   'Network Fee',
+  'Platform Fee',
+  'Platform Fee USD',
   'Transaction Hash',
+  'Destination Network',
+  'Destination Transaction Hash',
   'From',
   'To',
   'Wager ID',
@@ -56,6 +66,18 @@ export function feeCell(item) {
     return `${item.feeNative} ${item.feeNativeSymbol || ''}`.trim()
   }
   return item.feeUnavailableReason || 'N/A'
+}
+
+/**
+ * The platform fee in USD: a figure only where one is actually known. `unknown`
+ * covers both "a chargeable action never reported what it took" and "the fee is
+ * known in tokens but the entry carries no basis to value it" — neither may be
+ * rendered as 0.00, which would read as "you were charged nothing" (FR-036).
+ */
+export function platformFeeUsdCell(item) {
+  const fee = item.platformFee
+  if (!fee || fee.status === PLATFORM_FEE_STATUS.NOT_APPLICABLE) return ''
+  return fee.usd != null ? fee.usd.toFixed(2) : 'unknown'
 }
 
 /** Real activity time or an explicit flag — never a fabricated date (FR-006). */
@@ -84,8 +106,13 @@ function ledgerRow(item) {
   return [
     timestampCell(item),
     item.class ?? 'wager',
+    // Human activity name alongside the machine class: 'pool' alone cannot tell
+    // a wager pool from a liquidity pool (FR-039a).
+    item.classLabel ?? classLabel(item.class),
     item.kind ?? item.direction,
-    item.direction,
+    // The VALUE direction — in / out / none. A bridge reads `none` because
+    // moving your own assets between networks is neither (FR-036).
+    item.valueDirection ?? item.direction,
     item.status ?? 'settled',
     item.failureReason ?? '',
     item.tokenTicker,
@@ -95,7 +122,11 @@ function ledgerRow(item) {
     item.valuationStatus ?? 'valued',
     unvalued ? 'unvalued' : item.costBasis.toFixed(2),
     feeCell(item),
+    formatPlatformFee(item.platformFee),
+    platformFeeUsdCell(item),
     item.txHash,
+    item.destinationNetworkName ?? '',
+    item.destinationTxHash ?? '',
     item.fromAddress,
     item.toAddress,
     item.wagerId,
@@ -136,20 +167,35 @@ export function render(report) {
   if (report.totals?.overall?.failedCount > 0) {
     preamble.push(['Failed operations', `${report.totals.overall.failedCount} failed operation(s) are listed but excluded from all totals.`])
   }
+  // Spec 067 FR-036: state the cross-chain treatment on the export itself.
+  if (report.selfTransferNote) {
+    preamble.push(['Cross-network transfers', report.selfTransferNote])
+  }
+  if (report.totals?.overall?.platformFeeUnknownCount > 0) {
+    preamble.push([
+      'Platform fee note',
+      `${report.totals.overall.platformFeeUnknownCount} entr${report.totals.overall.platformFeeUnknownCount === 1 ? 'y' : 'ies'} ` +
+        'carry a platform fee that could not be valued in USD; they are excluded from the platform-fee total below and marked "unknown".',
+    ])
+  }
   preamble.push(['Disclaimer', report.disclaimer], [])
 
   const table = [reportColumns(report), ...report.lineItems.map((it) => lineItemToRow(it, report))]
 
   const totals = [[], ['Totals by token (settled activity only)']]
   for (const t of Object.values(report.totals.byTicker)) {
-    totals.push([
+    const row = [
       t.ticker,
       `deposits ${t.deposits}`,
       `payouts ${t.payouts}`,
       `refunds ${t.refunds}`,
       `net ${t.net}`,
       `USD ${t.usdValue.toFixed(2)}`,
-    ])
+    ]
+    // Value moved between the member's own networks sits outside net — it is
+    // neither a receipt nor a disposal (FR-036).
+    if (t.moved) row.push(`moved between your networks ${t.moved} (USD ${t.movedUsd.toFixed(2)})`)
+    totals.push(row)
   }
 
   // Collated per-activity breakdown — the multi-use view the flat table cannot
@@ -158,21 +204,44 @@ export function render(report) {
   if (report.source === 'ledger' && byClass && Object.keys(byClass).length) {
     totals.push([], ['Totals by activity type (settled activity only)'])
     for (const c of Object.values(byClass)) {
-      totals.push([
+      const row = [
         c.class,
+        c.label ?? classLabel(c.class),
         `entries ${c.count}`,
         `in USD ${c.inUsd.toFixed(2)}`,
         `out USD ${c.outUsd.toFixed(2)}`,
         `USD ${c.usdValue.toFixed(2)}`,
-      ])
+      ]
+      if (c.movedUsd) row.push(`moved between your networks USD ${c.movedUsd.toFixed(2)}`)
+      if (c.platformFeesUsd) row.push(`platform fees USD ${c.platformFeesUsd.toFixed(2)}`)
+      totals.push(row)
     }
   }
 
+  const overall = report.totals.overall
   totals.push([
     'Overall',
-    `USD ${report.totals.overall.usdValue.toFixed(2)}`,
-    `fees ${report.totals.overall.feesNative} ${report.totals.overall.feesNativeSymbol}`,
+    `USD ${overall.usdValue.toFixed(2)}`,
+    `fees ${overall.feesNative} ${overall.feesNativeSymbol}`,
   ])
+  // Reported beside the overall, never inside it: a self-transfer is not income
+  // and not a disposal, and the platform fee is the only cost it carries.
+  if (overall.movedUsd) {
+    totals.push([
+      'Moved between your own networks',
+      `USD ${overall.movedUsd.toFixed(2)}`,
+      'not income, not a disposal — excluded from the overall above',
+    ])
+  }
+  if (report.source === 'ledger' && (overall.platformFeesUsd || overall.platformFeeUnknownCount)) {
+    totals.push([
+      'Platform fees charged',
+      `USD ${(overall.platformFeesUsd || 0).toFixed(2)}`,
+      overall.platformFeeUnknownCount
+        ? `${overall.platformFeeUnknownCount} entr${overall.platformFeeUnknownCount === 1 ? 'y' : 'ies'} with an unvalued platform fee excluded`
+        : '',
+    ])
+  }
 
   return Papa.unparse([...preamble, ...table, ...totals])
 }

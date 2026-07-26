@@ -228,24 +228,24 @@ platform fees, and sanctions.
 report with correct classification; notifications fire and respect per-category delivery; the fee shown
 matches what was charged; a deny-listed wallet is refused at both surfaces before any signature.
 
-- [ ] T105 [P] [US3] Register the bridge and liquidity ledger sources in `frontend/src/data/ledger/index.js` and `ledgerRepository.js`
-- [ ] T106 [US3] Ensure a bridge renders as **one** logical ledger entry naming both networks and both transactions in `frontend/src/data/ledger/normalize.js` (FR-035)
-- [ ] T107 [US3] Include bridge and liquidity entries in reporting with fees attributed and cross-chain self-transfers excluded from income and disposals, in `frontend/src/lib/reports/` and the Reporting panel under `frontend/src/components/reports/` (FR-036)
-- [ ] T108 [P] [US3] Add `bridge: { label: 'Bridge' }` and `liquidity: { label: 'Liquidity' }` to `DOMAIN_META` in `frontend/src/data/notifications/domains.js`
-- [ ] T109 [US3] **Relabel the wager-pool domain from `'Pool'` to `'Wager Pool'`** in `frontend/src/data/notifications/domains.js` (FR-039a) — the collision is otherwise invisible until a member has both kinds of activity
-- [ ] T110 [P] [US3] Append the Bridge and Liquidity categories to `NOTIFICATION_CATEGORIES` in `frontend/src/lib/notifications/deliveryPreferences.js`, defaulting to delivered (FR-038)
-- [ ] T111 [US3] Emit notifications for bridge delivered, refunded, and needs-attention from `frontend/src/lib/bridge/bridgeStatus.js` (FR-037)
-- [ ] T112 [US3] Emit notifications for pool closed-to-deposits and positions materially affected by a protocol event from `frontend/src/lib/liquidity/liquidityRouter.js` (FR-037)
-- [ ] T113 [US3] Wire the live `bridge.transfer` rate into the bridge confirm step via `fetchFeeQuote`, rendering **no fee line at all** at zero rate (FR-028/FR-029) in `frontend/src/components/wallet/BridgeQuoteCard.jsx`
-- [ ] T114 [US3] Wire the live `liquidity.deposit` rate into the supply confirm step, with no fee line for bridge-LP pools at any rate, in `frontend/src/components/earn/SupplySheet.jsx`
-- [ ] T115 [US3] Block the fee-bearing path (never assume a lower rate) when `FeeRouter` is present but unreadable, in `frontend/src/lib/fees/feeQuote.js`
-- [ ] T116 [P] [US3] Wire `useAddressScreening` into both surfaces so screening happens at submission, not only at display, in `frontend/src/components/wallet/BridgeView.jsx` and `frontend/src/components/earn/SupplySheet.jsx` (FR-032)
-- [ ] T117 [P] [US3] Ledger consistency tests for bridge single-entry representation and liquidity/wager-pool distinguishability in `frontend/src/test/ledger/ledgerConsistency.test.js`
-- [ ] T118 [P] [US3] Tests asserting the two new notification categories are independently controllable and that no bridge or liquidity notification is attributed to the wager-pool category, in `frontend/src/test/notifications/`
-- [ ] T119 [P] [US3] Tests asserting the quoted rate is a hard ceiling and that a zero rate renders no fee line, in `frontend/src/test/fees/`
-- [ ] T120 [P] [US3] Tests asserting a deny-listed wallet is refused at both surfaces before signature, including a listing that lands between quote and submission, in `frontend/src/test/` (SC-013)
-- [ ] T154 [US3] Implement the platform's existing **restricted-account policy** for view and exit on both surfaces in `frontend/src/components/wallet/BridgeView.jsx` and `frontend/src/components/earn/SupplyView.jsx` — a restricted member must still see existing positions and in-flight bridges and still be able to exit, following the established treatment rather than a new one (FR-033)
-- [ ] T155 [P] [US3] Test that a restricted account can still view and exit existing positions while being refused new value-in, in `frontend/src/test/` (FR-033)
+- [X] T105 [P] [US3] Register the bridge and liquidity ledger sources in `frontend/src/data/ledger/index.js` and `ledgerRepository.js`
+- [X] T106 [US3] Ensure a bridge renders as **one** logical ledger entry naming both networks and both transactions in `frontend/src/data/ledger/normalize.js` (FR-035)
+- [X] T107 [US3] Include bridge and liquidity entries in reporting with fees attributed and cross-chain self-transfers excluded from income and disposals, in `frontend/src/data/reports/` and the Reporting panel at `frontend/src/components/wallet/TaxReportsPanel.jsx` (FR-036)
+- [X] T108 [P] [US3] Add `bridge: { label: 'Bridge' }` and `liquidity: { label: 'Liquidity' }` to `DOMAIN_META` in `frontend/src/data/notifications/domains.js`
+- [X] T109 [US3] **Relabel the wager-pool domain from `'Pool'` to `'Wager Pool'`** in `frontend/src/data/notifications/domains.js` (FR-039a) — the collision is otherwise invisible until a member has both kinds of activity
+- [X] T110 [P] [US3] Append the Bridge and Liquidity categories to `NOTIFICATION_CATEGORIES` in `frontend/src/lib/notifications/deliveryPreferences.js`, defaulting to delivered (FR-038)
+- [X] T111 [US3] Emit notifications for bridge delivered, refunded, and needs-attention from `frontend/src/lib/bridge/bridgeStatus.js` (FR-037)
+- [X] T112 [US3] Emit notifications for pool closed-to-deposits and positions materially affected by a protocol event from `frontend/src/lib/liquidity/liquidityRouter.js` (FR-037)
+- [X] T113 [US3] Wire the live `bridge.transfer` rate into the bridge confirm step via `fetchFeeQuote`, rendering **no fee line at all** at zero rate (FR-028/FR-029) in `frontend/src/components/wallet/BridgeQuoteCard.jsx`
+- [X] T114 [US3] Wire the live `liquidity.deposit` rate into the supply confirm step, with no fee line for bridge-LP pools at any rate, in `frontend/src/components/earn/SupplySheet.jsx`
+- [X] T115 [US3] Block the fee-bearing path (never assume a lower rate) when `FeeRouter` is present but unreadable, in `frontend/src/lib/fees/feeQuote.js`
+- [X] T116 [P] [US3] Wire `useAddressScreening` into both surfaces so screening happens at submission, not only at display, in `frontend/src/components/wallet/BridgeView.jsx` and `frontend/src/components/earn/SupplySheet.jsx` (FR-032)
+- [X] T117 [P] [US3] Ledger consistency tests for bridge single-entry representation and liquidity/wager-pool distinguishability in `frontend/src/test/ledger/ledgerConsistency.test.js`
+- [X] T118 [P] [US3] Tests asserting the two new notification categories are independently controllable and that no bridge or liquidity notification is attributed to the wager-pool category, in `frontend/src/test/notifications/`
+- [X] T119 [P] [US3] Tests asserting the quoted rate is a hard ceiling and that a zero rate renders no fee line, in `frontend/src/test/fees/`
+- [X] T120 [P] [US3] Tests asserting a deny-listed wallet is refused at both surfaces before signature, including a listing that lands between quote and submission, in `frontend/src/test/` (SC-013)
+- [X] T154 [US3] Implement the platform's existing **restricted-account policy** for view and exit on both surfaces in `frontend/src/components/wallet/BridgeView.jsx` and `frontend/src/components/earn/SupplyView.jsx` — a restricted member must still see existing positions and in-flight bridges and still be able to exit, following the established treatment rather than a new one (FR-033)
+- [X] T155 [P] [US3] Test that a restricted account can still view and exit existing positions while being refused new value-in, in `frontend/src/test/` (FR-033)
 
 **Checkpoint**: both surfaces are fully wired into the shared services.
 

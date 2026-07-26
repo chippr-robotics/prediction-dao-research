@@ -38,6 +38,19 @@
  *    retirement closes new deposits only, and the pool stays visible and withdrawable
  *    (FR-024). Where inventory cannot fill an exit in full, the member takes what is available
  *    now and is told plainly that the remainder can be withdrawn later (FR-022).
+ *
+ * 6. SCREENING REFUSES VALUE-IN ONLY, AND IT BITES AT SUBMISSION (FR-032/FR-033, T116/T154).
+ *    The acting wallet is screened through `useAddressScreening` — the platform's one
+ *    screening path — against the POOL's network, using that network's own read provider,
+ *    because the wallet may still be on another chain until the signing-time switch. The
+ *    verdict is read TWICE and for two different jobs: at display it holds back the step that
+ *    leads to a signature, and inside `submitSupply` it is re-read PAST THE CACHE so a wallet
+ *    deny-listed since the sheet opened is refused before anything is signed. It never touches
+ *    `submitWithdraw`: a restricted member keeps the exit, in full, always — point 5 is not
+ *    conditional on screening. Note the BRIDGE-LP supply is a direct HubPool call with no
+ *    FairWins contract in it, so this client-side screen is the only screen on that path;
+ *    `uncertain` is still disclosed rather than treated as flagged, because the guard is not
+ *    deployed on every pooling network and refusing everyone there would be its own dishonesty.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * ── PROPS ────────────────────────────────────────────────────────────────────────────────
@@ -61,11 +74,13 @@ import UniversalAssetSelect from '../ui/UniversalAssetSelect'
 import InfoTip from '../ui/InfoTip'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { useEarnSend } from '../../hooks/useEarnSend'
+import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { useActivityOptional } from '../../hooks/useActivity'
 import usePortfolio from '../../hooks/usePortfolio'
 import { NETWORKS } from '../../config/networks'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
 import { makeReadProvider } from '../../utils/rpcProvider'
+import { readPooledToken } from '../../lib/liquidity/acrossLpPositions'
 import { samePair } from '../../lib/assets/networkPin'
 import {
   POOL_KIND,
@@ -97,12 +112,24 @@ import {
   poolDisclosure,
   poolKindOf,
 } from '../../lib/liquidity/liquidityCopy'
-import { FEE_SERVICES, bpsToPercent, fetchFeeQuote } from '../../lib/fees/feeQuote'
+import { FEE_SERVICES, bpsToPercent, fetchFeeQuote, maxFeeBpsFor } from '../../lib/fees/feeQuote'
 import { LIQUIDITY_ACTION, captureLiquidityAction } from '../../data/ledger/sources/liquidityLedgerSource'
 import './SupplySheet.css'
 
 /** Uniswap's deadline: long enough for a slow inclusion, short enough to expire honestly. */
 const DEADLINE_SECONDS = 30 * 60
+
+/**
+ * FR-032/FR-033 — the refusal a flagged wallet gets. It names what is refused (new value
+ * in) AND what is not (the exit), because a member who is told only "blocked" will assume
+ * their money is stuck, and it is not.
+ */
+const SCREENING_REFUSAL =
+  'This wallet is flagged by sanctions screening, so nothing new can be supplied. Nothing has been moved. Withdrawing what you already have in a pool is unaffected.'
+
+/** Screening could not run here — an unknown, stated as one, blocking nothing. */
+const SCREENING_UNAVAILABLE =
+  'Sanctions screening could not be run on this network just now, so this deposit has not been pre-checked here.'
 
 const lower = (v) => (v == null ? null : String(v).toLowerCase())
 /** Identity of one pool leg: a token address ON a network. */
@@ -156,15 +183,20 @@ export default function SupplySheet({
   positions = [],
   onClose,
   onActionComplete,
+  initialMode = 'supply',
 }) {
   const { address, chainId: walletChainId } = useWallet() || {}
   const { sendOnChain, canTransactOn, cannotTransactReason, isPasskey } = useEarnSend()
+  const { screenOne } = useAddressScreening()
   const activity = useActivityOptional()
   const portfolio = usePortfolio() || {}
   const sheetRef = useRef(null)
   const restoreFocusRef = useRef(null)
 
-  const [mode, setMode] = useState('supply') // supply | withdraw
+  // Honour the mode the CARD asked for. It used to hard-start at 'supply', so tapping Withdraw
+  // landed the member on the supply tab — worst on a retired pool, which renders no Supply control
+  // at all, leaving the member unable to reach their own exit (FR-021/FR-024).
+  const [mode, setMode] = useState(initialMode === 'withdraw' ? 'withdraw' : 'supply')
   const [step, setStep] = useState('amount') // amount | confirm
   const [ackDisclosure, setAckDisclosure] = useState(false)
   const [amount0Text, setAmount0Text] = useState('')
@@ -175,6 +207,8 @@ export default function SupplySheet({
   const [secondKey, setSecondKey] = useState(null)
   const [inputError, setInputError] = useState(null)
   const [feeQuote, setFeeQuote] = useState(null)
+  // null = not screened yet | 'clear' | 'restricted' | 'uncertain'
+  const [screening, setScreening] = useState(null)
   const [txState, setTxState] = useState({ step: 'idle', txUrl: null, error: null, note: null })
 
   useEffect(() => {
@@ -197,7 +231,7 @@ export default function SupplySheet({
   }, [onClose])
 
   const isTrading = Number(initialPool?.kind) === POOL_KIND.TRADING_LP
-  const kindLabel = LIQUIDITY_KIND_LABEL[poolKindOf(initialPool?.kind)] || 'Pool'
+  const kindLabel = LIQUIDITY_KIND_LABEL[poolKindOf(initialPool?.kind)] || 'Liquidity pool'
 
   // ── The pair selector (T097/T103) ───────────────────────────────────────────────────────
   // Every leg of every ENABLED curated trading pool, so the first selector offers exactly the
@@ -337,9 +371,52 @@ export default function SupplySheet({
     }
   }, [feeApplicable, chainId])
 
-  const feeBps = feeApplicable && feeQuote?.available ? Number(feeQuote.bps) || 0 : 0
-  const feeBlocked = feeApplicable && Boolean(feeQuote?.failed)
+  // ── Screening the ACTING wallet (FR-032, point 6) ───────────────────────────────────────
+  // Against the POOL's network, with that network's own read provider: the wallet may still
+  // be on another chain until the signing-time switch, and screening against the wrong
+  // network's guard would be worse than not screening at all.
+  useEffect(() => {
+    if (!address || !chainId) {
+      setScreening(null)
+      return undefined
+    }
+    let cancelled = false
+    setScreening(null)
+    const rpcUrl = NETWORKS[chainId]?.rpcUrl
+    const provider = rpcUrl ? makeReadProvider(rpcUrl, chainId) : null
+    Promise.resolve(screenOne(address, chainId, { provider }))
+      .then((status) => {
+        if (!cancelled) setScreening(status)
+      })
+      .catch(() => {
+        if (!cancelled) setScreening('uncertain')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [address, chainId, screenOne])
+
+  /**
+   * ONE derivation for both the rate on screen and the ceiling in the calldata (T113/
+   * T114). `maxFeeBpsFor` is the only thing that turns a quote into basis points, so the
+   * disclosed rate and the signed `maxFeeBps` cannot drift apart — and an unread or
+   * out-of-cap rate resolves to `null` (no usable rate) rather than to a quiet 0, which
+   * would be a ceiling nobody was shown.
+   */
+  const quotedBps = useMemo(() => {
+    if (!feeApplicable) return 0
+    try {
+      return maxFeeBpsFor(feeQuote)
+    } catch {
+      return null
+    }
+  }, [feeApplicable, feeQuote])
+
   const feeLoading = feeApplicable && feeQuote == null
+  // A router IS deployed here and the rate did not come back (or came back failing its
+  // own cap). New value-in stops; withdrawing is untouched (point 5).
+  const feeBlocked = feeApplicable && !feeLoading && quotedBps == null
+  const feeBps = quotedBps ?? 0
   /**
    * The fee copy, or null ⇒ NO fee line at all. Null for a bridge pool (point 2), for a
    * network with no fee system, and at a zero rate (FR-029 — identical to no fee configured).
@@ -424,10 +501,23 @@ export default function SupplySheet({
       const leg = violation.leg === 0 ? { d: decimals0, s: symbol0 } : { d: decimals1, s: symbol1 }
       return `${LIQUIDITY_UNAVAILABLE.aboveLimit} The most this pool takes in one deposit is ${fmt(violation.max, leg.d, leg.s)}.`
     }
+    // Both fee stops are re-checked HERE, on the submit path, not only on the control
+    // that leads to it: the rate is re-read whenever the pool's network changes, so a
+    // member can be standing on the confirm step when it goes away. A quote still in
+    // flight is not a zero rate, so it holds the signature back too (FR-028).
     if (feeBlocked) return LIQUIDITY_UNAVAILABLE.fees
+    if (feeLoading) return 'The current platform fee is still being read — one moment, so the rate you sign against is the live one.'
+    // FR-032 — new value in is refused for a flagged wallet. This is the DISPLAY-side
+    // half; `submitSupply` re-reads the verdict live before it builds anything.
+    if (screening === 'restricted') return SCREENING_REFUSAL
     return null
   }
 
+  /**
+   * FR-033 — deliberately NO screening check here, and none in `submitWithdraw`.
+   * Refusing new value in is correct; standing between a member and money that is
+   * already theirs is not. The exit stays open whatever the verdict.
+   */
   const validateWithdraw = () => {
     if (!hasPosition) return 'You do not have anything in this pool to withdraw.'
     if (isTrading) {
@@ -535,6 +625,23 @@ export default function SupplySheet({
       return
     }
     if (!guard()) return
+
+    // FR-032 — the screen BITES HERE, before any call is built or signed, and it is a
+    // forced re-read rather than the cached verdict behind the disabled control: a wallet
+    // deny-listed since the sheet opened is refused at this line. It matters most on the
+    // bridge-LP branch below, which calls the HubPool directly with no FairWins contract
+    // in the path, so no on-chain guard backs it up.
+    const rpc = NETWORKS[chainId]?.rpcUrl
+    const verdict = await screenOne(address, chainId, {
+      provider: rpc ? makeReadProvider(rpc, chainId) : null,
+      force: true,
+    })
+    setScreening(verdict)
+    if (verdict === 'restricted') {
+      setTxState({ step: 'error', txUrl: null, note: null, error: SCREENING_REFUSAL })
+      return
+    }
+
     const deadline = Math.floor(Date.now() / 1000) + DEADLINE_SECONDS
 
     if (!isTrading) {
@@ -546,6 +653,26 @@ export default function SupplySheet({
         setTxState({ step: 'error', txUrl: null, note: null, error: err.message })
         return
       }
+
+      // Re-read the pool at signing time, exactly as the trading branch below does. Across
+      // exposes its own retirement flag (`isEnabled`) and it is already read at DISPLAY time, so
+      // a pool retired between opening the sheet and signing was reaching the wallet and
+      // reverting opaquely — the very failure the trading branch says it exists to prevent.
+      setTxState({ step: 'checking', txUrl: null, error: null, note: null })
+      try {
+        const provider = makeReadProvider(pool.chainId)
+        const pooled = provider
+          ? await readPooledToken({ provider, hubPool: pool.hubPool, l1Token: pool.token0 })
+          : null
+        if (pooled && pooled.isEnabled === false) {
+          setTxState({ step: 'error', txUrl: null, note: null, error: RETIRED_POOL_COPY })
+          return
+        }
+      } catch {
+        // A failed re-read is not proof the pool is closed. Fall through rather than refuse a
+        // supply on an unreadable RPC — the contract still enforces its own state.
+      }
+
       await runSend(built.calls, {
         action: LIQUIDITY_ACTION.SUPPLY,
         extra: { amountRaw: amount0.toString() },
@@ -599,8 +726,10 @@ export default function SupplySheet({
         amount0Desired: amount0,
         amount1Desired: amount1,
         deadline,
-        // FR-028 — the rate the member was shown is the ceiling the router enforces on-chain.
-        maxFeeBps: feeBps,
+        // FR-028 — the ceiling the router enforces on-chain is the SAME number the
+        // confirm step disclosed, straight from `maxFeeBpsFor`. `validateSupply` has
+        // already refused an unread rate, so this is never a defaulted 0.
+        maxFeeBps: quotedBps,
       })
     } catch (err) {
       setTxState({ step: 'error', txUrl: null, note: null, error: err.message })
@@ -703,21 +832,30 @@ export default function SupplySheet({
   // until the rate is known (FR-028). Blocking the keyboard on a pending read would read as
   // a broken form rather than as an honest wait.
   const depositsClosed = retired || unreachable
-  const supplyBlocked = depositsClosed || feeBlocked || feeLoading
+  // FR-033 — a flagged wallet loses the SUPPLY path and nothing else. The Withdraw tab, the
+  // position figures, and `submitWithdraw` are all untouched below, so a restricted member
+  // can still see what they hold and take it out.
+  const screeningRestricted = screening === 'restricted'
+  const supplyBlocked = depositsClosed || feeBlocked || feeLoading || screeningRestricted
   // FR-065 — a pin that leaves no counterpart says so and names what would change it, rather
   // than pairing an empty dropdown with a silently disabled control.
   const pairEmptyMessage = noPairCounterpartCopy(firstAsset?.symbol, firstAsset?.networkName || networkName)
 
-  const feeCeiling =
-    feeCopy && amount0 != null && amount1 != null
-      ? feeCeilingCopy(
-          `${fmt(maxSupplyFee({ amountDesired: amount0, bps: feeBps }), decimals0, symbol0)} + ${fmt(
-            maxSupplyFee({ amountDesired: amount1, bps: feeBps }),
-            decimals1,
-            symbol1,
-          )}`,
-        )
-      : null
+  /**
+   * FR-028's "resulting net amount", in the only form that is true here: a CEILING.
+   * `maxSupplyFee` is the fee on the whole amount entered — the most it can ever be,
+   * because the pool can only take less than offered, never more — and the net beside
+   * it is the matching floor on what goes in. Neither is presented as the charge.
+   */
+  const feeCeiling = (() => {
+    if (!feeCopy || amount0 == null || amount1 == null) return null
+    const maxFee0 = maxSupplyFee({ amountDesired: amount0, bps: feeBps })
+    const maxFee1 = maxSupplyFee({ amountDesired: amount1, bps: feeBps })
+    return feeCeilingCopy(
+      `${fmt(maxFee0, decimals0, symbol0)} + ${fmt(maxFee1, decimals1, symbol1)}`,
+      `${fmt(amount0 - maxFee0, decimals0, symbol0)} + ${fmt(amount1 - maxFee1, decimals1, symbol1)}`,
+    )
+  })()
 
   return (
     <div className="asset-sheet-backdrop">
@@ -804,6 +942,20 @@ export default function SupplySheet({
 
             {mode === 'supply' ? (
               <>
+                {/* FR-032/FR-033 — the verdict, stated, on the value-in path only.
+                    'restricted' refuses and says what is NOT refused; 'uncertain' is
+                    disclosed as an unknown and blocks nothing, because the guard is not
+                    deployed on every pooling network. */}
+                {screeningRestricted && (
+                  <p className="earn-input-error" role="alert" data-testid="supply-screening-refusal">
+                    {SCREENING_REFUSAL}
+                  </p>
+                )}
+                {screening === 'uncertain' && (
+                  <p className="supply-note" role="note" data-testid="supply-screening-unavailable">
+                    {SCREENING_UNAVAILABLE}
+                  </p>
+                )}
                 {step === 'amount' ? (
                   <>
                     {/* ── The pair selector (T097). `samePair`, never `bridgeDest`. ── */}

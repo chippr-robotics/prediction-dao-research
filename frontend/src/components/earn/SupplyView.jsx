@@ -721,6 +721,9 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
         <Suspense fallback={<p className="earn-state">Opening…</p>}>
           <SupplySheet
             pool={sheet.pool}
+            /* The card asked for supply or withdraw — deliver it. Without this the sheet
+               always opened on Supply, and a retired pool has no Supply control at all. */
+            initialMode={sheet.mode}
             /* Every curated pool, not just the shown ones: the sheet decides which
                assets can form a real pair, and a token filter must not silently
                narrow what a member is allowed to pair (FR-054). */
