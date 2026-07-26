@@ -78,6 +78,20 @@
  *   BTC_WRITE_QUOTA_PER_IP     broadcasts/min per caller IP (default 20 — stricter than reads)
  *   BTC_WRITE_QUOTA_GLOBAL     broadcasts/min across all callers (default 100)
  *   BTC_KILLSWITCH             'true' => all /v1/bitcoin/* routes answer 503 bitcoin_killed (ops kill)
+ *   BRIDGE_ENABLED             'true' enables the /v1/bridge/* Across proxy (spec 067). Default false =>
+ *                              routes answer 503 bridge_disabled and the SPA hides the Bridge tab
+ *   BRIDGE_API_URL             Across API base (default https://app.across.to/api)
+ *   BRIDGE_CHAIN_IDS           comma list of chains bridging is offered between (default the spec-067
+ *                              five: 1,10,137,8453,42161 — all carry an Across SpokePool)
+ *   BRIDGE_TIMEOUT_MS          upstream request timeout (default 5000)
+ *   BRIDGE_RETRIES             upstream retries on 5xx/transport (default 1; all routes are reads)
+ *   BRIDGE_QUOTE_TTL_MS        quote cache TTL (default 10000 — single-flight only; a quote is NEVER
+ *                              served stale, the route 503s instead)
+ *   BRIDGE_STATUS_TTL_MS       deposit-status cache TTL (default 15000; stale IS served, marked)
+ *   BRIDGE_QUOTA_PER_IP        reads/min per caller IP (default 60 — polymarket parity)
+ *   BRIDGE_QUOTA_GLOBAL        reads/min across all callers (default 300)
+ *   BRIDGE_QUOTA_WINDOW_MS     quota window (default 60000)
+ *   BRIDGE_KILLSWITCH          'true' => all /v1/bridge/* routes answer 503 bridge_killed (ops kill)
  *   FEE_ROUTER_ADDRESS         FeeRouter proxy (spec 060) serving the LIVE polymarket.taker/.maker bps.
  *                              Defaults to the deployment record's feeRouter for FEE_ROUTER_CHAIN_ID;
  *                              a set value that CONTRADICTS the record fails boot loudly. Unset and not
@@ -436,6 +450,54 @@ export function loadConfig(env = process.env, opts = {}) {
         writeQuotaPerIp: int(env, 'BTC_WRITE_QUOTA_PER_IP', 20),
         writeQuotaGlobal: int(env, 'BTC_WRITE_QUOTA_GLOBAL', 100),
         killSwitch: opt(env, 'BTC_KILLSWITCH', 'false').toLowerCase() === 'true',
+      }
+    })(),
+    // Cross-chain bridge proxy (spec 067): optional like the Bitcoin/Polymarket proxies — disabled
+    // means the /v1/bridge/* routes 503 fail-closed (bridge_disabled) and the SPA hides the Bridge
+    // tab for a stated reason (FR-053); boot is unaffected. Fail-loud validation applies only when
+    // the module is ENABLED, because a bad upstream URL or a one-chain route set cannot produce a
+    // single valid bridge and must stop the boot rather than 502 every request.
+    bridge: (() => {
+      const enabled = opt(env, 'BRIDGE_ENABLED', 'false').toLowerCase() === 'true'
+      const apiUrl = opt(env, 'BRIDGE_API_URL', 'https://app.across.to/api')
+      // The spec-067 launch matrix (research R8): every one of these carries an Across SpokePool.
+      // ETC/Mordor/Amoy are absent on purpose — no Across deployment exists there (FR-006c).
+      const chainIds = opt(env, 'BRIDGE_CHAIN_IDS', '1,10,137,8453,42161')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => {
+          const n = Number.parseInt(s, 10)
+          if (!Number.isInteger(n) || n <= 0) throw new Error(`[relay-gateway] invalid chainId in BRIDGE_CHAIN_IDS: ${s}`)
+          return n
+        })
+      if (enabled) {
+        let ok = false
+        try {
+          ok = ['http:', 'https:'].includes(new URL(apiUrl).protocol)
+        } catch {
+          ok = false
+        }
+        if (!ok) throw new Error(`[relay-gateway] BRIDGE_API_URL=${apiUrl} is not a valid http(s) URL`)
+        // A bridge needs two endpoints; one chain can only ever produce same-chain "routes".
+        if (new Set(chainIds).size < 2) {
+          throw new Error('[relay-gateway] BRIDGE_CHAIN_IDS must list at least two distinct chainIds when BRIDGE_ENABLED=true')
+        }
+      }
+      return {
+        enabled,
+        apiUrl,
+        chainIds,
+        timeoutMs: int(env, 'BRIDGE_TIMEOUT_MS', 5000),
+        retries: int(env, 'BRIDGE_RETRIES', 1),
+        // Quotes move with gas and relayer capital, so the window is short and the cache is used
+        // for single-flight de-dup only — routes.js refuses to serve a stale quote at all (FR-008).
+        quoteTtlMs: int(env, 'BRIDGE_QUOTE_TTL_MS', 10_000),
+        statusTtlMs: int(env, 'BRIDGE_STATUS_TTL_MS', 15_000),
+        quotaPerIp: int(env, 'BRIDGE_QUOTA_PER_IP', 60),
+        quotaGlobal: int(env, 'BRIDGE_QUOTA_GLOBAL', 300),
+        quotaWindowMs: int(env, 'BRIDGE_QUOTA_WINDOW_MS', 60_000),
+        killSwitch: opt(env, 'BRIDGE_KILLSWITCH', 'false').toLowerCase() === 'true',
       }
     })(),
     // FeeRouter (spec 060): the on-chain source of truth for the Polymarket builder bps. The env

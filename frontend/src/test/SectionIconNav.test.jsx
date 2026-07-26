@@ -10,7 +10,7 @@ import SectionIconNav from '../components/nav/SectionIconNav'
 
 const ITEMS = [
   { id: 'trade', label: 'Trade', icon: 'trade' },
-  { id: 'paytransfer', label: 'Pay & Transfer', icon: 'transfer' },
+  { id: 'paytransfer', label: 'Transfer', icon: 'transfer' },
   { id: 'custody', label: 'Protect', icon: 'shield' },
 ]
 
@@ -35,7 +35,7 @@ describe('SectionIconNav (mobile bottom quick-nav)', () => {
   it('calls onSelect with the item id when tapped', () => {
     const onSelect = vi.fn()
     render(<SectionIconNav items={ITEMS} activeId="trade" onSelect={onSelect} />)
-    fireEvent.click(screen.getByRole('button', { name: /pay & transfer/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^transfer$/i }))
     expect(onSelect).toHaveBeenCalledWith('paytransfer')
   })
 

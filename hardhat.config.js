@@ -362,6 +362,25 @@ module.exports = {
         url: process.env.AMOY_RPC_URL,
         blockNumber: process.env.AMOY_FORK_BLOCK ? parseInt(process.env.AMOY_FORK_BLOCK, 10) : undefined,
       } : undefined,
+      // Hardfork activation history for the chains spec-067 fork tests reset onto
+      // (test/fork/bridgeRouter.fork.test.js, liquidityRouter.fork.test.js).
+      //
+      // Hardhat only ships an activation history for Ethereum mainnet; forking any other
+      // chain fails with "No known hardfork for execution on historical block N ... The node
+      // was not configured with a hardfork activation history." Declaring the history here is
+      // the documented fix.
+      //
+      // `cancun: 0` is a deliberate simplification, not a historical claim: these fork tests
+      // only ever reset onto a RECENT block, and all five networks are well past their
+      // Cancun-equivalent upgrade today, so the semantics applied to the blocks we actually
+      // execute against are correct. Do NOT rely on this config to replay genuinely historical
+      // blocks — pin a real activation history first if that is ever needed.
+      chains: {
+        10: { hardforkHistory: { cancun: 0 } },     // Optimism
+        137: { hardforkHistory: { cancun: 0 } },    // Polygon
+        8453: { hardforkHistory: { cancun: 0 } },   // Base
+        42161: { hardforkHistory: { cancun: 0 } },  // Arbitrum One
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545",

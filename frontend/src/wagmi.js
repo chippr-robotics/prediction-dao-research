@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import { arbitrum, base, mainnet, optimism, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { passkeyConnector } from './connectors/passkey'
 
@@ -169,7 +169,22 @@ const appUrl = resolveAppUrl()
 // Exported so config-parity tests can assert every selectable network (config/networks.js)
 // is registered here — otherwise switchChain cannot reach it. Polygon stays first (wagmi
 // default chain — FR-015).
-export const chains = [polygon, amoy, ethereumClassic, mordor, mainnet, sepolia, hoodi, hardhat]
+// Spec 067 adds arbitrum, base and optimism — every `selectable: true` network in
+// config/networks.js MUST be registered here or switchChain cannot reach it (there is a
+// config-parity test asserting exactly that).
+export const chains = [
+  polygon,
+  amoy,
+  ethereumClassic,
+  mordor,
+  mainnet,
+  sepolia,
+  hoodi,
+  arbitrum,
+  base,
+  optimism,
+  hardhat,
+]
 
 // Create wagmi config
 export const config = createConfig({
@@ -203,6 +218,10 @@ export const config = createConfig({
     [mainnet.id]: http(networkId === 1 ? rpcUrl : 'https://ethereum-rpc.publicnode.com'),
     [sepolia.id]: http(networkId === 11155111 ? rpcUrl : 'https://ethereum-sepolia-rpc.publicnode.com'),
     [hoodi.id]: http(networkId === 560048 ? rpcUrl : 'https://ethereum-hoodi-rpc.publicnode.com'),
+    // Spec 067 bridge/liquidity networks — defaults mirror config/networks.js.
+    [arbitrum.id]: http(networkId === 42161 ? rpcUrl : 'https://arbitrum-one-rpc.publicnode.com'),
+    [base.id]: http(networkId === 8453 ? rpcUrl : 'https://base-rpc.publicnode.com'),
+    [optimism.id]: http(networkId === 10 ? rpcUrl : 'https://optimism-rpc.publicnode.com'),
     [hardhat.id]: http('http://localhost:8545'),
   },
 })

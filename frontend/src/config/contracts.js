@@ -47,6 +47,12 @@ const MORDOR_CONTRACTS = {
   // Staking control surface (spec 066). Empty until `deploy-staking-router.js` runs; sync populates it.
   // Undeployed ⇒ the member app falls back to spec-065 fee-free direct staking.
   stakingRouter: '',
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -65,6 +71,12 @@ const HARDHAT_CONTRACTS = {
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)
@@ -89,6 +101,12 @@ const AMOY_CONTRACTS = {
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
 }
 
 // Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
@@ -123,6 +141,35 @@ const POLYGON_CONTRACTS = {
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
+  // Cross-chain bridge + liquidity supply (spec 067). Empty until
+  // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
+  // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
+  // per-network empty state (FR-051) — never invented availability.
+  bridgeRouter: '',
+  liquidityRouter: '',
+}
+
+// Spec 067 bridge/liquidity networks. These chains host NO FairWins wager/membership
+// deployment — only the two spec-067 routers — so their maps carry just those keys and
+// every other lookup honestly resolves empty.
+const ETHEREUM_CONTRACTS = {
+  bridgeRouter: '',
+  liquidityRouter: '',
+}
+
+const OPTIMISM_CONTRACTS = {
+  bridgeRouter: '',
+  liquidityRouter: '',
+}
+
+const BASE_CONTRACTS = {
+  bridgeRouter: '',
+  liquidityRouter: '',
+}
+
+const ARBITRUM_CONTRACTS = {
+  bridgeRouter: '',
+  liquidityRouter: '',
 }
 
 const NETWORK_CONTRACTS = {
@@ -130,6 +177,11 @@ const NETWORK_CONTRACTS = {
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
+  // Spec 067 — routers only (no wager/membership deployment on these chains).
+  1: ETHEREUM_CONTRACTS,    // Ethereum mainnet
+  10: OPTIMISM_CONTRACTS,   // Optimism
+  8453: BASE_CONTRACTS,     // Base
+  42161: ARBITRUM_CONTRACTS,// Arbitrum One
 }
 
 // Default to Polygon mainnet (137) — the primary network — when VITE_NETWORK_ID

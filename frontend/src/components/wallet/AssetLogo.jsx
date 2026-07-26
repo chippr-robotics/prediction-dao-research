@@ -38,10 +38,19 @@ const ASSET_GLYPHS = {
 
 // Per-network badge colors (chainId → fill). Testnets get a dashed ring so
 // they read as non-production at a glance.
+// Spec 067 adds Arbitrum/Base/Optimism. Every network a member can hold an asset on
+// needs an entry here: the cross-network selectors (FR-059/FR-060) list holdings from
+// all networks together, so a missing badge would leave an asset visually unattributed
+// to any chain — exactly the ambiguity the nested logo exists to remove.
 const NETWORK_BADGES = {
   1: { bg: '#627EEA', label: 'E' },
+  10: { bg: '#FF0420', label: 'O' },
   61: { bg: '#3AB83A', label: 'C' },
   137: { bg: '#8247E5', label: 'P' },
+  8453: { bg: '#0052FF', label: 'B' },
+  // 'AR', not 'A' — Amoy (80002) already owns 'A'. A cross-network list renders both
+  // side by side, and the testnet ring alone is too subtle to carry the distinction.
+  42161: { bg: '#12AAFF', label: 'AR' },
   11155111: { bg: '#9AA6B2', label: 'S', testnet: true },
   80002: { bg: '#B39DED', label: 'A', testnet: true },
   63: { bg: '#7FBF8E', label: 'M', testnet: true },
@@ -113,7 +122,14 @@ export default function AssetLogo({ symbol, chainId = null, showBadge = false, s
         <span className={`asset-logo-badge ${badge.testnet ? 'asset-logo-badge-testnet' : ''}`}>
           <svg viewBox="0 0 16 16" width="100%" height="100%">
             <circle cx="8" cy="8" r="7" fill={badge.bg} />
-            <text x="8" y="11" textAnchor="middle" fontSize="8" fontWeight="700" fill="#ffffff">
+            <text
+              x="8"
+              y={badge.label.length > 1 ? 10.5 : 11}
+              textAnchor="middle"
+              fontSize={badge.label.length > 1 ? 6.5 : 8}
+              fontWeight="700"
+              fill="#ffffff"
+            >
               {badge.label}
             </text>
           </svg>

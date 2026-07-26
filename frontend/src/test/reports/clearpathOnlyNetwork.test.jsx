@@ -18,10 +18,14 @@ describe('ClearPath-only network self-discloses honestly (spec 042 US1)', () => 
     expect(getNetwork(CHAIN).capabilities.friendMarkets).toBe(false)
   })
 
-  it('swap/DEX: no dex config + capability off → swap surface hidden', () => {
-    expect(getNetwork(CHAIN).dex).toBeNull()
-    expect(getNetwork(CHAIN).capabilities.dex).toBe(false)
-    expect(getNetworkFeatures(CHAIN).find((f) => f.key === 'swap').deployed).toBe(false)
+  it('swap/DEX: configured and ON as of spec 067 (supersedes the ClearPath-only cut)', () => {
+    // Spec 048 shipped chain 1 without an in-app DEX because no `dex` block existed.
+    // Spec 067 configures Uniswap V3 here for both swapping and liquidity supply, so
+    // this network is no longer ClearPath-ONLY. The rest of the honest-disclosure
+    // contract below (passkey, wagers, membership) is unchanged.
+    expect(getNetwork(CHAIN).dex?.positionManager).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    expect(getNetwork(CHAIN).capabilities.dex).toBe(true)
+    expect(getNetworkFeatures(CHAIN).find((f) => f.key === 'swap').deployed).toBe(true)
   })
 
   it('passkey: capability off + no passkey config → login option hidden', () => {
@@ -34,8 +38,10 @@ describe('ClearPath-only network self-discloses honestly (spec 042 US1)', () => 
     expect(getNetworkFeatures(CHAIN).find((f) => f.key === 'membership').deployed).toBe(false)
   })
 
-  it('the ONLY enabled surface is ClearPath', () => {
+  it('enables only ClearPath and swap — no wager/membership/passkey surface', () => {
+    // Spec 067 adds swap alongside ClearPath. Everything else stays honestly off,
+    // which is the property this test actually guards.
     const enabled = getNetworkFeatures(CHAIN).filter((f) => f.deployed).map((f) => f.key)
-    expect(enabled).toEqual(['clearpath'])
+    expect(new Set(enabled)).toEqual(new Set(['clearpath', 'swap']))
   })
 })

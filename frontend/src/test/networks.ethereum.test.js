@@ -55,13 +55,22 @@ describe('Ethereum family networks (spec 048)', () => {
     expect(firstTestnetIdx).toBeGreaterThan(lastMainnetIdx)
   })
 
-  it('enables NO app-specific capability on the Ethereum family except mainnet ClearPath', () => {
+  it('enables NO app-specific capability on the Ethereum family except mainnet ClearPath/DEX', () => {
     for (const id of ETH_FAMILY) {
       const caps = getNetwork(id).capabilities
-      expect(caps.dex).toBe(false)
       expect(caps.passkeyAccounts).toBe(false)
       expect(caps.polymarketSidebets).toBe(false)
       expect(caps.friendMarkets).toBe(false)
+      // Swap + liquidity are mainnet-only in this family: spec 067 configures Uniswap
+      // on chain 1 (superseding spec 048's no-swap cut) but NOT on Sepolia/Hoodi, so
+      // the testnets still self-disclose both capabilities off.
+      if (id === 1) {
+        expect(caps.dex).toBe(true)
+        expect(caps.liquidity).toBe(true)
+      } else {
+        expect(caps.dex).toBe(false)
+        expect(caps.liquidity).toBe(false)
+      }
     }
     // ClearPath (spec 042) stays on for mainnet; testnets are not governance networks.
     expect(getNetwork(1).capabilities.clearpath).toBe(true)

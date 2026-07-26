@@ -113,8 +113,21 @@ describe('AssetDetailSheet actions', () => {
   })
 
   it('disables Trade on networks without an in-app DEX', () => {
-    renderSheet(ETH_AGG)
-    // Ethereum mainnet (chain 1) has dex: null — select the native instance.
+    // Ethereum mainnet gained a DEX in spec 067, so it is no longer a no-DEX example.
+    // Sepolia (11155111) is: it is outside SWAP_CHAIN_IDS and has no `dex` block.
+    renderSheet({
+      ...ETH_AGG,
+      instances: [
+        instance({
+          symbol: 'ETH',
+          kind: 'native',
+          chainId: 11155111,
+          network: 'Sepolia',
+          balance: 1,
+          usd: 2000,
+        }),
+      ],
+    })
     fireEvent.click(screen.getAllByRole('radio')[0])
     expect(screen.getByRole('button', { name: 'Trade' })).toBeDisabled()
     expect(screen.getByText(/no in-app trading on this network/i)).toBeInTheDocument()

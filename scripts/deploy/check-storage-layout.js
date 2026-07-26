@@ -26,6 +26,8 @@ const UPGRADEABLE_CONTRACTS = [
   { name: "CallsignRegistry", deploymentsKey: "callsignRegistry" }, // spec 054 — in-house %callsign naming registry
   { name: "FeeRouter", deploymentsKey: "feeRouter" }, // spec 060 — unified platform-fee registry + wrapper
   { name: "StakingRouter", deploymentsKey: "stakingRouter" }, // spec 066 — staking control surface + liquid fee router
+  { name: "BridgeRouter", deploymentsKey: "bridgeRouter" }, // spec 067 — cross-chain bridge control surface + fee router
+  { name: "LiquidityRouter", deploymentsKey: "liquidityRouter" }, // spec 067 — liquidity-supply control surface + fee router
 ];
 
 function loadDeployedImpl(deploymentsKey) {

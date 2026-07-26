@@ -45,7 +45,8 @@ import './WalletPage.css'
 // hosts the panels and reads `?tab=` to pick one. WALLET_TABS is the flat list
 // used for deep-link/alias resolution and for the active tab's heading label.
 // (Account / Membership / Preferences are reached from the account button;
-// 'custody' is surfaced to users as "Protect".)
+// 'custody' is surfaced to users as "Protect" and 'paytransfer' as "Transfer" —
+// the ids stay stable so saved links keep resolving, spec 067 FR-002.)
 const WALLET_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'membership', label: 'Membership' },
@@ -57,7 +58,7 @@ const WALLET_TABS = [
   { id: 'trade', label: 'Trade' },
   { id: 'collectibles', label: 'Collect' },
   { id: 'predict', label: 'Predict' },
-  { id: 'paytransfer', label: 'Pay & Transfer' },
+  { id: 'paytransfer', label: 'Transfer' },
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
   { id: 'reports', label: 'Reporting' },
