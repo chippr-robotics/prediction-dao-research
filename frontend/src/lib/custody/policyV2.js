@@ -230,8 +230,8 @@ const SELECTORS = {
   approve: '0x095ea7b3',
 }
 
-/** Client twin of the guard's calldata classification. */
-export function classifyPayload({ to, value = 0n, data = '0x' }) {
+/** Client twin of the guard's calldata classification (native `value` is scoped by the caller). */
+export function classifyPayload({ to, data = '0x' }) {
   const hex = (data || '0x').toLowerCase()
   const selector = hex.slice(0, 10)
   const word = (n) => '0x' + hex.slice(10 + n * 64, 10 + (n + 1) * 64)

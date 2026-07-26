@@ -18,6 +18,7 @@ import {
   isPolicySupported,
   validatePolicyConfig,
 } from '../../lib/custody/policy'
+import { fromV1Policy, isPolicyV2Supported } from '../../lib/custody/policyV2'
 import { summarizePolicyConfig } from '../../lib/custody/policySummary'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
@@ -147,17 +148,33 @@ export default function PolicyStep({ chainId, value, onChange }) {
       : null
 
   // Push the derived value to the parent whenever it changes (skip identical re-emissions).
+  // Spec 068 (T026) — where the ordered engine is deployed, the same member answers are ALSO
+  // emitted as ordered rules (`orderedRules`), so a new vault attaches V2 rather than being born
+  // on the superseded engine. The v1 shape stays in the payload for chains that only have v1.
   const lastEmitted = useRef('unset')
   useEffect(() => {
     let next = null
     if (supported && enabled) {
       next = derived.error ? { invalid: true, error: derived.error } : { ...derived.config, summary }
+      if (next && !next.invalid && isPolicyV2Supported(chainId)) {
+        const v2 = fromV1Policy({
+          cooldown: derived.config.cooldown,
+          allowlistEnabled: derived.config.allowlistEnabled,
+          allowlist: derived.config.allowlistAdd,
+          assetRules: (derived.config.limits || []).map((l) => ({
+            asset: l.asset,
+            perTxLimit: l.perTxLimit,
+            windowLimit: l.windowLimit,
+          })),
+        })
+        next = { ...next, orderedRules: v2.rules, cooldown: v2.cooldown }
+      }
     }
     const key = JSON.stringify(next, (_, v) => (typeof v === 'bigint' ? `${v}n` : v))
     if (key === lastEmitted.current) return
     lastEmitted.current = key
     onChange?.(next)
-  }, [supported, enabled, derived, summary, onChange])
+  }, [supported, enabled, derived, summary, onChange, chainId])
 
   const updateRecipient = (i, val) => setRecipients((prev) => prev.map((r, idx) => (idx === i ? val : r)))
   const addRecipient = () => setRecipients((prev) => [...prev, ''])

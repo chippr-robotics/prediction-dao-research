@@ -35,7 +35,10 @@
     { "path": "contracts/tokens/TokenFactory.sol", "tier": "B", "min": { "statements": 90, "branches": 70 } },
     { "path": "contracts/privacy/KeyRegistry.sol", "tier": "B" },
     { "path": "contracts/privacy/BackupPointerRegistry.sol", "tier": "B" },
-    { "path": "contracts/custody/SafeProposalHub.sol", "tier": "B" }
+    { "path": "contracts/custody/SafeProposalHub.sol", "tier": "B" },
+    { "path": "contracts/custody/SafePolicyGuard.sol", "tier": "A" },
+    { "path": "contracts/custody/PolicyGuardSetup.sol", "tier": "A", "min": { "statements": 100, "branches": 87 } },
+    { "path": "contracts/custody/SafePolicyGuardV2.sol", "tier": "A", "min": { "statements": 93, "branches": 90 } }
   ],
   "reportOnly": [
     { "path": "contracts/tokens/templates/OpenERC20.sol", "tier": "C", "rationale": "token template not on active launch path" },

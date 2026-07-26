@@ -82,7 +82,7 @@ ok, A alone blocked, over-limit blocked) + § 3 UI walk
 - [X] T023 [US2] Route `PolicyPanelV2` from `frontend/src/components/custody/CustodyPanel.jsx`/`VaultDetail.jsx` by policy status; extend `frontend/src/components/custody/PolicyBadge.jsx` with a `managed-v2` presentation; update `PolicyBadge.test.jsx`
 - [X] T024 [US2] Extend `frontend/src/components/custody/ProposeTransactionForm.jsx` violation preview to V2: debounced `matchPreview` + `previewTransaction(bytes32(0))`, warning names the display rule number or "no rule allows this" (SC-003); preview copy MUST disclose it checks scope/limits only ("approvals are verified at execution") since `bytes32(0)` mode skips approver evaluation; update `frontend/src/test/custody/ProposeTransactionForm.test.jsx`
 - [X] T025 [US2] Extend `frontend/src/components/custody/ProposalQueue.jsx` decode with `classifyPolicyProposalV2` (setRules diffs render rule-numbered lines; `setGuard(guardV2)` labeled as upgrade/adopt); update `frontend/src/test/custody/ProposalQueue.test.jsx`
-- [ ] T026 [US2] Wire the create-flow Policy step to V2 ONLY: `frontend/src/components/custody/PolicyStep.jsx` emits a V2 rules config (`policyGuardSetup.enablePolicy(guardV2, encodeSetRules(...))`) when `isPolicyV2Supported(chainId)`, and skips the step with an honest notice where V2 is undeployed — no v1 path for NEW vaults (v1 stays read/upgrade-only per FR-020; avoids a dead dual branch once T040 deploys V2 everywhere); update `PolicyStep.test.jsx` and `CreateVaultWizard.test.jsx` (setup calldata decodes to V2 guard + setRules)
+- [X] T026 [US2] Wire the create-flow Policy step to V2 ONLY: `frontend/src/components/custody/PolicyStep.jsx` emits a V2 rules config (`policyGuardSetup.enablePolicy(guardV2, encodeSetRules(...))`) when `isPolicyV2Supported(chainId)`, and skips the step with an honest notice where V2 is undeployed — no v1 path for NEW vaults (v1 stays read/upgrade-only per FR-020; avoids a dead dual branch once T040 deploys V2 everywhere); update `PolicyStep.test.jsx` and `CreateVaultWizard.test.jsx` (setup calldata decodes to V2 guard + setRules)
 
 **Checkpoint**: full ordered-policy lifecycle usable and enforced on-chain
 
@@ -143,12 +143,12 @@ book names shown, owners land in the deployed set (US5 acceptance)
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T037 Add `contracts/custody/SafePolicyGuardV2.sol` to `coverage-threshold-policy.json` (tier per custody convention) and confirm `npm run test:coverage` gates it
+- [X] T037 Add `contracts/custody/SafePolicyGuardV2.sol` to `coverage-threshold-policy.json` (tier per custody convention) and confirm `npm run test:coverage` gates it
 - [ ] T038 [P] Static analysis + fuzz: Slither clean of new high/critical on `SafePolicyGuardV2.sol`; Medusa stateful properties (first-match determinism, window accounting never exceeds limit per rule per window span, no-rules ⇒ never reverts); record accepted-risk notes in the contract header (constitution I)
 - [ ] T039 [P] Security review against `.github/agents/smart-contract-security.agent.md` for `SafePolicyGuardV2.sol` (custody path); log outcome in the PR
 - [ ] T040 Deploy to live networks in launch order (Mordor 63 → ETC 61 → Polygon 137): run T008 scripts + `sync:frontend-contracts` per network; verify `deployments/*-v2.json` records and `DEPLOYMENT_BLOCKS_BY_CHAIN.safeProposalHub` completeness (floppy keystore flow for deployer keys). Chain 61 has NO record in `NETWORK_CONTRACTS` today — verify the sync script can mint a brand-new chain-61 record (extend `scripts/` sync tooling if it only updates existing records) and add a config test asserting `getContractAddressForChain('safePolicyGuardV2', 61)` resolves after sync
-- [ ] T041 [P] Write `docs/developer-guide/protect-policies.md` (V2 rule model incl. `approvalsRequired`/banding/same-scope alternative in member + developer language, migration from v1, multi-chain behavior, service catalog) and update `CLAUDE.md` guardrails with a spec-068 bullet (two live guard versions; custody address entry; catalog)
-- [ ] T042 Full-suite gate: `npm test`, `npm run test:frontend`, `npx vitest run` custody suites, quickstart § 3 local E2E walk; confirm SC-001…SC-007 spot-checks from quickstart § Success criteria
+- [X] T041 [P] Write `docs/developer-guide/protect-policies.md` (V2 rule model incl. `approvalsRequired`/banding/same-scope alternative in member + developer language, migration from v1, multi-chain behavior, service catalog) and update `CLAUDE.md` guardrails with a spec-068 bullet (two live guard versions; custody address entry; catalog)
+- [X] T042 Full-suite gate: `npm test`, `npm run test:frontend`, `npx vitest run` custody suites, quickstart § 3 local E2E walk; confirm SC-001…SC-007 spot-checks from quickstart § Success criteria
 
 ---
 
