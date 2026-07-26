@@ -435,6 +435,32 @@ describe("SafePolicyGuardV2", function () {
     expect((await guard.getRuleAccounting(vault.address, 1)).spentInWindow).to.equal(0n);
   });
 
+  // Security-review regression: a transaction moving BOTH native value and a token is governed by a
+  // single ANY_ASSET rule, and each leg is checked against the remaining allowance before either
+  // commits — so two legs that individually fit can together overshoot the window. The overshoot
+  // must degrade to a clean typed error (remaining 0), never an arithmetic panic that would leave
+  // the rule unevaluable — and unreadable — until its window reset.
+  it("keeps an overshot window readable and blocking, not panicking", async () => {
+    const transfer = erc20.encodeFunctionData("transfer", [recipient.address, 60n]);
+    await guard.connect(vault).setRules([rule({ asset: ANY, windowLimit: 100n })], 0);
+
+    // 60 native + 60 token in one transaction: each leg fits under 100, together they do not.
+    await guard.connect(vault).checkTransaction(...checkArgs({ to: token, value: 60n, data: transfer }));
+    const acc = await guard.getRuleAccounting(vault.address, 0);
+    expect(acc.spentInWindow).to.equal(120n);
+    expect(acc.remaining).to.equal(0n); // saturated, not underflowed
+
+    // Any further spend is refused with the typed error, and the view stays readable.
+    await expect(guard.connect(vault).checkTransaction(...checkArgs({ to: recipient.address, value: 1n })))
+      .to.be.revertedWithCustomError(guard, "RuleWindowExceeded")
+      .withArgs(0n, NATIVE, 1n, 0n);
+
+    // The window still resets normally.
+    await time.increase(DAY);
+    await expect(guard.connect(vault).checkTransaction(...checkArgs({ to: recipient.address, value: 50n }))).to.not.be
+      .reverted;
+  });
+
   it("reports no window cap as unlimited remaining", async () => {
     await guard.connect(vault).setRules([rule({ asset: NATIVE, perTxLimit: 5n })], 0);
     expect((await guard.getRuleAccounting(vault.address, 0)).remaining).to.equal(ethers.MaxUint256);

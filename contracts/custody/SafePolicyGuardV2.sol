@@ -60,6 +60,17 @@ interface ISafeMinimal {
 ///      passes amount limits unvalued; for `ANY_ASSET` rules the per-transaction limit is applied to
 ///      each leg in that leg's own units and the window counter accumulates raw amounts across
 ///      assets, so window limits are only meaningful on asset-scoped rules (the composer says so).
+///
+///      Accepted static-analysis findings (Slither, no High/Medium outstanding):
+///      - `calls-loop` in `_countApprovals`: the per-approver `isOwner` / `approvedHashes` reads are
+///        `view` calls into the CALLING Safe — the one contract already executing this transaction —
+///        and the loop is bounded by MAX_APPROVERS (8). There is no reentrancy or griefing surface:
+///        a failing read reverts the whole transaction, which fails closed.
+///      - `timestamp` in the window/cooldown comparisons: these rules are defined in wall-clock time,
+///        so `block.timestamp` is the intended reference. Miner drift is bounded and can only shift a
+///        window edge by seconds — far below the 24 h granularity members configure.
+///      - `assembly` in `_raise`: bubbling pre-encoded custom errors is the only way to keep typed
+///        reverts across the shared evaluate/preview path (identical to v1).
 contract SafePolicyGuardV2 is ISafeGuard {
     // ---------------------------------------------------------------- constants
 
@@ -193,20 +204,13 @@ contract SafePolicyGuardV2 is ISafeGuard {
         if (denial.length > 0) _raise(denial);
         if (exempt) return;
 
-        TxContext memory ctx;
-        ctx.safe = safe;
-        ctx.to = to;
-        ctx.value = value;
-        ctx.executor = msgSender;
-        (ctx.tokenAsset, ctx.tokenAmount, ctx.tokenRecipient, ctx.isTokenAction) = _classify(to, data);
-        ctx.counted = value > 0 || ctx.isTokenAction;
-
-        if (_meta[safe].hasApproverRules) {
-            // Safe v1.4.1 increments `nonce` BEFORE invoking the guard, so the in-flight
-            // transaction was hashed at `nonce - 1`. Gas-refund fields are passed through as
-            // received: `gasPrice != 0` is already rejected above, and the remaining fields must
-            // enter the hash exactly as the Safe hashed them.
-            ctx.txHash = ISafeMinimal(safe).getTransactionHash(
+        // Safe v1.4.1 increments `nonce` BEFORE invoking the guard, so the in-flight transaction was
+        // hashed at `nonce - 1`. Gas-refund fields are passed through as received: `gasPrice != 0`
+        // is already rejected above, and the remaining fields must enter the hash exactly as the
+        // Safe hashed them. Only computed when some rule actually names approvers.
+        bool evaluable = _meta[safe].hasApproverRules;
+        bytes32 txHash = evaluable
+            ? ISafeMinimal(safe).getTransactionHash(
                 to,
                 value,
                 data,
@@ -217,9 +221,10 @@ contract SafePolicyGuardV2 is ISafeGuard {
                 gasToken,
                 refundReceiver,
                 ISafeMinimal(safe).nonce() - 1
-            );
-            ctx.approversEvaluable = true;
-        }
+            )
+            : bytes32(0);
+
+        TxContext memory ctx = _context(safe, to, value, msgSender, txHash, evaluable, data);
 
         (bytes memory err, uint256 governing) = _evaluate(ctx);
         if (err.length > 0) _raise(err);
@@ -254,7 +259,7 @@ contract SafePolicyGuardV2 is ISafeGuard {
         }
         delete _rules[safe];
 
-        bool anyApprovers;
+        bool anyApprovers = false;
         for (uint256 i = 0; i < rules.length; i++) {
             anyApprovers = _appendRule(safe, rules[i], i) || anyApprovers;
         }
@@ -275,7 +280,7 @@ contract SafePolicyGuardV2 is ISafeGuard {
         if (cfg.banded && cfg.perTxLimit == 0) revert BandedNeedsLimit();
 
         // Normalize "all listed approvers" (0) to an explicit count so reads are unambiguous.
-        uint8 required;
+        uint8 required = 0;
         if (approverCount == 0) {
             if (cfg.approvalsRequired != 0) revert BadApprovalsRequired();
         } else {
@@ -342,7 +347,7 @@ contract SafePolicyGuardV2 is ISafeGuard {
         RuleAccounting storage acc = _accounting[safe][index];
         uint128 limit = index < _rules[safe].length ? _rules[safe][index].windowLimit : 0;
         uint256 spent = block.timestamp >= uint256(acc.windowStart) + WINDOW ? 0 : acc.spentInWindow;
-        remaining = limit == 0 ? type(uint256).max : uint256(limit) - spent;
+        remaining = limit == 0 ? type(uint256).max : _remaining(limit, spent);
         return (acc.spentInWindow, acc.windowStart, remaining);
     }
 
@@ -360,12 +365,7 @@ contract SafePolicyGuardV2 is ISafeGuard {
         view
         returns (bool matched, uint256 ruleIndex)
     {
-        TxContext memory ctx;
-        ctx.safe = safe;
-        ctx.to = to;
-        ctx.value = value;
-        (ctx.tokenAsset, ctx.tokenAmount, ctx.tokenRecipient, ctx.isTokenAction) = _classify(to, data);
-        ctx.counted = value > 0 || ctx.isTokenAction;
+        TxContext memory ctx = _context(safe, to, value, address(0), bytes32(0), false, data);
 
         Rule[] storage rules = _rules[safe];
         for (uint256 i = 0; i < rules.length; i++) {
@@ -391,21 +391,41 @@ contract SafePolicyGuardV2 is ISafeGuard {
         if (denial.length > 0) return (false, denial);
         if (exempt) return (true, "");
 
-        TxContext memory ctx;
-        ctx.safe = safe;
-        ctx.to = to;
-        ctx.value = value;
-        ctx.executor = executor;
-        ctx.txHash = approvedTxHash;
-        ctx.approversEvaluable = approvedTxHash != bytes32(0);
-        (ctx.tokenAsset, ctx.tokenAmount, ctx.tokenRecipient, ctx.isTokenAction) = _classify(to, data);
-        ctx.counted = value > 0 || ctx.isTokenAction;
+        TxContext memory ctx =
+            _context(safe, to, value, executor, approvedTxHash, approvedTxHash != bytes32(0), data);
 
         (revertData,) = _evaluate(ctx);
         ok = revertData.length == 0;
     }
 
     // ================================================================ internal — evaluation
+
+    /// @dev Build the evaluation context in one place, so enforcement, preview and match-only reads
+    ///      can never classify the same transaction differently.
+    function _context(
+        address safe,
+        address to,
+        uint256 value,
+        address executor,
+        bytes32 txHash,
+        bool approversEvaluable,
+        bytes calldata data
+    ) private pure returns (TxContext memory ctx) {
+        (address tokenAsset, uint256 tokenAmount, address tokenRecipient, bool isTokenAction) = _classify(to, data);
+        ctx = TxContext({
+            safe: safe,
+            to: to,
+            value: value,
+            executor: executor,
+            txHash: txHash,
+            approversEvaluable: approversEvaluable,
+            tokenAsset: tokenAsset,
+            tokenAmount: tokenAmount,
+            tokenRecipient: tokenRecipient,
+            isTokenAction: isTokenAction,
+            counted: value > 0 || isTokenAction
+        });
+    }
 
     /// @dev Exemptions and hard denials, shared by enforcement and preview.
     ///      Returns (encoded error or empty, whether the transaction bypasses rule evaluation).
@@ -437,11 +457,13 @@ contract SafePolicyGuardV2 is ISafeGuard {
         Rule[] storage rules = _rules[ctx.safe];
         uint256 count = rules.length;
 
-        bool sawMatch;
-        bool pendingApproverFailure;
-        uint256 failedIndex;
-        uint256 failedHave;
-        uint256 failedNeed;
+        // Explicitly initialized: Solidity zero-fills these, but stating it keeps the
+        // fall-through bookkeeping obvious and keeps static analysis quiet.
+        bool sawMatch = false;
+        bool pendingApproverFailure = false;
+        uint256 failedIndex = 0;
+        uint256 failedHave = 0;
+        uint256 failedNeed = 0;
 
         for (uint256 i = 0; i < count; i++) {
             Rule storage rule = rules[i];
@@ -594,7 +616,7 @@ contract SafePolicyGuardV2 is ISafeGuard {
         if (windowLimit > 0) {
             RuleAccounting storage acc = _accounting[safe][index];
             uint256 spent = block.timestamp >= uint256(acc.windowStart) + WINDOW ? 0 : acc.spentInWindow;
-            uint256 remaining = uint256(windowLimit) - spent;
+            uint256 remaining = _remaining(windowLimit, spent);
             if (amount > remaining) {
                 return abi.encodeWithSelector(RuleWindowExceeded.selector, index, asset, amount, remaining);
             }
@@ -647,6 +669,17 @@ contract SafePolicyGuardV2 is ISafeGuard {
             return (to, amount, recipient, true);
         }
         return (address(0), 0, address(0), false);
+    }
+
+    /// @dev Saturating "how much is left in this window".
+    ///      `spent` CAN exceed `windowLimit`: a transaction moving both native value and a token is
+    ///      governed by a single `ANY_ASSET` rule, and each leg is checked against the remaining
+    ///      allowance BEFORE either commits — so two legs that individually fit can together
+    ///      overshoot. Saturating here keeps the overshoot a clean `RuleWindowExceeded` (remaining
+    ///      = 0) instead of an arithmetic panic that would make the rule unevaluable — and
+    ///      unreadable — until its window reset. Overshoot only ever restricts, never permits.
+    function _remaining(uint256 limit, uint256 spent) private pure returns (uint256) {
+        return spent >= limit ? 0 : limit - spent;
     }
 
     function _listed(address[] storage list, address candidate) internal view returns (bool) {
