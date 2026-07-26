@@ -178,6 +178,35 @@ artifacts live under `specs/<feature>/`.
   recovery is audited via `captureLegacyRecovery` (client-ledger `legacy_account_recovered`, address +
   type only, stable/idempotent entryId, **never** key material). See
   `docs/developer-guide/legacy-account-recovery.md` + `specs/062-legacy-account-recovery/`.
+- **Bridging + supplied liquidity (spec 067) route through TWO UUPS routers that never take custody.**
+  `BridgeRouter` (`bridgeRouter`/`bridgeRouterImpl`, Across Protocol V3) powers the **Bridge** tab inside
+  **Transfer**; `LiquidityRouter` (`liquidityRouter`/`liquidityRouterImpl`, Uniswap V3 + Across HubPool)
+  powers the **Supply** section inside **Earn**. Neither is deployed on any network yet (issue #966).
+  Four rules govern every change here:
+  (1) **THE MEMBER IS THE DEPOSITOR.** `depositV3` is passed `msg.sender`, never `address(this)`, so an
+  unfilled Across deposit refunds to the MEMBER. That is why `IBridgeRouter` has **no rescue or
+  claim-refund function** — the absence is the design, and adding one would create the custody surface
+  the router exists to avoid. (2) **NO CUSTODY.** Uniswap position NFTs mint to the member; Across
+  **bridge-LP deposits never touch a FairWins contract at all** (a direct member call to the HubPool —
+  `addLiquidity` has no recipient parameter, research R3), so the contract *cannot* pause them and only
+  the app-honoured `enabled` flag withholds one. The Supply pause is therefore **"new Uniswap supplies"
+  only** — never label it "pooling". (3) **A PAUSE NEVER TRAPS VALUE**: it stops NEW bridges/supplies;
+  in-flight bridges settle or refund via Across, and positions stay withdrawable because exits never
+  routed through the router. There is no `removePool` — retiring is `setPoolEnabled(false)`, and retired
+  pools stay listed with their position count (FR-024). (4) **FEES**: two spec-060 services
+  (`bridge.transfer`, `liquidity.deposit`), both `ConfigOnly`, both **cap 250 bps / rate 0 at launch** —
+  never hardcode a bps value, never imply a fee ships non-zero. The member's `maxFeeBps` is a consent
+  ceiling, the cap binds the fee **amount** taken (not the rate a FeeRouter reports about itself), and
+  the fee is charged on **capital Uniswap actually consumed**, never on what was offered.
+  **Roles**: `LIQUIDITY_ADMIN_ROLE` curates routes/pools; `GUARDIAN_ROLE` pauses; `DEFAULT_ADMIN_ROLE`
+  owns the fund-path addresses (`spokePool`/`positionManager`/`feeRouter`/`sanctionsGuard`) — curating
+  badly is reversible, repointing a router is not. `GUARDIAN_ROLE` is **per-router** and does NOT inherit
+  the WagerRegistry guardian set; the admin tabs read authority from the router in scope
+  (`readRouterAuthority`), never from the app-wide role flags. **Availability**: Uniswap trading pools on
+  all five EVM mainnets (1/10/137/8453/42161); Across **bridge-LP on ETHEREUM ONLY** (the HubPool is an
+  L1 contract); ETC 61 and Mordor 63 have neither protocol and **cannot host these routers**. See
+  `docs/developer-guide/bridge-and-liquidity.md` + `docs/runbooks/bridge-liquidity-operations.md` +
+  `specs/067-bridge-pool-liquidity/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
