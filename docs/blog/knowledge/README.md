@@ -35,6 +35,7 @@ interleaves these primers with the deep-dives, is in the
 - [Morpho & vaults explained](08-morpho-and-vaults/blog.md)
 - [Reading APY & understanding risk](09-apy-and-risk/blog.md)
 - [Fees & basis points: reading what you pay](10-fees-and-basis-points/blog.md)
+- [Bridges & liquidity pools: moving assets between networks, and impermanent loss](21-bridges-and-liquidity/blog.md)
 
 ### Security & Custody
 - [Multisig wallets: why several signatures beat one](11-multisig-wallets/blog.md)
