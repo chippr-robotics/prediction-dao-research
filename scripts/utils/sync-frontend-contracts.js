@@ -280,7 +280,10 @@ function main() {
         liquidityRouter: deployed.liquidityRouter, // spec 067 — liquidity-supply control surface + fee router (only where deployed)
         safeProposalHub: deployed.safeProposalHub, // spec 043 — Safe custody proposal broadcaster (only where deployed)
         safePolicyGuard: deployed.safePolicyGuard, // spec 049 — multisig policy engine guard (only where deployed)
-        policyGuardSetup: deployed.policyGuardSetup, // spec 049 — Safe.setup policy attach helper (only where deployed)
+        // spec 068 — ordered policy engine. Deployed ALONGSIDE v1, never replacing it: vaults adopt
+        // it through a threshold-approved setGuard, so both addresses must stay resolvable.
+        safePolicyGuardV2: deployed.safePolicyGuardV2,
+        policyGuardSetup: deployed.policyGuardSetup, // spec 049/068 — Safe.setup policy attach helper (guard-agnostic)
         entryPoint: deployed.entryPoint, // spec 041 — ERC-4337 EntryPoint v0.6 (canonical or self-deployed)
         accountFactory: deployed.accountFactory, // spec 041 — deterministic CoinbaseSmartWalletFactory (same address on every network)
         p256Verifier: deployed.p256Verifier, // spec 041 — only on networks needing an external P-256 verifier
