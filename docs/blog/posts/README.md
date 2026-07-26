@@ -56,6 +56,7 @@ notable correction.
 | 32 | [Spec-driven development with Spec Kit](32-spec-driven-development/blog.md) | Security & DevOps |
 | 33 | [CallsignRegistry: an in-house ENS-style naming system](33-callsign-registry/blog.md) | Standalone |
 | 34 | [TokenFactory: templated token minting](34-token-factory/blog.md) | Standalone |
+| 35 | [Cross-chain intents & pooled liquidity: the refund address and the no-custody fee rule](35-cross-chain-intents-and-lp/blog.md) | Standalone |
 
 ## Suggested publishing order
 
