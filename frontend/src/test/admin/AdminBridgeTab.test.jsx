@@ -6,7 +6,7 @@
  * card refusing to invent a rate it could not read, and the per-network scope working while the
  * wallet sits somewhere else. Those are the parts an operator acts on during an incident.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ethers as ethersActual } from 'ethers'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { axe } from 'vitest-axe'
@@ -139,6 +139,20 @@ function props(overrides = {}) {
   }
 }
 
+// `window.confirm` is stubbed by the removeRoute tests. Restoring inside the test body is not
+// enough: any assertion that throws first skips the restore, leaving the stub installed for every
+// later test in the worker — which showed up as two different admin tests failing intermittently
+// depending on run order. `stubConfirm` registers the cleanup so it runs even when a test fails.
+let confirmSpy = null
+function stubConfirm(answer) {
+  confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(answer)
+  return confirmSpy
+}
+afterEach(() => {
+  confirmSpy?.mockRestore()
+  confirmSpy = null
+})
+
 beforeEach(() => {
   m.addr = { 1: ROUTER }
   m.events = {}
@@ -252,13 +266,12 @@ describe('BridgeTab — routes (T124, FR-041/FR-045)', () => {
     // Removal ASKS FIRST, and the question names what it costs — removal is not the harder version
     // of Disable, it is the one that deletes the entry and blinds the Operations panel's lateness
     // detection for transfers still moving on the route.
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const confirm = stubConfirm(true)
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /removed/.test(c[1]))).toBe(true))
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(confirm.mock.calls[0][0]).toMatch(/Disable/)
     expect(confirm.mock.calls[0][0]).toMatch(/expected delivery window/i)
-    confirm.mockRestore()
   })
 
   it('does not remove a route when the operator declines the confirm', async () => {
@@ -266,11 +279,10 @@ describe('BridgeTab — routes (T124, FR-041/FR-045)', () => {
     render(<BridgeTab {...node} />)
     await screen.findByRole('table', { name: 'Curated bridge routes' })
 
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const confirm = stubConfirm(false)
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     expect(confirm).toHaveBeenCalled()
     expect(runTx).not.toHaveBeenCalled()
-    confirm.mockRestore()
   })
 
   it('refuses an invalid route before the wallet prompt and dispatches a valid one', async () => {

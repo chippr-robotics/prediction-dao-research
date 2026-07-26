@@ -359,13 +359,26 @@ index table updated and internal links resolving.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T144 [P] Write the developer guide in `docs/developer-guide/bridge-and-liquidity.md` covering both routers, the two fee services, and the R11b predicate inversion
-- [ ] T145 [P] Write the operator runbook in `docs/runbooks/bridge-liquidity-operations.md` covering pause/resume, route and pool curation, stuck-bridge triage, and the limits of operator action
-- [ ] T146 [P] Add the spec-067 summary block to `CLAUDE.md` following the existing per-spec guardrail format
+- [X] T144 [P] Write the developer guide in `docs/developer-guide/bridge-and-liquidity.md` covering both routers, the two fee services, and the R11b predicate inversion
+- [X] T145 [P] Write the operator runbook in `docs/runbooks/bridge-liquidity-operations.md` covering pause/resume, route and pool curation, stuck-bridge triage, and the limits of operator action
+- [X] T146 [P] Add the spec-067 summary block to `CLAUDE.md` following the existing per-spec guardrail format
 - [ ] T147 Run `npm run compile && npm test && npm run test:frontend && npm run check:storage-layout` and confirm all green
 - [ ] T148 (SC-012, SC-019, SC-020) Run the full `quickstart.md` walkthrough end to end, including the honest-degradation and cross-network selection checks
-- [ ] T149 [P] Confirm no `continue-on-error` was added to any lint/test/build/security step in `.github/workflows/`
-- [ ] T150 Request the smart-contract security review required by constitution I (`.github/agents/smart-contract-security.agent.md`) for `contracts/bridge/BridgeRouter.sol` and `contracts/liquidity/LiquidityRouter.sol`
+- [X] T149 [P] Confirm no `continue-on-error` was added to any lint/test/build/security step in `.github/workflows/`
+- [X] T150 Request the smart-contract security review required by constitution I (`.github/agents/smart-contract-security.agent.md`) for `contracts/bridge/BridgeRouter.sol` and `contracts/liquidity/LiquidityRouter.sol`
+      **DONE — verdict APPROVE_WITH_NITS** (PR #965). Three lenses (value flow & custody / access
+      control & upgradeability / external integration & DoS) over both routers; each of 28 candidate
+      findings handed to an independent skeptic instructed to refute it. Nothing survived above
+      `low`. EthTrust-SL **Level 2** met. Confirmed under active attack: `depositor == member` on
+      both legs (`_deposit` is the single `depositV3` call site; no rescue function exists in the
+      ABI), non-custodial, transient custody, the `MAX_FEE_BPS` amount bound, and fee-on-consumed-
+      capital. Reentrancy protection is structurally sufficient — every external read is `view` and
+      compiles to `STATICCALL`. Fixed in `b4d107b6`: the missing Uniswap slippage bound (the only
+      unprivileged-attacker path), `bool enabled` on `RouteSet`/`PoolListed` so the FR-046 audit
+      history can reconstruct availability, and `TreasuryTransferFailed` replacing a misleading
+      `ResidualFunds`. Carried to #966: the bridge `recipient` screening scope (a compliance
+      decision), proving the fork suite green against the real Across SpokePool, and the FeeRouter
+      service-registration liveness gate.
 - [ ] T158 Run the moderated impermanent-loss comprehension check behind SC-005 before mainnet launch and record the result in `specs/067-bridge-pool-liquidity/checklists/requirements.md` — the in-flow gate (T096) proves the disclosure is *shown*, this proves it is *understood*
 
 ---
