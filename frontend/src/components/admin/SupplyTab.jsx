@@ -31,7 +31,7 @@
  * As on the Bridge tab, scope is a NETWORK and not the connected wallet: reads span every
  * Uniswap-capable network from its own RPC, and only writes need the wallet there (FR-050).
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
 import { LIQUIDITY_ROUTER_ABI } from '../../abis/LiquidityRouter'
@@ -338,11 +338,16 @@ export default function SupplyTab({
    * figure at all for the money inside it, while the member screen showed exactly that. One number
    * genuinely cannot be produced; this one can, so it is.
    */
+  // Bumped whenever a newer run starts, so a slow HubPool read cannot land its result after the
+  // scope moved on — or after unmount, which surfaced in tests as a React act() warning and an
+  // intermittent failure in whichever test happened to be running when the late update arrived.
+  const bridgePoolsRun = useRef(0)
   const fetchBridgePools = useCallback(async () => {
     if (!readProvider || !state?.pools) return
+    const run = ++bridgePoolsRun.current
     const bridgePools = state.pools.filter((p) => p.kind === POOL_KIND.BRIDGE_LP)
     if (bridgePools.length === 0) {
-      setBridgeSizes({})
+      if (run === bridgePoolsRun.current) setBridgeSizes({})
       return
     }
     const entries = await Promise.all(
@@ -356,7 +361,8 @@ export default function SupplyTab({
         return [pool.poolId, info]
       }),
     )
-    setBridgeSizes(Object.fromEntries(entries))
+    // Stale runs drop their result rather than overwriting a newer network's.
+    if (run === bridgePoolsRun.current) setBridgeSizes(Object.fromEntries(entries))
   }, [readProvider, state?.pools])
 
   useEffect(() => {
