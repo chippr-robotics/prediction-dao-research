@@ -62,7 +62,7 @@ import {
 } from '../../lib/fees/feeQuote'
 import { BRIDGE_QUOTE_LINE, buildBridgeQuote } from '../../lib/bridge/acrossQuotes'
 import { buildBridgeCalls } from '../../lib/bridge/bridgeRouter'
-import { buildSupplyCalls, maxSupplyFee, POOL_KIND } from '../../lib/liquidity/liquidityRouter'
+import { buildSupplyCalls, maxSupplyFee, POOL_KIND, supplyMinimums } from '../../lib/liquidity/liquidityRouter'
 import { feeCeilingCopy, liquidityFeeCopy } from '../../lib/liquidity/liquidityCopy'
 import { BRIDGE_ROUTER_ABI } from '../../abis/BridgeRouter'
 import { LIQUIDITY_ROUTER_ABI } from '../../abis/LiquidityRouter'
@@ -156,6 +156,14 @@ const supplyCalldata = (maxFeeBps) =>
       pool,
       amount0Desired: 1_000_000_000n,
       amount1Desired: 500_000_000_000_000_000n,
+      // Real slippage bounds, as the shipped caller passes. They are required arguments: a supply
+      // built without them mints at any price, which is the sandwich exposure the security review
+      // found when the only production caller was letting them default to zero.
+      ...supplyMinimums({
+        amount0Desired: 1_000_000_000n,
+        amount1Desired: 500_000_000_000_000_000n,
+        bps: maxFeeBps ?? 0,
+      }),
       deadline: DEADLINE,
       maxFeeBps,
     }).calls.at(-1).data,

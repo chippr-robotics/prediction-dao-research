@@ -1057,11 +1057,10 @@ function describeLiquidityEvent(scopeChainId) {
         return {
           action: 'Pool listed',
           target: poolTarget(args),
-          // `PoolListed` does NOT carry `enabled` (see ILiquidityRouter), so `args.enabled` is
-          // undefined and this used to fall through to "open to new deposits" — telling an auditor
-          // that a pool listed with the box unchecked was taking money. The event says nothing about
-          // availability, so neither does this row; PoolEnabledChanged is where that history lives.
-          after: `${tokenLabel(scopeChainId, args.token0)}${args.token1 && args.token1 !== ethers.ZeroAddress ? ` / ${tokenLabel(scopeChainId, args.token1)}` : ''}`,
+          // `PoolListed` now carries `enabled` (added after the T150 security review), so this row
+          // can state availability truthfully. It previously could not — the event omitted the field,
+          // so a naive ternary reported every listed pool as open, including one listed closed.
+          after: `${args.enabled ? 'open to new deposits' : 'retired'}, ${tokenLabel(scopeChainId, args.token0)}${args.token1 && args.token1 !== ethers.ZeroAddress ? ` / ${tokenLabel(scopeChainId, args.token1)}` : ''}`,
         }
       case 'PoolEnabledChanged':
         return {

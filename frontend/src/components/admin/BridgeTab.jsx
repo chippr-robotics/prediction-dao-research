@@ -1198,11 +1198,12 @@ function describeBridgeEvent(scopeChainId) {
         return {
           action: 'Route saved',
           target: `${tokenLabel(scopeChainId, args.inputToken)} ${route(args)}`,
-          // `RouteSet` does NOT carry `enabled` (see IBridgeRouter), so `args.enabled` is undefined
-          // and this used to fall through to "offered" — telling an auditor that a route saved with
-          // the box unchecked had gone live. The event says nothing about availability, so neither
-          // does this row: the RouteEnabledChanged rows are where that history actually lives.
-          after: `max ${formatLimit(scopeChainId, args.inputToken, args.maxAmount)}, window ${formatDuration(args.expectedFillSeconds)}`,
+          // `RouteSet` now carries `enabled` (added after the T150 security review), so this row can
+          // state availability truthfully. It previously could NOT: the event omitted the field, so
+          // `args.enabled` was undefined and a naive ternary reported every saved route as offered —
+          // including one saved with the box unchecked. Reporting it is only correct because the
+          // contract emits it; if that ever regresses, report nothing again rather than guessing.
+          after: `${args.enabled ? 'offered' : 'not offered'}, max ${formatLimit(scopeChainId, args.inputToken, args.maxAmount)}, window ${formatDuration(args.expectedFillSeconds)}`,
         }
       case 'RouteEnabledChanged':
         return { action: 'Route availability', target: route(args), after: args.enabled ? 'enabled' : 'disabled' }

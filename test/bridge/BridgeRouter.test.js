@@ -226,7 +226,9 @@ describe("BridgeRouter", function () {
       const newId = await router.computeRouteId(usdcAddr, usdcDest, 10n);
       await expect(router.connect(liquidityAdmin).setRoute(newRoute))
         .to.emit(router, "RouteSet")
-        .withArgs(newId, usdcAddr, 10n, usdcDest, AMT("5"), 1800, false, liquidityAdmin.address);
+        // `enabled` is the 8th arg: RouteSet carries it so the FR-046 audit history can reconstruct
+        // availability, since setRoute overwrites the struct and can flip it either way.
+        .withArgs(newId, usdcAddr, 10n, usdcDest, AMT("5"), 1800, false, true, liquidityAdmin.address);
 
       await expect(router.connect(liquidityAdmin).setRouteEnabled(newId, false))
         .to.emit(router, "RouteEnabledChanged")
@@ -245,6 +247,25 @@ describe("BridgeRouter", function () {
       expect(await router.paused()).to.equal(true);
       await router.connect(guardian).unpause();
       expect(await router.paused()).to.equal(false);
+    });
+
+    // T150 — the FR-046 audit history must be able to reconstruct AVAILABILITY, not just metadata.
+    // `setRoute` is idempotent and overwrites the whole struct, so it can flip `enabled` in either
+    // direction while emitting only `RouteSet`. Without `enabled` on that event, a route disabled
+    // during an incident and quietly re-enabled is indistinguishable from a metadata edit in the log.
+    it("records `enabled` on RouteSet, so a log reader can tell availability from metadata", async function () {
+      const disabled = route({ destinationChainId: 42161n, enabled: false });
+      const id = await router.computeRouteId(usdcAddr, usdcDest, 42161n);
+      await expect(router.connect(liquidityAdmin).setRoute(disabled))
+        .to.emit(router, "RouteSet")
+        .withArgs(id, usdcAddr, 42161n, usdcDest, 0n, 1800, false, false, liquidityAdmin.address);
+      expect((await router.getRoute(id)).enabled).to.equal(false);
+
+      // The same call flipping it back on, again emitting only RouteSet.
+      await expect(router.connect(liquidityAdmin).setRoute(route({ destinationChainId: 42161n, enabled: true })))
+        .to.emit(router, "RouteSet")
+        .withArgs(id, usdcAddr, 42161n, usdcDest, 0n, 1800, false, true, liquidityAdmin.address);
+      expect((await router.getRoute(id)).enabled).to.equal(true);
     });
 
     it("rejects the route setters for an unknown routeId and zero addresses", async function () {
