@@ -48,12 +48,16 @@ describe('useConnectorAvailability', () => {
     expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/does not support/i)
   })
 
-  it('gates passkey on the active network even when the device is capable', async () => {
+  it('keeps passkey available on a network with no submission support (the lockout fix)', async () => {
+    // Availability here means "can this member SIGN IN", which is device-scoped. Gating it on the
+    // active network locked members out: the selected chain persists, so an unsupported chain hid
+    // the only way back in. Whether a chain can carry a TRANSACTION is disclosed separately, at
+    // the point of action.
     getNetwork.mockReturnValue({ capabilities: { passkeyAccounts: false } })
     const { result } = renderHook(() => useConnectorAvailability())
     await waitFor(() => expect(result.current.isChecking).toBe(false))
-    expect(result.current.isAvailable(CONNECTORS[2])).toBe(false)
-    expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/network/i)
+    expect(result.current.isAvailable(CONNECTORS[2])).toBe(true)
+    expect(result.current.unavailableReason(CONNECTORS[2])).toBeUndefined()
   })
 
   it('does not re-probe when the connectors array identity changes but content does not', async () => {
