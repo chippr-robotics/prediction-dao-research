@@ -109,6 +109,27 @@ const CHAIN_SPECIFIC = {
   8453: ['uniswap.factory', 'uniswap.positionManager'],
 }
 
+/**
+ * An endpoint safe to print.
+ *
+ * RPC URLs in this project routinely carry credentials — QuickNode and Alchemy embed the API key in
+ * the PATH, others use a query parameter — and this script's output goes to stdout, into CI logs,
+ * and into terminal transcripts people paste into issues. Printing the resolved URL verbatim leaked
+ * a live key every time it ran against a keyed endpoint. Host only: enough to tell which provider
+ * answered, with nothing worth stealing.
+ */
+function safeRpcLabel(rpcUrl) {
+  try {
+    const u = new URL(rpcUrl)
+    // A path or query beyond "/" is where the credential lives, so say it exists without showing it.
+    const hasSecret = (u.pathname && u.pathname !== '/') || u.search !== ''
+    return `${u.protocol}//${u.host}${hasSecret ? '/…' : ''}`
+  } catch {
+    // Not parseable as a URL — say nothing rather than risk echoing a raw secret.
+    return '(unparseable endpoint)'
+  }
+}
+
 function resolveRpc(target) {
   for (const key of target.rpc) {
     if (process.env[key]) return process.env[key]
@@ -122,7 +143,7 @@ async function getCode(rpcUrl, address) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getCode', params: [address, 'latest'] }),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${rpcUrl}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status} from ${safeRpcLabel(rpcUrl)}`)
   const body = await res.json()
   if (body.error) throw new Error(`RPC error: ${JSON.stringify(body.error)}`)
   return body.result
@@ -182,7 +203,7 @@ async function main() {
     const results = await verifyChain(Number(id), target)
     all.push(...results)
     if (!asJson) {
-      console.log(`\n${target.name} (${id}) via ${resolveRpc(target)}`)
+      console.log(`\n${target.name} (${id}) via ${safeRpcLabel(resolveRpc(target))}`)
       for (const r of results) {
         const status = r.ok ? `OK ${String(r.bytes).padStart(6)} bytes` : `FAIL ${r.error || 'no bytecode'}`
         console.log(`  ${r.label.padEnd(26)} ${r.address}  ${status}`)

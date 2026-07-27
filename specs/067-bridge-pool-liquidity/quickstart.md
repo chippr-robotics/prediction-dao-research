@@ -39,17 +39,30 @@ Never put a private key in `.env` for these — fork tests impersonate accounts.
 ### 1a. The refund address — the one that can silently strand funds
 
 ```bash
-npx hardhat test test/fork/bridgeRouter.fork.test.js --grep "expiry refund"
+npx hardhat test test/fork/bridgeRouter.fork.test.js --grep "MEMBER as depositor"
 ```
 
-**Expected**: an expired deposit refunds to the **member's** address; the `BridgeRouter` balance is zero
-throughout. A happy-path fill passes whether or not `depositor` is set correctly, so this case is the
-only signal — if it is skipped or quarantined, the merge is not safe.
+**Expected**: one test runs and passes — the real SpokePool's own deposit event records the **member**
+as `depositor`, not the router. That is what makes an unfilled deposit refund to the member, and it is
+why the router deliberately has no rescue function.
+
+> **Check the count, not just the exit code.** `--grep` with no match exits **0** reporting
+> "0 passing", so a stale pattern here reads as a green merge gate that asserted nothing. If you see
+> 0 passing, the gate did not run.
+>
+> A direct expired-deposit test is not reproducible on a fork: an Across refund needs an off-chain
+> dataworker to propose a root bundle, a dispute window to elapse, and a merkle-proved refund leaf —
+> staging that would mostly test Across. The `depositor` assertion against the real contract's event
+> encoding is the reproducible form of the same guarantee. See the note at
+> `test/fork/bridgeRouter.fork.test.js:17-26`.
+>
+> This test needs `POLYGON_RPC_URL` (or the configured fork endpoint). **Without it the test SKIPS,
+> and a skip is not a pass.**
 
 ### 1b. Position custody — the member owns the position, always
 
 ```bash
-npx hardhat test test/fork/liquidityRouter.fork.test.js --grep "NFT owner|exit without router"
+npx hardhat test test/fork/liquidityRouter.fork.test.js --grep "OWNED BY THE MEMBER|exit WITHOUT the router|never involved"
 ```
 
 **Expected**: after `mintFullRangeWithFee` the Uniswap position NFT is owned by the member; the member
@@ -59,10 +72,14 @@ the Across `HubPool` round trip never involves the router.
 ### 1c. No residual custody
 
 ```bash
-npx hardhat test test/bridge test/liquidity --grep "balance|allowance"
+npx hardhat test test/bridge/BridgeRouter.test.js test/liquidity/LiquidityRouter.test.js \
+  --grep "residue|balance|allowance|ResidualFunds"
 ```
 
 **Expected**: both routers hold zero token balance and leave zero allowance after every call.
+
+> `hardhat test` takes FILES, not directories — passing `test/bridge` crashes with
+> `MODULE_NOT_FOUND`. And as in 1a, confirm the passing count is non-zero.
 
 ---
 
