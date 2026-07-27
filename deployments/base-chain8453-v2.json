@@ -10,7 +10,11 @@
     "bridgeRouter": "0x1afcAC1949BD306F7D4818999f509941F2E85582",
     "bridgeRouterImpl": "0x41ba6bcA216bd6A4c5A0Bf8F9b2d682ec0a879D5",
     "liquidityRouter": "0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED",
-    "liquidityRouterImpl": "0x7Af46728e7c969b75723398E3f93b565E968A3bA"
+    "liquidityRouterImpl": "0x7Af46728e7c969b75723398E3f93b565E968A3bA",
+    "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+    "accountFactory": "0xd519C25e9dEd0DAC586B764574100479CB318734",
+    "accountImpl": "0xfC5086A397e4FbAAF8f73892807415Da8d255E61",
+    "p256Verifier": null
   },
   "constructorArgs": {
     "safePolicyGuardV2": [],
