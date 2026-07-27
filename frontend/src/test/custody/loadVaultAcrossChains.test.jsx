@@ -109,6 +109,54 @@ describe('loadByAddress — cross-chain search', () => {
     expect(upsert).toHaveBeenCalledWith(ME, expect.objectContaining({ role: 'watch' }), expect.anything())
   })
 
+  it('accepts an EIP-3770-prefixed paste ("ETCM:0x…") and searches with the bare address', async () => {
+    chainState = { 63: safeOnMordor }
+    const { result } = renderHook(() => useCustodyVaults())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loaded
+    await act(async () => {
+      loaded = await result.current.loadByAddress(`ETCM:${VAULT}`, 'Admin Safe')
+    })
+    expect(loaded.isSafe).toBe(true)
+    expect(loaded.chainId).toBe(63)
+    expect(upsert).toHaveBeenCalledWith(ME, expect.objectContaining({ chainId: 63 }), expect.anything())
+  })
+
+  it('uses a recognized prefix as the chain hint, outranking the connected chain', async () => {
+    // Same address is a Safe on Mordor AND Polygon; wallet is on Polygon. A member who pasted
+    // "ETCM:…" said which one they meant — the connected-chain preference must not override it.
+    chainState = { 63: safeOnMordor, 137: safeOnMordor }
+    const { result } = renderHook(() => useCustodyVaults())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loaded
+    await act(async () => {
+      loaded = await result.current.loadByAddress(`ETCM:${VAULT}`)
+    })
+    expect(loaded.chainId).toBe(63)
+  })
+
+  it('strips an unrecognized prefix and still searches everywhere', async () => {
+    chainState = { 63: safeOnMordor }
+    const { result } = renderHook(() => useCustodyVaults())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loaded
+    await act(async () => {
+      loaded = await result.current.loadByAddress(`weirdchain:${VAULT}`)
+    })
+    expect(loaded.chainId).toBe(63)
+  })
+
+  it('an explicit member choice still outranks the pasted prefix', async () => {
+    chainState = { 63: safeOnMordor, 137: safeOnMordor }
+    const { result } = renderHook(() => useCustodyVaults())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loaded
+    await act(async () => {
+      loaded = await result.current.loadByAddress(`ETCM:${VAULT}`, '', 0, { preferredChainId: 137 })
+    })
+    expect(loaded.chainId).toBe(137)
+  })
+
   it('prefers the connected chain when the address is a Safe on several', async () => {
     chainState = { 63: safeOnMordor, 137: safeOnMordor }
     const { result } = renderHook(() => useCustodyVaults())

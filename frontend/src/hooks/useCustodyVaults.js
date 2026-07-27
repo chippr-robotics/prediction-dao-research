@@ -17,6 +17,7 @@ import {
   buildCreateVaultTx,
   loadVault,
   findVaultAcrossChains,
+  parseVaultAddressInput,
   isVaultOwner,
 } from '../lib/custody/safeVault'
 import {
@@ -147,8 +148,12 @@ export function useCustodyVaults() {
   const loadByAddress = useCallback(
     async (rawAddress, label = '', nowMs = 0, { preferredChainId } = {}) => {
       setError(null)
+      // Safe UIs (incl. the ETC Cooperative fork) display EIP-3770-prefixed addresses
+      // ("ETC:0x…", "ETCM:0x…") and members paste them verbatim: strip the prefix and use a
+      // recognized one as a chain hint, ranked below an explicit member choice.
+      const { address: cleanAddress, chainHint } = parseVaultAddressInput(rawAddress)
       const { matches, unreachable, searched } = await findVaultAcrossChains(
-        rawAddress,
+        cleanAddress,
         CUSTODY_SUPPORTED_CHAIN_IDS,
         { providerFor: (id) => (Number(id) === Number(chainId) ? provider : getProvider(id)) },
       )
@@ -167,10 +172,12 @@ export function useCustodyVaults() {
         throw err
       }
 
-      // Same address, multiple chains: honour an explicit choice, else prefer the connected chain,
-      // else the first hit. All matches are returned so the caller can offer the rest.
+      // Same address, multiple chains: honour an explicit choice, else the pasted prefix's chain,
+      // else prefer the connected chain, else the first hit. All matches are returned so the
+      // caller can offer the rest.
       const picked =
         matches.find((m) => Number(m.chainId) === Number(preferredChainId)) ||
+        (chainHint != null && matches.find((m) => Number(m.chainId) === Number(chainHint))) ||
         matches.find((m) => Number(m.chainId) === Number(chainId)) ||
         matches[0]
 
