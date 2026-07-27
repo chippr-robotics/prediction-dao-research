@@ -30,7 +30,7 @@ describe('appNav — Protect placement (spec 068 FR-024)', () => {
   it('shows Protect its Tools siblings in the section nav', () => {
     // SectionIconNav renders groupForTab(activeTab).items — the mobile bottom bar for Protect.
     const siblings = groupForTab('custody').items.map((i) => i.id)
-    expect(siblings).toEqual(expect.arrayContaining(['addressbook', 'security', 'reports', 'network']))
+    expect(siblings).toEqual(expect.arrayContaining(['addressbook', 'security', 'reports']))
     expect(siblings).not.toContain('earn')
   })
 
@@ -40,5 +40,24 @@ describe('appNav — Protect placement (spec 068 FR-024)', () => {
 
     const hidden = visibleNavGroups({ custody: false })
     expect(hidden.find((g) => g.label === 'Tools').items.map((i) => i.id)).not.toContain('custody')
+  })
+})
+
+// Spec 069 (FR-001) — Network moved out of Tools onto the account button beside Preferences.
+// The app reads every supported network at once, so the active chain is a per-transaction
+// detail, and the panel is now mostly endpoint configuration: member settings, not a tool.
+describe('appNav — Network placement (spec 069 FR-001)', () => {
+  it('no longer lists Network in any nav group', () => {
+    const allIds = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id))
+    expect(allIds).not.toContain('network')
+  })
+
+  it('reports no section group for the network tab, so no bottom bar claims it', () => {
+    // SectionIconNav renders nothing for a null group — same as account/membership/preferences.
+    expect(groupForTab('network')).toBeNull()
+  })
+
+  it('keeps the route resolvable so saved links and bookmarks still work', () => {
+    expect(pathForNavItem('network')).toBe('/wallet?tab=network')
   })
 })

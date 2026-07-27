@@ -229,6 +229,31 @@ artifacts live under `specs/<feature>/`.
   `docs/developer-guide/bridge-and-liquidity.md` + `docs/runbooks/bridge-liquidity-operations.md` +
   `specs/067-bridge-pool-liquidity/`.
 
+- **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
+  The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
+  `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE
+  implementation — `frontend/src/lib/network/rpcEndpoints.js#resolveRpcEndpoints`, precedence
+  **member override → build default** (`NETWORKS[chainId].rpcUrl`) — consumed by BOTH
+  `utils/rpcProvider.js#makeReadProvider` (every ethers read) and `wagmi.js`'s transports. **Never
+  hand-build a provider from `NETWORKS[chainId].rpcUrl`**: go through `makeReadProvider` /
+  `getReadProvider(chainId)`, or `getRpcUrlForChain(chainId)` for a bare URL. A member failover yields
+  real failover (quorum-1 `FallbackProvider` / viem `fallback`), with the build default behind it so a
+  custom endpoint going dark never takes a network down. **Credential rules are absolute**: keys ride
+  in a request HEADER (never written into a URL by the app), attach to the PRIMARY endpoint only,
+  redact through `redactRpcUrl` at every display/log boundary, are device-scoped
+  (`fw_global_prefs.network_endpoints`, usable with no wallet connected) and are **deliberately absent
+  from `lib/backup/syncedObjects.js`** — do not add them. Saving is honest: an endpoint answering with
+  a DIFFERENT `eth_chainId` is refused (it would silently serve another chain's state), an unreachable
+  one saves with the failure shown. **Bring-your-own-node is supported**: any https host, plus loopback
+  http for a local node — which is why `connect-src` grants `https:` scheme-wide (a per-member
+  allowlist cannot exist in a static header). That grant is for `connect-src` ONLY; never extend it to
+  `script-src`/`frame-src`/`img-src`. `CSP_RPC_GRANTS` (endpointStore.js) and both nginx configs must
+  stay in sync (gated by `src/test/nginxCspConnectSrc.test.js`). Non-loopback `http://` is refused
+  (browser mixed-content blocking, not a policy we control). Reads pick up a change immediately
+  (`useEndpointsRevision` in provider memo deps); wallet transports are module-load-time, so the panel
+  discloses the reload instead of implying an instant switch. See
+  `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan

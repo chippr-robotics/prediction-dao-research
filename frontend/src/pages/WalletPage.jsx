@@ -30,8 +30,8 @@ import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPan
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import CallsignPanel from '../components/account/CallsignPanel'
 import BackupPanel from '../components/account/BackupPanel'
+import NetworkPanel from '../components/account/NetworkPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
-import NetworkSettings from '../components/wallet/NetworkSettings'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
 import { groupForTab } from '../config/appNav'
@@ -44,7 +44,7 @@ import './WalletPage.css'
 // global nav drawer + account button (see config/appNav.js) — this page just
 // hosts the panels and reads `?tab=` to pick one. WALLET_TABS is the flat list
 // used for deep-link/alias resolution and for the active tab's heading label.
-// (Account / Membership / Preferences are reached from the account button;
+// (Account / Membership / Network / Preferences are reached from the account button;
 // 'custody' is surfaced to users as "Protect" and 'paytransfer' as "Transfer" —
 // the ids stay stable so saved links keep resolving, spec 067 FR-002.)
 const WALLET_TABS = [
@@ -376,7 +376,7 @@ function WalletPage() {
 
                 {activeTab === 'network' && (
                   <div className="network-section" role="tabpanel">
-                    <NetworkSettings />
+                    <NetworkPanel />
                   </div>
                 )}
 

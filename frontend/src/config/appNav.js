@@ -7,9 +7,9 @@
  *   - WalletPage        — hosts the section panels, keyed by the same tab ids
  *
  * Every section item routes to `/wallet?tab=<id>` (the panels render there); the
- * Home entry is the dashboard. Account / Membership / Preferences intentionally
- * live on the account button (top right), NOT in this menu, so they are absent
- * from the groups below.
+ * Home entry is the dashboard. Account / Membership / Network / Preferences
+ * intentionally live on the account button (top right), NOT in this menu, so they
+ * are absent from the groups below.
  */
 
 // Quick-access entry pinned to the top of the drawer list. `icon` is a NavIcon
@@ -63,7 +63,11 @@ export const NAV_GROUPS = [
       // (see WalletPage TAB_ALIASES).
       { id: 'security', label: 'Recovery', icon: 'lock' },
       { id: 'reports', label: 'Reporting', icon: 'reports' },
-      { id: 'network', label: 'Network', icon: 'globe' },
+      // 'network' deliberately absent (spec 069): network settings moved to the account
+      // button beside Preferences. The app reads every supported network at once, so the
+      // active chain is a per-transaction detail rather than a tool you go to — and the
+      // panel is now mostly endpoint configuration, which belongs with preferences. The
+      // tab id stays 'network' so saved links keep resolving (WalletPage hosts it).
     ],
   },
   {

@@ -24,6 +24,7 @@ import { Contract, formatUnits } from 'ethers'
 import { useWallet } from './useWalletManagement'
 import { useUserPreferences } from './useUserPreferences'
 import { makeReadProvider } from '../utils/rpcProvider'
+import { useEndpointsRevision } from './useRpcEndpoints'
 import { NETWORKS } from '../config/networks'
 import {
   getPortfolioRegistry,
@@ -88,9 +89,14 @@ export function usePortfolio({ accountAddress } = {}) {
   // One registry entry list across all in-scope chains; entries carry their
   // chainId so nothing ever mixes across networks.
   const registry = useMemo(() => chainIds.flatMap((id) => getPortfolioRegistry(id)), [chainIds])
+  const endpointRevision = useEndpointsRevision()
+  // `endpointRevision` is a dependency so a member who repoints a network in Network
+  // settings gets fresh providers on the next read instead of after a remount (spec 069).
   const providers = useMemo(
     () => new Map(chainIds.map((id) => [id, makeReadProvider(NETWORKS[id].rpcUrl, id)])),
-    [chainIds],
+    // The store lives outside React, so the revision IS the dependency that matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chainIds, endpointRevision],
   )
 
   // Non-EVM bitcoin scope (spec 061, FR-008/021): mainnet always, testnet only

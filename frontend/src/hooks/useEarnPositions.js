@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWallet } from './useWalletManagement'
 import { NETWORKS, getEarnNetworks } from '../config/networks'
 import { makeReadProvider } from '../utils/rpcProvider'
+import { useEndpointsRevision } from './useRpcEndpoints'
 import { POSITIONS_POLL_MS } from '../config/earn'
 import { readVaultUserState } from '../lib/earn/vaultActions'
 import { fetchPositionsEnrichment } from '../lib/earn/morphoApi'
@@ -32,9 +33,13 @@ export function useEarnPositions(vaults) {
   const [status, setStatus] = useState('loading')
   const reqIdRef = useRef(0)
 
+  const endpointRevision = useEndpointsRevision()
+  // Member endpoint changes (spec 069) rebuild the providers on the next read.
   const providers = useMemo(
     () => new Map(earnChainIds.map((id) => [id, makeReadProvider(NETWORKS[id].rpcUrl, id)])),
-    [earnChainIds],
+    // The store lives outside React, so the revision IS the dependency that matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [earnChainIds, endpointRevision],
   )
 
   const load = useCallback(async () => {

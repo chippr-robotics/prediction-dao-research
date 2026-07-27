@@ -329,8 +329,8 @@ function WalletButton({ className = '' }) {
               )}
 
               {/* Account Actions \u2014 personal account entries live here (moved off
-                  the section menu): Account, Membership, Preferences, plus the
-                  membership purchase flow and Disconnect. */}
+                  the section menu): Account, Membership, Network, Preferences, plus
+                  the membership purchase flow and Disconnect. */}
               <div className="dropdown-actions">
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=account') }}
@@ -362,6 +362,16 @@ function WalletButton({ className = '' }) {
                     <span>Purchase Membership</span>
                   </button>
                 )}
+                {/* Network settings sit beside Preferences (spec 069) — RPC endpoints,
+                    failover and API keys are member configuration, not a Tools section. */}
+                <button
+                  onClick={() => { setIsOpen(false); navigate('/wallet?tab=network') }}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span className="action-icon" aria-hidden="true"><NavIcon name="globe" size={16} /></span>
+                  <span>Network</span>
+                </button>
                 <button
                   onClick={() => { setIsOpen(false); navigate('/wallet?tab=preferences') }}
                   className="action-button"
