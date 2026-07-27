@@ -103,8 +103,12 @@ describe('createFeeRouterReader', () => {
 const jsonRes = (body) => ({ ok: true, status: 200, async json() { return body }, async text() { return JSON.stringify(body) } })
 const pmFetch = () => async (url) => (String(url).includes('/fee-rate') ? jsonRes({ base_fee: 1000 }) : jsonRes({ data: [] }))
 
-function build({ feeRates } = {}) {
+function build({ feeRates, noRouter = false } = {}) {
   const config = testConfig(PM_ENV)
+  // Spec 060 shipped with no FeeRouter recorded anywhere, so "no router" used to be the config
+  // default. The router is now deployed on every network (issue #966), so the record-less state —
+  // still legitimate for a fresh chain — must be constructed explicitly.
+  if (noRouter) config.feeRouter = { ...config.feeRouter, address: null }
   const { app } = createApp(config, {
     providers: mockProviders(config),
     engineClient: mockEngine(),
@@ -139,8 +143,8 @@ describe('GET fee-rate with the FeeRouter as source (spec 060)', () => {
     expect(res.body.source).toBe('env-fallback')
   })
 
-  it('defaults to env-fallback with no FeeRouter recorded for the chain (pre-060 parity)', async () => {
-    const res = await get(build().app, FEE_PATH)
+  it('falls back to env bps when the chain has no FeeRouter recorded (pre-060 parity)', async () => {
+    const res = await get(build({ noRouter: true }).app, FEE_PATH)
     expect(res.status).toBe(200)
     expect(res.body.builderTakerFeeBps).toBe(50)
     expect(res.body.source).toBe('env-fallback')
@@ -164,7 +168,7 @@ describe('GET /status fees block (spec 060)', () => {
   })
 
   it('reports env-fallback rates when no router is configured', async () => {
-    const res = await get(build().app, '/status')
+    const res = await get(build({ noRouter: true }).app, '/status')
     expect(res.status).toBe(200)
     expect(res.body.fees.feeRouter).toBeNull()
     expect(res.body.fees.polymarket).toEqual({ takerBps: 50, makerBps: 0, source: 'env-fallback' })
