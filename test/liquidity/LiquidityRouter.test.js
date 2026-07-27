@@ -168,6 +168,9 @@ describe("LiquidityRouter", function () {
           token1.target,
           FEE_TIER,
           ETH("5"), ETH("5"),
+          // `enabled` — PoolListed carries it for the same reason RouteSet does: listPool
+          // overwrites the struct, so it can open or retire a pool while emitting only this event.
+          true,
           liquidityAdmin.address
         );
       expect(await router.poolCount()).to.equal(2);

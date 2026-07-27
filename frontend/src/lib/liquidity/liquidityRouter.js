@@ -300,6 +300,36 @@ export function maxSupplyFee({ amountDesired, bps }) {
   return splitFee(amountDesired ?? 0n, bps).feeAmount
 }
 
+/** Default slippage tolerance for a supply, in basis points (0.50%). */
+export const DEFAULT_SUPPLY_SLIPPAGE_BPS = 50
+
+/**
+ * The minimum of each leg the member will accept the position to consume, given the amounts they
+ * offered and the tolerance they were shown.
+ *
+ * Computed against the NET amount — what remains after the platform fee — because the fee is taken
+ * before the mint. A bound derived from the gross would exceed what the position manager can
+ * possibly consume and revert every supply the moment a non-zero fee rate goes live.
+ *
+ * A full-range mint consumes at the pool's current ratio, so one leg is normally consumed in full
+ * and the other only partially; the bound is deliberately a floor on BOTH, which is what makes a
+ * sandwich unprofitable rather than an attempt to predict the split.
+ *
+ * @returns {{amount0Min: bigint, amount1Min: bigint}}
+ */
+export function supplyMinimums({ amount0Desired, amount1Desired, bps, slippageBps = DEFAULT_SUPPLY_SLIPPAGE_BPS }) {
+  if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 10_000) {
+    throw new Error('supplyMinimums: slippageBps must be a tolerance in basis points')
+  }
+  const floor = (gross) => {
+    const net = splitFee(gross ?? 0n, bps).netAmount
+    // Zero legs stay zero: a leg the member is not supplying has no minimum to enforce.
+    if (net === 0n) return 0n
+    return (net * BigInt(10_000 - slippageBps)) / 10_000n
+  }
+  return { amount0Min: floor(amount0Desired), amount1Min: floor(amount1Desired) }
+}
+
 /**
  * Which per-transaction ceiling an amount pair would breach, or null when it fits.
  *
@@ -332,6 +362,18 @@ export function poolLimitViolation(pool, { amount0 = 0n, amount1 = 0n } = {}) {
  * rate. The router additionally enforces its own immutable `MAX_FEE_BPS` on-chain, whatever
  * the FeeRouter reports.
  *
+ * `amount0Min` / `amount1Min` are REQUIRED for exactly the same reason, and were not always.
+ * They become Uniswap's `MintParams.amount0Min`/`amount1Min`, where `LiquidityManagement` enforces
+ * `require(amount0 >= amount0Min && amount1 >= amount1Min, 'Price slippage check')`. They used to
+ * default to `0n`, and the only production caller never passed them — so every member position was
+ * minted with that check switched off, leaving the deposit open to being sandwiched at a
+ * manipulated price. The router cannot fix this for us: forwarding a caller-supplied minimum
+ * verbatim is what Uniswap's own periphery does, and a bound hardcoded in the contract would be
+ * wrong. So the defaults are gone and omitting them is now an error, not a silent zero.
+ *
+ * They must be computed against the NET (post-fee) amounts, since the fee is taken before the mint
+ * and a bound derived from the gross would revert every supply the day a non-zero rate goes live.
+ *
  * Refuses — rather than producing calldata guaranteed to revert — for a bridge pool (wrong
  * path entirely: research R3), a retired pool, both amounts zero, and an amount over either
  * per-transaction ceiling.
@@ -344,12 +386,19 @@ export function buildSupplyCalls({
   pool,
   amount0Desired,
   amount1Desired,
-  amount0Min = 0n,
-  amount1Min = 0n,
+  amount0Min,
+  amount1Min,
   deadline,
   maxFeeBps,
 }) {
   if (!routerAddress) throw new Error('buildSupplyCalls: routerAddress is required')
+  // No defaults: a missing bound is a caller bug, and silently minting at any price is the failure
+  // it used to cause. `0n` remains expressible, but only by asking for it in so many words.
+  if (typeof amount0Min !== 'bigint' || typeof amount1Min !== 'bigint') {
+    throw new Error(
+      'buildSupplyCalls: amount0Min and amount1Min are required (bigint) — they are the slippage bound Uniswap enforces, and omitting them mints the position at any price',
+    )
+  }
   if (!pool?.poolId) throw new Error('buildSupplyCalls: a pool read from the router is required')
   if (Number(pool.kind) === POOL_KIND.BRIDGE_LP) {
     throw new Error(

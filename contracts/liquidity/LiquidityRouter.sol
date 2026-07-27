@@ -143,6 +143,7 @@ contract LiquidityRouter is ILiquidityRouter, UUPSManaged, ReentrancyGuardUpgrad
             pool.feeTier,
             pool.maxDeposit0PerTx,
             pool.maxDeposit1PerTx,
+            pool.enabled,
             msg.sender
         );
     }

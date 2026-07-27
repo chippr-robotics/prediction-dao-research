@@ -37,6 +37,7 @@ const path = require("path");
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
 const { deployProxy } = require("./lib/upgradeable");
 const { ServiceKind } = require("./lib/feeServices");
+const { MAINNET_CHAIN_IDS } = require("./lib/constants");
 
 /**
  * External protocol addresses per chain, each taken from that chain's own official deployment record
@@ -272,6 +273,17 @@ async function main() {
   console.log(`Network:  ${networkName} (chainId ${chainId})`);
   console.log(`Deployer: ${deployer.address}`);
 
+  // Mainnet gate, checked BEFORE anything is deployed — same position and env var as
+  // deploy-fee-router.js:78 and deploy.js. Without it a bare `--network mainnet` typo puts two
+  // value-bearing UUPS proxies on a live chain with no prompt and no undo. init-deployment-record.js
+  // already instructs operators to run this script AS `CONFIRM_MAINNET=true …`, so until now the
+  // tooling advertised a gate that did not exist (T150 finding M2).
+  if (MAINNET_CHAIN_IDS.includes(chainId) && !process.env.CONFIRM_MAINNET) {
+    throw new Error(
+      `Mainnet deployment requires CONFIRM_MAINNET=true env var (network ${networkName}, chainId ${chainId}).`,
+    );
+  }
+
   const filename = getDeploymentFilename(network, "v2");
   const filepath = path.join(process.cwd(), "deployments", filename);
   if (!fs.existsSync(filepath)) {
@@ -404,9 +416,21 @@ async function main() {
   const router = await ethers.getContractAt("FeeRouter", feeRouter);
   const canRegister = await router.hasRole(await router.DEFAULT_ADMIN_ROLE(), deployer.address);
   if (!canRegister) {
-    console.log(`\n⚠️  Deployer lacks DEFAULT_ADMIN_ROLE on the FeeRouter — register the spec-067`);
-    console.log(
-      `   services (${BRIDGE_LIQUIDITY_FEE_SERVICES.map((s) => s.label).join(", ")}) from the FeeRouter admin.`
+    // FATAL, not a warning (T150 finding M3). Without these services registered, FeeRouter.quoteFee
+    // reverts ServiceUnknown, which both routers call on EVERY member action — so continuing here
+    // publishes live routers where bridging and supplying revert for everyone. The record has
+    // already been written at this point, so a warn-and-continue also printed a success banner and
+    // exited 0 over a broken deployment.
+    //
+    // Recovery when the deployer has legitimately handed admin to the multisig: register the
+    // services from that admin (scripts/ops/register-fee-service.js), then re-run this script — the
+    // deploy steps above are idempotent and will skip.
+    throw new Error(
+      `Deployer ${deployer.address} lacks DEFAULT_ADMIN_ROLE on the FeeRouter (${feeRouter}), so the ` +
+        `spec-067 fee services (${BRIDGE_LIQUIDITY_FEE_SERVICES.map((s) => s.label).join(", ")}) cannot be ` +
+        `registered. The routers are deployed but EVERY member action would revert ServiceUnknown until ` +
+        `they are. Register them from the FeeRouter admin (scripts/ops/register-fee-service.js) and re-run ` +
+        `this script to complete setup.`,
     );
   } else {
     console.log("\nRegistering fee services on the FeeRouter...");

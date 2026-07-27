@@ -153,6 +153,7 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
             route.maxAmount,
             route.expectedFillSeconds,
             route.nativeInput,
+            route.enabled,
             msg.sender
         );
     }
@@ -362,7 +363,10 @@ contract BridgeRouter is IBridgeRouter, UUPSManaged, ReentrancyGuardUpgradeable,
 
         if (fee > 0) {
             (bool ok, ) = treasury.call{value: fee}("");
-            if (!ok) revert ResidualFunds();
+            // NOT `ResidualFunds` — that error means this router is holding value it should not be,
+            // and a treasury that cannot receive ETH is a fact about a DIFFERENT contract. Conflating
+            // them sends an operator to read the wrong source during an incident.
+            if (!ok) revert TreasuryTransferFailed();
         }
         // Across wraps the native value itself when `inputToken` is the wrapped native token.
         _deposit(route, net, outputAmount, recipient, quoteTimestamp, fillDeadline, exclusivityDeadline, exclusiveRelayer, net);

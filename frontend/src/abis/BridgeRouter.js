@@ -53,7 +53,7 @@ export const BRIDGE_ROUTER_ABI = [
   // --- member action: fee-and-forward to Across ---
   'function bridgeWithFee(bytes32 routeId, uint256 inputAmount, uint256 outputAmount, address recipient, uint32 quoteTimestamp, uint32 fillDeadline, uint32 exclusivityDeadline, address exclusiveRelayer, uint16 maxFeeBps) payable',
   // --- events: config + audit history ---
-  'event RouteSet(bytes32 indexed routeId, address indexed inputToken, uint256 indexed destinationChainId, address outputToken, uint256 maxAmount, uint32 expectedFillSeconds, bool nativeInput, address actor)',
+  'event RouteSet(bytes32 indexed routeId, address indexed inputToken, uint256 indexed destinationChainId, address outputToken, uint256 maxAmount, uint32 expectedFillSeconds, bool nativeInput, bool enabled, address actor)',
   'event RouteEnabledChanged(bytes32 indexed routeId, bool enabled, address indexed actor)',
   'event RouteLimitChanged(bytes32 indexed routeId, uint256 oldMax, uint256 newMax, address indexed actor)',
   'event RouteRemoved(bytes32 indexed routeId, address indexed actor)',
