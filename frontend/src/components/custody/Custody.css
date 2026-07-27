@@ -108,6 +108,30 @@
   color: var(--text-muted, #6b7280);
 }
 
+/* Spec 068 (FR-002) — chain identity on every vault row. Testnet vaults are visually distinct so a
+   testnet vault is never mistaken for the mainnet one of the same name. */
+.custody-chain-badge {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-subtle, #d1d5db);
+  color: var(--text-muted, #6b7280);
+  background: var(--surface-subtle, #f9fafb);
+}
+
+.custody-chain-badge.is-testnet {
+  border-color: var(--warning-border, #fcd34d);
+  background: var(--warning-bg, #fffbeb);
+  color: var(--warning-text, #92400e);
+}
+
+.custody-owner-name {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.8125rem;
+}
+
 .custody-vault-facts {
   display: grid;
   gap: 0.375rem;

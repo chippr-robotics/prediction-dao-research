@@ -32,11 +32,21 @@ describe('CustodyPanel', () => {
     expect(screen.getByText(/no vaults yet/i)).toBeInTheDocument()
   })
 
-  it('shows an "unavailable on this network" state on an unsupported chain', () => {
+  // Spec 068 (FR-005) — an unsupported connected network withdraws vault CREATION only. The vault
+  // list keeps rendering, because a member's vaults live on their own chains and must not vanish
+  // because the wallet happens to be pointed somewhere else.
+  it('withdraws vault creation on an unsupported chain but keeps the vault list', () => {
     walletCtx = { chainId: 1 }
     render(<CustodyPanel />)
-    expect(screen.getByText(/not available on this network/i)).toBeInTheDocument()
-    expect(screen.queryByText(/no vaults yet/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/cannot be created on this network/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^create vault$/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/no vaults yet/i)).toBeInTheDocument()
+  })
+
+  it('names the custody chains a member can switch to (FR-005)', () => {
+    walletCtx = { chainId: 1 }
+    render(<CustodyPanel />)
+    expect(screen.getByText(/custody is available on/i)).toBeInTheDocument()
   })
 
   it('has no axe violations', async () => {

@@ -21,15 +21,16 @@ export default function VaultProposalsPanel({ vault, proposals }) {
   if (!vault?.isSafe) return null
 
   // Acting on a vault requires being on its network (approvals/execution are chain-scoped).
+  const vaultChainLabel = vault.chainName ? `${vault.chainName} (${vault.chainId})` : `network ${vault.chainId}`
   if (Number(chainId) !== Number(vault.chainId)) {
     return (
       <div className="custody-proposals" role="region" aria-label="Vault proposals">
         <p className="custody-error" role="alert">
-          This vault is on network {vault.chainId}. Switch networks to view and act on its transactions.
+          This vault is on {vaultChainLabel}. Switch networks to view and act on its transactions.
         </p>
         {switchNetwork && (
           <button type="button" onClick={() => switchNetwork(vault.chainId)}>
-            Switch to network {vault.chainId}
+            Switch to {vault.chainName || `network ${vault.chainId}`}
           </button>
         )}
       </div>
@@ -40,6 +41,14 @@ export default function VaultProposalsPanel({ vault, proposals }) {
     setActionError(null)
     setBusy(true)
     try {
+      // Spec 068 (FR-004) — re-check at SUBMIT time, not just at render: the wallet may have
+      // switched networks while this panel was open, and a custody action must never be submitted
+      // to a chain other than the vault's own.
+      if (Number(chainId) !== Number(vault.chainId)) {
+        throw new Error(
+          `This vault is on ${vaultChainLabel} but your wallet is on network ${chainId}. Switch networks and try again.`,
+        )
+      }
       await fn(...args)
     } catch (e) {
       setActionError(e?.message || 'Action failed')

@@ -34,7 +34,12 @@
     "poolImpl": "0xd0b94a77DA7Aaa488343CF89978f1Bbf9E72E277",
     "wagerPoolFactory": "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F",
     "wagerPoolFactoryImpl": "0xfB6F9F7EfD86a220eE1aD7906278247051B25430",
-    "wagerRegistryIntents": "0x81a9c5904A109F0b7bC6329ba6F2be2de5B6abB1"
+    "wagerRegistryIntents": "0x81a9c5904A109F0b7bC6329ba6F2be2de5B6abB1",
+    "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c",
+    "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
+    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
+    "feeRouter": "0x5249e3008Cb1Eb81B5BF39148B7760B1c36e516e",
+    "feeRouterImpl": "0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -67,7 +72,11 @@
     "zkWagerPoolFactoryImpl": [],
     "poolImpl": [],
     "wagerPoolFactoryImpl": [],
-    "wagerRegistryIntents": []
+    "wagerRegistryIntents": [],
+    "safePolicyGuardV2": [],
+    "policyGuardSetup": [],
+    "safeProposalHub": [],
+    "feeRouterImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -78,7 +87,11 @@
     "voucherBatchMinter": 16407208,
     "backupPointerRegistry": 16430733,
     "wagerPoolFactory": 16495564,
-    "poolImpl": 16497337
+    "poolImpl": 16497337,
+    "safePolicyGuardV2": 16645528,
+    "policyGuardSetup": 16645530,
+    "safeProposalHub": 16645531,
+    "feeRouter": 16646334
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
@@ -89,5 +102,6 @@
   "wagerPoolsDeployedAt": "2026-07-04T15:27:55.875Z",
   "poolTemplateResyncedAt": "2026-07-04T21:47:07.000Z",
   "gaslessIntentsUpgradedAt": "2026-07-05T17:35:37.300Z",
-  "tier2PoolIntentsUpgradedAt": "2026-07-06T04:32:38.208Z"
+  "tier2PoolIntentsUpgradedAt": "2026-07-06T04:32:38.208Z",
+  "feeRouterDeployedAt": "2026-07-27T01:12:47.440Z"
 }

@@ -5,6 +5,7 @@
 
 import { useState, useMemo } from 'react'
 import { getAddress } from 'ethers'
+import CustodyAddressField from './CustodyAddressField'
 import {
   buildAddOwner,
   buildRemoveOwner,
@@ -83,10 +84,15 @@ export default function OwnersThresholdPanel({ vault, onPropose, busy }) {
       </div>
 
       {mode === 'add' && (
-        <div className="custody-field">
-          <label htmlFor="gov-new-owner">New owner address</label>
-          <input id="gov-new-owner" type="text" placeholder="0x…" value={newOwner} onChange={(e) => setNewOwner(e.target.value)} />
-        </div>
+        // Spec 068 (US5) — an owner address is the highest-stakes address in Protect; entry goes
+        // through the shared field (paste, address book, QR), never a bare text input.
+        <CustodyAddressField
+          id="gov-new-owner"
+          label="New owner address"
+          value={newOwner}
+          onChange={setNewOwner}
+          chainId={vault?.chainId}
+        />
       )}
 
       {mode === 'remove' && (

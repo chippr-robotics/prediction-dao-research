@@ -72,6 +72,11 @@ interface ILiquidityRouter {
         uint24 feeTier,
         uint256 maxDeposit0PerTx,
         uint256 maxDeposit1PerTx,
+        /// @dev Present for the same reason as `RouteSet.enabled`: `listPool` overwrites the whole
+        ///      struct, so it can open or retire a pool while emitting only this event, and the
+        ///      FR-046 audit history would otherwise be unable to say when a pool stopped taking
+        ///      member deposits.
+        bool enabled,
         address actor
     );
     event PoolEnabledChanged(bytes32 indexed poolId, bool enabled, address indexed actor);

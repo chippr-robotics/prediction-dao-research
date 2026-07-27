@@ -395,6 +395,19 @@ index table updated and internal links resolving.
       `ResidualFunds`. Carried to #966: the bridge `recipient` screening scope (a compliance
       decision), proving the fork suite green against the real Across SpokePool, and the FeeRouter
       service-registration liveness gate.
+
+      **CORRECTION (2026-07-26).** The paragraph above was written while `b4d107b6` existed only on
+      `claude/spec067-phase6-admin`, which was never merged — it was an ancestor of neither `main`
+      nor any deploy branch. For roughly a day this entry therefore recorded a security review as
+      passed, and its findings as fixed, against code that **was not in the tree anyone would deploy
+      from**: `liquidityRouter.js` still defaulted `amount0Min`/`amount1Min` to `0n`, so every
+      Uniswap mint had vacuous slippage protection. A second review for #966 caught the discrepancy.
+      `b4d107b6` has now been cherry-picked onto the deploy branch and the fixes verified present.
+
+      The lesson is about the record, not the code: a task entry that cites a commit hash as
+      remediation must cite one that is REACHABLE from the branch being deployed, or the sign-off
+      is describing a different program than the one that ships. Cite merged commits, or say
+      "pending merge of X" — never both at once.
 - [ ] T158 Run the moderated impermanent-loss comprehension check behind SC-005 before mainnet launch and record the result in `specs/067-bridge-pool-liquidity/checklists/requirements.md` — the in-flow gate (T096) proves the disclosure is *shown*, this proves it is *understood*
 
 ---

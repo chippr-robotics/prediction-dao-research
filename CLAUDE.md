@@ -163,6 +163,27 @@ artifacts live under `specs/<feature>/`.
   (`services/relay-gateway/src/bitcoin/`, `BTC_*` env) is optional — unset/disabled ⇒ every
   Bitcoin surface hides/degrades honestly. See `docs/developer-guide/bitcoin.md` +
   `docs/runbooks/bitcoin-operations.md` + `specs/061-bitcoin-transactions/`.
+- **Protect (specs 043 + 049 + 068) runs TWO policy guards side by side, on purpose.** Custody vaults
+  are Safe v1.4.1 multisigs; their optional on-chain policy is enforced by a guard singleton that is
+  deliberately **NOT upgradeable** (an upgrade key over a policy guard is a backdoor across every
+  vault). `SafePolicyGuard` (v1, flat rules) keeps enforcing for vaults that have not adopted
+  `SafePolicyGuardV2` (spec 068, deployment key `safePolicyGuardV2`) — migration is **vault-consented**
+  via a threshold-approved `setGuard`, never a release-time migration, and new rule types ship as a new
+  guard version. V2 policy is an **ordered rule array** replaced atomically by `setRules` (so add/edit/
+  remove/**reorder** are one proposal) evaluated **first-match-governs**, with exactly one fall-through:
+  an unmet approver requirement continues to the next rule of *strictly identical scope* (this is what
+  makes "A+B together, or C alone" expressible). **No matching rule ⇒ denial** — once a vault has rules,
+  silence is denial. Approver sets are verified against the vault's own on-chain `approvedHashes` at
+  `nonce()-1`, and an approver only counts **while still an owner**. Client seam is
+  `frontend/src/lib/custody/policyV2.js`; its `matchPreview` is a twin of on-chain matching and MUST be
+  changed in lockstep with the contract (the Solidity and Vitest suites share scenarios). Custody is
+  **multi-chain**: vault references carry `chainId`, the list spans chains with per-vault read providers
+  and failure isolation, and custody code MUST use strict `NETWORKS[chainId]` lookups (never
+  `getNetwork()`, which falls back to the default network) plus a wallet-chain check at submit time.
+  `safeProposalHub` needs a recorded deploy block per chain or proposal discovery is silently dead. Protect
+  lives in the **Tools** nav group (tab id `custody` unchanged). See
+  `docs/developer-guide/protect-policies.md` + `docs/runbooks/protect-policy-operations.md` +
+  `specs/068-protect-multi-chain-policies/`.
 - **Legacy account recovery (spec 062) is FRONTEND-ONLY** — the **Recovery** section (renamed from
   "Backup & Security"; tab id `security` + `backup` alias unchanged). Members import an old EOA
   **private key** or **BIP-39 word list**; the secret is encrypted at rest (AES-GCM under a
@@ -211,5 +232,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/067-bridge-pool-liquidity/plan.md
+at specs/068-protect-multi-chain-policies/plan.md
 <!-- SPECKIT END -->

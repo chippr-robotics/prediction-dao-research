@@ -74,7 +74,7 @@ export const LIQUIDITY_ROUTER_ABI = [
   // --- member action: fee-and-forward to Uniswap V3, position NFT minted to the member ---
   'function mintFullRangeWithFee(bytes32 poolId, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, uint256 deadline, uint16 maxFeeBps) returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)',
   // --- events: config + audit history ---
-  'event PoolListed(bytes32 indexed poolId, uint8 indexed kind, address indexed poolAddress, address token0, address token1, uint24 feeTier, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx, address actor)',
+  'event PoolListed(bytes32 indexed poolId, uint8 indexed kind, address indexed poolAddress, address token0, address token1, uint24 feeTier, uint256 maxDeposit0PerTx, uint256 maxDeposit1PerTx, bool enabled, address actor)',
   'event PoolEnabledChanged(bytes32 indexed poolId, bool enabled, address indexed actor)',
   'event PoolLimitChanged(bytes32 indexed poolId, uint256 newMax0, uint256 newMax1, address indexed actor)',
   'event PositionManagerUpdated(address oldManager, address newManager, address indexed actor)',

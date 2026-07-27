@@ -8,8 +8,9 @@
  * or the process exits non-zero (fail loudly — never run against a stale/unknown target).
  *
  * Env:
- *   ENABLED_CHAIN_IDS          comma list (default "137,80002,63" — 61 has no deployment record yet;
- *                              enabling it without one fails the startup check by design)
+ *   ENABLED_CHAIN_IDS          comma list (default "137,80002,63" — 61's record has custody
+ *                              contracts only (no wagerRegistry), so enabling it fails the
+ *                              startup check by design until the full target set is pinned)
  *   RPC_URLS_<chainId>         comma list, failover order (default: built-in public pair, FR-007)
  *   ORIGIN_AUTH_SECRET         origin-lock shared secret (X-Origin-Auth). Unset => lock DISABLED
  *                              (dev only; production must set it — research.md §4 / SC-016)

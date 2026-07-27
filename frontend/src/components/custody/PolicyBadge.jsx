@@ -25,6 +25,17 @@ function ShieldGlyph() {
 }
 
 export default function PolicyBadge({ status, summary }) {
+  // Spec 068 — the ordered engine gets its own presentation so a member can tell at a glance which
+  // rules govern a vault; both remain "policy active" to a screen reader.
+  if (status === 'managed-v2') {
+    return (
+      <span className="custody-policy-badge custody-policy-badge--managed custody-policy-badge--ordered">
+        <ShieldGlyph />
+        <span className="sr-only">Policy-governed vault with ordered rules.</span>
+        <span className="custody-policy-badge-summary">{summary || 'Ordered rules'}</span>
+      </span>
+    )
+  }
   if (status === 'managed') {
     return (
       <span className="custody-policy-badge custody-policy-badge--managed">

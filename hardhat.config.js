@@ -95,12 +95,12 @@ function decryptKeystoreSync(keystorePath, password) {
  */
 function loadFloppyKeysSync(allowFallback = false) {
   if (!isFloppyMounted()) {
-    console.warn('[Floppy] Disk not mounted at', FLOPPY_CONFIG.MOUNT_POINT);
-    console.warn('[Floppy] Run: npm run floppy:mount');
-    if (allowFallback && process.env.PRIVATE_KEY) {
-      console.log('[Floppy] Development mode: Using PRIVATE_KEY env var fallback');
-      return [process.env.PRIVATE_KEY];
-    }
+    // Not an error, and not worth warning about on every command. The floppy keystore is OPTIONAL
+    // for deployment (see the DEPLOYER KEY note above loadDeployerKeys): admin authority lives in
+    // the multisig, so an unmounted disk means "sign with the deploy key", not "something is wrong".
+    if (allowFallback && process.env.PRIVATE_KEY) return [process.env.PRIVATE_KEY];
+    console.warn('[Floppy] Disk not mounted at', FLOPPY_CONFIG.MOUNT_POINT, '— and no PRIVATE_KEY set');
+    console.warn('[Floppy] Run: npm run floppy:mount, or set PRIVATE_KEY');
     return [];
   }
 
@@ -161,9 +161,26 @@ function loadFloppyKeysSync(allowFallback = false) {
   return [];
 }
 
-// Load keys from floppy at config time (synchronous)
-// SECURITY: allowFallback=true enables PRIVATE_KEY env var when floppy unavailable
-// Load floppy keys WITH fallback for deployment when password mismatch
+// ---------------------------------------------------------------------------------------------
+// DEPLOYER KEY — the floppy keystore is OPTIONAL, deliberately (issue #966).
+//
+// The air-gapped floppy ceremony existed because the deploy key WAS the admin: it held
+// DEFAULT_ADMIN_ROLE and UPGRADER_ROLE on every live contract, so compromising it meant losing the
+// protocol. That is no longer the model. Admin authority belongs to the multisig Safe
+// (deployments/admin-safe.json — 0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa, 2-of-3, same address
+// on every supported chain), and the deploy key is a DEPLOYMENT VEHICLE: it pays gas and calls
+// CREATE2. Contract addresses are deterministic and independent of who sends the transaction, so a
+// compromised deploy key can waste gas and deploy junk — it cannot touch a deployed contract.
+//
+// If the floppy is mounted it is still used, so an operator who wants the ceremony keeps it. If it
+// is not, PRIVATE_KEY is used without complaint. What is gone is the per-command warning noise for
+// a state that is now normal.
+//
+// THE CAVEAT THAT MAKES THIS TRUE: it holds only once roles are actually handed to the Safe. Until
+// a contract's DEFAULT_ADMIN/UPGRADER is transferred, its deploy key remains its admin and is as
+// sensitive as it ever was. Do not read this comment as "the hot key is harmless" — read it as
+// "the hot key is harmless for contracts whose admin already lives in the Safe".
+// ---------------------------------------------------------------------------------------------
 const floppyKeys = loadFloppyKeysSync(true);
 const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
 

@@ -83,6 +83,7 @@ import { makeReadProvider } from '../../utils/rpcProvider'
 import { readPooledToken } from '../../lib/liquidity/acrossLpPositions'
 import { samePair } from '../../lib/assets/networkPin'
 import {
+  DEFAULT_SUPPLY_SLIPPAGE_BPS,
   POOL_KIND,
   buildSupplyCalls,
   chargesPlatformFee,
@@ -91,6 +92,7 @@ import {
   poolLimitViolation,
   readLiquidityPool,
   revalidatePairCounterpart,
+  supplyMinimums,
 } from '../../lib/liquidity/liquidityRouter'
 import {
   EXCHANGE_RATE_SCALE,
@@ -720,11 +722,25 @@ export default function SupplySheet({
 
     let built
     try {
+      // SLIPPAGE BOUND. These become Uniswap's `amount0Min`/`amount1Min`, and they used to be
+      // omitted entirely — `buildSupplyCalls` defaulted them to 0, which switches off Uniswap's
+      // own price-slippage check and leaves the deposit open to being sandwiched at a manipulated
+      // price. Derived from the amounts the confirm step disclosed, net of the fee, at the
+      // tolerance shown alongside them. `buildSupplyCalls` now requires both, so this cannot be
+      // silently dropped again.
+      const { amount0Min, amount1Min } = supplyMinimums({
+        amount0Desired: amount0,
+        amount1Desired: amount1,
+        bps: feeBps,
+        slippageBps: DEFAULT_SUPPLY_SLIPPAGE_BPS,
+      })
       built = buildSupplyCalls({
         routerAddress: pool.routerAddress,
         pool: fresh,
         amount0Desired: amount0,
         amount1Desired: amount1,
+        amount0Min,
+        amount1Min,
         deadline,
         // FR-028 — the ceiling the router enforces on-chain is the SAME number the
         // confirm step disclosed, straight from `maxFeeBpsFor`. `validateSupply` has

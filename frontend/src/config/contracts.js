@@ -53,6 +53,9 @@ const MORDOR_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -68,7 +71,11 @@ const HARDHAT_CONTRACTS = {
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
+  // Spec 068 ordered rule engine; deployed alongside v1 (both guards stay live — vaults adopt V2
+  // through a threshold-approved setGuard, never a forced migration).
+  safePolicyGuardV2: '0xc01E5F3EAFd2C0138e98382A3F54B6CeB3dc05cf',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
@@ -147,6 +154,19 @@ const POLYGON_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+}
+
+// Ethereum Classic mainnet (chainId 61) — CUSTODY ONLY. ETC hosts no FairWins wager/membership
+// deployment; it gained a contracts block with spec 068 so Protect vaults can live there (Safe
+// v1.4.1 is canonical on ETC). Every other lookup honestly resolves empty.
+//   npx hardhat run scripts/deploy/custody/deploy-policy-guard-v2.js --network etc
+//   npm run sync:frontend-contracts -- --network etc --chainId 61
+const ETC_CONTRACTS = {
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 // Spec 067 bridge/liquidity networks. These chains host NO FairWins wager/membership
@@ -160,16 +180,25 @@ const ETHEREUM_CONTRACTS = {
 const OPTIMISM_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const BASE_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const ARBITRUM_CONTRACTS = {
   bridgeRouter: '',
   liquidityRouter: '',
+  safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
+  safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
 }
 
 const NETWORK_CONTRACTS = {
@@ -177,6 +206,8 @@ const NETWORK_CONTRACTS = {
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
+  // Spec 068 — custody only (Protect vaults + policy engine; no wager/membership here).
+  61: ETC_CONTRACTS,        // Ethereum Classic mainnet
   // Spec 067 — routers only (no wager/membership deployment on these chains).
   1: ETHEREUM_CONTRACTS,    // Ethereum mainnet
   10: OPTIMISM_CONTRACTS,   // Optimism
@@ -199,10 +230,32 @@ export const DEPLOYED_CONTRACTS =
  * v1 used friendGroupMarketFactory; v2 uses wagerRegistry. Both kept here to
  * support legacy Mordor reads while Amoy migrates.
  */
+// NOTE (spec 068): `safeProposalHub` MUST carry a deployment block on every custody chain —
+// `useVaultProposals` refuses to scan without one, so a missing entry silently disables custody
+// proposal discovery on that chain even when the hub itself is deployed.
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
-  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0, membershipVoucher: 16404315, wagerPoolFactory: 16495564 },
+  63: {
+    friendGroupMarketFactory: 15658191,
+    wagerRegistry: 0,
+    membershipVoucher: 16404315,
+    wagerPoolFactory: 16495564,
+    safeProposalHub: 16645531,
+  },
+  // Custody-only chains (spec 068). `safeProposalHub` MUST carry a block on every custody chain or
+  // useVaultProposals refuses to scan and proposal discovery is silently dead there.
+  61: { safeProposalHub: 25026893 }, // Ethereum Classic
+  10: { safeProposalHub: 154753770 }, // Optimism
+  8453: { safeProposalHub: 49158472 }, // Base
+  42161: { safeProposalHub: 488059169 }, // Arbitrum One
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 89717915, membershipVoucher: 89717915, wagerPoolFactory: 89720731 },
+  137: {
+    friendGroupMarketFactory: 0,
+    wagerRegistry: 89717915,
+    membershipVoucher: 89717915,
+    wagerPoolFactory: 89720731,
+    safeProposalHub: 90120743,
+  },
+  1337: { safeProposalHub: 4, safePolicyGuardV2: 2 },
 }
 
 export const DEPLOYMENT_BLOCKS =

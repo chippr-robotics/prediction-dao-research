@@ -44,6 +44,12 @@ interface IBridgeRouter {
         uint256 maxAmount,
         uint32 expectedFillSeconds,
         bool nativeInput,
+        /// @dev Present because `setRoute` is idempotent and overwrites the whole struct, so it can
+        ///      flip availability in EITHER direction while emitting only this event. Without it the
+        ///      FR-046 audit history cannot reconstruct whether a route was offered to members at a
+        ///      given block — a route disabled during an incident and quietly re-enabled would read
+        ///      identically to a metadata edit.
+        bool enabled,
         address actor
     );
     event RouteEnabledChanged(bytes32 indexed routeId, bool enabled, address indexed actor);
@@ -78,6 +84,10 @@ interface IBridgeRouter {
     ///      report its own rate either, so the bridge refuses rather than moving funds on its word.
     error FeeSplitMismatch();
     error ResidualFunds();
+    /// @dev The treasury refused the native fee. Distinct from `ResidualFunds` on purpose: that error
+    ///      means THIS router is holding value it should not be, and reusing it here would point an
+    ///      operator at the wrong contract during an incident.
+    error TreasuryTransferFailed();
     error RouteUnknown();
     error RouteDisabled();
     error AmountAboveRouteLimit();

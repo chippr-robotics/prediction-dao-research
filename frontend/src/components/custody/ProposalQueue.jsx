@@ -9,6 +9,9 @@ import { STATUS } from '../../lib/custody/proposalStatus'
 import { approvalsRemaining } from '../../lib/custody/proposalStatus'
 import { getContractAddressForChain } from '../../config/contracts'
 import { guardIface, NATIVE_ASSET, shortAddress, formatDuration } from '../../lib/custody/policy'
+// Spec 068 — ordered-engine proposals (setRules / adopt) decode through the V2 classifier and render
+// the resulting rule list in order, since one call replaces the whole policy.
+import { classifyPolicyProposalV2, describeRulesV2 } from '../../lib/custody/policyV2'
 import './Policy.css'
 
 const SAFE_GUARD_IFACE = new Interface(['function setGuard(address guard)'])
@@ -73,6 +76,36 @@ function classifyPolicyProposal(p, chainId, vaultAddress) {
 }
 
 function PolicyProposalFacts({ policyInfo }) {
+  // Spec 068 — the ordered engine replaces a vault's whole rule set in one call, so the queue shows
+  // the proposed rules IN ORDER: what owners approve is the resulting policy, not a delta.
+  if (policyInfo.kind === 'set-rules') {
+    return (
+      <div className="custody-proposal-facts custody-proposal-facts--policy">
+        <span className="custody-policy-tag">Policy change</span>
+        <ol className="custody-policy-diff" aria-label="Proposed rules, in order">
+          {policyInfo.descriptions.map((line, i) => (
+            <li key={i}>
+              <strong>{line.number}</strong> {line.text}
+            </li>
+          ))}
+        </ol>
+        {policyInfo.descriptions.length === 0 && (
+          <span>This proposal removes every rule — the vault would refuse all transactions.</span>
+        )}
+      </div>
+    )
+  }
+  if (policyInfo.kind === 'adopt-v2') {
+    return (
+      <div className="custody-proposal-facts custody-proposal-facts--policy">
+        <span className="custody-policy-tag">Activate ordered rules</span>
+        <span>
+          Switches this vault to the ordered policy engine — the rules proposed alongside this take effect when
+          it executes.
+        </span>
+      </div>
+    )
+  }
   if (policyInfo.kind === 'configure') {
     return (
       <div className="custody-proposal-facts custody-proposal-facts--policy">
@@ -101,7 +134,11 @@ function PolicyProposalFacts({ policyInfo }) {
 
 function ProposalRow({ p, isOwner, hasApproved, onApprove, onExecute, onCancel, busy, chainId, vaultAddress }) {
   const remaining = approvalsRemaining(p.approvals, p.threshold)
-  const policyInfo = classifyPolicyProposal(p, chainId, vaultAddress)
+  // Try the ordered engine first, then fall back to the v1 classifier — a vault may still be on v1.
+  const v2Info = classifyPolicyProposalV2(p, chainId, vaultAddress)
+  const policyInfo = v2Info
+    ? { ...v2Info, descriptions: v2Info.rules ? describeRulesV2(v2Info.rules, v2Info.cooldown) : [] }
+    : classifyPolicyProposal(p, chainId, vaultAddress)
   return (
     <li className="custody-proposal-row">
       <div className="custody-proposal-main">

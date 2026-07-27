@@ -1,0 +1,19 @@
+{
+  "network": "etc",
+  "chainId": 61,
+  "contracts": {
+    "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c",
+    "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
+    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7"
+  },
+  "constructorArgs": {
+    "safePolicyGuardV2": [],
+    "policyGuardSetup": [],
+    "safeProposalHub": []
+  },
+  "deployBlocks": {
+    "safePolicyGuardV2": 25026887,
+    "policyGuardSetup": 25026889,
+    "safeProposalHub": 25026893
+  }
+}

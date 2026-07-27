@@ -1,0 +1,74 @@
+{
+  "chains": {
+    "1": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "10": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "61": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "63": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "137": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "8453": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    },
+    "42161": {
+      "address": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+      "threshold": 2,
+      "owners": [
+        "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+        "0x1215185387E70a48b07D73AcB67002A073F18575",
+        "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+      ]
+    }
+  },
+  "owners": [
+    "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+    "0x1215185387E70a48b07D73AcB67002A073F18575",
+    "0x4402e3A7ea161DC989bA8BD81d9ECA1bC2B58eC5"
+  ],
+  "threshold": 2,
+  "saltNonce": "68"
+}

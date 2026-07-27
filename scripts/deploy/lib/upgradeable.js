@@ -14,6 +14,37 @@
 
 const { ethers, upgrades } = require("hardhat");
 
+const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
+/**
+ * Read the implementation address of a freshly deployed proxy, tolerating RPC read lag.
+ *
+ * `upgrades.erc1967.getImplementationAddress` reads the EIP-1967 slot once and throws
+ * "doesn't look like an ERC 1967 proxy with a logic contract address" when it comes back zero. On a
+ * load-balanced endpoint that happens even though the deploy SUCCEEDED — the node serving the read
+ * has not yet applied the block that the deploy receipt came from. Observed repeatedly on Base,
+ * where it aborted three separate multi-contract runs mid-way, each time leaving a correctly
+ * deployed and initialised proxy unrecorded and the remaining contracts undeployed.
+ *
+ * Retrying is safe: this is a pure read of a slot that is already written on-chain.
+ */
+async function readImplementationWithRetry(proxyAddress, { attempts = 10, delayMs = 3000 } = {}) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await upgrades.erc1967.getImplementationAddress(proxyAddress);
+    } catch (e) {
+      lastError = e;
+      // Fall back to reading the slot directly — the plugin's own read may be the stale one.
+      const raw = await ethers.provider.getStorage(proxyAddress, EIP1967_IMPL_SLOT).catch(() => null);
+      if (raw && /[1-9a-f]/.test(raw.slice(-40))) return ethers.getAddress("0x" + raw.slice(-40));
+      if (i === 0) console.log("    … implementation slot not visible yet; waiting for the RPC to catch up");
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Deploy `name` behind a fresh ERC1967 UUPS proxy, initialized with `initArgs`.
  * @returns {Promise<{ proxy: string, implementation: string, contract: import("ethers").Contract }>}
@@ -23,7 +54,7 @@ async function deployProxy({ name, initArgs, kind = "uups" }) {
   const proxy = await upgrades.deployProxy(Factory, initArgs, { kind });
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
-  const implementation = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+  const implementation = await readImplementationWithRetry(proxyAddress);
   console.log(`  ✓ ${name} proxy: ${proxyAddress}`);
   console.log(`    ${name} implementation: ${implementation}`);
   return { proxy: proxyAddress, implementation, contract: proxy };

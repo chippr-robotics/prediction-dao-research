@@ -25,14 +25,29 @@ async function main() {
   const chainId = Number(net.chainId);
 
   const deploymentsDir = path.join(__dirname, "..", "..", "..", "deployments");
+  // Custody chains (frontend/src/config/safeContracts.js SAFE_CONTRACTS) plus local; ETC (61)
+  // joined in spec 068, and 1337 lets the local quickstart exercise proposal discovery.
   const fileByChain = {
+    10: "optimism-chain10-v2.json",
+    61: "etc-chain61-v2.json",
     63: "mordor-chain63-v2.json",
     137: "polygon-chain137-v2.json",
+    8453: "base-chain8453-v2.json",
+    42161: "arbitrum-chain42161-v2.json",
+    1337: "hardhat-chain1337-v2.json",
+  };
+  const networkLabel = {
+    10: "optimism", 61: "etc", 63: "mordor", 137: "polygon",
+    8453: "base", 42161: "arbitrum", 1337: "hardhat",
   };
   const fileName = fileByChain[chainId];
-  if (!fileName) throw new Error(`SafeProposalHub is only deployed to Custody-supported chains (63, 137); got ${chainId}`);
+  if (!fileName) {
+    throw new Error(`SafeProposalHub is only deployed to Custody-supported chains (10, 61, 63, 137, 8453, 42161) or local 1337; got ${chainId}`);
+  }
   const recordPath = path.join(deploymentsDir, fileName);
-  const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+  const record = fs.existsSync(recordPath)
+    ? JSON.parse(fs.readFileSync(recordPath, "utf8"))
+    : { network: networkLabel[chainId], chainId, contracts: {}, constructorArgs: {}, deployBlocks: {} };
 
   const [deployer] = await ethers.getSigners();
   const bal = await ethers.provider.getBalance(deployer.address);
