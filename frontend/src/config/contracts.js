@@ -56,6 +56,7 @@ const MORDOR_CONTRACTS = {
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x5249e3008Cb1Eb81B5BF39148B7760B1c36e516e',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.

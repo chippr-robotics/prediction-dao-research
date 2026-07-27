@@ -976,6 +976,36 @@ export function getRoleHash(roleName) {
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
  */
+/**
+ * Which contracts DEFINE a role on a given chain — i.e. what `hasRoleOnChain` would be able to ask.
+ *
+ * This exists so a UI can tell "you do not hold this role" apart from "there is nothing here to
+ * ask". `hasRoleOnChain` correctly returns false in both cases — false is the safe answer for
+ * gating a control — but rendering both as a red ✗ tells an operator who DOES hold the role
+ * on-chain that their grant did not land. That has already happened once here (see the comment on
+ * the permissions card in AdminPanel), and it happened again when the spec-067 routers were live
+ * on five networks while the frontend config still carried empty strings for them.
+ *
+ * Keep the mapping below in step with the branches in `hasRoleOnChain`.
+ *
+ * @returns {string[]} contract keys backing this role that are actually configured on this chain
+ */
+export function roleBackingContracts(roleName, chainId) {
+  const resolve = (name) =>
+    chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
+  const keysFor = () => {
+    if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') return ['membershipManager']
+    if (roleName === 'FEE_ADMIN') return ['feeRouter']
+    if (roleName === 'STAKING_ADMIN') return ['stakingRouter']
+    if (roleName === 'LIQUIDITY_ADMIN') return ['bridgeRouter', 'liquidityRouter']
+    if (roleName === 'SANCTIONS_ADMIN') return ['sanctionsGuard']
+    if (roleName === 'ADMIN') return ['wagerRegistry', 'membershipManager', 'bridgeRouter', 'liquidityRouter']
+    if (roleName === 'GUARDIAN') return ['wagerRegistry', 'bridgeRouter', 'liquidityRouter']
+    return ['wagerRegistry']
+  }
+  return keysFor().filter((k) => Boolean(resolve(k)))
+}
+
 export async function hasRoleOnChain(userAddress, roleName, chainId) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {

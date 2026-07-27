@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useRoles } from '../hooks/useRoles'
+import { roleBackingContracts } from '../utils/blockchainService'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useEnsResolution } from '../hooks/useEnsResolution'
@@ -117,6 +118,10 @@ function AdminPanel() {
   // network before offering a write, and the control state the tabs read is
   // per-network regardless of which network the wallet sits on (FR-050).
   const isLiquidityAdmin = hasRole(ROLES.LIQUIDITY_ADMIN)
+  // Can this role even be ASKED about on the connected chain? A role whose contract is not
+  // deployed here reads false from hasRole — correct for gating, wrong to render as "×", which
+  // tells an operator who does hold it that their grant failed. Distinguish the two.
+  const roleCheckable = (role) => roleBackingContracts(role, chainId).length > 0
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
   // The Bridge/Supply fee cards link across to where a rate is actually editable — but only for
   // an operator who can open that tab. Offering the link to someone the Fees tab is closed to
@@ -510,16 +515,31 @@ function AdminPanel() {
                     than no card.
                   */}
                   <div className={`permission-item ${isFeeAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isFeeAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Fee Administrator (platform fee rates on the FeeRouter)</span>
+                    <span className="permission-icon">{isFeeAdmin ? '✓' : roleCheckable(ROLES.FEE_ADMIN) ? '×' : '—'}</span>
+                    <span className="permission-name">
+                      Fee Administrator (platform fee rates on the FeeRouter)
+                      {!isFeeAdmin && !roleCheckable(ROLES.FEE_ADMIN) && (
+                        <em className="permission-unknown"> — not deployed on this network, so this could not be checked</em>
+                      )}
+                    </span>
                   </div>
                   <div className={`permission-item ${isStakingAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isStakingAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Staking Administrator (provider addresses + validator allowlist)</span>
+                    <span className="permission-icon">{isStakingAdmin ? '✓' : roleCheckable(ROLES.STAKING_ADMIN) ? '×' : '—'}</span>
+                    <span className="permission-name">
+                      Staking Administrator (provider addresses + validator allowlist)
+                      {!isStakingAdmin && !roleCheckable(ROLES.STAKING_ADMIN) && (
+                        <em className="permission-unknown"> — not deployed on this network, so this could not be checked</em>
+                      )}
+                    </span>
                   </div>
                   <div className={`permission-item ${isLiquidityAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isLiquidityAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Liquidity Administrator (bridge routes + curated pools, per router)</span>
+                    <span className="permission-icon">{isLiquidityAdmin ? '✓' : roleCheckable(ROLES.LIQUIDITY_ADMIN) ? '×' : '—'}</span>
+                    <span className="permission-name">
+                      Liquidity Administrator (bridge routes + curated pools, per router)
+                      {!isLiquidityAdmin && !roleCheckable(ROLES.LIQUIDITY_ADMIN) && (
+                        <em className="permission-unknown"> — not deployed on this network, so this could not be checked</em>
+                      )}
+                    </span>
                   </div>
                 </div>
                 {/*
