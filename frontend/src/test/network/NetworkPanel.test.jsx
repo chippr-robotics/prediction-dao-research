@@ -242,7 +242,7 @@ describe('NetworkPanel — member RPC endpoints (spec 069)', () => {
     expect(getEndpointSettings(137)).toBeNull()
   })
 
-  it('warns when a pasted host is outside the app content-security policy', () => {
+  it('saves a self-hosted node on an arbitrary https host without complaint', () => {
     render(<NetworkPanel />)
     const card = openEditor()
     fireEvent.change(within(card).getByLabelText('RPC URL'), {
@@ -250,9 +250,33 @@ describe('NetworkPanel — member RPC endpoints (spec 069)', () => {
     })
     fireEvent.click(within(card).getByRole('button', { name: 'Save' }))
 
-    expect(screen.getByText(/will block requests to it/)).toBeInTheDocument()
-    // It still saves — a member may be configuring ahead of a policy change.
     expect(getEndpointSettings(137)).toMatchObject({ url: 'https://rpc.my-own-node.example/eth' })
+    expect(within(polygonCard()).getByText('Your endpoint')).toBeInTheDocument()
+  })
+
+  it('accepts a local node over loopback http and states the local-node caveats', () => {
+    render(<NetworkPanel />)
+    const card = openEditor()
+    fireEvent.change(within(card).getByLabelText('RPC URL'), {
+      target: { value: 'http://localhost:8545' },
+    })
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }))
+
+    expect(getEndpointSettings(137)).toMatchObject({ url: 'http://localhost:8545' })
+    expect(screen.getByText(/reachable only from this device/)).toBeInTheDocument()
+    expect(screen.getByText(/CORS/)).toBeInTheDocument()
+  })
+
+  it('refuses a non-loopback http endpoint the browser would block anyway', () => {
+    render(<NetworkPanel />)
+    const card = openEditor()
+    fireEvent.change(within(card).getByLabelText('RPC URL'), {
+      target: { value: 'http://192.168.1.5:8545' },
+    })
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByText(/browsers block insecure http:\/\/ requests/)).toBeInTheDocument()
+    expect(getEndpointSettings(137)).toBeNull()
   })
 
   it('blocks a WebSocket endpoint with a reason instead of saving it', () => {
@@ -263,7 +287,7 @@ describe('NetworkPanel — member RPC endpoints (spec 069)', () => {
     })
     fireEvent.click(within(card).getByRole('button', { name: 'Save' }))
 
-    expect(screen.getByText(/must be an HTTPS endpoint/)).toBeInTheDocument()
+    expect(screen.getByText(/must be an HTTP\(S\) endpoint/)).toBeInTheDocument()
     expect(getEndpointSettings(137)).toBeNull()
   })
 

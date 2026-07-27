@@ -97,8 +97,9 @@ policy blocks. The panel tells them which, before they rely on it.
 
 1. "Test" reports the chain the endpoint actually serves.
 2. An endpoint serving a different chain than the network being edited cannot be saved.
-3. A host outside the CSP allowlist warns plainly that the browser will block it, and still saves
-   (the member may be configuring ahead of a policy change).
+3. A local (loopback) endpoint saves with its real caveats stated: device-only, and the node must
+   allow cross-origin requests from the app. A non-loopback `http://` endpoint is refused, because
+   the browser would block it as mixed content whatever the app's policy says.
 4. An unreachable endpoint reports the failure without echoing the credential.
 
 ### User Story 6 - Stop thinking about which network I am on (Priority: P2)
@@ -155,11 +156,14 @@ only when they send.
 - **FR-010**: Validation MUST reject WebSocket URLs, non-localhost `http://`, URL-embedded
   credentials, a failover equal to the primary, auth settings without a primary URL, and a malformed
   header name; each rejection MUST state the reason.
-- **FR-011**: A host outside the production CSP `connect-src` allowlist MUST produce an explicit
-  warning that the browser will block it. The allowlist used for that warning MUST stay in sync with
-  the shipped nginx policy, enforced by a test.
-- **FR-012**: The production CSP MUST allow the RPC hosts of every supported network plus the major
-  provider host patterns a member may configure.
+- **FR-011**: A member MUST be able to use their own node — self-hosted on any https host, or running
+  locally over loopback http. A non-loopback `http://` endpoint MUST be refused with the reason
+  (browsers block it as mixed content) and the two options that do work. A local endpoint MUST
+  disclose that it is device-only and requires CORS on the node.
+- **FR-012**: The production CSP `connect-src` MUST grant `https:` scheme-wide plus the loopback http
+  origins, since a per-member allowlist is not expressible in a static header. The grant MUST NOT
+  extend to `script-src`, `frame-src` or `img-src`. What the policy admits MUST stay in sync with what
+  the endpoint form validates (`CSP_RPC_GRANTS`), enforced by a test.
 - **FR-013**: A saved endpoint MUST take effect for reads without a reload; where a reload is
   genuinely required (wallet transports, built once at module load), the UI MUST say so rather than
   implying an instant switch.
@@ -188,14 +192,18 @@ only when they send.
 - **SC-003**: Network is absent from Tools and present beside Preferences; existing deep links still
   resolve.
 - **SC-004**: A wrong-chain endpoint cannot be saved; a CSP-blocked host is warned about before use.
-- **SC-005**: `CSP_RPC_HOST_PATTERNS` and the shipped nginx `connect-src` cannot drift without a
-  failing test.
+- **SC-005**: `CSP_RPC_GRANTS` and the shipped nginx `connect-src` cannot drift without a failing
+  test, and the broad grant cannot silently spread to other directives.
+- **SC-006**: A member can point a network at `http://localhost:8545` or at their own https node and
+  the app uses it.
 
 ## Assumptions
 
 - Members configuring an endpoint are advanced users acting on their own provider account; the app's
   job is to route honestly and never leak, not to manage provider accounts.
 - HTTP JSON-RPC only. WebSocket transports would need a separate provider path and are out of scope.
+- The scheme-wide `connect-src` grant is an accepted trade: it is what makes bring-your-own-node
+  possible, and it widens where data could be sent if a script were injected, not whether one can be.
 - Bitcoin (spec 061) keeps its own network registry and gateway configuration; it is display-only in
   this panel.
 - Per-endpoint credentials for the failover are out of scope; a keyed failover carries its key in its

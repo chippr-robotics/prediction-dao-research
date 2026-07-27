@@ -128,7 +128,7 @@ describe('probeRpcEndpoint', () => {
     expect(result.message).not.toContain('member-key')
   })
 
-  it('reports an unreachable endpoint and names the CSP allowlist as a cause', async () => {
+  it('reports an unreachable endpoint and names the causes a self-hosted node actually hits', async () => {
     const result = await probeRpcEndpoint(MEMBER_RPC, {
       expectedChainId: 137,
       fetchImpl: vi.fn(async () => {
@@ -136,7 +136,8 @@ describe('probeRpcEndpoint', () => {
       }),
     })
     expect(result).toMatchObject({ ok: false, code: 'unreachable' })
-    expect(result.message).toMatch(/content-security-policy/)
+    expect(result.message).toMatch(/reachable from this device/)
+    expect(result.message).toMatch(/CORS/)
     // The thrown error carried the full URL; the reported message must not.
     expect(result.message).not.toContain('member-key')
   })

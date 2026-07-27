@@ -158,14 +158,16 @@ export async function probeRpcEndpoint(url, opts = {}) {
     }
     return { ok: true, chainId: reported, code: 'ok', message: `${safeUrl} answered for chain ${reported}.` }
   } catch {
-    // No error detail echoed — a thrown fetch error can contain the full URL.
+    // No error detail echoed — a thrown fetch error can contain the full URL. The causes are
+    // listed in the order they actually occur for a self-hosted node: the browser refuses the
+    // cross-origin call far more often than the node is genuinely down.
     return {
       ok: false,
       chainId: null,
       code: 'unreachable',
       message:
-        `Could not reach ${safeUrl}. It may be offline, or blocked by the app's ` +
-        'content-security-policy allowlist.',
+        `Could not reach ${safeUrl}. Check that the node is running and reachable from this ` +
+        'device, and that it allows cross-origin requests from this site (CORS).',
     }
   } finally {
     if (timer) clearTimeout(timer)

@@ -50,60 +50,42 @@ const MAX_TOKEN_LENGTH = 512
 const MAX_HEADER_NAME_LENGTH = 64
 
 /**
- * Hosts the production Content-Security-Policy `connect-src` allows the browser to
- * reach (frontend/nginx.conf + nginx.conf.template). A custom endpoint on any other
- * host is BLOCKED BY THE BROWSER before a request leaves the page, so the panel warns
- * about it up front rather than letting the member discover it as a dead network.
+ * What the production Content-Security-Policy `connect-src` admits for RPC
+ * (frontend/nginx.conf + nginx.conf.template), and therefore what a member may point a
+ * network at. The browser blocks anything else before a request leaves the page.
  *
- * Entries are matched as either an exact host or, for `*.`-prefixed patterns, any
- * subdomain of the suffix — the same semantics as the CSP host-source grammar, so this
- * list and the header stay one statement in two places. Keep in sync with
- * `src/test/nginxCspConnectSrc.test.js`, which asserts the header carries them.
+ * The policy is deliberately BROAD: `https:` at any host, plus the loopback origins. A
+ * member's own node lives on a domain we cannot know at build time — a box in their cloud,
+ * or their laptop — and a static header served to everyone cannot express a per-member
+ * allowlist. Curating provider hostnames would have made every self-hosted endpoint a dead
+ * network, which is the opposite of "bring your own node".
+ *
+ * Loopback is the local-node case. `http://` is otherwise unusable from an https page
+ * (mixed content), and loopback is the only http origin browsers treat as potentially
+ * trustworthy — so `http://192.168.1.5:8545` is blocked by the browser no matter what this
+ * policy says, and `validateRpcUrl` says so rather than letting it fail mysteriously.
+ *
+ * Keep in sync with `src/test/nginxCspConnectSrc.test.js`, which asserts the shipped header
+ * carries exactly these grants.
  */
-export const CSP_RPC_HOST_PATTERNS = [
-  // Curated build defaults (config/networks.js).
-  'rpc-amoy.polygon.technology',
-  'polygon-bor-rpc.publicnode.com',
-  'rpc.mordor.etccooperative.org',
-  'etc.rivet.link',
-  'ethereum-rpc.publicnode.com',
-  'ethereum-sepolia-rpc.publicnode.com',
-  'ethereum-hoodi-rpc.publicnode.com',
-  'arbitrum-one-rpc.publicnode.com',
-  'base-rpc.publicnode.com',
-  'optimism-rpc.publicnode.com',
-  // Member-supplied endpoints: the providers whose hosts we allow so a pasted URL works.
-  '*.publicnode.com',
-  '*.infura.io',
-  '*.alchemy.com',
-  '*.quiknode.pro',
-  '*.chainstacklabs.com',
-  '*.core.chainstack.com',
-  '*.ankr.com',
-  '*.drpc.org',
-  '*.blastapi.io',
-  '*.llamarpc.com',
-  '*.tenderly.co',
-  '*.nodereal.io',
-  '*.omniatech.io',
-  '*.rpc.grove.city',
-  '*.etccooperative.org',
-  '*.rivet.link',
-  '1rpc.io',
-]
+export const CSP_RPC_GRANTS = {
+  /** Any host on these schemes is reachable. */
+  schemes: ['https:'],
+  /** http is reachable only on these hostnames (any port). */
+  httpHosts: ['localhost', '127.0.0.1', '[::1]'],
+}
 
-/** True when `host` matches a CSP host pattern (exact, or `*.suffix`). */
-function hostMatchesPattern(host, pattern) {
-  if (pattern.startsWith('*.')) {
-    const suffix = pattern.slice(2)
-    return host === suffix || host.endsWith(`.${suffix}`)
-  }
-  return host === pattern
+/** Hostnames that are loopback — the only http origins a secure page may call. */
+export function isLoopbackHost(hostname) {
+  return CSP_RPC_GRANTS.httpHosts.includes(hostname) || hostname === '::1'
 }
 
 /**
  * Whether the browser will be allowed to connect to this URL under the production CSP.
- * Localhost is always treated as allowed — dev serves without the nginx policy.
+ *
+ * With the scheme-wide grant this is true for every https endpoint, so it is no longer a
+ * gate members trip over — it exists to keep the http rule (loopback only) in one place and
+ * to keep the policy assertion in the test suite meaningful.
  */
 export function isCspAllowedRpcUrl(url) {
   let parsed
@@ -112,9 +94,9 @@ export function isCspAllowedRpcUrl(url) {
   } catch {
     return false
   }
-  const host = parsed.hostname
-  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return true
-  return CSP_RPC_HOST_PATTERNS.some((pattern) => hostMatchesPattern(host, pattern))
+  if (CSP_RPC_GRANTS.schemes.includes(parsed.protocol)) return true
+  if (parsed.protocol === 'http:') return isLoopbackHost(parsed.hostname)
+  return false
 }
 
 /**
@@ -153,11 +135,22 @@ export function validateRpcUrl(url, { label = 'RPC URL' } = {}) {
   }
 
   if (parsed.protocol === 'ws:' || parsed.protocol === 'wss:') {
-    return { ok: false, error: `${label} must be an HTTPS endpoint — WebSocket RPC is not supported.` }
+    return { ok: false, error: `${label} must be an HTTP(S) endpoint — WebSocket RPC is not supported.` }
   }
-  const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
-  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLocal)) {
-    return { ok: false, error: `${label} must use https:// (http:// is allowed only for localhost).` }
+  const isLoopback = isLoopbackHost(parsed.hostname)
+  if (parsed.protocol === 'http:' && !isLoopback) {
+    // Not a policy choice we can reverse: browsers block insecure requests from a secure
+    // page, and only loopback is exempt. Say which two options actually work.
+    return {
+      ok: false,
+      error:
+        `${label} must use https:// — browsers block insecure http:// requests from this page. ` +
+        'Only a node on this device (localhost / 127.0.0.1) may use http://; put a remote node ' +
+        'behind https or reach it through an SSH tunnel to localhost.',
+    }
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { ok: false, error: `${label} must be an https:// endpoint.` }
   }
   if (parsed.username || parsed.password) {
     return {
@@ -165,12 +158,14 @@ export function validateRpcUrl(url, { label = 'RPC URL' } = {}) {
       error: `${label} must not carry credentials in the URL — use the API key fields instead.`,
     }
   }
-  if (!isCspAllowedRpcUrl(trimmed)) {
+  if (isLoopback) {
+    // Not a problem — just a property of a local node worth stating, since endpoint settings
+    // are per-device and other devices on this account will keep using their own route.
     return {
       ok: true,
       warning:
-        `${parsed.hostname} is not in the app's content-security-policy allowlist, so the browser ` +
-        'will block requests to it. Test the endpoint before relying on it.',
+        'Local node: reachable only from this device, and it must allow cross-origin requests ' +
+        'from this site (enable CORS on the node, e.g. geth --http.corsdomain). Test it to confirm.',
     }
   }
   return { ok: true }

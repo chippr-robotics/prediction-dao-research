@@ -66,14 +66,39 @@ member's route, and the bypass is invisible in review. Go through `makeReadProvi
 - **HTTPS only** (plus `http://localhost` for dev). WebSocket endpoints are rejected with a
   reason: the read providers are HTTP.
 
-## The CSP allowlist is part of this feature
+## The CSP grant is part of this feature
 
-The browser blocks `fetch` to any host missing from the production `connect-src`
-(`frontend/nginx.conf` + `nginx.conf.template`), so an unlisted endpoint is a dead network
-however correct it is. `CSP_RPC_HOST_PATTERNS` in `endpointStore.js` mirrors the header's
-RPC hosts (exact hosts + `*.provider` wildcards for the major providers) and is what the
-panel uses to warn a member up front. `src/test/nginxCspConnectSrc.test.js` asserts the two
-stay in sync — when you add a provider, add it in **both** places, in both nginx files.
+The browser blocks `fetch` to anything the production `connect-src` does not admit
+(`frontend/nginx.conf` + `nginx.conf.template`), so the policy decides what a member can
+actually configure. Members run their own nodes — in their cloud on a domain we cannot know
+at build time, or locally — and a static header served to everyone cannot express a
+per-member allowlist, so the RPC grant is **scheme-wide**:
+
+- `https:` — any host. A curated provider list would have made every self-hosted endpoint a
+  dead network.
+- `http://localhost:*`, `http://127.0.0.1:*`, `http://[::1]:*` — the local-node case. `http://`
+  is otherwise unusable from an https page (mixed content), and loopback is the only http
+  origin browsers treat as potentially trustworthy.
+
+**The cost, stated plainly:** with `script-src` carrying `'unsafe-inline'`, an injected script
+could POST to any https host rather than only to a curated list. The XSS entry point is
+unchanged; what widens is where data could go afterwards. That trade was made deliberately to
+make member-run nodes real. `https:` is granted to `connect-src` **only** — a test asserts
+`script-src`, `frame-src` and `img-src` never carry a bare `https:` grant.
+
+`CSP_RPC_GRANTS` in `endpointStore.js` mirrors what the header admits and is what the endpoint
+form validates against; `src/test/nginxCspConnectSrc.test.js` asserts the two stay in sync in
+both nginx files.
+
+**A LAN node (`http://192.168.x.x:8545`) is refused**, with the reason: mixed-content blocking
+is not ours to grant. The two paths that work are https (put the node behind TLS) or an SSH
+tunnel to `localhost`.
+
+**A local or self-hosted node must allow cross-origin requests from the app's origin** (e.g.
+`geth --http.corsdomain=https://…`). That is the most common cause of a "Could not reach"
+probe result, and the message says so before it says "offline". Note also that Chrome's
+private-network-access rules can require a preflight for public→loopback requests, so a node
+that answers `curl` may still refuse the browser until CORS is configured.
 
 ## Changing an endpoint at runtime
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { CSP_RPC_HOST_PATTERNS } from '../lib/network/endpointStore'
+import { CSP_RPC_GRANTS } from '../lib/network/endpointStore'
 
 // Regression guard for the CSP connect-src blockchain RPC allowlist.
 //
@@ -115,29 +115,62 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
       ).toContain(host)
     }
 
-    // The dev-only Hardhat RPC must never ship in the production policy.
-    expect(connectSrc).not.toContain('localhost:8545')
-    expect(connectSrc).not.toContain('127.0.0.1')
+    // Loopback IS allowed now (spec 069: a member may run their own node on this device).
+    // What must never ship is a DEFAULT pointed at localhost — that is config, asserted in
+    // networks.mainnet.test.js, not something this header can express.
+    expect(connectSrc).toContain('http://localhost:*')
   })
 
-  // Spec 069 — a member can point any network at their own provider. The panel tells them a
-  // host outside the policy will be blocked, and it decides that from CSP_RPC_HOST_PATTERNS;
-  // if the header and that list drift, the panel starts lying in one direction or the other
-  // (promising an endpoint that is blocked, or warning about one that works).
-  it.each(CONFIGS)('%s allowlists every member-configurable RPC host pattern', (path) => {
-    const conf = readFileSync(path, 'utf8')
-    const cspLine = conf
-      .split('\n')
-      .find((l) => l.includes('add_header Content-Security-Policy'))
-    const connectSrc = cspLine.match(/connect-src\s+([^;]*)/)?.[1]
-    expect(connectSrc).toBeTruthy()
-
-    for (const pattern of CSP_RPC_HOST_PATTERNS) {
-      expect(
-        connectSrc,
-        `${path} connect-src is missing https://${pattern} — the Network panel would offer ` +
-          'members an endpoint the browser then blocks',
-      ).toContain(`https://${pattern}`)
+  // Spec 069 — members may point a network at their OWN node, self-hosted on a domain we
+  // cannot know at build time or running locally. That is only true if the shipped policy
+  // grants it, and the endpoint form decides what to warn about from CSP_RPC_GRANTS; if the
+  // header and that object drift, the form starts lying in one direction or the other
+  // (promising an endpoint the browser blocks, or warning about one that works).
+  describe('member-configurable endpoints (spec 069)', () => {
+    const connectSrcOf = (path) => {
+      const conf = readFileSync(path, 'utf8')
+      const cspLine = conf
+        .split('\n')
+        .find((l) => l.includes('add_header Content-Security-Policy'))
+      const connectSrc = cspLine.match(/connect-src\s+([^;]*)/)?.[1]
+      expect(connectSrc, `${path} CSP has no connect-src directive`).toBeTruthy()
+      return connectSrc
     }
+
+    it.each(CONFIGS)('%s grants every scheme the endpoint form accepts', (path) => {
+      const connectSrc = connectSrcOf(path)
+      for (const scheme of CSP_RPC_GRANTS.schemes) {
+        // `https:` (scheme-source, no host) — a curated host list cannot serve self-hosted nodes.
+        expect(
+          connectSrc.split(/\s+/),
+          `${path} connect-src does not grant ${scheme} — self-hosted member endpoints would be blocked`,
+        ).toContain(scheme)
+      }
+    })
+
+    it.each(CONFIGS)('%s grants the loopback origins a local node runs on', (path) => {
+      const connectSrc = connectSrcOf(path)
+      for (const host of CSP_RPC_GRANTS.httpHosts) {
+        expect(
+          connectSrc,
+          `${path} connect-src is missing http://${host}:* — a member's local node would be blocked`,
+        ).toContain(`http://${host}:*`)
+      }
+    })
+
+    it.each(CONFIGS)('%s keeps the broad grant scoped to connect-src only', (path) => {
+      const conf = readFileSync(path, 'utf8')
+      const cspLine = conf
+        .split('\n')
+        .find((l) => l.includes('add_header Content-Security-Policy'))
+      // The cost of `https:` is accepted for connect-src alone. Script, frame and image
+      // sources must stay narrow — a scheme-wide grant there is a different class of risk.
+      for (const directive of ['script-src', 'frame-src', 'img-src']) {
+        const value = cspLine.match(new RegExp(`${directive}\\s+([^;]*)`))?.[1] || ''
+        expect(value.split(/\s+/), `${path} ${directive} must not carry a bare https: grant`).not.toContain(
+          'https:',
+        )
+      }
+    })
   })
 })

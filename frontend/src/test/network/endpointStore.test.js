@@ -13,6 +13,7 @@ import {
   endpointsRevision,
   getEndpointSettings,
   isCspAllowedRpcUrl,
+  isLoopbackHost,
   loadEndpointSettings,
   redactRpcUrl,
   resetEndpointSettings,
@@ -37,24 +38,36 @@ describe('endpointStore — validation', () => {
   it('rejects a WebSocket endpoint (the read providers are HTTP)', () => {
     const result = validateRpcUrl('wss://polygon-mainnet.g.alchemy.com/v2/key')
     expect(result.ok).toBe(false)
-    expect(result.error).toMatch(/HTTPS/)
+    expect(result.error).toMatch(/HTTP\(S\) endpoint/)
   })
 
-  it('rejects plain http except on localhost', () => {
-    expect(validateRpcUrl('http://rpc.example.com').ok).toBe(false)
-    expect(validateRpcUrl('http://localhost:8545').ok).toBe(true)
+  // Spec 069 follow-up: bring-your-own-node. Any https host is accepted — a self-hosted node
+  // lives on a domain no build-time list can predict.
+  it('accepts a self-hosted node on an arbitrary https host', () => {
+    expect(validateRpcUrl('https://rpc.my-own-node.example/eth')).toEqual({ ok: true })
+  })
+
+  it('accepts a local node over http on loopback, with the local-node caveats stated', () => {
+    for (const url of ['http://localhost:8545', 'http://127.0.0.1:8545']) {
+      const result = validateRpcUrl(url)
+      expect(result.ok).toBe(true)
+      expect(result.warning).toMatch(/only from this device/)
+      expect(result.warning).toMatch(/CORS/)
+    }
+  })
+
+  it('refuses http on a non-loopback host, because the browser would block it anyway', () => {
+    // Mixed content is not ours to grant — say which two options actually work.
+    const result = validateRpcUrl('http://192.168.1.5:8545')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/https:\/\//)
+    expect(result.error).toMatch(/SSH tunnel|localhost/)
   })
 
   it('rejects credentials embedded in the URL userinfo', () => {
     const result = validateRpcUrl('https://user:secret@polygon-mainnet.g.alchemy.com/v2/key')
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/API key fields/)
-  })
-
-  it('warns — but does not block — a host outside the CSP allowlist', () => {
-    const result = validateRpcUrl('https://rpc.my-own-node.example/eth')
-    expect(result.ok).toBe(true)
-    expect(result.warning).toMatch(/content-security-policy/)
   })
 
   it('requires a primary endpoint before a failover or an API key', () => {
@@ -174,12 +187,22 @@ describe('endpointStore — disclosure helpers', () => {
     expect(redactRpcUrl('not a url')).toBe('(unparseable endpoint)')
   })
 
-  it('matches wildcard CSP patterns across subdomain depth, and localhost always', () => {
+  it('reports the policy the shipped CSP actually grants', () => {
+    // https anywhere — including a member's own box.
     expect(isCspAllowedRpcUrl('https://polygon-mainnet.g.alchemy.com/v2/k')).toBe(true)
-    expect(isCspAllowedRpcUrl('https://mainnet.infura.io/v3/k')).toBe(true)
+    expect(isCspAllowedRpcUrl('https://rpc.some-random-host.example')).toBe(true)
+    // http only on loopback; everything else on http is browser-blocked regardless of policy.
     expect(isCspAllowedRpcUrl('http://localhost:8545')).toBe(true)
-    expect(isCspAllowedRpcUrl('https://rpc.some-random-host.example')).toBe(false)
-    // A host that merely ENDS with an allowlisted string must not pass.
-    expect(isCspAllowedRpcUrl('https://evil-infura.io/v3/k')).toBe(false)
+    expect(isCspAllowedRpcUrl('http://127.0.0.1:8545')).toBe(true)
+    expect(isCspAllowedRpcUrl('http://192.168.1.5:8545')).toBe(false)
+    expect(isCspAllowedRpcUrl('ftp://rpc.example.com')).toBe(false)
+    expect(isCspAllowedRpcUrl('not a url')).toBe(false)
+  })
+
+  it('recognises the loopback hostnames', () => {
+    expect(isLoopbackHost('localhost')).toBe(true)
+    expect(isLoopbackHost('127.0.0.1')).toBe(true)
+    expect(isLoopbackHost('::1')).toBe(true)
+    expect(isLoopbackHost('192.168.1.5')).toBe(false)
   })
 })

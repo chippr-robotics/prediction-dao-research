@@ -244,9 +244,12 @@ artifacts live under `specs/<feature>/`.
   (`fw_global_prefs.network_endpoints`, usable with no wallet connected) and are **deliberately absent
   from `lib/backup/syncedObjects.js`** — do not add them. Saving is honest: an endpoint answering with
   a DIFFERENT `eth_chainId` is refused (it would silently serve another chain's state), an unreachable
-  one saves with the failure shown, and a host outside the CSP `connect-src` allowlist warns that the
-  browser will block it — `CSP_RPC_HOST_PATTERNS` (endpointStore.js) and both nginx configs must stay
-  in sync (gated by `src/test/nginxCspConnectSrc.test.js`). Reads pick up a change immediately
+  one saves with the failure shown. **Bring-your-own-node is supported**: any https host, plus loopback
+  http for a local node — which is why `connect-src` grants `https:` scheme-wide (a per-member
+  allowlist cannot exist in a static header). That grant is for `connect-src` ONLY; never extend it to
+  `script-src`/`frame-src`/`img-src`. `CSP_RPC_GRANTS` (endpointStore.js) and both nginx configs must
+  stay in sync (gated by `src/test/nginxCspConnectSrc.test.js`). Non-loopback `http://` is refused
+  (browser mixed-content blocking, not a policy we control). Reads pick up a change immediately
   (`useEndpointsRevision` in provider memo deps); wallet transports are module-load-time, so the panel
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.

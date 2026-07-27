@@ -13,8 +13,11 @@ import { AUTH_MODES } from '../../lib/network/endpointStore'
  *   - "Test" is the truth: it asks the endpoint for `eth_chainId` and reports what came back.
  *   - An endpoint serving a DIFFERENT chain cannot be saved (it would silently poison every
  *     read for this network). Validation blocks it; the message names both chains.
- *   - An unreachable endpoint saves with the failure shown — a member may be configuring
- *     ahead of a provider or CSP change — but nothing claims it works.
+ *   - An unreachable endpoint saves with the failure shown — a member may be starting their
+ *     node next — but nothing claims it works.
+ *   - Self-hosted nodes are first-class: any https host, or http on loopback. A non-loopback
+ *     http URL is refused with the reason (browsers block it as mixed content), because
+ *     "saved but permanently blocked" is the one outcome the member cannot debug.
  *   - The API key is sent to the PRIMARY endpoint only, and the form says so, because a
  *     failover is usually a different provider.
  */
@@ -95,7 +98,8 @@ function NetworkEndpointForm({ network, entry, onSave, onReset, onProbe, onCance
           aria-invalid={errors.url ? 'true' : undefined}
         />
         <p className="network-endpoint-hint" id={fieldId('url-hint')}>
-          Leave empty to use the app default ({network.rpcUrl}).
+          Any https endpoint — a provider, or your own node. A node on this device can use
+          http://localhost:8545. Leave empty to use the app default ({network.rpcUrl}).
         </p>
         {errors.url && (
           <p className="network-endpoint-error" id={fieldId('url-error')} role="alert">

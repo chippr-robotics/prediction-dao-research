@@ -49,9 +49,24 @@ Status: all tasks complete on `claude/network-tab-user-panel-ih10ko`.
 ## Phase 4 — Policy & docs
 
 - [x] **T014** `frontend/nginx.conf` + `nginx.conf.template`: add the three spec-067 chain RPC hosts
-      (missing, so those reads were CSP-blocked) and the member provider host patterns. (FR-012)
-- [x] **T015** `test/nginxCspConnectSrc.test.js`: assert every `CSP_RPC_HOST_PATTERNS` entry is in the
-      shipped `connect-src`, in both configs. (FR-011)
+      (missing, so those reads were CSP-blocked). (FR-012)
+- [x] **T015** `test/nginxCspConnectSrc.test.js`: assert the shipped `connect-src` grants everything
+      the endpoint form accepts, in both configs. (FR-011, FR-012)
+
+## Phase 5 — Bring your own node
+
+- [x] **T017** `connect-src` grants `https:` scheme-wide plus `http://localhost:*`,
+      `http://127.0.0.1:*`, `http://[::1]:*`; the provider wildcard list is dropped as redundant. The
+      rationale and its cost are written into both nginx configs. (FR-012)
+- [x] **T018** `endpointStore`: `CSP_RPC_HOST_PATTERNS` → `CSP_RPC_GRANTS` + `isLoopbackHost`; accept
+      any https host; accept loopback http with the device-only + CORS caveats; refuse non-loopback
+      http with the mixed-content reason and the two working alternatives. (FR-011)
+- [x] **T019** `probeRpcEndpoint` unreachable message names the causes a self-hosted node actually
+      hits (not running / not reachable / CORS) instead of the CSP allowlist. (FR-009)
+- [x] **T020** Endpoint form hint states that any https endpoint or a local `http://localhost:8545`
+      works. (FR-011)
+- [x] **T021** Tests: loopback accepted, LAN http refused, arbitrary https accepted, the broad grant
+      is asserted present in `connect-src` and asserted ABSENT from `script-src`/`frame-src`/`img-src`.
 - [x] **T016** `docs/developer-guide/network-endpoints.md` + the CLAUDE.md guardrail bullet.
 
 ## Verification
