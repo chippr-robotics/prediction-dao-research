@@ -31,7 +31,7 @@ function otherCustodyChains(chainId) {
 
 function OnChainSection() {
   const { address, chainId, switchNetwork } = useWallet()
-  const { active, operateAsVault } = useCustody()
+  const { active } = useCustody()
   const {
     vaults,
     activeVault,
@@ -108,7 +108,6 @@ function OnChainSection() {
             <VaultDetail
               vault={activeVault}
               onForget={forget}
-              onOperateAs={operateAsVault}
               isActiveIdentity={active.mode === 'vault' && active.vaultAddress === activeVault.address}
               onProposePolicy={activeVault.owner && onVaultChain ? proposals.propose : undefined}
               onSwitchNetwork={switchNetwork}

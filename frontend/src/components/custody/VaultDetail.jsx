@@ -14,7 +14,6 @@ import { isPolicyV2Supported } from '../../lib/custody/policyV2'
 export default function VaultDetail({
   vault,
   onForget,
-  onOperateAs,
   isActiveIdentity,
   onProposePolicy,
   onSwitchNetwork,
@@ -127,12 +126,18 @@ export default function VaultDetail({
       ) : (
         <PolicyPanel vault={vault} onPropose={onVaultChain ? onProposePolicy : undefined} />
       )}
+      {/* A vault is an account you can act as, chosen from the account switcher next to your
+          biticon — the same place recovered accounts live. It is not a mode you enter from a
+          separate button here, so there is no "Operate as this vault": one way to switch accounts,
+          wherever you are in the app. This line just says where. */}
+      {vault.owner && onVaultChain && (
+        <p className="custody-hint" role="note">
+          {isActiveIdentity
+            ? 'You are acting as this vault. Switch back from the account menu next to your avatar.'
+            : 'To spend from this vault, pick it in the account menu next to your avatar, then use Transfer as usual.'}
+        </p>
+      )}
       <div className="custody-actions">
-        {vault.owner && onOperateAs && onVaultChain && (
-          <button type="button" onClick={() => onOperateAs(vault)} disabled={isActiveIdentity}>
-            {isActiveIdentity ? 'Operating as this vault' : 'Operate as this vault'}
-          </button>
-        )}
         {onForget && (
           <button type="button" className="custody-link" onClick={() => onForget(vault.address, vault.chainId)}>
             Remove from list

@@ -55,6 +55,7 @@ export default function ContactCard({
   networkName = (id) => `Chain ${id}`,
   onEdit,
   onDeleteContact,
+  isVault = false,
 }) {
   const [copiedKey, setCopiedKey] = useState(null)
   const statuses = contact.addresses.map((a) => getStatus(a.address, a.chainId))
@@ -72,6 +73,11 @@ export default function ContactCard({
       <div className="ab-contact-head">
         <div className="ab-contact-name">
           <span className="ab-contact-nickname">{contact.nickname}</span>
+          {/* Spec 068 — a multisig vault is an ordinary address-book entry, badged by matching the
+              member's own vault references rather than by storing a type on the entry (the book is
+              a synced object whose loader rebuilds a fixed field list, so an extra key would be
+              dropped). Renaming it here renames it everywhere the vault appears. */}
+          {isVault && <span className="ab-contact-tag">Multisig</span>}
           {containsRestricted && (
             <span className="ab-contact-restricted-flag">
               <RestrictionTag status="restricted" />
