@@ -222,6 +222,41 @@ throughout, so every later step has a worked example to match rather than a desi
 
 ---
 
+## R10 — The spec-067 tabs span cohorts, and this feature must not "fix" that silently ⚠️
+
+**Found during implementation of Phase 2**, not during planning — recording it here because it
+qualifies FR-002 and the claim that Bridge/Supply "already comply".
+
+`adminNetworks(capability)` in `liquidityAdminCommon.js` builds its roster from
+`listSupportedChainIds()` — **both cohorts** — and the two spec-067 routers exist on mainnets only
+(Uniswap on 1/10/137/8453/42161, Across LP on Ethereum). The test build runs
+`VITE_NETWORK_ID=63` (Mordor), so it is a *testnet* build whose Bridge and Supply tabs list five
+**mainnets**. Under a strict reading of FR-002 that is precisely the cross-cohort read
+constitution III forbids.
+
+**Decision for this feature: leave it exactly as it is, and say so.** Cohort-bounding that roster
+would return an empty list in a testnet build and blank both tabs — replacing a debatable
+disclosure with a definite regression, in the two views this feature holds up as its reference
+implementation. So:
+
+- `estateNetworks()` (new, cohort-bounded) is used by every **new** estate read.
+- `adminNetworks()` (existing, cross-cohort) keeps its behaviour, with the reason written at the
+  call site, and `readProviderFor` takes an explicit `{ requireCohort: false }` opt-out that only
+  those two tabs pass.
+
+**Open question this leaves**, deliberately not settled here: whether a testnet build should show
+mainnet router state at all. Both answers are defensible — it is an operator surface, and the
+routers genuinely have no testnet deployment — but it is a spec-067 question about what those tabs
+are *for*, not a spec-071 question about how reads are scoped. It needs its own decision rather
+than being resolved as a side effect of this change.
+
+**Consequence for the spec**: FR-002 governs the reads this feature introduces. It does not
+retroactively bind the two pre-existing spec-067 rosters, and `contracts/view-scope.md`'s "Bridge
+and Supply already comply" should be read as "with the scope contract", which is how it is now
+worded.
+
+---
+
 ## R9 — Testing approach
 
 **Decision**:

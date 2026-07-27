@@ -889,6 +889,77 @@ const NETWORKS = {
 
 export { NETWORKS, PRIMARY_CHAIN_ID, MAINNET_CHAIN_ID, TESTNET_CHAIN_ID }
 
+/* ---------------------------------------------------------------------------
+   Environment cohort + membership reference chain (spec 071)
+   --------------------------------------------------------------------------- */
+
+/**
+ * Whether this build reads the testnet estate or the mainnet one.
+ *
+ * Constitution III forbids network-scoped data leaking across the testnet/mainnet
+ * boundary, so "read every chain" has to mean "every chain THIS BUILD MAY READ".
+ * The split is total — every NETWORKS entry carries `isTestnet` — so no chain is
+ * unclassified and none can fall into both.
+ */
+function buildIsTestnet() {
+  return Boolean(NETWORKS[getCurrentChainId()]?.isTestnet ?? NETWORKS[PRIMARY_CHAIN_ID]?.isTestnet)
+}
+
+/**
+ * The single chain that is the authority for membership in this build (spec 071 FR-001/FR-002).
+ *
+ * DERIVED from the mainnet/testnet pair above rather than declared again: a second literal
+ * `137` in the codebase is a divergence waiting to happen, and a hardcoded one would silently
+ * read MAINNET membership in a testnet build.
+ *
+ * Not runtime-configurable, deliberately. This is a payment destination as well as a read
+ * target (FR-006) — a wrong value sends a member's USDC to a chain where their membership
+ * will never be read.
+ */
+export function membershipChainId() {
+  return buildIsTestnet() ? TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
+}
+
+/**
+ * Every chain this build may read, mainnets-first. The ONLY roster an estate read may use —
+ * `listSupportedChainIds()` spans both cohorts and would leak across the boundary.
+ */
+export function cohortChainIds() {
+  const testnet = buildIsTestnet()
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net && Boolean(net.isTestnet) === testnet)
+    .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
+    .map((net) => net.chainId)
+}
+
+/** Whether a chain is in this build's cohort. */
+export function isInCohort(chainId) {
+  const net = NETWORKS[chainId]
+  return Boolean(net) && Boolean(net.isTestnet) === buildIsTestnet()
+}
+
+/**
+ * Fail loudly rather than resolve a reference chain outside the cohort (contracts/membership-chain.md
+ * rule 3). Silently returning an out-of-cohort chain is the failure this whole feature exists to
+ * prevent — it would route real membership purchases at a chain the build must not touch.
+ */
+export function assertReferenceChainInCohort() {
+  const id = membershipChainId()
+  if (!isInCohort(id)) {
+    throw new Error(
+      `[networks] membership reference chain ${id} is not in this build's cohort ` +
+        `(${buildIsTestnet() ? 'testnet' : 'mainnet'}). Check MAINNET_CHAIN_ID / TESTNET_CHAIN_ID.`,
+    )
+  }
+  return id
+}
+
+// Checked once at module load: a build whose reference chain sits outside its own cohort is
+// broken in a way that must not reach a member, so it stops here rather than quietly routing
+// a purchase at the wrong chain.
+assertReferenceChainInCohort()
+
 export function getCurrentChainId() {
   const env = import.meta.env?.VITE_NETWORK_ID
   return env ? parseInt(env, 10) : PRIMARY_CHAIN_ID

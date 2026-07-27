@@ -30,8 +30,8 @@ is reachable from the wrong chain until it does, and the incident-response views
 
 **Purpose**: Directory scaffolding. No new dependencies — this feature adds none.
 
-- [ ] T001 Create `frontend/src/lib/chains/` following the existing `lib/<domain>/` convention used by `lib/custody/`, `lib/network/`, `lib/relay/`
-- [ ] T002 [P] Create `frontend/src/test/lib/chains/` for the estate-helper unit suites
+- [X] T001 Create `frontend/src/lib/chains/` following the existing `lib/<domain>/` convention used by `lib/custody/`, `lib/network/`, `lib/relay/`
+- [X] T002 [P] Create `frontend/src/test/lib/chains/` for the estate-helper unit suites
 
 ---
 
@@ -44,27 +44,27 @@ depends on this phase.** No user-visible change lands here.
 
 ### Cohort and reference chain
 
-- [ ] T003 Add `MEMBERSHIP_REFERENCE_CHAIN_ID`, `membershipChainId()`, `cohortChainIds()`, and `isInCohort(chainId)` to `frontend/src/config/networks.js`, deriving the reference chain from the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair selected by `NETWORKS[PRIMARY_CHAIN_ID].isTestnet` — no second literal `137` (FR-001, FR-002; research R1, contracts/membership-chain.md)
-- [ ] T004 Make a reference chain outside the current cohort fail loudly at module load rather than resolve, in `frontend/src/config/networks.js` (contracts/membership-chain.md rule 3)
-- [ ] T005 [P] Test the resolver in `frontend/src/test/membershipChain.test.js`: returns 137 under a mainnet build, 80002 under a testnet build, and never a mainnet id under a testnet build (SC-008)
+- [X] T003 Add `MEMBERSHIP_REFERENCE_CHAIN_ID`, `membershipChainId()`, `cohortChainIds()`, and `isInCohort(chainId)` to `frontend/src/config/networks.js`, deriving the reference chain from the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair selected by `NETWORKS[PRIMARY_CHAIN_ID].isTestnet` — no second literal `137` (FR-001, FR-002; research R1, contracts/membership-chain.md)
+- [X] T004 Make a reference chain outside the current cohort fail loudly at module load rather than resolve, in `frontend/src/config/networks.js` (contracts/membership-chain.md rule 3)
+- [X] T005 [P] Test the resolver in `frontend/src/test/lib/chains/membershipChain.test.js`: returns 137 under a mainnet build, 80002 under a testnet build, and never a mainnet id under a testnet build (SC-008)
 
 ### Chain read result
 
-- [ ] T006 Create `frontend/src/lib/chains/chainReadResult.js` with `readOk`, `notDeployed`, `unreadable`, and `aggregate` per contracts/estate-read.md — no value field on the non-`read` states, so a default has nowhere to live
-- [ ] T007 Implement `aggregate` in `frontend/src/lib/chains/chainReadResult.js` as per-unit subtotals with `partial` + `missing`; expose no API that returns one figure across units (FR-022, FR-023)
-- [ ] T008 [P] Test the three states and aggregation in `frontend/src/test/lib/chains/chainReadResult.test.js`: mixed units yield separate subtotals; an `unreadable` contributor sets `partial` and is named; a `not-deployed` contributor does **not** set `partial`
+- [X] T006 Create `frontend/src/lib/chains/chainReadResult.js` with `readOk`, `notDeployed`, `unreadable`, and `aggregate` per contracts/estate-read.md — no value field on the non-`read` states, so a default has nowhere to live
+- [X] T007 Implement `aggregate` in `frontend/src/lib/chains/chainReadResult.js` as per-unit subtotals with `partial` + `missing`; expose no API that returns one figure across units (FR-022, FR-023)
+- [X] T008 [P] Test the three states and aggregation in `frontend/src/test/lib/chains/chainReadResult.test.js`: mixed units yield separate subtotals; an `unreadable` contributor sets `partial` and is named; a `not-deployed` contributor does **not** set `partial`
 
 ### Estate read helper
 
-- [ ] T009 Create `frontend/src/lib/chains/estate.js` by moving `readProviderFor`, the network-roster helper, and `readRouterAuthority` out of `frontend/src/components/admin/liquidityAdminCommon.js`, preserving their doc-comments — they are the design (research R2)
-- [ ] T010 **Fix the spec-069 violation while moving**: `readProviderFor` in `frontend/src/lib/chains/estate.js` obtains its provider from `getReadProvider(chainId)` instead of hand-building from `NETWORKS[chainId].rpcUrl`, keeping only the reuse-the-wallet-provider-for-the-connected-chain shortcut (research R2)
-- [ ] T011 Bound the roster to the cohort: `estateNetworks(capability)` in `frontend/src/lib/chains/estate.js` filters through `cohortChainIds()`, and still lists chains that could carry the capability but have no FairWins deployment (FR-002, FR-013; contracts/estate-read.md rule 7)
-- [ ] T012 Add `readAcrossEstate({chainIds, addressFor, read, walletChainId, walletProvider})` to `frontend/src/lib/chains/estate.js` — concurrent, never rejects, one dead endpoint becomes `unreadable` without failing the batch (FR-015)
-- [ ] T013 Generalize `readRouterAuthority` to `readAuthority({provider, address, account, roles})` in `frontend/src/lib/chains/estate.js` for any AccessControl contract, keeping `readable: false` ⇒ unknown-not-denied and `deployed: false` ⇒ definite denial (research R4)
-- [ ] T014 Turn `frontend/src/components/admin/liquidityAdminCommon.js` into a re-export of the promoted helpers so `BridgeTab`/`SupplyTab` are untouched
-- [ ] T015 [P] Test the helper in `frontend/src/test/lib/chains/estate.test.js`: a rejected read yields `unreadable` with a reason while siblings resolve; a slow chain does not delay its siblings' results, which are observable before it settles (FR-015); the roster never contains an out-of-cohort chain
-- [ ] T016 [P] Source-level test in `frontend/src/test/lib/chains/estateProvider.test.js` asserting `estate.js` reaches providers via `getReadProvider` and contains no `NETWORKS[...].rpcUrl` access, so the spec-069 bypass cannot return
-- [ ] T017 **Checkpoint**: run `npx vitest run src/test/admin/AdminBridgeTab.test.jsx src/test/admin/AdminSupplyTab.test.jsx` — both suites MUST pass **unmodified**. If either needed changing, the helper was rewritten rather than moved; revert and redo T009–T014.
+- [X] T009 Create `frontend/src/lib/chains/estate.js` by moving `readProviderFor`, the network-roster helper, and `readRouterAuthority` out of `frontend/src/components/admin/liquidityAdminCommon.js`, preserving their doc-comments — they are the design (research R2)
+- [X] T010 **Fix the spec-069 violation while moving**: `readProviderFor` in `frontend/src/lib/chains/estate.js` obtains its provider from `getReadProvider(chainId)` instead of hand-building from `NETWORKS[chainId].rpcUrl`, keeping only the reuse-the-wallet-provider-for-the-connected-chain shortcut (research R2)
+- [X] T011 Bound the roster to the cohort: `estateNetworks(capability)` in `frontend/src/lib/chains/estate.js` filters through `cohortChainIds()`, and still lists chains that could carry the capability but have no FairWins deployment (FR-002, FR-013; contracts/estate-read.md rule 7)
+- [X] T012 Add `readAcrossEstate({chainIds, addressFor, read, walletChainId, walletProvider})` to `frontend/src/lib/chains/estate.js` — concurrent, never rejects, one dead endpoint becomes `unreadable` without failing the batch (FR-015)
+- [X] T013 Generalize `readRouterAuthority` to `readAuthority({provider, address, account, roles})` in `frontend/src/lib/chains/estate.js` for any AccessControl contract, keeping `readable: false` ⇒ unknown-not-denied and `deployed: false` ⇒ definite denial (research R4)
+- [X] T014 Turn `frontend/src/components/admin/liquidityAdminCommon.js` into a re-export of the promoted helpers so `BridgeTab`/`SupplyTab` are untouched
+- [X] T015 [P] Test the helper in `frontend/src/test/lib/chains/estate.test.js`: a rejected read yields `unreadable` with a reason while siblings resolve; a slow chain does not delay its siblings' results, which are observable before it settles (FR-015); the roster never contains an out-of-cohort chain
+- [X] T016 [P] Source-level test (in `frontend/src/test/lib/chains/estate.test.js`, alongside the behavioural cases) asserting `estate.js` reaches providers via `getReadProvider` and contains no `NETWORKS[...].rpcUrl` access, so the spec-069 bypass cannot return
+- [X] T017 **Checkpoint**: run `npx vitest run src/test/admin/AdminBridgeTab.test.jsx src/test/admin/AdminSupplyTab.test.jsx` — both suites MUST pass **unmodified**. If either needed changing, the helper was rewritten rather than moved; revert and redo T009–T014.
 
 ---
 

@@ -31,7 +31,18 @@
  */
 import { ethers } from 'ethers'
 import { NETWORKS, listSupportedChainIds } from '../../config/networks'
-import { makeReadProvider } from '../../utils/rpcProvider'
+import { networkName as estateNetworkName, readProviderFor as estateReadProviderFor } from '../../lib/chains/estate'
+
+// Spec 071: the generic halves of this module now live in `lib/chains/estate.js`, because
+// non-component callers (role sync, purchase preflight) need them too. They are re-exported
+// here so this module stays the one import site for the Bridge and Supply tabs.
+//
+// `readProviderFor` gained a fix in the move: it used to build a provider straight from
+// `NETWORKS[chainId].rpcUrl`, which bypassed `resolveRpcEndpoints` and so ignored the member's
+// configured endpoint and failover for every read these two tabs make (a live spec-069
+// violation). It now resolves through `getReadProvider`. Behaviour these tabs depend on —
+// reuse the wallet provider for the connected chain, null for a chain with no endpoint — is
+// unchanged.
 
 /** How far back the history/ops event scans look. Bounded — public RPCs refuse open ranges. */
 export const HISTORY_LOOKBACK_BLOCKS = 200_000
@@ -46,9 +57,7 @@ export function shortAddr(a) {
 export const isValidAddr = (a) => ethers.isAddress(a) && a !== ethers.ZeroAddress
 
 /** Display name for a chain, or an honest placeholder — never a guessed one. */
-export function networkName(chainId) {
-  return NETWORKS[chainId]?.name || `Chain ${chainId}`
-}
+export const networkName = estateNetworkName
 
 /**
  * Every supported network carrying the capability a tab controls, mainnets first.
@@ -58,6 +67,15 @@ export function networkName(chainId) {
  * and whether FairWins has deployed a router there is a separate question the tab answers
  * per-network. Listing only deployed networks would hide the ones an operator most needs to
  * see — the ones still waiting for a deployment.
+ *
+ * ── DELIBERATELY *NOT* COHORT-BOUNDED (spec 071) ────────────────────────────────────────────
+ * Spec 071's `estateNetworks()` narrows a roster to the build's environment cohort, and every
+ * NEW estate read uses it. This one does not, and must not: the spec-067 routers exist only on
+ * mainnets (1/10/137/8453/42161 for Uniswap, plus Ethereum-only Across LP), so cohort-bounding
+ * it would return an EMPTY roster in a testnet build and blank both tabs. The cross-cohort
+ * roster here is pre-existing spec-067 behaviour that spec 071 does not change; see the note in
+ * specs/071-multi-chain-admin-console/research.md (R10) for why that is being tracked as an
+ * open question rather than settled silently in this change.
  *
  * @param {'bridge'|'liquidity'} capability
  */
@@ -69,17 +87,15 @@ export function adminNetworks(capability) {
 }
 
 /**
- * A read connection for `chainId`.
+ * A read connection for `chainId`. See `lib/chains/estate.js`.
  *
- * Reuses the wallet's own provider when the scope happens to be the connected chain (cheaper,
- * and it is already authenticated to whatever RPC the member configured), and otherwise builds
- * a read-only provider from that network's configured RPC. Returns null for a network with no
- * RPC, which the caller reports as unreadable rather than as empty.
+ * NOTE: this module's roster (`adminNetworks`) may name a chain outside the build's cohort, and
+ * `estateReadProviderFor` refuses those — which is correct for cohort-bounded estate reads but
+ * would blank these two tabs. So the cohort check is bypassed here, preserving spec-067
+ * behaviour exactly, while still routing through the fixed provider resolution.
  */
 export function readProviderFor(chainId, walletChainId, walletProvider) {
-  if (walletProvider && Number(chainId) === Number(walletChainId)) return walletProvider
-  const rpcUrl = NETWORKS[chainId]?.rpcUrl
-  return rpcUrl ? makeReadProvider(rpcUrl, chainId) : null
+  return estateReadProviderFor(chainId, walletChainId, walletProvider, { requireCohort: false })
 }
 
 /** Minimal AccessControl surface — every spec-067 router exposes it via UUPSManaged. */
