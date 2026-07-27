@@ -91,6 +91,7 @@ import {
   encodeAddWalletOwner,
   requirePasskeySupport,
   deriveAddress,
+  computeAccountAddress,
   defaultPublicClient,
   ChainNotSupportedError,
   LastControllerError,
@@ -146,15 +147,25 @@ describe('defaultPublicClient (issue #854 — client.chain.id crash)', () => {
 })
 
 describe('deriveAddress', () => {
-  it('reads the factory getAddress with the exact (owners, nonce) inputs', async () => {
-    const publicClient = { readContract: vi.fn().mockResolvedValue('0xACC0000000000000000000000000000000000001') }
+  it('computes the address LOCALLY — no RPC, so sign-in works on any chain', async () => {
+    // Was an eth_call to the factory's getAddress behind requirePasskeySupport, which made
+    // sign-in fail on chains with no passkey config. A rejecting client proves nothing is read.
+    const publicClient = { readContract: vi.fn().mockRejectedValue(new Error('RPC must not be used')) }
     const ownersBytes = [publicKeyToOwnerBytes({ x: X, y: Y })]
     const addr = await deriveAddress({ chainId: 80002, ownersBytes, nonce: 7n, deps: { publicClient } })
-    expect(addr).toMatch(/^0xACC/)
-    const call = publicClient.readContract.mock.calls[0][0]
-    expect(call.functionName).toBe('getAddress')
-    expect(call.args).toEqual([ownersBytes, 7n])
-    expect(call.address).toMatch(/^0xFAC7/i)
+    expect(addr).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+  })
+
+  it('binds owners and nonce into the salt (different inputs ⇒ different accounts)', async () => {
+    const owners = [publicKeyToOwnerBytes({ x: X, y: Y })]
+    const other = [publicKeyToOwnerBytes({ x: Y, y: X })]
+    const [a, b, c] = await Promise.all([
+      deriveAddress({ chainId: 80002, ownersBytes: owners, nonce: 0n }),
+      deriveAddress({ chainId: 80002, ownersBytes: owners, nonce: 7n }),
+      deriveAddress({ chainId: 80002, ownersBytes: other, nonce: 0n }),
+    ])
+    expect(new Set([a, b, c]).size).toBe(3)
   })
 })
 
@@ -273,16 +284,16 @@ describe('buildAccount FairWins-factory address pinning (factory-mismatch fix)',
     expect(out.account.address).toBe(FUNDED)
   })
 
-  it('derives the sender from the FairWins factory (getAddress) when the caller omits it', async () => {
-    const publicClient = { readContract: vi.fn().mockResolvedValue(FUNDED), getCode: vi.fn() }
+  it('derives the sender from the FairWins factory params when the caller omits it', async () => {
+    // Derivation is LOCAL now (CREATE2 over the configured factory + pinned initCodeHash), so no
+    // RPC is consulted — but the result must still be exactly what the factory would have
+    // returned, and it must be what viem is pinned to. Pinning viem to anything else is the
+    // factory-mismatch bug this describe block exists to prevent.
+    const publicClient = { readContract: vi.fn(), getCode: vi.fn() }
     await buildAccount({ chainId: 137, credential, ownerIndex: 0, deps: { publicClient } })
-    // deriveAddress → getAddress on the FairWins-deployed factory (0xFAC7…), with the credential’s owner bytes.
-    const call = publicClient.readContract.mock.calls[0][0]
-    expect(call.functionName).toBe('getAddress')
-    expect(call.address).toMatch(/^0xFAC7/i)
-    expect(call.args).toEqual([[ownerBytes], 0n])
-    // …and that derived address is what viem is pinned to.
-    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(FUNDED)
+    const expected = computeAccountAddress({ ownersBytes: [ownerBytes], nonce: 0n })
+    expect(publicClient.readContract).not.toHaveBeenCalled()
+    expect(toCoinbaseSmartAccount.mock.calls[0][0].address).toBe(expected)
   })
 
   it('overrides getFactoryArgs to deploy via the FairWins factory while counterfactual', async () => {

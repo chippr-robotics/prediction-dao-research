@@ -21,12 +21,7 @@ import {
   isTransactComplete,
   hasExistingCredential,
 } from '../lib/passkey/credentials'
-import {
-  requirePasskeySupport,
-  deriveAddress,
-  publicKeyToOwnerBytes,
-  readControllers,
-} from '../lib/passkey/smartAccount'
+import { deriveAddress, publicKeyToOwnerBytes, readControllers } from '../lib/passkey/smartAccount'
 
 export const PASSKEY_CONNECTOR_ID = 'fairwinsPasskey'
 const SESSION_KEY = 'fairwins.passkey.session.v1'
@@ -64,7 +59,12 @@ export function passkeyConnector(options = {}) {
 
     async connect({ chainId, isReconnecting, credentialId, discoverable, mode: requestedMode } = {}) {
       const targetChain = chainId ?? config.chains[0]?.id
-      requirePasskeySupport(targetChain) // throws ChainNotSupportedError (FR-022)
+      // NO network gate here, deliberately. Signing in is a WebAuthn ceremony plus a local address
+      // derivation — it needs no bundler, no EntryPoint and no RPC. Gating it on submission support
+      // locked members out: selecting a network without a bundler persisted in the session, and on
+      // the next visit the passkey option was refused on the very chain they were already on, with
+      // no way to switch back because switching required being signed in. Submission support is
+      // enforced where it actually applies, in buildAccount (lib/passkey/smartAccount.js).
 
       // Silent restore: no ceremony on reload (FR-003). Transactions still
       // require a fresh ceremony each (FR-008) — the session is read-state only.
@@ -107,19 +107,26 @@ export function passkeyConnector(options = {}) {
           deps,
         })
         credential = { credentialId: assertion.credentialId }
-        address = await (deps.resolveAddress ?? resolveAddressForCredential)({
+        // Passing the assertion through enables cross-device sign-in: with no local record, the
+        // public key is recovered from this very signature rather than the member being told the
+        // passkey "does not have an account on this device".
+        const resolved = await (deps.resolveAccount ?? resolveAccountForCredential)({
           credentialId: assertion.credentialId,
           chainId: targetChain,
+          assertion,
           deps,
         })
+        address = resolved.address
         // Keep the book transact-complete (spec 045 FR-005): refresh the
-        // record for the asserted credential, repairing a missing public key
-        // from the chain when it can be identified unambiguously.
+        // record for the asserted credential. The key comes from cross-device
+        // recovery when that ran, else from the chain when it is unambiguous.
         const record = upsertCredential(
           {
             credentialId: assertion.credentialId,
             address,
-            publicKey: await repairPublicKey({ credentialId: assertion.credentialId, address, chainId: targetChain, deps }),
+            publicKey:
+              resolved.publicKey ??
+              (await repairPublicKey({ credentialId: assertion.credentialId, address, chainId: targetChain, deps })),
           },
           deps.storage
         )
@@ -166,7 +173,10 @@ export function passkeyConnector(options = {}) {
     },
 
     async switchChain({ chainId }) {
-      requirePasskeySupport(chainId) // ChainNotSupportedError on ETC/Mordor (FR-022)
+      // Switching to a chain without passkey submission is ALLOWED: the member keeps their session
+      // and every read surface (portfolio, receive, history) keeps working. Refusing here was half
+      // of the lockout — it made an unsupported chain a one-way door. The write path discloses the
+      // limitation honestly at the point of action instead.
       const session = readSession(deps.storage)
       if (session) writeSession({ ...session, chainId }, deps.storage)
       const chain = config.chains.find((c) => c.id === chainId)
@@ -225,17 +235,72 @@ async function repairPublicKey({ credentialId, address, chainId, deps }) {
  * then the on-chain owner lookup rebuild (survives cleared browser data —
  * the address book of last resort is the chain itself).
  */
-export async function resolveAddressForCredential({ credentialId, chainId, deps = {} }) {
+export async function resolveAccountForCredential({ credentialId, chainId, assertion, deps = {} }) {
   const { knownCredentials } = await import('../lib/passkey/credentials')
   const local = knownCredentials(deps.storage).find((c) => c.credentialId === credentialId)
-  if (local?.address) return local.address
+  if (local?.address) return { address: local.address, publicKey: local.publicKey }
   if (local?.publicKey) {
-    return deriveAddress({ chainId, ownersBytes: [publicKeyToOwnerBytes(local.publicKey)], deps })
+    const address = await deriveAddress({
+      chainId,
+      ownersBytes: [publicKeyToOwnerBytes(local.publicKey)],
+      deps,
+    })
+    return { address, publicKey: local.publicKey }
   }
-  // Cleared storage AND an assertion that carries no public key: the address
-  // can be re-derived once the user provides/looks up their account address
-  // (US3 flow) — surfaced as an explicit, honest error here.
+
+  // Nothing local — the CROSS-DEVICE case: the passkey is synced from another device (iCloud
+  // Keychain / Google Password Manager) so the ceremony succeeds, but this browser has never seen
+  // the account. Recover the public key from the signature the member just produced; that is
+  // enough to derive the address, and it also leaves the session able to transact without a
+  // further ceremony. Needs one extra confirmation because a single signature cannot identify a
+  // key unambiguously — see lib/passkey/crossDevice.js — and only on first use on this device.
+  if (assertion) {
+    const { recoverPublicKey } = await import('../lib/passkey/crossDevice')
+    const { publicKey, ownerBytes } = await (deps.recoverPublicKey ?? recoverPublicKey)({
+      first: assertion,
+      credentialId,
+      deps,
+    })
+    const address = await deriveAddress({ chainId, ownersBytes: [ownerBytes], deps })
+
+    // The derivation assumes this passkey is the account's INITIAL owner, which is true for a
+    // passkey created at sign-up but NOT for one added later as an extra controller to a
+    // pre-existing account — that account's address came from a different initial key and is not
+    // recoverable from this one. Confirm against the chain when we can reach it: an undeployed
+    // address is the canonical account this key owns (nothing to contradict), and a deployed one
+    // must actually list the key. A deployed account that does NOT list it means this passkey
+    // belongs to some other account we cannot find offline — refuse rather than hand back an
+    // address that is not theirs.
+    //
+    // Soft-fails on an unreachable RPC by design: sign-in must not require a working chain (that
+    // is the lockout fix), and the derived address is still the correct self-owned account.
+    try {
+      const { deployed, controllers } = await (deps.readControllers ?? readControllers)({
+        chainId,
+        accountAddress: address,
+        deps,
+      })
+      const listed = controllers.some((c) => c.ownerBytes?.toLowerCase() === ownerBytes.toLowerCase())
+      if (deployed && !listed) {
+        throw new Error(
+          'This passkey controls an account that this browser cannot identify. Sign in on the device ' +
+            'where it was set up, or use a linked wallet to recover access.'
+        )
+      }
+    } catch (err) {
+      if (err?.message?.includes('cannot identify')) throw err
+      // Unreachable chain — proceed on the derivation (see above).
+    }
+    return { address, publicKey }
+  }
+
   throw new Error(
     'This passkey is not yet linked to an account on this browser. Enter your account address to relink.'
   )
+}
+
+/** Address-only form of {@link resolveAccountForCredential}. */
+export async function resolveAddressForCredential({ credentialId, chainId, assertion, deps = {} }) {
+  const { address } = await resolveAccountForCredential({ credentialId, chainId, assertion, deps })
+  return address
 }
