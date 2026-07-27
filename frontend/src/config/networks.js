@@ -16,9 +16,9 @@
  *     (specs 033 / 042).
  *   - Ethereum family (spec 048) — value networks for select + portfolio +
  *     send/receive: Ethereum Mainnet (1, also ClearPath + Uniswap swap/liquidity
- *     as of spec 067), Hoodi (560048) and Sepolia (11155111) testnets. No
- *     wager/passkey infra is deployed here; those capabilities self-disclose as
- *     unavailable (honest-state).
+ *     as of spec 067), Hoodi (560048) and Sepolia (11155111) testnets. No wager
+ *     infra is deployed here; that capability self-discloses as unavailable
+ *     (honest-state).
  *   - Arbitrum One (42161), Base (8453), Optimism (10) — spec 067 bridge +
  *     liquidity networks, first-class for select/portfolio/send-receive. Each
  *     carries an Across SpokePool and a Uniswap V3 deployment.
@@ -28,6 +28,13 @@
  * (SWAP_CHAIN_IDS) and `capabilities.liquidity` is derived separately. Adding
  * `dex` addresses to a network no longer switches swapping on by itself — see
  * the SWAP_CHAIN_IDS comment.
+ *
+ * Passkey note (spec 041): every EVM network here declares a `passkey` block and
+ * derives `capabilities.passkeyAccounts` from it, because every one of them was
+ * probed and can host the ERC-4337 account stack. Declaring the block enables
+ * ops, not members: the capability stays false until a bundler URL is set, and UI
+ * surfaces gate on `config/passkeySupport.js#isPasskeySupported`, which ALSO
+ * requires the account factory to be deployed on that chain.
  *
  * The user-facing Testnet/Mainnet toggle switches between 80002 (testnet) and
  * 137 (mainnet) via wagmi.switchChain; every network with `selectable: true`
@@ -132,6 +139,20 @@ const CANONICAL_UNISWAP = {
 // optional FairWins-sponsored paymaster endpoint (spec 050 → the relay-gateway's
 // /v1/paymaster); null → UserOp fees fall back to the account's native balance and
 // the confirm UI discloses the native fee honestly (never a false "sponsored").
+//
+// EVERY EVM network below now declares a passkey block, because every one of them
+// was probed and can host the stack — `scripts/ops/verify-passkey-support.js`
+// verifies, on-chain and by bytecode hash, that the Arachnid CREATE2 proxy and
+// EntryPoint v0.6 are present (they are, on all ten). Declaring the block is NOT a
+// claim that passkeys work there: it is the switch that lets ops turn a network on
+// by deploying the factory and setting one env var, with no code change. Until
+// both happen the capability stays false and every passkey surface hides.
+//
+// `capabilities.passkeyAccounts` is therefore the CONFIG half of the answer only.
+// The full gate — bundler configured AND the account stack deployed on that chain
+// — lives in `config/passkeySupport.js#isPasskeySupported`, which is what UI
+// surfaces must consult. A bundler URL alone would advertise passkey login on a
+// chain with no factory, where account creation reverts.
 const passkeyConfig = (urlsEnv, sponsorEnv) => {
   const bundlerUrls = (urlsEnv || '')
     .split(',')
@@ -292,10 +313,17 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
     },
-    // Passkey smart accounts are a deferred increment on the ETC family
-    // (spec 041 FR-022): no RIP-7212 precompile, no canonical EntryPoint,
-    // no bundler infrastructure. null keeps the login option honestly hidden.
-    passkey: null,
+    // Passkey smart accounts (spec 041). The old "deferred ETC increment" note
+    // said Mordor had no canonical EntryPoint; that is no longer true —
+    // `verify-passkey-support.js` finds EntryPoint v0.6 and the Arachnid CREATE2
+    // proxy here, byte-identical to Polygon's. What Mordor genuinely lacks is the
+    // RIP-7212 precompile, so P-256 verification falls back to WebAuthnSol's
+    // inlined FCL Solidity path: correct, but materially more gas per UserOp.
+    // Budget for that before pointing a sponsoring paymaster at this chain.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_MORDOR,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_MORDOR
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -312,7 +340,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
         clearpath: true,
       }
@@ -370,9 +398,14 @@ const NETWORKS = {
       name: 'ETCswap',
       url: import.meta.env?.VITE_ETC_ETCSWAP_URL || 'https://v3.etcswap.org',
     },
-    // Passkey smart accounts are a deferred increment on the ETC family
-    // (spec 041 FR-022) — see the Mordor entry for the constraint list.
-    passkey: null,
+    // Passkey smart accounts (spec 041) — EntryPoint v0.6 + the Arachnid CREATE2
+    // proxy are both live on ETC (verified by bytecode hash); no RIP-7212
+    // precompile, so the FCL Solidity fallback carries P-256 verification. See
+    // the Mordor entry for the gas caveat.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_ETC,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_ETC
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -389,7 +422,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: true,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         // ClearPath DAO governance (spec 042) — Olympia lives on the ETC family; registry-optional.
         clearpath: true,
       }
@@ -506,7 +539,12 @@ const NETWORKS = {
     earn: null,
     contracts: {},
     polymarket: null,
-    passkey: null,
+    // Passkey smart accounts (spec 041) — EntryPoint v0.6, the Arachnid CREATE2
+    // proxy, and the RIP-7212 P-256 precompile are all live on Arbitrum One.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_ARBITRUM,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_ARBITRUM
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -518,7 +556,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         clearpath: true,
       }
     },
@@ -555,7 +593,12 @@ const NETWORKS = {
     earn: null,
     contracts: {},
     polymarket: null,
-    passkey: null,
+    // Passkey smart accounts (spec 041) — EntryPoint v0.6, the Arachnid CREATE2
+    // proxy, and the RIP-7212 P-256 precompile are all live on Base.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_BASE,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_BASE
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -567,7 +610,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         clearpath: true,
       }
     },
@@ -595,7 +638,12 @@ const NETWORKS = {
     earn: null,
     contracts: {},
     polymarket: null,
-    passkey: null,
+    // Passkey smart accounts (spec 041) — EntryPoint v0.6, the Arachnid CREATE2
+    // proxy, and the RIP-7212 P-256 precompile are all live on Optimism.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_OPTIMISM,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_OPTIMISM
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -607,7 +655,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         clearpath: true,
       }
     },
@@ -660,8 +708,15 @@ const NETWORKS = {
     staking: ethereumStakingConfig(),
     contracts: {}, // no wager/membership deployment — ClearPath needs none (registry-optional)
     polymarket: null,
-    // Passkey smart accounts are not enabled on this ClearPath-only network in this cut.
-    passkey: null,
+    // Passkey smart accounts (spec 041). Ethereum carries EntryPoint v0.6, the
+    // Arachnid CREATE2 proxy, and a P-256 precompile at 0x100, so nothing about
+    // the chain blocks the stack — the earlier "not enabled in this cut" note
+    // described our own rollout, not a constraint. L1 gas makes this the most
+    // expensive network to sponsor; enable it deliberately.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_MAINNET,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_MAINNET
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -678,7 +733,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         // The single enabled capability: ClearPath DAO governance (ENS, Uniswap, …).
         clearpath: true,
       }
@@ -709,7 +764,13 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
-    passkey: null,
+    // Passkey smart accounts (spec 041) — Sepolia carries EntryPoint v0.6, the
+    // Arachnid CREATE2 proxy, and a P-256 precompile, which makes it the
+    // free-to-fund rehearsal network for the Ethereum-family rollout.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_SEPOLIA,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_SEPOLIA
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -726,7 +787,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         clearpath: false,
       }
     },
@@ -756,7 +817,12 @@ const NETWORKS = {
     dex: null,
     contracts: {},
     polymarket: null,
-    passkey: null,
+    // Passkey smart accounts (spec 041) — Hoodi carries EntryPoint v0.6, the
+    // Arachnid CREATE2 proxy, and a P-256 precompile.
+    passkey: passkeyConfig(
+      import.meta.env?.VITE_BUNDLER_URLS_HOODI,
+      import.meta.env?.VITE_SPONSOR_PAYMASTER_HOODI
+    ),
     get capabilities() {
       return {
         collectibles: COLLECTIBLES_CHAIN_IDS.has(this.chainId),
@@ -773,7 +839,7 @@ const NETWORKS = {
         earn: Boolean(this.earn),
         staking: Boolean(this.staking),
         friendMarkets: false,
-        passkeyAccounts: false,
+        passkeyAccounts: Boolean(this.passkey),
         clearpath: false,
       }
     },

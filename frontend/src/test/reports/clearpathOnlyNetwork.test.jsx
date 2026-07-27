@@ -29,6 +29,8 @@ describe('ClearPath-only network self-discloses honestly (spec 042 US1)', () => 
   })
 
   it('passkey: capability off + no passkey config → login option hidden', () => {
+    // The network declares a passkey block (spec 041 multi-network), but with no bundler URL
+    // configured it resolves to null — so the capability is off and the option stays hidden.
     expect(getNetwork(CHAIN).passkey).toBeNull()
     expect(getNetwork(CHAIN).capabilities.passkeyAccounts).toBe(false)
   })

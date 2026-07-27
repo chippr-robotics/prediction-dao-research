@@ -40,8 +40,9 @@ describe('useChainTokens on the Ethereum family (spec 048 FR-009)', () => {
 
   it('exposes honest capabilities (no passkey on the Ethereum family; DEX on mainnet only)', () => {
     // mockChainId is 1 here. Spec 067 configures Uniswap V3 on Ethereum mainnet, so
-    // `dex` is now true — superseding spec 048's no-in-app-swap cut. Passkey infra is
-    // still not deployed on this family and continues to self-disclose off.
+    // `dex` is now true — superseding spec 048's no-in-app-swap cut. Passkey submission
+    // is declared but unconfigured on this family (no bundler URL, no deployed account
+    // factory), so it continues to self-disclose off.
     const t = useChainTokens()
     expect(t.capabilities.passkeyAccounts).toBe(false)
     expect(t.capabilities.dex).toBe(true)

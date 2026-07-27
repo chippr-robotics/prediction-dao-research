@@ -9,12 +9,15 @@ import { renderHook, waitFor } from '@testing-library/react'
 
 import { useConnect, useChainId } from 'wagmi'
 
-const { detectCapability, getNetwork } = vi.hoisted(() => ({
+const { detectCapability, getPasskeySupport } = vi.hoisted(() => ({
   detectCapability: vi.fn(),
-  getNetwork: vi.fn(),
+  getPasskeySupport: vi.fn(),
 }))
 vi.mock('../../lib/passkey/credentials', () => ({ detectCapability }))
-vi.mock('../../config/networks', () => ({ getNetwork }))
+// The hook gates on the JOINED support check (bundler configured AND account stack deployed),
+// not on `capabilities.passkeyAccounts` alone — a bundler URL with no factory would render a
+// login button that fails at account creation (spec 041 FR-004).
+vi.mock('../../config/passkeySupport', () => ({ getPasskeySupport }))
 
 import { useConnectorAvailability } from '../useConnectorAvailability'
 
@@ -29,7 +32,7 @@ beforeEach(() => {
   useConnect.mockReturnValue({ connect: vi.fn(), connectors: CONNECTORS })
   useChainId.mockReturnValue(137)
   detectCapability.mockResolvedValue({ available: true, platformAuthenticator: true })
-  getNetwork.mockReturnValue({ capabilities: { passkeyAccounts: true } })
+  getPasskeySupport.mockReturnValue({ supported: true, reason: null })
 })
 
 describe('useConnectorAvailability', () => {
@@ -49,11 +52,27 @@ describe('useConnectorAvailability', () => {
   })
 
   it('gates passkey on the active network even when the device is capable', async () => {
-    getNetwork.mockReturnValue({ capabilities: { passkeyAccounts: false } })
+    getPasskeySupport.mockReturnValue({ supported: false, reason: 'Not available on this network' })
     const { result } = renderHook(() => useConnectorAvailability())
     await waitFor(() => expect(result.current.isChecking).toBe(false))
     expect(result.current.isAvailable(CONNECTORS[2])).toBe(false)
     expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/network/i)
+  })
+
+  it('surfaces WHICH half of passkey support is missing, not a blanket refusal', async () => {
+    // A network mid-rollout — bundler wired, factory not deployed yet. The member should read
+    // the actual state of the rollout rather than "not available on this network", which would
+    // be indistinguishable from a network we never intend to support.
+    getPasskeySupport.mockReturnValue({
+      supported: false,
+      reason: 'Passkey accounts are not deployed on this network yet',
+      bundlerConfigured: true,
+      stackDeployed: false,
+    })
+    const { result } = renderHook(() => useConnectorAvailability())
+    await waitFor(() => expect(result.current.isChecking).toBe(false))
+    expect(result.current.isAvailable(CONNECTORS[2])).toBe(false)
+    expect(result.current.unavailableReason(CONNECTORS[2])).toMatch(/not deployed on this network/i)
   })
 
   it('does not re-probe when the connectors array identity changes but content does not', async () => {

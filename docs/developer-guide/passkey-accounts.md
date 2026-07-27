@@ -19,9 +19,10 @@ relies on:
 - **ERC-1271** with a per-account replay-safe hash — how passkey accounts
   sign spec-035 intents and USDC EIP-3009 authorizations (ERC-7598).
 - **`executeBatch`** — approve+act in ONE user ceremony (FR-016).
-- **WebAuthnSol**: RIP-7212 precompile first (3,450 gas on Polygon/Amoy),
-  FreshCryptoLib Solidity fallback elsewhere — the same bytecode serves the
-  deferred ETC/Mordor increment (FR-022).
+- **WebAuthnSol**: RIP-7212 precompile first (3,450 gas), FreshCryptoLib
+  Solidity fallback elsewhere — the same bytecode serves every network. The
+  precompile is live on every supported chain except ETC and Mordor (see
+  [Network scope](#network-scope)), which pay the FCL path's higher gas.
 - **UUPS upgradable by its owners only** — FairWins holds no authority over
   instances (plan.md Complexity Tracking).
 
@@ -166,6 +167,38 @@ after execution. Before setting `VITE_BUNDLER_URLS_ETC` / `_MORDOR`, pin the
 bundler to legacy fee quoting and prove one UserOp end-to-end on **Mordor**
 first. This is separate from — and more consequential than — the missing RIP-7212
 precompile on these chains, which only costs extra gas.
+
+The per-chain prerequisites are not assumed — `npm run verify:passkey-support`
+(`scripts/ops/verify-passkey-support.js`) probes every network and checks, by
+**bytecode hash** rather than "something has code here", that the Arachnid CREATE2
+proxy, EntryPoint v0.6 and the factory are the real ones. It also reports the
+RIP-7212 P-256 precompile, which is present everywhere **except ETC 61 and
+Mordor 63** — those fall back to WebAuthnSol's inlined FCL path: correct, but
+materially more gas per UserOp. Re-run the probe rather than trusting any table
+here; it is a snapshot.
+
+### Enabling a network
+
+Two ops steps, **no code change** — every EVM network already declares a
+`passkey` block in `config/networks.js`:
+
+1. **Deploy the stack** —
+   `npx hardhat run scripts/deploy/deploy-account-stack.js --network <net>`
+   then `npm run sync:frontend-contracts -- --network <net> --chainId <id>`.
+   The script hard-fails on any cross-network factory divergence (FR-023), so the
+   account address stays chain-independent.
+2. **Point at a bundler** — set `VITE_BUNDLER_URLS_<NET>` and rebuild. Optionally
+   `VITE_SPONSOR_PAYMASTER_<NET>` for sponsored gas, which additionally needs a
+   funded paymaster deposit on that chain (`docs/runbooks/paymaster-operations.md`).
+
+Support is the **conjunction** of those two steps, and
+`config/passkeySupport.js#isPasskeySupported` is the single gate that evaluates
+it — a bundler with no factory fails at account creation, a factory with no
+bundler fails at submit, and each state names itself in the connect UI rather
+than showing a dead button. `capabilities.passkeyAccounts` sees only the config
+half (networks.js deliberately does not import contracts.js), so **UI surfaces
+must gate on `isPasskeySupported`, not on the capability flag**.
+`smartAccount.js#requirePasskeySupport` re-checks at the transaction boundary.
 
 ## Complexity-tracking exceptions (plan.md)
 

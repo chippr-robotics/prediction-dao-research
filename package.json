@@ -26,6 +26,7 @@
     "verify:etc": "hardhat run scripts/deploy/verify.js --network etc",
     "verify:amoy": "hardhat run scripts/deploy/verify.js --network amoy",
     "verify:polygon": "hardhat run scripts/deploy/verify.js --network polygon",
+    "verify:passkey-support": "node scripts/ops/verify-passkey-support.js",
     "check:storage-layout": "hardhat run scripts/deploy/check-storage-layout.js",
     "sync:frontend-contracts": "node scripts/utils/sync-frontend-contracts.js --network mordor --chainId 63",
     "sync:frontend-contracts:amoy": "node scripts/utils/sync-frontend-contracts.js --network amoy --chainId 80002",

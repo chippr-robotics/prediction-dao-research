@@ -38,16 +38,20 @@ export function useConnectorAvailability() {
             next[connector.id] = { available: true }
           } else if (connector.type === 'passkey') {
             // Passkey option only where genuinely usable (spec 041 FR-004):
-            // WebAuthn support on this device AND passkey config on the
-            // active network (bundler endpoints + synced factory address).
+            // WebAuthn support on this device AND a network where BOTH halves of
+            // passkey support are real — a bundler to relay the UserOp and a
+            // deployed account factory to create the account. `getPasskeySupport`
+            // joins the two and names which half is missing, so a member on a
+            // network mid-rollout reads the actual reason instead of a blanket
+            // "not available".
             const { detectCapability } = await import('../lib/passkey/credentials')
-            const { getNetwork } = await import('../config/networks')
+            const { getPasskeySupport } = await import('../config/passkeySupport')
             const capability = await detectCapability()
-            const net = getNetwork(chainId)
+            const support = getPasskeySupport(chainId)
             if (!capability.available) {
               next[connector.id] = { available: false, reason: capability.reason || 'Not supported on this device' }
-            } else if (!net?.capabilities?.passkeyAccounts) {
-              next[connector.id] = { available: false, reason: 'Not available on this network' }
+            } else if (!support.supported) {
+              next[connector.id] = { available: false, reason: support.reason }
             } else {
               next[connector.id] = { available: true }
             }

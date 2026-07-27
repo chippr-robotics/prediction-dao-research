@@ -29,7 +29,9 @@ describe('Ethereum mainnet value network (spec 048; ClearPath since spec 042)', 
     expect(caps.dex).toBe(true)
     expect(caps.liquidity).toBe(true)
     expect(caps.bridge).toBe(true)
-    // Still no wager/passkey infra deployed here — those self-disclose off.
+    // Still no wager infra deployed here, and no bundler configured for passkey submission —
+    // both self-disclose off. Ethereum's passkey block exists (the chain carries EntryPoint v0.6
+    // + the CREATE2 proxy) but stays unconfigured, so the capability is false by configuration.
     expect(caps.passkeyAccounts).toBe(false)
     expect(caps.polymarketSidebets).toBe(false)
     expect(caps.friendMarkets).toBe(false)
