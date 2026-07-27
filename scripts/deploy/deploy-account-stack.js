@@ -24,6 +24,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { saveDeployment, getDeploymentFilename } = require("./lib/helpers");
+const { MAINNET_CHAIN_IDS } = require("./lib/constants");
 
 // Arachnid CREATE2 proxy — canonical singleton, same address on every EVM chain.
 const CREATE2_DEPLOYER = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
@@ -42,6 +43,24 @@ const P256_VECTOR =
 // (a new salt means a new factory address ⇒ new account addresses).
 const SALT = ethers.id("fairwins.041.account-stack.v1");
 
+/**
+ * Confirm code exists at `address`, tolerating a node that has mined the transaction but not yet
+ * caught its own state read up.
+ *
+ * Base does exactly this: `eth_getCode` immediately after an included deploy returns "0x" for a
+ * beat, so a single read turned two SUCCESSFUL Base deploys into "landed no code" failures — the
+ * contracts were live, but the script aborted before writing the deployment record. A read-once
+ * check cannot distinguish that from a genuine failure; polling can, and costs nothing when the
+ * node is already consistent (the first read returns on every other chain).
+ */
+async function waitForCode(address, { attempts = 10, delayMs = 3000 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    if ((await ethers.provider.getCode(address)) !== "0x") return true;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return false;
+}
+
 async function create2Deploy(deployer, initCode, label) {
   const initCodeHash = ethers.keccak256(initCode);
   const predicted = ethers.getCreate2Address(CREATE2_DEPLOYER, SALT, initCodeHash);
@@ -54,8 +73,11 @@ async function create2Deploy(deployer, initCode, label) {
     data: ethers.concat([SALT, initCode]),
   });
   await tx.wait();
-  if ((await ethers.provider.getCode(predicted)) === "0x") {
-    throw new Error(`${label}: CREATE2 deploy landed no code at ${predicted}`);
+  if (!(await waitForCode(predicted))) {
+    throw new Error(
+      `${label}: CREATE2 deploy landed no code at ${predicted} (tx ${tx.hash}). ` +
+        `Re-check with eth_getCode before assuming failure — this script is idempotent, so re-running is safe.`
+    );
   }
   console.log(`${label}: deployed at ${predicted}`);
   return predicted;
@@ -72,11 +94,44 @@ async function verify7212() {
   return ok;
 }
 
+/**
+ * Persist what is on chain SO FAR. Called after each leg rather than once at the end: the two
+ * CREATE2 sends are separate transactions, and anything failing between them (a fee-market move
+ * pricing the second send out, a stale nonce from a load-balanced RPC) used to exit with the
+ * implementation live and NOTHING on disk — an orphan the next run could only rediscover by
+ * recomputing the address by hand.
+ */
+function recordStack(network, chainId, { implAddr, factoryAddr }) {
+  const filename = getDeploymentFilename(network, "v2");
+  const filepath = path.join(process.cwd(), "deployments", filename);
+  const record = fs.existsSync(filepath) ? JSON.parse(fs.readFileSync(filepath, "utf8")) : { chainId, contracts: {} };
+  record.contracts = record.contracts || {};
+  record.contracts.entryPoint = ENTRYPOINT_V06;
+  if (implAddr) record.contracts.accountImpl = implAddr;
+  if (factoryAddr) record.contracts.accountFactory = factoryAddr;
+  // WebAuthnSol needs no external verifier (FCL is inlined); keep the key explicit-null
+  // so the frontend capability check stays honest.
+  record.contracts.p256Verifier = record.contracts.p256Verifier || null;
+  saveDeployment(filename, record);
+  return filename;
+}
+
 async function main() {
   const network = await ethers.provider.getNetwork();
   const chainId = Number(network.chainId);
   const [deployer] = await ethers.getSigners();
   console.log(`Account-stack deploy on ${hre.network.name} (chainId ${chainId}) — deployer ${deployer.address}`);
+
+  // Mainnet gate, matching every other mainnet-touching deploy script in the repo (deploy.js,
+  // deploy-fee-router.js, deploy-bridge-liquidity.js, deploy-verifying-paymaster.js). This script
+  // spends real funds on six chains in MAINNET_CHAIN_IDS and previously had no such guard, so a
+  // mistyped --network was one keystroke from a live deploy.
+  if (MAINNET_CHAIN_IDS.includes(chainId) && !process.env.CONFIRM_MAINNET) {
+    throw new Error(
+      `Chain ${chainId} is a MAINNET. Re-run with CONFIRM_MAINNET=true to proceed.\n` +
+        `  CONFIRM_MAINNET=true npx hardhat run scripts/deploy/deploy-account-stack.js --network ${hre.network.name}`
+    );
+  }
 
   // Local dev chains have no Arachnid proxy; the stack is deployed per-run in tests
   // instead. Guard against silently recording a non-deterministic address.
@@ -98,6 +153,8 @@ async function main() {
 
   const Wallet = await ethers.getContractFactory("CoinbaseSmartWallet");
   const implAddr = await create2Deploy(deployer, Wallet.bytecode, "CoinbaseSmartWallet (implementation)");
+  // Persist the implementation BEFORE spending gas on the factory — see recordStack.
+  recordStack(network, chainId, { implAddr });
 
   const Factory = await ethers.getContractFactory("CoinbaseSmartWalletFactory");
   const factoryInitCode = ethers.concat([
@@ -110,18 +167,7 @@ async function main() {
     await verify7212();
   }
 
-  // Record into the network's v2 deployment file.
-  const filename = getDeploymentFilename(network, "v2");
-  const filepath = path.join(process.cwd(), "deployments", filename);
-  const record = fs.existsSync(filepath) ? JSON.parse(fs.readFileSync(filepath, "utf8")) : { chainId, contracts: {} };
-  record.contracts = record.contracts || {};
-  record.contracts.entryPoint = ENTRYPOINT_V06;
-  record.contracts.accountFactory = factoryAddr;
-  record.contracts.accountImpl = implAddr;
-  // WebAuthnSol needs no external verifier (FCL is inlined); keep the key explicit-null
-  // so the frontend capability check stays honest.
-  record.contracts.p256Verifier = record.contracts.p256Verifier || null;
-  saveDeployment(filename, record);
+  const filename = recordStack(network, chainId, { implAddr, factoryAddr });
 
   // HARD cross-network assertion (FR-023): every deployments/ record that carries an
   // accountFactory must carry THIS address.

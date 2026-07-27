@@ -125,10 +125,47 @@ authoritative.
 
 ## Network scope
 
-Polygon (137) + **Amoy (80002, the passkey validation network)**. ETC/Mordor
-are a deferred increment: self-deploy the EntryPoint + factory (same salt →
-same addresses), WebAuthnSol falls back to FCL, bundler must be self-hosted.
-The deploy script hard-fails on any cross-network factory divergence.
+The account stack is **deployed on all eight EVM networks**, at the same two
+addresses everywhere (FR-023):
+
+| | `accountFactory` | `accountImpl` |
+| --- | --- | --- |
+| Ethereum 1, Optimism 10, Base 8453, Arbitrum 42161, Polygon 137, ETC 61, Mordor 63, Amoy 80002 | `0xd519C25e9dEd0DAC586B764574100479CB318734` | `0xfC5086A397e4FbAAF8f73892807415Da8d255E61` |
+
+Verified functionally, not just by address: every factory answers
+`getAddress(owners, nonce)` with the **same** counterfactual account address on
+all eight chains. The deploy script also hard-fails on any cross-network factory
+divergence.
+
+Deploying the factory is only half of enabling a network — see
+[Enabling a network](#enabling-a-network). Each chain still needs a bundler URL
+before members see the option.
+
+### ⚠️ ETC (61) and Mordor (63) require a legacy-mode bundler
+
+Both chains **do not implement the `BASEFEE` opcode** (EIP-3198 — ETC never
+adopted EIP-1559). Verified directly on-chain: a probe contract whose constructor
+executes `BASEFEE` fails to deploy on both, while the identical probe without it
+succeeds, and `PUSH0` works (ETC's Spiral upgrade).
+
+EntryPoint v0.6 reads `block.basefee` in `UserOperation.gasPrice()`, but only on
+one branch — `contracts/account/lib/account-abstraction/interfaces/UserOperation.sol:51-61`:
+
+```solidity
+if (maxFeePerGas == maxPriorityFeePerGas) {
+    //legacy mode (for networks that don't support basefee opcode)
+    return maxFeePerGas;
+}
+return min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
+```
+
+So ERC-4337 works on ETC/Mordor **only if every UserOp sets
+`maxFeePerGas == maxPriorityFeePerGas`**. A stock bundler config that quotes an
+EIP-1559 fee pair will hit an invalid opcode at post-op and the operation fails
+after execution. Before setting `VITE_BUNDLER_URLS_ETC` / `_MORDOR`, pin the
+bundler to legacy fee quoting and prove one UserOp end-to-end on **Mordor**
+first. This is separate from — and more consequential than — the missing RIP-7212
+precompile on these chains, which only costs extra gas.
 
 ## Complexity-tracking exceptions (plan.md)
 

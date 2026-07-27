@@ -39,7 +39,11 @@
     "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
     "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
     "feeRouter": "0x5249e3008Cb1Eb81B5BF39148B7760B1c36e516e",
-    "feeRouterImpl": "0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6"
+    "feeRouterImpl": "0x744b8E56d84bb8D7657b2Bb13426cB882c93B7E6",
+    "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+    "accountFactory": "0xd519C25e9dEd0DAC586B764574100479CB318734",
+    "accountImpl": "0xfC5086A397e4FbAAF8f73892807415Da8d255E61",
+    "p256Verifier": null
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
