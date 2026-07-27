@@ -33,6 +33,23 @@ Related: [operator onboarding](operator-onboarding.md) ·
 | Access Control | Admin Roles | `DEFAULT_ADMIN_ROLE` | role-defining contracts |
 | Infrastructure | Services | admin or guardian | read-only + paymaster |
 
+## Navigating: the collapsible section rail
+
+The groups above render as a side panel down the left of `/admin`, with the
+hamburger (☰) pinned to its **top left**. The panel has two widths and the
+hamburger switches between them:
+
+- **Expanded** — group headings plus the full label of every view.
+- **Collapsed** — an icon-only rail. Every view you can use is still listed and
+  still one click away; only the text is hidden (hover for the name). Collapsing
+  never removes a section from reach, so you can work from a wide content column
+  and still jump straight to Emergency.
+
+It opens expanded on desktop and collapsed on mobile, where expanding slides the
+panel over the content — pick a view, tap the dimmed area, or press `Esc` to
+close it again. Mobile also keeps the bottom icon bar for switching between
+views without opening the panel at all.
+
 ## How-to: common procedures
 
 ### Emergency-pause the protocol (Guardian)
@@ -143,6 +160,7 @@ on-chain; the view exists so operators can act without CLI tooling.
 |---|---|
 | "Access Restricted" on `/admin` | Connected wallet holds no operator role on this chain. Roles are chain-scoped — check the network selector first. |
 | A group/view is missing from the rail | You lack the gating role; the rail only shows what you can use. |
+| The rail is a strip of icons with no labels | It is collapsed, not broken — every view is still there. Hover for a name, or click the hamburger at its top left to expand. |
 | A view shows "not deployed on this network" | Address not in the frontend address book for this chain — run `npm run sync:frontend-contracts` after deploy. |
 | Gasless card shows "No relay gateway configured" | `VITE_RELAYER_URL` unset in this build; gasless flows self-submit. Expected in local dev. |
 | Runway numbers missing from the health card | The gateway only discloses operator telemetry to origin-authenticated callers; the public subset (RPC up/down) still renders. |

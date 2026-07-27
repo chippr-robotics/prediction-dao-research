@@ -14,12 +14,27 @@
  *   - 'nav': a navigation landmark of plain buttons that route ELSEWHERE (active
  *     reflected via aria-current="page"). Use this when selecting an entry
  *     navigates between routes rather than swapping an in-page panel.
+ *
+ * `collapsed` renders the icon-only rail: every entry still renders, so the whole
+ * section list stays one tap away, but the text label is visually hidden rather
+ * than dropped — the button keeps its accessible name, so screen readers and
+ * `getByRole('tab', { name })` see the same rail collapsed or expanded. Group
+ * headings become hairline rules (a 200px-wide word cannot survive a 64px rail).
  */
 import { Fragment } from 'react'
 import NavIcon from '../nav/NavIcon'
 import './PortalNav.css'
 
-export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel, variant = 'tabs' }) {
+export default function PortalNav({
+  items,
+  groups,
+  activeId,
+  onSelect,
+  ariaLabel,
+  variant = 'tabs',
+  collapsed = false,
+  id,
+}) {
   const isTabs = variant === 'tabs'
 
   const renderItem = (item) => (
@@ -30,11 +45,17 @@ export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel
       aria-selected={isTabs ? item.id === activeId : undefined}
       aria-current={!isTabs && item.id === activeId ? 'page' : undefined}
       className={`portal-nav-item ${item.id === activeId ? 'active' : ''}`}
+      // Collapsed, the glyph is the only thing on screen; the native tooltip is
+      // what tells a mouse user which area it is.
+      title={collapsed ? item.label : undefined}
       onClick={() => onSelect(item.id)}
     >
-      {item.icon && (
+      {/* Collapsed, an icon-less item would be an unreadable blank row, so the
+          rail falls back to its initial. Expanded, it keeps rendering exactly
+          what it did before: nothing at all. */}
+      {(item.icon || collapsed) && (
         <span className="portal-nav-item-icon" aria-hidden="true">
-          <NavIcon name={item.icon} />
+          {item.icon ? <NavIcon name={item.icon} /> : <span className="portal-nav-item-initial">{item.label?.[0]}</span>}
         </span>
       )}
       <span className="portal-nav-item-label">{item.label}</span>
@@ -43,7 +64,8 @@ export default function PortalNav({ items, groups, activeId, onSelect, ariaLabel
 
   return (
     <nav
-      className="portal-nav"
+      id={id}
+      className={`portal-nav ${collapsed ? 'portal-nav--collapsed' : ''}`}
       role={isTabs ? 'tablist' : undefined}
       aria-orientation={isTabs ? 'vertical' : undefined}
       aria-label={ariaLabel}
