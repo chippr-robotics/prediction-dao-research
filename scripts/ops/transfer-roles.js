@@ -164,9 +164,20 @@ async function main() {
           continue;
         }
         await (await instance.grantRole(role.id, multisig)).wait();
-        // Re-read: a receipt is not proof the role is held.
-        if (!(await instance.hasRole(role.id, multisig))) {
-          throw new Error(`${key}.${role.name}: grant transaction mined but multisig still lacks the role`);
+        // Re-read: a receipt is not proof the role is held. Retry before concluding failure — a
+        // load-balanced RPC can serve this read from a node that has not yet applied the block the
+        // receipt came from (seen repeatedly on Base). The GUARANTEE is unchanged: we still refuse
+        // to report success on state we have not read back. We just stop mistaking lag for failure.
+        let held = false;
+        for (let i = 0; i < 10 && !held; i++) {
+          held = await instance.hasRole(role.id, multisig);
+          if (!held) await new Promise((r) => setTimeout(r, 3000));
+        }
+        if (!held) {
+          throw new Error(
+            `${key}.${role.name}: grant transaction mined but the multisig still lacks the role after retries. ` +
+              `Check an explorer before re-running — do NOT renounce anything.`,
+          );
         }
         acted++;
         console.log(`  ✓ ${role.name.padEnd(20)} granted to multisig`);
