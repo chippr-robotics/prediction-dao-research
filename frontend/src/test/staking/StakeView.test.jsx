@@ -106,4 +106,28 @@ describe('StakeView (spec 065 US1)', () => {
     renderView()
     expect(screen.getByText(/slashing/i)).toBeInTheDocument()
   })
+
+  // Regression (issue #977): the Polygon staking API quotes wei-scale stake as
+  // a JSON double, so a raw amount can arrive in exponential notation. Rendering
+  // it must never throw — a thrown BigInt conversion took the whole wallet page
+  // into the error boundary.
+  it('renders an exponential-notation staked amount instead of crashing', () => {
+    mockOptions.current = {
+      options: [{ ...VALIDATOR, totalStaked: { raw: '1.2105466892436343e+26', usd: null } }],
+      status: 'ready',
+      refresh: () => {},
+    }
+    renderView()
+    expect(screen.getByText(/121\.1M POL staked/)).toBeInTheDocument()
+  })
+
+  it('shows "—" for a staked amount it cannot make sense of', () => {
+    mockOptions.current = {
+      options: [{ ...VALIDATOR, totalStaked: { raw: 'not-a-number', usd: null } }],
+      status: 'ready',
+      refresh: () => {},
+    }
+    renderView()
+    expect(screen.getByText(/— staked/)).toBeInTheDocument()
+  })
 })

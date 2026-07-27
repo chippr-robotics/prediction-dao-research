@@ -9,7 +9,6 @@
  * asset (ETH → liquid; POL → liquid + delegated).
  */
 import { useMemo, useState } from 'react'
-import { formatUnits } from 'ethers'
 import { useStakingOptions } from '../../hooks/useStakingOptions'
 import { useStakingPositions } from '../../hooks/useStakingPositions'
 import { NETWORKS, getStakingNetworks } from '../../config/networks'
@@ -18,15 +17,7 @@ import AssetLogo from '../wallet/AssetLogo'
 import StakeSheet from './StakeSheet'
 import StakingPositionsList from './StakingPositionsList'
 import { STAKING_TIPS, STAKING_DISCLOSURE } from '../../lib/staking/stakingCopy'
-import { formatApy } from '../../lib/earn/format'
-
-function formatStaked(raw, decimals, symbol) {
-  if (raw == null) return '—'
-  const value = Number(formatUnits(BigInt(raw), decimals))
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M ${symbol}`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K ${symbol}`
-  return `${value.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${symbol}`
-}
+import { formatApy, formatTokenAmount } from '../../lib/earn/format'
 
 export default function StakeView({ tokenFilter: initialTokenFilter = null }) {
   const { options, status, refresh } = useStakingOptions()
@@ -123,7 +114,10 @@ export default function StakeView({ tokenFilter: initialTokenFilter = null }) {
                   <span className="earn-vault-numbers">
                     <span className="earn-vault-apy">{formatApy(option.rewardRateApr)}</span>
                     <span className="earn-vault-tvl">
-                      {formatStaked(option.totalStaked?.raw, option.asset.decimals, option.asset.symbol)} staked
+                      {/* Total staked is an external API field, so it goes through the total
+                          formatter: an unusable amount shows "—" instead of throwing mid-render
+                          and taking the whole page into the error boundary (issue #977). */}
+                      {formatTokenAmount(option.totalStaked?.raw, option.asset.decimals, option.asset.symbol)} staked
                     </span>
                   </span>
                 </button>
