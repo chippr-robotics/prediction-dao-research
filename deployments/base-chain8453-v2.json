@@ -4,16 +4,22 @@
   "contracts": {
     "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c",
     "policyGuardSetup": "0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b",
-    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7"
+    "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
+    "feeRouter": "0x98218248CA53Dd88159979af20172C86b94e8B29",
+    "feeRouterImpl": "0x9B68fDbBaEaeafbe2349549A4994A4697462AFea"
   },
   "constructorArgs": {
     "safePolicyGuardV2": [],
     "policyGuardSetup": [],
-    "safeProposalHub": []
+    "safeProposalHub": [],
+    "feeRouterImpl": []
   },
   "deployBlocks": {
     "safePolicyGuardV2": 49158464,
     "policyGuardSetup": 49158466,
     "safeProposalHub": 49158472
-  }
+  },
+  "treasury": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "feeRouterDeployedAt": "2026-07-27T01:17:47.978Z"
 }

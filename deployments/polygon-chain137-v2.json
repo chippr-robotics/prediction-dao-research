@@ -40,7 +40,9 @@
     "safeProposalHub": "0x94b5b38C247CE51F7C42C83B63115998b7e970E7",
     "callsignRegistry": "0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2",
     "callsignRegistryImpl": "0xD220D34ed2148B9F4DC65C1bc75169D7DECFBB49",
-    "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c"
+    "safePolicyGuardV2": "0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c",
+    "feeRouter": "0xf8161fC26172621E9fbcc6c39500Bb14b0902B35",
+    "feeRouterImpl": "0x40ee755246E60f66E7bA425F99C6d704859d38db"
   },
   "mocks": null,
   "constructorArgs": {
@@ -85,7 +87,8 @@
     "policyGuardSetup": [],
     "safeProposalHub": [],
     "callsignRegistryImpl": [],
-    "safePolicyGuardV2": []
+    "safePolicyGuardV2": [],
+    "feeRouterImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
@@ -104,7 +107,9 @@
     "safePolicyGuard": 90120723,
     "policyGuardSetup": 90120725,
     "safeProposalHub": 90120743,
-    "safePolicyGuardV2": 90932886
+    "safePolicyGuardV2": 90932886,
+    "feeRouter": 90939919
   },
-  "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z"
+  "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z",
+  "feeRouterDeployedAt": "2026-07-27T01:14:35.084Z"
 }

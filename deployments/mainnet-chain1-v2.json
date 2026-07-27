@@ -1,0 +1,19 @@
+{
+  "network": "mainnet",
+  "chainId": 1,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "treasury": "0x8cc564E3dF4003c2F0a33C679c8DfE6237c5c3fa",
+  "paymentToken": null,
+  "wmatic": null,
+  "polymarketCTF": null,
+  "contracts": {
+    "feeRouter": "0xB9F80D6D4CfD3ecC60b63810aDF9d88931D0e3d3",
+    "feeRouterImpl": "0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00"
+  },
+  "mocks": null,
+  "constructorArgs": {},
+  "saltPrefix": "FairWins-P2P-v2.0-",
+  "timestamp": "2026-07-27T01:18:30.104Z",
+  "bootstrappedBy": "scripts/deploy/init-deployment-record.js",
+  "bootstrapNote": "Created empty — no contracts were deployed by this file. Addresses are appended by the targeted deploy scripts (deploy-fee-router.js, deploy-bridge-liquidity.js)."
+}
