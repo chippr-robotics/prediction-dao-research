@@ -5,6 +5,7 @@ import { useActiveAccount } from './useActiveAccount'
 import { useChainTokens } from './useChainTokens'
 import { getNetwork } from '../config/networks'
 import { makeReadProvider } from '../utils/rpcProvider'
+import { useEndpointsRevision } from './useRpcEndpoints'
 import {
   TRANSFER_ABI,
   signTransferAuthorization,
@@ -81,11 +82,14 @@ export function useTransfer() {
   const [stableBalance, setStableBalance] = useState(null)
 
   const stableDomainVersion = getNetwork(chainId)?.stablecoin?.domainVersion ?? null
+  const endpointRevision = useEndpointsRevision()
+  // Rebuilt when the member repoints this network (spec 069).
   const readProvider = useMemo(() => {
     const net = getNetwork(chainId)
     const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
     return isPasskey ? (rpcProvider || provider) : (provider || rpcProvider)
-  }, [chainId, isPasskey, provider])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainId, isPasskey, provider, endpointRevision])
   // A transfer is gasless when a passkey smart account's UserOp is FairWins-sponsored (spec 050: a
   // sponsor paymaster is configured for this chain), or — for classic wallets — when the token
   // supports EIP-3009 AND a relayer is configured. Without a sponsor paymaster a passkey UserOp

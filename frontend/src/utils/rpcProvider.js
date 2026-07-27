@@ -1,6 +1,12 @@
 /**
  * Shared read-provider factory.
  *
+ * Every ethers read in the app comes through here, which makes this the seam where the
+ * member's own RPC route (spec 069, `lib/network/rpcEndpoints`) is applied: pass a chainId
+ * and you get a provider pointed at their endpoint, with their API-key header attached and
+ * their failover behind it. Callers that still pass a URL keep working — the URL is used
+ * only when the chain has no member override (see `makeReadProvider`).
+ *
  * ethers v6 batches concurrent JSON-RPC calls into a single request by default
  * (batchMaxCount = 100). Some chains' public RPC endpoints — notably Ethereum
  * Classic / Mordor (Caddy-fronted core-geth/besu nodes) — return batch
@@ -19,22 +25,92 @@
  * volume.
  */
 import { ethers } from 'ethers'
+import { resolveRpcEndpoints } from '../lib/network/rpcEndpoints'
 
 // Ethereum Classic mainnet (61) and Mordor testnet (63).
 const NO_BATCH_CHAIN_IDS = new Set([61, 63])
 
 /**
- * Build a JsonRpcProvider for read calls, disabling request batching on chains
- * whose RPCs mishandle JSON-RPC batches.
+ * Build one JsonRpcProvider for a single endpoint.
  *
- * @param {string} rpcUrl
- * @param {number|null} [chainId] - used only to decide whether to disable batching
- * @returns {ethers.JsonRpcProvider}
+ * Auth headers ride on a `FetchRequest` rather than the URL, so a provider credential
+ * never lands in a URL that could be logged. `staticNetwork` is set only when the chainId
+ * is known AND the caller is building a failover set (see below) — a single provider keeps
+ * ethers' own network detection so a misconfigured endpoint fails loudly instead of
+ * silently answering for another chain.
+ */
+function buildProvider(url, headers, chainId, { staticNetwork = false } = {}) {
+  const options = {}
+  if (chainId != null && NO_BATCH_CHAIN_IDS.has(Number(chainId))) options.batchMaxCount = 1
+
+  let target = url
+  if (headers && Object.keys(headers).length > 0) {
+    const request = new ethers.FetchRequest(url)
+    for (const [name, value] of Object.entries(headers)) request.setHeader(name, value)
+    target = request
+  }
+
+  let network
+  if (staticNetwork && chainId != null) {
+    // A FallbackProvider needs every member to agree on the network up front; ethers only
+    // knows the well-known chains by number, so name the rest explicitly.
+    network = new ethers.Network(`chain-${Number(chainId)}`, Number(chainId))
+    options.staticNetwork = network
+  }
+
+  return new ethers.JsonRpcProvider(target, network, Object.keys(options).length ? options : undefined)
+}
+
+/**
+ * Build a provider for read calls.
+ *
+ * Resolution order for the endpoint (spec 069):
+ *   1. the member's configured endpoint + failover for `chainId`
+ *   2. `rpcUrl` as passed by the caller (the build default, `NETWORKS[chainId].rpcUrl`)
+ *
+ * With a failover configured the result is an `ethers.FallbackProvider` at quorum 1: the
+ * primary is tried first and the failover answers when it stalls or errors, which is the
+ * whole point of the member setting one.
+ *
+ * @param {string} rpcUrl - default endpoint; used when the chain has no member override
+ * @param {number|null} [chainId] - selects the member's route and the batching decision
+ * @returns {ethers.JsonRpcProvider|ethers.FallbackProvider}
  */
 export function makeReadProvider(rpcUrl, chainId = null) {
-  const options =
-    chainId != null && NO_BATCH_CHAIN_IDS.has(Number(chainId)) ? { batchMaxCount: 1 } : undefined
-  return new ethers.JsonRpcProvider(rpcUrl, undefined, options)
+  const route = chainId != null ? resolveRpcEndpoints(chainId) : null
+
+  // No member override → exactly the pre-069 behavior for the caller's URL.
+  if (!route || route.source !== 'member' || !route.primary) {
+    return buildProvider(rpcUrl, null, chainId)
+  }
+
+  if (!route.failover) {
+    return buildProvider(route.primary.url, route.primary.headers, chainId)
+  }
+
+  const primary = buildProvider(route.primary.url, route.primary.headers, chainId, { staticNetwork: true })
+  const failover = buildProvider(route.failover.url, route.failover.headers, chainId, { staticNetwork: true })
+  return new ethers.FallbackProvider(
+    [
+      { provider: primary, priority: 1, weight: 1, stallTimeout: 2000 },
+      { provider: failover, priority: 2, weight: 1 },
+    ],
+    new ethers.Network(`chain-${Number(chainId)}`, Number(chainId)),
+    { quorum: 1 },
+  )
+}
+
+/**
+ * Provider for a chain, resolving the endpoint itself. Preferred in new code — it cannot
+ * be called with a URL that contradicts the member's settings.
+ *
+ * @param {number} chainId
+ * @returns {ethers.JsonRpcProvider|ethers.FallbackProvider|null} null when the chain has no endpoint at all
+ */
+export function getReadProvider(chainId) {
+  const route = resolveRpcEndpoints(chainId)
+  if (!route.primary) return null
+  return makeReadProvider(route.primary.url, chainId)
 }
 
 /** Exported for tests / callers that need the batching decision directly. */

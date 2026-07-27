@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { CSP_RPC_HOST_PATTERNS } from '../lib/network/endpointStore'
 
 // Regression guard for the CSP connect-src blockchain RPC allowlist.
 //
@@ -42,6 +43,11 @@ const REQUIRED_RPCS = [
   'https://ethereum-rpc.publicnode.com', // Ethereum mainnet (1)
   'https://ethereum-sepolia-rpc.publicnode.com', // Sepolia (11155111)
   'https://ethereum-hoodi-rpc.publicnode.com', // Hoodi (560048)
+  // Spec 067 bridge/liquidity networks — portfolio, position and route reads hit these
+  // directly, exactly like the chains above.
+  'https://arbitrum-one-rpc.publicnode.com', // Arbitrum One (42161)
+  'https://base-rpc.publicnode.com', // Base (8453)
+  'https://optimism-rpc.publicnode.com', // Optimism (10)
 ]
 
 // Gasless infrastructure the SPA POSTs to directly (specs 035/036 + 041). Without these in connect-src
@@ -112,5 +118,26 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
     // The dev-only Hardhat RPC must never ship in the production policy.
     expect(connectSrc).not.toContain('localhost:8545')
     expect(connectSrc).not.toContain('127.0.0.1')
+  })
+
+  // Spec 069 — a member can point any network at their own provider. The panel tells them a
+  // host outside the policy will be blocked, and it decides that from CSP_RPC_HOST_PATTERNS;
+  // if the header and that list drift, the panel starts lying in one direction or the other
+  // (promising an endpoint that is blocked, or warning about one that works).
+  it.each(CONFIGS)('%s allowlists every member-configurable RPC host pattern', (path) => {
+    const conf = readFileSync(path, 'utf8')
+    const cspLine = conf
+      .split('\n')
+      .find((l) => l.includes('add_header Content-Security-Policy'))
+    const connectSrc = cspLine.match(/connect-src\s+([^;]*)/)?.[1]
+    expect(connectSrc).toBeTruthy()
+
+    for (const pattern of CSP_RPC_HOST_PATTERNS) {
+      expect(
+        connectSrc,
+        `${path} connect-src is missing https://${pattern} — the Network panel would offer ` +
+          'members an endpoint the browser then blocks',
+      ).toContain(`https://${pattern}`)
+    }
   })
 })

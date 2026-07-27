@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useChainId, useSwitchChain } from 'wagmi'
 import { getSelectableNetworks } from '../../config/networks'
 import { getNetworkFeatures } from '../../config/networkCapabilities'
 import { BITCOIN_NETWORKS } from '../../config/bitcoinNetworks'
-import './NetworkSettings.css'
+import { useRpcEndpoints } from '../../hooks/useRpcEndpoints'
+import NetworkEndpointForm from './NetworkEndpointForm'
+import './NetworkPanel.css'
 
 /**
  * Bitcoin capability tags (spec 061, FR-020) — resolved from the non-EVM
@@ -92,29 +95,48 @@ function BitcoinNetworkCard({ net }) {
 }
 
 /**
- * NetworkSettings
+ * NetworkPanel
  *
- * The relocated network selector that lives on the My Account → Network tab.
- * Lists every user-switchable network as a card and surfaces capability tags
- * (Sanctions Guard, oracles, swaps, …) so members can make an informed switch
- * before moving to another chain. Switching goes through wagmi.switchChain, so
- * the connected wallet prompts the user to confirm the chain change.
+ * Network settings, reached from the account button beside Preferences (spec 069 — it used
+ * to be a Tools section, which no longer fits: FairWins reads every supported network at
+ * once, so "which network am I on" is a per-transaction detail, not a place you go).
+ *
+ * The panel does two things:
+ *
+ *   1. Documents each network and its capabilities, and offers a wallet switch. The switch
+ *      is deliberately framed as optional — assets carry their own chainId and reads fan out
+ *      across chains regardless of the connected one, so a member only needs to switch when
+ *      they SEND on a network their wallet is not currently on (and the sending surfaces
+ *      prompt for that themselves).
+ *   2. Lets the member own the route: their own RPC endpoint, a failover behind it, and any
+ *      API key their provider needs, per network (`NetworkEndpointForm`). Every read in the
+ *      app resolves through those settings (lib/network/rpcEndpoints).
  */
-function NetworkSettings() {
+function NetworkPanel() {
   const chainId = useChainId()
   const { switchChain, isPending, variables, error } = useSwitchChain()
   const networks = getSelectableNetworks()
   const pendingChainId = isPending ? variables?.chainId : null
+  const { entryFor, describe, save, reset, probe, reloadRecommended } = useRpcEndpoints()
+  const [editingChainId, setEditingChainId] = useState(null)
 
   return (
     <div className="network-settings" role="tabpanel">
       <div className="section">
         <h3>Network</h3>
         <p className="section-description">
-          Choose which network FairWins connects to. Tags show which protocol
-          features are deployed on each network so you can switch with
-          confidence — switching prompts your wallet to confirm.
+          FairWins reads every supported network at once — your assets carry their own network,
+          so you only need to switch when sending on a network your wallet is not currently on.
+          Tags show which protocol features are deployed where, and each network can run on your
+          own RPC endpoint.
         </p>
+
+        {reloadRecommended && (
+          <p className="network-reload-note" role="status">
+            Endpoint changes apply to new lookups right away. Reload the app so wallet
+            transactions use them too.
+          </p>
+        )}
 
         {error && (
           <div className="key-error" role="alert">
@@ -127,6 +149,11 @@ function NetworkSettings() {
             const isActive = net.chainId === chainId
             const features = getNetworkFeatures(net.chainId)
             const switching = pendingChainId === net.chainId
+            // Both are read during render, so a save (which re-renders through the store
+            // subscription) immediately re-describes the route.
+            const route = describe(net.chainId)
+            const entry = entryFor(net.chainId)
+            const editing = editingChainId === net.chainId
             return (
               <li
                 key={net.chainId}
@@ -230,6 +257,41 @@ function NetworkSettings() {
                     </div>
                   )}
                 </dl>
+
+                {/* Endpoint row: which route this network's reads actually take, always
+                    redacted (a provider URL routinely carries the API key in its path). */}
+                <div className="network-endpoint-row">
+                  <div className="network-endpoint-summary">
+                    <span className={`network-endpoint-source ${route.source}`}>
+                      {route.source === 'member' ? 'Your endpoint' : 'App default'}
+                    </span>
+                    <span className="network-endpoint-url">{route.primary || 'No endpoint configured'}</span>
+                    {route.failover && (
+                      <span className="network-endpoint-failover">failover {route.failover}</span>
+                    )}
+                    {route.hasAuth && <span className="network-endpoint-auth-badge">API key</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="network-endpoint-edit-btn"
+                    onClick={() => setEditingChainId(editing ? null : net.chainId)}
+                    aria-expanded={editing}
+                    aria-label={`${editing ? 'Close' : 'Edit'} ${net.name} endpoints`}
+                  >
+                    {editing ? 'Close' : 'Edit endpoints'}
+                  </button>
+                </div>
+
+                {editing && (
+                  <NetworkEndpointForm
+                    network={net}
+                    entry={entry}
+                    onSave={(next) => save(net.chainId, next)}
+                    onReset={() => reset(net.chainId)}
+                    onProbe={(next) => probe(net.chainId, next)}
+                    onCancel={() => setEditingChainId(null)}
+                  />
+                )}
               </li>
             )
           })}
@@ -246,4 +308,4 @@ function NetworkSettings() {
   )
 }
 
-export default NetworkSettings
+export default NetworkPanel
