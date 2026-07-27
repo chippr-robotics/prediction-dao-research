@@ -29,7 +29,29 @@ The set of chains a build may read.
 
 ---
 
-## 2. Membership reference chain
+## 2. Estate
+
+The platform's deployed state across the whole cohort.
+
+| Field | Type | Notes |
+|---|---|---|
+| `chainIds` | number[] | The cohort's chains — the estate is always cohort-bounded |
+| `results` | ChainReadResult[] | One per chain, for whichever contract is being read |
+
+**Rules**
+
+- The cohort is the **list of chains**; the estate is **what is deployed on them and what it says**.
+  The two are separate words because the distinction is load-bearing: a view can enumerate the
+  cohort correctly and still misreport the estate by dropping a chain it could not read.
+- "Reading the estate" means asking **every** cohort chain and reporting **all** of them —
+  including those that answered *not deployed* and those that could not be asked. A view reading one
+  chain is not reading the estate; a view reading five and silently dropping a sixth is not either.
+- The estate has no existence independent of a contract being read. There is no global "estate
+  object" — each view assembles its own for the contract it manages.
+
+---
+
+## 3. Membership reference chain
 
 The single chain that is the authority for membership.
 
@@ -50,7 +72,7 @@ build misconfiguration and must fail loudly rather than resolve.
 
 ---
 
-## 3. Chain read result
+## 4. Chain read result
 
 The outcome of reading one contract on one chain. **The central shape of this feature.**
 
@@ -101,7 +123,7 @@ The outcome of reading one contract on one chain. **The central shape of this fe
 
 ---
 
-## 4. Scoped chain
+## 5. Scoped chain
 
 The chain an operator view is currently showing.
 
@@ -120,7 +142,7 @@ The chain an operator view is currently showing.
 
 ---
 
-## 5. Per-chain authority
+## 6. Per-chain authority
 
 Whether an account holds a given role on a given contract on a given chain.
 
@@ -152,9 +174,12 @@ Environment cohort  ──contains──▶  chain IDs
         │
         ├──exactly one──▶  Membership reference chain   (membership reads + purchases)
         │
-        └──each chain──▶   Chain read result            (per contract, per view)
-                                    │
-                                    └──aggregated──▶  per-unit subtotals + partial flag
+        └──bounds──────▶   Estate                       (what is deployed on those chains)
+                              │
+                              └──each chain──▶  Chain read result   (per contract, per view)
+                                                        │
+                                                        └──aggregated──▶  per-unit subtotals
+                                                                          + partial flag
 
 Scoped chain  ──selects which──▶  Chain read result a view foregrounds
       │

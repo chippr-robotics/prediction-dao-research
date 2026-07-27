@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Polygon as the membership reference chain, and all-chains reads across the operations console
+# Specification Quality Checklist: Polygon as the membership reference chain, and all-chains reads across the operations control plane
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-27

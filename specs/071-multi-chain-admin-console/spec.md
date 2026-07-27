@@ -1,4 +1,4 @@
-# Feature Specification: Polygon as the membership reference chain, and all-chains reads across the operations console
+# Feature Specification: Polygon as the membership reference chain, and all-chains reads across the operations control plane
 
 **Feature Branch**: `071-multi-chain-admin-console`
 
@@ -59,7 +59,7 @@ retry, and never as *none*.
 
 ### User Story 2 - An operator reaches the console from wherever they are (Priority: P1)
 
-An operator holds an operator role somewhere in the estate. They open the operations console and
+An operator holds an operator role somewhere in the estate. They open the operations control plane and
 get in, and the console tells them where their authority actually lives — rather than refusing
 them because their wallet happened to be pointed at a network where they hold nothing.
 
@@ -183,7 +183,7 @@ exists to complete a purchase on any other network.
 
 **Console entry**
 
-- **FR-009**: Entry to the operations console MUST be granted when the account holds any operator role on any chain in the cohort, regardless of the connected chain.
+- **FR-009**: Entry to the operations control plane MUST be granted when the account holds any operator role on any chain in the cohort, regardless of the connected chain.
 - **FR-010**: The console MUST show, for each operator role, the network(s) on which the account holds it.
 - **FR-011**: A chain that could not be read during the entry check MUST be reported as unread and MUST NOT be counted as evidence that a role is not held.
 - **FR-012**: Entry MUST be refused when no chain reports any operator role; when no chain could be read at all, the refusal MUST say so rather than asserting the account holds nothing.
@@ -212,6 +212,7 @@ exists to complete a purchase on any other network.
 
 - **Membership reference chain**: The single chain, per environment cohort, that is the authority for membership state. One per build; not operator-configurable at runtime.
 - **Environment cohort**: The set of chains a build may read — mainnets for a mainnet build, testnets for a testnet build. Reads never cross cohorts.
+- **Estate**: The platform's deployed state across the whole cohort — every contract on every chain the build may read. Distinct from the cohort, which is the *list of chains*: the estate is *what is deployed on them and what it says*. "Reading the estate" means asking every cohort chain and reporting all of them, including the ones that answered *not deployed* and the ones that could not be asked at all. A view that reads one chain is not reading the estate; a view that reads five and silently drops a sixth is not either.
 - **Chain read result**: The outcome of reading one contract on one chain. Carries one of *read*, *not deployed*, or *unreadable*, plus the value when read and the reason when not.
 - **Scoped chain**: The chain an operator view is currently showing. Chosen by the operator, independent of the wallet's network, and unchanged by wallet network changes.
 - **Per-chain authority**: Whether an account holds a given role on a given contract on a given chain. Distinct from console entry, which is an estate-wide question.

@@ -146,8 +146,8 @@ rather than staying under `components/admin/` because non-component callers (rol
 
 ## Phase 1 Design Summary
 
-**Entities** — see [data-model.md](./data-model.md). Five: environment cohort, membership reference
-chain, chain read result, scoped chain, per-chain authority.
+**Entities** — see [data-model.md](./data-model.md). Six: environment cohort, estate, membership
+reference chain, chain read result, scoped chain, per-chain authority.
 
 **Module contracts** — see [contracts/](./contracts/). Three, each stating a rule that must hold at a
 seam rather than describing an implementation:
