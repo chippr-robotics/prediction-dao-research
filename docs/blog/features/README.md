@@ -26,6 +26,7 @@ Swap the `<link>` placeholders in each `social.md` for the live post URL at publ
 |---|--------------|------|---------|--------|
 | 01 | [Put Your Idle Crypto to Work: Staking Comes to FairWins](01-staking/blog.md) · [social](01-staking/social.md) | Finance → Earn | 065, 066 | Draft |
 | 02 | [Move It, Then Put It to Work: Bridge and Supply Come to FairWins](02-bridge-and-supply/blog.md) · [social](02-bridge-and-supply/social.md) | Finance → Transfer, Finance → Earn | 067 | Draft |
+| 03 | [Rules Your Vault Actually Enforces: Protect Goes Multi-Chain](03-protect-multi-chain-policies/blog.md) · [social](03-protect-multi-chain-policies/social.md) | Tools → Protect | 068 | Draft |
 
 ## Adding an announcement
 
