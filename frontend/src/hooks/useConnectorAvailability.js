@@ -6,11 +6,10 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useConnect, useChainId } from 'wagmi'
+import { useConnect } from 'wagmi'
 
 export function useConnectorAvailability() {
   const { connectors } = useConnect()
-  const chainId = useChainId()
   const [status, setStatus] = useState({})
   const [isChecking, setIsChecking] = useState(true)
 
@@ -37,24 +36,24 @@ export function useConnectorAvailability() {
             // Always usable: QR code / deep links need no local provider.
             next[connector.id] = { available: true }
           } else if (connector.type === 'passkey') {
-            // Passkey option only where genuinely usable (spec 041 FR-004):
-            // WebAuthn support on this device AND a network where BOTH halves of
-            // passkey support are real — a bundler to relay the UserOp and a
-            // deployed account factory to create the account. `getPasskeySupport`
-            // joins the two and names which half is missing, so a member on a
-            // network mid-rollout reads the actual reason instead of a blanket
-            // "not available".
+            // Availability here means "can this member SIGN IN", which depends on the DEVICE only
+            // (spec 041 FR-004) — a WebAuthn ceremony plus a local address derivation, needing no
+            // bundler, no EntryPoint and no RPC.
+            //
+            // It deliberately does NOT consider the active network. Doing so locked members out of
+            // their own accounts: the selected network persists, so a member who switched to a
+            // chain without a bundler came back to find the passkey option refused on the chain
+            // they were already on — and switching away required signing in first. Whether a chain
+            // can carry a transaction is a separate question, disclosed at the point of action.
             const { detectCapability } = await import('../lib/passkey/credentials')
-            const { getPasskeySupport } = await import('../config/passkeySupport')
             const capability = await detectCapability()
-            const support = getPasskeySupport(chainId)
-            if (!capability.available) {
-              next[connector.id] = { available: false, reason: capability.reason || 'Not supported on this device' }
-            } else if (!support.supported) {
-              next[connector.id] = { available: false, reason: support.reason }
-            } else {
-              next[connector.id] = { available: true }
-            }
+            next[connector.id] = capability.available
+              ? { available: true }
+              : { available: false, reason: capability.reason || 'Not supported on this device' }
+            // NOTE: `config/passkeySupport.js#getPasskeySupport` joins bundler config with the
+            // deployed factory and names which half is missing. That gate is correct for the
+            // Network tab and for disclosing why a TRANSACTION cannot be sent — but it must not
+            // gate sign-in, so it is deliberately not consulted here.
           } else {
             try {
               const provider = await connector.getProvider()
@@ -79,8 +78,9 @@ export function useConnectorAvailability() {
     return () => {
       cancelled = true
     }
+    // No chainId dep: availability is device-scoped now, so switching networks cannot change it.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- connectorsKey stands in for connectors
-  }, [connectorsKey, chainId])
+  }, [connectorsKey])
 
   const isAvailable = (connector) => status[connector.id]?.available !== false
   const unavailableReason = (connector) => status[connector.id]?.reason

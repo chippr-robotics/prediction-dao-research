@@ -27,6 +27,7 @@ vi.mock('../../../config/contracts', () => ({
 
 import { resolveAddressForCredential } from '../../../connectors/passkey'
 import { rememberCredential } from '../credentials'
+import { computeAccountAddress, publicKeyToOwnerBytes } from '../smartAccount'
 
 const ACCOUNT = '0x00000000000000000000000000000000000a11ce'
 
@@ -40,20 +41,22 @@ describe('resolveAddressForCredential', () => {
   })
 
   it('re-derives the SAME address from the remembered public key after partial data loss', async () => {
+    const publicKey = { x: '0x' + '1'.repeat(64), y: '0x' + '2'.repeat(64) }
     rememberCredential({
       credentialId: 'cred-1',
-      publicKey: { x: '0x' + '1'.repeat(64), y: '0x' + '2'.repeat(64) },
+      publicKey,
       // no cached address — simulates a partially-migrated/cleared mapping
     })
-    const publicClient = { readContract: vi.fn().mockResolvedValue(ACCOUNT) }
+    // Derivation is LOCAL now, so a dead RPC cannot stop it (that is the point: sign-in must not
+    // depend on the chain). The address must equal what the deterministic factory would return.
+    const publicClient = { readContract: vi.fn().mockRejectedValue(new Error('RPC must not be used')) }
     const out = await resolveAddressForCredential({
       credentialId: 'cred-1',
       chainId: 80002,
       deps: { publicClient },
     })
-    expect(out).toBe(ACCOUNT)
-    // Derivation queried the deterministic factory with the credential's key.
-    expect(publicClient.readContract.mock.calls[0][0].functionName).toBe('getAddress')
+    expect(out).toBe(computeAccountAddress({ ownersBytes: [publicKeyToOwnerBytes(publicKey)] }))
+    expect(publicClient.readContract).not.toHaveBeenCalled()
   })
 
   it('fails HONESTLY for an unknown credential — never invents an account', async () => {
