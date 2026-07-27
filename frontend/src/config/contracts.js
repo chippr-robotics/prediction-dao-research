@@ -152,9 +152,10 @@ const POLYGON_CONTRACTS = {
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
   // Undeployed ⇒ the Bridge surface hides and Earn → Supply shows its honest
   // per-network empty state (FR-051) — never invented availability.
-  bridgeRouter: '',
-  liquidityRouter: '',
+  bridgeRouter: '0x8064F3Cd9F8f113691B981d2B15EF85D95Abd551',
+  liquidityRouter: '0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
+  feeRouter: '0xf8161fC26172621E9fbcc6c39500Bb14b0902B35',
 }
 
 // Ethereum Classic mainnet (chainId 61) — CUSTODY ONLY. ETC hosts no FairWins wager/membership
@@ -173,32 +174,40 @@ const ETC_CONTRACTS = {
 // deployment — only the two spec-067 routers — so their maps carry just those keys and
 // every other lookup honestly resolves empty.
 const ETHEREUM_CONTRACTS = {
-  bridgeRouter: '',
-  liquidityRouter: '',
+  bridgeRouter: '0x258181DF2aa45EA3a3eAC748d6491D5e1f2675eE',
+  liquidityRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  feeRouter: '0xB9F80D6D4CfD3ecC60b63810aDF9d88931D0e3d3',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
 }
 
 const OPTIMISM_CONTRACTS = {
-  bridgeRouter: '',
-  liquidityRouter: '',
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
 }
 
 const BASE_CONTRACTS = {
-  bridgeRouter: '',
-  liquidityRouter: '',
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
 }
 
 const ARBITRUM_CONTRACTS = {
-  bridgeRouter: '',
-  liquidityRouter: '',
+  bridgeRouter: '0x1afcAC1949BD306F7D4818999f509941F2E85582',
+  liquidityRouter: '0xA273aF8ebB76d1D0Dcd55692C1f5a7db956F7EED',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   safePolicyGuardV2: '0xf18B813Ad8C01249FE904A732543A1b8E6CAfd0c',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
+  feeRouter: '0x98218248CA53Dd88159979af20172C86b94e8B29',
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
 }
 
 const NETWORK_CONTRACTS = {

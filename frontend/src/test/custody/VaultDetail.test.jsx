@@ -79,14 +79,27 @@ describe('VaultDetail', () => {
     expect(onSwitchNetwork).toHaveBeenCalledWith(63)
   })
 
-  it('offers actions again once the wallet is on the vault chain', () => {
+  // A vault is switched to from the account menu, like a recovered account — not from a
+  // vault-only button here. This asserts the button is GONE and the member is told where to go,
+  // so the two ways of becoming a vault cannot silently come back.
+  it('points at the account switcher instead of offering its own operate-as button', () => {
     const vault = {
       isSafe: true, address: A, chainId: 63, chainName: 'Mordor', owners: [A], threshold: 1,
       owner: true, onVaultChain: true,
     }
-    render(<VaultDetail vault={vault} onOperateAs={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /operate as this vault/i })).toBeInTheDocument()
+    render(<VaultDetail vault={vault} />)
+    expect(screen.queryByRole('button', { name: /operate as this vault/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/account menu next to your avatar/i)).toBeInTheDocument()
     expect(screen.queryByText(/shown read-only/i)).not.toBeInTheDocument()
+  })
+
+  it('says so when the vault is already the acting account', () => {
+    const vault = {
+      isSafe: true, address: A, chainId: 63, chainName: 'Mordor', owners: [A], threshold: 1,
+      owner: true, onVaultChain: true,
+    }
+    render(<VaultDetail vault={vault} isActiveIdentity />)
+    expect(screen.getByText(/you are acting as this vault/i)).toBeInTheDocument()
   })
 
   it('explains an unreachable chain without implying the vault changed', () => {

@@ -142,9 +142,20 @@ export function loadAddressBook(ownerAddress) {
  * @param {string} ownerAddress
  * @param {AddressBook} book
  */
+/** Event fired after any write, so views holding derived copies can re-read. */
+export const ADDRESS_BOOK_CHANGED = 'fairwins:address-book-changed'
+
 export function saveAddressBook(ownerAddress, book) {
   if (!ownerAddress) throw new Error('Wallet address is required')
   saveUserPreference(ownerAddress, STORAGE_KEY, { ...book, updatedAt: Date.now() }, true)
+  // Spec 068 — the book is no longer read only by the address-book screen: a vault's NAME lives
+  // here, so the vault list and account switcher derive from it too. Announcing writes at the one
+  // place they happen means renaming a vault updates it everywhere, rather than everywhere except
+  // wherever the member happens to be looking. Cheap, and it cannot be forgotten by a new caller
+  // the way a per-component refresh call would be.
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(ADDRESS_BOOK_CHANGED, { detail: { ownerAddress } }))
+  }
 }
 
 // ---------------------------------------------------------------------------

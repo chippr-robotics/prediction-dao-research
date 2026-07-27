@@ -26,6 +26,8 @@ import {
   removeVaultReference,
 } from '../lib/custody/vaultReferences'
 import { readPolicy, summarizeRules } from '../lib/custody/policy'
+import { ensureVaultContact, vaultDisplayName } from '../lib/custody/vaultAddressBook'
+import { loadAddressBook, ADDRESS_BOOK_CHANGED } from '../lib/addressBook/addressBookStore'
 import { getPolicyStatus as getPolicyStatusV2, readPolicyV2 } from '../lib/custody/policyV2'
 
 /**
@@ -86,6 +88,9 @@ export function useCustodyVaults() {
       // Every saved vault, on every chain (FR-003) — the list is the member's whole custody estate,
       // not a view of the connected network.
       const refs = loadVaultReferences(address)
+      // Spec 068 — the NAME comes from the address book, because that is where the member renames
+      // it. The reference's own label is only a fallback for a vault the book has not seen yet.
+      const book = loadAddressBook(address)
       const enriched = await Promise.all(
         refs.map(async (ref) => {
           const refChainId = Number(ref.chainId)
@@ -101,6 +106,7 @@ export function useCustodyVaults() {
               ...ref,
               ...identity,
               ...state,
+              label: vaultDisplayName(book, { ...ref, chainId: refChainId }),
               chainId: refChainId,
               onVaultChain,
               reachable: true,
@@ -113,6 +119,7 @@ export function useCustodyVaults() {
             return {
               ...ref,
               ...identity,
+              label: vaultDisplayName(book, { ...ref, chainId: refChainId }),
               chainId: refChainId,
               onVaultChain,
               reachable: false,
@@ -132,6 +139,15 @@ export function useCustodyVaults() {
 
   useEffect(() => {
     refresh()
+  }, [refresh])
+
+  // A vault's name lives in the address book, so a rename there must show up here. Without this the
+  // list keeps the old name until something unrelated happens to re-run the effect.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onChanged = () => refresh()
+    window.addEventListener(ADDRESS_BOOK_CHANGED, onChanged)
+    return () => window.removeEventListener(ADDRESS_BOOK_CHANGED, onChanged)
   }, [refresh])
 
   /**
@@ -187,6 +203,9 @@ export function useCustodyVaults() {
         { chainId: Number(picked.chainId), address: picked.address, label, role: owner ? 'owner' : 'watch' },
         nowMs || Date.now(),
       )
+      // The vault joins the address book, so it is renamed and managed like any other address.
+      // Non-destructive: an entry the member already renamed is left alone.
+      ensureVaultContact(address, { ...picked, label })
       await refresh()
       setActiveAddress(picked.address)
       return { ...picked, owner, matches, unreachable }
@@ -220,6 +239,7 @@ export function useCustodyVaults() {
         { chainId: Number(chainId), address: vaultAddress, label, role: 'owner' },
         nowMs || Date.now(),
       )
+      ensureVaultContact(address, { address: vaultAddress, chainId: Number(chainId), label })
       await refresh()
       setActiveAddress(vaultAddress)
       return { address: vaultAddress, txHash }

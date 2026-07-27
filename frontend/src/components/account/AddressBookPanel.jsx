@@ -12,6 +12,8 @@ import { useAddressBook } from '../../hooks/useAddressBook'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { getNetwork, getSelectableNetworks, getCurrentChainId } from '../../config/networks'
 import { addressKey, listEntries } from '../../lib/addressBook/addressBookStore'
+import { isVaultAddress } from '../../lib/custody/vaultAddressBook'
+import { loadVaultReferences } from '../../lib/custody/vaultReferences'
 function IconPlus() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="ab-icon">
@@ -32,6 +34,9 @@ function networkName(chainId) {
 
 export default function AddressBookPanel({ address }) {
   const wallet = useWallet()
+  // Spec 068 — the member's own vaults, used only to badge matching entries. Nothing is stored on
+  // the entry itself: the book's loader rebuilds a fixed field list, so a type key would be lost.
+  const vaultRefs = useMemo(() => (address ? loadVaultReferences(address) : []), [address])
   const activeChainId = wallet?.chainId ?? getCurrentChainId()
   const {
     book,
@@ -154,6 +159,8 @@ export default function AddressBookPanel({ address }) {
               contact={contact}
               getStatus={getStatus}
               networkName={networkName}
+              // Spec 068 — badge entries that are the member's own multisig vaults.
+              isVault={contact.addresses.some((a) => isVaultAddress(vaultRefs, a.address, a.chainId))}
               onEdit={(c) => setEditing({ contact: c })}
               onDeleteContact={deleteContact}
             />
