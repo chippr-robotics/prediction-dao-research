@@ -19,9 +19,10 @@ relies on:
 - **ERC-1271** with a per-account replay-safe hash — how passkey accounts
   sign spec-035 intents and USDC EIP-3009 authorizations (ERC-7598).
 - **`executeBatch`** — approve+act in ONE user ceremony (FR-016).
-- **WebAuthnSol**: RIP-7212 precompile first (3,450 gas on Polygon/Amoy),
-  FreshCryptoLib Solidity fallback elsewhere — the same bytecode serves the
-  deferred ETC/Mordor increment (FR-022).
+- **WebAuthnSol**: RIP-7212 precompile first (3,450 gas), FreshCryptoLib
+  Solidity fallback elsewhere — the same bytecode serves every network. The
+  precompile is live on every supported chain except ETC and Mordor (see
+  [Network scope](#network-scope)), which pay the FCL path's higher gas.
 - **UUPS upgradable by its owners only** — FairWins holds no authority over
   instances (plan.md Complexity Tracking).
 
@@ -125,10 +126,57 @@ authoritative.
 
 ## Network scope
 
-Polygon (137) + **Amoy (80002, the passkey validation network)**. ETC/Mordor
-are a deferred increment: self-deploy the EntryPoint + factory (same salt →
-same addresses), WebAuthnSol falls back to FCL, bundler must be self-hosted.
-The deploy script hard-fails on any cross-network factory divergence.
+Every EVM network FairWins supports **can** host the passkey stack. That was not
+an assumption — `node scripts/ops/verify-passkey-support.js` probes each chain
+and checks, by **bytecode hash** (not merely "something has code here"), that the
+canonical prerequisites are the real ones:
+
+| Network | EntryPoint v0.6 | CREATE2 proxy | RIP-7212 | `accountFactory` | Status |
+| --- | --- | --- | --- | --- | --- |
+| Polygon 137 | ✓ | ✓ | ✓ | ✓ deployed | ready — needs `VITE_BUNDLER_URLS_POLYGON` |
+| Polygon Amoy 80002 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Ethereum 1 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Optimism 10 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Base 8453 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Arbitrum One 42161 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Sepolia 11155111 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Hoodi 560048 | ✓ | ✓ | ✓ | ✗ | deployable |
+| Ethereum Classic 61 | ✓ | ✓ | **✗** | ✗ | deployable (FCL fallback) |
+| Mordor 63 | ✓ | ✓ | **✗** | ✗ | deployable (FCL fallback) |
+
+Two things this corrected. **ETC/Mordor were never blocked**: the "deferred
+increment" note said they lacked a canonical EntryPoint, and they do not — v0.6
+is live at the canonical address on both, byte-identical to Polygon's. What they
+genuinely lack is the RIP-7212 precompile, so P-256 verification runs
+WebAuthnSol's inlined FCL path — correct, but materially more gas per UserOp.
+Weigh that before pointing a sponsoring paymaster at the ETC family. And **Amoy,
+described as "the passkey validation network", has no `accountFactory`** — only
+Polygon 137 has ever had one deployed.
+
+Re-run the probe rather than trusting this table; it is a snapshot.
+
+### Enabling a network
+
+Two ops steps, **no code change** — every EVM network already declares a
+`passkey` block in `config/networks.js`:
+
+1. **Deploy the stack** —
+   `npx hardhat run scripts/deploy/deploy-account-stack.js --network <net>`
+   then `npm run sync:frontend-contracts -- --network <net> --chainId <id>`.
+   The script hard-fails on any cross-network factory divergence (FR-023), so the
+   account address stays chain-independent.
+2. **Point at a bundler** — set `VITE_BUNDLER_URLS_<NET>` and rebuild. Optionally
+   `VITE_SPONSOR_PAYMASTER_<NET>` for sponsored gas, which additionally needs a
+   funded paymaster deposit on that chain (`docs/runbooks/paymaster-operations.md`).
+
+Support is the **conjunction** of those two steps, and
+`config/passkeySupport.js#isPasskeySupported` is the single gate that evaluates
+it — a bundler with no factory fails at account creation, a factory with no
+bundler fails at submit, and each state names itself in the connect UI rather
+than showing a dead button. `capabilities.passkeyAccounts` sees only the config
+half (networks.js deliberately does not import contracts.js), so **UI surfaces
+must gate on `isPasskeySupported`, not on the capability flag**.
+`smartAccount.js#requirePasskeySupport` re-checks at the transaction boundary.
 
 ## Complexity-tracking exceptions (plan.md)
 

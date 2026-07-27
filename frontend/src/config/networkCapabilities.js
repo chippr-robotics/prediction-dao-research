@@ -11,6 +11,7 @@
 import { getContractAddressForChain } from './contracts'
 import { getNetwork } from './networks'
 import { isBitcoinNetworkId } from './bitcoinNetworks'
+import { isPasskeySupported } from './passkeySupport'
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
@@ -69,6 +70,15 @@ export const NETWORK_FEATURES = [
     label: 'Token Swap',
     description: 'In-app token swaps via the network’s DEX (Uniswap or ETCswap).',
     deployed: (chainId) => Boolean(getNetwork(chainId)?.capabilities?.dex),
+  },
+  {
+    key: 'passkeyAccounts',
+    label: 'Passkey Accounts',
+    description: 'Sign in and transact with a passkey instead of a browser wallet.',
+    // Both halves, via the shared gate: a bundler to relay the UserOp AND a deployed account
+    // factory. Reporting the network-config flag alone would tag a chain "deployed" on the
+    // strength of an env var (spec 041 FR-004).
+    deployed: (chainId) => isPasskeySupported(chainId),
   },
   {
     key: 'clearpath',

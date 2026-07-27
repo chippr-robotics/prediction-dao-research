@@ -87,12 +87,14 @@ async function main() {
     );
   }
 
-  // EntryPoint: canonical where present; on chains without it (future ETC/Mordor
-  // increment) it must be self-deployed at the same address BEFORE this script runs.
+  // EntryPoint: canonical where present; on a chain without it, it must be self-deployed at the
+  // same address BEFORE this script runs. `scripts/ops/verify-passkey-support.js` reports which
+  // networks are in that position — as of the last sweep, none of the ten supported EVM networks
+  // are (ETC and Mordor included, contrary to the original "deferred increment" note).
   if ((await ethers.provider.getCode(ENTRYPOINT_V06)) === "0x") {
     throw new Error(
       `EntryPoint v0.6 not found at ${ENTRYPOINT_V06} on chain ${chainId}. ` +
-        `Self-deploy the canonical EntryPoint first (deferred ETC/Mordor increment, spec 041 FR-022).`
+        `Self-deploy the canonical EntryPoint first (spec 041 FR-022).`
     );
   }
 
