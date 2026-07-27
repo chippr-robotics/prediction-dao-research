@@ -25,7 +25,9 @@ import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
 import PortalNav from './ui/PortalNav'
+import NavIcon from './nav/NavIcon'
 import SectionIconNav from './nav/SectionIconNav'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import './AdminPanel.css'
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -124,7 +126,11 @@ function AdminPanel() {
   const canOpenFees = isAdmin || isFeeAdmin
 
   const [activeTab, setActiveTab] = useState('overview')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // The section rail collapses to an icon-only strip rather than disappearing.
+  // It starts collapsed on mobile, where expanded it covers the content it is
+  // navigating; on desktop it opens alongside and starts expanded.
+  const isMobile = useIsMobile()
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile)
   const [pendingTx, setPendingTx] = useState(false)
   const [contractState, setContractState] = useState({
     isPaused: false,
@@ -372,6 +378,23 @@ function AdminPanel() {
   })
   const adminTabs = flattenNavGroups(navGroups)
 
+  // On mobile the expanded rail sits ON TOP of the view it just switched to, so
+  // picking a section collapses it back to icons. On desktop it stays open.
+  const handleSelectTab = useCallback((id) => {
+    setActiveTab(id)
+    if (isMobile) setSidebarOpen(false)
+  }, [isMobile])
+
+  // Escape closes the overlay rail, matching the global nav drawer.
+  useEffect(() => {
+    if (!sidebarOpen || !isMobile) return
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sidebarOpen, isMobile])
+
   if (!hasAdminAccess) {
     return (
       <div className="admin-panel">
@@ -428,29 +451,42 @@ function AdminPanel() {
       </header>
 
       <div className={`portal-shell admin-portal-shell ${sidebarOpen ? '' : 'portal-collapsed'}`}>
-        <aside className="portal-sidebar admin-portal-sidebar">
-          <PortalNav
-            groups={navGroups}
-            activeId={activeTab}
-            onSelect={setActiveTab}
-            ariaLabel="Operations sections"
+        {/* Only the mobile rail overlays anything, so only it has something to dismiss. */}
+        {isMobile && sidebarOpen && (
+          <button
+            type="button"
+            className="portal-sidebar-backdrop"
+            aria-label="Close sections menu"
+            onClick={() => setSidebarOpen(false)}
           />
-        </aside>
+        )}
 
-        <div className="portal-main">
-          <div className="admin-portal-topbar">
+        <aside className="portal-sidebar admin-portal-sidebar">
+          <div className="portal-sidebar-header">
             <button
               type="button"
               className="portal-sidebar-toggle"
               aria-expanded={sidebarOpen}
-              aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              aria-controls="admin-portal-nav"
+              aria-label={sidebarOpen ? 'Collapse sections menu' : 'Expand sections menu'}
               onClick={() => setSidebarOpen((o) => !o)}
             >
-              <span aria-hidden="true">{'☰'}</span>
-              <span className="portal-sidebar-toggle-label">Menu</span>
+              <NavIcon name="menu" size={20} />
             </button>
+            {sidebarOpen && <span className="portal-sidebar-title">Sections</span>}
           </div>
 
+          <PortalNav
+            id="admin-portal-nav"
+            groups={navGroups}
+            activeId={activeTab}
+            onSelect={handleSelectTab}
+            ariaLabel="Operations sections"
+            collapsed={!sidebarOpen}
+          />
+        </aside>
+
+        <div className="portal-main">
           <main className="admin-panel-content">
         {/* Overview */}
         {activeTab === 'overview' && (

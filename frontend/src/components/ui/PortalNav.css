@@ -8,27 +8,44 @@
  */
 
 .portal-shell {
+  --portal-rail-expanded: 216px;
+  --portal-rail-collapsed: 64px;
   display: flex;
   align-items: stretch;
   gap: 0;
   min-height: 320px;
+  position: relative;
 }
 
 .portal-sidebar {
-  flex: 0 0 200px;
+  flex: 0 0 var(--portal-rail-expanded);
+  width: var(--portal-rail-expanded);
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-color, var(--color-border, #e5e7eb));
   background: var(--bg-secondary, var(--color-surface-secondary, #f9fafb));
+  overflow-x: hidden;
+  transition: flex-basis 0.22s ease, width 0.22s ease;
 }
 
+/* Collapsed is an ICON RAIL, not a hidden sidebar: every section stays one
+   click away and the panel visibly slides open from the left edge rather than
+   appearing out of nothing. */
 .portal-shell.portal-collapsed .portal-sidebar {
-  display: none;
+  flex-basis: var(--portal-rail-collapsed);
+  width: var(--portal-rail-collapsed);
 }
 
 .portal-main {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Backdrop for the mobile overlay rail. The host only renders it on mobile;
+   this keeps it inert if a wider surface ever renders one, since expanding the
+   rail there pushes the content across instead of covering it. */
+.portal-sidebar-backdrop {
+  display: none;
 }
 
 .portal-nav {
@@ -121,13 +138,106 @@
   outline-offset: -2px;
 }
 
-/* Sidebar show/hide toggle (☰) */
+/* ---------------------------------------------------------------------------
+   Collapsed (icon-only) rail
+   --------------------------------------------------------------------------- */
+
+.portal-nav--collapsed {
+  padding: 8px 0;
+  align-items: center;
+}
+
+.portal-nav--collapsed .portal-nav-item {
+  width: 44px;
+  justify-content: center;
+  gap: 0;
+  padding: 7px 0;
+  border-left-width: 0;
+}
+
+/* Visually hidden, NOT removed: the button keeps its accessible name, so the
+   collapsed rail reads identically to the expanded one for assistive tech. */
+.portal-nav--collapsed .portal-nav-item-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The active marker moves off the left border (there is no room for a 3px rule
+   plus a centred 30px tile) and onto the tile itself. */
+.portal-nav--collapsed .portal-nav-item.active {
+  background: transparent;
+}
+
+.portal-nav--collapsed .portal-nav-item.active .portal-nav-item-icon {
+  box-shadow: 0 0 0 1px var(--brand-primary, var(--color-primary, #36B37E));
+}
+
+.portal-nav-item-initial {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Group headings collapse to a hairline: the grouping stays legible without a
+   200px word in a 64px rail. */
+.portal-nav--collapsed .portal-nav-group-label {
+  width: 32px;
+  height: 0;
+  padding: 0;
+  margin: 6px 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+  color: transparent;
+}
+
+.portal-nav--collapsed .portal-nav-group-label:first-child {
+  display: none;
+}
+
+/* Sidebar header — the hamburger sits at the TOP LEFT of the rail, in both
+   states, so the control that opens the panel never moves. */
+.portal-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border-color, var(--color-border, #e5e7eb));
+}
+
+.portal-shell.portal-collapsed .portal-sidebar-header {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.portal-sidebar-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-tertiary, var(--color-text-secondary, #8895A1));
+}
+
+/* Sidebar show/hide toggle (hamburger) */
 .portal-sidebar-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   gap: 8px;
-  padding: 8px 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: 1px solid var(--border-color, var(--color-border, #e5e7eb));
   border-radius: 8px;
   background: var(--bg-secondary, var(--color-surface, #fff));
@@ -135,7 +245,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .portal-sidebar-toggle:hover {
@@ -148,7 +258,46 @@
 }
 
 @media (max-width: 768px) {
+  /* Mobile: expanding must not squeeze the content column to nothing, so the
+     open rail floats OVER it. Sticky (not fixed) keeps it inside the panel —
+     it never covers the app header — while following the page as the operator
+     scrolls, so the hamburger is always reachable on a long view. */
+  .portal-shell {
+    --portal-rail-expanded: 232px;
+    --portal-rail-collapsed: 52px;
+  }
+
   .portal-sidebar {
-    flex-basis: 150px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    z-index: 30;
+    max-height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The rail keeps taking only its COLLAPSED width in the flex line, so opening
+     it slides the panel across the content rather than reflowing the page. */
+  .portal-shell:not(.portal-collapsed) .portal-sidebar {
+    margin-right: calc(var(--portal-rail-collapsed) - var(--portal-rail-expanded));
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .portal-shell:not(.portal-collapsed) .portal-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-sidebar {
+    transition: none;
   }
 }
