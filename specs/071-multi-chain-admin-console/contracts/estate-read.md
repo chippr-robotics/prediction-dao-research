@@ -45,7 +45,7 @@ export function readAuthority({ provider, address, account, roles }): Promise<Pe
    This fixes a live spec-069 violation being carried by the current helper (research R2). The
    existing code bypasses `resolveRpcEndpoints`, so a member's configured endpoint override and its
    failover are ignored for every read the Bridge and Supply tabs make. Generalizing the helper
-   without fixing it would spread that bug to all fifteen views.
+   without fixing it would spread that bug to the fifteen remaining views.
 
    The one permitted shortcut is reusing the wallet's own provider when the scoped chain *is* the
    connected chain — cheaper, and already the member's chosen transport.

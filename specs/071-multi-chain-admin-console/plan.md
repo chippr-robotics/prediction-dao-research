@@ -19,7 +19,7 @@ authority verified against that chain's own contract.
 
 The approach is **generalization, not invention**. The Bridge and Supply tabs (spec 067 FR-050)
 already do all of this for two views; their helper module moves to `lib/`, gets its spec-069
-provider bug fixed (research R2), and the other thirteen views adopt it.
+provider bug fixed (research R2), and the fifteen remaining views adopt it.
 
 ## Technical Context
 
@@ -51,7 +51,8 @@ the connected chain.
 - Reads must never cross the testnet/mainnet cohort boundary (constitution III, FR-002).
 - Balances in different units are never summed (FR-022).
 
-**Scale/Scope**: 15 operator views (2 already converted), 2 membership resolver functions, 1 purchase
+**Scale/Scope**: 17 operator views — the tab ids in `components/admin/adminNav.js` — of which 2
+(Bridge, Supply) are already converted, leaving 15. Plus 2 membership resolver functions, 1 purchase
 flow, ~6,000 lines of admin component code within reach. Cohort size 5–6 chains.
 
 ## Constitution Check

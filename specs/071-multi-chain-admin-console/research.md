@@ -61,7 +61,7 @@ export function readProviderFor(chainId, walletChainId, walletProvider) {
 `getRpcUrlForChain(chainId)`."* The consequence is real, not stylistic — this path bypasses
 `resolveRpcEndpoints`, so a member's configured endpoint override and its failover are ignored for
 every read the Bridge and Supply tabs make. Today that affects two tabs. Generalizing this helper
-to all fifteen views without fixing it would propagate the bug across the whole console.
+to the fifteen remaining views without fixing it would propagate the bug across the whole console.
 
 The shared helper therefore calls `getReadProvider(chainId)` and keeps only the
 "reuse the wallet's provider when the scope is the connected chain" optimization.
@@ -196,7 +196,10 @@ This is a gate the plan's Constitution Check treats as **passing**, not as a jus
 
 ---
 
-## R8 — Conversion order for the fifteen operator views
+## R8 — Conversion order for the fifteen remaining operator views
+
+The console has **17** views (`components/admin/adminNav.js` tab ids). Bridge and Supply are already
+converted, leaving **15**.
 
 **Decision**: convert in this order, so each step is independently shippable and the highest-risk
 surface is not first:
@@ -234,7 +237,7 @@ throughout, so every later step has a worked example to match rather than a desi
 
 **Rationale**: constitution principle II requires tests alongside behaviour. The existing
 `AdminBridgeTab` / `AdminSupplyTab` suites (27 and 28 tests) already cover exactly these cases for
-the two converted tabs and are the template for the other thirteen.
+the two converted tabs and are the template for the fifteen remaining.
 
 ---
 

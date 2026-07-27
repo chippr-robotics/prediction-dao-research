@@ -191,7 +191,7 @@ exists to complete a purchase on any other network.
 **All-chains reads across operator views**
 
 - **FR-013**: Every operator view MUST be able to present the control state of every chain in the cohort where the contract it manages can exist, independent of the connected chain.
-- **FR-014**: Each view MUST distinguish, per chain, at least these states: *read successfully*, *contract not deployed on this chain*, and *chain could not be read*. A chain that could not be read MUST NOT render as zero, empty, or absent.
+- **FR-014**: Each view MUST distinguish, per chain, exactly these three states: *read successfully*, *contract not deployed on this chain*, and *chain could not be read*. There is no fourth state, and the latter two carry no value — so no consumer has anywhere to put a default. A chain that could not be read MUST NOT render as zero, empty, or absent.
 - **FR-015**: A view MUST NOT block on the slowest chain; each chain's state MUST render as it resolves.
 - **FR-016**: A view's scoped chain MUST NOT change implicitly when the wallet changes network.
 

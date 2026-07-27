@@ -44,7 +44,7 @@ depends on this phase.** No user-visible change lands here.
 
 ### Cohort and reference chain
 
-- [ ] T003 Add `MEMBERSHIP_REFERENCE_CHAIN_ID`, `membershipChainId()`, `cohortChainIds()`, and `isInCohort(chainId)` to `frontend/src/config/networks.js`, deriving the reference chain from the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair selected by `NETWORKS[PRIMARY_CHAIN_ID].isTestnet` — no second literal `137` (research R1, contracts/membership-chain.md)
+- [ ] T003 Add `MEMBERSHIP_REFERENCE_CHAIN_ID`, `membershipChainId()`, `cohortChainIds()`, and `isInCohort(chainId)` to `frontend/src/config/networks.js`, deriving the reference chain from the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair selected by `NETWORKS[PRIMARY_CHAIN_ID].isTestnet` — no second literal `137` (FR-001, FR-002; research R1, contracts/membership-chain.md)
 - [ ] T004 Make a reference chain outside the current cohort fail loudly at module load rather than resolve, in `frontend/src/config/networks.js` (contracts/membership-chain.md rule 3)
 - [ ] T005 [P] Test the resolver in `frontend/src/test/membershipChain.test.js`: returns 137 under a mainnet build, 80002 under a testnet build, and never a mainnet id under a testnet build (SC-008)
 
@@ -58,11 +58,11 @@ depends on this phase.** No user-visible change lands here.
 
 - [ ] T009 Create `frontend/src/lib/chains/estate.js` by moving `readProviderFor`, the network-roster helper, and `readRouterAuthority` out of `frontend/src/components/admin/liquidityAdminCommon.js`, preserving their doc-comments — they are the design (research R2)
 - [ ] T010 **Fix the spec-069 violation while moving**: `readProviderFor` in `frontend/src/lib/chains/estate.js` obtains its provider from `getReadProvider(chainId)` instead of hand-building from `NETWORKS[chainId].rpcUrl`, keeping only the reuse-the-wallet-provider-for-the-connected-chain shortcut (research R2)
-- [ ] T011 Bound the roster to the cohort: `estateNetworks(capability)` in `frontend/src/lib/chains/estate.js` filters through `cohortChainIds()`, and still lists chains that could carry the capability but have no FairWins deployment (contracts/estate-read.md rule 7)
+- [ ] T011 Bound the roster to the cohort: `estateNetworks(capability)` in `frontend/src/lib/chains/estate.js` filters through `cohortChainIds()`, and still lists chains that could carry the capability but have no FairWins deployment (FR-002, FR-013; contracts/estate-read.md rule 7)
 - [ ] T012 Add `readAcrossEstate({chainIds, addressFor, read, walletChainId, walletProvider})` to `frontend/src/lib/chains/estate.js` — concurrent, never rejects, one dead endpoint becomes `unreadable` without failing the batch (FR-015)
 - [ ] T013 Generalize `readRouterAuthority` to `readAuthority({provider, address, account, roles})` in `frontend/src/lib/chains/estate.js` for any AccessControl contract, keeping `readable: false` ⇒ unknown-not-denied and `deployed: false` ⇒ definite denial (research R4)
 - [ ] T014 Turn `frontend/src/components/admin/liquidityAdminCommon.js` into a re-export of the promoted helpers so `BridgeTab`/`SupplyTab` are untouched
-- [ ] T015 [P] Test the helper in `frontend/src/test/lib/chains/estate.test.js`: a rejected read yields `unreadable` with a reason while siblings resolve; the roster never contains an out-of-cohort chain
+- [ ] T015 [P] Test the helper in `frontend/src/test/lib/chains/estate.test.js`: a rejected read yields `unreadable` with a reason while siblings resolve; a slow chain does not delay its siblings' results, which are observable before it settles (FR-015); the roster never contains an out-of-cohort chain
 - [ ] T016 [P] Source-level test in `frontend/src/test/lib/chains/estateProvider.test.js` asserting `estate.js` reaches providers via `getReadProvider` and contains no `NETWORKS[...].rpcUrl` access, so the spec-069 bypass cannot return
 - [ ] T017 **Checkpoint**: run `npx vitest run src/test/admin/AdminBridgeTab.test.jsx src/test/admin/AdminSupplyTab.test.jsx` — both suites MUST pass **unmodified**. If either needed changing, the helper was rewritten rather than moved; revert and redo T009–T014.
 
@@ -128,7 +128,7 @@ declining buys nothing, and that no path completes a purchase elsewhere.
 - [ ] T038 [US5] Offer a wallet network switch to the reference chain, and ensure declining leaves no purchase attempted on any chain (FR-007, acceptance 2)
 - [ ] T039 [US5] Evaluate payment-token sufficiency against the reference chain's balance only, stating any shortfall in that chain's payment token, in `frontend/src/components/ui/PremiumPurchaseModal.jsx` (FR-008)
 - [ ] T040 [US5] Audit `frontend/src/hooks/useTierPrices.js` and `frontend/src/hooks/useVouchers.js` for connected-chain assumptions in the purchase path and route them to the reference chain
-- [ ] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx`: purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager
+- [ ] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx`: purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager; **and the absence SC-006 claims** — drive the flow on *each* non-reference cohort chain and assert every built call still targets the reference chain's address, so "no path completes a purchase elsewhere" is verified rather than asserted in prose (mirrors the absence assertion T067 makes for FR-020)
 
 **Checkpoint**: US1 + US5 together close the read/write loop — a purchase is now readable from
 everywhere.
@@ -158,44 +158,46 @@ pattern for Phase 7.
 
 ## Phase 7: User Story 4 — Every operator view spans the estate (P2)
 
-**Goal**: The remaining thirteen views honour [contracts/view-scope.md](./contracts/view-scope.md).
+**Goal**: Thirteen of the fifteen remaining views honour
+[contracts/view-scope.md](./contracts/view-scope.md). The other two — Overview and Treasury —
+converted in Phase 6, so "thirteen" here is this phase's share, not the whole remainder.
 
 **Independent test**: Per view — connect on chain A, scope to B, confirm B's state renders, writes
 are withheld with a stated reason, and the scope does **not** follow the wallet when it switches.
 
 ### Shared scope control
 
-- [ ] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-016)
+- [ ] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-013, FR-016)
 - [ ] T051 [US4] Add a shared per-chain state renderer (read / not deployed / unreadable + reason + retry) so no view invents its own rendering of the three states (FR-014)
 - [ ] T052 [US4] Add a shared write-gate presenter that states "switch to <chain> to act" before signature and "role not held here" when authority is read and denied, leaving controls offered with authority unconfirmed when the read failed (FR-018, FR-019, research R4)
 - [ ] T053 [P] [US4] Test the three shared pieces in `frontend/src/test/admin/adminScopeControls.test.jsx`, including axe-clean rendering and per-chain status conveyed by text not colour alone (constitution V)
 
 ### Read-mostly views
 
-- [ ] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain
+- [ ] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
 - [ ] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
 - [ ] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
 - [ ] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
 
 ### Write-heavy views
 
-- [ ] T058 [P] [US4] Convert the Tiers view in `frontend/src/components/AdminPanel.jsx` — only the reference chain carries a MembershipManager on the mainnet cohort, so the rest must show *not deployed*, not an empty form
-- [ ] T059 [P] [US4] Convert the Members view in `frontend/src/components/AdminPanel.jsx`
+- [ ] T058 [US4] Convert the Tiers view in `frontend/src/components/AdminPanel.jsx` — only the reference chain carries a MembershipManager on the mainnet cohort, so the rest must show *not deployed*, not an empty form (**not** `[P]`: shares `AdminPanel.jsx` with T059/T064/T066/T068)
+- [ ] T059 [US4] Convert the Members view in `frontend/src/components/AdminPanel.jsx` (**not** `[P]`: same file as T058/T064/T066/T068)
 - [ ] T060 [P] [US4] Convert `frontend/src/components/admin/FeesTab.jsx`; fee rates are genuinely per chain and must not be shown as one global rate
 - [ ] T061 [P] [US4] Convert `frontend/src/components/admin/StakingTab.jsx`
 - [ ] T062 [P] [US4] Convert `frontend/src/components/admin/DenyListAdmin.jsx`
 - [ ] T063 [P] [US4] Convert `frontend/src/components/admin/CallsignRegistryAdmin.jsx`
 - [ ] T064 [US4] Convert the Admin Roles view in `frontend/src/components/AdminPanel.jsx` so a grant names the chain it lands on — grants are already per contract **per chain** on-chain, and the view currently implies otherwise
-- [ ] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly
+- [ ] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly; **the write confirmation names the chain it targets** (FR-017 — the only write requirement with no other test); and the view is **axe-clean** in every per-chain state, matching the `is axe-clean fully loaded` case the existing `AdminBridgeTab`/`AdminSupplyTab` suites already carry (constitution V)
 
 ### Incident-response views (converted last, on a proven pattern — research R8)
 
-- [ ] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it
+- [ ] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it (FR-017)
 - [ ] T067 [US4] Assert there is **no** cross-chain "pause everywhere" control (FR-020) — an implicit multi-chain killswitch is exactly what this feature must not create
-- [ ] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it
+- [ ] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it (FR-017)
 - [ ] T069 [P] [US4] Test the incident paths in `frontend/src/test/admin/adminIncidentEstate.test.jsx`, including the absence of any multi-chain action
 
-**Checkpoint**: all fifteen views honour one contract; the console no longer mixes estate-wide and
+**Checkpoint**: all seventeen views honour one contract; the console no longer mixes estate-wide and
 wallet-scoped views.
 
 ---

@@ -1,7 +1,13 @@
 # Contract: What every converted operator view must honour
 
-**Applies to**: all 15 views of the operations console. Bridge and Supply already comply and are the
-reference implementation.
+**Applies to**: all **17** views of the operations control plane — the tab ids in
+`components/admin/adminNav.js`. Bridge and Supply already comply **with this scope contract** and are
+the reference implementation, leaving **15** to convert.
+
+Note the scope of that compliance: Bridge and Supply satisfy every clause below, but their reads
+currently reach the chain through a hand-built provider that bypasses the member's endpoint
+override (research R2). Task T010 fixes that while promoting the helper, so their read *behaviour*
+does change even though their scope behaviour does not.
 
 This is a behavioural contract, not an API. A view "is converted" when it satisfies every clause
 below and has tests proving it.
