@@ -8,7 +8,11 @@
   "polymarketCTF": null,
   "contracts": {
     "feeRouter": "0xB9F80D6D4CfD3ecC60b63810aDF9d88931D0e3d3",
-    "feeRouterImpl": "0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00"
+    "feeRouterImpl": "0x5cCd55D62Ce7Df730c39543B332dD8d6054B5d00",
+    "bridgeRouter": "0x258181DF2aa45EA3a3eAC748d6491D5e1f2675eE",
+    "bridgeRouterImpl": "0xcA277Cc3485Da12771d6171a9D0A894B8DD159f8",
+    "liquidityRouter": "0x1afcAC1949BD306F7D4818999f509941F2E85582",
+    "liquidityRouterImpl": "0x41ba6bca216bd6A4c5a0bf8F9B2d682EC0a879d5"
   },
   "mocks": null,
   "constructorArgs": {},
