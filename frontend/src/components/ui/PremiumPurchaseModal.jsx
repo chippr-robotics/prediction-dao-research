@@ -7,6 +7,8 @@ import { useTierPrices } from '../../hooks/useTierPrices'
 import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { getUserTierOnChain, buildMembershipPurchaseCalls } from '../../utils/blockchainService'
+import { membershipChainId } from '../../config/networks'
+import { networkName } from '../../lib/chains/estate'
 import { ensurePasskeyEncryptionKeys } from '../../lib/passkey/encryption'
 import { buildRegisterKeyCalls, hasRegisteredKey } from '../../utils/keyRegistryService'
 import { readSession } from '../../connectors/passkey'
@@ -130,6 +132,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
 
   const [userCurrentTier, setUserCurrentTier] = useState(0)
   const [isLoadingTier, setIsLoadingTier] = useState(false)
+  // FR-004: false ⇒ the reference chain would not answer, so the current tier is UNKNOWN.
+  // Purchase is refused in that state rather than guessing (FR-005).
+  const [tierReadable, setTierReadable] = useState(true)
+  const [tierRetry, setTierRetry] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -139,8 +145,13 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     // have no membership). Re-fetch for the chain the wallet is now on.
     setUserCurrentTier(0)
     setIsLoadingTier(true)
-    getUserTierOnChain(account, ROLE_KEY, chainId).then(({ tier }) => {
+    getUserTierOnChain(account, ROLE_KEY, chainId).then(({ tier, readable }) => {
       if (cancelled) return
+      // FR-004/FR-005: an unreadable reference chain is NOT tier 0. Offering "upgrade from
+      // None" to a member who already holds Platinum — because their RPC blipped — would take
+      // their money for a tier they already own.
+      setTierReadable(readable !== false)
+      if (readable === false) return
       setUserCurrentTier(tier || 0)
       // Default tier select to the lowest available upgrade (or BRONZE for fresh)
       const minTier = (tier || 0) + 1
@@ -150,11 +161,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       }
     }).catch((err) => {
       console.warn('[PremiumPurchaseModal] tier fetch failed:', err)
+      if (!cancelled) setTierReadable(false)
     }).finally(() => {
       if (!cancelled) setIsLoadingTier(false)
     })
     return () => { cancelled = true }
-  }, [account, chainId])
+  }, [account, chainId, tierRetry])
 
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
@@ -196,6 +208,15 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const handlePurchase = async () => {
     if (!isConnected || !account) {
       showNotification('Please connect your wallet first', 'error')
+      return
+    }
+    // FR-005: refuse while membership is UNKNOWN, and attribute the refusal to the failed read
+    // rather than to anything about the member's account.
+    if (!tierReadable) {
+      showNotification(
+        `Cannot purchase yet: your current membership could not be read from ${networkName(membershipChainId())}. Retry the check first.`,
+        'error',
+      )
       return
     }
     if (!isCorrectNetwork) {
@@ -454,6 +475,26 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                   <div className="ppm-loading-tiers">
                     <div className="ppm-spinner" aria-hidden="true"></div>
                     <p>Checking your current membership tier...</p>
+                  </div>
+                )}
+
+                {/* FR-004/FR-005: unknown is not "none". Say the read failed, offer a retry, and
+                    refuse the purchase — buying "from None" on a blipped read could charge a
+                    member for a tier they already hold. */}
+                {!isLoadingTier && !tierReadable && (
+                  <div className="ppm-info-card ppm-tier-unknown" role="status">
+                    <span className="ppm-info-icon" aria-hidden="true">⚠️</span>
+                    <div>
+                      <strong>Your current membership could not be read.</strong>
+                      <p>
+                        We could not reach {networkName(membershipChainId())}, where memberships
+                        are held, so we cannot tell what you already own. This is a connection
+                        problem, not a statement that you have no membership.
+                      </p>
+                      <button type="button" className="ppm-btn-secondary" onClick={() => setTierRetry((n) => n + 1)}>
+                        Retry
+                      </button>
+                    </div>
                   </div>
                 )}
 

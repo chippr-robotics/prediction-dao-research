@@ -101,15 +101,15 @@ yields *unknown*, never *none*.
 confirm identical tier and expiry; then break the reference chain's endpoint and confirm *unknown*
 with a retry.
 
-- [ ] T027 [US1] Resolve the membership branch of `hasRoleOnChain` in `frontend/src/utils/blockchainService.js` against `membershipChainId()`, ignoring the caller's chain; leave the admin-role branch honouring its explicit chain (research R3, FR-003)
-- [ ] T028 [US1] Do the same for the MembershipManager path of `getUserTierOnChain` in `frontend/src/utils/blockchainService.js`
-- [ ] T029 [US1] Introduce a distinct *unknown* membership state in `frontend/src/utils/blockchainService.js` so a failed reference-chain read is no longer swallowed into `{tier: 0}` / `false` (FR-004) — this is the load-bearing change; today both functions return the same value for "no membership" and "could not ask"
-- [ ] T030 [US1] Propagate *unknown* through `frontend/src/contexts/RoleContext.jsx` and `frontend/src/hooks/useRoleDetails.js` without collapsing it to "no membership"
-- [ ] T031 [US1] Render *unknown* honestly wherever membership gates a surface: state that membership could not be read, offer a retry, and refuse the gated action attributing the refusal to the failed read (FR-005)
-- [ ] T032 [P] [US1] Test in `frontend/src/test/membershipReferenceChain.test.js` that `hasRoleOnChain(account, 'WAGER_PARTICIPANT', <any chain>)` constructs against the reference chain's MembershipManager — asserted by the constructed-address technique `adminLeastPrivilege.test.jsx` already uses
-- [ ] T033 [P] [US1] Test that `hasRoleOnChain(account, 'GUARDIAN', 8453)` still reads chain 8453 — the admin branch is unaffected
-- [ ] T034 [P] [US1] Test that a failed reference-chain read yields *unknown* and that no surface renders the words "no membership" in that state (FR-004)
-- [ ] T035 [P] [US1] Amend the doc-comment in `frontend/src/test/chainResolutionGuard.test.js` to state the rule the code actually follows — resolve against an **explicit** chain (wallet's, reference, or scoped), never the build-time default — and confirm the mechanical check still passes unmodified (research R5)
+- [X] T027 [US1] Resolve the membership branch of `hasRoleOnChain` in `frontend/src/utils/blockchainService.js` against `membershipChainId()`, ignoring the caller's chain; leave the admin-role branch honouring its explicit chain (research R3, FR-003)
+- [X] T028 [US1] Do the same for the MembershipManager path of `getUserTierOnChain` in `frontend/src/utils/blockchainService.js`
+- [X] T029 [US1] Introduce a distinct *unknown* membership state in `frontend/src/utils/blockchainService.js` so a failed reference-chain read is no longer swallowed into `{tier: 0}` / `false` (FR-004) — this is the load-bearing change; today both functions return the same value for "no membership" and "could not ask"
+- [X] T030 [US1] Propagate *unknown* through `frontend/src/contexts/RoleContext.jsx` and `frontend/src/hooks/useRoleDetails.js` without collapsing it to "no membership"
+- [X] T031 [US1] Render *unknown* honestly wherever membership gates a surface: state that membership could not be read, offer a retry, and refuse the gated action attributing the refusal to the failed read (FR-005)
+- [X] T032 [P] [US1] Test in `frontend/src/test/lib/chains/membershipReferenceChain.test.js` that `hasRoleOnChain(account, 'WAGER_PARTICIPANT', <any chain>)` constructs against the reference chain's MembershipManager — asserted by the constructed-address technique `adminLeastPrivilege.test.jsx` already uses
+- [X] T033 [P] [US1] Test that `hasRoleOnChain(account, 'GUARDIAN', 8453)` still reads chain 8453 — the admin branch is unaffected
+- [X] T034 [P] [US1] Test that a failed reference-chain read yields *unknown* and that no surface renders the words "no membership" in that state (FR-004)
+- [X] T035 [P] [US1] Amend the doc-comment in `frontend/src/test/chainResolutionGuard.test.js` to state the rule the code actually follows — resolve against an **explicit** chain (wallet's, reference, or scoped), never the build-time default — and confirm the mechanical check still passes unmodified (research R5)
 
 **Checkpoint**: US1 is independently shippable and closes the live defect.
 

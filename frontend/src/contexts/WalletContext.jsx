@@ -48,6 +48,9 @@ export function WalletProvider({ children }) {
   // operations control plane needs to be honest about what it actually learned.
   const [roleChains, setRoleChains] = useState({})
   const [estateRead, setEstateRead] = useState({ read: [], unreadable: [], swept: false })
+  // FR-004: false ⇒ membership is UNKNOWN (the reference chain would not answer), which is
+  // never the same as "no membership". Surfaces so a gated action can attribute its refusal.
+  const [membershipReadable, setMembershipReadable] = useState(true)
 
   // ---- Spec 045: single connect surface (FR-001) ----
   // Every "Connect" control in the app opens THIS modal; no surface renders
@@ -348,13 +351,20 @@ export function WalletProvider({ children }) {
       ),
     )
 
-    // Membership stays on the wallet's chain for now; spec 071 Phase 4 (US1) moves it to the
-    // reference chain. Kept separate so the two migrations don't tangle.
+    // Membership resolves on the REFERENCE chain regardless of what is passed (spec 071 FR-003) —
+    // `hasRoleOnChain` enforces that internally, so the wallet's chain is irrelevant here.
+    //
+    // `membershipReadable === false` means UNKNOWN, not "none" (FR-004). A member whose reference
+    // chain blipped keeps whatever was cached rather than being told they own nothing, and the
+    // unknown is surfaced so a gated action can attribute its refusal to the failed read.
     let membershipHeld = false
+    let membershipReadable = true
     try {
       const r = await hasRoleOnChain(walletAddress, 'WAGER_PARTICIPANT', activeChainId, { detailed: true })
-      membershipHeld = Boolean(r?.held)
+      membershipReadable = r?.readable !== false
+      membershipHeld = membershipReadable ? Boolean(r?.held) : localRoles.includes('WAGER_PARTICIPANT')
     } catch {
+      membershipReadable = false
       membershipHeld = localRoles.includes('WAGER_PARTICIPANT')
     }
 
@@ -387,9 +397,11 @@ export function WalletProvider({ children }) {
       }
     }
     // Only prune against the wallet's chain, and only when that chain answered: removing a
-    // locally-cached role because some other chain said no would be a different bug.
+    // locally-cached role because some other chain said no would be a different bug. Membership
+    // is pruned only when the REFERENCE chain actually answered — never on an unknown.
     if (!unreadableChains.includes(activeChainId)) {
       for (const roleName of allSyncedRoles) {
+        if (roleName === 'WAGER_PARTICIPANT' && !membershipReadable) continue
         const heldHere =
           roleName === 'WAGER_PARTICIPANT'
             ? membershipHeld
@@ -412,6 +424,7 @@ export function WalletProvider({ children }) {
       errors: [],
       roleChains: foundOn,
       estateRead: { read: readChains, unreadable: unreadableChains, swept: true },
+      membershipReadable,
     }
   }, [])
 
@@ -433,11 +446,13 @@ export function WalletProvider({ children }) {
       setRoles(synced.roles)
       setRoleChains(synced.roleChains || {})
       setEstateRead(synced.estateRead || { read: [], unreadable: [], swept: true })
+      setMembershipReadable(synced.membershipReadable !== false)
       setBlockchainSynced(true)
     } catch (error) {
       console.error('Error loading user roles:', error)
       setRoles([])
       setRoleChains({})
+      setMembershipReadable(false)
       // A failed sweep is NOT "you hold nothing" — leave it unswept so the console can say so
       // rather than asserting a denial it never established (FR-012).
       setEstateRead({ read: [], unreadable: [], swept: false })
@@ -802,6 +817,7 @@ export function WalletProvider({ children }) {
     estateRead,
     chainsForRole,
     hasRoleOnChainId,
+    membershipReadable,
     grantRole,
     revokeRole,
   }

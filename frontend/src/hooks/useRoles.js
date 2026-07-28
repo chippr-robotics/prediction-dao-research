@@ -34,7 +34,10 @@ export function useRoles() {
     roleChains,
     estateRead,
     chainsForRole,
-    hasRoleOnChainId
+    hasRoleOnChainId,
+    // FR-004: false ⇒ membership could not be read from the reference chain. Callers MUST NOT
+    // render this as "no membership" — it is unknown, and a gated refusal must say which.
+    membershipReadable
   } = context
 
   // Provide a consistent interface for role operations
@@ -51,6 +54,7 @@ export function useRoles() {
     estateRead,
     chainsForRole,
     hasRoleOnChainId,
+    membershipReadable,
     loadRoles: refreshRoles,
     // Include role constants for convenience
     ROLES,
