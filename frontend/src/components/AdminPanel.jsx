@@ -24,6 +24,7 @@ import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
+import { networkName } from '../lib/chains/estate'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
 import SectionIconNav from './nav/SectionIconNav'
@@ -99,7 +100,7 @@ function shortAddr(address) {
  * role its actions require.
  */
 function AdminPanel() {
-  const { hasRole, hasAnyRole } = useRoles()
+  const { hasRole, hasAnyRole, estateRead, chainsForRole, loadRoles } = useRoles()
   const { account, signer, provider, chainId } = useWeb3()
   const { showNotification } = useNotification()
   const { native: nativeSymbol } = useChainTokens()
@@ -363,6 +364,20 @@ function AdminPanel() {
     )
   }
 
+  // Every role that can open this panel gets a row, each naming where it was found. Built here
+  // rather than inline so a role can never again be in ADMIN_ROLES and the nav but missing from
+  // the card — an operator reading a list of × concludes their grant did not land.
+  const ADMIN_ROLE_ROWS = [
+    { role: ROLES.ADMIN, held: isAdmin, label: 'Administrator (tier config, treasury, grant admin roles)' },
+    { role: ROLES.GUARDIAN, held: isGuardian, label: 'Guardian (pause / unpause WagerRegistry)' },
+    { role: ROLES.ACCOUNT_MODERATOR, held: isAccountModerator, label: 'Account Moderator (freeze / unfreeze accounts)' },
+    { role: ROLES.ROLE_MANAGER, held: isRoleManager, label: 'Role Manager (grant / revoke memberships)' },
+    { role: ROLES.SANCTIONS_ADMIN, held: isSanctionsAdmin, label: 'Compliance Officer (deny-list on SanctionsGuard)' },
+    { role: ROLES.FEE_ADMIN, held: isFeeAdmin, label: 'Fee Administrator (platform fee rates on the FeeRouter)' },
+    { role: ROLES.STAKING_ADMIN, held: isStakingAdmin, label: 'Staking Administrator (provider addresses + validator allowlist)' },
+    { role: ROLES.LIQUIDITY_ADMIN, held: isLiquidityAdmin, label: 'Liquidity Administrator (bridge routes + curated pools, per router)' },
+  ]
+
   // Grouped, role-gated section rail (see admin/adminNav.js). Mirrors the
   // per-tab role checks below — a view only appears if the connected account
   // can use it, and a group only appears if it has at least one usable view.
@@ -396,16 +411,46 @@ function AdminPanel() {
   }, [sidebarOpen, isMobile])
 
   if (!hasAdminAccess) {
+    // FR-012: "you hold no operator role" and "we could not ask" are different statements, and
+    // the second must never be dressed as the first. An operator refused during a network outage
+    // needs to know their grant is not in question — otherwise they go looking for a
+    // permissions problem that does not exist.
+    const noChainAnswered =
+      !estateRead?.swept || (estateRead.read.length === 0 && estateRead.unreadable.length > 0)
     return (
       <div className="admin-panel">
         <div className="admin-unauthorized">
           <div className="unauthorized-icon" aria-hidden="true">🔒</div>
-          <h2>Access Restricted</h2>
-          <p>The operations control plane is only accessible to users with operator privileges.</p>
-          <p className="unauthorized-hint">
-            Operator roles include: Administrator, Emergency Guardian, Account Moderator, Role
-            Manager, and Compliance Officer.
-          </p>
+          <h2>{noChainAnswered ? 'Could Not Verify Access' : 'Access Restricted'}</h2>
+          {noChainAnswered ? (
+            <>
+              <p>
+                No network could be read, so your operator roles could not be checked. This is a
+                connectivity problem, not a statement about what you hold.
+              </p>
+              <p className="unauthorized-hint">
+                {estateRead?.unreadable?.length
+                  ? `Unreachable: ${estateRead.unreadable.map(networkName).join(', ')}.`
+                  : 'The role sweep did not complete.'}{' '}
+                Check your network endpoints, then retry.
+              </p>
+              <button type="button" className="confirm-btn primary" onClick={() => loadRoles?.(account, chainId)}>
+                Retry
+              </button>
+            </>
+          ) : (
+            <>
+              <p>The operations control plane is only accessible to users with operator privileges.</p>
+              <p className="unauthorized-hint">
+                Operator roles include: Administrator, Emergency Guardian, Account Moderator, Role
+                Manager, and Compliance Officer. Checked across{' '}
+                {estateRead.read.length} network{estateRead.read.length === 1 ? '' : 's'}
+                {estateRead.unreadable.length > 0 &&
+                  ` (${estateRead.unreadable.map(networkName).join(', ')} could not be read)`}
+                .
+              </p>
+            </>
+          )}
         </div>
       </div>
     )
@@ -518,56 +563,43 @@ function AdminPanel() {
 
               <div className="admin-card">
                 <div className="admin-card-header"><h3>Your Permissions</h3></div>
+                {/*
+                  One row per role, data-driven. Each names the NETWORK(S) the role was actually
+                  found on (spec 071 FR-010) — a bare ✓ on a per-chain role tells an operator
+                  they hold it without saying where, which is not enough to act on.
+                */}
                 <div className="permissions-list">
-                  <div className={`permission-item ${isAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Administrator (tier config, treasury, grant admin roles)</span>
-                  </div>
-                  <div className={`permission-item ${isGuardian ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isGuardian ? '✓' : '×'}</span>
-                    <span className="permission-name">Guardian (pause / unpause WagerRegistry)</span>
-                  </div>
-                  <div className={`permission-item ${isAccountModerator ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isAccountModerator ? '✓' : '×'}</span>
-                    <span className="permission-name">Account Moderator (freeze / unfreeze accounts)</span>
-                  </div>
-                  <div className={`permission-item ${isRoleManager ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isRoleManager ? '✓' : '×'}</span>
-                    <span className="permission-name">Role Manager (grant / revoke memberships)</span>
-                  </div>
-                  <div className={`permission-item ${isSanctionsAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isSanctionsAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Compliance Officer (deny-list on SanctionsGuard)</span>
-                  </div>
-                  {/*
-                    These three were in ROLES, in ADMIN_ROLES and in the nav, but not in this card —
-                    so an operator holding one of them read a list of five × and concluded their grant
-                    had not landed. A permissions card that omits a role it let you in on is worse
-                    than no card.
-                  */}
-                  <div className={`permission-item ${isFeeAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isFeeAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Fee Administrator (platform fee rates on the FeeRouter)</span>
-                  </div>
-                  <div className={`permission-item ${isStakingAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isStakingAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Staking Administrator (provider addresses + validator allowlist)</span>
-                  </div>
-                  <div className={`permission-item ${isLiquidityAdmin ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{isLiquidityAdmin ? '✓' : '×'}</span>
-                    <span className="permission-name">Liquidity Administrator (bridge routes + curated pools, per router)</span>
-                  </div>
+                  {ADMIN_ROLE_ROWS.map(({ role, label, held }) => {
+                    const on = chainsForRole?.(role) ?? []
+                    return (
+                      <div key={role} className={`permission-item ${held ? 'enabled' : 'disabled'}`}>
+                        <span className="permission-icon">{held ? '✓' : '×'}</span>
+                        <span className="permission-name">
+                          {label}
+                          {held && on.length > 0 && (
+                            <span className="permission-networks"> — {on.map(networkName).join(', ')}</span>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
                 {/*
-                  Every row above is resolved on the CONNECTED network. The spec-067 routers exist on
-                  five, and their roles are per-contract — so this card is a summary, not a verdict:
-                  the Bridge and Supply tabs each ask the router in scope directly before offering a
-                  control. Saying so here stops the summary being read as the authority.
+                  This card is a summary, not a verdict, and now says so on two counts: it names
+                  where each role was found, and it names the networks it could not read at all —
+                  because an unread network showing as × would be the platform asserting a denial
+                  it never established (FR-011).
                 */}
                 <p className="card-info">
-                  Read on {NETWORK_CONFIG.name}. Roles are per-contract and per-network, so the
-                  Bridge and Supply tabs re-check the specific router for the network you select —
-                  what they offer there is the authoritative answer.
+                  Read across {estateRead?.read?.length ?? 0} network
+                  {(estateRead?.read?.length ?? 0) === 1 ? '' : 's'}.
+                  {estateRead?.unreadable?.length > 0 && (
+                    <> {estateRead.unreadable.map(networkName).join(', ')} could not be read, so
+                    nothing above rules out a role held there.</>
+                  )}{' '}
+                  Roles are per-contract and per-network, so each view re-checks the specific
+                  contract for the network you select — what it offers there is the authoritative
+                  answer.
                 </p>
               </div>
 

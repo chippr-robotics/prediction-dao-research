@@ -239,9 +239,24 @@ describe('LIQUIDITY_ADMIN_ROLE resolution (spec 067)', () => {
     // FEE_ADMIN, STAKING_ADMIN and LIQUIDITY_ADMIN were in ROLES, in ADMIN_ROLES and in the nav but
     // not in this card, so an operator holding one read a list of × and concluded their grant had not
     // landed. A permissions card that omits a role it let you in on is worse than no card.
-    for (const flag of ['isFeeAdmin', 'isStakingAdmin', 'isLiquidityAdmin']) {
-      expect(adminPanelSource).toMatch(new RegExp(`permission-item \\$\\{${flag} \\?`))
+    //
+    // Spec 071 turned the eight hand-written rows into one ADMIN_ROLE_ROWS table, so this checks
+    // the table rather than the markup — and checks ALL of ADMIN_ROLES rather than the three that
+    // happened to be missing once, which is the invariant that actually matters.
+    const rows = adminPanelSource.match(/const ADMIN_ROLE_ROWS = \[[\s\S]*?\n  \]/)
+    expect(rows, 'ADMIN_ROLE_ROWS table not found in AdminPanel.jsx').toBeTruthy()
+    for (const role of ADMIN_ROLES) {
+      expect(rows[0]).toContain(`ROLES.${role}`)
     }
+  })
+
+  it('names the network each held role was found on (spec 071 FR-010)', () => {
+    // A bare ✓ on a per-chain role tells an operator they hold it without saying where, which is
+    // not enough to act on — and an unread network rendering as × would assert a denial the
+    // platform never established.
+    expect(adminPanelSource).toContain('chainsForRole')
+    expect(adminPanelSource).toMatch(/permission-networks/)
+    expect(adminPanelSource).toContain('could not be read')
   })
 
   it('both tab bodies are gated exactly like the nav items (no direct-id bypass)', () => {

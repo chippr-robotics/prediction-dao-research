@@ -27,7 +27,14 @@ export function useRoles() {
     hasAnyRole,
     hasAllRoles,
     grantRole,
-    revokeRole
+    revokeRole,
+    // Spec 071: `hasRole`/`hasAnyRole` are now ESTATE-WIDE — true when the role is held on any
+    // chain in the build's cohort, not just the one the wallet sits on. These carry the detail:
+    // which chains each role was found on, and which chains would not answer at all.
+    roleChains,
+    estateRead,
+    chainsForRole,
+    hasRoleOnChainId
   } = context
 
   // Provide a consistent interface for role operations
@@ -40,6 +47,10 @@ export function useRoles() {
     hasAllRoles,
     grantRole,
     revokeRole,
+    roleChains,
+    estateRead,
+    chainsForRole,
+    hasRoleOnChainId,
     loadRoles: refreshRoles,
     // Include role constants for convenience
     ROLES,

@@ -77,15 +77,15 @@ gets in from any chain, and is told where their authority lives.
 network, open `/admin`, and confirm it opens with only that role's views and names the network each
 role was found on.
 
-- [ ] T018 [US2] Extend the role sync in `frontend/src/contexts/RoleContext.jsx` to resolve each admin role across `cohortChainIds()` instead of the wallet chain only, recording per chain whether the role was held, not held, or unreadable (FR-009, FR-011)
-- [ ] T019 [US2] Apply the same estate-wide sync in `frontend/src/contexts/WalletContext.jsx`, which carries a parallel copy of the sync loop
-- [ ] T020 [US2] Keep the existing `(address, chainId)` local-storage cache key in `frontend/src/utils/roleStorage.js` — the chain dimension already exists, so entries simply exist for more chains and **no migration is needed**; confirm no schema change is introduced
-- [ ] T021 [US2] Expose an estate-wide `hasAnyRole`/`hasRole` plus a per-chain query from `frontend/src/contexts/RoleContext.jsx`, so entry and authority stay separable (FR-009 vs FR-019)
-- [ ] T022 [US2] Make the entry gate in `frontend/src/components/AdminPanel.jsx` use the estate-wide answer
-- [ ] T023 [US2] Distinguish the two refusals in `frontend/src/components/AdminPanel.jsx`: "you hold no operator role" vs "no network could be read" (FR-012) — the second must never be phrased as the first
-- [ ] T024 [US2] Extend the "Your Permissions" card in `frontend/src/components/AdminPanel.jsx` to name the network(s) each role is held on, and mark unread networks as unread rather than as ✗ (FR-010, FR-011)
-- [ ] T025 [P] [US2] Test in `frontend/src/test/admin/adminEstateEntry.test.jsx`: role on one chain + wallet on another ⇒ console opens with that role's views; no role anywhere ⇒ refused; one chain unreadable ⇒ still granted from roles found elsewhere; all chains unreadable ⇒ the distinct refusal message
-- [ ] T026 [P] [US2] Test that the permissions card names the network per role and never renders an unread network as a denial
+- [X] T018 [US2] ~~Extend the role sync in `frontend/src/contexts/RoleContext.jsx`~~ **N/A — `RoleContext.jsx` (`RoleProvider`) is imported nowhere and mounted nowhere; `useRoles` reads `WalletContext`. Dead code, so the estate sweep landed in T019 only rather than being mirrored into an unmounted provider.** Original scope: extend the role sync to resolve each admin role across `cohortChainIds()` instead of the wallet chain only, recording per chain whether the role was held, not held, or unreadable (FR-009, FR-011)
+- [X] T019 [US2] Apply the same estate-wide sync in `frontend/src/contexts/WalletContext.jsx`, which carries a parallel copy of the sync loop
+- [X] T020 [US2] Keep the existing `(address, chainId)` local-storage cache key in `frontend/src/utils/roleStorage.js` — the chain dimension already exists, so entries simply exist for more chains and **no migration is needed**; confirm no schema change is introduced
+- [X] T021 [US2] Expose an estate-wide `hasAnyRole`/`hasRole` plus a per-chain query (`chainsForRole`, `hasRoleOnChainId`, `estateRead`) from `frontend/src/contexts/WalletContext.jsx` (the live provider; see T018) and through `hooks/useRoles.js`, so entry and authority stay separable (FR-009 vs FR-019)
+- [X] T022 [US2] Make the entry gate in `frontend/src/components/AdminPanel.jsx` use the estate-wide answer
+- [X] T023 [US2] Distinguish the two refusals in `frontend/src/components/AdminPanel.jsx`: "you hold no operator role" vs "no network could be read" (FR-012) — the second must never be phrased as the first
+- [X] T024 [US2] Extend the "Your Permissions" card in `frontend/src/components/AdminPanel.jsx` to name the network(s) each role is held on, and mark unread networks as unread rather than as ✗ (FR-010, FR-011)
+- [X] T025 [P] [US2] Test in `frontend/src/test/admin/adminEstateEntry.test.jsx`: role on one chain + wallet on another ⇒ console opens with that role's views; no role anywhere ⇒ refused; one chain unreadable ⇒ still granted from roles found elsewhere; all chains unreadable ⇒ the distinct refusal message
+- [X] T026 [P] [US2] Test that the permissions card names the network per role and never renders an unread network as a denial
 
 **Checkpoint**: US2 is independently shippable — the console is reachable from any chain, with every
 view still gated exactly as before.

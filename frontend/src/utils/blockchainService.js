@@ -976,16 +976,23 @@ export function getRoleHash(roleName) {
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
  */
-export async function hasRoleOnChain(userAddress, roleName, chainId) {
+export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed = false } = {}) {
+  // `detailed` callers get to tell "not held" apart from "could not ask" (spec 071 FR-011).
+  // Everyone else keeps the plain boolean this has always returned, so no existing caller
+  // changes behaviour. An estate-wide sweep NEEDS the distinction: counting an unreachable
+  // chain as "role not held" is how an operator gets locked out of the console by an RPC blip.
+  const held = (value) => (detailed ? { held: value, readable: true, reason: null } : value)
+  const unread = (reason) => (detailed ? { held: false, readable: false, reason } : false)
+
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
-    return false
+    return held(false)
   }
 
   const roleHash = getRoleHash(roleName)
   if (!roleHash) {
     console.warn(`Unknown role: ${roleName}`)
-    return false
+    return held(false)
   }
 
   const provider = getProvider(chainId)
@@ -999,13 +1006,13 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
   // gated by a (Tier, expiry) pair — read via hasActiveRole.
   if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') {
     const mmAddress = resolveAddress('membershipManager')
-    if (!mmAddress) return false
+    if (!mmAddress) return held(false)
     try {
       const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
-      return await mm.hasActiveRole(userAddress, roleHash)
+      return held(Boolean(await mm.hasActiveRole(userAddress, roleHash)))
     } catch (e) {
       console.warn('[hasRoleOnChain] membership read failed:', e.message)
-      return false
+      return unread(e?.message || 'membership read failed')
     }
   }
 
@@ -1067,16 +1074,23 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
       if (liquidity) candidates.push(liquidity)
     }
   }
+  // No candidate contract on this chain is a DEFINITE "no role here" — there is nothing to hold
+  // a role on. A candidate that would not answer is a different thing, tracked below.
+  let anyFailed = null
   for (const addr of candidates) {
     try {
       const c = new ethers.Contract(addr, accessControlAbi, provider)
       const yes = await c.hasRole(roleHash, userAddress)
-      if (yes) return true
+      if (yes) return held(true)
     } catch (e) {
       console.debug(`[hasRoleOnChain] AccessControl read failed on ${addr}:`, e.message)
+      anyFailed = e?.message || 'AccessControl read failed'
     }
   }
-  return false
+  // A definite "no" only when every candidate actually answered. If one refused, the honest
+  // answer is "could not tell" — a caller sweeping the estate must not record that as a denial.
+  if (anyFailed) return unread(anyFailed)
+  return held(false)
 }
 
 /**

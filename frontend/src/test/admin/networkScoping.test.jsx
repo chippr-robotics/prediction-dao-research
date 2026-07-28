@@ -41,12 +41,18 @@ vi.mock('../../lib/bridge/bridgeStatus', async (orig) => ({
 }))
 // Every read is keyed by the CONTRACT ADDRESS the tab constructed, so a value from one network's
 // router can only appear on screen if the tab actually asked that router for it.
+// Spec 071 (T010): estate reads now resolve providers via `getReadProvider(chainId)` rather than
+// hand-building one from `NETWORKS[chainId].rpcUrl`, so the member's own endpoint and failover
+// apply. Both names are stubbed here — the assertions below are unchanged, and still key every
+// read on the CONTRACT ADDRESS the tab constructed.
+const fakeProvider = () => ({
+  getBlockNumber: () => Promise.resolve(1_000_000),
+  getBlock: () => Promise.resolve({ timestamp: 0 }),
+  getTransactionReceipt: () => Promise.resolve(null),
+})
 vi.mock('../../utils/rpcProvider', () => ({
-  makeReadProvider: () => ({
-    getBlockNumber: () => Promise.resolve(1_000_000),
-    getBlock: () => Promise.resolve({ timestamp: 0 }),
-    getTransactionReceipt: () => Promise.resolve(null),
-  }),
+  makeReadProvider: () => fakeProvider(),
+  getReadProvider: () => fakeProvider(),
 }))
 vi.mock('ethers', async (orig) => {
   const actual = await orig()
