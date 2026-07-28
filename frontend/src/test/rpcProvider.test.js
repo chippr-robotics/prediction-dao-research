@@ -34,3 +34,23 @@ describe('makeReadProvider', () => {
     expect(p._getOption('batchMaxCount')).toBeGreaterThan(1)
   })
 })
+
+describe('makeReadProvider — provider caching', () => {
+  // Each `ethers` provider runs its own perpetual `_detectNetwork` retry loop when the
+  // endpoint is unreachable. Building a fresh one per call means every read from every
+  // hook piles up one more never-terminated loop hammering the same endpoint — this is
+  // what turned one flaky chain into a flood of parallel retries. One provider per
+  // resolved route caps that to a single loop per chain.
+  it('reuses the same provider instance for repeated calls with the same route', () => {
+    const a = makeReadProvider('https://example.invalid/rpc', 900001)
+    const b = makeReadProvider('https://example.invalid/rpc', 900001)
+    expect(b).toBe(a)
+  })
+
+  it('builds a fresh provider — and keeps it cached — when the resolved route changes', () => {
+    const a = makeReadProvider('https://example.invalid/rpc', 900002)
+    const b = makeReadProvider('https://example.invalid/other-rpc', 900002)
+    expect(b).not.toBe(a)
+    expect(makeReadProvider('https://example.invalid/other-rpc', 900002)).toBe(b)
+  })
+})
