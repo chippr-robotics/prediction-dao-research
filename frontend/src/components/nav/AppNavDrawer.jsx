@@ -1,7 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import PortalNav from '../ui/PortalNav'
+import NavIcon from './NavIcon'
 import Footer from '../Footer'
 import { HOME_ITEM, PORTFOLIO_ITEM, WAGERS_ITEM, NAV_GROUPS, pathForNavItem, visibleNavGroups } from '../../config/appNav'
 import { useChainTokens } from '../../hooks/useChainTokens'
@@ -46,17 +48,22 @@ function resolveActiveId(location) {
 }
 
 /**
- * AppNavDrawer — the global left navigation drawer ("us"), opened by the clover
- * logo on every in-app route. Replaces the per-page section rail that used to
- * live only on My Account. Selecting an entry routes to the section and closes
- * the drawer; the in-app legal footer is pinned to the bottom.
+ * AppNavDrawer — the global left navigation ("us"). On mobile it's a slide-over
+ * drawer opened by the clover logo, exactly as before. On larger screens it's
+ * always visible as a persistent icon-only gutter (no page content renders
+ * under it — see the `.app-shell` padding in this file's CSS) that expands in
+ * place to the full labelled panel; it never fully hides on desktop, so a
+ * section is always one click away. Selecting an entry routes to the section
+ * and returns to the gutter; the in-app legal footer only fits once expanded.
  */
 export default function AppNavDrawer() {
-  const { isOpen, close } = useNavDrawer()
+  const { isOpen, close, toggle } = useNavDrawer()
   const navigate = useNavigate()
   const location = useLocation()
   const activeId = resolveActiveId(location)
   const { capabilities } = useChainTokens()
+  const isMobile = useIsMobile()
+  const drawerRef = useRef(null)
   const drawerGroups = useMemo(
     () =>
       buildDrawerGroups({
@@ -65,6 +72,10 @@ export default function AppNavDrawer() {
       }),
     [capabilities],
   )
+
+  // Desktop never fully closes: `collapsed` is the icon gutter, `isOpen` is the
+  // expanded panel. Mobile keeps the original fully-hidden/fully-open pair.
+  const collapsed = !isMobile && !isOpen
 
   // Close on Escape while open.
   useEffect(() => {
@@ -76,14 +87,33 @@ export default function AppNavDrawer() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isOpen, close])
 
+  // Desktop's expanded panel has no modal backdrop (the gutter beside it stays
+  // usable), so a click outside it collapses back to the gutter instead.
+  useEffect(() => {
+    if (!isOpen || isMobile) return
+    const onPointerDown = (event) => {
+      if (drawerRef.current && !drawerRef.current.contains(event.target)) {
+        close()
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [isOpen, isMobile, close])
+
   const handleSelect = (id) => {
     navigate(pathForNavItem(id))
     close()
   }
 
+  // Mobile: always fully closes. Desktop: flips between gutter and expanded.
+  const handleToggleClick = () => {
+    if (isMobile) close()
+    else toggle()
+  }
+
   return (
     <>
-      {isOpen && (
+      {isOpen && isMobile && (
         <button
           type="button"
           className="app-nav-backdrop"
@@ -92,20 +122,21 @@ export default function AppNavDrawer() {
         />
       )}
       <aside
+        ref={drawerRef}
         id="app-nav-drawer"
-        className={`app-nav-drawer ${isOpen ? 'open' : ''}`}
-        aria-hidden={!isOpen}
+        className={`app-nav-drawer ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}
+        aria-hidden={isMobile && !isOpen}
         aria-label="Site navigation"
       >
         <div className="app-nav-drawer-header">
-          <span className="app-nav-drawer-title">Menu</span>
+          {!collapsed && <span className="app-nav-drawer-title">Menu</span>}
           <button
             type="button"
-            className="app-nav-drawer-close"
-            aria-label="Close menu"
-            onClick={close}
+            className="app-nav-drawer-toggle"
+            aria-label={collapsed ? 'Expand menu' : 'Close menu'}
+            onClick={handleToggleClick}
           >
-            <span aria-hidden="true">✕</span>
+            {collapsed ? <NavIcon name="menu" /> : <span aria-hidden="true">✕</span>}
           </button>
         </div>
 
@@ -115,9 +146,10 @@ export default function AppNavDrawer() {
           activeId={activeId}
           onSelect={handleSelect}
           ariaLabel="Site sections"
+          collapsed={collapsed}
         />
 
-        <Footer variant="drawer" />
+        {!collapsed && <Footer variant="drawer" />}
       </aside>
     </>
   )
