@@ -30,6 +30,33 @@ import { resolveRpcEndpoints } from '../lib/network/rpcEndpoints'
 // Ethereum Classic mainnet (61) and Mordor testnet (63).
 const NO_BATCH_CHAIN_IDS = new Set([61, 63])
 
+// Every ethers provider runs its own `_detectNetwork` polling loop, which retries forever
+// (once a second) when the endpoint is unreachable — there is no signal back to the app
+// when that happens, and nothing ever calls `.destroy()`. Building a fresh provider on
+// every read (as this used to) means a single flaky chain accumulates one more permanent
+// retry loop per read, all hammering the endpoint independently and forever. Caching one
+// provider per resolved route keeps that to at most one loop per chain, and rebuilds
+// (replacing, not stacking) the moment the resolved route actually changes — e.g. a
+// member edits their endpoint in Network settings.
+const providerCache = new Map() // chainId -> { key, provider }
+
+function cachedProvider(chainId, key, build) {
+  if (chainId == null) return build()
+  const existing = providerCache.get(chainId)
+  if (existing && existing.key === key) return existing.provider
+  if (typeof existing?.provider?.destroy === 'function') {
+    try {
+      existing.provider.destroy()
+    } catch {
+      // best-effort cleanup — a provider that fails to tear down cleanly shouldn't block
+      // building its replacement.
+    }
+  }
+  const provider = build()
+  providerCache.set(chainId, { key, provider })
+  return provider
+}
+
 /**
  * Build one JsonRpcProvider for a single endpoint.
  *
@@ -81,23 +108,34 @@ export function makeReadProvider(rpcUrl, chainId = null) {
 
   // No member override → exactly the pre-069 behavior for the caller's URL.
   if (!route || route.source !== 'member' || !route.primary) {
-    return buildProvider(rpcUrl, null, chainId)
+    const key = JSON.stringify(['single', rpcUrl])
+    return cachedProvider(chainId, key, () => buildProvider(rpcUrl, null, chainId))
   }
 
   if (!route.failover) {
-    return buildProvider(route.primary.url, route.primary.headers, chainId)
+    const key = JSON.stringify(['single', route.primary.url, route.primary.headers])
+    return cachedProvider(chainId, key, () => buildProvider(route.primary.url, route.primary.headers, chainId))
   }
 
-  const primary = buildProvider(route.primary.url, route.primary.headers, chainId, { staticNetwork: true })
-  const failover = buildProvider(route.failover.url, route.failover.headers, chainId, { staticNetwork: true })
-  return new ethers.FallbackProvider(
-    [
-      { provider: primary, priority: 1, weight: 1, stallTimeout: 2000 },
-      { provider: failover, priority: 2, weight: 1 },
-    ],
-    new ethers.Network(`chain-${Number(chainId)}`, Number(chainId)),
-    { quorum: 1 },
-  )
+  const key = JSON.stringify([
+    'fallback',
+    route.primary.url,
+    route.primary.headers,
+    route.failover.url,
+    route.failover.headers,
+  ])
+  return cachedProvider(chainId, key, () => {
+    const primary = buildProvider(route.primary.url, route.primary.headers, chainId, { staticNetwork: true })
+    const failover = buildProvider(route.failover.url, route.failover.headers, chainId, { staticNetwork: true })
+    return new ethers.FallbackProvider(
+      [
+        { provider: primary, priority: 1, weight: 1, stallTimeout: 2000 },
+        { provider: failover, priority: 2, weight: 1 },
+      ],
+      new ethers.Network(`chain-${Number(chainId)}`, Number(chainId)),
+      { quorum: 1 },
+    )
+  })
 }
 
 /**

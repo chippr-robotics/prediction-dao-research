@@ -38,6 +38,9 @@ artifacts live under `specs/<feature>/`.
 - `npm run test:frontend` — frontend tests
 - `npm run frontend` — run the frontend dev server
 - `npm run sync:frontend-contracts` — regenerate frontend contract artifacts
+- Only run the **full** frontend suite (`vitest run` with no filter) in CI — locally it
+  OOMs this environment. Scope local runs to specific files/dirs
+  (`npx vitest run src/test/foo.test.js`).
 
 ## Guardrails
 
