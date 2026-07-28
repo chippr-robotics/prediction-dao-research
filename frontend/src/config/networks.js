@@ -355,6 +355,12 @@ const NETWORKS = {
     selectable: true,
     nativeCurrency: { decimals: 18, name: 'Ethereum Classic', symbol: 'ETC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_ETC || 'https://etc.rivet.link',
+    // Build-level last resort when the primary default above is unreachable and the member
+    // hasn't configured their own endpoint (spec 069) — without this, a member on default
+    // settings has zero redundancy on a community-run RPC. Verified independently to answer
+    // eth_chainId with a correct `access-control-allow-origin` header on both the preflight
+    // and the real request. Override via VITE_RPC_URL_ETC_FAILOVER.
+    rpcFailoverUrl: import.meta.env?.VITE_RPC_URL_ETC_FAILOVER || 'https://etc.etcdesktop.com',
     explorer: { name: 'Blockscout', baseUrl: 'https://etc.blockscout.com' },
     // No hosted Graph indexer supports Ethereum Classic, so wager reads go
     // straight to the WagerRegistry over RPC (RegistrySource). ETC mainnet is

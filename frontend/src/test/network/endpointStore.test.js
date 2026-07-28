@@ -197,12 +197,25 @@ describe('endpointStore — disclosure helpers', () => {
     expect(isCspAllowedRpcUrl('http://192.168.1.5:8545')).toBe(false)
     expect(isCspAllowedRpcUrl('ftp://rpc.example.com')).toBe(false)
     expect(isCspAllowedRpcUrl('not a url')).toBe(false)
+    // IPv6 loopback is a real local node but CSP cannot express a bracketed literal, so the
+    // browser blocks it — answering true here would promise a route that never works.
+    expect(isCspAllowedRpcUrl('http://[::1]:8545')).toBe(false)
   })
 
   it('recognises the loopback hostnames', () => {
     expect(isLoopbackHost('localhost')).toBe(true)
     expect(isLoopbackHost('127.0.0.1')).toBe(true)
     expect(isLoopbackHost('::1')).toBe(true)
+    // `URL` keeps the brackets on an IPv6 literal, so callers passing `parsed.hostname`
+    // straight through get the same answer.
+    expect(isLoopbackHost('[::1]')).toBe(true)
     expect(isLoopbackHost('192.168.1.5')).toBe(false)
+  })
+
+  it('refuses an IPv6 loopback endpoint rather than saving an unreachable one', () => {
+    const result = validateRpcUrl('http://[::1]:8545')
+    expect(result.ok).toBe(false)
+    // The message has to point somewhere that works, not just say no.
+    expect(result.error).toMatch(/localhost|127\.0\.0\.1/)
   })
 })

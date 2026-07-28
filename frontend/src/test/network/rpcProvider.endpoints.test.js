@@ -116,3 +116,44 @@ describe('makeReadProvider — member endpoints', () => {
     expect(getReadProvider(999999)).toBeNull()
   })
 })
+
+describe('makeReadProvider — build-curated failover', () => {
+  // A member who has configured nothing still needs redundancy on chains served by a single
+  // community-run RPC. Ethereum Classic's default going dark is what left every read on the
+  // chain with no route at all, so the chain declares a second endpoint at build time.
+  beforeEach(() => {
+    localStorage.clear()
+    __resetEndpointStoreForTests()
+    constructed.length = 0
+  })
+
+  it('falls back to the chain-declared endpoint on ETC with no member settings', () => {
+    makeReadProvider(NETWORKS[61].rpcUrl, 61)
+
+    const fallbackCall = constructed.find((c) => c.kind === 'fallback')
+    expect(fallbackCall).toBeTruthy()
+    expect(fallbackCall.configs.map((c) => c.provider.target)).toEqual([
+      NETWORKS[61].rpcUrl,
+      NETWORKS[61].rpcFailoverUrl,
+    ])
+    // staticNetwork on both members is what stops ethers' endless `_detectNetwork` retry
+    // loop — the source of the "failed to detect network; retry in 1s" console storm.
+    expect(fallbackCall.configs.every((c) => c.provider.options?.staticNetwork)).toBe(true)
+  })
+
+  it('leaves chains without a declared failover on a single provider', () => {
+    makeReadProvider(NETWORKS[137].rpcUrl, 137)
+    expect(constructed.some((c) => c.kind === 'fallback')).toBe(false)
+  })
+
+  it('still prefers the member endpoint, keeping the build default behind it', () => {
+    saveEndpointSettings(61, { url: 'https://etc.member.example/rpc' })
+    makeReadProvider(NETWORKS[61].rpcUrl, 61)
+
+    const fallbackCall = constructed.find((c) => c.kind === 'fallback')
+    expect(fallbackCall.configs.map((c) => c.provider.target)).toEqual([
+      'https://etc.member.example/rpc',
+      NETWORKS[61].rpcUrl,
+    ])
+  })
+})
