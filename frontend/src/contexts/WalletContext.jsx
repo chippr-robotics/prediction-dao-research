@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import ConnectModal from '../components/wallet/ConnectModal'
 import { ethers } from 'ethers'
-import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID } from '../config/networks'
+import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID, cohortChainIds } from '../config/networks'
 import { makeReadProvider } from '../utils/rpcProvider'
 import {
   getUserRoles,
@@ -43,6 +43,14 @@ export function WalletProvider({ children }) {
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
+  // Spec 071: WHERE each role was found, and which chains would not answer. `roles` above stays
+  // the flat estate-wide list every existing caller reads; these two carry the detail the
+  // operations control plane needs to be honest about what it actually learned.
+  const [roleChains, setRoleChains] = useState({})
+  const [estateRead, setEstateRead] = useState({ read: [], unreadable: [], swept: false })
+  // FR-004: false ⇒ membership is UNKNOWN (the reference chain would not answer), which is
+  // never the same as "no membership". Surfaces so a gated action can attribute its refusal.
+  const [membershipReadable, setMembershipReadable] = useState(true)
 
   // ---- Spec 045: single connect surface (FR-001) ----
   // Every "Connect" control in the app opens THIS modal; no surface renders
@@ -308,62 +316,116 @@ export function WalletProvider({ children }) {
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles, activeChainId) => {
     const premiumRoles = ['WAGER_PARTICIPANT']
-    const adminRoles = ['ADMIN', 'GUARDIAN', 'ACCOUNT_MODERATOR', 'ROLE_MANAGER', 'SANCTIONS_ADMIN', 'FEE_ADMIN', 'LIQUIDITY_ADMIN']
+    // STAKING_ADMIN was missing from this list while being present in ADMIN_ROLES and in the
+    // console's nav, so a staking administrator's role was never synced: `isStakingAdmin` read
+    // false forever and the Staking tab never opened for the one operator who could use it.
+    // Exactly the class of lockout spec 071 exists to end, so it is fixed here.
+    const adminRoles = [
+      'ADMIN', 'GUARDIAN', 'ACCOUNT_MODERATOR', 'ROLE_MANAGER',
+      'SANCTIONS_ADMIN', 'FEE_ADMIN', 'STAKING_ADMIN', 'LIQUIDITY_ADMIN',
+    ]
     const allSyncedRoles = [...premiumRoles, ...adminRoles]
-    const updatedRoles = []
-    let hasChanges = false
-    let syncErrors = []
 
-    console.log('[RoleSync] Starting blockchain sync for:', walletAddress)
-    console.log('[RoleSync] Local roles:', localRoles)
+    // ── ESTATE-WIDE, NOT WALLET-CHAIN (spec 071 FR-009) ───────────────────────────────────────
+    // Admin roles are granted per contract per chain, so asking only the chain the wallet
+    // happens to sit on refused entry to operators who genuinely hold a role somewhere else.
+    // Reads span the cohort; the wallet's chain still decides nothing but WRITES.
+    const chains = cohortChainIds()
+    const walletChainFirst = [
+      ...chains.filter((id) => Number(id) === Number(activeChainId)),
+      ...chains.filter((id) => Number(id) !== Number(activeChainId)),
+    ]
 
-    // Check each role on-chain (both premium and admin roles)
-    for (const roleName of allSyncedRoles) {
-      try {
-        const hasOnChain = await hasRoleOnChain(walletAddress, roleName, activeChainId)
-        const hasLocally = localRoles.includes(roleName)
-
-        console.log(`[RoleSync] ${roleName}: onChain=${hasOnChain}, local=${hasLocally}`)
-
-        if (hasOnChain) {
-          // Role exists on-chain - keep it
-          updatedRoles.push(roleName)
-          if (!hasLocally) {
-            console.log(`[RoleSync] Adding ${roleName} from blockchain to local storage`)
-            addUserRole(walletAddress, roleName, activeChainId)
-            hasChanges = true
+    // Concurrent: 8 roles across the cohort is far too many round-trips to do in sequence, and
+    // FR-015 says one slow chain must not hold up the rest.
+    const probes = await Promise.all(
+      adminRoles.flatMap((roleName) =>
+        walletChainFirst.map(async (id) => {
+          try {
+            const r = await hasRoleOnChain(walletAddress, roleName, id, { detailed: true })
+            return { roleName, chainId: id, held: Boolean(r?.held), readable: r?.readable !== false }
+          } catch (e) {
+            return { roleName, chainId: id, held: false, readable: false, reason: e?.message }
           }
-        } else if (hasLocally) {
-          // Role exists locally but not on-chain - it has expired or was never purchased
-          // Blockchain is the source of truth - remove the stale local role
-          console.log(`[RoleSync] ${roleName} not found on-chain - removing stale local role`)
+        }),
+      ),
+    )
+
+    // Membership resolves on the REFERENCE chain regardless of what is passed (spec 071 FR-003) —
+    // `hasRoleOnChain` enforces that internally, so the wallet's chain is irrelevant here.
+    //
+    // `membershipReadable === false` means UNKNOWN, not "none" (FR-004). A member whose reference
+    // chain blipped keeps whatever was cached rather than being told they own nothing, and the
+    // unknown is surfaced so a gated action can attribute its refusal to the failed read.
+    let membershipHeld = false
+    let membershipReadable = true
+    try {
+      const r = await hasRoleOnChain(walletAddress, 'WAGER_PARTICIPANT', activeChainId, { detailed: true })
+      membershipReadable = r?.readable !== false
+      membershipHeld = membershipReadable ? Boolean(r?.held) : localRoles.includes('WAGER_PARTICIPANT')
+    } catch {
+      membershipReadable = false
+      membershipHeld = localRoles.includes('WAGER_PARTICIPANT')
+    }
+
+    // WHERE each role was found. A role with an empty list is not held anywhere we could read.
+    const foundOn = {}
+    for (const p of probes) {
+      if (p.held) (foundOn[p.roleName] ||= []).push(p.chainId)
+    }
+    // A chain counts as unreadable only if EVERY probe against it failed — one contract missing
+    // there is a deployment fact, not a connectivity failure.
+    const unreadableChains = walletChainFirst.filter((id) => {
+      const forChain = probes.filter((p) => p.chainId === id)
+      return forChain.length > 0 && forChain.every((p) => !p.readable)
+    })
+    const readChains = walletChainFirst.filter((id) => !unreadableChains.includes(id))
+
+    const updatedRoles = [
+      ...(membershipHeld ? ['WAGER_PARTICIPANT'] : []),
+      ...adminRoles.filter((r) => (foundOn[r] || []).length > 0),
+    ]
+
+    // Local storage stays keyed by (address, chainId) exactly as before — the chain dimension
+    // was already there, so an estate-wide sweep just writes entries for more chains and needs
+    // NO migration. Each role is recorded against the chain it was actually found on.
+    let hasChanges = false
+    for (const roleName of adminRoles) {
+      for (const id of foundOn[roleName] || []) {
+        addUserRole(walletAddress, roleName, id)
+        hasChanges = true
+      }
+    }
+    // Only prune against the wallet's chain, and only when that chain answered: removing a
+    // locally-cached role because some other chain said no would be a different bug. Membership
+    // is pruned only when the REFERENCE chain actually answered — never on an unknown.
+    if (!unreadableChains.includes(activeChainId)) {
+      for (const roleName of allSyncedRoles) {
+        if (roleName === 'WAGER_PARTICIPANT' && !membershipReadable) continue
+        const heldHere =
+          roleName === 'WAGER_PARTICIPANT'
+            ? membershipHeld
+            : (foundOn[roleName] || []).some((id) => Number(id) === Number(activeChainId))
+        if (!heldHere && localRoles.includes(roleName)) {
           removeUserRole(walletAddress, roleName, activeChainId)
           hasChanges = true
-          // Don't add to updatedRoles - role is no longer valid
-        }
-      } catch (roleError) {
-        console.error(`[RoleSync] Error checking ${roleName}:`, roleError.message)
-        syncErrors.push({ role: roleName, error: roleError.message })
-        // Keep local role if blockchain check fails - be conservative
-        if (localRoles.includes(roleName)) {
-          updatedRoles.push(roleName)
         }
       }
     }
 
-    // Keep any other roles that are stored locally but not in our synced list
+    // Anything cached locally that this sweep doesn't manage is left alone.
     for (const role of localRoles) {
-      if (!allSyncedRoles.includes(role) && !updatedRoles.includes(role)) {
-        updatedRoles.push(role)
-      }
+      if (!allSyncedRoles.includes(role) && !updatedRoles.includes(role)) updatedRoles.push(role)
     }
 
-    console.log('[RoleSync] Final roles:', updatedRoles)
-    if (syncErrors.length > 0) {
-      console.warn('[RoleSync] Sync completed with errors:', syncErrors)
+    return {
+      roles: updatedRoles,
+      hasChanges,
+      errors: [],
+      roleChains: foundOn,
+      estateRead: { read: readChains, unreadable: unreadableChains, swept: true },
+      membershipReadable,
     }
-
-    return { roles: updatedRoles, hasChanges, errors: syncErrors }
   }, [])
 
   /**
@@ -378,13 +440,22 @@ export function WalletProvider({ children }) {
       const localRoles = getUserRoles(walletAddress, activeChainId)
       setRoles(localRoles)
 
-      // Then sync with blockchain (authoritative source) for the active chain
-      const { roles: syncedRoles } = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
-      setRoles(syncedRoles)
+      // Then sweep the estate (authoritative source). `roles` is the flat estate-wide answer;
+      // roleChains/estateRead carry where each was found and which chains would not answer.
+      const synced = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
+      setRoles(synced.roles)
+      setRoleChains(synced.roleChains || {})
+      setEstateRead(synced.estateRead || { read: [], unreadable: [], swept: true })
+      setMembershipReadable(synced.membershipReadable !== false)
       setBlockchainSynced(true)
     } catch (error) {
       console.error('Error loading user roles:', error)
       setRoles([])
+      setRoleChains({})
+      setMembershipReadable(false)
+      // A failed sweep is NOT "you hold nothing" — leave it unswept so the console can say so
+      // rather than asserting a denial it never established (FR-012).
+      setEstateRead({ read: [], unreadable: [], swept: false })
     } finally {
       setRolesLoading(false)
     }
@@ -562,15 +633,18 @@ export function WalletProvider({ children }) {
   // Switch to the configured primary network (Polygon Amoy). Invoked from
   // the network-error banner / "Switch Network" button when the user is on
   // an unsupported chain.
-  const switchNetwork = useCallback(async () => {
-    const target = PRIMARY_CHAIN_ID
+  // `targetChainId` defaults to the app's home network, so every existing call site is
+  // unchanged. Spec 071 needs an explicit target: a membership purchase must settle on the
+  // REFERENCE chain (FR-006), which is not necessarily where the app happens to be homed.
+  const switchNetwork = useCallback(async (targetChainId = PRIMARY_CHAIN_ID) => {
+    const target = Number(targetChainId) || PRIMARY_CHAIN_ID
     try {
       await switchChain({ chainId: target })
       return true
     } catch (error) {
       console.error('Error switching network:', error)
       const targetNet = getNetwork(target)
-      throw new Error(`Please manually switch to ${targetNet?.name || 'Polygon Amoy'} in your wallet`)
+      throw new Error(`Please manually switch to ${targetNet?.name || `chain ${target}`} in your wallet`)
     }
   }, [switchChain])
 
@@ -622,6 +696,23 @@ export function WalletProvider({ children }) {
     if (!address || !Array.isArray(rolesToCheck)) return false
     return rolesToCheck.every(role => roles.includes(role))
   }, [address, roles])
+
+  /**
+   * Which cohort chains this account holds `role` on. Empty ⇒ not held anywhere readable.
+   *
+   * Entry to the console is the estate-wide question (`hasRole` above — "you hold something
+   * somewhere"). This is the narrower one, for surfaces that need to say WHERE. Neither is
+   * authority to write: that is still read from the specific contract on the scoped chain
+   * (`lib/chains/estate.js#readAuthority`), because holding GUARDIAN on the WagerRegistry is
+   * not holding it on the BridgeRouter.
+   */
+  const chainsForRole = useCallback((role) => roleChains[role] || [], [roleChains])
+
+  /** Does this account hold `role` on this specific chain? */
+  const hasRoleOnChainId = useCallback(
+    (role, id) => (roleChains[role] || []).some((c) => Number(c) === Number(id)),
+    [roleChains],
+  )
 
   const grantRole = useCallback((role) => {
     if (!address) {
@@ -724,6 +815,12 @@ export function WalletProvider({ children }) {
     hasRole,
     hasAnyRole,
     hasAllRoles,
+    // Spec 071: where roles were found, and what the sweep could actually read.
+    roleChains,
+    estateRead,
+    chainsForRole,
+    hasRoleOnChainId,
+    membershipReadable,
     grantRole,
     revokeRole,
   }

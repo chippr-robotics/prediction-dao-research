@@ -77,15 +77,15 @@ gets in from any chain, and is told where their authority lives.
 network, open `/admin`, and confirm it opens with only that role's views and names the network each
 role was found on.
 
-- [ ] T018 [US2] Extend the role sync in `frontend/src/contexts/RoleContext.jsx` to resolve each admin role across `cohortChainIds()` instead of the wallet chain only, recording per chain whether the role was held, not held, or unreadable (FR-009, FR-011)
-- [ ] T019 [US2] Apply the same estate-wide sync in `frontend/src/contexts/WalletContext.jsx`, which carries a parallel copy of the sync loop
-- [ ] T020 [US2] Keep the existing `(address, chainId)` local-storage cache key in `frontend/src/utils/roleStorage.js` — the chain dimension already exists, so entries simply exist for more chains and **no migration is needed**; confirm no schema change is introduced
-- [ ] T021 [US2] Expose an estate-wide `hasAnyRole`/`hasRole` plus a per-chain query from `frontend/src/contexts/RoleContext.jsx`, so entry and authority stay separable (FR-009 vs FR-019)
-- [ ] T022 [US2] Make the entry gate in `frontend/src/components/AdminPanel.jsx` use the estate-wide answer
-- [ ] T023 [US2] Distinguish the two refusals in `frontend/src/components/AdminPanel.jsx`: "you hold no operator role" vs "no network could be read" (FR-012) — the second must never be phrased as the first
-- [ ] T024 [US2] Extend the "Your Permissions" card in `frontend/src/components/AdminPanel.jsx` to name the network(s) each role is held on, and mark unread networks as unread rather than as ✗ (FR-010, FR-011)
-- [ ] T025 [P] [US2] Test in `frontend/src/test/admin/adminEstateEntry.test.jsx`: role on one chain + wallet on another ⇒ console opens with that role's views; no role anywhere ⇒ refused; one chain unreadable ⇒ still granted from roles found elsewhere; all chains unreadable ⇒ the distinct refusal message
-- [ ] T026 [P] [US2] Test that the permissions card names the network per role and never renders an unread network as a denial
+- [X] T018 [US2] ~~Extend the role sync in `frontend/src/contexts/RoleContext.jsx`~~ **N/A — `RoleContext.jsx` (`RoleProvider`) is imported nowhere and mounted nowhere; `useRoles` reads `WalletContext`. Dead code, so the estate sweep landed in T019 only rather than being mirrored into an unmounted provider.** Original scope: extend the role sync to resolve each admin role across `cohortChainIds()` instead of the wallet chain only, recording per chain whether the role was held, not held, or unreadable (FR-009, FR-011)
+- [X] T019 [US2] Apply the same estate-wide sync in `frontend/src/contexts/WalletContext.jsx`, which carries a parallel copy of the sync loop
+- [X] T020 [US2] Keep the existing `(address, chainId)` local-storage cache key in `frontend/src/utils/roleStorage.js` — the chain dimension already exists, so entries simply exist for more chains and **no migration is needed**; confirm no schema change is introduced
+- [X] T021 [US2] Expose an estate-wide `hasAnyRole`/`hasRole` plus a per-chain query (`chainsForRole`, `hasRoleOnChainId`, `estateRead`) from `frontend/src/contexts/WalletContext.jsx` (the live provider; see T018) and through `hooks/useRoles.js`, so entry and authority stay separable (FR-009 vs FR-019)
+- [X] T022 [US2] Make the entry gate in `frontend/src/components/AdminPanel.jsx` use the estate-wide answer
+- [X] T023 [US2] Distinguish the two refusals in `frontend/src/components/AdminPanel.jsx`: "you hold no operator role" vs "no network could be read" (FR-012) — the second must never be phrased as the first
+- [X] T024 [US2] Extend the "Your Permissions" card in `frontend/src/components/AdminPanel.jsx` to name the network(s) each role is held on, and mark unread networks as unread rather than as ✗ (FR-010, FR-011)
+- [X] T025 [P] [US2] Test in `frontend/src/test/admin/adminEstateEntry.test.jsx`: role on one chain + wallet on another ⇒ console opens with that role's views; no role anywhere ⇒ refused; one chain unreadable ⇒ still granted from roles found elsewhere; all chains unreadable ⇒ the distinct refusal message
+- [X] T026 [P] [US2] Test that the permissions card names the network per role and never renders an unread network as a denial
 
 **Checkpoint**: US2 is independently shippable — the console is reachable from any chain, with every
 view still gated exactly as before.
@@ -101,15 +101,15 @@ yields *unknown*, never *none*.
 confirm identical tier and expiry; then break the reference chain's endpoint and confirm *unknown*
 with a retry.
 
-- [ ] T027 [US1] Resolve the membership branch of `hasRoleOnChain` in `frontend/src/utils/blockchainService.js` against `membershipChainId()`, ignoring the caller's chain; leave the admin-role branch honouring its explicit chain (research R3, FR-003)
-- [ ] T028 [US1] Do the same for the MembershipManager path of `getUserTierOnChain` in `frontend/src/utils/blockchainService.js`
-- [ ] T029 [US1] Introduce a distinct *unknown* membership state in `frontend/src/utils/blockchainService.js` so a failed reference-chain read is no longer swallowed into `{tier: 0}` / `false` (FR-004) — this is the load-bearing change; today both functions return the same value for "no membership" and "could not ask"
-- [ ] T030 [US1] Propagate *unknown* through `frontend/src/contexts/RoleContext.jsx` and `frontend/src/hooks/useRoleDetails.js` without collapsing it to "no membership"
-- [ ] T031 [US1] Render *unknown* honestly wherever membership gates a surface: state that membership could not be read, offer a retry, and refuse the gated action attributing the refusal to the failed read (FR-005)
-- [ ] T032 [P] [US1] Test in `frontend/src/test/membershipReferenceChain.test.js` that `hasRoleOnChain(account, 'WAGER_PARTICIPANT', <any chain>)` constructs against the reference chain's MembershipManager — asserted by the constructed-address technique `adminLeastPrivilege.test.jsx` already uses
-- [ ] T033 [P] [US1] Test that `hasRoleOnChain(account, 'GUARDIAN', 8453)` still reads chain 8453 — the admin branch is unaffected
-- [ ] T034 [P] [US1] Test that a failed reference-chain read yields *unknown* and that no surface renders the words "no membership" in that state (FR-004)
-- [ ] T035 [P] [US1] Amend the doc-comment in `frontend/src/test/chainResolutionGuard.test.js` to state the rule the code actually follows — resolve against an **explicit** chain (wallet's, reference, or scoped), never the build-time default — and confirm the mechanical check still passes unmodified (research R5)
+- [X] T027 [US1] Resolve the membership branch of `hasRoleOnChain` in `frontend/src/utils/blockchainService.js` against `membershipChainId()`, ignoring the caller's chain; leave the admin-role branch honouring its explicit chain (research R3, FR-003)
+- [X] T028 [US1] Do the same for the MembershipManager path of `getUserTierOnChain` in `frontend/src/utils/blockchainService.js`
+- [X] T029 [US1] Introduce a distinct *unknown* membership state in `frontend/src/utils/blockchainService.js` so a failed reference-chain read is no longer swallowed into `{tier: 0}` / `false` (FR-004) — this is the load-bearing change; today both functions return the same value for "no membership" and "could not ask"
+- [X] T030 [US1] Propagate *unknown* through `frontend/src/contexts/RoleContext.jsx` and `frontend/src/hooks/useRoleDetails.js` without collapsing it to "no membership"
+- [X] T031 [US1] Render *unknown* honestly wherever membership gates a surface: state that membership could not be read, offer a retry, and refuse the gated action attributing the refusal to the failed read (FR-005)
+- [X] T032 [P] [US1] Test in `frontend/src/test/lib/chains/membershipReferenceChain.test.js` that `hasRoleOnChain(account, 'WAGER_PARTICIPANT', <any chain>)` constructs against the reference chain's MembershipManager — asserted by the constructed-address technique `adminLeastPrivilege.test.jsx` already uses
+- [X] T033 [P] [US1] Test that `hasRoleOnChain(account, 'GUARDIAN', 8453)` still reads chain 8453 — the admin branch is unaffected
+- [X] T034 [P] [US1] Test that a failed reference-chain read yields *unknown* and that no surface renders the words "no membership" in that state (FR-004)
+- [X] T035 [P] [US1] Amend the doc-comment in `frontend/src/test/chainResolutionGuard.test.js` to state the rule the code actually follows — resolve against an **explicit** chain (wallet's, reference, or scoped), never the build-time default — and confirm the mechanical check still passes unmodified (research R5)
 
 **Checkpoint**: US1 is independently shippable and closes the live defect.
 
@@ -123,12 +123,12 @@ resolver.
 **Independent test**: Start a purchase from a non-reference chain; confirm disclosure + switch, that
 declining buys nothing, and that no path completes a purchase elsewhere.
 
-- [ ] T036 [US5] Route the purchase calls built in `frontend/src/components/ui/PremiumPurchaseModal.jsx` to `membershipChainId()` rather than the connected chain (FR-006)
-- [ ] T037 [US5] Disclose the settlement network in the confirm step of `frontend/src/components/ui/PremiumPurchaseModal.jsx` before signature, and require the wallet to be there (FR-007)
-- [ ] T038 [US5] Offer a wallet network switch to the reference chain, and ensure declining leaves no purchase attempted on any chain (FR-007, acceptance 2)
-- [ ] T039 [US5] Evaluate payment-token sufficiency against the reference chain's balance only, stating any shortfall in that chain's payment token, in `frontend/src/components/ui/PremiumPurchaseModal.jsx` (FR-008)
-- [ ] T040 [US5] Audit `frontend/src/hooks/useTierPrices.js` and `frontend/src/hooks/useVouchers.js` for connected-chain assumptions in the purchase path and route them to the reference chain
-- [ ] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx`: purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager; **and the absence SC-006 claims** — drive the flow on *each* non-reference cohort chain and assert every built call still targets the reference chain's address, so "no path completes a purchase elsewhere" is verified rather than asserted in prose (mirrors the absence assertion T067 makes for FR-020)
+- [X] T036 [US5] Route the purchase calls built in `frontend/src/components/ui/PremiumPurchaseModal.jsx` to `membershipChainId()` rather than the connected chain (FR-006)
+- [X] T037 [US5] Disclose the settlement network in the confirm step of `frontend/src/components/ui/PremiumPurchaseModal.jsx` before signature, and require the wallet to be there (FR-007)
+- [X] T038 [US5] Offer a wallet network switch to the reference chain, and ensure declining leaves no purchase attempted on any chain (FR-007, acceptance 2)
+- [X] T039 [US5] Evaluate payment-token sufficiency against the reference chain's balance only, stating any shortfall in that chain's payment token, in `frontend/src/components/ui/PremiumPurchaseModal.jsx` (FR-008)
+- [X] T040 [US5] Audit `frontend/src/hooks/useTierPrices.js` and `frontend/src/hooks/useVouchers.js` for connected-chain assumptions in the purchase path and route them to the reference chain
+- [X] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx` (9 tests): purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager; **and the absence SC-006 claims** — drive the flow on *each* non-reference cohort chain and assert every built call still targets the reference chain's address, so "no path completes a purchase elsewhere" is verified rather than asserted in prose (mirrors the absence assertion T067 makes for FR-020)
 
 **Checkpoint**: US1 + US5 together close the read/write loop — a purchase is now readable from
 everywhere.

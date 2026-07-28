@@ -4,10 +4,24 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Regression guard for spec 008 (FR-011): user-facing code MUST resolve contract
- * addresses and providers for the wallet's CONNECTED chain
- * (`getContractAddressForChain(name, chainId)` / `getProvider(chainId)`), never
- * the build-time default (`getContractAddress(name)` / argless `getProvider()`).
+ * Regression guard for spec 008 (FR-011): user-facing code MUST resolve contract addresses and
+ * providers against an EXPLICIT chain — never the build-time default
+ * (`getContractAddress(name)` / argless `getProvider()`).
+ *
+ * ── WHY "EXPLICIT" AND NOT "THE WALLET'S CONNECTED CHAIN" (spec 071) ────────────────────────
+ * This comment used to say the rule was "the wallet's CONNECTED chain". That is no longer what
+ * the code does, and a guard whose stated reason contradicts the code it guards teaches the next
+ * reader to distrust it. There are now three legitimate explicit chains:
+ *
+ *   • the WALLET's chain      — for wallet-scoped state (balances, the member's own positions)
+ *   • the REFERENCE chain     — for membership, which lives in exactly one place per cohort
+ *                               (spec 071 FR-003; `membershipChainId()`)
+ *   • the SCOPED chain        — for operator views, which read a network the operator picks
+ *                               rather than the one the wallet sits on (spec 071 FR-013)
+ *
+ * The mechanical check below is UNCHANGED and still passes: all three go through
+ * `getContractAddressForChain(name, id)` / `getProvider(id)` / `getReadProvider(id)`. What the
+ * guard forbids is the build-time default, and that is still forbidden everywhere.
  *
  * This scans the source and fails when a user-facing file contains MORE
  * build-time-bound calls than its documented allowlist baseline. The allowlist

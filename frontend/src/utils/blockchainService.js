@@ -7,7 +7,7 @@
 
 import { ethers } from 'ethers'
 import { getContractAddress, getContractAddressForChain, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRACTS } from '../config/contracts'
-import { getNetwork } from '../config/networks'
+import { getNetwork, membershipChainId } from '../config/networks'
 import { makeReadProvider } from './rpcProvider'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
@@ -889,42 +889,52 @@ export async function checkRoleSyncNeeded(userAddress, roleName) {
 /**
  * Get user's current membership tier for a role from blockchain.
  *
- * Pass the wallet's CURRENT chainId so the tier is read from the chain the user
- * is actually on. Without it the address/provider default to the build-time
- * chain, so a tier held on testnet would be reported on mainnet (and vice
- * versa) — the cause of "current membership is already Silver" appearing after
- * switching from Amoy to Polygon. Mirrors hasRoleOnChain's chain-aware reads.
+ * ── READS THE MEMBERSHIP REFERENCE CHAIN, NOT THE WALLET'S (spec 071 FR-003) ─────────────────
+ * Membership lives in exactly one place per environment cohort, so the `chainId` argument is
+ * ignored for the MembershipManager path — see the matching note in `hasRoleOnChain`. It is
+ * still honoured by the legacy TierRegistry fallback below, which predates the reference chain.
+ *
+ * ── AND `unknown` IS NOT `None` (FR-004) ────────────────────────────────────────────────────
+ * A failed read used to return `{ tier: 0, tierName: 'None' }` — byte-identical to a genuine
+ * "you have no membership". A member whose RPC blipped was therefore told they owned nothing.
+ * The result now carries `readable`, and callers MUST NOT render `!readable` as "no membership".
  *
  * @param {string} userAddress - User's wallet address
  * @param {string} roleName - Role name or constant
- * @param {number} [chainId] - Chain to read from; defaults to the build-time chain
- * @returns {Promise<{tier: number, tierName: string}>} Current tier (0=None, 1=Bronze, 2=Silver, 3=Gold, 4=Platinum)
+ * @param {number} [chainId] - Only used by the legacy TierRegistry fallback
+ * @returns {Promise<{tier: number, tierName: string, readable: boolean, reason: string|null}>}
+ *          `readable: false` ⇒ tier is UNKNOWN, not zero.
  */
 export async function getUserTierOnChain(userAddress, roleName, chainId) {
+  const known = (tier, tierName) => ({ tier, tierName, readable: true, reason: null })
+  const unknownTier = (reason) => ({ tier: 0, tierName: 'Unknown', readable: false, reason })
+
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
-    return { tier: 0, tierName: 'None' }
+    return known(0, 'None')
   }
 
-  // Resolve the contract + provider against the selected chain (see hasRoleOnChain)
-  // so a membership held on one network is not read on another.
+  // Legacy fallback only (see doc-comment); the v2 path below is reference-chain bound.
   const resolveAddress = (name) =>
     chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
-  const provider = getProvider(chainId)
 
-  // v2 path: MembershipManager.getActiveTier
-  const mmAddress = resolveAddress('membershipManager')
+  // v2 path: MembershipManager.getActiveTier, always on the reference chain.
+  const refChain = membershipChainId()
+  const mmAddress = getContractAddressForChain('membershipManager', refChain)
   if (mmAddress) {
     try {
       const roleHash = getRoleHash(roleName)
-      if (!roleHash) return { tier: 0, tierName: 'None' }
-      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
+      if (!roleHash) return known(0, 'None')
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider(refChain))
       const tier = Number(await mm.getActiveTier(userAddress, roleHash))
       const tierName = tier === 0 ? 'None' : (TIER_NAMES[tier] || 'Unknown')
-      return { tier, tierName }
+      return known(tier, tierName)
     } catch (e) {
+      // THE load-bearing line of FR-004: this used to return `None`, which is what a member with
+      // no membership at all looks like. A reference chain that would not answer is not evidence
+      // the member owns nothing.
       console.warn('[getUserTierOnChain v2] failed:', e.message)
-      return { tier: 0, tierName: 'None' }
+      return unknownTier(e?.message || 'membership read failed')
     }
   }
 
@@ -932,31 +942,29 @@ export async function getUserTierOnChain(userAddress, roleName, chainId) {
     const tierRegistryAddress = resolveAddress('tierRegistry')
     if (!tierRegistryAddress) {
       console.warn('TierRegistry not deployed - cannot check user tier')
-      return { tier: 0, tierName: 'None' }
+      return known(0, 'None')
     }
 
     const roleHash = getRoleHash(roleName)
     if (!roleHash) {
       console.warn(`Unknown role: ${roleName}`)
-      return { tier: 0, tierName: 'None' }
+      return known(0, 'None')
     }
 
     const tierRegistry = new ethers.Contract(
       tierRegistryAddress,
       TIER_REGISTRY_ABI,
-      provider
+      getProvider(chainId)
     )
 
     const tier = await tierRegistry.getUserTier(userAddress, roleHash)
     const tierNum = Number(tier)
     const tierName = tierNum === 0 ? 'None' : (TIER_NAMES[tierNum] || 'Unknown')
 
-    console.log(`[getUserTierOnChain] ${roleName}: tier=${tierNum} (${tierName}) for ${userAddress}`)
-
-    return { tier: tierNum, tierName }
+    return known(tierNum, tierName)
   } catch (error) {
     console.error('Error getting user tier:', error)
-    return { tier: 0, tierName: 'None' }
+    return unknownTier(error?.message || 'tier read failed')
   }
 }
 
@@ -976,16 +984,23 @@ export function getRoleHash(roleName) {
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
  */
-export async function hasRoleOnChain(userAddress, roleName, chainId) {
+export async function hasRoleOnChain(userAddress, roleName, chainId, { detailed = false } = {}) {
+  // `detailed` callers get to tell "not held" apart from "could not ask" (spec 071 FR-011).
+  // Everyone else keeps the plain boolean this has always returned, so no existing caller
+  // changes behaviour. An estate-wide sweep NEEDS the distinction: counting an unreachable
+  // chain as "role not held" is how an operator gets locked out of the console by an RPC blip.
+  const held = (value) => (detailed ? { held: value, readable: true, reason: null } : value)
+  const unread = (reason) => (detailed ? { held: false, readable: false, reason } : false)
+
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
-    return false
+    return held(false)
   }
 
   const roleHash = getRoleHash(roleName)
   if (!roleHash) {
     console.warn(`Unknown role: ${roleName}`)
-    return false
+    return held(false)
   }
 
   const provider = getProvider(chainId)
@@ -995,17 +1010,26 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
   const resolveAddress = (name) =>
     chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
 
-  // Paid memberships (WAGER_PARTICIPANT) live in MembershipManager and are
-  // gated by a (Tier, expiry) pair — read via hasActiveRole.
+  // ── MEMBERSHIP ALWAYS READS THE REFERENCE CHAIN (spec 071 FR-003) ─────────────────────────
+  // Paid memberships (WAGER_PARTICIPANT) live in MembershipManager, gated by a (Tier, expiry)
+  // pair. Membership exists in exactly ONE place per environment cohort — Polygon on mainnet,
+  // Amoy on testnet — so reading it wherever the wallet happens to point reported every member
+  // on Ethereum / Optimism / Base / Arbitrum / ETC as having no membership. They have one; the
+  // lookup was aimed at chains it was never kept on.
+  //
+  // The caller's `chainId` is deliberately IGNORED here, and honoured in the admin-role branch
+  // below, because admin roles genuinely ARE per-chain. Splitting at this seam means the rule is
+  // enforced once rather than remembered at six call sites.
   if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') {
-    const mmAddress = resolveAddress('membershipManager')
-    if (!mmAddress) return false
+    const refChain = membershipChainId()
+    const mmAddress = getContractAddressForChain('membershipManager', refChain)
+    if (!mmAddress) return held(false)
     try {
-      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
-      return await mm.hasActiveRole(userAddress, roleHash)
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider(refChain))
+      return held(Boolean(await mm.hasActiveRole(userAddress, roleHash)))
     } catch (e) {
       console.warn('[hasRoleOnChain] membership read failed:', e.message)
-      return false
+      return unread(e?.message || 'membership read failed')
     }
   }
 
@@ -1067,16 +1091,23 @@ export async function hasRoleOnChain(userAddress, roleName, chainId) {
       if (liquidity) candidates.push(liquidity)
     }
   }
+  // No candidate contract on this chain is a DEFINITE "no role here" — there is nothing to hold
+  // a role on. A candidate that would not answer is a different thing, tracked below.
+  let anyFailed = null
   for (const addr of candidates) {
     try {
       const c = new ethers.Contract(addr, accessControlAbi, provider)
       const yes = await c.hasRole(roleHash, userAddress)
-      if (yes) return true
+      if (yes) return held(true)
     } catch (e) {
       console.debug(`[hasRoleOnChain] AccessControl read failed on ${addr}:`, e.message)
+      anyFailed = e?.message || 'AccessControl read failed'
     }
   }
-  return false
+  // A definite "no" only when every candidate actually answered. If one refused, the honest
+  // answer is "could not tell" — a caller sweeping the estate must not record that as a denial.
+  if (anyFailed) return unread(anyFailed)
+  return held(false)
 }
 
 /**

@@ -373,6 +373,13 @@
   font-weight: 500;
 }
 
+/* Where a held role actually lives (spec 071 FR-010). Secondary to the role name — it
+   qualifies the ✓ rather than competing with it. */
+.permission-networks {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
 /* Contract Addresses */
 .contract-addresses {
   display: flex;
