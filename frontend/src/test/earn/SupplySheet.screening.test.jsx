@@ -14,8 +14,10 @@
  *      stop there. A screen that only ran at render would sign that deposit.
  *   3. AN UNSCREENABLE WALLET IS NOT A FLAGGED ONE. The SanctionsGuard is not deployed on
  *      every pooling network (Ethereum, where every bridge pool lives, has none), so
- *      'uncertain' is disclosed and blocks nothing. Refusing there would refuse everyone
- *      on no evidence.
+ *      'uncertain' blocks nothing. Refusing there would refuse everyone on no evidence.
+ *      It is also no longer ANNOUNCED: the pools are a curated list of protocol contracts,
+ *      not counterparties a member picked, so "we could not screen this network" was a
+ *      warning about a risk the deposit in front of them does not carry.
  *   4. A RESTRICTED MEMBER STILL SEES AND STILL EXITS (FR-033). New value in is refused;
  *      the position figures, the Withdraw tab, and the withdrawal itself are untouched.
  *      Refusing new money is correct; trapping money that is already theirs is not.
@@ -310,13 +312,27 @@ describe('SupplySheet — screening the acting wallet (T116/T120, FR-032)', () =
     const user = userEvent.setup()
     renderBridge()
 
-    expect(await screen.findByTestId('supply-screening-unavailable')).toBeInTheDocument()
+    await waitFor(() => expect(screenOne).toHaveBeenCalled())
     expect(screen.queryByTestId('supply-screening-refusal')).not.toBeInTheDocument()
 
     const supply = await bridgeToConfirm(user)
     await acknowledge(user)
     await user.click(supply)
     await waitFor(() => expect(sendOnChain).toHaveBeenCalled())
+  })
+
+  it('says NOTHING about an unscreenable network — a curated pool has no counterparty to warn about', async () => {
+    verdict = 'uncertain'
+    renderBridge()
+
+    await waitFor(() => expect(screenOne).toHaveBeenCalled())
+    // The old notice ("screening could not be run on this network…") read as a warning
+    // about a deposit into a curated protocol contract, which is not a counterparty a
+    // member chose. Point 3 above is unchanged — an unknown is still never a refusal —
+    // but an unknown that changes nothing is not disclosed as though it did.
+    expect(screen.queryByTestId('supply-screening-unavailable')).not.toBeInTheDocument()
+    expect(screen.queryByText(/sanctions screening/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/pre-checked/i)).not.toBeInTheDocument()
   })
 })
 
@@ -394,21 +410,16 @@ describe('SupplySheet — screening states are accessible', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('has no axe violations while disclosing an unscreenable wallet', async () => {
+  it('has no axe violations on an unscreenable network, where the sheet says nothing', async () => {
     verdict = 'uncertain'
     const { container } = renderTrading()
-    await screen.findByTestId('supply-screening-unavailable')
+    await waitFor(() => expect(screenOne).toHaveBeenCalled())
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('announces the refusal assertively and the unknown passively', async () => {
+  it('announces the refusal assertively', async () => {
     verdict = 'restricted'
-    const { unmount } = renderTrading()
-    expect(await screen.findByTestId('supply-screening-refusal')).toHaveAttribute('role', 'alert')
-    unmount()
-
-    verdict = 'uncertain'
     renderTrading()
-    expect(await screen.findByTestId('supply-screening-unavailable')).toHaveAttribute('role', 'note')
+    expect(await screen.findByTestId('supply-screening-refusal')).toHaveAttribute('role', 'alert')
   })
 })

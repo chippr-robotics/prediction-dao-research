@@ -152,10 +152,12 @@ supply-earn-withdraw loop.
 1. **Given** a connected member, **When** they open Earn, **Then** **Supply** appears as a live,
    selectable area (not a disabled "coming later" tile), and the word "Bridges" no longer labels an
    Earn area.
-2. **Given** a member opens Earn → Supply, **When** the list loads, **Then** each pool card shows the
-   pool kind (bridge liquidity or trading liquidity), the asset or asset pair, the protocol and
-   network, the estimated return, the total already supplied, and the pool-specific risk summary —
-   each concept explained by an info bubble.
+2. **Given** a member opens Earn → Supply, **When** the list loads, **Then** each pool is one
+   scannable row showing the pool kind (bridge liquidity or trading liquidity), the asset or asset
+   pair, the protocol and network, the total already supplied, and the estimated return (stated as
+   absent where there is none); **And** opening the row shows the same figures with the reason for
+   any that are missing, plus the pool-specific risk summary, each concept explained by an info
+   bubble.
 3. **Given** a member supplies to a Uniswap trading pool, **When** they review before signing,
    **Then** they see the two-asset composition being supplied, the platform fee line and net amounts,
    and an explicit impermanent-loss disclosure that must be visible — not hidden behind a tooltip —
@@ -472,9 +474,14 @@ resolving.
 - **FR-016b**: Protocol contract addresses MUST be resolved per network from that network's own
   authoritative deployment record. The system MUST NOT assume a protocol uses the same address on
   every chain — several do not.
-- **FR-017**: Each pool card MUST show the pool kind, the asset or asset pair, the protocol and
-  network, the estimated return, the total already supplied, and a pool-kind-specific risk summary,
-  with every unfamiliar term explained by an info bubble in the same plain register as the Lend area.
+- **FR-017**: Each pool MUST show the pool kind, the asset or asset pair, the protocol and network,
+  the estimated return, the total already supplied, and a pool-kind-specific risk summary, with every
+  unfamiliar term explained by an info bubble in the same plain register as the Lend area. These may
+  be split between a scannable list ROW and the pool's DETAIL VIEW — the row carrying the kind, the
+  pair, the protocol, the network, the total and the return, and the detail view carrying those again
+  with the reason for any that are missing, plus the risk summary and every info bubble. Splitting
+  them is a change of WHERE, never of WHETHER: the whole row MUST open the detail view, and no
+  disclosure this clause names may live in neither place.
 - **FR-018**: Before supplying to a trading pool, the member MUST see an explicit, visible impermanent-
   loss disclosure — stating that the mix of assets returned changes with price and can be worth less
   than simply holding — presented in the confirm step itself rather than only behind a tooltip.
@@ -523,6 +530,12 @@ resolving.
   wallet deny-listed between quote and submission is still refused.
 - **FR-033**: A restricted account's ability to view and to exit existing positions MUST follow the
   platform's established policy for restricted accounts rather than being newly invented here.
+- **FR-033a**: A screening verdict of "could not be determined" MUST NOT be announced on the Supply
+  surface. It still refuses nothing (that would refuse everyone on no evidence), and it is still
+  never treated as clearance on the refusal path — but the pools are a CURATED list of protocol
+  contracts, not counterparties a member chose, so "screening could not be run on this network" is a
+  warning about a risk the deposit in front of them does not carry. The refusal of a wallet that IS
+  listed is unaffected: it is shown, and it is re-checked past the cache at submission (FR-032).
 
 #### Activity ledger, reporting, and notifications
 

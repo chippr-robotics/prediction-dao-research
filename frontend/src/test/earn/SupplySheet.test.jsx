@@ -465,6 +465,68 @@ describe('SupplySheet — the fee disclosure (T095, FR-028/FR-029, research R3)'
 })
 
 // =========================================================================================
+// =========================================================================================
+// The pool facts (FR-017). These moved OFF the list row when it became a dense, scannable
+// summary. They did not get dropped on the way — that is the whole point of this block: the
+// sheet is where the estimated return, the pool's total, and the kind-specific risk are
+// stated, above the tabs, so they are read BEFORE an amount is typed rather than after.
+// =========================================================================================
+describe('SupplySheet — the pool facts the row is too dense to carry (FR-017)', () => {
+  it('states the estimated return, the total supplied, and the trading-pool risk', () => {
+    // The pool has to be enriched in `pools` too: the sheet re-resolves the pool from the
+    // curated list as the pair selection changes, so a display-only override on `pool`
+    // alone would be replaced the moment it did.
+    const enriched = tradingPool({
+      protocol: 'Uniswap',
+      estimatedReturnApr: 0.052,
+      totalSuppliedLabel: '1.2M USDC + 340 WETH',
+    })
+    renderTrading({ pool: enriched, pools: [enriched, daiPool(), ethPool()] })
+
+    expect(screen.getByText('5.20%')).toBeInTheDocument()
+    expect(screen.getByText('1.2M USDC + 340 WETH')).toBeInTheDocument()
+    expect(
+      screen.getByText(/mix of the two assets you get back changes with their prices/i),
+    ).toBeInTheDocument()
+    // And where the pool lives, which the row states in shorthand.
+    expect(screen.getByText(/Uniswap · On Polygon · 0.30% pool fee/)).toBeInTheDocument()
+  })
+
+  it('states the bridge-pool risk instead, which is about inventory, not price', () => {
+    walletState.chainId = 1
+    renderBridge({ pool: bridgePool({ protocol: 'Across', totalSuppliedLabel: '8.4M WETH' }) })
+
+    expect(screen.getByText('8.4M WETH')).toBeInTheDocument()
+    expect(screen.getByText(/Across moves this pool’s funds between networks/i)).toBeInTheDocument()
+    expect(
+      screen.queryByText(/mix of the two assets you get back changes/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it('says WHY a figure is missing rather than filling it in (FR-054)', () => {
+    // The ordinary case: neither protocol publishes a realised return we can read.
+    renderTrading()
+
+    expect(
+      screen.getByText(/we would rather show nothing than a figure we cannot source/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/could not read this pool’s total just now/i)).toBeInTheDocument()
+    expect(screen.queryByText('0.00%')).not.toBeInTheDocument()
+  })
+
+  it('closes the amount fields on a PAUSED router and names the pause as one', async () => {
+    // The pause is the list's reading, carried on the pool. Without it the sheet would
+    // offer a deposit the list already knew would revert.
+    const paused = tradingPool({ unavailableReason: 'paused' })
+    renderTrading({ pool: paused, pools: [paused, daiPool(), ethPool()] })
+
+    expect(await screen.findByText(LIQUIDITY_UNAVAILABLE.paused)).toBeInTheDocument()
+    expect(screen.queryByText(RETIRED_POOL_COPY)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Amount (USDC)')).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Review and confirm/i })).toBeDisabled()
+  })
+})
+
 describe('SupplySheet — add-to and withdraw (T099, FR-021/FR-022/FR-024/FR-030)', () => {
   it('offers "Add to position" once the member holds one', async () => {
     renderTrading({ positions: [tradingPosition()] })

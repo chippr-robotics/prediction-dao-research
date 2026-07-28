@@ -358,6 +358,29 @@ export const LIQUIDITY_UNAVAILABLE = Object.freeze({
 })
 
 /**
+ * FR-024 — the SHORT form of "this pool is not taking deposits", for the dense
+ * list row. Each reason names ITSELF rather than collapsing into one "closed":
+ * a retired pool, a paused router, an unreachable protocol and an unreadable fee
+ * rate have four different remedies, and a member who is told the wrong one
+ * waits for the wrong thing. The full explanation is in the pool's sheet, which
+ * the row opens — a chip is a signpost, never the whole disclosure.
+ */
+export const POOL_STATE_LABEL = Object.freeze({
+  retired: 'Closed to new deposits',
+  paused: 'New deposits paused',
+  unreachable: 'Protocol unreachable',
+  fees: 'Fee rate unavailable',
+})
+
+/**
+ * @param {string|null|undefined} reason a pool's `unavailableReason`
+ * @returns {string|null} the short label, or null when the pool is open
+ */
+export function poolStateLabel(reason) {
+  return POOL_STATE_LABEL[reason] || null
+}
+
+/**
  * FR-065 — a pinned first asset leaves no valid counterpart on its network.
  * Says what would change it instead of showing an empty dropdown.
  * @param {string} symbol

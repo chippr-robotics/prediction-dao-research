@@ -359,6 +359,34 @@ genuinely different assets and quoting them as one would be dishonest. Both pred
 legitimately produce an empty second list — `noPairCounterpartCopy` / `noBridgeDestinationCopy` say
 what would change it rather than rendering a dead dropdown.
 
+## The Supply list: a row summarises, the sheet discloses
+
+Earn → Supply is a list of dense, scannable **rows** (`LiquidityPoolCard.jsx`), not cards. Each row
+carries what you choose a pool by — the pair or asset, the kind, `protocol · network · pool fee`, the
+total supplied, and the estimated return — and **the whole row is a `<button>` that opens
+`SupplySheet`**. Three rules govern edits here:
+
+1. **Moving a disclosure is fine; losing one is not.** FR-017's list (return, total, risk summary,
+   every InfoTip) is satisfied across the row *and* the sheet it opens. The reasons behind a missing
+   figure, the kind-specific risk, and every tip live in the sheet's facts block, above the tabs, so
+   they are read before an amount is typed. If you take something off the row, it lands there.
+2. **No InfoTip inside a row.** The row is one interactive element; nesting a tip button inside it is
+   an accessibility failure. That is the same reason the Lend vault row has none.
+3. **A closed pool still opens, and each closed state names itself.** `poolStateLabel()` maps the
+   pool's `unavailableReason` to one short chip — *Closed to new deposits* / *New deposits paused* /
+   *Protocol unreachable* / *Fee rate unavailable* — because the four have four different remedies.
+   The row never collapses them into one "closed", never hides the pool, and never disables itself:
+   `SupplyView` opens a closed pool the member holds **straight onto Withdraw** (FR-021/FR-024).
+
+The row draws no sparkline and no composition bar, unlike the design it follows. Neither has an
+honest source — no price feed backs a two-asset split, no history feed backs a trend — and on a value
+surface a decorative chart is a claim (rule 4 of the invariants below).
+
+The Supply surface also **says nothing when sanctions screening is unavailable** (FR-033a). These
+pools are a curated list of protocol contracts, not counterparties a member picked, so an
+"unscreenable network" notice warned about a risk the deposit does not carry. A wallet that IS listed
+is still refused, at display and again past the cache at submission (FR-032) — that half is untouched.
+
 ## Client libraries
 
 Both `lib/` trees follow the same **read/degrade contract**, copied from `lib/staking/stakingRouter.js`

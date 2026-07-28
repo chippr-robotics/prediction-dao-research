@@ -7,7 +7,7 @@
  * nested asset + network artwork, laid out like the Lend vault list so the two
  * areas read as one experience.
  *
- * ── FIVE THINGS THIS FILE IS DELIBERATE ABOUT ───────────────────────────────
+ * ── SIX THINGS THIS FILE IS DELIBERATE ABOUT ────────────────────────────────
  *
  * 1. THE AREA IS NOT GATED ON THE WALLET'S ACTIVE CHAIN. Availability is per
  *    POOL, not per active network, and the network switch happens at SIGNING
@@ -39,6 +39,15 @@
  *    whole. Cards disclose the RATE (see LiquidityPoolCard); bridge pools show
  *    no fee line at all, because that path cannot be charged without taking
  *    custody (research R3).
+ *
+ * 6. THE LIST SUMMARISES; THE SHEET DISCLOSES. Every pool is one dense,
+ *    scannable ROW — identity, size, kind, where it lives, and a label when it
+ *    is not taking deposits — and the whole row opens `SupplySheet`. That is
+ *    where the estimated return, the total's caveat, the risk summary, the
+ *    platform-fee rate and every InfoTip explaining those terms now live. The
+ *    rule this keeps is that nothing was DROPPED to make the row dense: a
+ *    disclosure the old card carried is a disclosure the sheet carries, and a
+ *    member reaches it before typing an amount, not after.
  *
  * DATA. `useLiquidityCatalog` reads the on-chain control surface directly — the
  * per-network `LiquidityRouter` is the authority on which pools are curated and
@@ -207,6 +216,10 @@ async function enrichPool({ listing, chainId, name, provider, config, fee, feeKn
   const assets = await Promise.all(addresses.map((a) => readTokenMeta(provider, chainId, a)))
 
   let totalSuppliedLabel = null
+  // The same total, unjoined. A pair's total is two amounts, and "33.8M USDC + 32K
+  // WETH" wrapped mid-figure in a dense row reads as one broken number — the row
+  // stacks the legs instead. Same figures, same source; only the joining differs.
+  let totalSuppliedParts = null
   let unavailableReason = null
   let acceptsDeposits = listing.enabled
   let lpToken = null
@@ -219,7 +232,8 @@ async function enrichPool({ listing, chainId, name, provider, config, fee, feeKn
     const parts = balances
       .map((raw, i) => formatTokenAmount(raw, assets[i]?.decimals, assets[i]?.symbol))
       .filter(Boolean)
-    totalSuppliedLabel = parts.length === addresses.length ? parts.join(' + ') : null
+    totalSuppliedParts = parts.length === addresses.length ? parts : null
+    totalSuppliedLabel = totalSuppliedParts ? totalSuppliedParts.join(' + ') : null
     // The router's pause stops UNISWAP supplies only — it is not a killswitch over
     // the bridge path, which never touches this contract (ILiquidityRouter).
     if (config.paused) unavailableReason = 'paused'
@@ -238,6 +252,7 @@ async function enrichPool({ listing, chainId, name, provider, config, fee, feeKn
       lpToken = pooled.lpToken || null
       const total = BigInt(pooled.liquidReserves ?? 0n) + BigInt(pooled.utilizedReserves ?? 0n)
       totalSuppliedLabel = formatTokenAmount(total, assets[0]?.decimals, assets[0]?.symbol)
+      totalSuppliedParts = totalSuppliedLabel ? [totalSuppliedLabel] : null
     }
   }
 
@@ -276,6 +291,7 @@ async function enrichPool({ listing, chainId, name, provider, config, fee, feeKn
     estimatedReturnApr: null,
     estimatedReturnReason: null,
     totalSuppliedLabel,
+    totalSuppliedParts,
     enabled: Boolean(acceptsDeposits),
     available: Boolean(acceptsDeposits) && !unavailableReason,
     unavailableReason,
@@ -592,6 +608,22 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
 
   const positionFor = (pool) => positions.find((p) => p.pool?.key === pool.key) || null
 
+  /**
+   * Point 6 — ONE way in. A row is a summary, not a fork: tapping it opens the
+   * pool's sheet, which holds the full disclosure and both actions behind tabs.
+   *
+   * The tab it lands on is the only thing decided here, and it is decided by
+   * what the member can actually do. A pool that is not taking deposits opens on
+   * WITHDRAW when they have something in it, because the supply tab is a dead
+   * end there and their exit is the whole reason the row is still listed
+   * (FR-021/FR-024). Everything else opens on Supply with Withdraw one tap away.
+   */
+  const openPool = (pool) => {
+    const closedToDeposits = !pool.available
+    const held = positionKeys.has(pool.key)
+    setSheet({ pool, mode: closedToDeposits && held ? 'withdraw' : 'supply' })
+  }
+
   return (
     <div className="earn-lend supply-view">
       {/* FR-020 — open positions first, exactly like the Lend area. */}
@@ -678,16 +710,7 @@ export default function SupplyView({ tokenFilter: initialTokenFilter = null, cat
         <ul className="supply-pool-list">
           {shownPools.map((pool) => (
             <li key={pool.key}>
-              <LiquidityPoolCard
-                pool={pool}
-                position={positionFor(pool)}
-                onSupply={(selected) => setSheet({ pool: selected, mode: 'supply' })}
-                onWithdraw={
-                  positionKeys.has(pool.key)
-                    ? (selected) => setSheet({ pool: selected, mode: 'withdraw' })
-                    : null
-                }
-              />
+              <LiquidityPoolCard pool={pool} position={positionFor(pool)} onOpen={openPool} />
             </li>
           ))}
         </ul>
