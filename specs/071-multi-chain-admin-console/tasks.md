@@ -192,10 +192,10 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 
 ### Incident-response views (converted last, on a proven pattern — research R8)
 
-- [ ] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it (FR-017)
-- [ ] T067 [US4] Assert there is **no** cross-chain "pause everywhere" control (FR-020) — an implicit multi-chain killswitch is exactly what this feature must not create
-- [ ] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it (FR-017)
-- [ ] T069 [P] [US4] Test the incident paths in `frontend/src/test/admin/adminIncidentEstate.test.jsx`, including the absence of any multi-chain action
+- [X] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it (FR-017)
+- [X] T067 [US4] Assert there is **no** cross-chain "pause everywhere" control (FR-020) — an implicit multi-chain killswitch is exactly what this feature must not create
+- [X] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it (FR-017)
+- [X] T069 [P] [US4] Test the incident paths in `frontend/src/test/admin/adminIncidentEstate.test.jsx`, including the absence of any multi-chain action
 
 **Checkpoint**: all seventeen views honour one contract; the console no longer mixes estate-wide and
 wallet-scoped views.
@@ -204,10 +204,10 @@ wallet-scoped views.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T070 [P] Add a source-level guard in `frontend/src/test/admin/adminEstateGuard.test.js` asserting no admin view reads the wallet chain implicitly and none sums balances across chains (research R9)
-- [ ] T071 [P] Update `docs/runbooks/operations-control-plane.md`: scope selectors, the three per-chain states, partial totals, and that a write is always one named chain
-- [ ] T072 [P] Add `docs/developer-guide/chain-estate-reads.md` covering `membershipChainId()`, the estate helper, and the rule that unreadable is never zero
-- [ ] T073 [P] Update `CLAUDE.md` guardrails with the reference-chain rule and the "never hand-build a provider" reminder now that it applies console-wide
+- [X] T070 [P] Add a source-level guard in `frontend/src/test/admin/adminEstateGuard.test.js` asserting no admin view reads the wallet chain implicitly and none sums balances across chains (research R9)
+- [X] T071 [P] Update `docs/runbooks/operations-control-plane.md`: scope selectors, the three per-chain states, partial totals, and that a write is always one named chain
+- [X] T072 [P] Add `docs/developer-guide/chain-estate-reads.md` covering `membershipChainId()`, the estate helper, and the rule that unreadable is never zero
+- [X] T073 [P] Update `CLAUDE.md` guardrails with the reference-chain rule and the "never hand-build a provider" reminder now that it applies console-wide
 - [ ] T074 Run the full `npm run test:frontend` and `npm run lint`; confirm the axe and Lighthouse CI jobs stay green
 - [ ] T075 Walk [quickstart.md](./quickstart.md) end to end, including the three failure modes it names
 

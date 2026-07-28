@@ -33,6 +33,53 @@ Related: [operator onboarding](operator-onboarding.md) ·
 | Access Control | Admin Roles | `DEFAULT_ADMIN_ROLE` | role-defining contracts |
 | Infrastructure | Services | admin or guardian | read-only + paymaster |
 
+## Reading the estate: what "per network" means here (spec 071)
+
+The console reads **every network this build may touch**, not the one your wallet happens to be
+connected to. Two consequences you will notice immediately:
+
+- **You can get in from anywhere.** Entry asks every network whether you hold an operator role,
+  so a guardian on Polygon reaches the console from a wallet pointed at Base. The permissions
+  card names the network each role was found on — a bare ✓ on a per-chain role is not enough to
+  act on.
+- **Your membership is read on one network.** Membership lives on Polygon (Amoy on testnet
+  builds) and nowhere else, so it resolves there whatever your wallet says.
+
+### The three states, and why a zero is never one of them
+
+Every per-network figure is in exactly one of three states, and they are deliberately not
+interchangeable:
+
+| State | Means | Do |
+|---|---|---|
+| a value | the contract answered | act on it |
+| *Not deployed on this network* | there is no such contract here | nothing to do here |
+| *Could not be read — <reason>* | **we could not ask** | retry; do not read it as zero |
+
+The third is the one that matters. A silent `0` on a control surface reads as a fact, so an
+unreachable network always says so and is excluded from any total — and that total is then
+labelled **partial** and names what is missing.
+
+For the same reason, balances are **never summed across networks**: different chains hold
+different payment tokens, so totals are shown per token. And **accrued** fees (undrawn, still
+withdrawable) are never added to **treasury** balances (already delivered) — they are different
+kinds of money.
+
+### Reads span the estate; writes do not
+
+Every change is one transaction on **one named network**, and the button says which. If your
+wallet is on a different network the control is withheld *and tells you which network to switch
+to* — before you sign, not at signature time.
+
+There is deliberately **no control that acts on several networks at once**. No "pause
+everywhere", no bulk freeze. A killswitch that fans out is one an operator can fire without
+knowing what they hit, so each network is paused, frozen, or withdrawn from explicitly.
+
+If a control is offered but says **authority could not be confirmed**, that is honest: we could
+not reach that network's contract to check your role. The contract itself will still refuse
+anything you do not hold — the control stays available because hiding a killswitch on a failed
+read tells an operator who *does* hold it that there isn't one.
+
 ## Navigating: the collapsible section rail
 
 The groups above render as a side panel down the left of `/admin`, with the

@@ -27,6 +27,9 @@ import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
 import { networkName } from '../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
 import { useFeeEstate } from '../hooks/useFeeEstate'
+import { estateNetworks } from '../lib/chains/estate'
+import { NetworkScopeCard } from './admin/scopeControls'
+import { useScopedChain } from './admin/scopeGate'
 import ChainStateTable from './admin/ChainStateTable'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
@@ -131,6 +134,32 @@ function AdminPanel() {
 
   // Fees across every cohort chain (US3), independent of where the wallet is connected.
   const feeEstate = useFeeEstate({ walletChainId: chainId, walletProvider: provider })
+
+  // Incident controls are per chain: pause and freeze act on ONE WagerRegistry. A guardian
+  // holding the role on Polygon could not pause Polygon from a wallet on Base, and the screen
+  // gave no reason. Scoped, named at the write, and — deliberately — with NO control that acts
+  // on several chains at once (FR-020): a killswitch that fans out is one an operator can fire
+  // without knowing what they hit.
+  const registryNetworks = useMemo(
+    () => estateNetworks().filter((n) => getContractAddressForChain('wagerRegistry', n.chainId)),
+    [],
+  )
+  const { scopeChainId: incidentChainId, setScopeChainId: setIncidentChainId } =
+    useScopedChain(registryNetworks, chainId)
+  const incidentRegistryAddr = getContractAddressForChain('wagerRegistry', incidentChainId)
+  const onIncidentChain = Number(incidentChainId) === Number(chainId)
+  const incidentWrite = () =>
+    new ethers.Contract(incidentRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer)
+  // Refuses at the call site as well as in the disabled button, so a stale render cannot pause
+  // the wrong network (FR-018).
+  const requireIncidentChain = () => {
+    if (onIncidentChain) return true
+    showNotification(
+      `This acts on ${networkName(incidentChainId)}. Switch your wallet there first.`,
+      'error',
+    )
+    return false
+  }
 
   // A withdrawal targets ONE chain. It defaults to the wallet's chain when that chain carries a
   // MembershipManager, otherwise to the first chain that does — the same rule the spec-067 tabs
@@ -279,14 +308,14 @@ function AdminPanel() {
     }
   }, [signer, showNotification, fetchContractState])
 
-  const handlePause = () => runTx(
-    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).pause(),
-    'WagerRegistry paused'
+  const handlePause = () => requireIncidentChain() && runTx(
+    () => incidentWrite().pause(),
+    `WagerRegistry paused on ${networkName(incidentChainId)}`
   )
 
-  const handleUnpause = () => runTx(
-    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unpause(),
-    'WagerRegistry unpaused'
+  const handleUnpause = () => requireIncidentChain() && runTx(
+    () => incidentWrite().unpause(),
+    `WagerRegistry unpaused on ${networkName(incidentChainId)}`
   )
 
   const handleConfigureTier = () => {
@@ -330,20 +359,20 @@ function AdminPanel() {
     const target = freezeEns.resolvedAddress || freezeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     if (!freezeForm.reason.trim()) return showNotification('Reason is required (recorded on-chain)', 'error')
+    if (!requireIncidentChain()) return false
     return runTx(
-      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).freezeAccount(
-        target, freezeForm.reason.trim()
-      ),
-      `Account ${shortAddr(target)} frozen`
+      () => incidentWrite().freezeAccount(target, freezeForm.reason.trim()),
+      `Account ${shortAddr(target)} frozen on ${networkName(incidentChainId)}`
     )
   }
 
   const handleUnfreeze = () => {
     const target = freezeEns.resolvedAddress || freezeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireIncidentChain()) return false
     return runTx(
-      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unfreezeAccount(target),
-      `Account ${shortAddr(target)} unfrozen`
+      () => incidentWrite().unfreezeAccount(target),
+      `Account ${shortAddr(target)} unfrozen on ${networkName(incidentChainId)}`
     )
   }
 
@@ -691,17 +720,30 @@ function AdminPanel() {
         {/* Emergency */}
         {activeTab === 'emergency' && isGuardian && (
           <div className="admin-tab-content" role="tabpanel">
+              <NetworkScopeCard
+                title="Emergency Pause"
+                description="The pause acts on ONE network\u2019s WagerRegistry. There is deliberately no control that pauses several at once \u2014 a killswitch that fans out is one an operator can fire without knowing what they hit."
+                networks={registryNetworks}
+                scopeChainId={incidentChainId}
+                onScopeChange={setIncidentChainId}
+                isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+                walletChainId={chainId}
+                onRefresh={fetchContractState}
+                lastReadAt={null}
+                notDeployedLabel="no wager registry"
+              />
+
             <div className="admin-card">
-              <h3>Emergency Pause</h3>
+              <h3>Emergency Pause on {networkName(incidentChainId)}</h3>
               <p>Pausing halts wager creation, acceptance, and settlement protocol-wide. Use only in response to a security incident. Unpausing restores normal operation.</p>
               <div className="emergency-actions">
                 {!contractState.isPaused ? (
-                  <button className="confirm-btn danger" onClick={handlePause} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Pause Protocol'}
+                  <button className="confirm-btn danger" onClick={handlePause} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Pause on ${networkName(incidentChainId)}`}
                   </button>
                 ) : (
-                  <button className="confirm-btn primary" onClick={handleUnpause} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Unpause Protocol'}
+                  <button className="confirm-btn primary" onClick={handleUnpause} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Unpause on ${networkName(incidentChainId)}`}
                   </button>
                 )}
               </div>
@@ -817,8 +859,21 @@ function AdminPanel() {
         {/* Account Moderation */}
         {activeTab === 'moderation' && isAccountModerator && (
           <div className="admin-tab-content" role="tabpanel">
+              <NetworkScopeCard
+                title="Account Moderation"
+                description="A freeze applies to ONE network\u2019s WagerRegistry. Freezing an account on one network does not freeze it on another, so each is done explicitly."
+                networks={registryNetworks}
+                scopeChainId={incidentChainId}
+                onScopeChange={setIncidentChainId}
+                isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+                walletChainId={chainId}
+                onRefresh={fetchContractState}
+                lastReadAt={null}
+                notDeployedLabel="no wager registry"
+              />
+
             <div className="admin-card">
-              <h3>Freeze / Unfreeze Account</h3>
+              <h3>Freeze / Unfreeze Account on {networkName(incidentChainId)}</h3>
               <p>
                 A frozen account cannot create wagers, accept wagers, cancel, declare a winner,
                 claim payouts, or claim refunds on WagerRegistry. Polymarket auto-resolution is
@@ -842,11 +897,11 @@ function AdminPanel() {
                     onChange={(e) => setFreezeForm({ ...freezeForm, reason: e.target.value })} />
                 </label>
                 <div className="emergency-actions">
-                  <button className="confirm-btn danger" onClick={handleFreeze} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Freeze Account'}
+                  <button className="confirm-btn danger" onClick={handleFreeze} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Freeze on ${networkName(incidentChainId)}`}
                   </button>
-                  <button className="confirm-btn secondary" onClick={handleUnfreeze} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Unfreeze Account'}
+                  <button className="confirm-btn secondary" onClick={handleUnfreeze} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Unfreeze on ${networkName(incidentChainId)}`}
                   </button>
                 </div>
               </div>
