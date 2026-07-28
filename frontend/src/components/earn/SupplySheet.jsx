@@ -48,9 +48,13 @@
  *    deny-listed since the sheet opened is refused before anything is signed. It never touches
  *    `submitWithdraw`: a restricted member keeps the exit, in full, always — point 5 is not
  *    conditional on screening. Note the BRIDGE-LP supply is a direct HubPool call with no
- *    FairWins contract in it, so this client-side screen is the only screen on that path;
- *    `uncertain` is still disclosed rather than treated as flagged, because the guard is not
- *    deployed on every pooling network and refusing everyone there would be its own dishonesty.
+ *    FairWins contract in it, so this client-side screen is the only screen on that path.
+ *    A verdict of `uncertain` blocks nothing AND says nothing: the pools here are a CURATED
+ *    list of protocol contracts, not counterparties a member picks, so "we could not screen
+ *    this network" is not a fact about the deposit in front of them. It used to be shown, and
+ *    it read as a warning about a swap that carries no counterparty risk to warn about. What
+ *    is NOT conditional is the refusal — a listed wallet is still refused, at display and
+ *    again past the cache at submission.
  * ─────────────────────────────────────────────────────────────────────────────────────────
  *
  * ── PROPS ────────────────────────────────────────────────────────────────────────────────
@@ -113,7 +117,9 @@ import {
   partialWithdrawalCopy,
   poolDisclosure,
   poolKindOf,
+  poolRiskSummary,
 } from '../../lib/liquidity/liquidityCopy'
+import { formatApy } from '../../lib/earn/format'
 import { FEE_SERVICES, bpsToPercent, fetchFeeQuote, maxFeeBpsFor } from '../../lib/fees/feeQuote'
 import { LIQUIDITY_ACTION, captureLiquidityAction } from '../../data/ledger/sources/liquidityLedgerSource'
 import './SupplySheet.css'
@@ -129,9 +135,12 @@ const DEADLINE_SECONDS = 30 * 60
 const SCREENING_REFUSAL =
   'This wallet is flagged by sanctions screening, so nothing new can be supplied. Nothing has been moved. Withdrawing what you already have in a pool is unaffected.'
 
-/** Screening could not run here — an unknown, stated as one, blocking nothing. */
-const SCREENING_UNAVAILABLE =
-  'Sanctions screening could not be run on this network just now, so this deposit has not been pre-checked here.'
+/** Why a return figure is missing, when the pool itself did not say. */
+const NO_RETURN_COPY =
+  'Not available right now. An estimated return comes from the pool’s recent trading and bridging activity — we would rather show nothing than a figure we cannot source.'
+
+/** Why a total is missing. Same rule: a blank with a reason beats an invented zero. */
+const NO_TOTAL_COPY = 'We could not read this pool’s total just now, so it is not being shown.'
 
 const lower = (v) => (v == null ? null : String(v).toLowerCase())
 /** Identity of one pool leg: a token address ON a network. */
@@ -337,6 +346,14 @@ export default function SupplySheet({
   const decimals1 = meta1.decimals ?? null
   const retired = pool ? !pool.enabled : false
   const unreachable = Boolean(pool?.unreachable)
+  /**
+   * The router's pause, as the LIST read it. The sheet does not re-read the router's
+   * paused flag — but it must not offer a deposit the list already knows would revert,
+   * so the reason travels on the pool and closes the amount fields here too. It is a
+   * separate state from retirement on purpose: a pause lifts, a retirement does not.
+   */
+  const routerPaused = pool?.unavailableReason === 'paused'
+  const risk = poolRiskSummary(pool?.kind)
 
   const position = useMemo(
     () => (positions || []).find((p) => p?.poolId && pool?.poolId && p.poolId === pool.poolId) || null,
@@ -487,6 +504,7 @@ export default function SupplySheet({
   const validateSupply = () => {
     if (!pool) return 'This pool could not be resolved, so nothing can be supplied to it.'
     if (retired) return RETIRED_POOL_COPY
+    if (routerPaused) return LIQUIDITY_UNAVAILABLE.paused
     if (amount0 === undefined || amount1 === undefined) return 'Enter a valid number.'
     if (amount0 == null) return `Enter an amount of ${symbol0} greater than zero.`
     if (isTrading && amount1 == null) {
@@ -847,7 +865,7 @@ export default function SupplySheet({
   // may still type and look around, but the step that leads to a signature is held back
   // until the rate is known (FR-028). Blocking the keyboard on a pending read would read as
   // a broken form rather than as an honest wait.
-  const depositsClosed = retired || unreachable
+  const depositsClosed = retired || unreachable || routerPaused
   // FR-033 — a flagged wallet loses the SUPPLY path and nothing else. The Withdraw tab, the
   // position figures, and `submitWithdraw` are all untouched below, so a restricted member
   // can still see what they hold and take it out.
@@ -892,11 +910,16 @@ export default function SupplySheet({
               <span className={`supply-kind-badge ${isTrading ? 'trading' : 'bridge'}`}>{kindLabel}</span>
             </h3>
             <p className="earn-vault-sheet-meta">
-              On {networkName}
+              {pool?.protocol ? `${pool.protocol} · ` : ''}On {networkName}
               {isTrading && pool?.feeTier ? ` · ${(Number(pool.feeTier) / 10_000).toFixed(2)}% pool fee` : ''}
               <InfoTip label="What is this pool?" className="earn-info">
                 {isTrading ? LIQUIDITY_TIPS.tradingPool : LIQUIDITY_TIPS.bridgePool}
               </InfoTip>
+              {isTrading && pool?.feeTier ? (
+                <InfoTip label="What is the pool fee?" className="earn-info">
+                  {LIQUIDITY_TIPS.feeTier}
+                </InfoTip>
+              ) : null}
             </p>
           </div>
           <button type="button" className="asset-sheet-close" onClick={onClose}>
@@ -904,8 +927,56 @@ export default function SupplySheet({
           </button>
         </div>
 
-        {/* FR-024 — a retired or unreachable pool stays VISIBLE and WITHDRAWABLE. It is never
-            hidden while a member's money is inside it; only new deposits are closed. */}
+        {/* FR-017 — the figures the list row is too dense to carry, read BEFORE an amount is
+            typed rather than after. A figure we could not source is "—" with the reason in
+            its place; the list said the same thing with a dash, and this is where it is
+            explained. */}
+        <dl className="supply-facts">
+          <div>
+            <dt>
+              Estimated return
+              <InfoTip label="What is the estimated return?" className="earn-info">
+                {LIQUIDITY_TIPS.estimatedReturn}
+              </InfoTip>
+            </dt>
+            <dd>
+              {pool?.estimatedReturnApr == null ? '—' : formatApy(pool.estimatedReturnApr)}
+              {pool?.estimatedReturnApr == null && (
+                <span className="supply-figure-note">{pool?.estimatedReturnReason || NO_RETURN_COPY}</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Total supplied
+              <InfoTip label="What does total supplied mean?" className="earn-info">
+                {LIQUIDITY_TIPS.totalSupplied}
+              </InfoTip>
+            </dt>
+            <dd>
+              {pool?.totalSuppliedLabel || '—'}
+              {!pool?.totalSuppliedLabel && <span className="supply-figure-note">{NO_TOTAL_COPY}</span>}
+            </dd>
+          </div>
+        </dl>
+
+        {/* FR-017 — the kind-specific risk, in the same plain register as the Lend area. */}
+        {risk && (
+          <p className="supply-card-risk">
+            {risk}
+            <InfoTip
+              label={isTrading ? 'About changing asset mix' : 'About withdrawing from a bridge pool'}
+              className="earn-info"
+            >
+              {isTrading ? LIQUIDITY_TIPS.impermanentLoss : LIQUIDITY_TIPS.inventory}
+            </InfoTip>
+          </p>
+        )}
+
+        {/* FR-024 — a pool that is not taking deposits stays VISIBLE and WITHDRAWABLE. It is
+            never hidden while a member's money is inside it; only new deposits are closed.
+            Each reason states ITSELF: they have different remedies, and telling a member the
+            wrong one has them waiting for the wrong thing. */}
         {retired && (
           <p className="supply-note" role="note">
             {RETIRED_POOL_COPY}
@@ -914,6 +985,11 @@ export default function SupplySheet({
         {unreachable && !retired && (
           <p className="supply-note" role="note">
             {POOL_UNREACHABLE_COPY}
+          </p>
+        )}
+        {routerPaused && (
+          <p className="supply-note" role="note">
+            {LIQUIDITY_UNAVAILABLE.paused}
           </p>
         )}
 
@@ -958,18 +1034,13 @@ export default function SupplySheet({
 
             {mode === 'supply' ? (
               <>
-                {/* FR-032/FR-033 — the verdict, stated, on the value-in path only.
-                    'restricted' refuses and says what is NOT refused; 'uncertain' is
-                    disclosed as an unknown and blocks nothing, because the guard is not
-                    deployed on every pooling network. */}
+                {/* FR-032/FR-033 — the verdict, stated, on the value-in path only, and only
+                    when it REFUSES: it says what is refused and what is not. An 'uncertain'
+                    verdict is deliberately silent — see point 6 — while still never being
+                    treated as clearance on the refusal path. */}
                 {screeningRestricted && (
                   <p className="earn-input-error" role="alert" data-testid="supply-screening-refusal">
                     {SCREENING_REFUSAL}
-                  </p>
-                )}
-                {screening === 'uncertain' && (
-                  <p className="supply-note" role="note" data-testid="supply-screening-unavailable">
-                    {SCREENING_UNAVAILABLE}
                   </p>
                 )}
                 {step === 'amount' ? (

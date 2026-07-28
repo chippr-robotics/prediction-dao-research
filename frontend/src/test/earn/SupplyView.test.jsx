@@ -3,12 +3,13 @@
  *
  * What these tests hold in place, in the order the review flagged them:
  *
- *   1. The fee is charged on capital ACTUALLY DEPLOYED. A card discloses a
- *      RATE and says what the rate applies to — it never promises "fee = rate ×
- *      what you entered", because the router quotes the fee after the mint
- *      against what Uniswap actually consumed and refunds the rest whole.
- *   2. A bridge pool shows NO fee line at all — not a line reading 0.00%, which
- *      would imply a lever that does not exist (research R3).
+ *   1. A ROW SUMMARISES AND OPENS; IT NEVER DISCLOSES. Each pool is one dense
+ *      row whose whole surface opens `SupplySheet`. The platform fee rate is
+ *      NOT on it: the fee is charged on capital the pool actually consumed, so
+ *      the only honest disclosure is the sheet's, before the signature. A row
+ *      that quoted a rate would be quoting one for an amount nobody has typed.
+ *   2. A bridge pool carries no fee figure anywhere — not one reading 0.00%,
+ *      which would imply a lever that does not exist (research R3).
  *   3. The pair selector uses `samePair`, the exact INVERSE of the Bridge
  *      surface's `bridgeDest`. The last block below fails if it is swapped.
  *   4. The Supply area is NOT gated on the wallet's active chain — that was the
@@ -16,10 +17,12 @@
  *   5. Availability is asymmetric: trading liquidity on the Uniswap networks,
  *      bridge liquidity on ETHEREUM ONLY.
  *
- * Plus FR-024 (a retired pool stays visible and withdrawable), FR-020 (every
- * position figure labelled a live estimate), FR-025 (honest empty state naming
- * where pooling IS available), honest degradation on an unreachable protocol,
- * and a WCAG audit with vitest-axe.
+ * Plus FR-024 (a pool closed to deposits stays visible, stays openable, and
+ * opens on the tab the member can actually use), FR-020 (every position figure
+ * labelled a live estimate), FR-025 (honest empty state naming where pooling IS
+ * available), honest degradation on an unreachable protocol — each closed state
+ * naming itself rather than collapsing into one "closed" — and a WCAG audit
+ * with vitest-axe.
  *
  * The `catalog` prop is the injection seam SupplyView exposes for exactly this:
  * no network is touched, so nothing here depends on a deployment.
@@ -46,8 +49,13 @@ vi.mock('../../hooks/useSelectableAssets', () => ({
 // LIST's wiring — that a control opens the sheet for the pool it belongs to —
 // without depending on the sheet's internals.
 vi.mock('../../components/earn/SupplySheet', () => ({
-  default: ({ pool, positions }) => (
-    <div data-testid="supply-sheet" data-pool={pool?.poolId} data-positions={positions?.length ?? 0} />
+  default: ({ pool, positions, initialMode }) => (
+    <div
+      data-testid="supply-sheet"
+      data-pool={pool?.poolId}
+      data-mode={initialMode}
+      data-positions={positions?.length ?? 0}
+    />
   ),
 }))
 
@@ -116,6 +124,15 @@ const RETIRED_POOL = {
   unavailableReason: 'retired',
 }
 
+/** No return figure to show — the ordinary case, since neither protocol publishes one. */
+const NO_RETURN_POOL = {
+  ...TRADING_POOL,
+  key: '137:0xnoreturn',
+  poolId: '0xnoreturn',
+  assets: [USDC, { ...WETH, symbol: 'ARB' }],
+  estimatedReturnApr: null,
+}
+
 /** The protocol could not be reached: figures withheld, never invented. */
 const UNREACHABLE_POOL = {
   ...TRADING_POOL,
@@ -182,56 +199,78 @@ beforeEach(() => {
   mockWallet.current = { chainId: 137, address: '0xmember', isConnected: true }
 })
 
+/** The row IS the control now, so it is found by the name it announces. */
+const poolRow = (name) => screen.getByRole('button', { name })
+const tradingRow = () => poolRow(/USDC \/ WETH —/)
+const bridgeRow = () => poolRow(/^USDC — Bridge liquidity/)
+
 // ---------------------------------------------------------------------------
 // The curated list — both kinds, cross-network (FR-015/T093)
 // ---------------------------------------------------------------------------
 
 describe('SupplyView — the curated list (FR-015)', () => {
-  it('lists both pool kinds together, each labelled, with protocol and network', () => {
+  it('lists both pool kinds together as rows, each labelled, with protocol and network', () => {
     render(<SupplyView catalog={catalog()} />)
 
     expect(screen.getByText('USDC / WETH')).toBeInTheDocument()
     expect(screen.getByText('USDC')).toBeInTheDocument()
     expect(screen.getByText('Trading liquidity')).toBeInTheDocument()
     expect(screen.getByText('Bridge liquidity')).toBeInTheDocument()
-    expect(screen.getByText(/Uniswap · on Polygon/)).toBeInTheDocument()
-    expect(screen.getByText(/Across · on Ethereum/)).toBeInTheDocument()
+
+    // Each row announces itself in one breath: what it is, where it lives, how big.
+    expect(
+      screen.getByRole('button', { name: /USDC \/ WETH — Trading liquidity on Polygon/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /USDC — Bridge liquidity on Ethereum/ }),
+    ).toBeInTheDocument()
+
+    const trading = tradingRow()
+    expect(within(trading).getByText('Uniswap')).toBeInTheDocument()
+    expect(within(trading).getByText('Polygon')).toBeInTheDocument()
+    expect(within(trading).getByText('0.30% fee')).toBeInTheDocument()
+    expect(within(bridgeRow()).getByText('Across')).toBeInTheDocument()
+    expect(within(bridgeRow()).getByText('Ethereum')).toBeInTheDocument()
   })
 
-  it('shows the estimated return, total supplied, and a kind-specific risk summary (FR-017)', () => {
-    render(<SupplyView catalog={catalog()} />)
+  it('carries the pool’s size on the row and states an absent return as one (FR-017/FR-054)', () => {
+    render(<SupplyView catalog={catalog({ pools: [TRADING_POOL, NO_RETURN_POOL] })} />)
 
-    expect(screen.getByText('5.20%')).toBeInTheDocument()
-    expect(screen.getByText('1.2M USDC + 340 WETH')).toBeInTheDocument()
-    expect(screen.getByText('3.10%')).toBeInTheDocument()
-    expect(screen.getByText('8.4M USDC')).toBeInTheDocument()
-
-    // Trading pools warn about the changing mix; bridge pools warn about inventory.
-    expect(
-      screen.getByText(/mix of the two assets you get back changes with their prices/i),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Across moves this pool’s funds between networks/i),
-    ).toBeInTheDocument()
+    expect(within(tradingRow()).getByText('1.2M USDC + 340 WETH')).toBeInTheDocument()
+    expect(within(tradingRow()).getByText('Return 5.20%')).toBeInTheDocument()
+    // No protocol publishes a realised return we can read, so the usual row says so
+    // rather than rendering a 0% that would read as a real figure.
+    const noReturn = screen.getByRole('button', { name: /USDC \/ ARB/ })
+    expect(within(noReturn).getByText('Return n/a')).toBeInTheDocument()
+    expect(within(noReturn).queryByText(/0\.00%/)).not.toBeInTheDocument()
   })
 
   it('does NOT gate the list on the wallet’s active chain (the Phase 3 Bridge bug)', () => {
-    // Wallet on Polygon; the Ethereum bridge pool is still offered and its
-    // Supply control is live — no "switch network first" wall.
-    mockWallet.current = { chainId: 137, address: '0xmember', isConnected: true }
+    // Wallet on a network with NO pools at all — Ethereum Classic runs neither
+    // protocol. Both pools are still listed and both rows still open.
+    mockWallet.current = { chainId: 61, address: '0xmember', isConnected: true }
     render(<SupplyView catalog={catalog()} />)
 
-    expect(screen.getByRole('button', { name: 'Supply USDC' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Supply USDC / WETH' })).toBeEnabled()
-    // And the active-network note explicitly says browsing needs no switch.
+    expect(bridgeRow()).toBeEnabled()
+    expect(tradingRow()).toBeEnabled()
+    // And the active-network note explicitly says browsing needs no switch. It is a
+    // NOTE about where the wallet happens to be, never a wall in front of the list.
     expect(screen.getByText(/You do not have to switch networks to look/i)).toBeInTheDocument()
   })
 
-  it('opens the confirm step for the pool whose control was pressed', async () => {
+  it('opens the detail sheet for the pool whose ROW was pressed', async () => {
     render(<SupplyView catalog={catalog()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Supply USDC' }))
+    fireEvent.click(bridgeRow())
     const sheet = await screen.findByTestId('supply-sheet')
     expect(sheet).toHaveAttribute('data-pool', BRIDGE_POOL.poolId)
+    // An open pool lands on Supply, with Withdraw one tap away inside the sheet.
+    expect(sheet).toHaveAttribute('data-mode', 'supply')
+  })
+
+  it('marks a pool the member is already in, so their exit is findable in the list', () => {
+    render(<SupplyView catalog={catalog({ positions: [TRADING_POSITION] })} />)
+    expect(within(tradingRow()).getByText('Your position')).toBeInTheDocument()
+    expect(within(bridgeRow()).queryByText('Your position')).not.toBeInTheDocument()
   })
 
   it('states the availability asymmetry — bridge pools are Ethereum only', () => {
@@ -248,33 +287,26 @@ describe('SupplyView — the curated list (FR-015)', () => {
 // The fee line — a rate, and only where a rate can be charged
 // ---------------------------------------------------------------------------
 
-describe('SupplyView — the platform fee line (FR-028/FR-029, research R3)', () => {
-  it('discloses a RATE for a trading pool and never a fee amount off the gross', () => {
+describe('SupplyView — the platform fee is disclosed in the sheet, never in the row', () => {
+  // The rate is live, per-network, and applies to capital the pool ACTUALLY consumes —
+  // none of which a one-line row can state honestly, and a bare "0.25%" beside a pool
+  // fee tier reads as part of the pool. `SupplySheet` discloses it before the signature
+  // and passes the same figure as `maxFeeBps`; those are its own tests (T095/T113).
+  it('never puts a fee rate on a row, on either pool kind', () => {
     render(<SupplyView catalog={catalog()} />)
-
-    expect(screen.getByText('FairWins platform fee: 0.25%')).toBeInTheDocument()
-    // What the rate applies to: capital actually deployed, not what was offered.
-    expect(
-      screen.getByText(/charged on what actually goes into the pool/i),
-    ).toBeInTheDocument()
-    expect(screen.getByText(/never on the whole amount you offered/i)).toBeInTheDocument()
-  })
-
-  it('shows NO fee line at all on a bridge pool — not even one reading 0.00%', () => {
-    render(<LiquidityPoolCard pool={BRIDGE_POOL} />)
     expect(screen.queryByText(/FairWins platform fee/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/0\.00%/)).not.toBeInTheDocument()
+    // And nothing that could be mistaken for one: the only percentage a trading row
+    // carries is the pool's own fee tier, labelled as such.
+    expect(within(tradingRow()).getByText('0.30% fee')).toBeInTheDocument()
+    expect(within(tradingRow()).queryByText('0.25%')).not.toBeInTheDocument()
   })
 
-  it('shows no fee line for a bridge pool even if a non-zero rate is somehow passed', () => {
-    // Defence in depth: the copy layer refuses a bridge fee regardless of bps.
+  it('shows no fee figure on a bridge row even if a non-zero rate is somehow passed', () => {
+    // Defence in depth: that path cannot be charged at all (research R3), and the row
+    // has nowhere for a rate to leak into.
     render(<LiquidityPoolCard pool={{ ...BRIDGE_POOL, feeBps: 250, feeAvailable: true }} />)
     expect(screen.queryByText(/FairWins platform fee/i)).not.toBeInTheDocument()
-  })
-
-  it('shows no fee line when the live rate is zero (FR-029)', () => {
-    render(<LiquidityPoolCard pool={{ ...TRADING_POOL, feeBps: 0 }} />)
-    expect(screen.queryByText(/FairWins platform fee/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/2\.50%/)).not.toBeInTheDocument()
   })
 })
 
@@ -283,30 +315,34 @@ describe('SupplyView — the platform fee line (FR-028/FR-029, research R3)', ()
 // ---------------------------------------------------------------------------
 
 describe('SupplyView — retired and unreachable pools (FR-024)', () => {
-  it('keeps a retired pool VISIBLE, marks it closed, and offers no deposit control', () => {
+  it('keeps a retired pool VISIBLE and marks it closed, without hiding or disabling the row', () => {
     render(<SupplyView catalog={catalog({ pools: [RETIRED_POOL] })} />)
 
-    expect(screen.getByText('USDC / WPOL')).toBeInTheDocument()
-    expect(screen.getByText('Closed to new deposits')).toBeInTheDocument()
-    expect(screen.getByText(/This pool is closed to new deposits/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Supply/ })).not.toBeInTheDocument()
+    const row = screen.getByRole('button', { name: /USDC \/ WPOL/ })
+    expect(within(row).getByText('USDC / WPOL')).toBeInTheDocument()
+    expect(within(row).getByText('Closed to new deposits')).toBeInTheDocument()
+    // The state travels in the row's announcement too, not only as a visual chip.
+    expect(row).toHaveAccessibleName(/Closed to new deposits/)
+    // Still openable: the full explanation and the member's exit are inside the sheet.
+    expect(row).toBeEnabled()
   })
 
-  it('keeps a retired pool WITHDRAWABLE when the member has money in it', () => {
+  it('opens a retired pool the member holds straight onto WITHDRAW — the exit always works', async () => {
     render(
       <SupplyView catalog={catalog({ pools: [RETIRED_POOL], positions: [RETIRED_POSITION] })} />,
     )
-    expect(screen.getByRole('button', { name: 'Withdraw' })).toBeEnabled()
-    expect(screen.queryByRole('button', { name: /^Supply/ })).not.toBeInTheDocument()
-  })
-
-  it('opens the confirm step for a retired pool’s WITHDRAW control — the exit always works', async () => {
-    render(
-      <SupplyView catalog={catalog({ pools: [RETIRED_POOL], positions: [RETIRED_POSITION] })} />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+    fireEvent.click(screen.getByRole('button', { name: /USDC \/ WPOL/ }))
     const sheet = await screen.findByTestId('supply-sheet')
     expect(sheet).toHaveAttribute('data-pool', RETIRED_POOL.poolId)
+    // Supply is a dead end on a closed pool, so the sheet must not land there.
+    expect(sheet).toHaveAttribute('data-mode', 'withdraw')
+  })
+
+  it('opens a retired pool the member does NOT hold on the supply tab, which states why it is closed', async () => {
+    render(<SupplyView catalog={catalog({ pools: [RETIRED_POOL] })} />)
+    fireEvent.click(screen.getByRole('button', { name: /USDC \/ WPOL/ }))
+    const sheet = await screen.findByTestId('supply-sheet')
+    expect(sheet).toHaveAttribute('data-mode', 'supply')
   })
 
   it('never filters a retired pool out of a token-filtered list', () => {
@@ -316,19 +352,18 @@ describe('SupplyView — retired and unreachable pools (FR-024)', () => {
         catalog={catalog({ pools: [RETIRED_POOL], positions: [RETIRED_POSITION] })}
       />,
     )
-    // The pool CARD itself survives the filter, not merely the position row.
-    expect(screen.getByRole('article', { name: /USDC \/ WPOL/ })).toBeInTheDocument()
+    // The pool ROW itself survives the filter, not merely the position row.
+    expect(screen.getByRole('button', { name: /USDC \/ WPOL/ })).toBeInTheDocument()
   })
 
   it('degrades an unreachable protocol without inventing figures', () => {
     render(<SupplyView catalog={catalog({ pools: [UNREACHABLE_POOL] })} />)
 
-    const card = screen.getByRole('article', { name: /USDC \/ ARB/ })
-    expect(within(card).getAllByText('—').length).toBe(2)
-    expect(within(card).getByText(/we would rather show nothing than a figure we cannot source/i))
-      .toBeInTheDocument()
-    expect(within(card).getByText(/We cannot reach this pool’s protocol right now/i)).toBeInTheDocument()
-    expect(within(card).queryByRole('button', { name: /^Supply/ })).not.toBeInTheDocument()
+    const row = screen.getByRole('button', { name: /USDC \/ ARB/ })
+    // A total we could not read is a dash, never a zero; the sheet says why.
+    expect(within(row).getByText('—')).toBeInTheDocument()
+    expect(within(row).getByText('Return n/a')).toBeInTheDocument()
+    expect(within(row).getByText('Protocol unreachable')).toBeInTheDocument()
   })
 
   it('blames the right fault when the fee rate — not the protocol — cannot be read', () => {
@@ -339,9 +374,23 @@ describe('SupplyView — retired and unreachable pools (FR-024)', () => {
         })}
       />,
     )
-    expect(screen.getByText(/We cannot read the current platform fee/i)).toBeInTheDocument()
-    expect(screen.queryByText(/We cannot reach this pool’s protocol/i)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Supply/ })).not.toBeInTheDocument()
+    // Four closed states, four different remedies: the row never collapses them into
+    // one "closed", because a member told the wrong one waits for the wrong thing.
+    expect(screen.getByText('Fee rate unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('Protocol unreachable')).not.toBeInTheDocument()
+    expect(screen.queryByText('Closed to new deposits')).not.toBeInTheDocument()
+  })
+
+  it('names a paused router as a pause, not as a retirement', () => {
+    render(
+      <SupplyView
+        catalog={catalog({
+          pools: [{ ...TRADING_POOL, available: false, unavailableReason: 'paused' }],
+        })}
+      />,
+    )
+    expect(screen.getByText('New deposits paused')).toBeInTheDocument()
+    expect(screen.queryByText('Closed to new deposits')).not.toBeInTheDocument()
   })
 
   it('names the networks whose pools could not be read rather than implying a whole list', () => {
@@ -367,8 +416,8 @@ describe('SupplyView — empty states (FR-025)', () => {
     expect(screen.getAllByText(/Bridge pools are available on Ethereum only/i).length)
       .toBeGreaterThan(0)
     // No mock rows and no dead controls.
-    expect(screen.queryByRole('article')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Supply/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /liquidity on/i })).not.toBeInTheDocument()
   })
 
   it('explains an empty token filter and names where pooling is available', () => {
