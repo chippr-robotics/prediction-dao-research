@@ -20,100 +20,16 @@
  *     before-value rather than back-filling a number nobody emitted (FR-046).
  */
 import { bpsToPercent } from '../../lib/fees/feeQuote'
-import { networkName, shortAddr } from './liquidityAdminCommon'
+import { shortAddr } from './liquidityAdminCommon'
 
 /* ------------------------------------------------------------------------------------------
  * Presentational pieces
  * ---------------------------------------------------------------------------------------- */
 
-/**
- * The network scope selector — the control that makes these tabs per-network rather than
- * per-wallet-connection.
- *
- * It lists every capable network and marks which of them actually carry a deployed router, so
- * "nothing configured here" and "nothing deployed here" are never confusable.
- */
-export function NetworkScopeCard({
-  title,
-  description,
-  networks,
-  scopeChainId,
-  onScopeChange,
-  isDeployed,
-  walletChainId,
-  onRefresh,
-  lastReadAt,
-  children,
-}) {
-  const deployedCount = networks.filter((n) => isDeployed(n.chainId)).length
-  return (
-    <div className="admin-card">
-      <div className="admin-card-header">
-        <h3>{title}</h3>
-        <button type="button" className="refresh-btn" onClick={onRefresh} aria-label={`Refresh ${title}`}>
-          ↻
-        </button>
-      </div>
-      <p className="card-info">{description}</p>
-      <div className="admin-form">
-        <label>
-          Network
-          <select
-            value={String(scopeChainId)}
-            onChange={(e) => onScopeChange(Number(e.target.value))}
-          >
-            {networks.map((net) => (
-              <option key={net.chainId} value={String(net.chainId)}>
-                {net.name}
-                {isDeployed(net.chainId) ? '' : ' — no router deployed'}
-                {Number(net.chainId) === Number(walletChainId) ? ' (wallet is here)' : ''}
-              </option>
-            ))}
-          </select>
-          <span className="hint">
-            Control state is per network. Reading any network works from anywhere; changing one
-            needs your wallet on it. Deployed on {deployedCount} of {networks.length} networks.
-          </span>
-        </label>
-      </div>
-      {lastReadAt && (
-        <p className="card-info">
-          Everything below is as of {lastReadAt.toLocaleTimeString()} — the last time this network was read.
-        </p>
-      )}
-      {children}
-    </div>
-  )
-}
-
-/**
- * Says plainly why the write controls are inert, when they are.
- *
- * Reading another network is fine; signing for it is not — the wallet signs on the chain it is
- * connected to, and a transaction built for a different router would go to the wrong contract
- * (or nowhere). Naming the required network is the difference between a dead button and an
- * instruction.
- */
-export function WriteScopeNotice({ scopeChainId, walletChainId, signer, canWrite }) {
-  if (!canWrite) return null
-  if (!signer) {
-    return (
-      <p className="card-info warning-text">
-        Connect your wallet to make changes here. Everything below is readable without one.
-      </p>
-    )
-  }
-  if (Number(scopeChainId) !== Number(walletChainId)) {
-    return (
-      <p className="card-info warning-text">
-        You are reading {networkName(scopeChainId)} while your wallet is on{' '}
-        {networkName(walletChainId)}. Changes here are signed on {networkName(scopeChainId)}, so
-        switch your wallet to it before making one. Reading is unaffected.
-      </p>
-    )
-  }
-  return null
-}
+// Spec 071: the scope controls are shared by every operator view now, so they live in
+// `scopeControls.jsx` and are re-exported here. Bridge and Supply keep this as their single
+// import site and are otherwise untouched — the same move-not-rewrite discipline as T014.
+export { NetworkScopeCard, WriteScopeNotice } from './scopeControls'
 
 /**
  * The read-only platform-fee card (FR-048/FR-051).

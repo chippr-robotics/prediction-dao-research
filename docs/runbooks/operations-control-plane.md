@@ -33,6 +33,64 @@ Related: [operator onboarding](operator-onboarding.md) ·
 | Access Control | Admin Roles | `DEFAULT_ADMIN_ROLE` | role-defining contracts |
 | Infrastructure | Services | admin or guardian | read-only + paymaster |
 
+## Reading the estate: what "per network" means here (spec 071)
+
+The console reads **every network this build may touch**, not the one your wallet happens to be
+connected to. Two consequences you will notice immediately:
+
+- **You can get in from anywhere.** Entry asks every network whether you hold an operator role,
+  so a guardian on Polygon reaches the console from a wallet pointed at Base. The permissions
+  card names the network each role was found on — a bare ✓ on a per-chain role is not enough to
+  act on.
+- **Your membership is read on one network.** Membership lives on Polygon (Amoy on testnet
+  builds) and nowhere else, so it resolves there whatever your wallet says.
+
+### The three states, and why a zero is never one of them
+
+Every per-network figure is in exactly one of three states, and they are deliberately not
+interchangeable:
+
+| State | Means | Do |
+|---|---|---|
+| a value | the contract answered | act on it |
+| *Not deployed on this network* | there is no such contract here | nothing to do here |
+| *Could not be read — <reason>* | **we could not ask** | retry; do not read it as zero |
+
+The third is the one that matters. A silent `0` on a control surface reads as a fact, so an
+unreachable network always says so and is excluded from any total — and that total is then
+labelled **partial** and names what is missing.
+
+For the same reason, balances are **never summed across networks**: different chains hold
+different payment tokens, so totals are shown per token. And **accrued** fees (undrawn, still
+withdrawable) are never added to **treasury** balances (already delivered) — they are different
+kinds of money.
+
+### Reads span the estate; writes do not
+
+Every change is one transaction on **one named network**, and the button says which. If your
+wallet is on a different network the control is withheld *and tells you which network to switch
+to* — before you sign, not at signature time.
+
+There is deliberately **no control that acts on several networks at once**. No "pause
+everywhere", no bulk freeze. A killswitch that fans out is one an operator can fire without
+knowing what they hit, so each network is paused, frozen, or withdrawn from explicitly.
+
+If a control is offered but says **authority could not be confirmed**, that is honest: we could
+not reach that network's contract to check your role. The contract itself will still refuse
+anything you do not hold — the control stays available because hiding a killswitch on a failed
+read tells an operator who *does* hold it that there isn't one.
+
+### Who a control is offered to
+
+A view's edit controls are offered on the strength of the role you hold **on the contract in
+scope**, read from that contract — not on an app-wide "you are an admin somewhere" flag. Holding
+`FEE_ADMIN_ROLE` on Polygon does not put the fee editor in front of you while you are reading
+Base's FeeRouter, because Base's router would refuse the transaction.
+
+The one exception is a role read that **fails**: the control stays offered and says
+*authority could not be confirmed*. The contract is the real gate, and withholding a killswitch
+because an RPC timed out tells an operator who *does* hold it that there isn't one.
+
 ## Navigating: the collapsible section rail
 
 The groups above render as a side panel down the left of `/admin`, with the
@@ -47,8 +105,13 @@ hamburger switches between them:
 
 It opens expanded on desktop and collapsed on mobile, where expanding slides the
 panel over the content — pick a view, tap the dimmed area, or press `Esc` to
-close it again. Mobile also keeps the bottom icon bar for switching between
-views without opening the panel at all.
+close it again.
+
+There is deliberately **no bottom icon bar** on this console. The other sections
+of the app have one, but they have a handful of views each; operations has 22, and
+a fixed strip fitted every one of them across a phone's width, so the labels
+overlapped into an unreadable run and the bar covered the content it was meant to
+navigate. The rail already puts every section one tap away, in named groups.
 
 ## How-to: common procedures
 
@@ -158,10 +221,15 @@ on-chain; the view exists so operators can act without CLI tooling.
 
 | Symptom | Likely cause / fix |
 |---|---|
-| "Access Restricted" on `/admin` | Connected wallet holds no operator role on this chain. Roles are chain-scoped — check the network selector first. |
+| "Access Restricted" on `/admin` | No operator role found for your wallet on **any** network in this build's cohort. Entry sweeps them all, so switching networks will not change this — check the address. |
 | A group/view is missing from the rail | You lack the gating role; the rail only shows what you can use. |
 | The rail is a strip of icons with no labels | It is collapsed, not broken — every view is still there. Hover for a name, or click the hamburger at its top left to expand. |
-| A view shows "not deployed on this network" | Address not in the frontend address book for this chain — run `npm run sync:frontend-contracts` after deploy. |
+| The view renders *below* the rail instead of beside it | A layout regression, not a setting. `.portal-shell` must be `display: flex`; `src/test/portalNavStylesheet.test.js` guards it. |
+| An edit control is missing though you hold the role | You hold it on another network. Roles are per contract per chain; scope the view to the network you hold it on. |
+| A view names a network and says "not deployed" | That contract is not in the frontend address book for **that** network. Pick another in the view's network selector, or run `npm run sync:frontend-contracts` after deploy. |
+| The paymaster deposit shows an unfamiliar currency | It is denominated in the **scoped** network's native token, not your wallet's — that is the figure being read. |
+| A deny-list status check says *unknown* | The guard on that network could not be reached. It is not a clearance; retry or pick a network you can read. |
 | Gasless card shows "No relay gateway configured" | `VITE_RELAYER_URL` unset in this build; gasless flows self-submit. Expected in local dev. |
 | Runway numbers missing from the health card | The gateway only discloses operator telemetry to origin-authenticated callers; the public subset (RPC up/down) still renders. |
 | A write reverts with an AccessControl error | The role lives on a different contract than you expect (e.g. `SANCTIONS_ADMIN_ROLE` is on SanctionsGuard, not the registry) or you hold it on another chain. |
+| Tiers / Members offer no network selector | Deliberate. Membership lives on one network, so there is no choice to make — a tier configured elsewhere is one no purchase would ever consult. |

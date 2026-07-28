@@ -39,7 +39,7 @@ describe('MembershipTreasuryOverview (admin overview: membership + treasury)', (
   it('shows a not-configured notice when MembershipManager is undeployed on this network', () => {
     useMembershipTreasuryStats.mockReturnValue({ loading: false, error: null, data: null, truncated: false, refresh: vi.fn() })
     render(<MembershipTreasuryOverview {...baseProps} address="" />)
-    expect(screen.getByText(/not deployed \/ configured on this network/i)).toBeInTheDocument()
+    expect(screen.getByText(/not deployed \/ configured on the membership network/i)).toBeInTheDocument()
     expect(screen.queryByText('Membership Statistics')).not.toBeInTheDocument()
   })
 
@@ -82,5 +82,42 @@ describe('MembershipTreasuryOverview (admin overview: membership + treasury)', (
     expect(screen.getByText(/Scan failed: rpc range too wide/)).toBeInTheDocument()
     expect(screen.getByText(/most recent block window only/i)).toBeInTheDocument()
     expect(screen.getByText('Active members (window)')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Spec 071 T046/T049 — the panel is PINNED to the membership reference chain, and an unreadable
+ * accrued balance is never a zero.
+ */
+describe('MembershipTreasuryOverview reads the membership chain honestly (T046)', () => {
+  beforeEach(() => useMembershipTreasuryStats.mockReset())
+
+  it('scans the chain it was GIVEN — provider, chainId and address must agree', () => {
+    useMembershipTreasuryStats.mockReturnValue({ loading: false, error: null, data: DATA, truncated: false, refresh: vi.fn() })
+    render(<MembershipTreasuryOverview {...baseProps} chainId={80002} />)
+    // The cache key and the scan follow the chain the caller named, not an ambient one. Passing a
+    // wallet provider next to the reference chain's address would read one chain's contract at
+    // another chain's address — the disagreement this spec exists to end.
+    expect(useMembershipTreasuryStats).toHaveBeenCalledWith(
+      expect.objectContaining({ provider, chainId: 80002, address: ADDRESS }),
+    )
+  })
+
+  it('says the accrued balance could not be read, rather than showing $0.00', () => {
+    useMembershipTreasuryStats.mockReturnValue({ loading: false, error: null, data: DATA, truncated: false, refresh: vi.fn() })
+    render(<MembershipTreasuryOverview {...baseProps} accruedFees="0" accruedFeesReadable={false} />)
+
+    expect(screen.getByText(/could not be read/i)).toBeInTheDocument()
+    // A $0.00 accrued balance reads as "the fees were already withdrawn" — an operator acts on it.
+    const tile = screen.getByText(/could not be read/i).closest('.mto-tile')
+    expect(tile).toHaveTextContent(/Accrued \(undrawn, live\)/i)
+    expect(tile).not.toHaveTextContent(/\$0\.00/)
+  })
+
+  it('still shows a real zero as a zero when the read succeeded', () => {
+    useMembershipTreasuryStats.mockReturnValue({ loading: false, error: null, data: DATA, truncated: false, refresh: vi.fn() })
+    render(<MembershipTreasuryOverview {...baseProps} accruedFees="0" accruedFeesReadable />)
+    const tile = screen.getByText(/Accrued \(undrawn, live\)/i).closest('.mto-tile')
+    expect(tile).toHaveTextContent('$0.00')
   })
 })

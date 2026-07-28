@@ -22,6 +22,9 @@ import { getContractAddressForChain } from '../../config/contracts'
 import { FEE_ROUTER_ABI } from '../../abis/FeeRouter'
 import { gatewayBaseUrl } from '../../hooks/useGatewayStatus'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
+import { estateNetworks, networkName, readProviderFor, readAuthority, authorityGate } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 
 // Friendly names for known service ids (keccak256 of the registered label).
 const KNOWN_SERVICES = {
@@ -45,9 +48,42 @@ function bpsPct(bps) {
   return `${(Number(bps) / 100).toFixed(2)}%`
 }
 
-export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, isAdmin, isFeeAdmin }) {
-  const routerAddr = getContractAddressForChain('feeRouter', chainId)
-  const canEditFees = Boolean(isAdmin || isFeeAdmin)
+export default function FeesTab({ signer, account, chainId, provider, runTx, pendingTx, isAdmin, isFeeAdmin }) {
+  // Spec 071 US4: fee rates are genuinely per network — each chain's FeeRouter carries its own
+  // services and its own bps. Showing the wallet's chain alone presented ONE network's rates as
+  // if they were the platform's, which for a fee schedule is a materially wrong statement.
+  const feeNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(feeNetworks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+  const routerAddr = getContractAddressForChain('feeRouter', scopeChainId)
+  const readProvider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, provider),
+    [scopeChainId, chainId, provider],
+  )
+  // Authority is read from the FeeRouter that will ENFORCE it, on the scoped chain — never from
+  // the app-wide flags. `isFeeAdmin` means "holds FEE_ADMIN_ROLE somewhere in the estate", which
+  // on a per-chain fee schedule is the wrong question: it would offer an enabled Set-fee button on
+  // a network whose router will revert. The flags are kept only as the pre-read assumption, so an
+  // operator who does hold the role is not made to wait on a round-trip to see the form.
+  const [authority, setAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    readAuthority({
+      provider: readProvider,
+      address: routerAddr,
+      account,
+      roles: ['admin', 'feeAdmin'],
+    }).then((a) => {
+      if (!cancelled) setAuthority(a)
+    })
+    return () => { cancelled = true }
+  }, [readProvider, routerAddr, account])
+
+  const feeGate = authorityGate(authority, ['admin', 'feeAdmin'])
+  const treasuryGate = authorityGate(authority, ['admin'])
+  // Pending (first read in flight) falls back to the app-wide flag rather than blanking the form.
+  const canEditFees = feeGate.pending ? Boolean(isAdmin || isFeeAdmin) : feeGate.allowed
+  const canEditTreasury = treasuryGate.pending ? Boolean(isAdmin) : treasuryGate.allowed
 
   const [services, setServices] = useState(null) // null = loading; [] = none
   const [treasury, setTreasury] = useState(undefined)
@@ -59,9 +95,10 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
   const [treasuryForm, setTreasuryForm] = useState('')
   const [formError, setFormError] = useState(null)
 
+  // Reads come from the SCOPED chain's endpoint, so the address and the provider cannot disagree.
   const routerRead = useMemo(
-    () => (routerAddr && provider ? new ethers.Contract(routerAddr, FEE_ROUTER_ABI, provider) : null),
-    [routerAddr, provider]
+    () => (routerAddr && readProvider ? new ethers.Contract(routerAddr, FEE_ROUTER_ABI, readProvider) : null),
+    [routerAddr, readProvider]
   )
 
   const fetchServices = useCallback(async () => {
@@ -194,11 +231,24 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
   if (!routerAddr) {
     return (
       <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Platform Fees"
+        description="Fee services and rates for one network's FeeRouter. Each chain carries its own services and its own bps — there is no single platform-wide rate."
+        networks={feeNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('feeRouter', id))}
+        walletChainId={chainId}
+        onRefresh={refresh}
+        lastReadAt={null}
+        notDeployedLabel="no FeeRouter"
+      />
         <div className="admin-card">
           <h3>Platform Fees</h3>
           <p className="card-info">
-            No FeeRouter is deployed on this network, so no platform fees are active here — member
-            flows behave exactly as if the fee system did not exist. Deploy it with{' '}
+            No FeeRouter is deployed on {networkName(scopeChainId)}, so no platform fees are active
+            there — member flows behave exactly as if the fee system did not exist. Pick another
+            network above, or deploy it with{' '}
             <code>scripts/deploy/deploy-fee-router.js</code> (see the fee operations runbook).
           </p>
         </div>
@@ -208,9 +258,27 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
 
   return (
     <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Platform Fees"
+        description="Fee services and rates for one network's FeeRouter. Each chain carries its own services and its own bps — there is no single platform-wide rate."
+        networks={feeNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('feeRouter', id))}
+        walletChainId={chainId}
+        onRefresh={refresh}
+        lastReadAt={null}
+        notDeployedLabel="no FeeRouter"
+      />
+      {!onScopeNetwork && (
+        <p className="card-info warning-text" role="status">
+          You are reading {networkName(scopeChainId)} while your wallet is on {networkName(chainId)}.
+          Rate changes are signed on {networkName(scopeChainId)} — switch your wallet to make one.
+        </p>
+      )}
       <div className="admin-card">
         <div className="admin-card-header">
-          <h3>Platform Fees</h3>
+          <h3>Platform Fees on {networkName(scopeChainId)}</h3>
           <button type="button" className="refresh-btn" onClick={refresh} aria-label="Refresh fees">↻</button>
         </div>
         {readError && <p className="card-info error">{readError}</p>}
@@ -347,15 +415,22 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
               type="button"
               className="confirm-btn primary"
               onClick={handleSetFeeBps}
-              disabled={pendingTx || !signer}
+              disabled={!onScopeNetwork || pendingTx || !signer}
             >
               Set fee rate
             </button>
+            {feeGate.unconfirmed && (
+              <p className="card-info warning-text" role="status">
+                Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+                available because the router itself is the real gate, and it will refuse anything
+                you do not hold.
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {isAdmin && (
+      {canEditTreasury && (
         <div className="admin-card">
           <h3>Change the fee treasury</h3>
           <p>
@@ -376,10 +451,16 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
               type="button"
               className="confirm-btn danger"
               onClick={handleSetTreasury}
-              disabled={pendingTx || !signer}
+              disabled={!onScopeNetwork || pendingTx || !signer}
             >
               Set treasury
             </button>
+            {treasuryGate.unconfirmed && (
+              <p className="card-info warning-text" role="status">
+                Authority could not be confirmed on {networkName(scopeChainId)} — the router will
+                still refuse this unless you hold the admin role there.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -418,8 +499,8 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
         )}
         <p className="card-info">
           Every change is an on-chain event (who, when, old → new).{' '}
-          {getBlockscoutUrl(chainId, routerAddr, 'address') && (
-            <a href={getBlockscoutUrl(chainId, routerAddr, 'address')} target="_blank" rel="noopener noreferrer">
+          {getBlockscoutUrl(scopeChainId, routerAddr, 'address') && (
+            <a href={getBlockscoutUrl(scopeChainId, routerAddr, 'address')} target="_blank" rel="noopener noreferrer">
               Full history on the block explorer ↗
             </a>
           )}

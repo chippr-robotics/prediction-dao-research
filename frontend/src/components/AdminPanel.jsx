@@ -9,6 +9,7 @@ import { ROLES, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { ACCOUNT_MODERATION_PATH } from '../constants/legalLinks'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddressForChain } from '../config/contracts'
+import { membershipChainId } from '../config/networks'
 import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
@@ -23,14 +24,16 @@ import SupplyTab from './admin/SupplyTab'
 import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
-import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
-import { networkName } from '../lib/chains/estate'
+import { buildAdminNavGroups } from './admin/adminNav'
+import { networkName, readProviderFor } from '../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
 import { useFeeEstate } from '../hooks/useFeeEstate'
+import { estateNetworks } from '../lib/chains/estate'
+import { NetworkScopeCard } from './admin/scopeControls'
+import { useScopedChain } from './admin/scopeGate'
 import ChainStateTable from './admin/ChainStateTable'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
-import SectionIconNav from './nav/SectionIconNav'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import './AdminPanel.css'
 
@@ -132,6 +135,32 @@ function AdminPanel() {
   // Fees across every cohort chain (US3), independent of where the wallet is connected.
   const feeEstate = useFeeEstate({ walletChainId: chainId, walletProvider: provider })
 
+  // Incident controls are per chain: pause and freeze act on ONE WagerRegistry. A guardian
+  // holding the role on Polygon could not pause Polygon from a wallet on Base, and the screen
+  // gave no reason. Scoped, named at the write, and — deliberately — with NO control that acts
+  // on several chains at once (FR-020): a killswitch that fans out is one an operator can fire
+  // without knowing what they hit.
+  const registryNetworks = useMemo(
+    () => estateNetworks().filter((n) => getContractAddressForChain('wagerRegistry', n.chainId)),
+    [],
+  )
+  const { scopeChainId: incidentChainId, setScopeChainId: setIncidentChainId } =
+    useScopedChain(registryNetworks, chainId)
+  const incidentRegistryAddr = getContractAddressForChain('wagerRegistry', incidentChainId)
+  const onIncidentChain = Number(incidentChainId) === Number(chainId)
+  const incidentWrite = () =>
+    new ethers.Contract(incidentRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer)
+  // Refuses at the call site as well as in the disabled button, so a stale render cannot pause
+  // the wrong network (FR-018).
+  const requireIncidentChain = () => {
+    if (onIncidentChain) return true
+    showNotification(
+      `This acts on ${networkName(incidentChainId)}. Switch your wallet there first.`,
+      'error',
+    )
+    return false
+  }
+
   // A withdrawal targets ONE chain. It defaults to the wallet's chain when that chain carries a
   // MembershipManager, otherwise to the first chain that does — the same rule the spec-067 tabs
   // use — and it does NOT follow the wallet afterwards (FR-016).
@@ -154,6 +183,7 @@ function AdminPanel() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     accruedFees: '0',
+    accruedFeesReadable: null,
     treasury: '',
     isLoaded: false,
   })
@@ -193,23 +223,51 @@ function AdminPanel() {
   const withdrawEns = useEnsResolution(withdrawForm.to || '')
 
   const wagerRegistryAddr = getContractAddressForChain('wagerRegistry', chainId)
-  const membershipManagerAddr = getContractAddressForChain('membershipManager', chainId)
-  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', chainId)
-  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', chainId)
-  const stakingRouterAddr = getContractAddressForChain('stakingRouter', chainId)
-  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', chainId)
-  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', chainId)
+  // ── MEMBERSHIP ADMIN IS PINNED TO THE REFERENCE CHAIN, NOT SCOPED (spec 071 FR-003/FR-006) ──
+  // Tiers and Members are the one place a scope PICKER would be wrong. Membership is read from
+  // exactly one chain, so a tier ladder configured anywhere else is one no purchase consults, and
+  // a membership granted anywhere else is one the app never sees — the operator's grant would
+  // simply not exist as far as every member surface is concerned. Same rule as purchases: one
+  // home, named, with the wallet required to be there.
+  const membershipAdminChainId = membershipChainId()
+  const onMembershipChain = Number(membershipAdminChainId) === Number(chainId)
+  const membershipManagerAddr = getContractAddressForChain('membershipManager', membershipAdminChainId)
+  const requireMembershipChain = () => {
+    if (onMembershipChain) return true
+    showNotification(
+      `Memberships live on ${networkName(membershipAdminChainId)}. Switch your wallet there first.`,
+      'error',
+    )
+    return false
+  }
+  // ── ROLE GRANTS ARE PER CONTRACT *PER CHAIN* (spec 071 T064/FR-017) ─────────────────────────
+  // That is already true on-chain — GUARDIAN_ROLE on Polygon's registry is not GUARDIAN_ROLE on
+  // Base's. The view resolved every target from the WALLET's chain, which quietly implied a grant
+  // was platform-wide. It is scoped and named instead, so an operator can see which network they
+  // are handing authority on.
+  const roleNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId: roleChainId, setScopeChainId: setRoleChainId } =
+    useScopedChain(roleNetworks, chainId)
+  const onRoleChain = Number(roleChainId) === Number(chainId)
+  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', roleChainId)
+  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', roleChainId)
+  const stakingRouterAddr = getContractAddressForChain('stakingRouter', roleChainId)
+  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', roleChainId)
+  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', roleChainId)
+  const roleRegistryAddr = getContractAddressForChain('wagerRegistry', roleChainId)
 
   // Each grantable role lives on a specific contract; grants must be sent
   // to the contract that defines the role, not blanket-sent to the registry.
   const roleHomeContract = (role) => {
+    // ROLE_MANAGER lives on the MembershipManager, which is reference-chain pinned like the
+    // membership it manages — so this one target is deliberately NOT scope-following.
     if (role === 'ROLE_MANAGER') return membershipManagerAddr
     if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
     if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
     if (role === 'STAKING_ADMIN') return stakingRouterAddr
     if (role === 'LIQUIDITY_ADMIN_BRIDGE' || role === 'GUARDIAN_BRIDGE') return bridgeRouterAddr
     if (role === 'LIQUIDITY_ADMIN_LIQUIDITY' || role === 'GUARDIAN_LIQUIDITY') return liquidityRouterAddr
-    return wagerRegistryAddr
+    return roleRegistryAddr
   }
 
   const wagerRegistryRead = useMemo(() => {
@@ -220,21 +278,25 @@ function AdminPanel() {
 
   const membershipManagerRead = useMemo(() => {
     if (!membershipManagerAddr) return null
-    const p = provider || getProvider(chainId)
+    const p = readProviderFor(membershipAdminChainId, chainId, provider) || getProvider(membershipAdminChainId)
     return new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, p)
-  }, [provider, membershipManagerAddr, chainId])
+  }, [provider, membershipManagerAddr, membershipAdminChainId, chainId])
 
   const fetchContractState = useCallback(async () => {
     if (!wagerRegistryRead || !membershipManagerRead) return
     try {
+      // `accruedFees` is money. A failed read must not arrive here as 0n: an operator reading a
+      // zero accrued balance concludes the fees were already withdrawn. Keep the failure as a
+      // failure and let the view say so (FR-013).
       const [paused, fees, treasury] = await Promise.all([
         wagerRegistryRead.paused().catch(() => false),
-        membershipManagerRead.accruedFees().catch(() => 0n),
+        membershipManagerRead.accruedFees().then((v) => ({ ok: true, v })).catch(() => ({ ok: false })),
         membershipManagerRead.treasury().catch(() => ''),
       ])
       setContractState({
         isPaused: paused,
-        accruedFees: ethers.formatUnits(fees, USDC_DECIMALS),
+        accruedFees: fees.ok ? ethers.formatUnits(fees.v, USDC_DECIMALS) : '0',
+        accruedFeesReadable: fees.ok,
         treasury: treasury || '',
         isLoaded: true,
       })
@@ -279,17 +341,18 @@ function AdminPanel() {
     }
   }, [signer, showNotification, fetchContractState])
 
-  const handlePause = () => runTx(
-    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).pause(),
-    'WagerRegistry paused'
+  const handlePause = () => requireIncidentChain() && runTx(
+    () => incidentWrite().pause(),
+    `WagerRegistry paused on ${networkName(incidentChainId)}`
   )
 
-  const handleUnpause = () => runTx(
-    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unpause(),
-    'WagerRegistry unpaused'
+  const handleUnpause = () => requireIncidentChain() && runTx(
+    () => incidentWrite().unpause(),
+    `WagerRegistry unpaused on ${networkName(incidentChainId)}`
   )
 
   const handleConfigureTier = () => {
+    if (!requireMembershipChain()) return false
     const priceUSDC = ethers.parseUnits(String(tierForm.price), USDC_DECIMALS)
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).setTier(
@@ -300,29 +363,31 @@ function AdminPanel() {
         { monthlyMarketCreation: tierForm.monthly, maxConcurrentMarkets: tierForm.concurrent },
         tierForm.active
       ),
-      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC`
+      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC on ${networkName(membershipAdminChainId)}`
     )
   }
 
   const handleGrantMembership = () => {
     const target = grantEns.resolvedAddress || grantForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).grantMembership(
         target, ROLE_HASHES.WAGER_PARTICIPANT, grantForm.tier, grantForm.durationDays
       ),
-      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)}`
+      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`
     )
   }
 
   const handleRevokeMembership = () => {
     const target = revokeEns.resolvedAddress || revokeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).revokeMembership(
         target, ROLE_HASHES.WAGER_PARTICIPANT
       ),
-      `Revoked membership for ${shortAddr(target)}`
+      `Revoked membership for ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`
     )
   }
 
@@ -330,20 +395,20 @@ function AdminPanel() {
     const target = freezeEns.resolvedAddress || freezeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
     if (!freezeForm.reason.trim()) return showNotification('Reason is required (recorded on-chain)', 'error')
+    if (!requireIncidentChain()) return false
     return runTx(
-      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).freezeAccount(
-        target, freezeForm.reason.trim()
-      ),
-      `Account ${shortAddr(target)} frozen`
+      () => incidentWrite().freezeAccount(target, freezeForm.reason.trim()),
+      `Account ${shortAddr(target)} frozen on ${networkName(incidentChainId)}`
     )
   }
 
   const handleUnfreeze = () => {
     const target = freezeEns.resolvedAddress || freezeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireIncidentChain()) return false
     return runTx(
-      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unfreezeAccount(target),
-      `Account ${shortAddr(target)} unfrozen`
+      () => incidentWrite().unfreezeAccount(target),
+      `Account ${shortAddr(target)} unfrozen on ${networkName(incidentChainId)}`
     )
   }
 
@@ -355,7 +420,7 @@ function AdminPanel() {
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).grantRole(roleHash, target),
-      `Granted ${adminRoleForm.role} to ${shortAddr(target)}`
+      `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleChainId)}`
     )
   }
 
@@ -367,7 +432,7 @@ function AdminPanel() {
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).revokeRole(roleHash, target),
-      `Revoked ${adminRoleForm.role} from ${shortAddr(target)}`
+      `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleChainId)}`
     )
   }
 
@@ -421,7 +486,6 @@ function AdminPanel() {
     isStakingAdmin,
     isLiquidityAdmin,
   })
-  const adminTabs = flattenNavGroups(navGroups)
 
   // On mobile the expanded rail sits ON TOP of the view it just switched to, so
   // picking a section collapses it back to icons. On desktop it stays open.
@@ -634,11 +698,21 @@ function AdminPanel() {
 
               <ServiceHealthCard />
 
+              {/*
+                T046 — the address is the REFERENCE chain's MembershipManager (memberships live on
+                one chain), so the provider and the cache key must name that chain too. Passing the
+                wallet's provider alongside another chain's address is the precise disagreement
+                this spec exists to end: it reads one chain's contract at another chain's address.
+              */}
               <MembershipTreasuryOverview
-                provider={provider || getProvider(chainId)}
-                chainId={chainId}
+                provider={
+                  readProviderFor(membershipAdminChainId, chainId, provider) ||
+                  getProvider(membershipAdminChainId)
+                }
+                chainId={membershipAdminChainId}
                 address={membershipManagerAddr}
                 accruedFees={contractState.accruedFees}
+                accruedFeesReadable={contractState.accruedFeesReadable}
               />
 
               {/*
@@ -691,17 +765,30 @@ function AdminPanel() {
         {/* Emergency */}
         {activeTab === 'emergency' && isGuardian && (
           <div className="admin-tab-content" role="tabpanel">
+              <NetworkScopeCard
+                title="Emergency Pause"
+                description="The pause acts on ONE network\u2019s WagerRegistry. There is deliberately no control that pauses several at once \u2014 a killswitch that fans out is one an operator can fire without knowing what they hit."
+                networks={registryNetworks}
+                scopeChainId={incidentChainId}
+                onScopeChange={setIncidentChainId}
+                isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+                walletChainId={chainId}
+                onRefresh={fetchContractState}
+                lastReadAt={null}
+                notDeployedLabel="no wager registry"
+              />
+
             <div className="admin-card">
-              <h3>Emergency Pause</h3>
+              <h3>Emergency Pause on {networkName(incidentChainId)}</h3>
               <p>Pausing halts wager creation, acceptance, and settlement protocol-wide. Use only in response to a security incident. Unpausing restores normal operation.</p>
               <div className="emergency-actions">
                 {!contractState.isPaused ? (
-                  <button className="confirm-btn danger" onClick={handlePause} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Pause Protocol'}
+                  <button className="confirm-btn danger" onClick={handlePause} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Pause on ${networkName(incidentChainId)}`}
                   </button>
                 ) : (
-                  <button className="confirm-btn primary" onClick={handleUnpause} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Unpause Protocol'}
+                  <button className="confirm-btn primary" onClick={handleUnpause} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Unpause on ${networkName(incidentChainId)}`}
                   </button>
                 )}
               </div>
@@ -717,7 +804,16 @@ function AdminPanel() {
         {activeTab === 'tiers' && isAdmin && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="admin-card">
-              <h3>Configure Tier: Wager Participant</h3>
+              <h3>Configure Tier: Wager Participant on {networkName(membershipAdminChainId)}</h3>
+              {!onMembershipChain && (
+                <p className="card-info warning-text" role="status">
+                  Memberships live on {networkName(membershipAdminChainId)} and are read from there
+                  everywhere. Switch your wallet to {networkName(membershipAdminChainId)} to make
+                  this change — doing it on another network would create state no member surface
+                  ever reads.
+                </p>
+              )}
+
               <p>Set price (USDC), duration, monthly cap, and concurrent cap for each tier. 0 = unlimited.</p>
               <div className="admin-form">
                 <label>
@@ -751,7 +847,7 @@ function AdminPanel() {
                     onChange={(e) => setTierForm({ ...tierForm, active: e.target.checked })} />
                   Active (available for purchase)
                 </label>
-                <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx}>
+                <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Saving...' : 'Save Tier Config'}
                 </button>
               </div>
@@ -763,7 +859,16 @@ function AdminPanel() {
         {activeTab === 'members' && isRoleManager && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="admin-card">
-              <h3>Grant Membership</h3>
+              <h3>Grant Membership on {networkName(membershipAdminChainId)}</h3>
+              {!onMembershipChain && (
+                <p className="card-info warning-text" role="status">
+                  Memberships live on {networkName(membershipAdminChainId)} and are read from there
+                  everywhere. Switch your wallet to {networkName(membershipAdminChainId)} to make
+                  this change — doing it on another network would create state no member surface
+                  ever reads.
+                </p>
+              )}
+
               <p>Grant a Wager Participant membership directly, bypassing the purchase flow. Use for support, gifts, or dispute resolution.</p>
               <div className="admin-form">
                 <label>
@@ -787,7 +892,7 @@ function AdminPanel() {
                   <input type="number" min="1" max="3650" value={grantForm.durationDays}
                     onChange={(e) => setGrantForm({ ...grantForm, durationDays: Number(e.target.value) })} />
                 </label>
-                <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx}>
+                <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Granting...' : 'Grant Membership'}
                 </button>
               </div>
@@ -806,7 +911,7 @@ function AdminPanel() {
                     <span className="hint">→ {shortAddr(revokeEns.resolvedAddress)}</span>
                   )}
                 </label>
-                <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx}>
+                <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Revoking...' : 'Revoke Membership'}
                 </button>
               </div>
@@ -817,8 +922,21 @@ function AdminPanel() {
         {/* Account Moderation */}
         {activeTab === 'moderation' && isAccountModerator && (
           <div className="admin-tab-content" role="tabpanel">
+              <NetworkScopeCard
+                title="Account Moderation"
+                description="A freeze applies to ONE network\u2019s WagerRegistry. Freezing an account on one network does not freeze it on another, so each is done explicitly."
+                networks={registryNetworks}
+                scopeChainId={incidentChainId}
+                onScopeChange={setIncidentChainId}
+                isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+                walletChainId={chainId}
+                onRefresh={fetchContractState}
+                lastReadAt={null}
+                notDeployedLabel="no wager registry"
+              />
+
             <div className="admin-card">
-              <h3>Freeze / Unfreeze Account</h3>
+              <h3>Freeze / Unfreeze Account on {networkName(incidentChainId)}</h3>
               <p>
                 A frozen account cannot create wagers, accept wagers, cancel, declare a winner,
                 claim payouts, or claim refunds on WagerRegistry. Polymarket auto-resolution is
@@ -842,11 +960,11 @@ function AdminPanel() {
                     onChange={(e) => setFreezeForm({ ...freezeForm, reason: e.target.value })} />
                 </label>
                 <div className="emergency-actions">
-                  <button className="confirm-btn danger" onClick={handleFreeze} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Freeze Account'}
+                  <button className="confirm-btn danger" onClick={handleFreeze} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Freeze on ${networkName(incidentChainId)}`}
                   </button>
-                  <button className="confirm-btn secondary" onClick={handleUnfreeze} disabled={pendingTx}>
-                    {pendingTx ? 'Processing...' : 'Unfreeze Account'}
+                  <button className="confirm-btn secondary" onClick={handleUnfreeze} disabled={pendingTx || !onIncidentChain}>
+                    {pendingTx ? 'Processing...' : `Unfreeze on ${networkName(incidentChainId)}`}
                   </button>
                 </div>
               </div>
@@ -857,8 +975,26 @@ function AdminPanel() {
         {/* Admin Roles */}
         {activeTab === 'admin-roles' && isAdmin && (
           <div className="admin-tab-content" role="tabpanel">
+            <NetworkScopeCard
+              title="Admin Roles"
+              description="Roles are granted per contract per network. A grant on one network gives no authority on another, so pick the network you mean."
+              networks={roleNetworks}
+              scopeChainId={roleChainId}
+              onScopeChange={setRoleChainId}
+              isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+              walletChainId={chainId}
+              onRefresh={() => {}}
+              lastReadAt={null}
+              notDeployedLabel="no wager registry"
+            />
             <div className="admin-card">
-              <h3>Grant / Revoke Admin Roles</h3>
+              <h3>Grant / Revoke Admin Roles on {networkName(roleChainId)}</h3>
+              {!onRoleChain && (
+                <p className="card-info warning-text" role="status">
+                  This grant is signed on {networkName(roleChainId)}. Your wallet is on{' '}
+                  {networkName(chainId)} — switch it there to grant or revoke.
+                </p>
+              )}
               <p>
                 Only the holder of <code>DEFAULT_ADMIN_ROLE</code> can grant other admin roles.
                 Grant sparingly: each role is a distinct privilege and a foothold.
@@ -906,10 +1042,10 @@ function AdminPanel() {
                   </select>
                 </label>
                 <div className="emergency-actions">
-                  <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx}>
+                  <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onRoleChain}>
                     {pendingTx ? 'Processing...' : 'Grant Role'}
                   </button>
-                  <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx}>
+                  <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onRoleChain}>
                     {pendingTx ? 'Processing...' : 'Revoke Role'}
                   </button>
                 </div>
@@ -1014,6 +1150,7 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
           />
@@ -1024,6 +1161,7 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
           />
@@ -1043,6 +1181,7 @@ function AdminPanel() {
         {activeTab === 'fees' && (isAdmin || isFeeAdmin) && (
           <FeesTab
             signer={signer}
+            account={account}
             chainId={chainId}
             provider={provider || getProvider(chainId)}
             runTx={runTx}
@@ -1055,6 +1194,7 @@ function AdminPanel() {
         {activeTab === 'staking' && (isAdmin || isStakingAdmin || isGuardian) && (
           <StakingTab
             signer={signer}
+            account={account}
             chainId={chainId}
             provider={provider || getProvider(chainId)}
             runTx={runTx}
@@ -1146,14 +1286,14 @@ function AdminPanel() {
           </div>
         )}
           </main>
-
-          {/* Mobile-only bottom quick-nav between admin sections. */}
-          <SectionIconNav
-            items={adminTabs}
-            activeId={activeTab}
-            onSelect={setActiveTab}
-            ariaLabel="Operations sections"
-          />
+          {/*
+            No bottom icon bar here, deliberately. The console has 22 sections, and a fixed
+            bottom strip fitted every one of them into a phone's width — the labels overlapped
+            into an unreadable run of text, and the bar covered the content it was meant to
+            navigate. The collapsible rail already lists every section one tap away, in groups,
+            with the hamburger pinned to its top left, so the bar was a worse copy of a control
+            that was already on screen.
+          */}
         </div>
       </div>
     </div>

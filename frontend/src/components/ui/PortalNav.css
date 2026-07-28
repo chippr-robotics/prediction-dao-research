@@ -4,7 +4,16 @@
  * down the left side and the sidebar can be hidden.
  *
  * Variable fallback chains let the same classes work in both theme systems
- * (admin uses --bg-*/--text-*/--brand-primary, wallet uses --color-*).
+ * (admin uses --bg-… / --text-… / --brand-primary, wallet uses --color-…).
+ *
+ * Do not abbreviate a group of custom properties as an asterisk glob directly
+ * followed by a slash inside a comment. That two-character sequence ENDS the
+ * comment, and CSS then treats everything up to the next closing brace as one
+ * invalid rule and drops it silently. This file did exactly that, and the rule
+ * it swallowed was `.portal-shell` — so the shell lost `display: flex` and both
+ * rail-width custom properties. The sidebar fell out of the flex row, the
+ * content column rendered BELOW it instead of beside it, and the rail sized
+ * itself to whatever its icons happened to need.
  */
 
 .portal-shell {
@@ -142,16 +151,19 @@
    Collapsed (icon-only) rail
    --------------------------------------------------------------------------- */
 
+/* The collapsed rail is a column of 40px tiles centred in the rail, which is the
+   same gutter the 36px hamburger above them sits on — the icons and the control
+   that reveals their labels line up on one axis instead of two. */
 .portal-nav--collapsed {
-  padding: 8px 0;
+  padding: 8px 0 12px;
   align-items: center;
 }
 
 .portal-nav--collapsed .portal-nav-item {
-  width: 44px;
+  width: 40px;
   justify-content: center;
   gap: 0;
-  padding: 7px 0;
+  padding: 5px 0;
   border-left-width: 0;
 }
 
@@ -188,9 +200,10 @@
 }
 
 /* Group headings collapse to a hairline: the grouping stays legible without a
-   200px word in a 64px rail. */
+   200px word in a 64px rail. It spans the same 40px as the tiles it separates —
+   a rule narrower than the things it divides reads as a stray mark. */
 .portal-nav--collapsed .portal-nav-group-label {
-  width: 32px;
+  width: 40px;
   height: 0;
   padding: 0;
   margin: 6px 0;
@@ -264,7 +277,7 @@
      scrolls, so the hamburger is always reachable on a long view. */
   .portal-shell {
     --portal-rail-expanded: 232px;
-    --portal-rail-collapsed: 52px;
+    --portal-rail-collapsed: 56px;
   }
 
   .portal-sidebar {

@@ -146,10 +146,10 @@ balance and unit; break one and confirm it is flagged, excluded, and the total l
 - [X] T043 [US3] Add the second fee source per research R6 — the treasury's payment-token balance on each cohort chain carrying a `FeeRouter` — labelled **received**, and never added to **accrued (undrawn)**; the FeeRouter itself holds nothing, so it is not read for a balance
 - [X] T044 [US3] Render the per-chain fee table in `frontend/src/components/AdminPanel.jsx` with each chain as read / not deployed / unreadable, each with its unit (FR-014, FR-021)
 - [X] T045 [US3] Use `aggregate` for any total, showing per-unit subtotals and a partial label naming missing chains (FR-022, FR-023)
-- [ ] T046 [US3] *(deferred — the estate card supersedes this card’s single-chain figure; see PR notes)* Update `frontend/src/components/admin/MembershipTreasuryOverview.jsx` to accept per-chain results instead of a single `accruedFees` string
+- [X] T046 [US3] Update `frontend/src/components/admin/MembershipTreasuryOverview.jsx` — **done differently than written, deliberately**: the task assumed per-chain results, but T058 settled that membership is PINNED to the reference chain, so there are no per-chain results to accept and a picker here would offer a choice that cannot be correct. What the panel actually needed was the wiring fix that pinning exposed (it was reading the reference chain's *address* through the *wallet's* provider) plus an `accruedFeesReadable` flag, so a failed balance read renders as "could not be read" rather than `$0.00` — a zero accrued balance reads as "already withdrawn" and an operator acts on it
 - [X] T047 [US3] Scope the Treasury withdrawal form in `frontend/src/components/AdminPanel.jsx` to a chain, defaulting its Max to that chain's accrued balance rather than a global figure
 - [X] T048 [P] [US3] Test in `frontend/src/test/admin/adminFeeEstate.test.jsx`: every cohort chain appears in one of the three states; an unreadable chain is excluded, flagged, and the total labelled partial; accrued and received are never summed
-- [ ] T049 [P] [US3] *(deferred with T046)* Update `frontend/src/test/MembershipTreasuryOverview.test.jsx` for the new per-chain props
+- [X] T049 [P] [US3] Update `frontend/src/test/MembershipTreasuryOverview.test.jsx` for T046's actual shape: the scan follows the chain the caller named, an unreadable accrued balance is not a zero, and a real zero still reads as one
 
 **Checkpoint**: US3 is the first view consuming the estate helper end-to-end and validates the
 pattern for Phase 7.
@@ -167,35 +167,35 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 
 ### Shared scope control
 
-- [ ] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-013, FR-016)
-- [ ] T051 [US4] Add a shared per-chain state renderer (read / not deployed / unreadable + reason + retry) so no view invents its own rendering of the three states (FR-014)
-- [ ] T052 [US4] Add a shared write-gate presenter that states "switch to <chain> to act" before signature and "role not held here" when authority is read and denied, leaving controls offered with authority unconfirmed when the read failed (FR-018, FR-019, research R4)
-- [ ] T053 [P] [US4] Test the three shared pieces in `frontend/src/test/admin/adminScopeControls.test.jsx`, including axe-clean rendering and per-chain status conveyed by text not colour alone (constitution V)
+- [X] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-013, FR-016)
+- [X] T051 [US4] *(landed in Phase 6 as `ChainStateTable`)* Add a shared per-chain state renderer (read / not deployed / unreadable + reason + retry) so no view invents its own rendering of the three states (FR-014)
+- [X] T052 [US4] Add a shared write-gate presenter that states "switch to <chain> to act" before signature and "role not held here" when authority is read and denied, leaving controls offered with authority unconfirmed when the read failed (FR-018, FR-019, research R4)
+- [X] T053 [P] [US4] Test the three shared pieces in `frontend/src/test/admin/adminScopeControls.test.jsx`, including axe-clean rendering and per-chain status conveyed by text not colour alone (constitution V)
 
 ### Read-mostly views
 
-- [ ] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
-- [ ] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
-- [ ] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
-- [ ] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
+- [X] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
+- [X] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
+- [X] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
+- [X] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
 
 ### Write-heavy views
 
-- [ ] T058 [US4] Convert the Tiers view in `frontend/src/components/AdminPanel.jsx` — only the reference chain carries a MembershipManager on the mainnet cohort, so the rest must show *not deployed*, not an empty form (**not** `[P]`: shares `AdminPanel.jsx` with T059/T064/T066/T068)
-- [ ] T059 [US4] Convert the Members view in `frontend/src/components/AdminPanel.jsx` (**not** `[P]`: same file as T058/T064/T066/T068)
-- [ ] T060 [P] [US4] Convert `frontend/src/components/admin/FeesTab.jsx`; fee rates are genuinely per chain and must not be shown as one global rate
-- [ ] T061 [P] [US4] Convert `frontend/src/components/admin/StakingTab.jsx`
-- [ ] T062 [P] [US4] Convert `frontend/src/components/admin/DenyListAdmin.jsx`
-- [ ] T063 [P] [US4] Convert `frontend/src/components/admin/CallsignRegistryAdmin.jsx`
-- [ ] T064 [US4] Convert the Admin Roles view in `frontend/src/components/AdminPanel.jsx` so a grant names the chain it lands on — grants are already per contract **per chain** on-chain, and the view currently implies otherwise
-- [ ] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly; **the write confirmation names the chain it targets** (FR-017 — the only write requirement with no other test); and the view is **axe-clean** in every per-chain state, matching the `is axe-clean fully loaded` case the existing `AdminBridgeTab`/`AdminSupplyTab` suites already carry (constitution V)
+- [X] T058 [US4] Convert the Tiers view in `frontend/src/components/AdminPanel.jsx` — only the reference chain carries a MembershipManager on the mainnet cohort, so the rest must show *not deployed*, not an empty form (**not** `[P]`: shares `AdminPanel.jsx` with T059/T064/T066/T068)
+- [X] T059 [US4] Convert the Members view in `frontend/src/components/AdminPanel.jsx` (**not** `[P]`: same file as T058/T064/T066/T068)
+- [X] T060 [P] [US4] Convert `frontend/src/components/admin/FeesTab.jsx`; fee rates are genuinely per chain and must not be shown as one global rate
+- [X] T061 [P] [US4] Convert `frontend/src/components/admin/StakingTab.jsx`
+- [X] T062 [P] [US4] Convert `frontend/src/components/admin/DenyListAdmin.jsx`
+- [X] T063 [P] [US4] Convert `frontend/src/components/admin/CallsignRegistryAdmin.jsx`
+- [X] T064 [US4] Convert the Admin Roles view in `frontend/src/components/AdminPanel.jsx` so a grant names the chain it lands on — grants are already per contract **per chain** on-chain, and the view currently implies otherwise
+- [X] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly; **the write confirmation names the chain it targets** (FR-017 — the only write requirement with no other test); and the view is **axe-clean** in every per-chain state, matching the `is axe-clean fully loaded` case the existing `AdminBridgeTab`/`AdminSupplyTab` suites already carry (constitution V)
 
 ### Incident-response views (converted last, on a proven pattern — research R8)
 
-- [ ] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it (FR-017)
-- [ ] T067 [US4] Assert there is **no** cross-chain "pause everywhere" control (FR-020) — an implicit multi-chain killswitch is exactly what this feature must not create
-- [ ] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it (FR-017)
-- [ ] T069 [P] [US4] Test the incident paths in `frontend/src/test/admin/adminIncidentEstate.test.jsx`, including the absence of any multi-chain action
+- [X] T066 [US4] Convert the Emergency view in `frontend/src/components/AdminPanel.jsx`; pause is per chain and the confirmation names it (FR-017)
+- [X] T067 [US4] Assert there is **no** cross-chain "pause everywhere" control (FR-020) — an implicit multi-chain killswitch is exactly what this feature must not create
+- [X] T068 [US4] Convert the Account Moderation view in `frontend/src/components/AdminPanel.jsx`; freeze is per chain and the confirmation names it (FR-017)
+- [X] T069 [P] [US4] Test the incident paths in `frontend/src/test/admin/adminIncidentEstate.test.jsx`, including the absence of any multi-chain action
 
 **Checkpoint**: all seventeen views honour one contract; the console no longer mixes estate-wide and
 wallet-scoped views.
@@ -204,12 +204,12 @@ wallet-scoped views.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T070 [P] Add a source-level guard in `frontend/src/test/admin/adminEstateGuard.test.js` asserting no admin view reads the wallet chain implicitly and none sums balances across chains (research R9)
-- [ ] T071 [P] Update `docs/runbooks/operations-control-plane.md`: scope selectors, the three per-chain states, partial totals, and that a write is always one named chain
-- [ ] T072 [P] Add `docs/developer-guide/chain-estate-reads.md` covering `membershipChainId()`, the estate helper, and the rule that unreadable is never zero
-- [ ] T073 [P] Update `CLAUDE.md` guardrails with the reference-chain rule and the "never hand-build a provider" reminder now that it applies console-wide
-- [ ] T074 Run the full `npm run test:frontend` and `npm run lint`; confirm the axe and Lighthouse CI jobs stay green
-- [ ] T075 Walk [quickstart.md](./quickstart.md) end to end, including the three failure modes it names
+- [X] T070 [P] Add a source-level guard in `frontend/src/test/admin/adminEstateGuard.test.js` asserting no admin view reads the wallet chain implicitly and none sums balances across chains (research R9)
+- [X] T071 [P] Update `docs/runbooks/operations-control-plane.md`: scope selectors, the three per-chain states, partial totals, and that a write is always one named chain
+- [X] T072 [P] Add `docs/developer-guide/chain-estate-reads.md` covering `membershipChainId()`, the estate helper, and the rule that unreadable is never zero
+- [X] T073 [P] Update `CLAUDE.md` guardrails with the reference-chain rule and the "never hand-build a provider" reminder now that it applies console-wide
+- [X] T074 Run the full `npm run test:frontend` and `npm run lint`; confirm the axe and Lighthouse CI jobs stay green
+- [X] T075 Walk [quickstart.md](./quickstart.md) end to end, including the three failure modes it names. The automated section runs green (Bridge 27 + Supply 28 **unmodified**, as the quickstart requires). The three failure modes were each checked against the code rather than only asserted: (1) *unreachable rendering as zero* — swept the admin surface for `catch(() => 0)` / `?? 0` on balances and found one live case, `accruedFees`, now fixed (T046); (2) *cross-unit sums* — `aggregate()` is the only path and the guard test enforces it; (3) *a write offered on an app-wide role flag* — **found in FeesTab and StakingTab**, which gated their editors on `isAdmin`/`isFeeAdmin`/`isStakingAdmin`/`isGuardian`. Both now read capability from the router on the scoped chain via `readAuthority`/`authorityGate`. The manual scenarios need a wallet and live networks and are for the reviewer
 
 ---
 

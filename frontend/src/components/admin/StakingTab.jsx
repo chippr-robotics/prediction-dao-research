@@ -16,6 +16,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
+import { estateNetworks, networkName, readProviderFor, readAuthority, authorityGate } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 import { STAKING_ROUTER_ABI } from '../../abis/StakingRouter'
 import { FEE_SERVICES, fetchFeeQuote, bpsToPercent } from '../../lib/fees/feeQuote'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
@@ -39,10 +42,42 @@ function shortAddr(a) {
 
 const isValidAddr = (a) => ethers.isAddress(a) && a !== ethers.ZeroAddress
 
-export default function StakingTab({ signer, chainId, provider, runTx, pendingTx, isAdmin, isStakingAdmin, isGuardian }) {
-  const routerAddr = getContractAddressForChain('stakingRouter', chainId)
-  const canConfig = Boolean(isAdmin || isStakingAdmin)
-  const canPause = Boolean(isAdmin || isGuardian)
+export default function StakingTab({ signer, account, chainId, provider, runTx, pendingTx, isAdmin, isStakingAdmin, isGuardian }) {
+  // Spec 071 US4: provider addresses and the validator allowlist are per network — a router on
+  // one chain knows nothing about another's. Scoped so an operator sees the network they mean.
+  const stakingNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(stakingNetworks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+  const routerAddr = getContractAddressForChain('stakingRouter', scopeChainId)
+  const readProvider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, provider),
+    [scopeChainId, chainId, provider],
+  )
+  // Authority comes from the router that will ENFORCE it, on the scoped chain. The app-wide
+  // flags answer "holds this role somewhere in the estate", which would offer an enabled pause
+  // on a network whose router reverts — and a pause an operator believes they hold is worse than
+  // one they know they do not. An UNCONFIRMED read keeps the control offered and says so
+  // (FR-044): hiding a killswitch because an RPC timed out is its own kind of lie.
+  const [authority, setAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    readAuthority({
+      provider: readProvider,
+      address: routerAddr,
+      account,
+      roles: ['admin', 'stakingAdmin', 'guardian'],
+    }).then((a) => {
+      if (!cancelled) setAuthority(a)
+    })
+    return () => { cancelled = true }
+  }, [readProvider, routerAddr, account])
+
+  const configGate = authorityGate(authority, ['admin', 'stakingAdmin'])
+  const pauseGate = authorityGate(authority, ['admin', 'guardian'])
+  // While the first read is in flight the app-wide flag stands in, so an operator who does hold
+  // the role is not shown an empty tab for a round-trip.
+  const canConfig = configGate.pending ? Boolean(isAdmin || isStakingAdmin) : configGate.allowed
+  const canPause = pauseGate.pending ? Boolean(isAdmin || isGuardian) : pauseGate.allowed
 
   const [state, setState] = useState(null) // null = loading
   const [readError, setReadError] = useState(null)
@@ -52,8 +87,8 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
   const [formError, setFormError] = useState(null)
 
   const routerRead = useMemo(
-    () => (routerAddr && provider ? new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, provider) : null),
-    [routerAddr, provider]
+    () => (routerAddr && readProvider ? new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, readProvider) : null),
+    [routerAddr, readProvider]
   )
   const write = useCallback(
     () => new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, signer),
@@ -91,17 +126,19 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
   }, [routerRead])
 
   const fetchFees = useCallback(async () => {
-    if (!provider || !routerAddr) return
+    // Guard on the SCOPED provider, which is what the body actually uses — guarding on the
+    // wallet's provider here would skip the fetch when the two differ.
+    if (!readProvider || !routerAddr) return
     const load = (serviceId) =>
-      fetchFeeQuote({ serviceId, chainId, provider }).catch(() => ({ available: false, bps: 0 }))
+      fetchFeeQuote({ serviceId, chainId: scopeChainId, provider: readProvider }).catch(() => ({ available: false, bps: 0 }))
     const [lido, polygon] = await Promise.all([load(FEE_SERVICES.STAKE_LIDO), load(FEE_SERVICES.STAKE_POLYGON)])
     setFees({ lido, polygon })
-  }, [provider, routerAddr, chainId])
+  }, [readProvider, routerAddr, scopeChainId])
 
   const fetchHistory = useCallback(async () => {
-    if (!routerRead || !provider) return
+    if (!routerRead || !readProvider) return
     try {
-      const latest = await provider.getBlockNumber()
+      const latest = await readProvider.getBlockNumber()
       const fromBlock = Math.max(0, Number(latest) - HISTORY_LOOKBACK_BLOCKS)
       const all = []
       for (const name of SETTER_EVENTS) {
@@ -112,7 +149,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       const recent = all.slice(0, HISTORY_LIMIT)
       const entries = await Promise.all(
         recent.map(async ({ name, ev }) => {
-          const block = await provider.getBlock(ev.blockNumber).catch(() => null)
+          const block = await readProvider.getBlock(ev.blockNumber).catch(() => null)
           const actor = ev.args?.actor || ev.args?.account
           return {
             name,
@@ -127,7 +164,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
     } catch (e) {
       setHistory({ entries: [], error: e?.message || String(e) })
     }
-  }, [routerRead, provider])
+  }, [routerRead, readProvider])
 
   useEffect(() => {
     fetchState()
@@ -170,10 +207,22 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
   if (!routerAddr) {
     return (
       <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Staking Controls"
+        description="Provider addresses and the validator allowlist for one network's StakingRouter."
+        networks={stakingNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('stakingRouter', id))}
+        walletChainId={chainId}
+        onRefresh={refresh}
+        lastReadAt={null}
+        notDeployedLabel="no StakingRouter"
+      />
         <div className="admin-card">
           <h3>Staking Controls</h3>
           <p className="card-info">
-            No StakingRouter is deployed on this network, so staking controls are not available here —
+            No StakingRouter is deployed on {networkName(scopeChainId)}, so staking controls are not available there —
             member staking behaves exactly as spec 065 (fee-free, direct staking, availability as
             configured). Deploy it with <code>scripts/deploy/deploy-staking-router.js</code> (see the
             staking operations runbook).
@@ -188,9 +237,27 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
 
   return (
     <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Staking Controls"
+        description="Provider addresses and the validator allowlist for one network's StakingRouter."
+        networks={stakingNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('stakingRouter', id))}
+        walletChainId={chainId}
+        onRefresh={refresh}
+        lastReadAt={null}
+        notDeployedLabel="no StakingRouter"
+      />
+      {!onScopeNetwork && (
+        <p className="card-info warning-text" role="status">
+          Reading {networkName(scopeChainId)}; your wallet is on {networkName(chainId)}. Changes are
+          signed on {networkName(scopeChainId)} — switch your wallet to make one.
+        </p>
+      )}
       <div className="admin-card">
         <div className="admin-card-header">
-          <h3>Staking Controls</h3>
+          <h3>Staking Controls on {networkName(scopeChainId)}</h3>
           <button type="button" className="refresh-btn" onClick={refresh} aria-label="Refresh staking controls">↻</button>
         </div>
         {readError && <p className="card-info error">{readError}</p>}
@@ -226,6 +293,13 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       {canPause && (
         <div className="admin-card">
           <h3>Emergency pause</h3>
+          {pauseGate.unconfirmed && (
+            <p className="card-info warning-text" role="status">
+              Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+              available because the router itself is the real gate, and it will refuse anything you
+              do not hold.
+            </p>
+          )}
           <p>
             Pausing stops <strong>new</strong> stakes on this network immediately (no redeploy). Members
             can always still unstake, withdraw, and claim — exits never route through the router.
@@ -234,7 +308,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
             type="button"
             className={`confirm-btn ${state?.paused ? 'primary' : 'danger'}`}
             onClick={togglePause}
-            disabled={pendingTx || !signer || state == null}
+            disabled={!onScopeNetwork || pendingTx || !signer || state == null}
           >
             {state?.paused ? 'Resume staking' : 'Pause staking'}
           </button>
@@ -244,6 +318,13 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       {canConfig && (
         <div className="admin-card">
           <h3>Provider addresses</h3>
+          {configGate.unconfirmed && (
+            <p className="card-info warning-text" role="status">
+              Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+              available because the router itself is the real gate, and it will refuse anything you
+              do not hold.
+            </p>
+          )}
           <p>Current values shown below each field. Invalid or zero addresses are rejected before the wallet prompt.</p>
           <div className="admin-form">
             <label>
@@ -254,7 +335,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
                 onChange={(e) => setForms((f) => ({ ...f, wsteth: e.target.value }))} />
               <span className="hint">now: {shortAddr(state?.lidoSteth) || '—'} / {shortAddr(state?.lidoWsteth) || '—'}</span>
             </label>
-            <button type="button" className="confirm-btn primary" disabled={pendingTx || !signer}
+            <button type="button" className="confirm-btn primary" disabled={!onScopeNetwork || pendingTx || !signer}
               onClick={() => setPair('setLidoContracts', forms.lido, forms.wsteth, 'Lido contracts')}>Set Lido</button>
 
             <label>
@@ -265,7 +346,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
                 onChange={(e) => setForms((f) => ({ ...f, spolT: e.target.value }))} />
               <span className="hint">now: {shortAddr(state?.spolController) || '—'} / {shortAddr(state?.spolToken) || '—'}</span>
             </label>
-            <button type="button" className="confirm-btn primary" disabled={pendingTx || !signer}
+            <button type="button" className="confirm-btn primary" disabled={!onScopeNetwork || pendingTx || !signer}
               onClick={() => setPair('setSpolContracts', forms.spolC, forms.spolT, 'sPOL contracts')}>Set sPOL</button>
 
             <label>
@@ -276,7 +357,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
                 onChange={(e) => setForms((f) => ({ ...f, stakeMgr: e.target.value }))} />
               <span className="hint">now: {shortAddr(state?.polToken) || '—'} / {shortAddr(state?.polygonStakeManager) || '—'}</span>
             </label>
-            <button type="button" className="confirm-btn primary" disabled={pendingTx || !signer}
+            <button type="button" className="confirm-btn primary" disabled={!onScopeNetwork || pendingTx || !signer}
               onClick={() => setPair('setPolygonContracts', forms.polToken, forms.stakeMgr, 'Polygon contracts')}>Set Polygon</button>
 
             <label>
@@ -285,7 +366,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
                 onChange={(e) => setForms((f) => ({ ...f, feeRouter: e.target.value }))} />
               <span className="hint">now: {shortAddr(state?.feeRouter) || '—'}</span>
             </label>
-            <button type="button" className="confirm-btn primary" disabled={pendingTx || !signer}
+            <button type="button" className="confirm-btn primary" disabled={!onScopeNetwork || pendingTx || !signer}
               onClick={() => setPair('setFeeRouter', forms.feeRouter, undefined, 'FeeRouter reference')}>Set FeeRouter</button>
             {formError && <p className="card-info error" role="alert">{formError}</p>}
           </div>
@@ -304,7 +385,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
                   <tr key={v}>
                     <td><code title={v}>{shortAddr(v)}</code></td>
                     <td>
-                      <button type="button" className="confirm-btn danger" disabled={pendingTx || !signer}
+                      <button type="button" className="confirm-btn danger" disabled={!onScopeNetwork || pendingTx || !signer}
                         onClick={() => removeValidator(v)}>Remove</button>
                     </td>
                   </tr>
@@ -320,7 +401,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
               <input type="text" placeholder="0x…" value={forms.addVal}
                 onChange={(e) => setForms((f) => ({ ...f, addVal: e.target.value }))} />
             </label>
-            <button type="button" className="confirm-btn primary" disabled={pendingTx || !signer} onClick={addValidator}>
+            <button type="button" className="confirm-btn primary" disabled={!onScopeNetwork || pendingTx || !signer} onClick={addValidator}>
               Add validator
             </button>
           </div>

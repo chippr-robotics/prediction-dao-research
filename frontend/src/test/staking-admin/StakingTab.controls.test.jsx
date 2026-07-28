@@ -4,6 +4,7 @@
  *   US4 validator add/remove (STAKING_ADMIN), US5 on-chain history — dispatch through runTx.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { cohortChainIds } from '../../config/networks'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const m = vi.hoisted(() => ({ routerAddr: null, reads: {}, qfEvents: [] }))
@@ -32,7 +33,35 @@ vi.mock('ethers', async (orig) => {
   return { ...actual, Contract: FakeCtor, ethers: { ...actual.ethers, Contract: FakeCtor } }
 })
 
+
+// Spec 071: the tab scopes to a network the operator picks (seeded from the wallet's chain when
+// that chain is in this build's cohort) and reads capability from the ROUTER's own AccessControl
+// on that network. A chainId outside the cohort would scope elsewhere and gate every write off —
+// correct behaviour, and not what these tests are about — so they run on a reachable chain and
+// answer hasRole the way that network's router would.
+const WALLET_CHAIN = cohortChainIds()[0]
+const ACCOUNT = '0x2222222222222222222222222222222222222222'
+
+import { ethers } from 'ethers'
 import StakingTab from '../../components/admin/StakingTab'
+// Capability now comes from the router's own AccessControl, so "a guardian" in these tests means
+// the router answers hasRole(GUARDIAN_ROLE) — not that an app-wide prop said so. The props stay
+// as the pre-read stand-in and are mirrored here so each test's intent is unchanged.
+const ROLE_HASH = {
+  admin: ethers.ZeroHash,
+  stakingAdmin: ethers.id('STAKING_ADMIN_ROLE'),
+  guardian: ethers.id('GUARDIAN_ROLE'),
+}
+
+function seedRoles({ isAdmin = false, isStakingAdmin = false, isGuardian = false } = {}) {
+  const held = new Map([
+    [ROLE_HASH.admin, isAdmin],
+    [ROLE_HASH.stakingAdmin, isStakingAdmin],
+    [ROLE_HASH.guardian, isGuardian],
+  ])
+  m.reads.hasRole = (role) => Promise.resolve(Boolean(held.get(role)))
+}
+
 
 const ROUTER = '0x1111111111111111111111111111111111111111'
 const VALID = '0x00000000000000000000000000000000000000a1' // all-lowercase ⇒ checksum-safe
@@ -40,10 +69,11 @@ const provider = { getBlockNumber: () => Promise.resolve(1000), getBlock: () => 
 
 function props(overrides = {}) {
   const runTx = vi.fn(() => Promise.resolve())
+  seedRoles(overrides)
   return {
     runTx,
     node: {
-      signer: {}, chainId: 1, provider, runTx, pendingTx: false,
+      signer: {}, chainId: WALLET_CHAIN, account: ACCOUNT, provider, runTx, pendingTx: false,
       isAdmin: false, isStakingAdmin: false, isGuardian: false, ...overrides,
     },
   }

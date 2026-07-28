@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
+import { estateNetworks, networkName } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 
 /**
  * MaintenanceTab — permissionless housekeeping calls on the wager registry
@@ -31,7 +34,15 @@ function parseIdList(text) {
 }
 
 function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
-  const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
+  // Spec 071 US4: these calls run on ONE registry on ONE chain. The tab used to take whichever
+  // chain the wallet sat on, which meant an operator could not sweep Polygon's expired wagers
+  // from a wallet pointed at Base — and nothing on screen said that was why.
+  const networks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(networks, chainId)
+  const registryAddr = getContractAddressForChain('wagerRegistry', scopeChainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+  // A permissionless call is still a WRITE: one named chain, wallet required there (FR-017/018).
+  const canSubmit = Boolean(signer) && onScopeNetwork && Boolean(registryAddr) && !pendingTx
   const [expireIds, setExpireIds] = useState('')
   const [resolveForm, setResolveForm] = useState({ id: '', source: 'polymarket' })
   const [parseError, setParseError] = useState('')
@@ -50,7 +61,7 @@ function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
     if (ids.length === 0) return
     runTx(
       () => write().batchExpireOpen(ids),
-      `Expired ${ids.length} open wager${ids.length === 1 ? '' : 's'} — creators refunded`
+      `Expired ${ids.length} open wager${ids.length === 1 ? '' : 's'} on ${networkName(scopeChainId)} — creators refunded`
     )
   }
 
@@ -65,11 +76,36 @@ function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
     const fn = resolveForm.source === 'polymarket'
       ? () => write().autoResolveFromPolymarket(id)
       : () => write().autoResolveFromOracle(id)
-    runTx(fn, `Auto-resolution triggered for wager #${resolveForm.id}`)
+    runTx(fn, `Auto-resolution triggered for wager #${resolveForm.id} on ${networkName(scopeChainId)}`)
   }
 
   return (
     <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Maintenance"
+        description="Permissionless housekeeping on one network's wager registry. Reading any network works from anywhere; each call is signed on the network in scope."
+        networks={networks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+        walletChainId={chainId}
+        onRefresh={() => {}}
+        lastReadAt={null}
+        notDeployedLabel="no wager registry"
+      />
+
+      {!registryAddr && (
+        <p className="card-info warning-text" role="status">
+          No wager registry on {networkName(scopeChainId)} — nothing to maintain here.
+        </p>
+      )}
+      {registryAddr && !onScopeNetwork && (
+        <p className="card-info warning-text" role="status">
+          These calls are signed on {networkName(scopeChainId)}. Your wallet is on{' '}
+          {networkName(chainId)} — switch it there to run them.
+        </p>
+      )}
+
       <div className="admin-card">
         <h3>Expire Open Wagers</h3>
         <p>
@@ -85,8 +121,8 @@ function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
             {parseError && <span className="hint">{parseError}</span>}
           </label>
           <button className="confirm-btn primary" onClick={handleBatchExpire}
-            disabled={pendingTx || !signer || !expireIds.trim() || !registryAddr}>
-            {pendingTx ? 'Sweeping...' : 'Run Expiry Sweep'}
+            disabled={!canSubmit || !expireIds.trim()}>
+            {pendingTx ? 'Sweeping...' : `Run Expiry Sweep on ${networkName(scopeChainId)}`}
           </button>
         </div>
       </div>
@@ -112,8 +148,8 @@ function MaintenanceTab({ signer, chainId, runTx, pendingTx }) {
             </select>
           </label>
           <button className="confirm-btn primary" onClick={handleAutoResolve}
-            disabled={pendingTx || !signer || !resolveForm.id.trim() || !registryAddr}>
-            {pendingTx ? 'Processing...' : 'Trigger Resolution'}
+            disabled={!canSubmit || !resolveForm.id.trim()}>
+            {pendingTx ? 'Processing...' : `Trigger Resolution on ${networkName(scopeChainId)}`}
           </button>
         </div>
       </div>

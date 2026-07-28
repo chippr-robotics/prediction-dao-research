@@ -229,6 +229,27 @@ artifacts live under `specs/<feature>/`.
   `docs/developer-guide/bridge-and-liquidity.md` + `docs/runbooks/bridge-liquidity-operations.md` +
   `specs/067-bridge-pool-liquidity/`.
 
+- **Membership has ONE home, and the operations console reads the whole estate (spec 071).**
+  Membership lives on exactly one chain per environment cohort — Polygon on a mainnet build, Amoy on
+  a testnet build — resolved by `membershipChainId()` in `config/networks.js` and **derived** from
+  the existing `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair (never a second literal `137`, which would
+  silently read mainnet membership in a testnet build). `hasRoleOnChain`/`getUserTierOnChain`
+  **ignore the chain you pass** on the `WAGER_PARTICIPANT` path and always read the reference chain;
+  their admin-role branch still honours an explicit chain, because admin roles genuinely ARE
+  per-chain. Purchases settle on the reference chain too — membership is only readable from one
+  place if it is also written in one place. "All chains" ALWAYS means the build's **cohort**
+  (`cohortChainIds()`, never `listSupportedChainIds()`): constitution III forbids reads crossing the
+  testnet/mainnet boundary. Every estate read returns one of **three** states —
+  `read` / `not-deployed` / `unreadable` — and `value` exists only on `read` so `?? 0` has nowhere
+  to live; an unreachable chain must NEVER render as a zero, and any total missing one is labelled
+  partial and names it. Balances are **never summed across units** (`aggregate()` returns per-unit
+  subtotals only), and accrued (undrawn) is never added to treasury (received). Reads span chains;
+  **writes never do**: one transaction, one named chain, wallet required there, authority read from
+  the contract that will enforce it — and an *unconfirmed* authority read leaves the control offered
+  rather than hiding a killswitch on an RPC timeout. There is deliberately **no control that acts on
+  several chains at once**. Providers come from `getReadProvider`/`readProviderFor`, never
+  hand-built from `NETWORKS[chainId].rpcUrl`. See `docs/developer-guide/chain-estate-reads.md` +
+  `specs/071-multi-chain-admin-console/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE

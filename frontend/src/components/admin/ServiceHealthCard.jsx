@@ -1,5 +1,5 @@
-import { NETWORK_CONFIG } from '../../config/contracts'
 import { useGatewayStatus } from '../../hooks/useGatewayStatus'
+import { networkName } from '../../lib/chains/estate'
 
 /**
  * ServiceHealthCard — read-only gasless-infrastructure telemetry for the
@@ -7,8 +7,17 @@ import { useGatewayStatus } from '../../hooks/useGatewayStatus'
  *
  * Strictly display: the gateway has no remote admin API by design (killswitch
  * and quotas are env/signal-driven — see docs/runbooks/relayer-operations.md).
+ *
+ * Spec 071 US4 — this card needs no network picker, because it never asked one
+ * chain in the first place: there is a single gateway and it reports every
+ * chain it serves. Two things about it were dishonest anyway:
+ *
+ *   - It closed with "network <the build's network>", which reads as the scope
+ *     of everything above it. The rows above span chains; naming one of them
+ *     invites an operator to read a Polygon outage as a local one.
+ *   - It carried its own four-entry chain-name map, so any chain the gateway
+ *     added showed up as "Chain 8453". Names come from the network registry.
  */
-const CHAIN_NAMES = { 63: 'Mordor', 137: 'Polygon', 80002: 'Amoy', 1337: 'Hardhat' }
 
 function fmtRunway(hrs) {
   if (hrs == null) return null
@@ -64,7 +73,7 @@ function ServiceHealthCard() {
             return (
               <div key={c.chainId} className="status-row">
                 <span className="status-label">
-                  {CHAIN_NAMES[c.chainId] || `Chain ${c.chainId}`} RPC
+                  {networkName(c.chainId)} RPC
                 </span>
                 <span className={`status-value ${c.rpc === 'up' ? 'active' : 'paused'}`}>
                   {c.rpc === 'up' ? 'Up' : 'Down'}
@@ -82,8 +91,9 @@ function ServiceHealthCard() {
           )}
           {lastChecked && (
             <p className="card-info">
-              Last checked {new Date(lastChecked).toLocaleTimeString()} · network{' '}
-              {NETWORK_CONFIG.name}. Killswitch and quotas are operated via the runbook
+              Last checked {new Date(lastChecked).toLocaleTimeString()}. One gateway serves every
+              network listed above, so this is estate-wide, not your wallet&apos;s network.
+              Killswitch and quotas are operated via the runbook
               (docs/runbooks/relayer-operations.md) — the gateway exposes no web admin API by
               design.
             </p>
