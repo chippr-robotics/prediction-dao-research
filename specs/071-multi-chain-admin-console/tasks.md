@@ -142,13 +142,13 @@ everywhere.
 **Independent test**: With balances on more than one network, confirm each is listed with its own
 balance and unit; break one and confirm it is flagged, excluded, and the total labelled partial.
 
-- [ ] T042 [US3] Replace the single-chain `accruedFees` read in `frontend/src/components/AdminPanel.jsx` with a `readAcrossEstate` call over every cohort chain carrying a MembershipManager (FR-021)
-- [ ] T043 [US3] Add the second fee source per research R6 — the treasury's payment-token balance on each cohort chain carrying a `FeeRouter` — labelled **received**, and never added to **accrued (undrawn)**; the FeeRouter itself holds nothing, so it is not read for a balance
-- [ ] T044 [US3] Render the per-chain fee table in `frontend/src/components/AdminPanel.jsx` with each chain as read / not deployed / unreadable, each with its unit (FR-014, FR-021)
-- [ ] T045 [US3] Use `aggregate` for any total, showing per-unit subtotals and a partial label naming missing chains (FR-022, FR-023)
+- [X] T042 [US3] Replace the single-chain `accruedFees` read in `frontend/src/components/AdminPanel.jsx` with a `readAcrossEstate` call over every cohort chain carrying a MembershipManager (FR-021)
+- [X] T043 [US3] Add the second fee source per research R6 — the treasury's payment-token balance on each cohort chain carrying a `FeeRouter` — labelled **received**, and never added to **accrued (undrawn)**; the FeeRouter itself holds nothing, so it is not read for a balance
+- [X] T044 [US3] Render the per-chain fee table in `frontend/src/components/AdminPanel.jsx` with each chain as read / not deployed / unreadable, each with its unit (FR-014, FR-021)
+- [X] T045 [US3] Use `aggregate` for any total, showing per-unit subtotals and a partial label naming missing chains (FR-022, FR-023)
 - [ ] T046 [US3] Update `frontend/src/components/admin/MembershipTreasuryOverview.jsx` to accept per-chain results instead of a single `accruedFees` string
 - [ ] T047 [US3] Scope the Treasury withdrawal form in `frontend/src/components/AdminPanel.jsx` to a chain, defaulting its Max to that chain's accrued balance rather than a global figure
-- [ ] T048 [P] [US3] Test in `frontend/src/test/admin/adminFeeEstate.test.jsx`: every cohort chain appears in one of the three states; an unreadable chain is excluded, flagged, and the total labelled partial; accrued and received are never summed
+- [X] T048 [P] [US3] Test in `frontend/src/test/admin/adminFeeEstate.test.jsx`: every cohort chain appears in one of the three states; an unreadable chain is excluded, flagged, and the total labelled partial; accrued and received are never summed
 - [ ] T049 [P] [US3] Update `frontend/src/test/MembershipTreasuryOverview.test.jsx` for the new per-chain props
 
 **Checkpoint**: US3 is the first view consuming the estate helper end-to-end and validates the

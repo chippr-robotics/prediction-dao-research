@@ -25,6 +25,8 @@ import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
 import { networkName } from '../lib/chains/estate'
+import { useFeeEstate } from '../hooks/useFeeEstate'
+import ChainStateTable from './admin/ChainStateTable'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
 import SectionIconNav from './nav/SectionIconNav'
@@ -125,6 +127,9 @@ function AdminPanel() {
   // an operator who can open that tab. Offering the link to someone the Fees tab is closed to
   // would send them to a blank panel, so they get the same sentence without a dead control.
   const canOpenFees = isAdmin || isFeeAdmin
+
+  // Fees across every cohort chain (US3), independent of where the wallet is connected.
+  const feeEstate = useFeeEstate({ walletChainId: chainId, walletProvider: provider })
 
   const [activeTab, setActiveTab] = useState('overview')
   // The section rail collapses to an icon-only strip rather than disappearing.
@@ -546,10 +551,9 @@ function AdminPanel() {
                       {contractState.isPaused ? 'Paused' : 'Active'}
                     </span>
                   </div>
-                  <div className="status-row">
-                    <span className="status-label">Accrued tier fees</span>
-                    <span className="status-value">{contractState.accruedFees} USDC</span>
-                  </div>
+                  {/* The single-chain figure that used to sit here read one network's balance
+                      and presented it without qualification — a number an operator would act on
+                      as if it were the total. The estate breakdown is its own card below. */}
                   <div className="status-row">
                     <span className="status-label">Network</span>
                     <span className="status-value">{NETWORK_CONFIG.name}</span>
@@ -611,6 +615,36 @@ function AdminPanel() {
                 address={membershipManagerAddr}
                 accruedFees={contractState.accruedFees}
               />
+
+              {/*
+                Fees across the whole estate (US3). Two SEPARATE figures, deliberately:
+                  • accrued (undrawn) — MembershipManager.accruedFees, the only accruing balance
+                  • treasury (received) — already delivered; the FeeRouter forwards and holds nothing
+                They are never added together — one is money the platform still owes itself, the
+                other is money already paid out. And neither is summed across units, because the
+                payment token differs per chain (research R6, FR-021…FR-023).
+              */}
+              <div className="admin-card full-width">
+                <div className="admin-card-header"><h3>Fees across the estate</h3></div>
+                <ChainStateTable
+                  caption="Accrued (undrawn) — withdrawable from MembershipManager"
+                  results={feeEstate.accrued}
+                  totals={feeEstate.accruedTotals}
+                  onRetry={feeEstate.refresh}
+                />
+                <ChainStateTable
+                  caption="Treasury balance (received) — already delivered by the FeeRouter"
+                  results={feeEstate.received}
+                  totals={feeEstate.receivedTotals}
+                  onRetry={feeEstate.refresh}
+                />
+                <p className="card-info">
+                  These two are never combined: the first is undrawn and still withdrawable, the
+                  second has already been paid to the treasury. Totals are shown per token because
+                  networks hold different payment tokens, and any total computed while a network
+                  was unreadable says so and names it.
+                </p>
+              </div>
 
               <div className="admin-card full-width">
                 <div className="admin-card-header"><h3>Contract Addresses</h3></div>
