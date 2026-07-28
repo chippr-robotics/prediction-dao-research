@@ -9,6 +9,7 @@ import { ROLES, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { ACCOUNT_MODERATION_PATH } from '../constants/legalLinks'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddressForChain } from '../config/contracts'
+import { membershipChainId } from '../config/networks'
 import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
@@ -24,7 +25,7 @@ import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
-import { networkName } from '../lib/chains/estate'
+import { networkName, readProviderFor } from '../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
 import { useFeeEstate } from '../hooks/useFeeEstate'
 import { estateNetworks } from '../lib/chains/estate'
@@ -222,23 +223,51 @@ function AdminPanel() {
   const withdrawEns = useEnsResolution(withdrawForm.to || '')
 
   const wagerRegistryAddr = getContractAddressForChain('wagerRegistry', chainId)
-  const membershipManagerAddr = getContractAddressForChain('membershipManager', chainId)
-  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', chainId)
-  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', chainId)
-  const stakingRouterAddr = getContractAddressForChain('stakingRouter', chainId)
-  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', chainId)
-  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', chainId)
+  // ── MEMBERSHIP ADMIN IS PINNED TO THE REFERENCE CHAIN, NOT SCOPED (spec 071 FR-003/FR-006) ──
+  // Tiers and Members are the one place a scope PICKER would be wrong. Membership is read from
+  // exactly one chain, so a tier ladder configured anywhere else is one no purchase consults, and
+  // a membership granted anywhere else is one the app never sees — the operator's grant would
+  // simply not exist as far as every member surface is concerned. Same rule as purchases: one
+  // home, named, with the wallet required to be there.
+  const membershipAdminChainId = membershipChainId()
+  const onMembershipChain = Number(membershipAdminChainId) === Number(chainId)
+  const membershipManagerAddr = getContractAddressForChain('membershipManager', membershipAdminChainId)
+  const requireMembershipChain = () => {
+    if (onMembershipChain) return true
+    showNotification(
+      `Memberships live on ${networkName(membershipAdminChainId)}. Switch your wallet there first.`,
+      'error',
+    )
+    return false
+  }
+  // ── ROLE GRANTS ARE PER CONTRACT *PER CHAIN* (spec 071 T064/FR-017) ─────────────────────────
+  // That is already true on-chain — GUARDIAN_ROLE on Polygon's registry is not GUARDIAN_ROLE on
+  // Base's. The view resolved every target from the WALLET's chain, which quietly implied a grant
+  // was platform-wide. It is scoped and named instead, so an operator can see which network they
+  // are handing authority on.
+  const roleNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId: roleChainId, setScopeChainId: setRoleChainId } =
+    useScopedChain(roleNetworks, chainId)
+  const onRoleChain = Number(roleChainId) === Number(chainId)
+  const sanctionsGuardAddr = getContractAddressForChain('sanctionsGuard', roleChainId)
+  const tokenFactoryAddr = getContractAddressForChain('tokenFactory', roleChainId)
+  const stakingRouterAddr = getContractAddressForChain('stakingRouter', roleChainId)
+  const bridgeRouterAddr = getContractAddressForChain('bridgeRouter', roleChainId)
+  const liquidityRouterAddr = getContractAddressForChain('liquidityRouter', roleChainId)
+  const roleRegistryAddr = getContractAddressForChain('wagerRegistry', roleChainId)
 
   // Each grantable role lives on a specific contract; grants must be sent
   // to the contract that defines the role, not blanket-sent to the registry.
   const roleHomeContract = (role) => {
+    // ROLE_MANAGER lives on the MembershipManager, which is reference-chain pinned like the
+    // membership it manages — so this one target is deliberately NOT scope-following.
     if (role === 'ROLE_MANAGER') return membershipManagerAddr
     if (role === 'SANCTIONS_ADMIN') return sanctionsGuardAddr
     if (role === 'TOKEN_ISSUER') return tokenFactoryAddr
     if (role === 'STAKING_ADMIN') return stakingRouterAddr
     if (role === 'LIQUIDITY_ADMIN_BRIDGE' || role === 'GUARDIAN_BRIDGE') return bridgeRouterAddr
     if (role === 'LIQUIDITY_ADMIN_LIQUIDITY' || role === 'GUARDIAN_LIQUIDITY') return liquidityRouterAddr
-    return wagerRegistryAddr
+    return roleRegistryAddr
   }
 
   const wagerRegistryRead = useMemo(() => {
@@ -249,9 +278,9 @@ function AdminPanel() {
 
   const membershipManagerRead = useMemo(() => {
     if (!membershipManagerAddr) return null
-    const p = provider || getProvider(chainId)
+    const p = readProviderFor(membershipAdminChainId, chainId, provider) || getProvider(membershipAdminChainId)
     return new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, p)
-  }, [provider, membershipManagerAddr, chainId])
+  }, [provider, membershipManagerAddr, membershipAdminChainId, chainId])
 
   const fetchContractState = useCallback(async () => {
     if (!wagerRegistryRead || !membershipManagerRead) return
@@ -319,6 +348,7 @@ function AdminPanel() {
   )
 
   const handleConfigureTier = () => {
+    if (!requireMembershipChain()) return false
     const priceUSDC = ethers.parseUnits(String(tierForm.price), USDC_DECIMALS)
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).setTier(
@@ -329,29 +359,31 @@ function AdminPanel() {
         { monthlyMarketCreation: tierForm.monthly, maxConcurrentMarkets: tierForm.concurrent },
         tierForm.active
       ),
-      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC`
+      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC on ${networkName(membershipAdminChainId)}`
     )
   }
 
   const handleGrantMembership = () => {
     const target = grantEns.resolvedAddress || grantForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).grantMembership(
         target, ROLE_HASHES.WAGER_PARTICIPANT, grantForm.tier, grantForm.durationDays
       ),
-      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)}`
+      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`
     )
   }
 
   const handleRevokeMembership = () => {
     const target = revokeEns.resolvedAddress || revokeForm.address
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!requireMembershipChain()) return false
     return runTx(
       () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).revokeMembership(
         target, ROLE_HASHES.WAGER_PARTICIPANT
       ),
-      `Revoked membership for ${shortAddr(target)}`
+      `Revoked membership for ${shortAddr(target)} on ${networkName(membershipAdminChainId)}`
     )
   }
 
@@ -384,7 +416,7 @@ function AdminPanel() {
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).grantRole(roleHash, target),
-      `Granted ${adminRoleForm.role} to ${shortAddr(target)}`
+      `Granted ${adminRoleForm.role} to ${shortAddr(target)} on ${networkName(roleChainId)}`
     )
   }
 
@@ -396,7 +428,7 @@ function AdminPanel() {
     if (!addr) return showNotification('Role contract not deployed on this network', 'error')
     return runTx(
       () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).revokeRole(roleHash, target),
-      `Revoked ${adminRoleForm.role} from ${shortAddr(target)}`
+      `Revoked ${adminRoleForm.role} from ${shortAddr(target)} on ${networkName(roleChainId)}`
     )
   }
 
@@ -759,7 +791,16 @@ function AdminPanel() {
         {activeTab === 'tiers' && isAdmin && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="admin-card">
-              <h3>Configure Tier: Wager Participant</h3>
+              <h3>Configure Tier: Wager Participant on {networkName(membershipAdminChainId)}</h3>
+              {!onMembershipChain && (
+                <p className="card-info warning-text" role="status">
+                  Memberships live on {networkName(membershipAdminChainId)} and are read from there
+                  everywhere. Switch your wallet to {networkName(membershipAdminChainId)} to make
+                  this change — doing it on another network would create state no member surface
+                  ever reads.
+                </p>
+              )}
+
               <p>Set price (USDC), duration, monthly cap, and concurrent cap for each tier. 0 = unlimited.</p>
               <div className="admin-form">
                 <label>
@@ -793,7 +834,7 @@ function AdminPanel() {
                     onChange={(e) => setTierForm({ ...tierForm, active: e.target.checked })} />
                   Active (available for purchase)
                 </label>
-                <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx}>
+                <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Saving...' : 'Save Tier Config'}
                 </button>
               </div>
@@ -805,7 +846,16 @@ function AdminPanel() {
         {activeTab === 'members' && isRoleManager && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="admin-card">
-              <h3>Grant Membership</h3>
+              <h3>Grant Membership on {networkName(membershipAdminChainId)}</h3>
+              {!onMembershipChain && (
+                <p className="card-info warning-text" role="status">
+                  Memberships live on {networkName(membershipAdminChainId)} and are read from there
+                  everywhere. Switch your wallet to {networkName(membershipAdminChainId)} to make
+                  this change — doing it on another network would create state no member surface
+                  ever reads.
+                </p>
+              )}
+
               <p>Grant a Wager Participant membership directly, bypassing the purchase flow. Use for support, gifts, or dispute resolution.</p>
               <div className="admin-form">
                 <label>
@@ -829,7 +879,7 @@ function AdminPanel() {
                   <input type="number" min="1" max="3650" value={grantForm.durationDays}
                     onChange={(e) => setGrantForm({ ...grantForm, durationDays: Number(e.target.value) })} />
                 </label>
-                <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx}>
+                <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Granting...' : 'Grant Membership'}
                 </button>
               </div>
@@ -848,7 +898,7 @@ function AdminPanel() {
                     <span className="hint">→ {shortAddr(revokeEns.resolvedAddress)}</span>
                   )}
                 </label>
-                <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx}>
+                <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx || !onMembershipChain}>
                   {pendingTx ? 'Revoking...' : 'Revoke Membership'}
                 </button>
               </div>
@@ -912,8 +962,26 @@ function AdminPanel() {
         {/* Admin Roles */}
         {activeTab === 'admin-roles' && isAdmin && (
           <div className="admin-tab-content" role="tabpanel">
+            <NetworkScopeCard
+              title="Admin Roles"
+              description="Roles are granted per contract per network. A grant on one network gives no authority on another, so pick the network you mean."
+              networks={roleNetworks}
+              scopeChainId={roleChainId}
+              onScopeChange={setRoleChainId}
+              isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+              walletChainId={chainId}
+              onRefresh={() => {}}
+              lastReadAt={null}
+              notDeployedLabel="no wager registry"
+            />
             <div className="admin-card">
-              <h3>Grant / Revoke Admin Roles</h3>
+              <h3>Grant / Revoke Admin Roles on {networkName(roleChainId)}</h3>
+              {!onRoleChain && (
+                <p className="card-info warning-text" role="status">
+                  This grant is signed on {networkName(roleChainId)}. Your wallet is on{' '}
+                  {networkName(chainId)} — switch it there to grant or revoke.
+                </p>
+              )}
               <p>
                 Only the holder of <code>DEFAULT_ADMIN_ROLE</code> can grant other admin roles.
                 Grant sparingly: each role is a distinct privilege and a foothold.
@@ -961,10 +1029,10 @@ function AdminPanel() {
                   </select>
                 </label>
                 <div className="emergency-actions">
-                  <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx}>
+                  <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx || !onRoleChain}>
                     {pendingTx ? 'Processing...' : 'Grant Role'}
                   </button>
-                  <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx}>
+                  <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx || !onRoleChain}>
                     {pendingTx ? 'Processing...' : 'Revoke Role'}
                   </button>
                 </div>
