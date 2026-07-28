@@ -26,6 +26,15 @@ export function defaultRpcUrlForChain(chainId) {
   return NETWORKS[Number(chainId)]?.rpcUrl || null
 }
 
+/**
+ * Build-time failover for a chain, where one is curated. Only some chains define this —
+ * it exists for networks served by community-run RPCs, where the single default going
+ * down would otherwise leave a member on default settings with no route at all.
+ */
+export function defaultRpcFailoverUrlForChain(chainId) {
+  return NETWORKS[Number(chainId)]?.rpcFailoverUrl || null
+}
+
 /** Request headers implied by an entry's auth settings. `{}` when there are none. */
 export function authHeadersFor(entry) {
   if (!entry || !entry.authToken) return {}
@@ -54,10 +63,15 @@ export function resolveRpcEndpoints(chainId) {
   const entry = getEndpointSettings(id)
 
   if (!entry?.url) {
+    // A member on default settings still gets the build's curated failover where one exists,
+    // so a community-run primary going dark degrades to a slower route rather than to nothing.
+    const builtInFailover = defaultRpcFailoverUrlForChain(id)
     return {
       chainId: id,
       primary: defaultUrl ? { url: defaultUrl, headers: {} } : null,
-      failover: null,
+      failover: defaultUrl && builtInFailover && builtInFailover !== defaultUrl
+        ? { url: builtInFailover, headers: {} }
+        : null,
       source: 'default',
       defaultUrl,
     }

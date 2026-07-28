@@ -106,27 +106,25 @@ function buildProvider(url, headers, chainId, { staticNetwork = false } = {}) {
 export function makeReadProvider(rpcUrl, chainId = null) {
   const route = chainId != null ? resolveRpcEndpoints(chainId) : null
 
-  // No member override → exactly the pre-069 behavior for the caller's URL.
-  if (!route || route.source !== 'member' || !route.primary) {
-    const key = JSON.stringify(['single', rpcUrl])
-    return cachedProvider(chainId, key, () => buildProvider(rpcUrl, null, chainId))
+  // A member endpoint replaces the caller's URL outright. Without one, the caller's URL stays
+  // the primary (pre-069 behavior) and only picks up the build's curated failover where the
+  // chain defines one — so a community-run default going dark degrades to a slower route
+  // instead of leaving the chain with no route at all.
+  const memberRoute = route?.source === 'member' && route.primary ? route.primary : null
+  const primaryUrl = memberRoute ? memberRoute.url : rpcUrl
+  const primaryHeaders = memberRoute ? memberRoute.headers : null
+  const failoverUrl =
+    route?.failover && route.failover.url !== primaryUrl ? route.failover.url : null
+
+  if (!failoverUrl) {
+    const key = JSON.stringify(['single', primaryUrl, primaryHeaders])
+    return cachedProvider(chainId, key, () => buildProvider(primaryUrl, primaryHeaders, chainId))
   }
 
-  if (!route.failover) {
-    const key = JSON.stringify(['single', route.primary.url, route.primary.headers])
-    return cachedProvider(chainId, key, () => buildProvider(route.primary.url, route.primary.headers, chainId))
-  }
-
-  const key = JSON.stringify([
-    'fallback',
-    route.primary.url,
-    route.primary.headers,
-    route.failover.url,
-    route.failover.headers,
-  ])
+  const key = JSON.stringify(['fallback', primaryUrl, primaryHeaders, failoverUrl])
   return cachedProvider(chainId, key, () => {
-    const primary = buildProvider(route.primary.url, route.primary.headers, chainId, { staticNetwork: true })
-    const failover = buildProvider(route.failover.url, route.failover.headers, chainId, { staticNetwork: true })
+    const primary = buildProvider(primaryUrl, primaryHeaders, chainId, { staticNetwork: true })
+    const failover = buildProvider(failoverUrl, null, chainId, { staticNetwork: true })
     return new ethers.FallbackProvider(
       [
         { provider: primary, priority: 1, weight: 1, stallTimeout: 2000 },
