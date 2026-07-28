@@ -126,3 +126,19 @@ export function partialLabel(aggregated, nameForChain = (id) => `chain ${id}`) {
   const names = aggregated.missing.map((m) => nameForChain(m.chainId))
   return `Partial — excludes ${names.join(', ')} (could not be read)`
 }
+
+/**
+ * A read value rendered in its own declared unit, or null when there is no value to render.
+ *
+ * Falls back to RAW UNITS with that fact stated rather than guessing a scale: a mis-scaled
+ * balance is a silent, wrong number, and an admitted "raw units" is not.
+ */
+export function formatUnitAmount(result, formatUnits) {
+  if (!isRead(result)) return null
+  const decimals = result.unit?.decimals ?? 0
+  try {
+    return `${formatUnits(result.value ?? 0n, decimals)} ${result.unit?.symbol ?? ''}`.trim()
+  } catch {
+    return `${String(result.value)} (raw units)`
+  }
+}

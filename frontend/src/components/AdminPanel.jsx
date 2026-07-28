@@ -25,6 +25,9 @@ import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
 import { networkName } from '../lib/chains/estate'
+import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
+import { useFeeEstate } from '../hooks/useFeeEstate'
+import ChainStateTable from './admin/ChainStateTable'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
 import SectionIconNav from './nav/SectionIconNav'
@@ -125,6 +128,21 @@ function AdminPanel() {
   // an operator who can open that tab. Offering the link to someone the Fees tab is closed to
   // would send them to a blank panel, so they get the same sentence without a dead control.
   const canOpenFees = isAdmin || isFeeAdmin
+
+  // Fees across every cohort chain (US3), independent of where the wallet is connected.
+  const feeEstate = useFeeEstate({ walletChainId: chainId, walletProvider: provider })
+
+  // A withdrawal targets ONE chain. It defaults to the wallet's chain when that chain carries a
+  // MembershipManager, otherwise to the first chain that does — the same rule the spec-067 tabs
+  // use — and it does NOT follow the wallet afterwards (FR-016).
+  const [withdrawChainId, setWithdrawChainId] = useState(null)
+  const withdrawScope = feeEstate.accrued.find((r) => Number(r.chainId) === Number(withdrawChainId))
+  useEffect(() => {
+    if (withdrawChainId != null || feeEstate.accrued.length === 0) return
+    const onWallet = feeEstate.accrued.find((r) => Number(r.chainId) === Number(chainId) && isRead(r))
+    const anyRead = feeEstate.accrued.find(isRead)
+    setWithdrawChainId((onWallet || anyRead || feeEstate.accrued[0]).chainId)
+  }, [feeEstate.accrued, chainId, withdrawChainId])
 
   const [activeTab, setActiveTab] = useState('overview')
   // The section rail collapses to an icon-only strip rather than disappearing.
@@ -356,12 +374,24 @@ function AdminPanel() {
   const handleWithdraw = () => {
     const target = withdrawEns.resolvedAddress || withdrawForm.to
     if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
-    const amount = ethers.parseUnits(String(withdrawForm.amount || '0'), USDC_DECIMALS)
+    // FR-017/FR-018: one named chain, wallet required to be there. Checked here as well as in
+    // the disabled button so a stale render can never send to the wrong network.
+    if (Number(chainId) !== Number(withdrawChainId)) {
+      return showNotification(
+        `This withdrawal happens on ${networkName(withdrawChainId)}. Switch your wallet there first.`,
+        'error',
+      )
+    }
+    const addr = getContractAddressForChain('membershipManager', withdrawChainId)
+    if (!addr) return showNotification(`No MembershipManager on ${networkName(withdrawChainId)}`, 'error')
+    const decimals = withdrawScope?.unit?.decimals ?? USDC_DECIMALS
+    const symbol = withdrawScope?.unit?.symbol ?? 'USDC'
+    const amount = ethers.parseUnits(String(withdrawForm.amount || '0'), decimals)
     if (amount === 0n) return showNotification('Amount must be greater than 0', 'error')
     return runTx(
-      () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).withdrawFees(amount, target),
-      `Withdrew ${withdrawForm.amount} USDC to ${shortAddr(target)}`
-    )
+      () => new ethers.Contract(addr, MEMBERSHIP_ADMIN_ABI, signer).withdrawFees(amount, target),
+      `Withdrew ${withdrawForm.amount} ${symbol} to ${shortAddr(target)} on ${networkName(withdrawChainId)}`
+    ).then((ok) => { if (ok) feeEstate.refresh(); return ok })
   }
 
   // Every role that can open this panel gets a row, each naming where it was found. Built here
@@ -546,10 +576,9 @@ function AdminPanel() {
                       {contractState.isPaused ? 'Paused' : 'Active'}
                     </span>
                   </div>
-                  <div className="status-row">
-                    <span className="status-label">Accrued tier fees</span>
-                    <span className="status-value">{contractState.accruedFees} USDC</span>
-                  </div>
+                  {/* The single-chain figure that used to sit here read one network's balance
+                      and presented it without qualification — a number an operator would act on
+                      as if it were the total. The estate breakdown is its own card below. */}
                   <div className="status-row">
                     <span className="status-label">Network</span>
                     <span className="status-value">{NETWORK_CONFIG.name}</span>
@@ -611,6 +640,36 @@ function AdminPanel() {
                 address={membershipManagerAddr}
                 accruedFees={contractState.accruedFees}
               />
+
+              {/*
+                Fees across the whole estate (US3). Two SEPARATE figures, deliberately:
+                  • accrued (undrawn) — MembershipManager.accruedFees, the only accruing balance
+                  • treasury (received) — already delivered; the FeeRouter forwards and holds nothing
+                They are never added together — one is money the platform still owes itself, the
+                other is money already paid out. And neither is summed across units, because the
+                payment token differs per chain (research R6, FR-021…FR-023).
+              */}
+              <div className="admin-card full-width">
+                <div className="admin-card-header"><h3>Fees across the estate</h3></div>
+                <ChainStateTable
+                  caption="Accrued (undrawn) — withdrawable from MembershipManager"
+                  results={feeEstate.accrued}
+                  totals={feeEstate.accruedTotals}
+                  onRetry={feeEstate.refresh}
+                />
+                <ChainStateTable
+                  caption="Treasury balance (received) — already delivered by the FeeRouter"
+                  results={feeEstate.received}
+                  totals={feeEstate.receivedTotals}
+                  onRetry={feeEstate.refresh}
+                />
+                <p className="card-info">
+                  These two are never combined: the first is undrawn and still withdrawable, the
+                  second has already been paid to the treasury. Totals are shown per token because
+                  networks hold different payment tokens, and any total computed while a network
+                  was unreadable says so and names it.
+                </p>
+              </div>
 
               <div className="admin-card full-width">
                 <div className="admin-card-header"><h3>Contract Addresses</h3></div>
@@ -864,11 +923,48 @@ function AdminPanel() {
           <div className="admin-tab-content" role="tabpanel">
             <div className="admin-card">
               <h3>Treasury Withdrawal</h3>
-              <p>
-                Withdraws accrued tier fees from MembershipManager in USDC. Current balance:{' '}
-                <strong>{contractState.accruedFees} USDC</strong>.
-              </p>
+              {/*
+                A withdrawal is a WRITE, so it targets exactly one chain and says which
+                (FR-017), and it is withheld unless the wallet is there rather than failing at
+                signature time (FR-018). The balance shown is that chain's — never an estate
+                total, which is not a thing any single `withdrawFees` call could move.
+              */}
               <div className="admin-form">
+                <label>
+                  Network to withdraw on
+                  <select
+                    value={String(withdrawChainId)}
+                    onChange={(e) => setWithdrawChainId(Number(e.target.value))}
+                  >
+                    {feeEstate.accrued.map((r) => (
+                      <option key={r.chainId} value={String(r.chainId)}>
+                        {networkName(r.chainId)}
+                        {isRead(r) ? ` — ${formatUnitAmount(r, ethers.formatUnits)} available` : ''}
+                        {isNotDeployed(r) ? ' — not deployed' : ''}
+                        {!isRead(r) && !isNotDeployed(r) ? ' — could not be read' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="card-info">
+                  {withdrawScope && isRead(withdrawScope) ? (
+                    <>
+                      Withdrawing <strong>{formatUnitAmount(withdrawScope, ethers.formatUnits)}</strong>{' '}
+                      of accrued tier fees on <strong>{networkName(withdrawChainId)}</strong>.
+                    </>
+                  ) : withdrawScope && isNotDeployed(withdrawScope) ? (
+                    <>No MembershipManager on {networkName(withdrawChainId)} — nothing to withdraw there.</>
+                  ) : (
+                    <>
+                      The balance on {networkName(withdrawChainId)} could not be read, so the
+                      available amount is unknown.
+                    </>
+                  )}
+                  {Number(chainId) !== Number(withdrawChainId) && (
+                    <> Your wallet is on {networkName(chainId)} — switch it to{' '}
+                    {networkName(withdrawChainId)} to sign this withdrawal.</>
+                  )}
+                </p>
                 <label>
                   Recipient (address or ENS)
                   <input type="text" value={withdrawForm.to}
@@ -883,16 +979,30 @@ function AdminPanel() {
                   )}
                 </label>
                 <label>
-                  Amount (USDC)
+                  Amount ({withdrawScope?.unit?.symbol || 'tokens'})
                   <input type="number" min="0" step="0.01" value={withdrawForm.amount}
                     onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })} />
+                  {/* Max is the SCOPED chain's balance, and is offered only when that balance
+                      was actually read — filling it from an unknown would be a guess. */}
                   <button type="button" className="hint-btn"
-                    onClick={() => setWithdrawForm({ ...withdrawForm, amount: contractState.accruedFees })}>
+                    disabled={!withdrawScope || !isRead(withdrawScope)}
+                    onClick={() => setWithdrawForm({
+                      ...withdrawForm,
+                      amount: ethers.formatUnits(withdrawScope.value, withdrawScope.unit?.decimals ?? 6),
+                    })}>
                     Max
                   </button>
                 </label>
-                <button className="confirm-btn primary" onClick={handleWithdraw} disabled={pendingTx}>
-                  {pendingTx ? 'Withdrawing...' : 'Withdraw Fees'}
+                <button
+                  className="confirm-btn primary"
+                  onClick={handleWithdraw}
+                  disabled={pendingTx || Number(chainId) !== Number(withdrawChainId)}
+                >
+                  {pendingTx
+                    ? 'Withdrawing...'
+                    : Number(chainId) !== Number(withdrawChainId)
+                      ? `Switch to ${networkName(withdrawChainId)} to withdraw`
+                      : `Withdraw on ${networkName(withdrawChainId)}`}
                 </button>
               </div>
             </div>
