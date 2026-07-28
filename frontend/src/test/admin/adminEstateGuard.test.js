@@ -29,12 +29,9 @@ const RE_WALLET_CHAIN = /getContractAddressForChain\(\s*'[^']+'\s*,\s*chainId\s*
 // Counts are MEASURED, not estimated — the first run of this guard corrected two of them, which
 // is the point: a baseline nobody verified is just a comment.
 const UNCONVERTED = {
-  // Converted in a later slice of Phase 7 — each reads a single contract and has no scope
-  // selector yet, so the wallet's chain is still what it uses.
-  'FeesTab.jsx': 1,
-  'StakingTab.jsx': 1,
-  'CallsignRegistryAdmin.jsx': 1,
-  // Infrastructure card: the paymaster deposit is per chain and follows the wallet today.
+  // Infrastructure card: the paymaster deposit is per chain and follows the wallet today. The
+  // last remaining entry — Fees, Staking and Callsigns were converted and removed from this list,
+  // which the guard's second assertion forced rather than left to memory.
   'PaymasterOpsCard.jsx': 1,
 }
 
