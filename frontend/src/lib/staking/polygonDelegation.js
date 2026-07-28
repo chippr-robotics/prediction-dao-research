@@ -13,6 +13,7 @@
 import { Contract, Interface } from 'ethers'
 import { POLYGON_VALIDATOR_SHARE_ABI, POL_TOKEN_ABI } from '../../abis/PolygonValidatorShare'
 import { POLYGON_STAKE_MANAGER_ABI } from '../../abis/PolygonStakeManager'
+import { toBaseUnitString } from '../earn/format'
 
 const VS_IFACE = new Interface(POLYGON_VALIDATOR_SHARE_ABI)
 const POL_IFACE = new Interface(POL_TOKEN_ABI)
@@ -41,7 +42,10 @@ export async function fetchValidatorDecoration(stakingApi, allowlistIds) {
       if (!wanted.has(id)) continue // allowlist decoration only — never expand
       out.set(id, {
         commissionPct: row.commissionPercent != null ? Number(row.commissionPercent) : null,
-        totalStakedRaw: row.totalStaked != null ? String(row.totalStaked) : null,
+        // The API quotes wei-scale stake as a JSON double
+        // (`"totalStaked": 1.2105466892436343e+26`), so String() would hand
+        // consumers an exponent BigInt() rejects — normalize at the boundary.
+        totalStakedRaw: toBaseUnitString(row.totalStaked),
         status: row.status || row.currentState || null,
         delegationEnabled: row.delegationEnabled !== false,
       })

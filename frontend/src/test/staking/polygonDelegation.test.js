@@ -38,6 +38,29 @@ describe('fetchValidatorDecoration', () => {
     expect(map.has(999)).toBe(false) // never surfaced — allowlist is the boundary
   })
 
+  // Regression (issue #977): the live API sends wei-scale stake as a JSON
+  // double, so the decoration must hand consumers an integer string BigInt()
+  // accepts — never "1.21e+26".
+  it('normalizes an exponential-notation totalStaked into an integer string', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          result: [
+            { id: 47, commissionPercent: 5, status: 'active', totalStaked: 1.2105466892436343e26 },
+            { id: 87, commissionPercent: 2, status: 'active', totalStaked: null },
+          ],
+        }),
+      }),
+    )
+    const map = await fetchValidatorDecoration('x', [47, 87])
+    const raw = map.get(47).totalStakedRaw
+    expect(raw).toMatch(/^\d+$/)
+    expect(BigInt(raw)).toBe(BigInt('121054668924363430000000000'))
+    expect(map.get(87).totalStakedRaw).toBeNull() // missing stays honest, not 0
+  })
+
   it('returns an empty map on failure (honest degradation)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
     expect((await fetchValidatorDecoration('x', [47])).size).toBe(0)
