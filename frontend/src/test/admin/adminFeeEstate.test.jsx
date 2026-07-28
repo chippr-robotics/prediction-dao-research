@@ -17,6 +17,7 @@ import ChainStateTable from '../../components/admin/ChainStateTable'
 import { readOk, notDeployed, unreadable, aggregate } from '../../lib/chains/chainReadResult'
 import { feeUnitFor } from '../../hooks/useFeeEstate'
 import { cohortChainIds, NETWORKS } from '../../config/networks'
+import adminPanelSource from '../../components/AdminPanel.jsx?raw'
 
 const USDC = { symbol: 'USDC', decimals: 6 }
 const USC = { symbol: 'USC', decimals: 6 }
@@ -163,5 +164,39 @@ describe('formatting refuses to guess a scale', () => {
     const { container } = render(<ChainStateTable results={results} caption="Accrued" />)
     expect(container.textContent).toContain(`${ethers.formatUnits(0n, 6)} USDC`)
     expect(container.textContent).not.toMatch(/Could not be read|Not deployed/)
+  })
+})
+
+// ── T047: a withdrawal is a WRITE, so it targets one named chain ────────────────────────────
+// `withdrawFees` moves money on exactly one MembershipManager. An estate total is not something
+// any single call could move, and a Max button filled from an unread balance would be a guess.
+describe('the Treasury withdrawal is scoped to one named chain (FR-017, FR-018)', () => {
+  const source = adminPanelSource
+
+  it('sends to the SCOPED chain\'s MembershipManager, not the wallet chain\'s', () => {
+    expect(source).toMatch(/getContractAddressForChain\('membershipManager', withdrawChainId\)/)
+  })
+
+  it('refuses to sign while the wallet is on a different chain, before the transaction', () => {
+    expect(source).toMatch(/Number\(chainId\) !== Number\(withdrawChainId\)/)
+    expect(source).toContain('Switch your wallet there first')
+  })
+
+  it('names the chain in the confirmation', () => {
+    expect(source).toMatch(/Withdrew \$\{withdrawForm\.amount\} \$\{symbol\} to \$\{shortAddr\(target\)\} on \$\{networkName\(withdrawChainId\)\}/)
+  })
+
+  it('offers Max only when that chain\'s balance was actually read', () => {
+    expect(source).toMatch(/disabled=\{!withdrawScope \|\| !isRead\(withdrawScope\)\}/)
+  })
+
+  it('uses the scoped chain\'s own decimals and symbol, not a hardcoded USDC', () => {
+    expect(source).toMatch(/withdrawScope\?\.unit\?\.decimals \?\? USDC_DECIMALS/)
+    expect(source).toMatch(/withdrawScope\?\.unit\?\.symbol \?\? 'USDC'/)
+  })
+
+  it('does not let the scope follow the wallet once chosen (FR-016)', () => {
+    // The effect seeds the scope only while it is null; it never re-assigns on a chainId change.
+    expect(source).toMatch(/if \(withdrawChainId != null \|\| feeEstate\.accrued\.length === 0\) return/)
   })
 })
