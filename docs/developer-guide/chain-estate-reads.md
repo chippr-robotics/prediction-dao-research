@@ -112,7 +112,10 @@ import { useScopedChain, writeGateReason, writeAllowed } from '../components/adm
   again at the call site so a stale render cannot send to the wrong network, and name the chain
   in the confirmation.
 - **Authority is read from the contract that will enforce it**, never from an app-wide role flag.
-  `GUARDIAN_ROLE` on the WagerRegistry is not `GUARDIAN_ROLE` on the BridgeRouter.
+  `GUARDIAN_ROLE` on the WagerRegistry is not `GUARDIAN_ROLE` on the BridgeRouter. Use
+  `readAuthority` + `authorityGate` from `lib/chains/estate.js`; an app-wide flag may stand in
+  only while the first read is in flight, so an operator who does hold the role is not shown an
+  empty tab for a round-trip.
 - **An unconfirmed authority read keeps the control offered**, and says so. Only a definite "no"
   withholds. Hiding a killswitch because an RPC timed out tells an operator who holds it that
   there isn't one.

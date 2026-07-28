@@ -16,7 +16,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
-import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { estateNetworks, networkName, readProviderFor, readAuthority, authorityGate } from '../../lib/chains/estate'
 import { NetworkScopeCard } from './scopeControls'
 import { useScopedChain } from './scopeGate'
 import { STAKING_ROUTER_ABI } from '../../abis/StakingRouter'
@@ -42,7 +42,7 @@ function shortAddr(a) {
 
 const isValidAddr = (a) => ethers.isAddress(a) && a !== ethers.ZeroAddress
 
-export default function StakingTab({ signer, chainId, provider, runTx, pendingTx, isAdmin, isStakingAdmin, isGuardian }) {
+export default function StakingTab({ signer, account, chainId, provider, runTx, pendingTx, isAdmin, isStakingAdmin, isGuardian }) {
   // Spec 071 US4: provider addresses and the validator allowlist are per network — a router on
   // one chain knows nothing about another's. Scoped so an operator sees the network they mean.
   const stakingNetworks = useMemo(() => estateNetworks(), [])
@@ -53,8 +53,31 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
     () => readProviderFor(scopeChainId, chainId, provider),
     [scopeChainId, chainId, provider],
   )
-  const canConfig = Boolean(isAdmin || isStakingAdmin)
-  const canPause = Boolean(isAdmin || isGuardian)
+  // Authority comes from the router that will ENFORCE it, on the scoped chain. The app-wide
+  // flags answer "holds this role somewhere in the estate", which would offer an enabled pause
+  // on a network whose router reverts — and a pause an operator believes they hold is worse than
+  // one they know they do not. An UNCONFIRMED read keeps the control offered and says so
+  // (FR-044): hiding a killswitch because an RPC timed out is its own kind of lie.
+  const [authority, setAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    readAuthority({
+      provider: readProvider,
+      address: routerAddr,
+      account,
+      roles: ['admin', 'stakingAdmin', 'guardian'],
+    }).then((a) => {
+      if (!cancelled) setAuthority(a)
+    })
+    return () => { cancelled = true }
+  }, [readProvider, routerAddr, account])
+
+  const configGate = authorityGate(authority, ['admin', 'stakingAdmin'])
+  const pauseGate = authorityGate(authority, ['admin', 'guardian'])
+  // While the first read is in flight the app-wide flag stands in, so an operator who does hold
+  // the role is not shown an empty tab for a round-trip.
+  const canConfig = configGate.pending ? Boolean(isAdmin || isStakingAdmin) : configGate.allowed
+  const canPause = pauseGate.pending ? Boolean(isAdmin || isGuardian) : pauseGate.allowed
 
   const [state, setState] = useState(null) // null = loading
   const [readError, setReadError] = useState(null)
@@ -64,8 +87,8 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
   const [formError, setFormError] = useState(null)
 
   const routerRead = useMemo(
-    () => (routerAddr && provider ? new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, provider) : null),
-    [routerAddr, provider]
+    () => (routerAddr && readProvider ? new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, readProvider) : null),
+    [routerAddr, readProvider]
   )
   const write = useCallback(
     () => new ethers.Contract(routerAddr, STAKING_ROUTER_ABI, signer),
@@ -113,9 +136,9 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
   }, [readProvider, routerAddr, scopeChainId])
 
   const fetchHistory = useCallback(async () => {
-    if (!routerRead || !provider) return
+    if (!routerRead || !readProvider) return
     try {
-      const latest = await provider.getBlockNumber()
+      const latest = await readProvider.getBlockNumber()
       const fromBlock = Math.max(0, Number(latest) - HISTORY_LOOKBACK_BLOCKS)
       const all = []
       for (const name of SETTER_EVENTS) {
@@ -126,7 +149,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       const recent = all.slice(0, HISTORY_LIMIT)
       const entries = await Promise.all(
         recent.map(async ({ name, ev }) => {
-          const block = await provider.getBlock(ev.blockNumber).catch(() => null)
+          const block = await readProvider.getBlock(ev.blockNumber).catch(() => null)
           const actor = ev.args?.actor || ev.args?.account
           return {
             name,
@@ -141,7 +164,7 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
     } catch (e) {
       setHistory({ entries: [], error: e?.message || String(e) })
     }
-  }, [routerRead, provider])
+  }, [routerRead, readProvider])
 
   useEffect(() => {
     fetchState()
@@ -270,6 +293,13 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       {canPause && (
         <div className="admin-card">
           <h3>Emergency pause</h3>
+          {pauseGate.unconfirmed && (
+            <p className="card-info warning-text" role="status">
+              Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+              available because the router itself is the real gate, and it will refuse anything you
+              do not hold.
+            </p>
+          )}
           <p>
             Pausing stops <strong>new</strong> stakes on this network immediately (no redeploy). Members
             can always still unstake, withdraw, and claim — exits never route through the router.
@@ -288,6 +318,13 @@ export default function StakingTab({ signer, chainId, provider, runTx, pendingTx
       {canConfig && (
         <div className="admin-card">
           <h3>Provider addresses</h3>
+          {configGate.unconfirmed && (
+            <p className="card-info warning-text" role="status">
+              Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+              available because the router itself is the real gate, and it will refuse anything you
+              do not hold.
+            </p>
+          )}
           <p>Current values shown below each field. Invalid or zero addresses are rejected before the wallet prompt.</p>
           <div className="admin-form">
             <label>

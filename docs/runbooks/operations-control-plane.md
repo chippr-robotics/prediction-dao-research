@@ -80,6 +80,17 @@ not reach that network's contract to check your role. The contract itself will s
 anything you do not hold — the control stays available because hiding a killswitch on a failed
 read tells an operator who *does* hold it that there isn't one.
 
+### Who a control is offered to
+
+A view's edit controls are offered on the strength of the role you hold **on the contract in
+scope**, read from that contract — not on an app-wide "you are an admin somewhere" flag. Holding
+`FEE_ADMIN_ROLE` on Polygon does not put the fee editor in front of you while you are reading
+Base's FeeRouter, because Base's router would refuse the transaction.
+
+The one exception is a role read that **fails**: the control stays offered and says
+*authority could not be confirmed*. The contract is the real gate, and withholding a killswitch
+because an RPC timed out tells an operator who *does* hold it that there isn't one.
+
 ## Navigating: the collapsible section rail
 
 The groups above render as a side panel down the left of `/admin`, with the
@@ -94,8 +105,13 @@ hamburger switches between them:
 
 It opens expanded on desktop and collapsed on mobile, where expanding slides the
 panel over the content — pick a view, tap the dimmed area, or press `Esc` to
-close it again. Mobile also keeps the bottom icon bar for switching between
-views without opening the panel at all.
+close it again.
+
+There is deliberately **no bottom icon bar** on this console. The other sections
+of the app have one, but they have a handful of views each; operations has 22, and
+a fixed strip fitted every one of them across a phone's width, so the labels
+overlapped into an unreadable run and the bar covered the content it was meant to
+navigate. The rail already puts every section one tap away, in named groups.
 
 ## How-to: common procedures
 
@@ -208,6 +224,8 @@ on-chain; the view exists so operators can act without CLI tooling.
 | "Access Restricted" on `/admin` | No operator role found for your wallet on **any** network in this build's cohort. Entry sweeps them all, so switching networks will not change this — check the address. |
 | A group/view is missing from the rail | You lack the gating role; the rail only shows what you can use. |
 | The rail is a strip of icons with no labels | It is collapsed, not broken — every view is still there. Hover for a name, or click the hamburger at its top left to expand. |
+| The view renders *below* the rail instead of beside it | A layout regression, not a setting. `.portal-shell` must be `display: flex`; `src/test/portalNavStylesheet.test.js` guards it. |
+| An edit control is missing though you hold the role | You hold it on another network. Roles are per contract per chain; scope the view to the network you hold it on. |
 | A view names a network and says "not deployed" | That contract is not in the frontend address book for **that** network. Pick another in the view's network selector, or run `npm run sync:frontend-contracts` after deploy. |
 | The paymaster deposit shows an unfamiliar currency | It is denominated in the **scoped** network's native token, not your wallet's — that is the figure being read. |
 | A deny-list status check says *unknown* | The guard on that network could not be reached. It is not a clearance; retry or pick a network you can read. |

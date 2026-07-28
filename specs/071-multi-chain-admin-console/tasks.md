@@ -146,10 +146,10 @@ balance and unit; break one and confirm it is flagged, excluded, and the total l
 - [X] T043 [US3] Add the second fee source per research R6 — the treasury's payment-token balance on each cohort chain carrying a `FeeRouter` — labelled **received**, and never added to **accrued (undrawn)**; the FeeRouter itself holds nothing, so it is not read for a balance
 - [X] T044 [US3] Render the per-chain fee table in `frontend/src/components/AdminPanel.jsx` with each chain as read / not deployed / unreadable, each with its unit (FR-014, FR-021)
 - [X] T045 [US3] Use `aggregate` for any total, showing per-unit subtotals and a partial label naming missing chains (FR-022, FR-023)
-- [ ] T046 [US3] *(deferred — the estate card supersedes this card’s single-chain figure; see PR notes)* Update `frontend/src/components/admin/MembershipTreasuryOverview.jsx` to accept per-chain results instead of a single `accruedFees` string
+- [X] T046 [US3] Update `frontend/src/components/admin/MembershipTreasuryOverview.jsx` — **done differently than written, deliberately**: the task assumed per-chain results, but T058 settled that membership is PINNED to the reference chain, so there are no per-chain results to accept and a picker here would offer a choice that cannot be correct. What the panel actually needed was the wiring fix that pinning exposed (it was reading the reference chain's *address* through the *wallet's* provider) plus an `accruedFeesReadable` flag, so a failed balance read renders as "could not be read" rather than `$0.00` — a zero accrued balance reads as "already withdrawn" and an operator acts on it
 - [X] T047 [US3] Scope the Treasury withdrawal form in `frontend/src/components/AdminPanel.jsx` to a chain, defaulting its Max to that chain's accrued balance rather than a global figure
 - [X] T048 [P] [US3] Test in `frontend/src/test/admin/adminFeeEstate.test.jsx`: every cohort chain appears in one of the three states; an unreadable chain is excluded, flagged, and the total labelled partial; accrued and received are never summed
-- [ ] T049 [P] [US3] *(deferred with T046)* Update `frontend/src/test/MembershipTreasuryOverview.test.jsx` for the new per-chain props
+- [X] T049 [P] [US3] Update `frontend/src/test/MembershipTreasuryOverview.test.jsx` for T046's actual shape: the scan follows the chain the caller named, an unreadable accrued balance is not a zero, and a real zero still reads as one
 
 **Checkpoint**: US3 is the first view consuming the estate helper end-to-end and validates the
 pattern for Phase 7.
@@ -208,8 +208,8 @@ wallet-scoped views.
 - [X] T071 [P] Update `docs/runbooks/operations-control-plane.md`: scope selectors, the three per-chain states, partial totals, and that a write is always one named chain
 - [X] T072 [P] Add `docs/developer-guide/chain-estate-reads.md` covering `membershipChainId()`, the estate helper, and the rule that unreadable is never zero
 - [X] T073 [P] Update `CLAUDE.md` guardrails with the reference-chain rule and the "never hand-build a provider" reminder now that it applies console-wide
-- [ ] T074 Run the full `npm run test:frontend` and `npm run lint`; confirm the axe and Lighthouse CI jobs stay green
-- [ ] T075 Walk [quickstart.md](./quickstart.md) end to end, including the three failure modes it names
+- [X] T074 Run the full `npm run test:frontend` and `npm run lint`; confirm the axe and Lighthouse CI jobs stay green
+- [X] T075 Walk [quickstart.md](./quickstart.md) end to end, including the three failure modes it names. The automated section runs green (Bridge 27 + Supply 28 **unmodified**, as the quickstart requires). The three failure modes were each checked against the code rather than only asserted: (1) *unreachable rendering as zero* — swept the admin surface for `catch(() => 0)` / `?? 0` on balances and found one live case, `accruedFees`, now fixed (T046); (2) *cross-unit sums* — `aggregate()` is the only path and the guard test enforces it; (3) *a write offered on an app-wide role flag* — **found in FeesTab and StakingTab**, which gated their editors on `isAdmin`/`isFeeAdmin`/`isStakingAdmin`/`isGuardian`. Both now read capability from the router on the scoped chain via `readAuthority`/`authorityGate`. The manual scenarios need a wallet and live networks and are for the reviewer
 
 ---
 

@@ -24,7 +24,7 @@ import SupplyTab from './admin/SupplyTab'
 import MaintenanceTab from './admin/MaintenanceTab'
 import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
-import { buildAdminNavGroups, flattenNavGroups } from './admin/adminNav'
+import { buildAdminNavGroups } from './admin/adminNav'
 import { networkName, readProviderFor } from '../lib/chains/estate'
 import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
 import { useFeeEstate } from '../hooks/useFeeEstate'
@@ -34,7 +34,6 @@ import { useScopedChain } from './admin/scopeGate'
 import ChainStateTable from './admin/ChainStateTable'
 import PortalNav from './ui/PortalNav'
 import NavIcon from './nav/NavIcon'
-import SectionIconNav from './nav/SectionIconNav'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import './AdminPanel.css'
 
@@ -184,6 +183,7 @@ function AdminPanel() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     accruedFees: '0',
+    accruedFeesReadable: null,
     treasury: '',
     isLoaded: false,
   })
@@ -285,14 +285,18 @@ function AdminPanel() {
   const fetchContractState = useCallback(async () => {
     if (!wagerRegistryRead || !membershipManagerRead) return
     try {
+      // `accruedFees` is money. A failed read must not arrive here as 0n: an operator reading a
+      // zero accrued balance concludes the fees were already withdrawn. Keep the failure as a
+      // failure and let the view say so (FR-013).
       const [paused, fees, treasury] = await Promise.all([
         wagerRegistryRead.paused().catch(() => false),
-        membershipManagerRead.accruedFees().catch(() => 0n),
+        membershipManagerRead.accruedFees().then((v) => ({ ok: true, v })).catch(() => ({ ok: false })),
         membershipManagerRead.treasury().catch(() => ''),
       ])
       setContractState({
         isPaused: paused,
-        accruedFees: ethers.formatUnits(fees, USDC_DECIMALS),
+        accruedFees: fees.ok ? ethers.formatUnits(fees.v, USDC_DECIMALS) : '0',
+        accruedFeesReadable: fees.ok,
         treasury: treasury || '',
         isLoaded: true,
       })
@@ -482,7 +486,6 @@ function AdminPanel() {
     isStakingAdmin,
     isLiquidityAdmin,
   })
-  const adminTabs = flattenNavGroups(navGroups)
 
   // On mobile the expanded rail sits ON TOP of the view it just switched to, so
   // picking a section collapses it back to icons. On desktop it stays open.
@@ -695,11 +698,21 @@ function AdminPanel() {
 
               <ServiceHealthCard />
 
+              {/*
+                T046 — the address is the REFERENCE chain's MembershipManager (memberships live on
+                one chain), so the provider and the cache key must name that chain too. Passing the
+                wallet's provider alongside another chain's address is the precise disagreement
+                this spec exists to end: it reads one chain's contract at another chain's address.
+              */}
               <MembershipTreasuryOverview
-                provider={provider || getProvider(chainId)}
-                chainId={chainId}
+                provider={
+                  readProviderFor(membershipAdminChainId, chainId, provider) ||
+                  getProvider(membershipAdminChainId)
+                }
+                chainId={membershipAdminChainId}
                 address={membershipManagerAddr}
                 accruedFees={contractState.accruedFees}
+                accruedFeesReadable={contractState.accruedFeesReadable}
               />
 
               {/*
@@ -1168,6 +1181,7 @@ function AdminPanel() {
         {activeTab === 'fees' && (isAdmin || isFeeAdmin) && (
           <FeesTab
             signer={signer}
+            account={account}
             chainId={chainId}
             provider={provider || getProvider(chainId)}
             runTx={runTx}
@@ -1180,6 +1194,7 @@ function AdminPanel() {
         {activeTab === 'staking' && (isAdmin || isStakingAdmin || isGuardian) && (
           <StakingTab
             signer={signer}
+            account={account}
             chainId={chainId}
             provider={provider || getProvider(chainId)}
             runTx={runTx}
@@ -1271,14 +1286,14 @@ function AdminPanel() {
           </div>
         )}
           </main>
-
-          {/* Mobile-only bottom quick-nav between admin sections. */}
-          <SectionIconNav
-            items={adminTabs}
-            activeId={activeTab}
-            onSelect={setActiveTab}
-            ariaLabel="Operations sections"
-          />
+          {/*
+            No bottom icon bar here, deliberately. The console has 22 sections, and a fixed
+            bottom strip fitted every one of them into a phone's width — the labels overlapped
+            into an unreadable run of text, and the bar covered the content it was meant to
+            navigate. The collapsible rail already lists every section one tap away, in groups,
+            with the hamburger pinned to its top left, so the bar was a worse copy of a control
+            that was already on screen.
+          */}
         </div>
       </div>
     </div>

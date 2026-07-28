@@ -22,7 +22,7 @@ import { getContractAddressForChain } from '../../config/contracts'
 import { FEE_ROUTER_ABI } from '../../abis/FeeRouter'
 import { gatewayBaseUrl } from '../../hooks/useGatewayStatus'
 import { getBlockscoutUrl } from '../../config/blockExplorer'
-import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { estateNetworks, networkName, readProviderFor, readAuthority, authorityGate } from '../../lib/chains/estate'
 import { NetworkScopeCard } from './scopeControls'
 import { useScopedChain } from './scopeGate'
 
@@ -48,7 +48,7 @@ function bpsPct(bps) {
   return `${(Number(bps) / 100).toFixed(2)}%`
 }
 
-export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, isAdmin, isFeeAdmin }) {
+export default function FeesTab({ signer, account, chainId, provider, runTx, pendingTx, isAdmin, isFeeAdmin }) {
   // Spec 071 US4: fee rates are genuinely per network — each chain's FeeRouter carries its own
   // services and its own bps. Showing the wallet's chain alone presented ONE network's rates as
   // if they were the platform's, which for a fee schedule is a materially wrong statement.
@@ -60,7 +60,30 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
     () => readProviderFor(scopeChainId, chainId, provider),
     [scopeChainId, chainId, provider],
   )
-  const canEditFees = Boolean(isAdmin || isFeeAdmin)
+  // Authority is read from the FeeRouter that will ENFORCE it, on the scoped chain — never from
+  // the app-wide flags. `isFeeAdmin` means "holds FEE_ADMIN_ROLE somewhere in the estate", which
+  // on a per-chain fee schedule is the wrong question: it would offer an enabled Set-fee button on
+  // a network whose router will revert. The flags are kept only as the pre-read assumption, so an
+  // operator who does hold the role is not made to wait on a round-trip to see the form.
+  const [authority, setAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    readAuthority({
+      provider: readProvider,
+      address: routerAddr,
+      account,
+      roles: ['admin', 'feeAdmin'],
+    }).then((a) => {
+      if (!cancelled) setAuthority(a)
+    })
+    return () => { cancelled = true }
+  }, [readProvider, routerAddr, account])
+
+  const feeGate = authorityGate(authority, ['admin', 'feeAdmin'])
+  const treasuryGate = authorityGate(authority, ['admin'])
+  // Pending (first read in flight) falls back to the app-wide flag rather than blanking the form.
+  const canEditFees = feeGate.pending ? Boolean(isAdmin || isFeeAdmin) : feeGate.allowed
+  const canEditTreasury = treasuryGate.pending ? Boolean(isAdmin) : treasuryGate.allowed
 
   const [services, setServices] = useState(null) // null = loading; [] = none
   const [treasury, setTreasury] = useState(undefined)
@@ -396,11 +419,18 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
             >
               Set fee rate
             </button>
+            {feeGate.unconfirmed && (
+              <p className="card-info warning-text" role="status">
+                Authority could not be confirmed on {networkName(scopeChainId)} — the control stays
+                available because the router itself is the real gate, and it will refuse anything
+                you do not hold.
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {isAdmin && (
+      {canEditTreasury && (
         <div className="admin-card">
           <h3>Change the fee treasury</h3>
           <p>
@@ -425,6 +455,12 @@ export default function FeesTab({ signer, chainId, provider, runTx, pendingTx, i
             >
               Set treasury
             </button>
+            {treasuryGate.unconfirmed && (
+              <p className="card-info warning-text" role="status">
+                Authority could not be confirmed on {networkName(scopeChainId)} — the router will
+                still refuse this unless you hold the admin role there.
+              </p>
+            )}
           </div>
         </div>
       )}
