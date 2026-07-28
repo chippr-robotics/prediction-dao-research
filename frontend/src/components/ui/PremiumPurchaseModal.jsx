@@ -117,6 +117,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     getContractAddressForChain('membershipManager', chainId)
   )
 
+  // ── PURCHASES SETTLE ON THE REFERENCE CHAIN (spec 071 FR-006/FR-007) ────────────────────
+  // Membership must be READABLE from one place (FR-003), which is only true if it is also
+  // WRITTEN in one place. A purchase that landed elsewhere would create a membership the
+  // reference-chain read can never see — the member pays and stays unentitled everywhere.
+  //
+  // `isCorrectNetwork` is not enough here: it means "any supported chain". The purchase needs
+  // one specific chain, disclosed before signature, with the wallet actually on it.
+  const purchaseChainId = membershipChainId()
+  const purchaseNetworkName = networkName(purchaseChainId)
+  const onPurchaseChain = Number(chainId) === Number(purchaseChainId)
+
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [acknowledged, setAcknowledged] = useState(false)
@@ -215,6 +226,16 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     if (!tierReadable) {
       showNotification(
         `Cannot purchase yet: your current membership could not be read from ${networkName(membershipChainId())}. Retry the check first.`,
+        'error',
+      )
+      return
+    }
+    // FR-006/FR-007: not "a supported network" — THE reference chain, named. Declining the
+    // switch must leave no purchase attempted anywhere, which is why this returns rather than
+    // falling through to a best-effort send on whatever chain the wallet is on.
+    if (!onPurchaseChain) {
+      showNotification(
+        `Membership purchases settle on ${purchaseNetworkName}. Switch your wallet there to continue.`,
         'error',
       )
       return
@@ -688,13 +709,27 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                   </div>
                 </div>
 
-                {isConnected && !isCorrectNetwork && (
+                {/* FR-007: the settlement network is disclosed BEFORE signature, always —
+                    not only when it is wrong. A member should not have to infer where their
+                    money is going from the absence of a warning. */}
+                <p className="ppm-settlement-note" role="note">
+                  Memberships are held on <strong>{purchaseNetworkName}</strong>, so this purchase
+                  settles there and is recognised from every network afterwards.
+                </p>
+
+                {isConnected && !onPurchaseChain && (
                   <div className="ppm-network-warning">
                     <span aria-hidden="true">⚠️</span>
                     <div>
-                      <strong>Wrong Network</strong>
-                      <p>Please switch to the correct network to continue.</p>
-                      <button type="button" onClick={switchNetwork}>Switch Network</button>
+                      <strong>Switch to {purchaseNetworkName}</strong>
+                      <p>
+                        Your wallet is on {networkName(chainId)}. Membership purchases settle on{' '}
+                        {purchaseNetworkName} — buying anywhere else would create a membership the
+                        app could never read back.
+                      </p>
+                      <button type="button" onClick={() => switchNetwork(purchaseChainId)}>
+                        Switch to {purchaseNetworkName}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -803,12 +838,14 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                 Continue
               </button>
             )}
+            {/* FR-005/FR-006: no purchase while the wallet is off the reference chain, and none
+                while the current tier is unknown — either would charge for the wrong thing. */}
             {!showProcessing && currentStep === 1 && (
               <button
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
                 onClick={handlePurchase}
-                disabled={isBusy || !isConnected || !isCorrectNetwork || !acknowledged}
+                disabled={isBusy || !isConnected || !onPurchaseChain || !tierReadable || !acknowledged}
               >
                 Confirm Purchase (${selectedPrice.toFixed(2)} USDC)
               </button>

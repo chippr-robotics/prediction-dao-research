@@ -633,15 +633,18 @@ export function WalletProvider({ children }) {
   // Switch to the configured primary network (Polygon Amoy). Invoked from
   // the network-error banner / "Switch Network" button when the user is on
   // an unsupported chain.
-  const switchNetwork = useCallback(async () => {
-    const target = PRIMARY_CHAIN_ID
+  // `targetChainId` defaults to the app's home network, so every existing call site is
+  // unchanged. Spec 071 needs an explicit target: a membership purchase must settle on the
+  // REFERENCE chain (FR-006), which is not necessarily where the app happens to be homed.
+  const switchNetwork = useCallback(async (targetChainId = PRIMARY_CHAIN_ID) => {
+    const target = Number(targetChainId) || PRIMARY_CHAIN_ID
     try {
       await switchChain({ chainId: target })
       return true
     } catch (error) {
       console.error('Error switching network:', error)
       const targetNet = getNetwork(target)
-      throw new Error(`Please manually switch to ${targetNet?.name || 'Polygon Amoy'} in your wallet`)
+      throw new Error(`Please manually switch to ${targetNet?.name || `chain ${target}`} in your wallet`)
     }
   }, [switchChain])
 

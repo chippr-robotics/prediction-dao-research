@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../config/contracts'
+import { membershipChainId } from '../config/networks'
 import { getProvider } from '../utils/blockchainService'
-import { useWeb3 } from './useWeb3'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
@@ -49,23 +49,30 @@ export function useTierPrices() {
   // that prices for a real-money product may be estimates / out of sync.
   const [usingFallbackPrices, setUsingFallbackPrices] = useState(true)
 
-  // Resolve the MembershipManager + provider for the wallet's connected chain so
-  // tier prices/limits reflect the network the user is actually on, not the
-  // build-time default. Falls back to the primary chain when disconnected
-  // (getProvider/getContractAddressForChain handle a null chainId).
-  const { chainId } = useWeb3()
-  const provider = useMemo(() => getProvider(chainId), [chainId])
+  // ── PRICES COME FROM THE REFERENCE CHAIN (spec 071 FR-003/FR-006/FR-008) ──────────────────
+  // These used to resolve against the WALLET's connected chain. Since spec 071 routes every
+  // purchase to the reference chain, that combination quoted one chain's price for a purchase
+  // that settles on another — and on any chain without a MembershipManager (every mainnet but
+  // Polygon) it found no contract at all and fell back to HARDCODED prices. A member was shown
+  // a placeholder price for a real charge, which is precisely what constitution III forbids.
+  //
+  // The price the member is quoted is now read from the same contract that will take their
+  // money, so the two cannot disagree.
+  const referenceChainId = membershipChainId()
+  const provider = useMemo(() => getProvider(referenceChainId), [referenceChainId])
 
   const contract = useMemo(() => {
-    const addr = getContractAddressForChain('membershipManager', chainId)
+    const addr = getContractAddressForChain('membershipManager', referenceChainId)
     if (!addr) return null
     return new ethers.Contract(addr, MEMBERSHIP_MANAGER_ABI, provider)
-  }, [provider, chainId])
+  }, [provider, referenceChainId])
 
   const fetchPrices = useCallback(async () => {
     if (!contract) {
-      // No MembershipManager on the connected chain — show fallback prices, not
-      // whatever was fetched for a previously-connected network.
+      // No MembershipManager on the REFERENCE chain — a build misconfiguration rather than a
+      // member being on the "wrong" network, since the reference chain no longer moves with the
+      // wallet. `usingFallbackPrices` stays true so the UI keeps disclosing that these are
+      // estimates rather than a quote from the contract that will take the money.
       setTierPrices(FALLBACK_PRICES)
       setTierLimits({})
       setUsingFallbackPrices(true)

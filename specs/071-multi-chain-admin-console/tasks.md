@@ -123,12 +123,12 @@ resolver.
 **Independent test**: Start a purchase from a non-reference chain; confirm disclosure + switch, that
 declining buys nothing, and that no path completes a purchase elsewhere.
 
-- [ ] T036 [US5] Route the purchase calls built in `frontend/src/components/ui/PremiumPurchaseModal.jsx` to `membershipChainId()` rather than the connected chain (FR-006)
-- [ ] T037 [US5] Disclose the settlement network in the confirm step of `frontend/src/components/ui/PremiumPurchaseModal.jsx` before signature, and require the wallet to be there (FR-007)
-- [ ] T038 [US5] Offer a wallet network switch to the reference chain, and ensure declining leaves no purchase attempted on any chain (FR-007, acceptance 2)
-- [ ] T039 [US5] Evaluate payment-token sufficiency against the reference chain's balance only, stating any shortfall in that chain's payment token, in `frontend/src/components/ui/PremiumPurchaseModal.jsx` (FR-008)
-- [ ] T040 [US5] Audit `frontend/src/hooks/useTierPrices.js` and `frontend/src/hooks/useVouchers.js` for connected-chain assumptions in the purchase path and route them to the reference chain
-- [ ] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx`: purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager; **and the absence SC-006 claims** — drive the flow on *each* non-reference cohort chain and assert every built call still targets the reference chain's address, so "no path completes a purchase elsewhere" is verified rather than asserted in prose (mirrors the absence assertion T067 makes for FR-020)
+- [X] T036 [US5] Route the purchase calls built in `frontend/src/components/ui/PremiumPurchaseModal.jsx` to `membershipChainId()` rather than the connected chain (FR-006)
+- [X] T037 [US5] Disclose the settlement network in the confirm step of `frontend/src/components/ui/PremiumPurchaseModal.jsx` before signature, and require the wallet to be there (FR-007)
+- [X] T038 [US5] Offer a wallet network switch to the reference chain, and ensure declining leaves no purchase attempted on any chain (FR-007, acceptance 2)
+- [X] T039 [US5] Evaluate payment-token sufficiency against the reference chain's balance only, stating any shortfall in that chain's payment token, in `frontend/src/components/ui/PremiumPurchaseModal.jsx` (FR-008)
+- [X] T040 [US5] Audit `frontend/src/hooks/useTierPrices.js` and `frontend/src/hooks/useVouchers.js` for connected-chain assumptions in the purchase path and route them to the reference chain
+- [X] T041 [P] [US5] Test in `frontend/src/test/membershipPurchaseRouting.test.jsx` (9 tests): purchase from a non-reference chain discloses the settlement network; declining the switch sends no transaction; the built calls target the reference chain's MembershipManager; **and the absence SC-006 claims** — drive the flow on *each* non-reference cohort chain and assert every built call still targets the reference chain's address, so "no path completes a purchase elsewhere" is verified rather than asserted in prose (mirrors the absence assertion T067 makes for FR-020)
 
 **Checkpoint**: US1 + US5 together close the read/write loop — a purchase is now readable from
 everywhere.
