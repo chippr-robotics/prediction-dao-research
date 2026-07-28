@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ethers } from 'ethers'
+import { cohortChainIds, NETWORKS } from '../config/networks'
 
 const m = vi.hoisted(() => ({ routerAddr: null, reads: {}, writes: {} }))
 
@@ -51,6 +52,13 @@ const EARN_LEND = ethers.id('earn.lend')
 const PM_TAKER = ethers.id('polymarket.taker')
 const TREASURY = '0x1111111111111111111111111111111111111111'
 
+// Spec 071: the tab now scopes to a network the operator picks, seeded from the wallet's chain
+// when that chain is in this build's cohort. A chainId outside the cohort would seed the scope
+// elsewhere and gate every write off — which is correct behaviour, and not what these tests are
+// about, so they run on a chain the build can actually reach.
+const WALLET_CHAIN = cohortChainIds()[0]
+const WALLET_CHAIN_NAME = NETWORKS[WALLET_CHAIN].name
+
 const PROVIDER = { getBlockNumber: async () => 500_000, getBlock: async () => ({ timestamp: 1_752_800_000 }) }
 const SIGNER = { isSigner: true }
 
@@ -75,7 +83,7 @@ function renderTab({ isAdmin = true, isFeeAdmin = false, runTx } = {}) {
   render(
     <FeesTab
       signer={SIGNER}
-      chainId={137}
+      chainId={WALLET_CHAIN}
       provider={PROVIDER}
       runTx={tx}
       pendingTx={false}
@@ -110,8 +118,12 @@ describe('FeesTab rendering', () => {
   it('is honest when no FeeRouter is deployed on the network', async () => {
     m.routerAddr = null
     renderTab()
+    // It names the network rather than saying "this network" — the tab is no longer showing
+    // whatever the wallet is on, so "this" would be ambiguous.
     expect(
-      await screen.findByText(/no feerouter is deployed on this network/i),
+      await screen.findByText(
+        new RegExp(`no feerouter is deployed on ${WALLET_CHAIN_NAME}`, 'i'),
+      ),
     ).toBeInTheDocument()
   })
 

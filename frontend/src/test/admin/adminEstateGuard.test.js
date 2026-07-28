@@ -29,10 +29,13 @@ const RE_WALLET_CHAIN = /getContractAddressForChain\(\s*'[^']+'\s*,\s*chainId\s*
 // Counts are MEASURED, not estimated — the first run of this guard corrected two of them, which
 // is the point: a baseline nobody verified is just a comment.
 const UNCONVERTED = {
-  // Infrastructure card: the paymaster deposit is per chain and follows the wallet today. The
-  // last remaining entry — Fees, Staking and Callsigns were converted and removed from this list,
-  // which the guard's second assertion forced rather than left to memory.
-  'PaymasterOpsCard.jsx': 1,
+  // Empty, and that is the finished state: every admin view resolves its contract from a chain it
+  // was given, not the one the wallet happens to be on. It emptied one entry at a time, each
+  // removal forced by the second assertion below rather than left to memory.
+  //
+  // Adding an entry here is not forbidden — a view mid-conversion belongs on this list with its
+  // measured count and a sentence saying why. Adding one WITHOUT that sentence is the thing this
+  // file exists to make awkward.
 }
 
 function adminFiles() {

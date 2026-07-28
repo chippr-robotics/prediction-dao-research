@@ -175,8 +175,8 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 ### Read-mostly views
 
 - [X] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
-- [ ] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
-- [ ] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
+- [X] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
+- [X] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
 - [X] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
 
 ### Write-heavy views
@@ -185,10 +185,10 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 - [X] T059 [US4] Convert the Members view in `frontend/src/components/AdminPanel.jsx` (**not** `[P]`: same file as T058/T064/T066/T068)
 - [X] T060 [P] [US4] Convert `frontend/src/components/admin/FeesTab.jsx`; fee rates are genuinely per chain and must not be shown as one global rate
 - [X] T061 [P] [US4] Convert `frontend/src/components/admin/StakingTab.jsx`
-- [ ] T062 [P] [US4] Convert `frontend/src/components/admin/DenyListAdmin.jsx`
+- [X] T062 [P] [US4] Convert `frontend/src/components/admin/DenyListAdmin.jsx`
 - [X] T063 [P] [US4] Convert `frontend/src/components/admin/CallsignRegistryAdmin.jsx`
 - [X] T064 [US4] Convert the Admin Roles view in `frontend/src/components/AdminPanel.jsx` so a grant names the chain it lands on — grants are already per contract **per chain** on-chain, and the view currently implies otherwise
-- [ ] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly; **the write confirmation names the chain it targets** (FR-017 — the only write requirement with no other test); and the view is **axe-clean** in every per-chain state, matching the `is axe-clean fully loaded` case the existing `AdminBridgeTab`/`AdminSupplyTab` suites already carry (constitution V)
+- [X] T065 [P] [US4] Per-view tests under `frontend/src/test/admin/` for T054–T064, each covering: scope-off-wallet renders read state; write withheld with a stated reason; unreadable ≠ zero; not-deployed stated explicitly; **the write confirmation names the chain it targets** (FR-017 — the only write requirement with no other test); and the view is **axe-clean** in every per-chain state, matching the `is axe-clean fully loaded` case the existing `AdminBridgeTab`/`AdminSupplyTab` suites already carry (constitution V)
 
 ### Incident-response views (converted last, on a proven pattern — research R8)
 

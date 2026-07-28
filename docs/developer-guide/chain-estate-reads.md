@@ -128,5 +128,10 @@ import { useScopedChain, writeGateReason, writeAllowed } from '../components/adm
    confirmation.
 6. Totals via `aggregate()` only.
 
-`frontend/src/test/admin/adminEstateGuard.test.js` enforces 3 and 6 at the source level, with a
-documented baseline for views not yet converted.
+`frontend/src/test/admin/adminEstateGuard.test.js` enforces 3 and 6 at the source level. Its
+allowlist of unconverted views is now **empty** — every admin view resolves its contract from a
+chain it was given. A view mid-conversion may be listed with a measured count and a sentence
+saying why; the guard also fails when a listed count drops, so a baseline cannot quietly drift.
+
+`frontend/src/test/admin/adminViewScope.test.jsx` covers the views themselves: two rendered end
+to end (deny-list, paymaster) across every per-chain state, and the rest structurally.

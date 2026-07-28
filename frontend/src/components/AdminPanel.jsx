@@ -1137,6 +1137,7 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
           />
@@ -1147,6 +1148,7 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}
           />

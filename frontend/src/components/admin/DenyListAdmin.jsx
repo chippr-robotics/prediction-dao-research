@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
+import { getContractAddressForChain } from '../../config/contracts'
+import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 
 /**
  * DenyListAdmin (Spec 007 — FR-020, SC-018)
@@ -8,8 +12,15 @@ import { ethers } from 'ethers'
  * reason (calls setDenied, gated on-chain by SANCTIONS_ADMIN_ROLE), and render the
  * add/remove audit trail from the DenyListUpdated event (actor + reason + block).
  *
- * Tab contract matches the other admin tabs: { signer, account, contracts, runTx, pendingTx }.
+ * Tab contract matches the other admin tabs: { signer, account, contracts, chainId, runTx, pendingTx }.
  * The guard address comes from the synced contracts config (FR-055) — never hardcoded.
+ *
+ * Spec 071 US4 — a deny-list entry is per guard, and there is a guard per network. Reading only
+ * the wallet's network made "not denied" ambiguous between *checked and clear* and *checked
+ * somewhere else*, which on a sanctions surface is the difference between a compliance answer and
+ * a guess. The network is now picked, reads follow the pick, and a write names the chain the entry
+ * lands on — a denial on one network is not a denial on another, and the audit trail below is that
+ * network's alone.
  */
 
 // Minimal human-readable ABI (keeps the bundle small; full ABI lives in abis/SanctionsGuard.js)
@@ -27,8 +38,22 @@ function shortAddr(a) {
   return a && ethers.isAddress(a) ? a.slice(0, 6) + '…' + a.slice(-4) : (a || '—')
 }
 
-function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
-  const guardAddress = contracts?.sanctionsGuard
+function DenyListAdmin({ signer, contracts, chainId, runTx, pendingTx }) {
+  const guardNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(guardNetworks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+  const guardAddress = useMemo(
+    () =>
+      getContractAddressForChain('sanctionsGuard', scopeChainId) ||
+      (Number(scopeChainId) === Number(chainId) ? contracts?.sanctionsGuard : '') ||
+      '',
+    [scopeChainId, chainId, contracts],
+  )
+  // Reads come from the scoped chain; only writes use the wallet's signer.
+  const readProvider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, signer?.provider || null),
+    [scopeChainId, chainId, signer],
+  )
   const [address, setAddress] = useState('')
   const [reason, setReason] = useState('')
   const [status, setStatus] = useState(null) // { denied, allowed } | null
@@ -43,11 +68,11 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
   }, [guardAddress, signer])
 
   const loadHistory = useCallback(async () => {
-    if (!isAddr(guardAddress) || !signer?.provider) return
+    if (!isAddr(guardAddress) || !readProvider) return
     setLoadingHistory(true)
     setError('')
     try {
-      const provider = signer.provider
+      const provider = readProvider
       const reader = new ethers.Contract(guardAddress, GUARD_ABI, provider)
       const filter = reader.filters.DenyListUpdated()
       const latest = await provider.getBlockNumber()
@@ -83,7 +108,7 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
     } finally {
       setLoadingHistory(false)
     }
-  }, [guardAddress, signer])
+  }, [guardAddress, readProvider])
 
   useEffect(() => { loadHistory() }, [loadHistory])
 
@@ -91,11 +116,17 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
     setError('')
     if (!isAddr(address)) { setError('Enter a valid address'); return }
     if (!reason.trim()) { setError('A reason is required (recorded on-chain for the audit trail)'); return }
+    // Re-checked here, not just at render: a wallet that switched networks between render and
+    // click would otherwise deny on the network the operator was not looking at.
+    if (!onScopeNetwork) {
+      setError(`Switch your wallet to ${networkName(scopeChainId)} to change its deny-list.`)
+      return
+    }
     const c = writer()
-    if (!c) { setError('SanctionsGuard is not configured on this network'); return }
+    if (!c) { setError(`SanctionsGuard is not configured on ${networkName(scopeChainId)}`); return }
     runTx(
       () => c.setDenied(address.trim(), denied, reason.trim()),
-      `Deny-list ${denied ? 'add' : 'remove'}: ${shortAddr(address)}`,
+      `Deny-list ${denied ? 'add' : 'remove'} on ${networkName(scopeChainId)}: ${shortAddr(address)}`,
     )
   }
 
@@ -103,9 +134,10 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
     setError('')
     setStatus(null)
     if (!isAddr(address)) { setError('Enter a valid address'); return }
-    if (!isAddr(guardAddress) || !signer?.provider) { setError('SanctionsGuard not configured'); return }
+    if (!isAddr(guardAddress)) { setError(`SanctionsGuard is not configured on ${networkName(scopeChainId)}`); return }
+    if (!readProvider) { setError(`Could not reach ${networkName(scopeChainId)} — status is unknown, not clear.`); return }
     try {
-      const reader = new ethers.Contract(guardAddress, GUARD_ABI, signer.provider)
+      const reader = new ethers.Contract(guardAddress, GUARD_ABI, readProvider)
       const [denied, allowed] = await Promise.all([
         reader.isDenied(address.trim()),
         reader.isAllowed(address.trim()),
@@ -116,11 +148,27 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
     }
   }
 
+  // The picker renders in BOTH branches. An empty state that drops it strands the operator on the
+  // one network with nothing to see, with no control left to leave it.
   if (!isAddr(guardAddress)) {
     return (
       <section aria-labelledby="denylist-heading">
         <h3 id="denylist-heading">Sanctions deny-list</h3>
-        <p role="status">SanctionsGuard is not deployed/configured on this network.</p>
+      <NetworkScopeCard
+        title="Deny-list network"
+        description="Each network has its own SanctionsGuard. A denial on one network is not a denial on another, and the audit trail below is this network's alone."
+        networks={guardNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('sanctionsGuard', id))}
+        walletChainId={chainId}
+        onRefresh={loadHistory}
+        lastReadAt={null}
+        notDeployedLabel="no SanctionsGuard"
+      />
+        <p role="status">
+          SanctionsGuard is not deployed on {networkName(scopeChainId)}. Pick a network that has one.
+        </p>
       </section>
     )
   }
@@ -128,10 +176,30 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
   return (
     <section aria-labelledby="denylist-heading">
       <h3 id="denylist-heading">Sanctions deny-list</h3>
+      <NetworkScopeCard
+        title="Deny-list network"
+        description="Each network has its own SanctionsGuard. A denial on one network is not a denial on another, and the audit trail below is this network's alone."
+        networks={guardNetworks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('sanctionsGuard', id))}
+        walletChainId={chainId}
+        onRefresh={loadHistory}
+        lastReadAt={null}
+        notDeployedLabel="no SanctionsGuard"
+      />
       <p>
-        Manage the discretionary on-chain deny-list. Requires <code>SANCTIONS_ADMIN_ROLE</code>.
+        Manage the discretionary on-chain deny-list on {networkName(scopeChainId)}. Requires{' '}
+        <code>SANCTIONS_ADMIN_ROLE</code> on that network&apos;s guard.
         Guard: <span title={guardAddress}>{shortAddr(guardAddress)}</span>
       </p>
+      {!onScopeNetwork && (
+        <p role="status" className="denylist-note">
+          You are reading {networkName(scopeChainId)} while your wallet is on {networkName(chainId)}.
+          Checking status and the audit trail work from here; changing the deny-list needs your
+          wallet on {networkName(scopeChainId)}.
+        </p>
+      )}
 
       <div className="denylist-form">
         <label htmlFor="denylist-address">Wallet address</label>
@@ -155,11 +223,11 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
         />
 
         <div className="denylist-actions">
-          <button type="button" className="confirm-btn danger" onClick={() => submit(true)} disabled={pendingTx}>
-            {pendingTx ? 'Processing…' : 'Add to deny-list'}
+          <button type="button" className="confirm-btn danger" onClick={() => submit(true)} disabled={pendingTx || !onScopeNetwork}>
+            {pendingTx ? 'Processing…' : `Add to deny-list on ${networkName(scopeChainId)}`}
           </button>
-          <button type="button" className="confirm-btn" onClick={() => submit(false)} disabled={pendingTx}>
-            {pendingTx ? 'Processing…' : 'Remove from deny-list'}
+          <button type="button" className="confirm-btn" onClick={() => submit(false)} disabled={pendingTx || !onScopeNetwork}>
+            {pendingTx ? 'Processing…' : `Remove from deny-list on ${networkName(scopeChainId)}`}
           </button>
           <button type="button" className="confirm-btn" onClick={checkStatus} disabled={pendingTx}>
             Check status

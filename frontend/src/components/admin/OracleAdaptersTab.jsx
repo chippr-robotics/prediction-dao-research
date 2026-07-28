@@ -1,5 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ethers } from 'ethers'
+import { getContractAddressForChain } from '../../config/contracts'
+import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 
 // Minimal admin-only ABI fragments. The full ABIs live under
 // frontend/src/abis/{ChainlinkDataFeedOracleAdapter,ChainlinkFunctionsOracleAdapter,UMAOptimisticOracleV3Adapter}.js
@@ -75,33 +79,60 @@ function shortAddr(a) {
  * Out of scope (separate PR): listing pre-registered conditions back to the
  * user-facing create-wager flow. That needs event indexing; this tab is
  * write-only for now.
+ *
+ * Spec 071 US4 — the adapters are per network and most of the cohort has none.
+ * This tab used to take the build's single `contracts` record, so it showed one
+ * network's adapters whatever the operator wanted to see, and an owner() read
+ * that failed was indistinguishable from an adapter that isn't there. Now the
+ * network is picked, addresses resolve from the pick, and "not deployed" is
+ * stated as the honest answer it is for most networks rather than rendered as
+ * an empty form.
  */
-function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
+function OracleAdaptersTab({ signer, account, contracts, chainId, runTx, pendingTx }) {
   const [activeAdapter, setActiveAdapter] = useState('chainlinkDataFeed')
   const [adapterOwners, setAdapterOwners] = useState({})
 
-  // Resolve adapter addresses from the synced deployment record.
-  const adapterAddresses = useMemo(() => ({
-    chainlinkDataFeedAdapter: contracts?.chainlinkDataFeedAdapter,
-    chainlinkFunctionsAdapter: contracts?.chainlinkFunctionsAdapter,
-    umaAdapter: contracts?.umaAdapter,
-  }), [contracts])
+  const adapterNetworks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(adapterNetworks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+
+  // Resolve adapter addresses from the SCOPED chain, falling back to the build's synced record
+  // only when the scope is the wallet's own network (where the two agree by construction).
+  const adapterAddresses = useMemo(() => {
+    const at = (key) =>
+      getContractAddressForChain(key, scopeChainId) ||
+      (Number(scopeChainId) === Number(chainId) ? contracts?.[key] : '') ||
+      ''
+    return {
+      chainlinkDataFeedAdapter: at('chainlinkDataFeedAdapter'),
+      chainlinkFunctionsAdapter: at('chainlinkFunctionsAdapter'),
+      umaAdapter: at('umaAdapter'),
+    }
+  }, [scopeChainId, chainId, contracts])
+
+  const readProvider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, signer?.provider || null),
+    [scopeChainId, chainId, signer],
+  )
 
   // Read each adapter's owner() so the UI can warn the user if they're not
   // the actual owner (in which case all writes will revert with onlyOwner).
+  // Three states, not two: `undefined` = not deployed here, `null` = deployed but the owner could
+  // not be read. Collapsing the second into the first would tell an operator there is no adapter
+  // when there is one they simply could not reach.
   useEffect(() => {
     let cancelled = false
-    if (!signer || !signer.provider) return
+    if (!readProvider) return
     ;(async () => {
       const next = {}
       for (const a of ADAPTERS) {
         const addr = adapterAddresses[a.addressKey]
         if (!addr || !ethers.isAddress(addr)) {
-          next[a.key] = null
+          next[a.key] = undefined
           continue
         }
         try {
-          const c = new ethers.Contract(addr, COMMON_READS, signer.provider)
+          const c = new ethers.Contract(addr, COMMON_READS, readProvider)
           next[a.key] = await c.owner()
         } catch {
           next[a.key] = null
@@ -110,7 +141,7 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
       if (!cancelled) setAdapterOwners(next)
     })()
     return () => { cancelled = true }
-  }, [signer, adapterAddresses])
+  }, [readProvider, adapterAddresses])
 
   // ── DataFeed forms ────────────────────────────────────────────────────────
   const [dfFeed, setDfFeed]               = useState({ address: '', allow: true })
@@ -125,20 +156,32 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
   const [umaCondition, setUmaCondition]   = useState({ conditionId: '', claim: '', bondCurrency: '', bondAmount: '', liveness: '7200' })
   const [umaLink, setUmaLink]             = useState({ friendMarketId: '', conditionId: '' })
 
+  // The single choke point every write handler already goes through — so the wallet-chain check
+  // lives here once rather than being repeated (and eventually forgotten) in seven handlers.
   function writer(addressKey, abi) {
     const addr = adapterAddresses[addressKey]
     if (!addr || !ethers.isAddress(addr) || !signer) return null
+    if (!onScopeNetwork) return null
     return new ethers.Contract(addr, abi, signer)
+  }
+
+  /** Why a write is unavailable right now, in words — the alerts below all use this. */
+  function writeBlockedReason(addressKey, label) {
+    const addr = adapterAddresses[addressKey]
+    if (!addr || !ethers.isAddress(addr)) return `${label} is not deployed on ${networkName(scopeChainId)}`
+    if (!signer) return 'Connect your wallet to make changes here'
+    if (!onScopeNetwork) return `Switch your wallet to ${networkName(scopeChainId)} to make this change`
+    return `${label} is unavailable`
   }
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSetFeedAllowed = () => {
     if (!isAddress(dfFeed.address)) return alert('Enter a valid feed address')
     const c = writer('chainlinkDataFeedAdapter', CHAINLINK_DATA_FEED_ADMIN_ABI)
-    if (!c) return alert('ChainlinkDataFeedOracleAdapter is not deployed on this chain')
+    if (!c) return alert(writeBlockedReason('chainlinkDataFeedAdapter', 'ChainlinkDataFeedOracleAdapter'))
     runTx(
       () => c.setFeedAllowed(dfFeed.address.trim(), Boolean(dfFeed.allow)),
-      `ChainlinkDataFeed: feed ${shortAddr(dfFeed.address)} ${dfFeed.allow ? 'allowlisted' : 'removed'}`,
+      `ChainlinkDataFeed: feed ${shortAddr(dfFeed.address)} ${dfFeed.allow ? 'allowlisted' : 'removed'} on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -153,10 +196,10 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
       return alert('Deadline must be in the future')
     }
     const c = writer('chainlinkDataFeedAdapter', CHAINLINK_DATA_FEED_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('chainlinkDataFeedAdapter', 'ChainlinkDataFeedOracleAdapter'))
     runTx(
       () => c.registerCondition(f.conditionId.trim(), f.feed.trim(), BigInt(String(f.threshold).trim()), Number(f.op), BigInt(deadlineSeconds)),
-      `ChainlinkDataFeed: condition ${f.conditionId.slice(0, 10)}… registered`,
+      `ChainlinkDataFeed: condition ${f.conditionId.slice(0, 10)}… registered on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -164,10 +207,10 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
     if (!isBytes32Hex(dfLink.conditionId)) return alert('conditionId must be a 0x-prefixed 32-byte hex string')
     if (!/^\d+$/.test((dfLink.friendMarketId || '').trim())) return alert('friendMarketId must be a non-negative integer')
     const c = writer('chainlinkDataFeedAdapter', CHAINLINK_DATA_FEED_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('chainlinkDataFeedAdapter', 'ChainlinkDataFeedOracleAdapter'))
     runTx(
       () => c.linkMarket(BigInt(dfLink.friendMarketId.trim()), dfLink.conditionId.trim()),
-      `ChainlinkDataFeed: wager #${dfLink.friendMarketId} linked`,
+      `ChainlinkDataFeed: wager #${dfLink.friendMarketId} linked on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -180,7 +223,7 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
     if (!/^\d+$/.test((f.gasLimit || '').trim())) return alert('gasLimit must be a non-negative integer')
     if (!isBytes32Hex(f.donId)) return alert('donId must be 0x + 64 hex (right-pad if shorter)')
     const c = writer('chainlinkFunctionsAdapter', CHAINLINK_FUNCTIONS_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('chainlinkFunctionsAdapter', 'ChainlinkFunctionsOracleAdapter'))
     runTx(
       () => c.registerCondition(
         f.conditionId.trim(),
@@ -190,7 +233,7 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
         Number(f.gasLimit.trim()),
         f.donId.trim(),
       ),
-      `ChainlinkFunctions: condition ${f.conditionId.slice(0, 10)}… registered`,
+      `ChainlinkFunctions: condition ${f.conditionId.slice(0, 10)}… registered on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -198,10 +241,10 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
     if (!isBytes32Hex(fnLink.conditionId)) return alert('conditionId invalid')
     if (!/^\d+$/.test((fnLink.friendMarketId || '').trim())) return alert('friendMarketId must be a non-negative integer')
     const c = writer('chainlinkFunctionsAdapter', CHAINLINK_FUNCTIONS_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('chainlinkFunctionsAdapter', 'ChainlinkFunctionsOracleAdapter'))
     runTx(
       () => c.linkMarket(BigInt(fnLink.friendMarketId.trim()), fnLink.conditionId.trim()),
-      `ChainlinkFunctions: wager #${fnLink.friendMarketId} linked`,
+      `ChainlinkFunctions: wager #${fnLink.friendMarketId} linked on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -213,7 +256,7 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
     if (!/^\d+$/.test((f.bondAmount || '').trim())) return alert('bondAmount must be a non-negative integer (raw units; e.g. 6-dec USDC)')
     if (!/^\d+$/.test((f.liveness || '').trim())) return alert('liveness must be a non-negative integer (seconds)')
     const c = writer('umaAdapter', UMA_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('umaAdapter', 'UMAOptimisticOracleV3Adapter'))
     runTx(
       () => c.registerCondition(
         f.conditionId.trim(),
@@ -222,7 +265,7 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
         BigInt(f.bondAmount.trim()),
         BigInt(f.liveness.trim()),
       ),
-      `UMA: condition ${f.conditionId.slice(0, 10)}… registered`,
+      `UMA: condition ${f.conditionId.slice(0, 10)}… registered on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -230,10 +273,10 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
     if (!isBytes32Hex(umaLink.conditionId)) return alert('conditionId invalid')
     if (!/^\d+$/.test((umaLink.friendMarketId || '').trim())) return alert('friendMarketId must be a non-negative integer')
     const c = writer('umaAdapter', UMA_ADMIN_ABI)
-    if (!c) return alert('Adapter not deployed')
+    if (!c) return alert(writeBlockedReason('umaAdapter', 'UMAOptimisticOracleV3Adapter'))
     runTx(
       () => c.linkMarket(BigInt(umaLink.friendMarketId.trim()), umaLink.conditionId.trim()),
-      `UMA: wager #${umaLink.friendMarketId} linked`,
+      `UMA: wager #${umaLink.friendMarketId} linked on ${networkName(scopeChainId)}`,
     )
   }
 
@@ -241,8 +284,18 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
   const activeMeta = ADAPTERS.find(a => a.key === activeAdapter)
   const activeAddr = adapterAddresses[activeMeta.addressKey]
   const activeOwner = adapterOwners[activeAdapter]
+  const activeDeployed = Boolean(activeAddr && ethers.isAddress(activeAddr))
   const isActualOwner = activeOwner && account &&
     String(activeOwner).toLowerCase() === String(account).toLowerCase()
+
+  // Not deployed, deployed-but-unread, and read-and-not-you are three different situations and
+  // call for three different operator responses. A single em dash for all three said nothing.
+  const ownerText = () => {
+    if (!activeDeployed) return 'Not deployed on this network'
+    if (activeOwner === null) return 'Could not be read — retry; this is not "no owner"'
+    if (!activeOwner) return 'Reading…'
+    return `${shortAddr(activeOwner)} ${isActualOwner ? '(you)' : '(NOT you — writes will revert)'}`
+  }
 
   return (
     <div className="admin-tab-content" role="tabpanel">
@@ -256,6 +309,31 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
             <code> keccak256(question + bytes32 salt) </code> works well.
           </p>
         </div>
+
+        <NetworkScopeCard
+          title="Adapter network"
+          description="Adapters are deployed per network, and most networks have none. Reading any network works from anywhere; registering or linking on one needs your wallet there."
+          networks={adapterNetworks}
+          scopeChainId={scopeChainId}
+          onScopeChange={setScopeChainId}
+          isDeployed={(id) =>
+            Boolean(
+              getContractAddressForChain('chainlinkDataFeedAdapter', id) ||
+              getContractAddressForChain('chainlinkFunctionsAdapter', id) ||
+              getContractAddressForChain('umaAdapter', id),
+            )
+          }
+          walletChainId={chainId}
+          onRefresh={() => {}}
+          lastReadAt={null}
+          notDeployedLabel="no adapters"
+        />
+        {!onScopeNetwork && (
+          <p className="card-info warning-text" role="status">
+            You are reading {networkName(scopeChainId)} while your wallet is on {networkName(chainId)}.
+            Switch to {networkName(scopeChainId)} before registering or linking anything here.
+          </p>
+        )}
 
         <nav className="oracle-adapters-subtabs" role="tablist" data-testid="oracle-adapters-subtabs">
           {ADAPTERS.map(a => (
@@ -275,13 +353,13 @@ function OracleAdaptersTab({ signer, account, contracts, runTx, pendingTx }) {
         <div className="oracle-adapter-meta">
           <div className="status-row">
             <span className="status-label">Adapter</span>
-            <span className="status-value">{shortAddr(activeAddr)}</span>
+            <span className="status-value">
+              {activeDeployed ? shortAddr(activeAddr) : `Not deployed on ${networkName(scopeChainId)}`}
+            </span>
           </div>
           <div className="status-row">
             <span className="status-label">Owner</span>
-            <span className={`status-value ${isActualOwner ? 'active' : 'paused'}`}>
-              {activeOwner ? `${shortAddr(activeOwner)} ${isActualOwner ? '(you)' : '(NOT you — writes will revert)'}` : '—'}
-            </span>
+            <span className={`status-value ${isActualOwner ? 'active' : 'paused'}`}>{ownerText()}</span>
           </div>
         </div>
 

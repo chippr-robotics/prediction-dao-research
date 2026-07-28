@@ -205,10 +205,13 @@ on-chain; the view exists so operators can act without CLI tooling.
 
 | Symptom | Likely cause / fix |
 |---|---|
-| "Access Restricted" on `/admin` | Connected wallet holds no operator role on this chain. Roles are chain-scoped — check the network selector first. |
+| "Access Restricted" on `/admin` | No operator role found for your wallet on **any** network in this build's cohort. Entry sweeps them all, so switching networks will not change this — check the address. |
 | A group/view is missing from the rail | You lack the gating role; the rail only shows what you can use. |
 | The rail is a strip of icons with no labels | It is collapsed, not broken — every view is still there. Hover for a name, or click the hamburger at its top left to expand. |
-| A view shows "not deployed on this network" | Address not in the frontend address book for this chain — run `npm run sync:frontend-contracts` after deploy. |
+| A view names a network and says "not deployed" | That contract is not in the frontend address book for **that** network. Pick another in the view's network selector, or run `npm run sync:frontend-contracts` after deploy. |
+| The paymaster deposit shows an unfamiliar currency | It is denominated in the **scoped** network's native token, not your wallet's — that is the figure being read. |
+| A deny-list status check says *unknown* | The guard on that network could not be reached. It is not a clearance; retry or pick a network you can read. |
 | Gasless card shows "No relay gateway configured" | `VITE_RELAYER_URL` unset in this build; gasless flows self-submit. Expected in local dev. |
 | Runway numbers missing from the health card | The gateway only discloses operator telemetry to origin-authenticated callers; the public subset (RPC up/down) still renders. |
 | A write reverts with an AccessControl error | The role lives on a different contract than you expect (e.g. `SANCTIONS_ADMIN_ROLE` is on SanctionsGuard, not the registry) or you hold it on another chain. |
+| Tiers / Members offer no network selector | Deliberate. Membership lives on one network, so there is no choice to make — a tier configured elsewhere is one no purchase would ever consult. |
