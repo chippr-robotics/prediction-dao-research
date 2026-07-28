@@ -56,10 +56,19 @@
   margin: 0;
 }
 
-/* Honest unavailable / explanatory blocks — same shape as .earn-unavailable so the two
+/* A routine, non-blocking disclosure (a withheld network, a screening unknown, a
+   partial route read) — stated plainly inline, like .bridge-hint, never boxed.
+   Boxing every fact on the screen is what read as narrative clutter; a card is
+   reserved for a state that actually blocks the member (below). */
+.bridge-note {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* Honest unavailable / blocking blocks — same shape as .earn-unavailable so the two
    sections read as one app. */
 .bridge-unavailable,
-.bridge-note,
 .bridge-switch-note,
 .bridge-gas-warning,
 .bridge-submitted {
@@ -75,7 +84,6 @@
 }
 
 .bridge-unavailable p,
-.bridge-note p,
 .bridge-submitted p {
   margin: 0;
 }

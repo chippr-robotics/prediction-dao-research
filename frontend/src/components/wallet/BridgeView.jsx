@@ -70,7 +70,6 @@ import {
 } from '../../lib/bridge/bridgeRouter'
 import { SPOKE_POOL_IFACE } from '../../lib/bridge/bridgeStatus'
 import {
-  BRIDGE_AREA_DESC,
   BRIDGE_DISCLOSURE,
   BRIDGE_TIPS,
   BRIDGE_UNAVAILABLE,
@@ -667,13 +666,6 @@ export default function BridgeView({ onRecorded } = {}) {
 
   return (
     <div className="bridge-root">
-      <p className="bridge-intro">
-        {BRIDGE_AREA_DESC}
-        <InfoTip label="What is bridging?" className="earn-info">
-          {BRIDGE_TIPS.bridge}
-        </InfoTip>
-      </p>
-
       {/* FR-066/FR-006c — assets this surface cannot use are named and explained wherever they
           exist, including when they are ALL a member holds. These sit outside the branch below
           because the empty case is exactly when the explanation matters most. */}
