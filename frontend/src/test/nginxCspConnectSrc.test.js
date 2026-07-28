@@ -121,6 +121,23 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
     expect(connectSrc).toContain('http://localhost:*')
   })
 
+  // The web font stylesheet is @imported by src/components/tokens/tokens.css, so it is a
+  // STYLE source, not merely a font source. Listing fonts.googleapis.com under font-src
+  // alone blocked the stylesheet outright and dropped the app to system fonts — visible on
+  // every page, and silent apart from one CSP console error.
+  it.each(CONFIGS)('%s allows the web font stylesheet as a style source', (path) => {
+    const conf = readFileSync(path, 'utf8')
+    const cspLine = conf
+      .split('\n')
+      .find((l) => l.includes('add_header Content-Security-Policy'))
+    const styleSrc = cspLine.match(/style-src\s+([^;]*)/)?.[1]
+    expect(styleSrc, `${path} CSP has no style-src directive`).toBeTruthy()
+    expect(
+      styleSrc,
+      `${path} style-src is missing https://fonts.googleapis.com — the IBM Plex stylesheet is blocked`,
+    ).toContain('https://fonts.googleapis.com')
+  })
+
   // Spec 069 — members may point a network at their OWN node, self-hosted on a domain we
   // cannot know at build time or running locally. That is only true if the shipped policy
   // grants it, and the endpoint form decides what to warn about from CSP_RPC_GRANTS; if the
@@ -156,6 +173,14 @@ describe('nginx CSP connect-src blockchain RPC allowlist', () => {
           `${path} connect-src is missing http://${host}:* — a member's local node would be blocked`,
         ).toContain(`http://${host}:*`)
       }
+    })
+
+    // CSP's host-source grammar cannot express a bracketed IPv6 literal, so `http://[::1]:*`
+    // is rejected as an invalid source: the browser drops it, logs an error on every page
+    // load, and grants nothing. Listing it made the endpoint form promise a route the
+    // browser always blocks.
+    it.each(CONFIGS)('%s does not list an ungrantable IPv6 loopback source', (path) => {
+      expect(connectSrcOf(path)).not.toContain('[::1]')
     })
 
     it.each(CONFIGS)('%s keeps the broad grant scoped to connect-src only', (path) => {

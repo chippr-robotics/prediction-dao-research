@@ -71,21 +71,36 @@ const MAX_HEADER_NAME_LENGTH = 64
 export const CSP_RPC_GRANTS = {
   /** Any host on these schemes is reachable. */
   schemes: ['https:'],
-  /** http is reachable only on these hostnames (any port). */
-  httpHosts: ['localhost', '127.0.0.1', '[::1]'],
+  /**
+   * http is reachable only on these hostnames (any port).
+   *
+   * The IPv6 loopback literal is deliberately ABSENT. CSP's host-source grammar has no
+   * syntax for a bracketed IPv6 address, so `http://[::1]:*` is rejected as an invalid
+   * source and dropped — the browser blocks the endpoint regardless of it being listed
+   * (and says so, once per page load, in the console). Listing it here would only make the
+   * app promise a route the browser refuses; a member running a local node reaches it on
+   * `localhost` or `127.0.0.1`, which are grantable and do work.
+   */
+  httpHosts: ['localhost', '127.0.0.1'],
 }
 
-/** Hostnames that are loopback — the only http origins a secure page may call. */
+/**
+ * Hostnames that are loopback, as a fact about the address — NOT a claim that the CSP
+ * grants them (IPv6 loopback is loopback but ungrantable; see `CSP_RPC_GRANTS`). `URL`
+ * keeps the brackets on an IPv6 literal, so both spellings are recognised.
+ */
 export function isLoopbackHost(hostname) {
-  return CSP_RPC_GRANTS.httpHosts.includes(hostname) || hostname === '::1'
+  return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname)
 }
 
 /**
  * Whether the browser will be allowed to connect to this URL under the production CSP.
  *
  * With the scheme-wide grant this is true for every https endpoint, so it is no longer a
- * gate members trip over — it exists to keep the http rule (loopback only) in one place and
- * to keep the policy assertion in the test suite meaningful.
+ * gate members trip over — it exists to keep the http rule (grantable loopback only) in one
+ * place and to keep the policy assertion in the test suite meaningful. Note this is
+ * narrower than `isLoopbackHost`: an IPv6-loopback endpoint is genuinely local but cannot
+ * be expressed in CSP, so answering `true` for it would be a promise the browser breaks.
  */
 export function isCspAllowedRpcUrl(url) {
   let parsed
@@ -95,7 +110,7 @@ export function isCspAllowedRpcUrl(url) {
     return false
   }
   if (CSP_RPC_GRANTS.schemes.includes(parsed.protocol)) return true
-  if (parsed.protocol === 'http:') return isLoopbackHost(parsed.hostname)
+  if (parsed.protocol === 'http:') return CSP_RPC_GRANTS.httpHosts.includes(parsed.hostname)
   return false
 }
 
@@ -147,6 +162,17 @@ export function validateRpcUrl(url, { label = 'RPC URL' } = {}) {
         `${label} must use https:// — browsers block insecure http:// requests from this page. ` +
         'Only a node on this device (localhost / 127.0.0.1) may use http://; put a remote node ' +
         'behind https or reach it through an SSH tunnel to localhost.',
+    }
+  }
+  if (parsed.protocol === 'http:' && !CSP_RPC_GRANTS.httpHosts.includes(parsed.hostname)) {
+    // Reached only by the IPv6 loopback literal: genuinely a local node, but CSP has no
+    // syntax for a bracketed IPv6 host, so the browser blocks it whatever the policy says.
+    // Refusing here beats saving an endpoint that can only ever fail.
+    return {
+      ok: false,
+      error:
+        `${label} cannot use an IPv6 address — browser security policy has no way to allow ` +
+        'one. Use http://localhost or http://127.0.0.1 for a node on this device.',
     }
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
