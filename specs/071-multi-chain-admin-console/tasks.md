@@ -167,10 +167,10 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 
 ### Shared scope control
 
-- [ ] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-013, FR-016)
-- [ ] T051 [US4] Add a shared per-chain state renderer (read / not deployed / unreadable + reason + retry) so no view invents its own rendering of the three states (FR-014)
-- [ ] T052 [US4] Add a shared write-gate presenter that states "switch to <chain> to act" before signature and "role not held here" when authority is read and denied, leaving controls offered with authority unconfirmed when the read failed (FR-018, FR-019, research R4)
-- [ ] T053 [P] [US4] Test the three shared pieces in `frontend/src/test/admin/adminScopeControls.test.jsx`, including axe-clean rendering and per-chain status conveyed by text not colour alone (constitution V)
+- [X] T050 [US4] Extract the network scope selector used by `BridgeTab`/`SupplyTab` into a shared component under `frontend/src/components/admin/`, defaulting to the wallet chain when in the roster and never re-targeting when the wallet switches (FR-013, FR-016)
+- [X] T051 [US4] *(landed in Phase 6 as `ChainStateTable`)* Add a shared per-chain state renderer (read / not deployed / unreadable + reason + retry) so no view invents its own rendering of the three states (FR-014)
+- [X] T052 [US4] Add a shared write-gate presenter that states "switch to <chain> to act" before signature and "role not held here" when authority is read and denied, leaving controls offered with authority unconfirmed when the read failed (FR-018, FR-019, research R4)
+- [X] T053 [P] [US4] Test the three shared pieces in `frontend/src/test/admin/adminScopeControls.test.jsx`, including axe-clean rendering and per-chain status conveyed by text not colour alone (constitution V)
 
 ### Read-mostly views
 
