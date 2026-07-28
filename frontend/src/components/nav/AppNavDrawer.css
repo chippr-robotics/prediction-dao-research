@@ -1,5 +1,7 @@
-/* Global navigation drawer ("us") — a left slide-over opened by the clover logo
-   on every in-app route. Sits above the sticky header. */
+/* Global navigation drawer ("us"). Mobile: a left slide-over opened by the
+   clover logo, sitting above the sticky header. Desktop (min-width: 769px,
+   the breakpoint PortalNav.css and useIsMobile already use): a persistent
+   icon gutter that expands in place — see the media query below. */
 
 .app-nav-backdrop {
   position: fixed;
@@ -59,10 +61,11 @@
   color: var(--text-primary, var(--color-text, #1F2933));
 }
 
-.app-nav-drawer-close {
+.app-nav-drawer-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 32px;
   height: 32px;
   border: none;
@@ -74,14 +77,20 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.app-nav-drawer-close:hover {
+.app-nav-drawer-toggle:hover {
   background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.05)));
   color: var(--text-primary, var(--color-text, #1F2933));
 }
 
-.app-nav-drawer-close:focus-visible {
+.app-nav-drawer-toggle:focus-visible {
   outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
   outline-offset: 2px;
+}
+
+/* Collapsed (desktop gutter): only the toggle remains, so it centres in the rail. */
+.app-nav-drawer.collapsed .app-nav-drawer-header {
+  justify-content: center;
+  padding: 16px 0;
 }
 
 /* The section list grows to fill so the footer sits at the bottom. */
@@ -105,5 +114,44 @@
   }
   .app-nav-backdrop {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop / larger screens: icon gutter, expandable in place
+   ---------------------------------------------------------------------------
+   Below 769px the rules above stand: fully off-canvas until the clover logo
+   opens it as an overlay. At 769px+ the drawer never leaves the screen — it's
+   a slim always-on rail (PortalNav's own `collapsed` prop renders its icons
+   only) that widens to the full panel instead of sliding in from nowhere. */
+@media (min-width: 769px) {
+  :root {
+    --app-nav-gutter-width: 64px;
+  }
+
+  .app-nav-drawer {
+    width: var(--app-nav-gutter-width);
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
+    transition: width 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .app-nav-drawer.open {
+    width: min(84vw, 300px);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+  }
+
+  /* The gutter is fixed and ignores this wrapper's padding, but Header /
+     Outlet / Footer live in normal flow inside it — reserve the gutter's
+     width so nothing renders underneath the always-visible rail. */
+  .app-shell {
+    padding-left: var(--app-nav-gutter-width, 64px);
+  }
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: reduce) {
+  .app-nav-drawer {
+    transition: none;
   }
 }

@@ -58,21 +58,26 @@ function AppLayout() {
       {/* App navigation redesign: the section menu ("us") is now a global left
           drawer opened by the clover logo, shared across every in-app route. */}
       <NavDrawerProvider>
-        <Header appMode />
-        <AppNavDrawer />
-        {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
-        <OperateAsIndicator />
-        {/* Spec 041: route a tapped push notification into in-app navigation. */}
-        <ActivityNotificationBridge />
-        {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
-        <EntryGate />
-        {/* Entering the app with no account opens the unlock dialog by itself —
-            every surface below is inert until one is connected. */}
-        <AutoConnectPrompt />
-        <Outlet />
-        {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
-            drawer carries its own copy; /wallet relies on that to avoid duplication. */}
-        {showPageFooter && <Footer variant="condensed" />}
+        {/* `app-shell` reserves room for AppNavDrawer's persistent desktop icon
+            gutter (see AppNavDrawer.css) — the drawer itself is fixed-position
+            and ignores this padding, but everything below needs to clear it. */}
+        <div className="app-shell">
+          <Header appMode />
+          <AppNavDrawer />
+          {/* Spec 043 (US3): persistent banner while operating as a vault, with switch-back. */}
+          <OperateAsIndicator />
+          {/* Spec 041: route a tapped push notification into in-app navigation. */}
+          <ActivityNotificationBridge />
+          {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
+          <EntryGate />
+          {/* Entering the app with no account opens the unlock dialog by itself —
+              every surface below is inert until one is connected. */}
+          <AutoConnectPrompt />
+          <Outlet />
+          {/* Spec 010 (US2): condensed legal/policy footer inside the app. The menu
+              drawer carries its own copy; /wallet relies on that to avoid duplication. */}
+          {showPageFooter && <Footer variant="condensed" />}
+        </div>
       </NavDrawerProvider>
     </ActivityProvider>
   )
