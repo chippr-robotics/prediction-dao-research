@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { getContractAddressForChain } from '../../config/contracts'
 import { isValidEthereumAddress } from '../../utils/validation'
+import { estateNetworks, networkName, readProviderFor } from '../../lib/chains/estate'
+import { NetworkScopeCard } from './scopeControls'
+import { useScopedChain } from './scopeGate'
 
 /**
  * ProtocolConfigTab — the protocol wiring view of the operations control
@@ -70,9 +73,15 @@ function WiringRow({ label, current, note }) {
 }
 
 function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
-  const registryAddr = getContractAddressForChain('wagerRegistry', chainId)
-  const membershipAddr = getContractAddressForChain('membershipManager', chainId)
-  const sanctionsAddr = getContractAddressForChain('sanctionsGuard', chainId)
+  // Spec 071 US4: wiring is per network — the three contracts below exist independently on each
+  // chain and can be wired differently. Scoping to the wallet's chain showed one network's wiring
+  // as if it were the platform's.
+  const networks = useMemo(() => estateNetworks(), [])
+  const { scopeChainId, setScopeChainId } = useScopedChain(networks, chainId)
+  const onScopeNetwork = Number(scopeChainId) === Number(chainId)
+  const registryAddr = getContractAddressForChain('wagerRegistry', scopeChainId)
+  const membershipAddr = getContractAddressForChain('membershipManager', scopeChainId)
+  const sanctionsAddr = getContractAddressForChain('sanctionsGuard', scopeChainId)
 
   const [wiring, setWiring] = useState({})
   const [addrForm, setAddrForm] = useState({ target: 'registry-sanctions', address: '' })
@@ -80,17 +89,24 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
   const [tokenForm, setTokenForm] = useState({ address: '', allowed: true, status: null })
   const [callerForm, setCallerForm] = useState({ address: '', authorized: true })
 
+  // Reads resolve against the SCOPED chain's endpoint — using the wallet's provider here would
+  // have read chain A's contract at chain B's address, or simply failed, once the scope and the
+  // wallet could differ.
+  const readProvider = useMemo(
+    () => readProviderFor(scopeChainId, chainId, provider),
+    [scopeChainId, chainId, provider],
+  )
   const registryRead = useMemo(
-    () => (registryAddr && provider ? new ethers.Contract(registryAddr, REGISTRY_ABI, provider) : null),
-    [registryAddr, provider]
+    () => (registryAddr && readProvider ? new ethers.Contract(registryAddr, REGISTRY_ABI, readProvider) : null),
+    [registryAddr, readProvider]
   )
   const membershipRead = useMemo(
-    () => (membershipAddr && provider ? new ethers.Contract(membershipAddr, MEMBERSHIP_ABI, provider) : null),
-    [membershipAddr, provider]
+    () => (membershipAddr && readProvider ? new ethers.Contract(membershipAddr, MEMBERSHIP_ABI, readProvider) : null),
+    [membershipAddr, readProvider]
   )
   const sanctionsRead = useMemo(
-    () => (sanctionsAddr && provider ? new ethers.Contract(sanctionsAddr, SANCTIONS_ABI, provider) : null),
-    [sanctionsAddr, provider]
+    () => (sanctionsAddr && readProvider ? new ethers.Contract(sanctionsAddr, SANCTIONS_ABI, readProvider) : null),
+    [sanctionsAddr, readProvider]
   )
 
   const fetchWiring = useCallback(async () => {
@@ -202,6 +218,29 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
 
   return (
     <div className="admin-tab-content" role="tabpanel">
+      <NetworkScopeCard
+        title="Wiring & Tokens"
+        description="Protocol wiring for one network. Each chain wires its own registry, membership manager and sanctions guard, and they can differ."
+        networks={networks}
+        scopeChainId={scopeChainId}
+        onScopeChange={setScopeChainId}
+        isDeployed={(id) => Boolean(getContractAddressForChain('wagerRegistry', id))}
+        walletChainId={chainId}
+        onRefresh={fetchWiring}
+        lastReadAt={null}
+        notDeployedLabel="no wager registry"
+      />
+      {registryAddr && !onScopeNetwork && (
+        <p className="card-info warning-text" role="status">
+          You are reading {networkName(scopeChainId)} while your wallet is on {networkName(chainId)}.
+          Changes here are signed on {networkName(scopeChainId)} — switch your wallet to make one.
+        </p>
+      )}
+      {!registryAddr && (
+        <p className="card-info warning-text" role="status">
+          No wager registry on {networkName(scopeChainId)} — nothing is wired here.
+        </p>
+      )}
       <div className="admin-card">
         <div className="admin-card-header">
           <h3>Live Wiring</h3>
@@ -253,7 +292,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
             )}
           </label>
           <button className="confirm-btn danger" onClick={handleSetAddress}
-            disabled={pendingTx || !signer || !addrForm.address || !selectedTarget?.addr()}>
+            disabled={pendingTx || !signer || !onScopeNetwork || !addrForm.address || !selectedTarget?.addr()}>
             {pendingTx ? 'Processing...' : 'Set Address'}
           </button>
         </div>
@@ -276,7 +315,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
               onChange={(e) => setOracleForm({ ...oracleForm, address: e.target.value })} />
           </label>
           <button className="confirm-btn primary" onClick={handleSetOracleAdapter}
-            disabled={pendingTx || !signer || !oracleForm.address || !registryAddr}>
+            disabled={pendingTx || !signer || !onScopeNetwork || !oracleForm.address || !registryAddr}>
             {pendingTx ? 'Processing...' : 'Set Adapter'}
           </button>
         </div>
@@ -305,7 +344,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
               Check Current
             </button>
             <button className="confirm-btn primary" onClick={handleSetTokenAllowed}
-              disabled={pendingTx || !signer || !tokenForm.address || !registryAddr}>
+              disabled={pendingTx || !signer || !onScopeNetwork || !tokenForm.address || !registryAddr}>
               {pendingTx ? 'Processing...' : 'Apply'}
             </button>
           </div>
@@ -330,7 +369,7 @@ function ProtocolConfigTab({ signer, chainId, provider, runTx, pendingTx }) {
             Authorized
           </label>
           <button className="confirm-btn danger" onClick={handleSetAuthorizedCaller}
-            disabled={pendingTx || !signer || !callerForm.address || !membershipAddr}>
+            disabled={pendingTx || !signer || !onScopeNetwork || !callerForm.address || !membershipAddr}>
             {pendingTx ? 'Processing...' : 'Apply'}
           </button>
         </div>

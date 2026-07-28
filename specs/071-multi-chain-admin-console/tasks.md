@@ -174,10 +174,10 @@ are withheld with a stated reason, and the scope does **not** follow the wallet 
 
 ### Read-mostly views
 
-- [ ] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
+- [X] T054 [P] [US4] Convert `frontend/src/components/admin/MaintenanceTab.jsx` to the scope contract; each permissionless call still targets one named chain (FR-017)
 - [ ] T055 [P] [US4] Convert `frontend/src/components/admin/ServiceHealthCard.jsx` and `frontend/src/components/admin/PaymasterOpsCard.jsx`; the paymaster deposit is per chain
 - [ ] T056 [P] [US4] Convert `frontend/src/components/admin/OracleAdaptersTab.jsx`; chains without adapters read *not deployed*, which is the honest answer for most of the cohort
-- [ ] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
+- [X] T057 [P] [US4] Convert `frontend/src/components/admin/ProtocolConfigTab.jsx` (Wiring & Tokens) across its three contracts
 
 ### Write-heavy views
 
