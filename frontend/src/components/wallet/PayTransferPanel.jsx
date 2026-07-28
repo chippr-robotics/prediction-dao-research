@@ -5,9 +5,10 @@ import TransferActivityList from './TransferActivityList'
 import BridgeView from './BridgeView'
 import BridgeStatusList from './BridgeStatusList'
 import BridgeUnavailableNotice from './BridgeUnavailableNotice'
+import InfoTip from '../ui/InfoTip'
 import { BRIDGE_UNAVAILABLE_REASON } from '../../hooks/useBridgeAvailability'
 import { bridgeGatewayUrl } from '../../lib/bridge/acrossQuotes'
-import { BRIDGE_AREA_DESC } from '../../lib/bridge/bridgeCopy'
+import { BRIDGE_AREA_DESC, BRIDGE_TIPS } from '../../lib/bridge/bridgeCopy'
 import './PayTransfer.css'
 
 const TABS = [
@@ -44,10 +45,16 @@ export default function PayTransferPanel() {
 
   return (
     <div className="pt-root">
-      <p className="pt-intro">
-        Send stablecoins and native tokens to any wallet or ENS name. Stablecoin transfers are gasless where
-        the rails are available.
-      </p>
+      {/* Each tab states only what applies to it — a same-chain send and a
+          cross-network bridge are different operations with different costs,
+          and folding them into one blurb either overstates or understates
+          each (mirrors TradePanel's per-context subtitle). */}
+      {tab === 'transfer' && (
+        <p className="pt-intro">
+          Send stablecoins and native tokens to any wallet or ENS name. Stablecoin transfers are gasless where
+          the rails are available.
+        </p>
+      )}
 
       <div className="pt-tabs" role="tablist" aria-label="Transfer sections">
         {TABS.map((t) => (
@@ -111,7 +118,12 @@ function BridgeTab() {
 
   return (
     <div className="bridge-tab">
-      <p className="pt-intro">{BRIDGE_AREA_DESC}</p>
+      <p className="pt-intro">
+        {BRIDGE_AREA_DESC}
+        <InfoTip label="What is bridging?" className="earn-info">
+          {BRIDGE_TIPS.bridge}
+        </InfoTip>
+      </p>
       {gatewayReady ? (
         <BridgeView onRecorded={() => setRecordedAt(Date.now())} />
       ) : (
