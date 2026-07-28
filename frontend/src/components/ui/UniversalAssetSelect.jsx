@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import AssetLogo from '../wallet/AssetLogo'
 import SensitiveValue from '../common/SensitiveValue'
+import { matchesAssetQuery } from '../../lib/assets/assetSearch'
 import './UniversalAssetSelect.css'
 
 /**
@@ -23,8 +24,10 @@ import './UniversalAssetSelect.css'
  *
  *   - SEARCH (FR-064). Five networks' assets in one list multiplies the option count,
  *     so the open list narrows on the three fields a member can actually see: asset
- *     symbol, asset name, and network name. Search only narrows what is already
- *     eligible, so typing never changes what the trigger shows as selected.
+ *     symbol, asset name, and network name. The rule itself lives in
+ *     `lib/assets/assetSearch.js` so the Trade ticket's pair pickers narrow on
+ *     exactly the same fields. Search only narrows what is already eligible, so
+ *     typing never changes what the trigger shows as selected.
  *
  *   - An optional `pin` + `pinPredicate` pair (FR-062/FR-063). The CALLER owns the
  *     rule — `lib/assets/networkPin.js` ships both predicates (`samePair` for pairs,
@@ -37,15 +40,6 @@ import './UniversalAssetSelect.css'
 
 /** AssetLogo only badges numeric EVM chains; a Bitcoin option (string id) renders its glyph alone. */
 const evmBadgeChainId = (chainId) => (typeof chainId === 'number' ? chainId : null)
-
-/** Search matches any of the three fields the member can see on an option (FR-064). */
-const matchesQuery = (option, query) => {
-  const needle = query.trim().toLowerCase()
-  if (!needle) return true
-  return [option?.symbol, option?.name, option?.networkName].some(
-    (field) => typeof field === 'string' && field.toLowerCase().includes(needle),
-  )
-}
 
 /**
  * Fallback empty-counterpart copy (FR-065). Deliberately rule-neutral — the component
@@ -85,7 +79,7 @@ export default function UniversalAssetSelect({
     () => (typeof pinPredicate === 'function' ? options.filter((o) => pinPredicate(o, pin)) : options),
     [options, pin, pinPredicate],
   )
-  const visible = useMemo(() => eligible.filter((o) => matchesQuery(o, query)), [eligible, query])
+  const visible = useMemo(() => eligible.filter((o) => matchesAssetQuery(o, query)), [eligible, query])
 
   const selected = eligible.find((o) => o.key === value) || eligible[0] || null
   // Options exist but the pin excludes every one of them — the FR-065 case.

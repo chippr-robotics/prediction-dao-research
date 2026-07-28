@@ -974,6 +974,24 @@ export function isDexAvailable(chainId) {
 }
 
 /**
+ * Every network a swap can actually route on — the `capabilities.dex` gate
+ * (policy allow-list AND real router config), mainnets first. Mirrors
+ * `getClearPathChainIds()`: the Trade ticket lists pairs from ALL of these
+ * regardless of which chain the wallet sits on, because quoting is a read over
+ * each chain's own provider. Only the swap itself (a WRITE) needs the wallet to
+ * be on the pair's network. Resolved strictly per-chain — never `getNetwork()`,
+ * whose fallback would advertise the default network's DEX for a chain that has
+ * none.
+ */
+export function getSwapChainIds() {
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net?.capabilities?.dex)
+    .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
+    .map((net) => net.chainId)
+}
+
+/**
  * The DEX provider descriptor (`{ name, url }`) for `chainId`, or null when the
  * network has no DEX provider (e.g. local Hardhat). Declared per network so the
  * mapping — ETC family (61, 63) → ETCswap; all others → Uniswap — is explicit

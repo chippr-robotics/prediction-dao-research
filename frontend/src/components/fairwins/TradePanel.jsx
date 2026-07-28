@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { parseUnits } from 'ethers'
+import { useSwitchChain } from 'wagmi'
 import { useDex } from '../../hooks/useDex'
 import {
   SLIPPAGE_OPTIONS,
@@ -9,12 +10,24 @@ import {
   getPerpsVenue,
   getExplorerUrl,
 } from '../../constants/dex'
+import { NETWORKS } from '../../config/networks'
 import { feeTierLabel } from '../../lib/uniswap/trade'
+import {
+  buildSwapOptions,
+  counterpartFor,
+  defaultPairForChain,
+  findSwapOption,
+  findSwapOptionByAddress,
+  getSwapAddresses,
+  getSwapVenue,
+  isSwapChain,
+} from '../../lib/uniswap/swapUniverse'
+import { PIN_MODE, createPin, samePair } from '../../lib/assets/networkPin'
 import { useWallet } from '../../hooks'
-import { useChainTokens } from '../../hooks/useChainTokens'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useCustodyVaults } from '../../hooks/useCustodyVaults'
 import { useLegacyAccounts } from '../../hooks/useLegacyAccounts'
+import { useSwapBalances } from '../../hooks/useSwapBalances'
 import LegacyUnlockDialog from '../account/LegacyUnlockDialog'
 import SensitiveValue from '../common/SensitiveValue'
 import InfoTip from '../ui/InfoTip'
@@ -39,26 +52,43 @@ const shortAddress = (addr) =>
 const fmtBalance = (value) =>
   Number(value || 0).toLocaleString(undefined, { maximumSignificantDigits: 8 })
 
-const sameAddr = (a, b) => Boolean(a) && Boolean(b) && a.toLowerCase() === b.toLowerCase()
-
+/**
+ * TradePanel — the brokerage-style order ticket, MULTI-NETWORK.
+ *
+ * Pairs are listed from EVERY swap-capable network, not just the connected one
+ * (`lib/uniswap/swapUniverse.js`), because seeing what is tradeable is a read:
+ * quotes come from each chain's own QuoterV2 over that chain's provider, exactly
+ * as the portfolio reads balances across chains. What still belongs to ONE
+ * network is the pair itself and the order:
+ *
+ *   1. A V3 pool lives on a single chain, so choosing the first leg PINS the
+ *      network and the second selector only offers legs from that same chain
+ *      (`lib/assets/networkPin.js#samePair` — the shared pair rule, never the
+ *      bridge's `bridgeDest`). Moving value between networks is the Bridge's job.
+ *   2. The swap is a WRITE against that chain's router, so when the pair's
+ *      network is not the wallet's, the ticket asks for the switch FIRST and
+ *      refuses to place the order until it happens (DexContext.swap re-checks,
+ *      so a mis-wired UI cannot approve a foreign address either).
+ *
+ * Balances follow the PAIR's network, not the wallet's (`useSwapBalances`), and
+ * live on the pay/receive cards where the amount is actually entered — the
+ * account card carries no balance rows.
+ */
 function TradePanel() {
   const {
-    balances,
     loading,
     quotingPrice,
     swap,
-    getBestQuote,
+    getBestQuoteOn,
     slippage,
     setSlippage,
-    addresses,
-    tradeTokens,
-    isDexAvailable,
     dexProvider,
     network,
+    tradingAddress,
   } = useDex()
 
   const { isConnected, chainId, address, loginMethod } = useWallet()
-  const { native: nativeSymbol, stable: stableSymbol } = useChainTokens()
+  const { switchChainAsync, isPending: switching } = useSwitchChain()
 
   // Account selection (spec 043 + 062): trade as the personal wallet, one of the
   // member's saved multisig vaults, or a recovered legacy account. A vault turns
@@ -70,56 +100,18 @@ function TradePanel() {
   const legacyAccounts = useLegacyAccounts()
   const [unlockEntry, setUnlockEntry] = useState(null)
 
-  // Session rails: passkey accounts transact through their smart account —
-  // gasless (FairWins-sponsored) where the network has a sponsor paymaster
-  // (spec 050), self-funded otherwise. Classic wallets pay network fees.
-  const isPasskey = loginMethod === 'passkey'
-  const passkeyReady = !isPasskey || Boolean(network?.passkey)
-  const passkeySponsored = isPasskey && Boolean(network?.passkey?.sponsorPaymasterUrl)
-
-  // Perpetuals order types only exist where the network has a perps venue.
-  // No supported network configures one yet, so these stay off — honest-state.
-  const perpsVenue = getPerpsVenue(network)
-
-  // Network-aware DEX provider identity (ETC family → ETCswap; else Uniswap).
-  const providerName = dexProvider?.name || 'the DEX'
-  const providerUrl = dexProvider?.url || null
-  const networkName = network?.name || 'this network'
-  // The trading engine is the Uniswap V3 protocol on every supported chain
-  // (ETCswap is a V3 deployment). Name the chain's DEX first, then note the
-  // protocol underneath — a subtle acknowledgement of the DeFi tool inside.
-  const isUniswap = /uniswap/i.test(providerName)
-  const poweredBy = isUniswap
-    ? 'Powered by Uniswap v3'
-    : `Powered by ${providerName} · Uniswap v3 protocol`
-
-  const wnativeSymbol = nativeSymbol ? `W${nativeSymbol}` : 'WNATIVE'
-
-  // The tradeable set for the active chain (wrapped-native, the stablecoin, and
-  // every curated portfolio asset with a routeable pair here). Keyed by address.
-  const assets = useMemo(() => tradeTokens || [], [tradeTokens])
-  const tokenFor = useCallback(
-    (addr) => assets.find((t) => sameAddr(t.address, addr)) || null,
-    [assets],
-  )
-  const symbolFor = useCallback((addr) => tokenFor(addr)?.symbol || '—', [tokenFor])
-  const balanceFor = useCallback(
-    (addr) => balances.tokens?.[addr?.toLowerCase?.()] ?? '0',
-    [balances],
+  // Every pair leg on every swap-capable network, connected network first.
+  const options = useMemo(() => buildSwapOptions({ connectedChainId: chainId }), [chainId])
+  // The opening pair: this network's wrapped-native → stablecoin when it can
+  // trade, otherwise the first network that can — a member on a chain without a
+  // DEX still gets a usable ticket instead of a dead end.
+  const initialPair = useMemo(
+    () => defaultPairForChain(options, chainId) || defaultPairForChain(options, options[0]?.chainId),
+    [options, chainId],
   )
 
-  const [fromToken, setFromToken] = useState(addresses.WNATIVE)
-  const [toToken, setToToken] = useState(addresses.STABLECOIN)
-  // Re-seed the pair to the chain default (sell wrapped-native for the
-  // stablecoin) whenever the active chain changes, without an effect: adjust
-  // state during render keyed on the chain's core addresses (React-endorsed),
-  // so a mid-chain token pick is never clobbered by a re-render.
-  const [chainKey, setChainKey] = useState(addresses.WNATIVE)
-  if (chainKey !== addresses.WNATIVE) {
-    setChainKey(addresses.WNATIVE)
-    setFromToken(addresses.WNATIVE)
-    setToToken(addresses.STABLECOIN)
-  }
+  const [fromKey, setFromKey] = useState(() => initialPair?.from.key ?? null)
+  const [toKey, setToKey] = useState(() => initialPair?.to.key ?? null)
   const [orderType, setOrderType] = useState('sell')
   const [priceType, setPriceType] = useState('market')
   const [limitPrice, setLimitPrice] = useState('')
@@ -129,24 +121,118 @@ function TradePanel() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  let fromToken = findSwapOption(options, fromKey)
+  let toToken = findSwapOption(options, toKey)
+  // A selection can only vanish when the option list itself shrinks (leaving the
+  // testnet whose legs it used). Re-seed during render — React's endorsed
+  // adjust-state-on-props-change pattern — so we never quote a leg that no longer
+  // exists. A deliberate cross-chain pick is otherwise NEVER reseeded: switching
+  // the wallet's network must not silently repoint the member's pair.
+  if (options.length > 0 && (!fromToken || !toToken) && initialPair) {
+    setFromKey(initialPair.from.key)
+    setToKey(initialPair.to.key)
+    fromToken = initialPair.from
+    toToken = initialPair.to
+  }
+
+  // The pair's network — the one that quotes, holds the balances, and must be the
+  // wallet's network before an order can be placed.
+  const pairChainId = Number(fromToken?.chainId ?? toToken?.chainId ?? chainId)
+  const pairNetwork =
+    pairChainId === Number(chainId) ? network || NETWORKS[pairChainId] : NETWORKS[pairChainId]
+  const pairAddresses = getSwapAddresses(pairChainId)
+  const pairNetworkName = pairNetwork?.name || 'this network'
+  const walletNetworkName = NETWORKS[Number(chainId)]?.name || 'another network'
+  const needsSwitch = Boolean(fromToken) && pairChainId !== Number(chainId)
+
+  // Second-leg eligibility: one network per pair (FR-062's rule, shared with the
+  // liquidity pair selector), minus the leg already chosen.
+  const pin = useMemo(() => createPin(fromToken, PIN_MODE.SAME_NETWORK), [fromToken])
+  const receiveOptions = useMemo(
+    () => options.filter((o) => samePair(o, pin) && o.key !== fromToken?.key),
+    [options, pin, fromToken],
+  )
+
+  // Leg balances come from the PAIR's network over its own read provider — the
+  // connected chain's DexContext balances would be the wrong account's funds on
+  // the wrong chain the moment a member picks a pair elsewhere.
+  const legTokens = useMemo(
+    () => [fromToken, toToken].filter(Boolean).map((o) => ({ address: o.address, decimals: o.decimals })),
+    [fromToken, toToken],
+  )
+  const { balances: legBalances, refresh: refreshLegBalances } = useSwapBalances({
+    chainId: pairChainId,
+    address: tradingAddress,
+    tokens: legTokens,
+  })
+  const balanceFor = useCallback(
+    (token) => (token ? legBalances[token.address.toLowerCase()] : undefined),
+    [legBalances],
+  )
+  // Honest-state: an unread balance shows as "…", never as 0 — nobody should be
+  // told they hold nothing because a read failed.
+  const renderBalance = (token) => {
+    const value = balanceFor(token)
+    return value == null ? (
+      <span className="trade-balance-pending" aria-label="balance loading">…</span>
+    ) : (
+      <SensitiveValue>{fmtBalance(value)}</SensitiveValue>
+    )
+  }
+
+  // Session rails: passkey accounts transact through their smart account —
+  // gasless (FairWins-sponsored) where the PAIR's network has a sponsor
+  // paymaster (spec 050), self-funded otherwise. Classic wallets pay network fees.
+  const isPasskey = loginMethod === 'passkey'
+  const passkeyReady = !isPasskey || Boolean(pairNetwork?.passkey)
+  const passkeySponsored = isPasskey && Boolean(pairNetwork?.passkey?.sponsorPaymasterUrl)
+
+  // Perpetuals order types only exist where the pair's network has a perps venue.
+  // No supported network configures one yet, so these stay off — honest-state.
+  const perpsVenue = getPerpsVenue(pairNetwork)
+
+  // DEX identity follows the PAIR's network (ETC family → ETCswap; else Uniswap),
+  // so an ETC pair is never labelled as routing through Uniswap.
+  const venue = getSwapVenue(pairChainId) || dexProvider
+  const providerName = venue?.name || 'the DEX'
+  const providerUrl = venue?.url || null
+  // The trading engine is the Uniswap V3 protocol on every supported chain
+  // (ETCswap is a V3 deployment). Name the chain's DEX first, then note the
+  // protocol underneath — a subtle acknowledgement of the DeFi tool inside.
+  const isUniswap = /uniswap/i.test(providerName)
+  const poweredBy = isUniswap
+    ? 'Powered by Uniswap v3'
+    : `Powered by ${providerName} · Uniswap v3 protocol`
+
+  const pairNativeSymbol = pairNetwork?.nativeCurrency?.symbol || ''
+  const wnativeSymbol = pairNativeSymbol ? `W${pairNativeSymbol}` : 'WNATIVE'
+  const pairStableSymbol = pairNetwork?.stablecoin?.symbol || 'the stablecoin'
+  const swapNetworkCount = useMemo(
+    () => new Set(options.map((o) => o.chainId)).size,
+    [options],
+  )
+
+  const symbolOf = (token) => token?.symbol || '—'
   const isPerpsOrder = orderType === 'sell_short' || orderType === 'buy_to_cover'
 
-  // Live quoting — debounced. Routes through the DEX for the selected pair.
+  // Live quoting — debounced, against the PAIR's network.
   useEffect(() => {
     if (!amount || parseFloat(amount) <= 0) {
       setQuote(null)
       return
     }
 
-    if (!fromToken || !toToken || sameAddr(fromToken, toToken) || isPerpsOrder) {
+    if (!fromToken || !toToken || fromToken.key === toToken.key || isPerpsOrder) {
       setQuote(null)
       return
     }
 
     let cancelled = false
+    const fromAddress = fromToken.address
+    const toAddress = toToken.address
     const timeoutId = setTimeout(async () => {
       try {
-        const result = await getBestQuote(fromToken, toToken, amount)
+        const result = await getBestQuoteOn(pairChainId, fromAddress, toAddress, amount)
         if (!cancelled) {
           setQuote(result)
           setError('')
@@ -163,15 +249,18 @@ function TradePanel() {
       cancelled = true
       clearTimeout(timeoutId)
     }
-  }, [amount, fromToken, toToken, isPerpsOrder, getBestQuote])
+  }, [amount, fromToken, toToken, pairChainId, isPerpsOrder, getBestQuoteOn])
 
   // Spot order type maps onto the pair direction relative to cash: paying the
-  // stablecoin to receive an asset is a Buy; paying an asset for the stablecoin
-  // is a Sell. Asset-for-asset pairs leave the order type unchanged.
+  // network's stablecoin to receive an asset is a Buy; paying an asset for the
+  // stablecoin is a Sell. Asset-for-asset pairs leave the order type unchanged.
   const deriveOrderType = (from, to) => {
-    const stable = addresses.STABLECOIN
-    if (sameAddr(to, stable) && !sameAddr(from, stable)) return 'sell'
-    if (sameAddr(from, stable) && !sameAddr(to, stable)) return 'buy'
+    const stable = getSwapAddresses(from?.chainId ?? to?.chainId)?.stablecoin
+    if (!stable) return null
+    const isStable = (token) =>
+      Boolean(token) && token.address.toLowerCase() === stable.toLowerCase()
+    if (isStable(to) && !isStable(from)) return 'sell'
+    if (isStable(from) && !isStable(to)) return 'buy'
     return null
   }
 
@@ -180,21 +269,31 @@ function TradePanel() {
     setQuote(null)
     setError('')
     setSuccess('')
-    if (next === 'buy') {
-      setFromToken(addresses.STABLECOIN)
-      setToToken(addresses.WNATIVE)
-    } else if (next === 'sell') {
-      setFromToken(addresses.WNATIVE)
-      setToToken(addresses.STABLECOIN)
-    }
+    if (next !== 'buy' && next !== 'sell') return
+    // Buy/Sell re-seed the pair on the network already in play, never a different one.
+    const wnative = findSwapOptionByAddress(options, pairChainId, pairAddresses?.wnative)
+    const stable = findSwapOptionByAddress(options, pairChainId, pairAddresses?.stablecoin)
+    if (!wnative || !stable) return
+    setFromKey(next === 'buy' ? stable.key : wnative.key)
+    setToKey(next === 'buy' ? wnative.key : stable.key)
   }
 
-  const handlePairChange = (side, value) => {
-    const from = side === 'from' ? value : fromToken
-    const to = side === 'to' ? value : toToken
-    if (side === 'from') setFromToken(value)
-    else setToToken(value)
-    const derived = deriveOrderType(from, to)
+  const handleSellLegChange = (option) => {
+    setFromKey(option.key)
+    // The pin moved: keep the receive leg when it is still on this network,
+    // otherwise take that network's stablecoin so the ticket stays quotable.
+    const counterpart = counterpartFor(options, option.chainId, option, toToken)
+    setToKey(counterpart?.key ?? null)
+    const derived = deriveOrderType(option, counterpart)
+    if (derived) setOrderType(derived)
+    setQuote(null)
+    setError('')
+    setSuccess('')
+  }
+
+  const handleBuyLegChange = (option) => {
+    setToKey(option.key)
+    const derived = deriveOrderType(fromToken, option)
     if (derived) setOrderType(derived)
     setQuote(null)
     setError('')
@@ -202,12 +301,24 @@ function TradePanel() {
 
   const handleFlipTokens = () => {
     const derived = deriveOrderType(toToken, fromToken)
-    setFromToken(toToken)
-    setToToken(fromToken)
+    setFromKey(toToken?.key ?? null)
+    setToKey(fromToken?.key ?? null)
     if (derived) setOrderType(derived)
     setAmount('')
     setQuote(null)
     setError('')
+  }
+
+  const handleSwitchNetwork = async () => {
+    setError('')
+    try {
+      if (typeof switchChainAsync !== 'function') {
+        throw new Error('This wallet cannot switch networks from the app.')
+      }
+      await switchChainAsync({ chainId: pairChainId })
+    } catch (err) {
+      setError(err?.shortMessage || err?.message || `Could not switch to ${pairNetworkName}.`)
+    }
   }
 
   const handleAccountChange = (value) => {
@@ -242,7 +353,7 @@ function TradePanel() {
 
   // A Limit order's floor: limit price (output per 1 unit paid) × quantity,
   // enforced on-chain as the swap's minimum received.
-  const outDecimals = tokenFor(toToken)?.decimals ?? 18
+  const outDecimals = toToken?.decimals ?? 18
   const limitFloor = useMemo(() => {
     if (priceType !== 'limit') return null
     const qty = parseFloat(amount)
@@ -271,17 +382,19 @@ function TradePanel() {
 
     try {
       const proposedNote = `Proposed to ${identity.label || 'the multisig'} — owners approve before it executes.`
-      const res =
-        priceType === 'limit'
-          ? await swap(fromToken, toToken, amount, { limitMinOutWei: limitFloor.wei })
-          : await swap(fromToken, toToken, amount)
+      // The pair's network rides along so the DEX layer refuses an order aimed at
+      // a chain the wallet is not on, whatever the UI believes.
+      const opts = { chainId: pairChainId }
+      if (priceType === 'limit') opts.limitMinOutWei = limitFloor.wei
+      const res = await swap(fromToken.address, toToken.address, amount, opts)
       setSuccess(
         res?.proposed
           ? proposedNote
-          : `Swapped ${amount} ${symbolFor(fromToken)} → ${symbolFor(toToken)}`,
+          : `Swapped ${amount} ${symbolOf(fromToken)} → ${symbolOf(toToken)} on ${pairNetworkName}`,
       )
       setAmount('')
       setQuote(null)
+      refreshLegBalances()
     } catch (err) {
       console.error('Trade error:', err)
       setError(err.message || 'Transaction failed')
@@ -289,7 +402,9 @@ function TradePanel() {
   }
 
   const handleSetMax = () => {
-    setAmount(balanceFor(fromToken))
+    const available = balanceFor(fromToken)
+    if (available == null) return
+    setAmount(available)
   }
 
   if (!isConnected) {
@@ -297,7 +412,7 @@ function TradePanel() {
       <div className="trade-panel">
         <div className="trade-header">
           <h2>Trade</h2>
-          <p className="trade-subtitle">Trade on {networkName}</p>
+          <p className="trade-subtitle">Trade across every supported network</p>
         </div>
         <div className="trade-empty">
           <p>Connect your wallet to start trading.</p>
@@ -306,18 +421,21 @@ function TradePanel() {
     )
   }
 
-  if (!isDexAvailable) {
+  // The only true dead end left: no supported network has a DEX deployment at
+  // all. A DEX-less CONNECTED chain is no longer a dead end — pairs from other
+  // networks are listed, and the ticket asks for the switch when one is picked.
+  if (options.length === 0) {
     return (
       <div className="trade-panel">
         <div className="trade-header">
           <h2>Trade</h2>
-          <p className="trade-subtitle">Trading is unavailable on {networkName}</p>
+          <p className="trade-subtitle">Trading is unavailable</p>
         </div>
         <div className="trade-empty">
           <p>
             {dexProvider
-              ? `${providerName} is not configured on ${networkName}. Switch to a supported network to trade in-app.`
-              : `No DEX is configured on ${networkName}. Switch to a supported network to trade in-app.`}
+              ? `${dexProvider.name} is not configured on any supported network in this build, so there are no pairs to trade in-app.`
+              : 'No DEX is configured on any supported network in this build, so there are no pairs to trade in-app.'}
           </p>
         </div>
       </div>
@@ -331,8 +449,13 @@ function TradePanel() {
       : '0.0'
 
   const severity = impactSeverity(quote?.priceImpactPercent)
+  // A vault is a contract on ONE network; it cannot sign for a pair elsewhere.
+  const vaultChainId = isVault && identity?.chainId != null ? Number(identity.chainId) : null
+  const vaultOffNetwork = vaultChainId != null && vaultChainId !== pairChainId
   const canExecute =
     !loading &&
+    !needsSwitch &&
+    !vaultOffNetwork &&
     // A recovered account signs with its own EOA key, not the passkey rail, so
     // passkey readiness doesn't gate it.
     (passkeyReady || isLegacy) &&
@@ -367,17 +490,20 @@ function TradePanel() {
       <div className="trade-header">
         <div className="trade-title-row">
           <h2>Trade</h2>
-          <span className="trade-venue" title={`Routing via ${providerName}`}>
+          <span className="trade-venue" title={`Routing via ${providerName} on ${pairNetworkName}`}>
             {providerName}
           </span>
         </div>
         <p className="trade-subtitle">
           Best-execution swaps routed across {providerName} liquidity
+          {swapNetworkCount > 1
+            ? ` on ${swapNetworkCount} networks — a pair always trades on one of them.`
+            : '.'}
         </p>
       </div>
 
-      {/* Account — the personal wallet or a saved multisig; the available
-          figures below always belong to the selected account. */}
+      {/* Account — the personal wallet or a saved multisig. Balances live on the
+          pay/receive cards below, next to the amount they apply to. */}
       <section className="trade-account" aria-label="Trading account">
         <div className="trade-account-top">
           <label className="trade-field-label" htmlFor="trade-account-select">
@@ -413,34 +539,37 @@ function TradePanel() {
         />
         {isLegacy && (
           <p className="trade-account-note" role="note">
-            Orders sign with your recovered account&apos;s key on {networkName}. You pay the
+            Orders sign with your recovered account&apos;s key on {pairNetworkName}. You pay the
             network fee — recovered accounts aren&apos;t gasless.
           </p>
         )}
-        <dl className="trade-account-rows">
-          <div className="trade-account-row">
-            <dt>Available to trade ({symbolFor(fromToken)})</dt>
-            <dd>
-              <SensitiveValue>{fmtBalance(balanceFor(fromToken))}</SensitiveValue>
-            </dd>
-          </div>
-          <div className="trade-account-row">
-            <dt>Cash available ({stableSymbol})</dt>
-            <dd>
-              <SensitiveValue>{fmtBalance(balances.stable)}</SensitiveValue>
-            </dd>
-          </div>
-        </dl>
         {isVault && (
           <p className="trade-account-note">
             Orders from this account are proposed to the multisig and execute once enough
             owners approve.
           </p>
         )}
+        {vaultOffNetwork && (
+          <p className="trade-account-note" role="note">
+            This multisig lives on {NETWORKS[vaultChainId]?.name || 'another network'}, so it
+            can&apos;t trade the {pairNetworkName} pair you picked. Choose a pair on{' '}
+            {NETWORKS[vaultChainId]?.name || 'its network'}, or switch to your personal wallet.
+          </p>
+        )}
         {!passkeyReady && !isLegacy && (
           <p className="trade-account-note" role="note">
-            Passkey accounts can’t send transactions on {networkName} yet — connect a
-            browser wallet to trade here.
+            Passkey accounts can’t send transactions on {pairNetworkName} yet — connect a
+            browser wallet to trade this pair.
+          </p>
+        )}
+        {/* A fact about the member's OWN network, stated whether or not a switch
+            is also pending — "your network can't trade" and "this pair is
+            elsewhere" are two different things to know. `isSwapChain` is the same
+            gate the option list is built from, so the note can never contradict it. */}
+        {!isSwapChain(chainId) && (
+          <p className="trade-account-note" role="note">
+            {walletNetworkName} has no DEX deployment, so its own pairs aren’t tradeable —
+            the pairs listed below are on other networks.
           </p>
         )}
       </section>
@@ -452,7 +581,8 @@ function TradePanel() {
           <span className="trade-field-label">
             <label htmlFor="trade-order-type">Order Type</label>
             <InfoTip label="About order types" className="trade-info">
-              Buy receives {wnativeSymbol} for {stableSymbol}; Sell does the reverse.
+              Buy receives {wnativeSymbol} for {pairStableSymbol}; Sell does the reverse.
+              Both stay on {pairNetworkName} — the network of the pair you picked.
               Sell Short and Buy to Cover appear on networks with a perpetuals venue —
               {perpsVenue ? ` ${perpsVenue.name} on this network.` : ' none of the supported networks has one yet.'}
             </InfoTip>
@@ -506,7 +636,7 @@ function TradePanel() {
         {priceType === 'limit' && (
           <div className="trade-field">
             <label className="trade-field-label" htmlFor="trade-limit-price">
-              Limit Price ({symbolFor(toToken)} per {symbolFor(fromToken)})
+              Limit Price ({symbolOf(toToken)} per {symbolOf(fromToken)})
             </label>
             <input
               id="trade-limit-price"
@@ -534,7 +664,7 @@ function TradePanel() {
         <div className="trade-message trade-error" role="alert">
           {perpsVenue
             ? `${orderType === 'sell_short' ? 'Sell Short' : 'Buy to Cover'} orders route to ${perpsVenue.name}, which isn’t wired into in-app execution yet.`
-            : `Short selling needs a perpetuals venue, and ${networkName} doesn’t have one yet.`}
+            : `Short selling needs a perpetuals venue, and ${pairNetworkName} doesn’t have one yet.`}
         </div>
       )}
 
@@ -543,9 +673,7 @@ function TradePanel() {
         <div className="trade-leg">
           <div className="trade-leg-top">
             <label htmlFor="trade-amount">You pay</label>
-            <span className="trade-balance">
-              Balance: <SensitiveValue>{fmtBalance(balanceFor(fromToken))}</SensitiveValue>
-            </span>
+            <span className="trade-balance">Balance: {renderBalance(fromToken)}</span>
           </div>
           <div className="trade-leg-body">
             <input
@@ -561,15 +689,20 @@ function TradePanel() {
             />
             <TradeTokenSelect
               ariaLabel="Token to sell"
-              assets={assets}
-              value={fromToken}
-              onChange={(addr) => handlePairChange('from', addr)}
-              chainId={chainId}
+              options={options}
+              value={fromKey}
+              onChange={handleSellLegChange}
             />
-            <button type="button" onClick={handleSetMax} className="trade-max-btn">
+            <button
+              type="button"
+              onClick={handleSetMax}
+              className="trade-max-btn"
+              disabled={balanceFor(fromToken) == null}
+            >
               MAX
             </button>
           </div>
+          <p className="trade-leg-network">{fromToken?.networkName || pairNetworkName}</p>
         </div>
 
         <div className="trade-switch-row">
@@ -583,13 +716,11 @@ function TradePanel() {
           </button>
         </div>
 
-        {/* Receive leg */}
+        {/* Receive leg — pinned to the pay leg's network (one pool, one chain). */}
         <div className="trade-leg">
           <div className="trade-leg-top">
             <label>You receive</label>
-            <span className="trade-balance">
-              Balance: <SensitiveValue>{fmtBalance(balanceFor(toToken))}</SensitiveValue>
-            </span>
+            <span className="trade-balance">Balance: {renderBalance(toToken)}</span>
           </div>
           <div className="trade-leg-body">
             <div className="trade-receive-value" aria-live="polite">
@@ -597,12 +728,17 @@ function TradePanel() {
             </div>
             <TradeTokenSelect
               ariaLabel="Token to buy"
-              assets={assets}
-              value={toToken}
-              onChange={(addr) => handlePairChange('to', addr)}
-              chainId={chainId}
+              options={receiveOptions}
+              value={toKey}
+              onChange={handleBuyLegChange}
+              emptyLabel="Select"
             />
           </div>
+          <p className="trade-leg-network">
+            {receiveOptions.length === 0
+              ? `No other token trades against ${symbolOf(fromToken)} on ${pairNetworkName}.`
+              : `On ${pairNetworkName} — a pair lives on one network.`}
+          </p>
         </div>
       </div>
 
@@ -651,6 +787,7 @@ function TradePanel() {
             <span className="trade-summary-val trade-route">
               {quote.tokenInSymbol} → {quote.tokenOutSymbol}
               <span className="trade-route-fee">{feeTierLabel(quote.feeTier)} pool</span>
+              <span className="trade-route-network">on {pairNetworkName}</span>
             </span>
           </div>
           {priceType !== 'limit' && (
@@ -681,22 +818,42 @@ function TradePanel() {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleExecute}
-        disabled={!canExecute}
-        className="trade-execute-btn"
-      >
-        {loading
-          ? 'Processing…'
-          : quotingPrice
-            ? 'Fetching best price…'
-            : quote
-              ? priceType === 'limit'
-                ? `Place limit order — ${symbolFor(fromToken)} for ${symbolFor(toToken)}`
-                : `Swap ${symbolFor(fromToken)} for ${symbolFor(toToken)}`
-              : 'Enter an amount'}
-      </button>
+      {/* The pair's network is the wallet's network, or the order can't be placed.
+          Disclosed before any signature, with the switch as the primary action. */}
+      {needsSwitch ? (
+        <>
+          <p className="trade-switch-note" role="note">
+            This pair trades on {pairNetworkName} and your wallet is on {walletNetworkName}.
+            Switch networks to place the order — the price above is quoted from{' '}
+            {pairNetworkName} liquidity either way.
+          </p>
+          <button
+            type="button"
+            onClick={handleSwitchNetwork}
+            disabled={switching}
+            className="trade-execute-btn"
+          >
+            {switching ? `Switching to ${pairNetworkName}…` : `Switch to ${pairNetworkName}`}
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={handleExecute}
+          disabled={!canExecute}
+          className="trade-execute-btn"
+        >
+          {loading
+            ? 'Processing…'
+            : quotingPrice
+              ? 'Fetching best price…'
+              : quote
+                ? priceType === 'limit'
+                  ? `Place limit order — ${symbolOf(fromToken)} for ${symbolOf(toToken)}`
+                  : `Swap ${symbolOf(fromToken)} for ${symbolOf(toToken)}`
+                : 'Enter an amount'}
+        </button>
+      )}
 
       {isPasskey && passkeyReady && !isVault && !isLegacy && (
         <p className="trade-session-note">
@@ -720,17 +877,19 @@ function TradePanel() {
       <div className="trade-footer">
         <div className="trade-attribution" title={`${providerName} — Uniswap V3 protocol`}>
           <span className="trade-attribution-dot" aria-hidden="true" />
-          {poweredBy}
+          {poweredBy} on {pairNetworkName}
         </div>
         <div className="trade-links">
-          <a
-            href={getExplorerUrl(chainId, addresses.SWAP_ROUTER_02, 'address')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="trade-link"
-          >
-            {providerName} Router ↗
-          </a>
+          {pairAddresses?.swapRouter && (
+            <a
+              href={getExplorerUrl(pairChainId, pairAddresses.swapRouter, 'address')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="trade-link"
+            >
+              {providerName} Router ↗
+            </a>
+          )}
           {providerUrl && (
             <a href={providerUrl} target="_blank" rel="noopener noreferrer" className="trade-link">
               Open {providerName} ↗
