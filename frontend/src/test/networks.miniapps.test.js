@@ -6,9 +6,16 @@
  * failure this file guards is not cosmetic: a build resolving the wrong side of the cohort
  * boundary would run mainnet-curated code against testnet wallets (or the reverse).
  *
- * The requirement behind the assertions is "derived from the MAINNET_CHAIN_ID/TESTNET_CHAIN_ID
- * pair, never a second literal" (research R5). A literal cannot be tested for directly, so both
- * cohort branches are exercised instead: only a derivation gives the right answer in both.
+ * THE TESTNET HOME IS MORDOR (63), NOT AMOY. The registry is deployed to **Polygon and Mordor
+ * only**; Amoy is deliberately not a deployment target for spec 073. So unlike
+ * `membershipChainId()`, this does NOT derive from `TESTNET_CHAIN_ID` — doing so would be the
+ * more symmetrical code and the wrong answer, resolving every testnet build to a chain with no
+ * registry address while a real one sat unread on Mordor.
+ *
+ * The load-bearing assertion is therefore no longer "derived from the pair" but the property that
+ * actually protects the product, and which would have caught the Amoy mistake directly: **the
+ * chain this resolves to must have a `miniAppRegistry` address**. A reference chain with no
+ * contract on it is not a configuration detail — it is a catalog that can never load.
  *
  * The test process runs with VITE_NETWORK_ID=63 (Mordor) per frontend/vite.config.js, so this
  * build is a TESTNET build by default; the mainnet branch is reached by stubbing that env var,
@@ -24,6 +31,10 @@ import {
   TESTNET_CHAIN_ID,
   getCurrentChainId,
 } from '../config/networks'
+import { getContractAddressForChain } from '../config/contracts'
+
+/** Mordor. Spelled out rather than imported, so a change to the source constant fails here. */
+const MINIAPP_TESTNET_CHAIN_ID = 63
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -33,48 +44,79 @@ function buildOn(chainId) {
 }
 
 describe('mini-app registry chain (spec 073 FR-025)', () => {
-  it('resolves to the testnet reference chain in a testnet build', () => {
-    // Default test env (Mordor, 63) — a testnet chain that is NOT itself the reference chain,
-    // which is the interesting case: the answer must be the cohort's reference chain, not
-    // whatever chain the build happens to point at.
+  it('resolves to Mordor in a testnet build — where the registry actually is', () => {
     expect(NETWORKS[getCurrentChainId()].isTestnet).toBe(true)
-    expect(miniAppChainId()).toBe(TESTNET_CHAIN_ID)
+    expect(miniAppChainId()).toBe(MINIAPP_TESTNET_CHAIN_ID)
     expect(miniAppChainId()).not.toBe(MAINNET_CHAIN_ID)
     expect(NETWORKS[miniAppChainId()].isTestnet).toBe(true)
   })
 
-  it('resolves to the mainnet reference chain in a mainnet build', () => {
+  it('does NOT resolve to Amoy — Amoy is not a spec-073 deployment target', () => {
+    // The bug this file exists to prevent: deriving from TESTNET_CHAIN_ID looks tidier and
+    // sends every testnet build to a chain with no registry.
+    expect(miniAppChainId()).not.toBe(TESTNET_CHAIN_ID)
+  })
+
+  it('resolves to Polygon in a mainnet build', () => {
     buildOn(MAINNET_CHAIN_ID)
 
     expect(NETWORKS[getCurrentChainId()].isTestnet).toBe(false)
     expect(miniAppChainId()).toBe(MAINNET_CHAIN_ID)
-    expect(miniAppChainId()).not.toBe(TESTNET_CHAIN_ID)
     expect(NETWORKS[miniAppChainId()].isTestnet).toBe(false)
   })
 
-  it('follows the cohort of any build chain, mainnet or testnet — the derivation, not a literal', () => {
-    // Ethereum (1) and Optimism (10) are mainnets that are not the reference chain; Amoy (80002)
-    // and Mordor (63) are the testnet side. A hardcoded value would fail at least one of these.
-    for (const chainId of [1, 10, 8453, 42161, 61, MAINNET_CHAIN_ID]) {
+  it('follows the COHORT of any build chain, not the chain itself', () => {
+    // ETC (61) belongs here, not below: Ethereum Classic is a MAINNET — Mordor is its testnet.
+    for (const chainId of [1, 10, 61, 8453, 42161, MAINNET_CHAIN_ID]) {
       buildOn(chainId)
       expect(miniAppChainId()).toBe(MAINNET_CHAIN_ID)
     }
+    // Amoy is a testnet-cohort chain that is not the reference chain; it must still resolve to
+    // Mordor rather than to itself.
     for (const chainId of [63, TESTNET_CHAIN_ID]) {
       buildOn(chainId)
-      expect(miniAppChainId()).toBe(TESTNET_CHAIN_ID)
+      expect(miniAppChainId()).toBe(MINIAPP_TESTNET_CHAIN_ID)
     }
   })
 
-  it('never invents a third chain — it is always one of the declared pair', () => {
-    for (const chainId of [MAINNET_CHAIN_ID, TESTNET_CHAIN_ID, 1, 63]) {
+  it('never invents a third chain — always Polygon or Mordor', () => {
+    for (const chainId of [MAINNET_CHAIN_ID, TESTNET_CHAIN_ID, 1, 61, 63]) {
       buildOn(chainId)
-      expect([MAINNET_CHAIN_ID, TESTNET_CHAIN_ID]).toContain(miniAppChainId())
+      expect([MAINNET_CHAIN_ID, MINIAPP_TESTNET_CHAIN_ID]).toContain(miniAppChainId())
     }
   })
 
   it('is stable and numeric — a launch check and a catalog read must agree', () => {
     expect(typeof miniAppChainId()).toBe('number')
     expect(miniAppChainId()).toBe(miniAppChainId())
+  })
+})
+
+describe('the reference chain must actually carry the registry', () => {
+  /*
+   * The invariant that would have caught the Amoy mistake on its own. Everything else in this
+   * file checks which number comes out; this checks that the number names a chain where the
+   * catalog can load at all.
+   */
+  it('has a miniAppRegistry address in a testnet build', () => {
+    const address = getContractAddressForChain('miniAppRegistry', miniAppChainId())
+    expect(address).toMatch(/^0x[0-9a-fA-F]{40}$/)
+  })
+
+  it('has a miniAppRegistry address in a mainnet build', () => {
+    buildOn(MAINNET_CHAIN_ID)
+    const address = getContractAddressForChain('miniAppRegistry', miniAppChainId())
+    expect(address).toMatch(/^0x[0-9a-fA-F]{40}$/)
+  })
+
+  it('holds for every build chain in either cohort', () => {
+    for (const chainId of [1, 10, 61, 63, 8453, 42161, MAINNET_CHAIN_ID, TESTNET_CHAIN_ID]) {
+      buildOn(chainId)
+      expect(
+        getContractAddressForChain('miniAppRegistry', miniAppChainId()),
+        `build on ${chainId} resolves a registry chain with no deployment`,
+      ).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    }
   })
 })
 
@@ -96,14 +138,16 @@ describe('the registry chain is always inside this build\'s cohort (constitution
   })
 })
 
-describe('shared derivation with the membership reference chain (research R5)', () => {
-  it('agrees with membershipChainId() in both cohorts', () => {
-    // Not a claim that the two are the same CONCEPT — they answer different questions and are
-    // separate functions so callers can say which authority they mean. They agree because both
-    // derive from the one MAINNET_CHAIN_ID/TESTNET_CHAIN_ID pair, and that agreement is exactly
-    // what proves no second chain-id literal was introduced for mini-apps. A future, deliberate
-    // split of the two chains would change this expectation on purpose.
-    expect(miniAppChainId()).toBe(membershipChainId())
+describe('relationship to the membership reference chain', () => {
+  it('agrees with membershipChainId() on mainnet, and DIVERGES on testnet', () => {
+    // They answer different questions — where membership is sold and read, versus where app
+    // curation is governed — and are separate functions so a caller says which authority it
+    // means. On a testnet build they now genuinely differ: membership lives on Amoy, the app
+    // registry on Mordor. This assertion pins that divergence as DELIBERATE, so a future
+    // "simplification" that aliases the two fails here instead of in the catalog.
+    expect(membershipChainId()).toBe(TESTNET_CHAIN_ID)
+    expect(miniAppChainId()).toBe(MINIAPP_TESTNET_CHAIN_ID)
+    expect(miniAppChainId()).not.toBe(membershipChainId())
 
     buildOn(MAINNET_CHAIN_ID)
     expect(miniAppChainId()).toBe(membershipChainId())

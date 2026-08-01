@@ -121,7 +121,11 @@ const AMOY_CONTRACTS = {
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
-  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
+  // Spec 073 — deliberately NOT a deployment target, and NOT "pending". The mini-app registry
+  // ships to Polygon and Mordor only, and `miniAppChainId()` sends every testnet build to
+  // Mordor 63. The key stays for shape parity with the other chains; deploying one here would
+  // create a second testnet catalog that nothing reads.
+  miniAppRegistry: '',
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.

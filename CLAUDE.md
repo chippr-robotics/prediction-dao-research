@@ -277,10 +277,12 @@ artifacts live under `specs/<feature>/`.
   READS the chain's `launchable` — never re-derive it. Approval is **content-committed**:
   `approveApp(id, expectedManifestHash)` reverts `StaleProposal`, because reading the proposed tuple
   at execution time let a vendor swap the package after review. **Never add an id-only overload.**
-  (2) **The registry has ONE home per cohort** — `miniAppChainId()` (Polygon on a mainnet build,
-  Amoy on a testnet one), derived from the `MAINNET_CHAIN_ID`/`TESTNET_CHAIN_ID` pair, never a
-  second literal. It is currently deployed on **137 and Mordor 63**; Amoy 80002 has NO address, so
-  a testnet build reads "not deployed".
+  (2) **The registry has ONE home per cohort** — `miniAppChainId()`: **Polygon 137** on a mainnet
+  build, **Mordor 63** on a testnet one. Deployment targets are **Polygon and Mordor ONLY; Amoy is
+  deliberately not one**, which is why this is the one reference chain in the estate that does NOT
+  derive from `TESTNET_CHAIN_ID` (that would resolve every testnet build to a chain with no
+  registry). Never hardcode `137`: the catalog decides which packages the host EXECUTES, so
+  crossing the cohort boundary would run mainnet-curated code against testnet wallets.
   (3) **The `host` object is the ENTIRE privileged surface** (`contracts/host-context.md`, hostApi
   **2**): `appId`, `wallet`, `readProvider`, `contracts`, `network`, `store`, `audit`, `toast`,
   `navigate`. Wrappers, never handles — no signer, no context, no storage handle, and adding a key
