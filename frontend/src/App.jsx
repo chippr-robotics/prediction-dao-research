@@ -22,6 +22,7 @@ import WalletPage from './pages/WalletPage'
 import VouchersPage from './pages/VouchersPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import PoolPage from './pages/PoolPage'
+import MiniAppWorkspace from './components/miniapps/MiniAppWorkspace'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
 import AutoConnectPrompt from './components/wallet/AutoConnectPrompt'
@@ -157,6 +158,11 @@ function AppContent() {
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
           <Route path="/pools/:address" element={<PoolPage />} />
+          {/* Spec 073: one mini-app workspace per registry listing. The slug is
+              derived from the listing's on-chain (unique) name, and the workspace
+              re-reads that record from the chain on every launch — a catalog card
+              is never what decides that something may run. */}
+          <Route path="/apps/:slug" element={<MiniAppWorkspace />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Route>
 

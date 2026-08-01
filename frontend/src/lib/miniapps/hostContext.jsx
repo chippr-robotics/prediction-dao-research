@@ -45,7 +45,9 @@
  * if the trail is written by the party the app cannot decline to use, so
  * `submit` records every outcome — sent, proposed, and failed — through
  * `data/ledger/sources/miniAppSource.js` before the result or the error reaches
- * the app. `audit.log` exists on top of that for the app's own contextual
+ * the app, and the `store` an app receives is a wrapper that records its
+ * significant writes (see {@link STATE_AUDIT_WINDOW_MS}) rather than the raw
+ * namespace. `audit.log` exists on top of that for the app's own contextual
  * entries; because those entries share a ledger with host-written ones, the
  * `host:` kind prefix is reserved and refused from apps.
  *
@@ -66,6 +68,7 @@ import { getReadProvider } from '../../utils/rpcProvider'
 import { createAppStore } from './store'
 import {
   captureMiniAppLog,
+  captureMiniAppStateChange,
   captureMiniAppTxSubmitted,
 } from '../../data/ledger/sources/miniAppSource'
 
@@ -153,6 +156,57 @@ const HOST_AUDIT_KIND = Object.freeze({
   TX_PROPOSED: 'host:tx_proposed',
   TX_FAILED: 'host:tx_failed',
 })
+
+/**
+ * How long one shared-state key stays "already recorded" after an audit entry
+ * for it lands.
+ *
+ * FR-019 asks the host to audit *significant* shared-state changes, and the host
+ * — not the app — has to decide what significant means. The decision has real
+ * consequences: these entries go into the member's DURABLE client ledger, which
+ * rides the spec-032 encrypted backup, so a per-write entry would not be a noisy
+ * log, it would be permanent damage. A draft form that saves on every keystroke
+ * is an entirely ordinary mini-app, and it would mint hundreds of entries a
+ * minute, in perpetuity, for one member editing one field.
+ *
+ * So the rule is deliberately coarse, and it is two rules:
+ *
+ * 1. **Significant means the value actually changed.** `store.set` already
+ *    distinguishes that from a refused or no-op write (it returns `false` for a
+ *    bad key, an unserializable value, an over-budget namespace, or a write of
+ *    the value already there), so the host audits exactly the writes that
+ *    changed the member's data and nothing else. Nothing is guessed about the
+ *    value's meaning — the host cannot know which of an app's keys matter.
+ * 2. **One entry per key per window, coalescing the burst into its first
+ *    write.** A reviewer's question is "did this app change its `drafts` state
+ *    while I was away", not "how many keystrokes did it take"; a minute is short
+ *    enough that two genuinely separate edits stay two entries and long enough
+ *    that a typing burst is one. Worst-case growth becomes (keys × minutes)
+ *    rather than (writes).
+ *
+ * LEADING EDGE, AND NO TIMER. The obvious implementation — a trailing debounce
+ * that writes the entry once the burst goes quiet — is wrong here: it holds the
+ * only record of a change inside a timer that a tab close, a navigation or an
+ * unmount destroys, so the ledger would silently lose exactly the changes made
+ * just before the member left. Recording the FIRST write of a window
+ * synchronously means an audit entry exists the instant a key changes, there is
+ * nothing pending to flush, and nothing to clean up on unmount.
+ *
+ * The VALUE is never recorded, in any of this — see `miniAppSource.js`, which
+ * takes only the key.
+ *
+ * WHAT THIS DOES NOT BUY. Coalescing is per key, so an app that ROTATED keys
+ * would still produce an entry per key per window. That residual is accepted
+ * rather than hidden: the number of keys an app can hold is already bounded by
+ * the store's own 256 KB namespace budget, and a package deliberately
+ * manufacturing keys to bloat a member's ledger is a hostile package — which
+ * curation, not this window, is the platform's boundary against (spec 073
+ * assumptions: iframe/zero-trust sandboxing is explicitly out of scope for v1).
+ * A per-app ceiling was considered and rejected: silently DROPPING audit entries
+ * to stay under a quota is worse than recording too many, because the trail
+ * would then lie by omission about a real change.
+ */
+export const STATE_AUDIT_WINDOW_MS = 60_000
 
 /** `to` must be a plain EVM address; the contract has no deployment form. */
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
@@ -324,7 +378,57 @@ export function MiniAppHostProvider({ appId, children }) {
    * as a vault belongs to the vault, and with no wallet at all the store runs
    * session-only rather than attributing durable state to nobody.
    */
-  const store = useMemo(() => createAppStore(address, appId), [address, appId])
+  const namespacedStore = useMemo(() => createAppStore(address, appId), [address, appId])
+
+  /**
+   * What the app actually receives: the namespace, with writes routed through
+   * the host's audit (FR-019). The raw store is never handed out — an app that
+   * held it could change the member's stored state with no trail, which is the
+   * one thing the automatic audit exists to prevent.
+   *
+   * `get` and `subscribe` are passed through untouched: reading is not an
+   * auditable event, and the store's methods close over their own namespace
+   * rather than `this`, so forwarding the references is safe.
+   *
+   * The coalescing window lives in this closure, so it is per (identity, chain,
+   * app) by construction — switching accounts or networks starts a fresh window
+   * and the first write under the new identity is always recorded.
+   */
+  const store = useMemo(() => {
+    /** storeKey -> timestamp of the entry that already covers this key's window. */
+    const recordedAt = new Map()
+
+    return Object.freeze({
+      get: namespacedStore.get,
+      subscribe: namespacedStore.subscribe,
+
+      /**
+       * Write one key, then record it if the write was significant. Returns what
+       * the underlying store returned, unchanged: auditing must be invisible to
+       * the app, including in its return value.
+       */
+      set(key, value) {
+        const changed = namespacedStore.set(key, value)
+        // A refused or no-op write changed nothing, so there is nothing to audit
+        // (see rule 1 on STATE_AUDIT_WINDOW_MS).
+        if (!changed) return changed
+        // An entry is attributed to an account on a chain; with neither there is
+        // nothing truthful to write, and no window to spend either — the store
+        // is running session-only in that case.
+        if (!address || walletChain == null) return changed
+
+        const at = Date.now()
+        const covered = recordedAt.get(key)
+        if (covered != null && at - covered < STATE_AUDIT_WINDOW_MS) return changed
+
+        recordedAt.set(key, at)
+        // Key only. The value is the app's own data, may be large, and would
+        // otherwise be copied into a ledger that travels in the member's backup.
+        safeAudit(() => captureMiniAppStateChange(address, walletChain, { appId, storeKey: key, at }))
+        return changed
+      },
+    })
+  }, [namespacedStore, appId, address, walletChain])
 
   const submit = useCallback(
     async (payload) => {

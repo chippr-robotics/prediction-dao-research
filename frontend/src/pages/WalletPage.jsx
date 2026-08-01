@@ -18,6 +18,7 @@ import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
 import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
+import CatalogPanel from '../components/miniapps/CatalogPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
@@ -34,7 +35,7 @@ import NetworkPanel from '../components/account/NetworkPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
-import { groupForTab } from '../config/appNav'
+import { groupForTab, isNavItemEnabledForTenant } from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
@@ -62,12 +63,26 @@ const WALLET_TABS = [
   { id: 'custody', label: 'Protect' },
   { id: 'addressbook', label: 'Address Book' },
   { id: 'reports', label: 'Reporting' },
+  // Apps (spec 073) — the mini-app catalog, and the only Apps nav item. ClearPath and Token
+  // Mint stay listed below because their tabs still RENDER: they left the menu, not the app.
+  { id: 'apps', label: 'Apps' },
   { id: 'clearpath', label: 'ClearPath' },
   { id: 'tokens', label: 'Token Mint' },
 ]
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
 // old standalone Backup tab is now part of the combined "Recovery" panel).
+//
+// Spec 073 (FR-009) — what this map deliberately does NOT contain yet. The Apps nav group
+// collapsed to the single mini-app catalog entry, so ClearPath and Token Mint no longer appear
+// in the menu; their `?tab=clearpath` / `?tab=tokens` deep links keep rendering the host-native
+// panels below, unchanged. They become aliases to the mini-app routes — `tokens` →
+// `/apps/token-mint` (T027) and `clearpath` → `/apps/clearpath` (T029) — only in the conversion
+// tasks that actually publish those packages, and not before: an alias pointing at a mini-app
+// nobody has registered turns a working deep link into a dead end, and the catalog would be
+// claiming a verified package that does not exist. `/wagers` is untouched for the same reason
+// (its conversion is T033, explicitly last — R11). This map must stay in parity with the copy in
+// components/nav/AppNavDrawer.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
@@ -98,6 +113,17 @@ function WalletPage() {
   // Predict (spec 057): tab exists only on Polygon (capability) AND with a gateway proxy configured —
   // everywhere else it hides and deep links fall back (FR-018).
   const predictEnabled = Boolean(capabilities?.predict) && predictGatewayUrl() !== ''
+  // Apps (spec 073 FR-009): the mini-app catalog is a tenant feature ('miniapps'), not a chain
+  // capability — a tenant that has not enabled it has no Apps nav item, so the `?tab=apps` deep
+  // link must not render a section that tenant does not have. Gated the same way as the two
+  // chain-gated tabs above, and for the same reason: a tab reachable by URL but absent from every
+  // menu is exactly how a "dead tab" gets shipped.
+  //
+  // Only the NEW tab is gated. The `?tab=clearpath` / `?tab=tokens` branches further down are
+  // knowingly left un-tenant-filtered, as they are today — tightening them here would change
+  // behavior for existing tenants that no task asked to change, and their conversions (T027/T029)
+  // remove those branches outright.
+  const miniAppsEnabled = isNavItemEnabledForTenant('apps')
   const {
     isStandalone: pwaStandalone,
     canPrompt: pwaCanPrompt,
@@ -117,6 +143,7 @@ function WalletPage() {
     const resolved = TAB_ALIASES[requested] || requested
     if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
     if (resolved === 'predict' && !predictEnabled) return 'account'
+    if (resolved === 'apps' && !miniAppsEnabled) return 'account'
     return WALLET_TABS.some((t) => t.id === resolved) ? resolved : 'account'
   })
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -206,9 +233,11 @@ function WalletPage() {
     const resolved = TAB_ALIASES[requested] || requested
     const known = WALLET_TABS.some((t) => t.id === resolved)
     const available =
-      (resolved !== 'collectibles' || collectiblesEnabled) && (resolved !== 'predict' || predictEnabled)
+      (resolved !== 'collectibles' || collectiblesEnabled) &&
+      (resolved !== 'predict' || predictEnabled) &&
+      (resolved !== 'apps' || miniAppsEnabled)
     setActiveTab(known && available ? resolved : 'account')
-  }, [searchParams, collectiblesEnabled, predictEnabled])
+  }, [searchParams, collectiblesEnabled, predictEnabled, miniAppsEnabled])
 
   const handleCheckForUpdate = useCallback(async () => {
     setPwaChecking(true)
@@ -605,6 +634,19 @@ function WalletPage() {
                   </div>
                 )}
 
+                {/* Apps (spec 073 US1) — the mini-app catalog. The panel does its own registry
+                    read and is honest about every way that read can fail; this branch only
+                    decides that the section exists for this tenant. */}
+                {activeTab === 'apps' && miniAppsEnabled && (
+                  <div className="apps-section" role="tabpanel">
+                    <CatalogPanel />
+                  </div>
+                )}
+
+                {/* ClearPath and Token Mint left the Apps MENU in spec 073, not the app: these two
+                    branches keep every saved `?tab=clearpath` / `?tab=tokens` link resolving to the
+                    same host-native panel it resolved to before. They are removed only when their
+                    packages are published and the tabs become aliases (T027 / T029). */}
                 {activeTab === 'tokens' && (
                   <div className="tokens-section" role="tabpanel">
                     <TokensPanel />

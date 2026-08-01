@@ -17,6 +17,7 @@ import {
   useMiniAppHost,
   MiniAppHostError,
   HOST_REFUSAL,
+  STATE_AUDIT_WINDOW_MS,
 } from '../../lib/miniapps/hostContext'
 import { appStoreStorageKey, __resetMiniAppStores } from '../../lib/miniapps/store'
 
@@ -39,6 +40,7 @@ const state = vi.hoisted(() => ({
   getReadProvider: null,
   captureTx: null,
   captureLog: null,
+  captureState: null,
 }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }))
@@ -52,6 +54,7 @@ vi.mock('../../utils/rpcProvider', () => ({ getReadProvider: (chainId) => state.
 vi.mock('../../data/ledger/sources/miniAppSource', () => ({
   captureMiniAppTxSubmitted: (...args) => state.captureTx(...args),
   captureMiniAppLog: (...args) => state.captureLog(...args),
+  captureMiniAppStateChange: (...args) => state.captureState(...args),
 }))
 
 /** A stand-in for the host's cached ethers provider, self-reference included. */
@@ -102,6 +105,7 @@ beforeEach(() => {
   state.getReadProvider = vi.fn(() => state.provider)
   state.captureTx = vi.fn(() => 'entry-tx')
   state.captureLog = vi.fn(() => 'entry-log')
+  state.captureState = vi.fn(() => 'entry-state')
 })
 
 describe('the exposed surface (FR-013)', () => {
@@ -387,6 +391,138 @@ describe('store namespacing (FR-018)', () => {
     const second = mountHost('other-app')
     expect(second.ref.current.store.get('layout')).toBeNull()
     expect(localStorage.getItem(appStoreStorageKey(ACCOUNT, 'other-app'))).toBeNull()
+  })
+})
+
+describe('automatic state-change audit (FR-019)', () => {
+  // These entries land in the member's DURABLE, backed-up ledger, so the two
+  // things worth pinning are what gets recorded (a key, never a value) and how
+  // OFTEN (coarse enough that an app saving on every keystroke cannot flood it).
+  const SECRET = 'a-members-private-note-that-must-never-be-audited'
+
+  it('records a value-free entry the first time a key really changes', () => {
+    const { ref } = mountHost()
+    expect(ref.current.store.set('notes', { body: SECRET })).toBe(true)
+
+    expect(state.captureState).toHaveBeenCalledTimes(1)
+    expect(state.captureState).toHaveBeenCalledWith(
+      ACCOUNT,
+      CHAIN,
+      expect.objectContaining({ appId: APP_ID, storeKey: 'notes' }),
+    )
+    // Not "no value field" — no value ANYWHERE in the arguments. The audit is
+    // attribution; the app's data stays the app's data.
+    expect(JSON.stringify(state.captureState.mock.calls)).not.toContain(SECRET)
+    expect(Object.keys(state.captureState.mock.calls[0][2]).sort()).toEqual(['appId', 'at', 'storeKey'])
+  })
+
+  it('records nothing for a write that changed nothing', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { ref } = mountHost()
+    ref.current.store.set('notes', { body: 'first' })
+    state.captureState.mockClear()
+
+    // Same value again, an unaddressable key, and a value that cannot be stored:
+    // the store reports each as `false`, and a change that did not happen must
+    // not appear in a compliance trail.
+    expect(ref.current.store.set('notes', { body: 'first' })).toBe(false)
+    expect(ref.current.store.set('not a key!', 1)).toBe(false)
+    expect(ref.current.store.set('fn', () => {})).toBe(false)
+    expect(state.captureState).not.toHaveBeenCalled()
+  })
+
+  it('coalesces a burst on one key into a single entry, per key', () => {
+    const { ref } = mountHost()
+    // A form autosaving as the member types — the ordinary case that would
+    // otherwise mint an entry per keystroke, forever, in the member's backup.
+    for (let i = 0; i < 25; i += 1) ref.current.store.set('draft', { text: `${SECRET}-${i}` })
+    expect(state.captureState).toHaveBeenCalledTimes(1)
+
+    // A different key is a different fact and is recorded on its own.
+    ref.current.store.set('layout', { pinned: true })
+    expect(state.captureState).toHaveBeenCalledTimes(2)
+    expect(state.captureState.mock.calls.map((call) => call[2].storeKey)).toEqual(['draft', 'layout'])
+    expect(JSON.stringify(state.captureState.mock.calls)).not.toContain(SECRET)
+  })
+
+  it('records again once the coalescing window has passed', () => {
+    const start = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start)
+    const { ref } = mountHost()
+
+    ref.current.store.set('draft', { text: 'one' })
+    clock.mockReturnValue(start + STATE_AUDIT_WINDOW_MS - 1)
+    ref.current.store.set('draft', { text: 'two' })
+    expect(state.captureState).toHaveBeenCalledTimes(1)
+
+    // Past the window: a genuinely separate edit is a genuinely separate entry.
+    clock.mockReturnValue(start + STATE_AUDIT_WINDOW_MS)
+    ref.current.store.set('draft', { text: 'three' })
+    expect(state.captureState).toHaveBeenCalledTimes(2)
+    expect(state.captureState.mock.calls[1][2].at).toBe(start + STATE_AUDIT_WINDOW_MS)
+  })
+
+  it('records the first change under a new identity, whatever the old window said', () => {
+    const { ref, view } = mountHost()
+    ref.current.store.set('draft', { text: 'as the personal wallet' })
+    expect(state.captureState).toHaveBeenCalledTimes(1)
+
+    // Acting as a vault now: a different account, a different namespace, and a
+    // window that has never seen this key.
+    state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: CHAIN }
+    view.rerender(
+      <MiniAppHostProvider appId={APP_ID}>
+        <ProbeAgain hostRef={ref} />
+      </MiniAppHostProvider>,
+    )
+    ref.current.store.set('draft', { text: 'as the vault' })
+
+    expect(state.captureState).toHaveBeenCalledTimes(2)
+    expect(state.captureState.mock.calls[1][0]).toBe(VAULT)
+  })
+
+  it('records nothing when there is no account or network to attribute it to', () => {
+    state.wallet = { chainId: null, isConnected: false, openConnectModal: vi.fn() }
+    state.effective = { address: null, connectedAddress: null, chainId: null }
+    const { ref } = mountHost()
+
+    // The store still works — an app must run with no wallet connected (FR-016,
+    // session-only) — there is simply nothing truthful to attribute.
+    expect(ref.current.store.set('draft', { text: 'kept for the session' })).toBe(true)
+    expect(ref.current.store.get('draft')).toEqual({ text: 'kept for the session' })
+    expect(state.captureState).not.toHaveBeenCalled()
+  })
+
+  it('never lets an audit failure break the write it was recording', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    state.captureState = vi.fn(() => {
+      throw new Error('ledger unavailable')
+    })
+    const { ref } = mountHost()
+
+    expect(() => ref.current.store.set('draft', { text: 'still saved' })).not.toThrow()
+    expect(ref.current.store.get('draft')).toEqual({ text: 'still saved' })
+  })
+
+  it('passes reads and subscriptions through untouched, and never audits a read', () => {
+    // The audit wrapper must be invisible in every direction except the trail it
+    // writes: an app that had to work around it would go looking for the raw
+    // store, and a read is not an auditable event to begin with.
+    const { ref } = mountHost()
+    const seen = vi.fn()
+    const unsubscribe = ref.current.store.subscribe(seen)
+
+    ref.current.store.set('draft', { text: 'one' })
+    expect(seen).toHaveBeenCalledTimes(1)
+    state.captureState.mockClear()
+
+    expect(ref.current.store.get('draft')).toEqual({ text: 'one' })
+    expect(ref.current.store.get('missing', 'fallback')).toBe('fallback')
+    expect(state.captureState).not.toHaveBeenCalled()
+
+    unsubscribe()
+    ref.current.store.set('draft', { text: 'two' })
+    expect(seen).toHaveBeenCalledTimes(1)
   })
 })
 

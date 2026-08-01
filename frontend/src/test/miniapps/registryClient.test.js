@@ -64,9 +64,12 @@ import {
   REGISTRY_STATUS,
   UNREACHABLE_REASON,
   appIdsByVendor,
+  appNamespaceKey,
+  appSlug,
   clearCatalogCache,
   fetchApp,
   fetchAppByName,
+  fetchAppBySlug,
   fetchCatalog,
   fetchVendorApps,
   miniAppRegistryAddress,
@@ -480,6 +483,195 @@ describe('fetchAppByName', () => {
     }
     const result = await fetchAppByName('Token Mint')
     expect(result.status).toBe(REGISTRY_STATUS.UNREACHABLE)
+  })
+})
+
+/**
+ * App identity. These two functions are what makes the loader's `manifest.id`
+ * check mean anything: a registry record carries no slug, so until the host can
+ * NAME the app it is launching there is nothing for the package's self-declared
+ * id to be checked against. The slug is derived from the one identifier the
+ * chain guarantees unique (the name), and the STORE/AUDIT identity is derived
+ * from something a vendor cannot edit at all (the numeric id + chain).
+ */
+describe('appSlug', () => {
+  it('folds exactly the way the contract’s _nameKey does', () => {
+    // Case, collapsed internal runs, and trimmed ends are ONE listing on-chain,
+    // so they must be one slug here. A client that folded differently would
+    // route a member to a different vendor's app than the one they clicked.
+    expect(appSlug('Token Mint')).toBe('token-mint')
+    expect(appSlug('token  mint')).toBe('token-mint')
+    expect(appSlug('   TOKEN   MINT   ')).toBe('token-mint')
+  })
+
+  it('refuses a name that already contains a hyphen, to keep slugs unambiguous', () => {
+    // The contract treats "Token Mint" and "Token-Mint" as two DIFFERENT listings, but the slug
+    // encoding (space -> hyphen) renders both as "token-mint". Emitting that slug would make one
+    // URL mean two vendors' packages. Proven against a live registry in slugFolding.test.js.
+    expect(appSlug('Token-Mint')).toBeNull()
+    expect(appSlug('Token - Mint')).toBeNull()
+    // The spaced spelling still slugs normally — it is the one that owns the URL.
+    expect(appSlug('Token Mint')).toBe('token-mint')
+  })
+
+  it('accepts digits and multi-word names', () => {
+    expect(appSlug('Recon 2')).toBe('recon-2')
+    expect(appSlug('Treasury Ops Console')).toBe('treasury-ops-console')
+  })
+
+  it('refuses a name it cannot slug rather than sanitizing one out of it', () => {
+    // Stripping characters would map two DISTINCT on-chain listings onto one
+    // slug — and therefore one URL, one store namespace and one audit trail.
+    expect(appSlug('Token Mint!')).toBeNull()
+    expect(appSlug('Café Mint')).toBeNull()
+    expect(appSlug('2Fast')).toBeNull() // an app id must start with a letter
+    expect(appSlug('A')).toBeNull() // shorter than an app id may be
+    expect(appSlug('x'.repeat(32))).toBeNull() // longer than an app id may be
+  })
+
+  it('refuses a name whose slug could not be resolved back to it', () => {
+    // "Token - Mint" folds to `token - mint` and would render as `token---mint`,
+    // which no candidate name folds back to. A slug that produces a dead link is
+    // worse than no slug at all.
+    expect(appSlug('Token - Mint')).toBeNull()
+  })
+
+  it('refuses an empty, blank or non-string name', () => {
+    expect(appSlug('')).toBeNull()
+    expect(appSlug('    ')).toBeNull()
+    expect(appSlug(null)).toBeNull()
+    expect(appSlug(42)).toBeNull()
+  })
+})
+
+describe('appNamespaceKey', () => {
+  it('keys on the immutable registry id and the registry chain, never the name', () => {
+    expect(appNamespaceKey(137, 12)).toBe('app-137-12')
+  })
+
+  it('separates the same registry id on two different chains', () => {
+    // Ids restart at 1 on every deployment, so a chain-blind key would let a
+    // Mordor listing read and overwrite a Polygon listing's saved state — and
+    // the backup this store rides on is deliberately not network-scoped.
+    expect(appNamespaceKey(137, 1)).not.toBe(appNamespaceKey(63, 1))
+  })
+
+  it('produces a key the app store will accept', () => {
+    // `createAppStore` refuses any id it cannot guarantee isolation for, so a
+    // key it would reject must never reach it — it would crash the workspace
+    // instead of refusing honestly.
+    expect(appNamespaceKey(11155111, 9999)).toMatch(/^[a-z][a-z0-9-]{1,30}$/)
+  })
+
+  it('has no key for a caller with no record', () => {
+    expect(appNamespaceKey(137, 0)).toBeNull()
+    expect(appNamespaceKey(0, 1)).toBeNull()
+    expect(appNamespaceKey(137, -1)).toBeNull()
+    expect(appNamespaceKey(137, 1.5)).toBeNull()
+    expect(appNamespaceKey(undefined, undefined)).toBeNull()
+  })
+})
+
+describe('fetchAppBySlug', () => {
+  /** Script `idByName` over a name -> id table, answering 0 (unclaimed) otherwise. */
+  function serveNames(table) {
+    m.fns.idByName = async (name) => BigInt(table[name] ?? 0)
+  }
+
+  it('resolves the slug through the registry’s own name index', async () => {
+    serveNames({ 'token mint': 3 })
+    m.fns.getApp = async (id) => appView({ id: Number(id), name: 'Token Mint' })
+
+    const result = await fetchAppBySlug('token-mint')
+
+    expect(result.status).toBe(REGISTRY_STATUS.OK)
+    expect(result.app.id).toBe(3)
+    expect(result.slug).toBe('token-mint')
+    // The space form is tried first: a registry name is a DISPLAY name.
+    expect(m.calls.find((c) => c.method === 'idByName').args[0]).toBe('token mint')
+  })
+
+  it('probes exactly one name — a slug has one meaning', async () => {
+    // A hyphen in a slug is always an encoded space (appSlug refuses names that contain one), so
+    // there is nothing else it could mean. Probing a second spelling would resurrect the ambiguity.
+    serveNames({ 'token-mint': 8 })
+    m.fns.getApp = async (id) => appView({ id: Number(id), name: 'Token-Mint' })
+
+    const result = await fetchAppBySlug('token-mint')
+
+    expect(result.status).toBe(REGISTRY_STATUS.NOT_FOUND)
+    expect(m.calls.filter((c) => c.method === 'idByName').map((c) => c.args[0])).toEqual([
+      'token mint',
+    ])
+  })
+
+  it('normalizes the casing a link may carry before asking the chain', async () => {
+    serveNames({ 'token mint': 3 })
+    m.fns.getApp = async (id) => appView({ id: Number(id), name: 'Token Mint' })
+
+    const result = await fetchAppBySlug('Token-Mint')
+
+    expect(result.status).toBe(REGISTRY_STATUS.OK)
+    expect(result.slug).toBe('token-mint')
+  })
+
+  it('is a LAUNCH read — it never serves the browsing memo', async () => {
+    // The window this closes is the one a curator uses: suspending a compromised
+    // app between a member opening the catalog and clicking Launch.
+    serveCatalog([appView({ id: 3, name: 'Token Mint', status: AppStatus.APPROVED })])
+    await fetchCatalog()
+
+    serveNames({ 'token mint': 3 })
+    m.fns.getApp = async (id) =>
+      appView({ id: Number(id), name: 'Token Mint', status: AppStatus.SUSPENDED })
+
+    const result = await fetchAppBySlug('token-mint')
+
+    expect(result.status).toBe(REGISTRY_STATUS.OK)
+    expect(result.app.status).toBe(AppStatus.SUSPENDED)
+    expect(result.app.launchable).toBe(false)
+  })
+
+  it('refuses a malformed slug without asking the chain anything', async () => {
+    // A route parameter is untrusted input, not a caller bug: it 404s.
+    for (const slug of ['', 'not a slug', '../../etc', '2fast', null]) {
+      const result = await fetchAppBySlug(slug)
+      expect(result.status).toBe(REGISTRY_STATUS.NOT_FOUND)
+    }
+    expect(m.calls.some((c) => c.method === 'idByName')).toBe(false)
+  })
+
+  it('is not-found when neither spelling is claimed', async () => {
+    serveNames({})
+    const result = await fetchAppBySlug('token-mint')
+    expect(result.status).toBe(REGISTRY_STATUS.NOT_FOUND)
+    expect(result.slug).toBe('token-mint')
+  })
+
+  it('declines a record that does not answer to the slug that asked for it', async () => {
+    // This client and the contract normalize independently. If they ever
+    // disagreed, "no such app" is the honest answer — never "here is a different
+    // app than the URL named".
+    serveNames({ 'token mint': 3 })
+    m.fns.getApp = async (id) => appView({ id: Number(id), name: 'Something Else' })
+
+    const result = await fetchAppBySlug('token-mint')
+
+    expect(result.status).toBe(REGISTRY_STATUS.NOT_FOUND)
+  })
+
+  it('is unreachable, not free, when the name lookup fails', async () => {
+    m.fns.idByName = async () => {
+      throw new Error('rpc down')
+    }
+    const result = await fetchAppBySlug('token-mint')
+    expect(result.status).toBe(REGISTRY_STATUS.UNREACHABLE)
+  })
+
+  it('is not-deployed when this build has no registry', async () => {
+    m.address = ''
+    const result = await fetchAppBySlug('token-mint')
+    expect(result.status).toBe(REGISTRY_STATUS.NOT_DEPLOYED)
   })
 })
 

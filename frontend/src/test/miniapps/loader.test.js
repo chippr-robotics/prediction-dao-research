@@ -30,6 +30,7 @@ import {
   GatewayUnavailableError,
   HostApiError,
   IntegrityError,
+  LoadCancelledError,
   MANIFEST_FILENAME,
   ManifestError,
   loadMiniApp,
@@ -501,17 +502,81 @@ describe('gateway failover (FR-012)', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('stops on caller cancellation instead of burning through the fallbacks', async () => {
+})
+
+describe('cancellation is not an availability failure', () => {
+  // A cancelled load is the one outcome on this path that is not a problem: the
+  // member navigated away, or the workspace unmounted. Reporting it as
+  // "every configured gateway is unreachable — check your network" is a lie
+  // about the member's connection, told to a surface that no longer exists.
+  it('reports a signal aborted before the launch as cancelled, without touching a gateway', async () => {
     const pkg = buildPackage()
     const fetchImpl = makeFetch({ [G1]: pkg.files, [G2]: pkg.files })
     const controller = new AbortController()
     controller.abort()
 
+    const error = await expectRefusal(
+      loadMiniApp(approvedRecord(pkg), { gateways: GATEWAYS, fetchImpl, signal: controller.signal, ...harness }),
+      { name: 'LoadCancelledError', reason: 'cancelled', harness }
+    )
+    expect(error).toBeInstanceOf(LoadCancelledError)
+    expect(error.cancelled).toBe(true)
+    expect(error.userMessage).not.toMatch(/unreachable|network|vpn/i)
+    // Nothing was asked of a gateway on behalf of a caller that had already gone.
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('reports a mid-flight abort as cancelled, and stops instead of burning the fallbacks', async () => {
+    const pkg = buildPackage()
+    const controller = new AbortController()
+    // Healthy gateways throughout: the ONLY thing that goes wrong is the abort,
+    // so an availability error here would be blaming the wrong party outright.
+    const fetchImpl = vi.fn(async (url, init) => {
+      controller.abort()
+      return makeFetch({ [G1]: pkg.files, [G2]: pkg.files })(url, init)
+    })
+
+    const error = await expectRefusal(
+      loadMiniApp(approvedRecord(pkg), { gateways: GATEWAYS, fetchImpl, signal: controller.signal, ...harness }),
+      { name: 'LoadCancelledError', reason: 'cancelled', harness }
+    )
+    expect(error.path).toBe(MANIFEST_FILENAME)
+    expect(error.attempts.map((a) => a.reason)).toEqual(['cancelled'])
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT execute a verified package once the caller has gone', async () => {
+    // Everything verified; the member left while it was verifying. Importing now
+    // would evaluate third-party code into a workspace that no longer exists.
+    const pkg = buildPackage()
+    const controller = new AbortController()
+    const fetchImpl = vi.fn(async (url, init) => {
+      const response = await makeFetch({ [G1]: pkg.files })(url, init)
+      if (url.endsWith('style.css')) controller.abort()
+      return response
+    })
+
     await expectRefusal(
       loadMiniApp(approvedRecord(pkg), { gateways: GATEWAYS, fetchImpl, signal: controller.signal, ...harness }),
-      { name: 'GatewayUnavailableError', harness }
+      { name: 'LoadCancelledError', reason: 'cancelled', harness }
     )
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('still reports a genuine timeout as an availability problem', async () => {
+    // The distinction has to cut both ways: a gateway that hangs produces the
+    // same AbortError as a caller cancel, and it IS an availability failure.
+    const pkg = buildPackage()
+    const fetchImpl = vi.fn(async () => {
+      const aborted = new Error('timed out')
+      aborted.name = 'AbortError'
+      throw aborted
+    })
+
+    const error = await expectRefusal(
+      loadMiniApp(approvedRecord(pkg), { gateways: GATEWAYS, fetchImpl, timeoutMs: 5, ...harness }),
+      { name: 'GatewayUnavailableError', reason: 'all_gateways_failed', harness }
+    )
+    expect(error.attempts.map((a) => a.reason)).toEqual(['timeout', 'timeout'])
   })
 })
 

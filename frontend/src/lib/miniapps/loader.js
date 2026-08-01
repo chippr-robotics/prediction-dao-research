@@ -32,6 +32,10 @@
  * - **Unverifiable ⇒ never fetched.** Only paths listed in the verified
  *   manifest are requested, so there is no code path that downloads bytes it
  *   has no digest for.
+ * - **Cancelled ⇒ say cancelled.** A caller that aborts (the member navigated
+ *   away, the workspace unmounted) has not encountered a problem, so it gets
+ *   {@link LoadCancelledError} rather than an availability error blaming a
+ *   network that was never at fault.
  *
  * The loader never reads the registry itself (`registryClient.js` owns that);
  * it is handed the record so the caller keeps the FR-010 status re-check where
@@ -130,6 +134,47 @@ export class GatewayUnavailableError extends Error {
         : 'The app package could not be downloaded — every configured gateway is unreachable. ' +
           'Check your network or VPN connection and try again.'
   }
+}
+
+/**
+ * The caller abandoned the load — the workspace unmounted, the member navigated
+ * away, a newer launch superseded this one.
+ *
+ * Its own class because it is the one failure on this path that is NOT a
+ * failure. Reporting it as {@link GatewayUnavailableError} ("every configured
+ * gateway is unreachable — check your network") would be a lie about the
+ * member's network, sent by the host to a workspace that no longer exists, and
+ * would train whoever reads the logs to distrust a message that means something
+ * real the rest of the time.
+ *
+ * `userMessage` exists for interface symmetry with the other refusals, but a
+ * caller that cancelled deliberately should show NOTHING: the sentence is for
+ * the rare case where a cancellation surfaces somewhere a member can see it.
+ */
+export class LoadCancelledError extends Error {
+  /**
+   * @param {string} path - the package file in flight when the abort landed, or null before any fetch
+   * @param {Array<{gateway: string, reason: string, status: number|null}>} [attempts]
+   */
+  constructor(path, attempts = []) {
+    super(`miniapp loader: the launch was cancelled${path ? ` while fetching "${path}"` : ' before it started'}`)
+    this.name = 'LoadCancelledError'
+    this.reason = 'cancelled'
+    this.cancelled = true
+    this.path = path
+    this.attempts = attempts
+    this.userMessage = 'Loading this app was cancelled before it finished.'
+  }
+}
+
+/**
+ * Refuse to keep working for a caller that has gone away. Called where the cost
+ * of continuing is highest: before the first fetch, and immediately before the
+ * verified bytes are made executable — a workspace that unmounted must not have
+ * a package evaluate into it after the fact.
+ */
+function throwIfCancelled(signal, path = null) {
+  if (signal?.aborted) throw new LoadCancelledError(path)
 }
 
 /**
@@ -262,8 +307,9 @@ async function fetchPackageFile(gateways, cid, path, options) {
     if (result.ok) return { bytes: result.bytes, gateway }
     attempts.push({ gateway, reason: result.reason, status: result.status })
     // A caller-cancelled load (unmount, navigation) is not an availability
-    // problem and must not burn through the remaining gateways.
-    if (result.reason === 'cancelled') break
+    // problem: it must not burn through the remaining gateways, and it must not
+    // be reported as one — every gateway here may have been perfectly healthy.
+    if (result.reason === 'cancelled') throw new LoadCancelledError(path, attempts)
   }
   throw new GatewayUnavailableError(path, attempts)
 }
@@ -284,16 +330,30 @@ const defaultRevokeObjectURL = (url) => URL.revokeObjectURL(url)
  * could select it.
  */
 function approvedPackageRef(record) {
-  // An ABSENT status is refused exactly like a wrong one. A backstop that stops
-  // existing when a field is missing is not a backstop: a caller that handed
-  // over a partially-built record (or one assembled by hand) would otherwise get
-  // a launch with no lifecycle check at all, which is the single thing this
-  // function exists to make impossible. `registryClient.normalizeApp` always
-  // sets `status`, so nothing on the real launch path is affected.
-  if (Number(record?.status) !== AppStatus.APPROVED) {
+  // THE SERVING DECISION IS `launchable`, NOT `status`. `status` is the REVIEW
+  // state; `launchable` is the registry's own answer to "may a host run this?"
+  // (`MiniAppRegistry.isLaunchable`, carried in every `AppView`). The two differ
+  // in exactly the case FR-003/FR-010 are about: a Pending record IS launchable
+  // once a package has been approved before — that is a LIVE app with an update
+  // in review, still serving its last reviewed bytes. Refusing it because the
+  // status reads Pending would hand every vendor an offline switch for their own
+  // live app, just by submitting something.
+  //
+  // `status` remains the fallback for a record assembled WITHOUT the chain's
+  // decision — a hand-built record, or one that did not come through
+  // `registryClient.normalizeApp` (which always sets `launchable`). An ABSENT
+  // decision is refused exactly like a negative one: a backstop that stops
+  // existing when a field is missing is not a backstop, and a partially-built
+  // record must not get a launch with no lifecycle check at all, which is the
+  // single thing this function exists to make impossible.
+  const launchable = record?.launchable
+  const servable =
+    typeof launchable === 'boolean' ? launchable : Number(record?.status) === AppStatus.APPROVED
+  if (!servable) {
     throw new AppNotLaunchableError(
       'not_approved',
-      `miniapp loader: refusing to launch app with status ${String(record?.status)} (only Approved launches)`
+      `miniapp loader: refusing to launch a record the registry does not report as launchable ` +
+        `(launchable=${String(launchable)}, status=${String(record?.status)})`
     )
   }
 
@@ -325,8 +385,9 @@ function approvedPackageRef(record) {
  * Fetch, verify and import a mini-app package.
  *
  * @param {object} record - a registry record from `registryClient.js`; only
- *   `status` and `approved` are read (plus `appId`, when the caller has not
- *   named the app itself). `status` MUST be Approved — an absent one refuses.
+ *   `launchable`/`status` and `approved` are read (plus `appId`, when the caller
+ *   has not named the app itself). The record MUST present a positive serving
+ *   decision — an absent one refuses.
  * @param {object} [options]
  * @param {string[]} [options.gateways] - ordered gateway bases; defaults to {@link resolveMiniAppGateways}
  * @param {Function} [options.fetchImpl] - injectable `fetch` (tests, instrumentation)
@@ -334,12 +395,17 @@ function approvedPackageRef(record) {
  * @param {Function} [options.createObjectURL] - injectable `URL.createObjectURL`
  * @param {Function} [options.revokeObjectURL] - injectable `URL.revokeObjectURL`
  * @param {number} [options.timeoutMs] - per-attempt timeout
- * @param {AbortSignal} [options.signal] - cancels an in-flight launch (unmount/navigation)
- * @param {string} [options.expectedAppId] - the slug the host is launching; defaults to `record.appId`
+ * @param {AbortSignal} [options.signal] - cancels an in-flight launch (unmount/navigation);
+ *   an abort raises {@link LoadCancelledError}, never an availability error
+ * @param {string} [options.expectedAppId] - the slug the host is launching; defaults to `record.appId`.
+ *   Registry records carry no slug of their own, so the launch path derives one
+ *   from the record's unique on-chain name (`registryClient.appSlug`) and names
+ *   it here — without that, the manifest-id check below has nothing to compare
+ *   against and does nothing.
  * @param {number} [options.supportedHostApi] - override for tests
  * @returns {Promise<{manifest: object, module: object, component: unknown,
  *   styles: Array<{path: string, css: string}>, gateway: string, cid: string, manifestHash: string}>}
- * @throws {AppNotLaunchableError|GatewayUnavailableError|IntegrityError|ManifestError|HostApiError}
+ * @throws {AppNotLaunchableError|GatewayUnavailableError|LoadCancelledError|IntegrityError|ManifestError|HostApiError}
  */
 export async function loadMiniApp(record, options = {}) {
   const {
@@ -355,6 +421,10 @@ export async function loadMiniApp(record, options = {}) {
   } = options
 
   const { cid, manifestHash } = approvedPackageRef(record)
+
+  // An already-aborted signal is a cancelled load, not a gateway problem — and
+  // there is no reason to open a connection on behalf of a caller that is gone.
+  throwIfCancelled(signal)
 
   const gateways = normalizeGateways(gatewayOption ?? resolveMiniAppGateways())
   if (gateways.length === 0) throw new GatewayUnavailableError(MANIFEST_FILENAME, [])
@@ -421,7 +491,9 @@ export async function loadMiniApp(record, options = {}) {
 
   // (5) EVERY check has passed. This is the first moment any package byte
   // becomes executable, and the Blob URL exists only for the duration of the
-  // import (research R1).
+  // import (research R1). Last look at the signal first: a workspace that
+  // unmounted mid-load must not have a package evaluate into it afterwards.
+  throwIfCancelled(signal, manifest.entry)
   const objectUrl = createObjectURL(new Blob([entryBytes], { type: 'text/javascript' }))
   let module
   try {

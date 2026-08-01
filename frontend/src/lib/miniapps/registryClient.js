@@ -38,6 +38,7 @@ import { AppStatus, MINI_APP_REGISTRY_ABI } from '../../abis/miniAppRegistry'
 import { getContractAddressForChain } from '../../config/contracts'
 import { miniAppChainId } from '../../config/networks'
 import { getReadProvider } from '../../utils/rpcProvider'
+import { APP_ID_PATTERN } from './manifest'
 
 /** Discriminants every function in this module returns. Never a bare value, never a bare array. */
 export const REGISTRY_STATUS = Object.freeze({
@@ -425,6 +426,243 @@ export async function fetchAppByName(name) {
   }
   if (!Number.isInteger(id) || id <= 0) return { status: REGISTRY_STATUS.NOT_FOUND, name, chainId, registryAddress }
   return fetchApp(id)
+}
+
+// =============================================================================
+// App identity: slug (the URL + manifest binding) and namespace key (storage +
+// audit attribution). Two DIFFERENT identities on purpose — see below.
+// =============================================================================
+
+/**
+ * The registry's own name normalization, mirrored exactly
+ * (`MiniAppRegistry._nameKey`): ASCII `A`-`Z` folded to lower case, runs of
+ * `0x20` spaces collapsed to one, leading/trailing spaces dropped.
+ *
+ * This function is a TWIN of Solidity, not an approximation, and the two must
+ * change together. If this folded more than the contract does, two names the
+ * chain treats as distinct listings would collapse to one slug here and a member
+ * clicking a link could reach the wrong vendor's app. If it folded less, a
+ * legitimate listing would simply be unreachable by URL. So: no `toLowerCase()`
+ * (it case-folds Unicode, which the contract deliberately does not), no `trim()`
+ * (it strips tabs and newlines, which the contract rejects outright rather than
+ * ignores), and bytes >= 0x80 pass through untouched exactly as they do on-chain.
+ *
+ * That last point is what makes "twin" literally true across the UTF-8/UTF-16
+ * boundary: the contract folds BYTES, this folds code units, and the two agree
+ * because every byte of a multi-byte UTF-8 sequence is >= 0x80 — so no non-ASCII
+ * character can contain the `0x20` or `0x41`–`0x5A` bytes either side acts on.
+ *
+ * @param {unknown} name
+ * @returns {string} the folded name, or `''` for anything unusable
+ */
+function foldRegistryName(name) {
+  if (typeof name !== 'string') return ''
+  let out = ''
+  let pendingSpace = false
+  for (let i = 0; i < name.length; i += 1) {
+    const code = name.charCodeAt(i)
+    if (code === 0x20) {
+      // Never leading (nothing emitted yet), and a run yields at most one space.
+      if (out.length > 0) pendingSpace = true
+      continue
+    }
+    if (pendingSpace) {
+      out += ' '
+      pendingSpace = false
+    }
+    // Iterating by UTF-16 code unit re-emits surrogate halves in order, so
+    // non-ASCII names survive this loop unchanged rather than being mangled.
+    out += code >= 0x41 && code <= 0x5a ? String.fromCharCode(code + 32) : name[i]
+  }
+  // A trailing run dies with `pendingSpace`, exactly as the contract discards it.
+  return out
+}
+
+/**
+ * The on-chain names a slug could have come from, in resolution order.
+ *
+ * The slug renders the folded name's spaces as hyphens, and that rendering is
+ * not injective: `"Token Mint"` and `"Token-Mint"` are two distinct listings
+ * on-chain (two different `_nameKey`s) that both render as `token-mint`. Rather
+ * than pretend otherwise, both candidates are tried — the space form first,
+ * because a registry name is a DISPLAY name and display names carry spaces.
+ *
+ * The consequence is stated plainly because it is real: when both listings
+ * exist, the space form owns the URL. That is a collision in the URL space
+ * only — it is not a collision in identity. Identity is the numeric registry id
+ * (see {@link appNamespaceKey}), the launch still verifies the package against
+ * the hash on THAT record, and the manifest-id binding still has to agree. A
+ * lookalike name that reaches a member is a curation question, which is where
+ * the contract's own comment says that judgement belongs.
+ */
+function slugNameCandidates(slug) {
+  // EXACTLY ONE candidate, on purpose. A slug's hyphens are always encoded spaces, because
+  // `appSlug` refuses any name whose folded form already contains a hyphen — that refusal is what
+  // makes the slug space injective. Also probing the literal hyphen spelling would undo it: with
+  // both `Token Mint` and `Token-Mint` registered, one URL would resolve to whichever candidate was
+  // tried first, and the loser's catalog card would launch the winner's package.
+  return [slug.replace(/-/g, ' ')]
+}
+
+/**
+ * The URL/manifest slug for a registry display name, or `null` when the name
+ * cannot produce one.
+ *
+ * WHY THIS EXISTS. `loader.js` refuses a package whose `manifest.id` is not the
+ * app being launched — but a registry record carries no id field, so until the
+ * host could NAME the app it was launching, that check had nothing to compare
+ * against and was inert. The registry `name` is the one identifier the chain
+ * already guarantees is unique (the duplicate-name guard runs on exactly the
+ * normalization mirrored above), so the slug derived from it is what binds a
+ * listing to the package bytes that claim to be it.
+ *
+ * The slug is STRICT, and deliberately so. A name is slugged, never sanitized:
+ * a name that does not fold to something matching {@link APP_ID_PATTERN} gets
+ * `null`, not a lossy best effort. Stripping characters to force a slug would
+ * map `"Token Mint!"` and `"Token Mint"` — two separate listings on-chain — onto
+ * one slug, one URL, one store namespace and one audit attribution, which is the
+ * exact confusion this binding exists to prevent. Names with no slug are
+ * therefore not launchable by URL, and the workspace says so specifically.
+ *
+ * Consequences a vendor should know about, all of them properties of
+ * {@link APP_ID_PATTERN} (which is also what a `manifest.id` must satisfy):
+ * a name must start with an ASCII letter, be 2–31 characters after folding, and
+ * contain only letters, digits and single spaces (or hyphens). `"2Fast"`, `"A"`
+ * and any non-ASCII name have no slug.
+ *
+ * @param {unknown} name - the registry record's `name`
+ * @returns {string|null} the slug, or null when the name cannot be one
+ */
+export function appSlug(name) {
+  const folded = foldRegistryName(name)
+  if (folded === '') return null
+
+  // INJECTIVE OR NOTHING. The slug encoding is "space becomes hyphen", so a folded name that
+  // ALREADY contains a hyphen would produce a slug indistinguishable from the space-spelled name:
+  // the contract treats `Token Mint` and `Token-Mint` as two DIFFERENT listings (proven against a
+  // live registry in test/miniapps/slugFolding.test.js), yet both render `token-mint`. Emitting
+  // that slug would make one launch URL mean two different vendors' packages, and whichever the
+  // resolver happened to try first would win — a member clicking one catalog card could launch the
+  // other app entirely. That is a supply-chain failure dressed as a routing bug, so a hyphen in the
+  // folded name costs the listing its URL rather than costing someone the wrong package.
+  //
+  // The cost is real and bounded: such a listing is still catalogued, but it cannot be launched by
+  // slug, and CatalogPanel says so instead of rendering a link. If hyphenated names ever become
+  // common the fix is an unambiguous reference (e.g. `/apps/<id>-<slug>`, resolving on the id and
+  // treating the slug as decoration), NOT a cleverer encoding here.
+  if (folded.includes('-')) return null
+
+  const slug = folded.replace(/ /g, '-')
+  if (!APP_ID_PATTERN.test(slug)) return null
+
+  // ROUND-TRIP OR NOTHING. A slug this client could not resolve back to this exact name is worse
+  // than no slug: it would render a working link in the catalog that lands on "no such app".
+  if (!slugNameCandidates(slug).some((candidate) => foldRegistryName(candidate) === folded)) return null
+
+  return slug
+}
+
+/**
+ * The per-app namespace key: the identity used for the mini-app's private store
+ * (FR-018) and for its audit attribution (FR-019).
+ *
+ * THIS IS NOT THE SLUG, AND THAT IS THE WHOLE POINT. A slug is derived from the
+ * registry NAME, and a name is neither immutable nor globally unique:
+ *
+ *  - a vendor can rename a listing (`updateMetadata`), and a rename must not
+ *    orphan the member's saved state or split one app's audit trail in two;
+ *  - the same name is registrable on every chain the registry is deployed to,
+ *    so a name-keyed namespace would let a Mordor listing read and overwrite the
+ *    state of the Polygon listing that happens to share its name — and the
+ *    backup this store rides on (`miniAppState`) is deliberately NOT
+ *    network-scoped, so nothing downstream would separate them either;
+ *  - a slug is what a PACKAGE claims about itself in `manifest.id`, and while
+ *    the launch binding now forces that claim to match the record, keying
+ *    storage on the immutable side of the check means a bug in the check can
+ *    never become a cross-app data leak.
+ *
+ * The numeric registry id is allocated by the contract, never reused and never
+ * editable by anyone; pairing it with the registry chain id makes it unique
+ * across every network this build can read. `app-<chainId>-<registryId>` is the
+ * result, shaped to satisfy {@link APP_ID_PATTERN} because `createAppStore`
+ * refuses any id it cannot guarantee isolation for — a leading letter is
+ * required, so the numeric key carries the `app-` prefix rather than starting
+ * with a digit.
+ *
+ * @param {number} chainId - the registry chain the record was read from
+ * @param {number} registryId - the record's on-chain `id` (allocated from 1)
+ * @returns {string|null} the namespace key, or null when either input is not a
+ *   positive integer (a caller with no record has no namespace to open)
+ */
+export function appNamespaceKey(chainId, registryId) {
+  const chain = Number(chainId)
+  const id = Number(registryId)
+  if (!Number.isInteger(chain) || chain <= 0) return null
+  if (!Number.isInteger(id) || id <= 0) return null
+  const key = `app-${chain}-${id}`
+  // Structurally unreachable for real ids (a 10-digit chain and a 10-digit id
+  // still fit), and checked anyway: handing `createAppStore` a key it refuses
+  // would surface as a crashed workspace rather than an honest refusal.
+  return APP_ID_PATTERN.test(key) ? key : null
+}
+
+/**
+ * Resolve a URL slug to its record — the launch read behind `/apps/:slug`.
+ *
+ * Goes through {@link fetchApp}, so this IS an FR-010 launch read: it never
+ * consults the catalog memo, and the record it returns is the record the caller
+ * is about to run.
+ *
+ * Two properties matter beyond the plumbing:
+ *
+ * 1. **The slug is normalized before it reaches the chain.** A member's link may
+ *    carry any casing (`/apps/Token-Mint`), and the registry's `idByName`
+ *    applies the contract's own folding — so the string handed over must already
+ *    be the shape that folding expects.
+ * 2. **The record is verified to answer to the slug that asked for it.** After
+ *    resolving, `appSlug(record.name)` must equal the requested slug. This
+ *    client and the contract normalize independently; if they ever disagreed,
+ *    the honest outcome is "no such app", never "here is a different app than
+ *    the URL named". A record that fails this check is skipped, not returned.
+ *
+ * @param {string} slug - the URL segment
+ * @returns {Promise<
+ *   {status:'ok', app: object, slug: string, fetchedAt: number, chainId: number, registryAddress: string} |
+ *   {status:'not-found', slug: *, chainId: number, registryAddress: string} |
+ *   {status:'not-deployed'} | {status:'unreachable'}
+ * >}
+ */
+export async function fetchAppBySlug(slug) {
+  const resolved = resolveRegistry()
+  if (resolved.outcome) return resolved.outcome
+  const { chainId, registryAddress, contract } = resolved
+
+  const normalized = foldRegistryName(slug)
+  // A malformed slug is untrusted input from a route parameter, exactly like a
+  // malformed id in `fetchApp`: a 404 surface, not a thrown caller bug.
+  if (!APP_ID_PATTERN.test(normalized)) {
+    return { status: REGISTRY_STATUS.NOT_FOUND, slug, chainId, registryAddress }
+  }
+
+  for (const candidate of slugNameCandidates(normalized)) {
+    let id
+    try {
+      id = Number(await contract.idByName(candidate))
+    } catch (error) {
+      // Not knowing whether a name is claimed is an outage, never a free "no".
+      return unreachable({ chainId, registryAddress, reason: UNREACHABLE_REASON.READ_FAILED, error })
+    }
+    // Ids are allocated from 1 precisely so zero can mean "unclaimed" — try the
+    // next spelling rather than reporting a definite absence we have not proven.
+    if (!Number.isInteger(id) || id <= 0) continue
+
+    const outcome = await fetchApp(id)
+    if (outcome.status !== REGISTRY_STATUS.OK) return outcome
+    if (appSlug(outcome.app.name) !== normalized) continue
+    return { ...outcome, slug: normalized }
+  }
+
+  return { status: REGISTRY_STATUS.NOT_FOUND, slug, chainId, registryAddress }
 }
 
 /**

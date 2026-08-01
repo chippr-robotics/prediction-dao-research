@@ -1,0 +1,17 @@
+{
+  "appId": "fixture-app",
+  "version": "1.0.0",
+  "approved": {
+    "cid": "bafybeifixtureminiapppackage073t014exampleaaaaaaaaaaaaaaaa",
+    "manifestHash": "0xb9733bbdcc68dd84417d9ccd6994f0470daa660fcc0bbdcdfa81d13e1f1f762e",
+    "version": 1
+  },
+  "files": {
+    "entry.js": "de36271802fc5b0d154ba74d9e62c7e8b98d11367f0dd5e65dadf77977f599a2",
+    "style.css": "fdd4da8992a4ef401b5a9cae5deea5697cf6167312cceb29770d302040f5822f"
+  },
+  "tampered": {
+    "manifestHash": "0x3f0f68f679c0b4905a606df11285725361e32c6192b17ad9bf057a64ef28bb1d",
+    "entrySha256": "15ef1504497c3c1ea59952de7a1b4c6e01ba75eb5fb987e2718e60cc46977c7c"
+  }
+}
