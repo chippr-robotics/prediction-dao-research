@@ -110,7 +110,7 @@
 
 **Independent Test**: two-app collision test; cross-namespace denial; state-change + app-contextual entries filterable in Reporting.
 
-- [ ] T040 [P] [US5] Add `miniAppState` synced object to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: false`, per-app shallow-union merge) per data-model.md §3; test in `frontend/src/test/backup/`
+- [x] T040 [P] [US5] Add `miniAppState` synced object to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: false`, per-app shallow-union merge) per data-model.md §3; test in `frontend/src/test/backup/`
 - [ ] T041 [P] [US5] Isolation hardening + tests: cross-namespace access impossible through the store interface (two-app collision scenario), host-internal stores unreachable from the `host` object — `frontend/src/test/miniapps/storeIsolation.test.js`
 - [ ] T042 [US5] Complete audit: auto `miniapp_state_changed` entries on significant store writes (debounced), `audit.log` → `miniapp_app_logged`, class label in `frontend/src/data/reports/activityClassification.js`, filterable by app/account/time in Reporting; tests extend `frontend/src/test/ledger/miniAppSource.test.js`
 

@@ -19,6 +19,11 @@ import {
   saveLegacyRecoveredKeys,
   mergeLegacyRecoveredKeys,
 } from '../recovery/legacyRecoveredKeysStore'
+import {
+  loadMiniAppState,
+  applyMiniAppState,
+  mergeMiniAppState,
+} from '../miniapps/store'
 
 const PREF_KEYS = {
   recentSearches: 'recent_searches',
@@ -150,6 +155,24 @@ export const syncedObjects = [
       return { conflicts }
     },
     merge: (current, incoming) => mergeLegacyRecoveredKeys(current, incoming),
+  },
+  {
+    // Spec 073 — per-app mini-app state, one entry for ALL apps rather than one
+    // per app: the installed set is open-ended, so a listing added next week has
+    // to ride this backup without editing this file.
+    //
+    // Not network-scoped. App data is chain-agnostic unless an app namespaces
+    // its own keys by chain, and declaring it scoped would make the restore UI
+    // offer a per-network choice the data cannot honor.
+    //
+    // Contains app state only — never a package, never key material, never
+    // anything privileged (see the module header of lib/miniapps/store.js).
+    key: 'miniAppState',
+    label: 'Mini-app data',
+    networkScoped: false,
+    load: (account) => loadMiniAppState(account),
+    apply: (account, value, mode) => applyMiniAppState(account, value, mode),
+    merge: (current, incoming) => mergeMiniAppState(current, incoming),
   },
 ]
 
