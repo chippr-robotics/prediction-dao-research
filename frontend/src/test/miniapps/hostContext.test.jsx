@@ -122,7 +122,9 @@ describe('the exposed surface (FR-013)', () => {
   it('exposes exactly the documented keys and nothing more', () => {
     const { ref } = mountHost()
     expect(Object.keys(ref.current).sort()).toEqual(
-      ['appId', 'audit', 'navigate', 'readProvider', 'store', 'toast', 'wallet'].sort(),
+      // hostApi 2 added `contracts` and `network`; both hand over inert public
+      // data and neither can move value or read the member's own data.
+      ['appId', 'audit', 'contracts', 'navigate', 'network', 'readProvider', 'store', 'toast', 'wallet'].sort(),
     )
     expect(Object.keys(ref.current.wallet).sort()).toEqual(
       ['address', 'chainId', 'connectedAddress', 'isConnected', 'requestConnect', 'submit'].sort(),
@@ -402,6 +404,140 @@ describe('wallet.submit routing and audit (FR-019)', () => {
       expect(error).toBeInstanceOf(MiniAppHostError)
       expect(error.reason).toBe(HOST_REFUSAL.NO_WRITE_RAIL)
       expect(state.active.submit).not.toHaveBeenCalled()
+    })
+  })
+
+  /*
+   * hostApi 2. Both accessors hand over inert PUBLIC data, and both exist
+   * because the alternative is worse: a package cannot bundle the host's config
+   * (it reaches `virtual:tenant`, a plugin the package preset does not
+   * register), and a hand-copied table frozen into immutable bytes would turn a
+   * routine redeploy into a re-publish/re-review/re-approve for every app.
+   */
+  describe('contracts() and network() (hostApi 2)', () => {
+    const withContracts = (names) => {
+      const ref = { current: null }
+      function Probe() { ref.current = useMiniAppHost(); return null }
+      render(
+        <MiniAppHostProvider appId={APP_ID} declaredContracts={names}>
+          <Probe />
+        </MiniAppHostProvider>,
+      )
+      return ref
+    }
+
+    it('resolves a declared name on a chain that has a deployment', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      // Polygon 137 carries the spec-073 registry.
+      expect(host.contracts('miniAppRegistry', 137)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    })
+
+    it('returns null — not "" — for a declared name with no deployment on that chain', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      // Amoy has the key seeded but empty. '' is how the address book spells
+      // absence; the contract spells it `null`, and an app must not have to
+      // know both.
+      expect(host.contracts('miniAppRegistry', 80002)).toBeNull()
+    })
+
+    it('THROWS for an undeclared name rather than answering null', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      const error = (() => { try { host.contracts('wagerRegistry', 137) } catch (e) { return e } })()
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.UNDECLARED_CONTRACT)
+      // "you are not approved for this" must never read as "not deployed here".
+      expect(host.contracts('miniAppRegistry', 80002)).toBeNull()
+    })
+
+    it('defaults to the wallet chain and never guesses another one', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      expect(host.contracts('miniAppRegistry')).toBe(host.contracts('miniAppRegistry', CHAIN))
+      expect(host.contracts('miniAppRegistry', 999999)).toBeNull()
+    })
+
+    it('declares nothing by default, so the gate fails closed', () => {
+      const { ref } = mountHost()
+      expect(() => ref.current.contracts('miniAppRegistry', 137)).toThrow(/not declared/)
+    })
+
+    it('projects a chain descriptor, never the NETWORKS entry', () => {
+      const { ref } = mountHost()
+      const net = ref.current.network(137)
+      expect(Object.keys(net).sort()).toEqual(
+        ['chainId', 'explorer', 'isTestnet', 'name', 'nativeCurrency', 'subgraphUrl'].sort(),
+      )
+      expect(net.chainId).toBe(137)
+      expect(net.isTestnet).toBe(false)
+      // The NETWORKS entry also carries rpcUrl, dex, polymarket and passkey
+      // config; handing it over would break "wrappers, never handles".
+      expect(net.rpcUrl).toBeUndefined()
+      expect(net.dex).toBeUndefined()
+      expect(net.stablecoin).toBeUndefined()
+      expect(Object.isFrozen(net)).toBe(true)
+    })
+
+    it('returns null for an unknown chain instead of falling back to the default network', () => {
+      const { ref } = mountHost()
+      // getNetwork() would answer with chain 137 here. An app must be able to
+      // say "unknown network", and must never render one chain's explorer link
+      // against another chain's data.
+      expect(ref.current.network(999999)).toBeNull()
+    })
+
+    it('reports a testnet as a testnet', () => {
+      const { ref } = mountHost()
+      expect(ref.current.network(80002).isTestnet).toBe(true)
+    })
+  })
+
+  describe('SubmitResult.wait() (hostApi 2)', () => {
+    it('resolves the receipt through the host read provider', async () => {
+      state.provider.waitForTransaction = vi.fn(async () => ({ status: 1, hash: '0xdead' }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      expect(await result.wait()).toEqual({ status: 1, hash: '0xdead' })
+      expect(state.provider.waitForTransaction).toHaveBeenCalledWith('0xdead', 1)
+    })
+
+    it('passes a confirmation count through', async () => {
+      state.provider.waitForTransaction = vi.fn(async () => ({ status: 1 }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      await result.wait(3)
+      expect(state.provider.waitForTransaction).toHaveBeenCalledWith('0xdead', 3)
+    })
+
+    it('is NON-ENUMERABLE, so the result stays a plain serialisable object', async () => {
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(Object.keys(result)).toEqual(['kind', 'txHash', 'safeTxHash'])
+      expect(JSON.parse(JSON.stringify(result))).toEqual({
+        kind: 'sent', txHash: '0xdead', safeTxHash: null,
+      })
+      expect(result).toEqual({ kind: 'sent', txHash: '0xdead', safeTxHash: null })
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    it('rejects for a vault proposal rather than waiting for a transaction that does not exist', async () => {
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: CHAIN }
+      state.active = {
+        ...state.active,
+        isVault: true,
+        canActAsVault: true,
+        submit: vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe' })),
+      }
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      await expect(result.wait()).rejects.toThrow(/no transaction to wait for/)
+    })
+
+    it('rejects when the rail reported no hash, instead of waiting on null', async () => {
+      state.active.submit = vi.fn(async () => ({ kind: 'sent', txHash: null }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      await expect(result.wait()).rejects.toThrow(/no hash to wait for/)
     })
   })
 

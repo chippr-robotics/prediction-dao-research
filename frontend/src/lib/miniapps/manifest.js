@@ -52,7 +52,7 @@ export const MANIFEST_SCHEMA = 'fairwins-miniapp-manifest/1'
  * (`specs/073-miniapp-platform/contracts/host-context.md`). Bumped only when
  * the runtime contract changes; a package declaring more than this is refused.
  */
-export const SUPPORTED_HOST_API = 1
+export const SUPPORTED_HOST_API = 2
 
 /** Capabilities the host context exposes; a manifest may declare any subset. */
 export const HOST_PERMISSIONS = Object.freeze([
@@ -61,7 +61,28 @@ export const HOST_PERMISSIONS = Object.freeze([
   'audit',
   'toast',
   'navigate',
+  // hostApi 2. Both hand over inert PUBLIC data — deployment addresses and
+  // chain descriptors — and neither can move value or read a member's data.
+  // They exist because the alternative is worse: a package cannot bundle the
+  // host's address book (`config/contracts.js` reaches `virtual:tenant`, a
+  // plugin the package preset does not register), and a hand-copied table
+  // frozen into immutable bytes turns a routine redeploy into a re-publish,
+  // re-review and re-approve for every installed app.
+  'contracts',
+  'network',
 ])
+
+/**
+ * Contract names a package may be allowed to resolve (`manifest.contracts`).
+ *
+ * Deliberately a per-package ALLOWLIST rather than open access to the address
+ * book. A reviewer approving a package reads one manifest line — "this app can
+ * resolve tokenFactory" — instead of diffing a bundled table, and an app that
+ * later tries to resolve something it never declared is refused rather than
+ * quietly served.
+ */
+export const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9]{1,63}$/
+export const MAX_DECLARED_CONTRACTS = 16
 
 /** Modules the host owns as singletons and resolves from its shared scope (research R2). */
 export const HOST_SHARED_MODULES = Object.freeze([
@@ -128,6 +149,8 @@ export const MANIFEST_REFUSAL = Object.freeze({
   BAD_SHARED_DEPS: 'bad_shared_deps',
   UNKNOWN_SHARED_DEP: 'unknown_shared_dep',
   BAD_PERMISSIONS: 'bad_permissions',
+  /** `contracts` is not an array of valid contract names, or exceeds the bound. */
+  BAD_CONTRACTS: 'bad_contracts',
   UNKNOWN_PERMISSION: 'unknown_permission',
   BAD_STORE_KEYS: 'bad_store_keys',
   FILE_NOT_LISTED: 'file_not_listed',
@@ -389,6 +412,18 @@ export function validateManifest(value, options = {}) {
   const sharedDeps = normalizeSharedDeps(value.sharedDeps)
   const permissions = normalizePermissions(value.permissions)
   const storeKeys = normalizeStoreKeys(value.storeKeys)
+  const contracts = normalizeContracts(value.contracts)
+
+  // Declaring names without declaring the capability that reads them is a
+  // manifest that misdescribes itself — a reviewer would see the allowlist and
+  // assume the app resolves addresses, while the host would refuse every call.
+  if (contracts.length > 0 && !permissions.includes('contracts')) {
+    throw new ManifestError(
+      MANIFEST_REFUSAL.BAD_CONTRACTS,
+      'miniapp manifest: contracts are declared but the "contracts" permission is not',
+      { field: 'contracts' }
+    )
+  }
 
   return Object.freeze({
     schema: value.schema,
@@ -401,6 +436,7 @@ export function validateManifest(value, options = {}) {
     sharedDeps,
     permissions,
     storeKeys,
+    contracts,
     files,
   })
 }
@@ -529,6 +565,32 @@ function normalizePermissions(value) {
         MANIFEST_REFUSAL.UNKNOWN_PERMISSION,
         `miniapp manifest: permissions declares "${String(permission)}", which is not a host capability`,
         { field: 'permissions' }
+      )
+    }
+  }
+  return Object.freeze([...value])
+}
+
+/**
+ * Declared contract names (hostApi 2). Unlike `storeKeys`, this IS an access
+ * gate: `host.contracts(name)` refuses a name the manifest did not declare, so
+ * what a reviewer approved is exactly what the app can resolve at runtime.
+ */
+function normalizeContracts(value) {
+  if (value === undefined || value === null) return Object.freeze([])
+  if (!Array.isArray(value) || value.length > MAX_DECLARED_CONTRACTS) {
+    throw new ManifestError(
+      MANIFEST_REFUSAL.BAD_CONTRACTS,
+      `miniapp manifest: contracts must be an array of at most ${MAX_DECLARED_CONTRACTS} names`,
+      { field: 'contracts' }
+    )
+  }
+  for (const name of value) {
+    if (typeof name !== 'string' || !CONTRACT_NAME_PATTERN.test(name)) {
+      throw new ManifestError(
+        MANIFEST_REFUSAL.BAD_CONTRACTS,
+        `miniapp manifest: contracts entry "${String(name)}" is not a valid contract name`,
+        { field: 'contracts' }
       )
     }
   }

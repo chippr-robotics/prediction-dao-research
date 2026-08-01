@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "approved": {
     "cid": "bafybeifixtureminiapppackage073t014exampleaaaaaaaaaaaaaaaa",
-    "manifestHash": "0xb9733bbdcc68dd84417d9ccd6994f0470daa660fcc0bbdcdfa81d13e1f1f762e",
+    "manifestHash": "0x3498a247f48842887115fcd54aca23976452cb796557dff7e36885b278f11cf8",
     "version": 1
   },
   "files": {
@@ -11,7 +11,7 @@
     "style.css": "fdd4da8992a4ef401b5a9cae5deea5697cf6167312cceb29770d302040f5822f"
   },
   "tampered": {
-    "manifestHash": "0x3f0f68f679c0b4905a606df11285725361e32c6192b17ad9bf057a64ef28bb1d",
+    "manifestHash": "0x44794a6a8ef2225ac9cc2d1fd09c74fa3d3c4fb61aafb70d3f156ef777a5ef20",
     "entrySha256": "15ef1504497c3c1ea59952de7a1b4c6e01ba75eb5fb987e2718e60cc46977c7c"
   }
 }

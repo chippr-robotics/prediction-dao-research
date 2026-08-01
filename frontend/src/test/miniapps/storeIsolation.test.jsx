@@ -208,9 +208,12 @@ describe('host-internal stores are unreachable from the REAL host object', () =>
 
     // Names of the host's own stores, key material, and the handles that would
     // let an app act outside the mediated surface.
+    // `contracts` is deliberately absent from this list as of hostApi 2: it is
+    // a documented capability, and — as the test below asserts — an ACCESSOR,
+    // not the address map itself.
     const FORBIDDEN = [
       'addressBook', 'preferences', 'ledger', 'backup', 'endpoints', 'legacyKeys',
-      'vault', 'keystore', 'passkey', 'contracts', 'config', 'namespaces',
+      'vault', 'keystore', 'passkey', 'config', 'namespaces', 'NETWORKS',
       'userStorage', 'localStorage', 'signer', 'getSigner', 'privateKey', 'seed',
       'mnemonic', 'signMessage', 'signTypedData',
     ]
@@ -233,6 +236,26 @@ describe('host-internal stores are unreachable from the REAL host object', () =>
       }
     }
     walk(host, '', 0)
+  })
+
+  it('hands over an ACCESSOR for deployments, never the address book itself', () => {
+    const host = mountRealHost()
+    // The distinction the whole hostApi-2 design rests on: a function the host
+    // controls, gated by the manifest allowlist, rather than a map the app
+    // could enumerate to learn the entire estate.
+    expect(typeof host.contracts).toBe('function')
+    expect(typeof host.network).toBe('function')
+    for (const value of [host.contracts, host.network]) {
+      expect(Array.isArray(value)).toBe(false)
+      expect(value.NETWORKS).toBeUndefined()
+    }
+  })
+
+  it('refuses a contract name the manifest never declared', () => {
+    // `mountRealHost` declares nothing, so every name is undeclared — the gate
+    // fails CLOSED when a workspace forgets to pass the allowlist.
+    const host = mountRealHost()
+    expect(() => host.contracts('tokenFactory', 137)).toThrow(/not declared/)
   })
 
   it('gives the app no way to sign outside `submit`', () => {

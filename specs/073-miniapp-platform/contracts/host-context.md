@@ -1,4 +1,4 @@
-# Runtime Contract: Mini-App ↔ Host (`hostApi: 1`)
+# Runtime Contract: Mini-App ↔ Host (`hostApi: 2`)
 
 The contract between a mini-app package and the FairWins host. A mini-app's entry
 module (`manifest.entry`) default-exports a React component; the host mounts it inside
@@ -32,6 +32,8 @@ or launch is refused.
     requestConnect(): void             // opens the host connect modal
   },
   readProvider(chainId?: number): Provider,   // spec-069-resolved read provider; default = wallet chain
+  contracts(name: string, chainId?: number): string | null,   // hostApi 2 — see below
+  network(chainId?: number): NetworkDescriptor | null,        // hostApi 2 — see below
   store: {                             // namespaced to appId; cross-namespace access impossible
     get(key: string): any,
     set(key: string, value: any): void,        // host auto-audits significant changes
@@ -43,6 +45,57 @@ or launch is refused.
 }
 ```
 
+## Deployments and networks (`hostApi: 2`)
+
+A package **cannot carry the address book**. Importing `config/contracts.js` reaches
+`config/tenant.js`, which imports the `virtual:tenant` module supplied by a Vite plugin the
+package preset does not register — a hard build failure. And if it built, the preset's
+`envPrefix` means every `import.meta.env` read inlines as `undefined`, so a bundled
+`NETWORKS` would report every subgraph as absent: the app would tell a Polygon member "this
+network has no subgraph", a fabricated fact rather than an outage.
+
+A hand-copied table is worse than it looks. Frozen into immutable bytes, it turns a routine
+redeploy into a re-publish, re-review and re-approve cycle for every installed app, while
+`npm run sync:frontend-contracts` keeps the host's own copy correct beside it. So the host
+answers instead, and a redeploy is a host release.
+
+```ts
+host.contracts('tokenFactory', 137)  // '0x…' | null
+host.network(137)
+// { chainId, name, isTestnet,
+//   nativeCurrency: { symbol, decimals },
+//   explorer: { name, baseUrl } | null,
+//   subgraphUrl: string | null }  | null
+```
+
+**`contracts` is gated by a per-package allowlist.** The manifest declares both the
+capability and the specific names:
+
+```json
+{ "permissions": ["contracts", "network"], "contracts": ["tokenFactory"] }
+```
+
+Declaring names without the permission is a build failure and a launch refusal — a manifest
+that misdescribes itself is worse than one that asks for too much. A reviewer reads one line
+instead of diffing a bundled table.
+
+The two negative answers are **different, and must stay different**:
+
+| Situation | Result |
+|---|---|
+| Name is not in the manifest allowlist | **Throws** `undeclared_contract` |
+| Name is declared, no deployment on that chain | Returns `null` |
+
+Answering `null` for an undeclared name would let "you are not approved for this" pass as
+"it is not deployed here". Note `null`, never `''` — the address book spells absence as an
+empty string, and an app must not have to know both spellings.
+
+`network()` is a flat **value projection**, never the `NETWORKS` entry (which also carries
+`rpcUrl`, `dex`, `polymarket` and passkey config — handing it over would break "wrappers,
+never handles"). An unknown chain is `null`, **not** the default network: an app must be able
+to say "unknown network", and must never render one chain's explorer link against another
+chain's data.
+
 ## Submission is not confirmation
 
 `submit` resolves as soon as the transaction is **broadcast**. `kind: 'sent'` means the
@@ -50,21 +103,25 @@ network accepted it, not that it mined, and not that it succeeded — it may sti
 `kind: 'proposed'` means nothing has moved at all: a vault action is waiting for its
 threshold, and there is no transaction hash yet.
 
-An app that awaits `submit` and then tells the member the action is done **is lying**, and
-`SubmitResult` deliberately carries no receipt to make that easy. To report confirmation,
-wait for it yourself:
+An app that awaits `submit` and then tells the member the action is done **is lying**. To
+report confirmation, wait for it — `SubmitResult.wait()` (`hostApi: 2`) resolves the receipt
+through the host's own read provider:
 
 ```js
-const { kind, txHash } = await host.wallet.submit({ to, data, chainId })
-if (kind === 'proposed') return showQueuedForVaultApproval()
-const receipt = await host.readProvider(chainId).waitForTransaction(txHash)
+const result = await host.wallet.submit({ to, data, chainId })
+if (result.kind === 'proposed') return showQueuedForVaultApproval()
+const receipt = await result.wait()          // rejects for a proposal; no hash to wait on
 if (receipt?.status !== 1) return showFailed()
 ```
+
+`wait` grants no capability `readProvider` did not already grant — it is
+`waitForTransaction` with the chain and hash filled in. It is **non-enumerable**, so
+`SubmitResult` stays a plain serialisable `{kind, txHash, safeTxHash}`.
 
 Two caveats to design for rather than hide. The read provider is a **different endpoint**
 than the one the wallet broadcast through, so "not visible yet" and "not mined yet" are
 indistinguishable — impose your own timeout and say *still pending*, never spin forever.
-And `waitForTransaction` does not follow a wallet-side speed-up or cancel the way a
+And it does not follow a wallet-side speed-up or cancel the way a
 `TransactionResponse.wait()` would.
 
 ## The two write rails (why an app must not branch on the wallet)
@@ -108,4 +165,5 @@ identifier, `txHash` is `null`.
 | All gateways unreachable | Availability message; retry affordance |
 | Wallet absent / wrong network on `submit` | Typed rejection; host directs user |
 | Session offers no write rail (no signer, no `sendCalls`) | Typed rejection `no_write_rail` — distinct from "no wallet" and from "locked" |
+| `contracts(name)` for an undeclared name | Typed rejection `undeclared_contract` — never `null`, which would read as "not deployed" |
 ```

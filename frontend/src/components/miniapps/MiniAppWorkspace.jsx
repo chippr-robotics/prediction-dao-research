@@ -602,7 +602,10 @@ function MiniAppLaunch({ slug, onRetry }) {
             </div>
           }
         >
-          <MiniAppHostProvider appId={namespaceKey}>
+          {/* The contract allowlist comes from the VERIFIED manifest — the same
+              bytes whose hash the registry committed to and a curator approved
+              — so what the app can resolve is exactly what was reviewed. */}
+          <MiniAppHostProvider appId={namespaceKey} declaredContracts={manifest.contracts}>
             <MiniAppSurface component={component} />
           </MiniAppHostProvider>
         </ErrorBoundary>

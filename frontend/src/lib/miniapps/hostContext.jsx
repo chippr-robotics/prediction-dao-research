@@ -65,6 +65,8 @@ import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useNotification } from '../../hooks/useUI'
 import { getReadProvider } from '../../utils/rpcProvider'
+import { NETWORKS } from '../../config/networks'
+import { getContractAddressForChain } from '../../config/contracts'
 import { createAppStore } from './store'
 import {
   captureMiniAppLog,
@@ -101,6 +103,12 @@ export const HOST_REFUSAL = Object.freeze({
    * between a member reconnecting, unlocking, or giving up on this browser.
    */
   NO_WRITE_RAIL: 'no_write_rail',
+  /**
+   * `contracts(name)` was asked for a name the package's manifest never
+   * declared. Refused rather than answered `null`, so "you are not approved to
+   * resolve this" can never be mistaken for "it is not deployed here".
+   */
+  UNDECLARED_CONTRACT: 'undeclared_contract',
 })
 
 /**
@@ -215,6 +223,73 @@ const HOST_AUDIT_KIND = Object.freeze({
  * would then lie by omission about a real change.
  */
 export const STATE_AUDIT_WINDOW_MS = 60_000
+
+/**
+ * Attach `wait()` to a submission result (hostApi 2).
+ *
+ * `submit` resolves at BROADCAST — `kind: 'sent'` means the network accepted
+ * the transaction, not that it mined, and not that it succeeded. An app that
+ * awaits `submit` and reports success is lying, which is the trap this removes.
+ *
+ * It grants NO new capability: `host.readProvider(chainId).waitForTransaction`
+ * already allows exactly this read, and this is that call with the chain and
+ * hash filled in. It is NON-ENUMERABLE so the result stays a plain serialisable
+ * data object — `JSON.stringify`, structured clone and equality assertions all
+ * see the same three fields they saw before.
+ *
+ * A `proposed` result rejects rather than hanging: nothing was broadcast, a
+ * vault action is waiting on its threshold, and there is no hash to wait for.
+ * Waiting forever on a transaction that does not exist is the worst answer.
+ *
+ * The provider is resolved INTERNALLY and never handed to the app, so the raw
+ * instance is used rather than the guarded wrapper — there is nothing here for
+ * an app to call `destroy()` on.
+ *
+ * @param {{kind: string, txHash: string|null, safeTxHash: string|null}} result
+ * @param {number} chainId - the chain the submission named
+ */
+function withWait(result, chainId) {
+  Object.defineProperty(result, 'wait', {
+    enumerable: false,
+    value: async (confirmations = 1) => {
+      if (result.kind === 'proposed') {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          'miniapp host: a proposed vault action has no transaction to wait for',
+          {
+            userMessage:
+              'This action is waiting for the vault’s approvals; there is no transaction to confirm yet.',
+          },
+        )
+      }
+      if (!result.txHash) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          'miniapp host: the transaction rail returned no hash to wait for',
+          { userMessage: 'This transaction was sent, but the wallet did not report an identifier for it.' },
+        )
+      }
+      const provider = getReadProvider(chainId)
+      if (!provider) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.NO_READ_PROVIDER,
+          `miniapp host: no RPC endpoint configured for chain ${chainId}`,
+          { userMessage: `No network connection is configured for network ${chainId}.` },
+        )
+      }
+      return provider.waitForTransaction(result.txHash, confirmations)
+    },
+  })
+  return Object.freeze(result)
+}
+
+/**
+ * Default contract allowlist: empty. A package that declared nothing can
+ * resolve nothing — the gate fails closed, so a workspace that forgot to pass
+ * the manifest's list withholds the capability rather than opening the whole
+ * address book. Module-level and frozen so it is a stable dependency identity.
+ */
+const EMPTY_CONTRACTS = Object.freeze([])
 
 /** `to` must be a plain EVM address; the contract has no deployment form. */
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
@@ -371,7 +446,7 @@ const MiniAppHostContext = createContext(null)
  *   (FR-015) is the right place for that to surface. A workspace only ever
  *   mounts an id the catalog and the manifest both validated.
  */
-export function MiniAppHostProvider({ appId, children }) {
+export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS, children }) {
   const {
     chainId: walletChainId,
     isConnected,
@@ -576,7 +651,7 @@ export function MiniAppHostProvider({ appId, children }) {
         // the first-party token path does. Never fabricate one.
         const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId ?? null
         safeAudit(() => captureMiniAppTxSubmitted(address, requestedChain, { appId, txHash, to }))
-        return Object.freeze({ kind: 'sent', txHash, safeTxHash: null })
+        return withWait({ kind: 'sent', txHash, safeTxHash: null }, requestedChain)
       }
 
       // A classic personal session with no signer has no rail either — say so
@@ -616,13 +691,13 @@ export function MiniAppHostProvider({ appId, children }) {
         )
         // Nothing has moved yet: a vault action waits for its threshold. Saying
         // so in the result is the only way an app can report it honestly.
-        return Object.freeze({ kind: 'proposed', txHash: null, safeTxHash: result.safeTxHash ?? null })
+        return withWait({ kind: 'proposed', txHash: null, safeTxHash: result.safeTxHash ?? null }, requestedChain)
       }
 
       safeAudit(() =>
         captureMiniAppTxSubmitted(address, requestedChain, { appId, txHash: result?.txHash, to }),
       )
-      return Object.freeze({ kind: 'sent', txHash: result?.txHash ?? null, safeTxHash: null })
+      return withWait({ kind: 'sent', txHash: result?.txHash ?? null, safeTxHash: null }, requestedChain)
     },
     [
       appId,
@@ -670,6 +745,86 @@ export function MiniAppHostProvider({ appId, children }) {
       return guardReadProvider(provider)
     },
     [walletChain, walletChainId],
+  )
+
+  /**
+   * Resolve a FairWins deployment address (hostApi 2).
+   *
+   * WHY THE HOST OWNS THIS. A package cannot carry the address book: importing
+   * `config/contracts.js` reaches `config/tenant.js`, which imports the
+   * `virtual:tenant` module supplied by a Vite plugin the package preset does
+   * not register — a hard build failure. And a hand-copied table frozen into
+   * immutable IPFS bytes would turn a routine redeploy into a re-publish,
+   * re-review and re-approve cycle for every installed app, while `npm run
+   * sync:frontend-contracts` kept the host's own copy correct beside it. Here,
+   * a redeploy is a host release.
+   *
+   * WHAT IT REFUSES, AND WHY THE TWO CASES DIFFER:
+   *   - an UNDECLARED name throws. The manifest allowlist is what a reviewer
+   *     approved; a name outside it is the package asking for something nobody
+   *     signed off on, and answering `null` would let that pass as "not
+   *     deployed here".
+   *   - a DECLARED name with no deployment on that chain returns `null`. That
+   *     is a fact about the estate, and the app is expected to render its own
+   *     honest unavailable state from it.
+   *
+   * Never a guess and never a fallback chain: `getContractAddressForChain` is
+   * asked about the chain the app named, and nothing else.
+   */
+  const contracts = useCallback(
+    (name, requestedChainId) => {
+      if (!declaredContracts.includes(name)) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.UNDECLARED_CONTRACT,
+          `miniapp host: "${String(name)}" is not declared in this package's manifest contracts`,
+          { userMessage: 'This app asked for a contract it is not approved to use.' },
+        )
+      }
+      const target = evmChainId(requestedChainId == null ? walletChain : requestedChainId)
+      if (target == null) return null
+      const address = getContractAddressForChain(name, target)
+      // '' is how the address book spells "not deployed here"; `null` is how
+      // this contract spells it, and the two must not be confused by the app.
+      return address ? address : null
+    },
+    [declaredContracts, walletChain],
+  )
+
+  /**
+   * A chain descriptor (hostApi 2) — display name, testnet flag, native
+   * currency, explorer, subgraph endpoint.
+   *
+   * A flat VALUE PROJECTION, never the `NETWORKS` entry itself: that object also
+   * carries rpcUrl, dex, polymarket and passkey configuration, and handing it
+   * over would break the host's own rule that an app receives wrappers, never
+   * handles.
+   *
+   * Returns `null` for an unknown chain rather than reproducing `getNetwork`'s
+   * default-network fallback. An app must be able to say "unknown network", and
+   * must never be able to render one chain's explorer link against another
+   * chain's data.
+   */
+  const network = useCallback(
+    (requestedChainId) => {
+      const target = evmChainId(requestedChainId == null ? walletChain : requestedChainId)
+      if (target == null) return null
+      const net = NETWORKS[target]
+      if (!net) return null
+      return Object.freeze({
+        chainId: target,
+        name: net.name ?? null,
+        isTestnet: Boolean(net.isTestnet),
+        nativeCurrency: Object.freeze({
+          symbol: net.nativeCurrency?.symbol ?? null,
+          decimals: net.nativeCurrency?.decimals ?? null,
+        }),
+        explorer: net.explorer?.baseUrl
+          ? Object.freeze({ name: net.explorer.name ?? null, baseUrl: net.explorer.baseUrl })
+          : null,
+        subgraphUrl: net.subgraphUrl ?? null,
+      })
+    },
+    [walletChain],
   )
 
   const audit = useMemo(
@@ -755,6 +910,8 @@ export function MiniAppHostProvider({ appId, children }) {
       appId,
       wallet,
       readProvider,
+      contracts,
+      network,
       store,
       audit,
       toast,
@@ -769,6 +926,8 @@ export function MiniAppHostProvider({ appId, children }) {
     submit,
     requestConnect,
     readProvider,
+    contracts,
+    network,
     store,
     audit,
     toast,

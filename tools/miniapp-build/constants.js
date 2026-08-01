@@ -28,7 +28,7 @@ export const HOST_SCOPE_SYMBOL_KEY = 'fairwins.miniapp.host'
  * supports, so this number is bumped only when the runtime contract in
  * `contracts/host-context.md` changes in a way old hosts cannot honor.
  */
-export const HOST_API_VERSION = 1
+export const HOST_API_VERSION = 2
 
 /** Manifest schema identifier; an unknown value is a launch refusal, not a warning. */
 export const MANIFEST_SCHEMA = 'fairwins-miniapp-manifest/1'
@@ -63,7 +63,22 @@ export const STORE_KEY_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/
  * than a silently ignored string, so the manifest cannot promise a capability
  * the host does not have.
  */
-export const HOST_PERMISSIONS = ['wallet:submit', 'store', 'audit', 'toast', 'navigate']
+export const HOST_PERMISSIONS = [
+  'wallet:submit',
+  'store',
+  'audit',
+  'toast',
+  'navigate',
+  // hostApi 2 — inert public data. `contracts` additionally requires the
+  // package to declare WHICH names it may resolve (`contracts: [...]`), so a
+  // reviewer reads an allowlist instead of a bundled address table.
+  'contracts',
+  'network',
+]
+
+/** Contract names a package may declare in `manifest.contracts` (hostApi 2). */
+export const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9]{1,63}$/
+export const MAX_DECLARED_CONTRACTS = 16
 
 /**
  * Modules the host owns as singletons and mini-apps must never bundle (R2).
