@@ -253,6 +253,21 @@ artifacts live under `specs/<feature>/`.
   several chains at once**. Providers come from `getReadProvider`/`readProviderFor`, never
   hand-built from `NETWORKS[chainId].rpcUrl`. See `docs/developer-guide/chain-estate-reads.md` +
   `specs/071-multi-chain-admin-console/`.
+- **White-label tenants (spec 072): the tenant manifest is the single source of truth.**
+  `tenants/<id>/manifest.json` defines a tenant's identity, settings, and contract set;
+  `tenants/fairwins/` is the default tenant and MUST reproduce the current product exactly.
+  Never hardcode a tenant identity value (name, logo, URL, PWA metadata, support/legal links)
+  in shipped paths — resolve via `frontend/src/config/tenant.js` (`tenantBrand()`,
+  `isFeatureEnabled()`, `tenantThemeClass()`). Tenant selection is BUILD-TIME
+  (`VITE_TENANT_ID`, one origin = one tenant, no runtime switching); an unknown id fails
+  loudly and never falls back to another tenant. Theming rides the existing `platform-<id>`
+  CSS class seam (default tokens stay in `theme.css`; non-default tenants inject from the
+  manifest). Isolation for value is ON-CHAIN via separate proxy instances: `TENANT_ID=<id>`
+  on deploy scripts tenant-prefixes CREATE2 salts and records under
+  `deployments/tenants/<id>/` (same schema); a dedicated tenant resolves ONLY its own set —
+  absence stays absence, no fallback to the shared estate. Manifests never contain secrets;
+  `npm run tenants:validate` gates in CI. See `docs/developer-guide/white-label-tenants.md`
+  + `specs/072-white-label-tenants/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE

@@ -41,12 +41,38 @@ function hexByteLength(hex) {
 }
 
 /**
- * Generate a deterministic salt from an identifier string
+ * Resolve the active tenant id from the TENANT_ID env var (spec 072).
+ *
+ * Returns null when no tenant is in scope — including TENANT_ID=fairwins,
+ * because the default tenant IS the shared estate (unprefixed salts, records
+ * at deployments/<network>-chain<id>-v2.json). With a non-default tenant set,
+ * salts are tenant-prefixed and records live under deployments/tenants/<id>/,
+ * yielding a deterministic, isolated address set per tenant on the same chain.
+ *
+ * The id is validated against the manifest id pattern; the id feeds CREATE2
+ * salts, so it must never change once a tenant has deployed (see tenants/README.md).
+ */
+function activeTenantId() {
+  const id = (process.env.TENANT_ID || "").trim();
+  if (!id || id === "fairwins") return null;
+  if (!/^[a-z][a-z0-9-]{1,30}$/.test(id)) {
+    throw new Error(
+      `TENANT_ID "${id}" is invalid — must match ^[a-z][a-z0-9-]{1,30}$ (see tenants/README.md)`
+    );
+  }
+  return id;
+}
+
+/**
+ * Generate a deterministic salt from an identifier string.
+ * When a tenant is in scope (TENANT_ID env), the salt is tenant-prefixed so
+ * the tenant gets its own deterministic address set (spec 072, research D5).
  * @param {string} identifier - Salt identifier
  * @returns {string} 32-byte hex salt
  */
 function generateSalt(identifier) {
-  return ethers.id(identifier);
+  const tenant = activeTenantId();
+  return ethers.id(tenant ? `tenant:${tenant}:${identifier}` : identifier);
 }
 
 // =============================================================================
@@ -542,10 +568,21 @@ async function safeTransferOwnership(name, contract, from, to) {
 // =============================================================================
 
 /**
+ * Resolve the deployments directory for the current scope: the shared estate
+ * lives in deployments/, a tenant's dedicated estate under
+ * deployments/tenants/<id>/ with the SAME record schema (spec 072).
+ */
+function deploymentsDirForScope() {
+  const base = path.join(process.cwd(), "deployments");
+  const tenant = activeTenantId();
+  return tenant ? path.join(base, "tenants", tenant) : base;
+}
+
+/**
  * Save deployment information to JSON file
  */
 function saveDeployment(filename, deploymentInfo) {
-  const deploymentsDir = path.join(process.cwd(), "deployments");
+  const deploymentsDir = deploymentsDirForScope();
   if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
 
   const outPath = path.join(deploymentsDir, filename);
@@ -558,7 +595,7 @@ function saveDeployment(filename, deploymentInfo) {
  * Load deployment information from JSON file
  */
 function loadDeployment(filename) {
-  const deploymentsDir = path.join(process.cwd(), "deployments");
+  const deploymentsDir = deploymentsDirForScope();
   const filePath = path.join(deploymentsDir, filename);
 
   if (!fs.existsSync(filePath)) {
@@ -630,6 +667,7 @@ module.exports = {
   sleep,
   hexByteLength,
   generateSalt,
+  activeTenantId,
 
   // Verification
   verifyOnBlockscout,

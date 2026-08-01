@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { tenantBrandingPlugin } from './vite-plugins/tenant-branding.js'
 
 // Fails a production build if Pinata write credentials are present in the build
 // environment. Any VITE_*-prefixed value is inlined into the client bundle in
@@ -30,7 +31,7 @@ function pinataSecretGuard() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), pinataSecretGuard()],
+  plugins: [react(), pinataSecretGuard(), tenantBrandingPlugin()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

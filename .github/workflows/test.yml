@@ -16,6 +16,26 @@ permissions:
   contents: read
 
 jobs:
+  # Gate (spec 072, FR-008): every tenants/<id>/manifest.json must be valid —
+  # structure, domain uniqueness, fee caps, cohort separation, dedicated-mode
+  # record presence. Must fail the pipeline loudly (Constitution IV). The
+  # validator is dependency-free, so no npm ci is needed.
+  tenant-manifests:
+    name: Tenant Manifest Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate tenant manifests
+        run: node scripts/tenants/validate-tenant-manifest.js
+
   smart-contract-tests:
     name: Smart Contract Tests
     runs-on: ubuntu-latest

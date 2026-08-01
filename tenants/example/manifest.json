@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "id": "example",
+  "lifecycle": "draft",
+
+  "identity": {
+    "displayName": "Example Wagers",
+    "legalName": "Example Wagers LLC",
+    "tagline": "A reference tenant manifest",
+    "metaDescription": "Example Wagers - reference tenant manifest for the white-label platform (spec 072). Never served to members.",
+    "domains": ["example.invalid"],
+    "appUrl": "https://example.invalid",
+    "support": { "email": "support@example.invalid" },
+    "social": {},
+    "legal": { "termsPath": "/terms", "privacyPath": "/privacy", "riskPath": "/risk" }
+  },
+
+  "brand": {
+    "logo": "/assets/logo_fairwins.svg",
+    "logoMark": "/assets/fairwins_no-text_logo.svg",
+    "favicon": "/assets/logo_fairwins.svg",
+    "appleTouchIcon": "/assets/fairwins_no-text_logo.svg",
+    "htmlTitle": "Example Wagers - Social Wagers",
+    "pwa": {
+      "name": "Example Wagers",
+      "shortName": "Example",
+      "appleTitle": "Example",
+      "themeColor": "#5B6EE1",
+      "backgroundColor": "#101623"
+    },
+    "theme": {
+      "base": {
+        "--brand-primary": "#5B6EE1",
+        "--brand-primary-rgb": "91, 110, 225",
+        "--brand-secondary": "#E1A85B",
+        "--brand-secondary-rgb": "225, 168, 91",
+        "--brand-accent": "#9BB0FF",
+        "--brand-accent-rgb": "155, 176, 255",
+        "--semantic-win": "#2ECC71",
+        "--semantic-active": "#5B6EE1",
+        "--semantic-warning": "#F5A623",
+        "--semantic-loss": "#E5533D",
+        "--chart-series-a": "#5B6EE1",
+        "--chart-series-b": "#E1A85B",
+        "--chart-series-c": "#9BB0FF",
+        "--chart-series-d": "#F5A623",
+        "--chart-series-e": "#9AA6B2"
+      },
+      "light": {
+        "--primary-button": "#5B6EE1",
+        "--primary-button-hover": "#4A5BC7",
+        "--primary-button-text": "#FFFFFF",
+        "--accent-color": "#E1A85B",
+        "--highlight-color": "#9BB0FF"
+      },
+      "dark": {
+        "--primary-button": "#7385F0",
+        "--primary-button-hover": "#8A9AF5",
+        "--primary-button-text": "#101623",
+        "--accent-color": "#E1A85B",
+        "--highlight-color": "#9BB0FF"
+      }
+    }
+  },
+
+  "settings": {
+    "features": ["wagers", "pools", "predict"],
+    "chains": {
+      "mainnet": [137],
+      "testnet": [80002]
+    },
+    "membership": {
+      "tiers": { "bronze": 2, "silver": 8, "gold": 25, "platinum": 100 }
+    },
+    "fees": {},
+    "gateway": { "relayerUrl": null, "bundlerUrls": {}, "paymaster": {} },
+    "subgraph": { "urls": {} }
+  },
+
+  "contractSet": {
+    "mode": "shared",
+    "saltPrefix": null
+  }
+}

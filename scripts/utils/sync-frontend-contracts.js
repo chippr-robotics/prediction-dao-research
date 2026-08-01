@@ -11,6 +11,7 @@ function parseArgs(argv) {
     else if (a === '--chainId') out.chainId = Number(argv[++i])
     else if (a === '--deploymentFile') out.deploymentFile = argv[++i]
     else if (a === '--contractsFile') out.contractsFile = argv[++i]
+    else if (a === '--tenant') out.tenant = argv[++i]
   }
   return out
 }
@@ -218,6 +219,67 @@ function resolveBlockName(source, chainId, contractsFile) {
   return blockName
 }
 
+/**
+ * Tenant mode (spec 072, T015): `--tenant <id>` reads the tenant's records
+ * from deployments/tenants/<id>/ and MERGES the per-chain v2 mapping into
+ * frontend/src/config/tenants/<id>.contracts.json — the generated set a
+ * dedicated tenant build resolves from (injected via virtual:tenant). It never
+ * touches contracts.js: the shared estate's maps stay the default tenant's.
+ */
+function syncTenant({ repoRoot, tenant, network, chainId, deploymentFileArg }) {
+  if (tenant === 'fairwins') {
+    throw new Error(
+      '--tenant fairwins is the default tenant (the shared estate); run the sync without --tenant.'
+    )
+  }
+  if (!/^[a-z][a-z0-9-]{1,30}$/.test(tenant)) {
+    throw new Error(`--tenant "${tenant}" is invalid — must match ^[a-z][a-z0-9-]{1,30}$`)
+  }
+
+  const deploymentsDir = path.join(repoRoot, 'deployments', 'tenants', tenant)
+  const deploymentFile = deploymentFileArg
+    ? path.resolve(repoRoot, deploymentFileArg)
+    : findDeploymentFile({ deploymentsDir, network, chainId })
+
+  if (!deploymentFile || !fs.existsSync(deploymentFile)) {
+    throw new Error(
+      `Tenant deployment JSON not found for "${tenant}". Looked for ${network} chainId=${chainId} ` +
+        `in ${deploymentsDir}. Deploy with TENANT_ID=${tenant} first, or pass --deploymentFile <path>.`
+    )
+  }
+
+  const deployment = readJson(deploymentFile)
+  const deployed = deployment.contracts || {}
+  const deploymentChainId = Number(deployment.chainId) || chainId
+
+  // Same v2 key surface as the shared sync below — one record schema (D5).
+  const record = {}
+  const keys = [
+    'wagerRegistry', 'membershipManager', 'membershipVoucher', 'voucherBatchMinter',
+    'keyRegistry', 'sanctionsGuard', 'tokenFactory', 'externalDAORegistry',
+    'backupPointerRegistry', 'wagerPoolFactory', 'callsignRegistry', 'feeRouter',
+    'stakingRouter', 'bridgeRouter', 'liquidityRouter', 'safeProposalHub',
+    'safePolicyGuard', 'safePolicyGuardV2', 'policyGuardSetup', 'entryPoint',
+    'accountFactory', 'p256Verifier', 'polymarketAdapter', 'chainlinkDataFeedAdapter',
+    'chainlinkFunctionsAdapter', 'umaAdapter',
+  ]
+  for (const key of keys) {
+    if (deployed[key]) record[key] = deployed[key]
+  }
+  if (deployment.paymentToken) record.paymentToken = deployment.paymentToken
+  if (deployment.wmatic) record.wmatic = deployment.wmatic
+  if (deployment.deployer) record.deployer = deployment.deployer
+
+  const outPath = path.join(repoRoot, 'frontend', 'src', 'config', 'tenants', `${tenant}.contracts.json`)
+  fs.mkdirSync(path.dirname(outPath), { recursive: true })
+  const existing = fs.existsSync(outPath) ? readJson(outPath) : {}
+  existing[deploymentChainId] = record
+  fs.writeFileSync(outPath, JSON.stringify(existing, null, 2) + '\n')
+
+  console.log(`Synced tenant "${tenant}" contracts from: ${deploymentFile}`)
+  console.log(`Updated: ${outPath} (chain ${deploymentChainId})`)
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2))
 
@@ -226,6 +288,11 @@ function main() {
 
   const network = args.network || 'amoy'
   const chainId = Number.isFinite(args.chainId) ? args.chainId : 80002
+
+  if (args.tenant) {
+    syncTenant({ repoRoot, tenant: args.tenant, network, chainId, deploymentFileArg: args.deploymentFile })
+    return
+  }
 
   const deploymentFile = args.deploymentFile
     ? path.resolve(repoRoot, args.deploymentFile)
