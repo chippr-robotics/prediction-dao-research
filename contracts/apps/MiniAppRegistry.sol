@@ -151,6 +151,7 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         _grantRole(APP_CURATOR_ROLE, curator);
 
         _setMembershipGate(membershipManager_, membershipRole_, minTier_);
+        if (sanctionsGuard_ != address(0) && sanctionsGuard_.code.length == 0) revert InvalidGateConfig();
         sanctionsGuard = ISanctionsGuard(sanctionsGuard_); // may be zero
         // Emitted from the initializer too, so an indexer can reconstruct the full gate history from logs
         // alone without a special-cased "deployment defaults" read.
@@ -361,7 +362,10 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
     }
 
     /// @inheritdoc IMiniAppRegistry
+    /// @dev Same contract-code check as the membership gate: a non-contract guard would make
+    ///      `isAllowed` return empty data and brick every submission with an undecodable revert.
     function setSanctionsGuard(address guard) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (guard != address(0) && guard.code.length == 0) revert InvalidGateConfig();
         sanctionsGuard = ISanctionsGuard(guard); // zero allowed (disable screening)
         emit SanctionsGuardChanged(guard);
     }
@@ -429,6 +433,11 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         // bricks submissions silently, so reject both loudly.
         if (manager != address(0) && role == bytes32(0)) revert InvalidGateConfig();
         if (tier > uint8(IMembershipManager.Tier.Platinum)) revert InvalidGateConfig();
+        // An EOA (or a wrong-network address) answers `getActiveTier` with empty returndata, which the
+        // ABI decoder then rejects — every submission would revert with NO decodable reason and the
+        // registry would look broken rather than misconfigured. Cheap to catch here, miserable to
+        // diagnose in production.
+        if (manager != address(0) && manager.code.length == 0) revert InvalidGateConfig();
 
         membershipManager = IMembershipManager(manager); // may be zero (gate disabled)
         membershipRole = role;

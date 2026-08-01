@@ -765,13 +765,22 @@ describe("MiniAppRegistry (spec 073)", function () {
     });
 
     it("rejects a gate configuration that would brick submissions", async function () {
-      const { reg, membership, admin } = await gatedFixture();
+      const { reg, membership, admin, outsider } = await gatedFixture();
       await expect(
         reg.connect(admin).setMembershipGate(await membership.getAddress(), ethers.ZeroHash, Tier.Silver)
       ).to.be.revertedWithCustomError(reg, "InvalidGateConfig");
       await expect(
         reg.connect(admin).setMembershipGate(await membership.getAddress(), VENDOR_ROLE, 5) // above Platinum
       ).to.be.revertedWithCustomError(reg, "InvalidGateConfig");
+      // An EOA answers getActiveTier/isAllowed with empty returndata, so every submission would
+      // revert with no decodable reason — the registry would look broken, not misconfigured.
+      await expect(
+        reg.connect(admin).setMembershipGate(outsider.address, VENDOR_ROLE, Tier.Silver)
+      ).to.be.revertedWithCustomError(reg, "InvalidGateConfig");
+      await expect(reg.connect(admin).setSanctionsGuard(outsider.address)).to.be.revertedWithCustomError(
+        reg,
+        "InvalidGateConfig"
+      );
     });
 
     it("restricts gate configuration to admin", async function () {

@@ -72,8 +72,13 @@ export const MINI_APP_REGISTRY_ABI = [
   'function sanctionsGuard() view returns (address)',
   'function APP_CURATOR_ROLE() view returns (bytes32)',
   'function hasRole(bytes32 role, address account) view returns (bool)',
+  // The curator role administers ITSELF, so getRoleAdmin(APP_CURATOR_ROLE) === APP_CURATOR_ROLE. The
+  // admin surface reads this to show honestly that platform admins cannot grant themselves curation —
+  // and to warn if a future deployment ever came up without that separation.
+  'function getRoleAdmin(bytes32 role) view returns (bytes32)',
   'function grantRole(bytes32 role, address account)',
   'function revokeRole(bytes32 role, address account)',
+  'function renounceRole(bytes32 role, address callerConfirmation)',
 
   // ---- Bounds (clients pre-validate against the same limits the chain enforces) ----
   'function MAX_NAME_LENGTH() view returns (uint256)',
