@@ -157,7 +157,21 @@ function loadDeployment(deploymentsDir, chainId) {
  * @param {{deploymentsDir?: string}} [opts]
  */
 export function loadConfig(env = process.env, opts = {}) {
-  const deploymentsDir = opts.deploymentsDir || opt(env, 'DEPLOYMENTS_DIR', DEFAULT_DEPLOYMENTS_DIR)
+  // Tenant scope (spec 072, T023): one gateway process serves ONE tenant.
+  // TENANT_ID resolves the records dir to the tenant's dedicated estate
+  // (deployments/tenants/<id>/, same schema) — the FR-025 allowlist below then
+  // IS the tenant boundary: an intent targeting another tenant's contracts is
+  // refused because those addresses are simply not in this process's records.
+  // Unset (or the default tenant) reads the shared estate, exactly as before.
+  const tenantId = opt(env, 'TENANT_ID', '')
+  if (tenantId && !/^[a-z][a-z0-9-]{1,30}$/.test(tenantId)) {
+    throw new Error(`[relay-gateway] invalid TENANT_ID "${tenantId}" — must match ^[a-z][a-z0-9-]{1,30}$`)
+  }
+  const tenantScoped = Boolean(tenantId) && tenantId !== 'fairwins'
+  const defaultDir = tenantScoped
+    ? path.join(DEFAULT_DEPLOYMENTS_DIR, 'tenants', tenantId)
+    : DEFAULT_DEPLOYMENTS_DIR
+  const deploymentsDir = opts.deploymentsDir || opt(env, 'DEPLOYMENTS_DIR', defaultDir)
 
   const enabledChainIds = opt(env, 'ENABLED_CHAIN_IDS', '137,80002,63')
     .split(',')
@@ -278,6 +292,9 @@ export function loadConfig(env = process.env, opts = {}) {
   }
 
   return {
+    // Tenant this process serves (spec 072). null = the shared/default estate.
+    tenantId: tenantScoped ? tenantId : null,
+    deploymentsDir,
     enabledChainIds,
     chains,
     port: int(env, 'PORT', 8788),

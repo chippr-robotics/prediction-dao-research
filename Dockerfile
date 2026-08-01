@@ -10,11 +10,17 @@ COPY frontend/package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source code
+# Copy source code + tenant manifests (spec 072 — the tenant-branding plugin
+# resolves tenants/ as a sibling of the frontend tree; the build fails loudly
+# if the directory is missing)
 COPY frontend/ .
+COPY tenants/ ../tenants/
 
 # Build arguments for environment variables (baked into JS bundle at build time)
 # Note: VITE_PINATA_JWT is NOT included here - it's handled at runtime via nginx proxy
+# Tenant selection (spec 072): one image = one tenant. Unset => the default
+# (fairwins) tenant, byte-identical to the pre-072 build.
+ARG VITE_TENANT_ID
 ARG VITE_WALLETCONNECT_PROJECT_ID
 ARG VITE_APP_URL
 ARG VITE_NETWORK_ID
@@ -33,6 +39,7 @@ ARG VITE_BUNDLER_URLS_POLYGON
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
 
 # Set environment variables from build args
+ENV VITE_TENANT_ID=${VITE_TENANT_ID}
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
 ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_NETWORK_ID=${VITE_NETWORK_ID}

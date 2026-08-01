@@ -5,6 +5,12 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      # Tenant selection (spec 072): this pipeline builds the DEFAULT (fairwins)
+      # instance. A per-tenant instance is the same pipeline with its own
+      # VITE_TENANT_ID + tenant URLs and its own Cloud Run service — see
+      # docs/runbooks/tenant-operations.md.
+      - '--build-arg'
+      - 'VITE_TENANT_ID=fairwins'
       - '--build-arg'
       - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
       - '--build-arg'
