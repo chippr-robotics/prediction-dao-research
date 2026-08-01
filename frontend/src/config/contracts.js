@@ -164,7 +164,7 @@ const POLYGON_CONTRACTS = {
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
-  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
+  miniAppRegistry: '0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2', // spec 073 — mini-app catalog registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
@@ -299,7 +299,7 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
     membershipVoucher: 89717915,
     wagerPoolFactory: 89720731,
     safeProposalHub: 90120743,
-    miniAppRegistry: 0,
+    miniAppRegistry: 91265680,
   },
   1337: { safeProposalHub: 4, safePolicyGuardV2: 2, miniAppRegistry: 0 },
 }

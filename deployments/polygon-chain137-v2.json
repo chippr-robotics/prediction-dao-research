@@ -46,7 +46,9 @@
     "bridgeRouter": "0x8064F3Cd9F8f113691B981d2B15EF85D95Abd551",
     "bridgeRouterImpl": "0x8F7A7e7437733326BD2F8045BFceD9B821aF1De1",
     "liquidityRouter": "0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31",
-    "liquidityRouterImpl": "0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65"
+    "liquidityRouterImpl": "0x33818052Ca8B5b8Bb9777Bf6eBbaFCD8Faae6e65",
+    "miniAppRegistry": "0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2",
+    "miniAppRegistryImpl": "0x41858006aD6dd0788b84F9fb17A28d8167C7b331"
   },
   "mocks": null,
   "constructorArgs": {
@@ -94,7 +96,8 @@
     "safePolicyGuardV2": [],
     "feeRouterImpl": [],
     "bridgeRouterImpl": [],
-    "liquidityRouterImpl": []
+    "liquidityRouterImpl": [],
+    "miniAppRegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-07-05T20:05:10.649Z",
@@ -114,7 +117,8 @@
     "policyGuardSetup": 90120725,
     "safeProposalHub": 90120743,
     "safePolicyGuardV2": 90932886,
-    "feeRouter": 90939919
+    "feeRouter": 90939919,
+    "miniAppRegistry": 91265680
   },
   "callsignRegistryDeployedAt": "2026-07-13T13:12:13.493Z",
   "feeRouterDeployedAt": "2026-07-27T01:14:35.084Z",
@@ -123,5 +127,6 @@
   "acrossSpokePool": "0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096",
   "acrossHubPool": null,
   "uniswapFactory": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
-  "uniswapPositionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+  "uniswapPositionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+  "miniAppRegistryDeployedAt": "2026-08-01T16:59:00.666Z"
 }
