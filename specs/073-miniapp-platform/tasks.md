@@ -122,8 +122,8 @@
 
 **Independent Test**: quickstart §6.
 
-- [ ] T043 [US6] Extend `frontend/public/sw.js` with `fairwins-miniapp-packages-v1`: cache-first for gateway package URLs (immutable CIDs), LRU bound + `activate` sweep; loader (T018) verifies after cache retrieval so stale cache can never bypass FR-010/FR-011 (R10)
-- [ ] T044 [P] [US6] Cache behavior tests where feasible (`frontend/src/test/miniapps/packageCache.test.js` — URL classification, LRU policy as pure functions extracted from sw.js) and a new-CID-bypasses-old-cache loader test
+- [x] T043 [US6] Extend `frontend/public/sw.js` with `fairwins-miniapp-packages-v1`: cache-first for gateway package URLs (immutable CIDs), LRU bound + `activate` sweep; loader (T018) verifies after cache retrieval so stale cache can never bypass FR-010/FR-011 (R10)
+- [x] T044 [P] [US6] Cache behavior tests where feasible (`frontend/src/test/miniapps/packageCache.test.js` — URL classification, LRU policy as pure functions extracted from sw.js) and a new-CID-bypasses-old-cache loader test
 
 ---
 
