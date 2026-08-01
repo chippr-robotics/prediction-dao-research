@@ -258,7 +258,7 @@ function syncTenant({ repoRoot, tenant, network, chainId, deploymentFileArg }) {
     'wagerRegistry', 'membershipManager', 'membershipVoucher', 'voucherBatchMinter',
     'keyRegistry', 'sanctionsGuard', 'tokenFactory', 'externalDAORegistry',
     'backupPointerRegistry', 'wagerPoolFactory', 'callsignRegistry', 'feeRouter',
-    'stakingRouter', 'bridgeRouter', 'liquidityRouter', 'safeProposalHub',
+    'stakingRouter', 'bridgeRouter', 'liquidityRouter', 'miniAppRegistry', 'safeProposalHub',
     'safePolicyGuard', 'safePolicyGuardV2', 'policyGuardSetup', 'entryPoint',
     'accountFactory', 'p256Verifier', 'polymarketAdapter', 'chainlinkDataFeedAdapter',
     'chainlinkFunctionsAdapter', 'umaAdapter',
@@ -345,6 +345,7 @@ function main() {
         stakingRouter: deployed.stakingRouter, // spec 066 — staking control surface + liquid fee router (only where deployed)
         bridgeRouter: deployed.bridgeRouter, // spec 067 — cross-chain bridge control surface + fee router (only where deployed)
         liquidityRouter: deployed.liquidityRouter, // spec 067 — liquidity-supply control surface + fee router (only where deployed)
+        miniAppRegistry: deployed.miniAppRegistry, // spec 073 — mini-app catalog + curation authority (only where deployed)
         safeProposalHub: deployed.safeProposalHub, // spec 043 — Safe custody proposal broadcaster (only where deployed)
         safePolicyGuard: deployed.safePolicyGuard, // spec 049 — multisig policy engine guard (only where deployed)
         // spec 068 — ordered policy engine. Deployed ALONGSIDE v1, never replacing it: vaults adopt

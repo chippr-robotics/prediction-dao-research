@@ -28,6 +28,7 @@ const UPGRADEABLE_CONTRACTS = [
   { name: "StakingRouter", deploymentsKey: "stakingRouter" }, // spec 066 — staking control surface + liquid fee router
   { name: "BridgeRouter", deploymentsKey: "bridgeRouter" }, // spec 067 — cross-chain bridge control surface + fee router
   { name: "LiquidityRouter", deploymentsKey: "liquidityRouter" }, // spec 067 — liquidity-supply control surface + fee router
+  { name: "MiniAppRegistry", deploymentsKey: "miniAppRegistry" }, // spec 073 — mini-app catalog + curation authority
 ];
 
 function loadDeployedImpl(deploymentsKey) {

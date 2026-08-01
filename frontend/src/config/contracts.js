@@ -48,6 +48,12 @@ const MORDOR_CONTRACTS = {
   // Callsigns (spec 054) — %callsign naming registry. Empty until `deploy-callsign-registry.js` runs;
   // populated by `npm run sync:frontend-contracts`.
   callsignRegistry: '',
+  // Mini-app registry (spec 073) — the curation authority for the Apps catalog. Empty until
+  // `deploy-miniapp-registry.js` runs; populated by `npm run sync:frontend-contracts`.
+  // Undeployed ⇒ the catalog says so and refuses every launch: a package is only ever fetched
+  // and executed against an Approved on-chain record (FR-010/FR-011), so "no registry" can
+  // never degrade into "run it anyway".
+  miniAppRegistry: '',
   // Staking control surface (spec 066). Empty until `deploy-staking-router.js` runs; sync populates it.
   // Undeployed ⇒ the member app falls back to spec-065 fee-free direct staking.
   stakingRouter: '',
@@ -69,12 +75,12 @@ const MORDOR_CONTRACTS = {
 const HARDHAT_CONTRACTS = {
   deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   treasury: '',
-  wagerRegistry: '0x260Fad26873AC132b34dD6FA5761DcfF0e26cbd0',
-  membershipManager: '0x81010Af3Ef2BBc092c898944D9D39E6c94124660',
+  wagerRegistry: '0x31F2B0a0d14a8814af2430154ee39E551b66BA8A',
+  membershipManager: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
   sanctionsGuard: '',
-  polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
-  paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
+  polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
+  paymentToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
@@ -84,6 +90,7 @@ const HARDHAT_CONTRACTS = {
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   safeProposalHub: '0x94b5b38C247CE51F7C42C83B63115998b7e970E7',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
@@ -114,6 +121,7 @@ const AMOY_CONTRACTS = {
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
+  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
@@ -156,6 +164,7 @@ const POLYGON_CONTRACTS = {
   safePolicyGuard: '0xa0F188776a65794cc06777412432e47dcB0d0c4B',
   policyGuardSetup: '0xD0CB9D0ca2E56e9552cb833eC6D16F86ce818C2b',
   callsignRegistry: '0x22BD6Dd351Db375b64C2886Bda6f3E3F4fd31dA2', // spec 054 — %callsign naming registry (synced after deploy)
+  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
@@ -261,6 +270,13 @@ export const DEPLOYED_CONTRACTS =
 // NOTE (spec 068): `safeProposalHub` MUST carry a deployment block on every custody chain —
 // `useVaultProposals` refuses to scan without one, so a missing entry silently disables custody
 // proposal discovery on that chain even when the hub itself is deployed.
+// NOTE (spec 073): `miniAppRegistry` carries a placeholder block (0 = unknown, per
+// getDeploymentBlockForChain) on every chain whose contract map declares the key, so the slot is
+// written down rather than remembered. `deploy-miniapp-registry.js` records the real block in
+// `deployments/`; copy it here by hand like every other entry. Unlike `safeProposalHub` above,
+// a missing block disables nothing today — catalog and launch reads are view calls (research
+// R6), never event scans — so a 0 here cannot make the Apps section look available before the
+// registry exists; availability comes from the address being non-empty and the record Approved.
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   63: {
     friendGroupMarketFactory: 15658191,
@@ -268,6 +284,7 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
     membershipVoucher: 16404315,
     wagerPoolFactory: 16495564,
     safeProposalHub: 16645531,
+    miniAppRegistry: 0,
   },
   // Custody-only chains (spec 068). `safeProposalHub` MUST carry a block on every custody chain or
   // useVaultProposals refuses to scan and proposal discovery is silently dead there.
@@ -275,15 +292,16 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   10: { safeProposalHub: 154753770 }, // Optimism
   8453: { safeProposalHub: 49158472 }, // Base
   42161: { safeProposalHub: 488059169 }, // Arbitrum One
-  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024 },
+  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
   137: {
     friendGroupMarketFactory: 0,
     wagerRegistry: 89717915,
     membershipVoucher: 89717915,
     wagerPoolFactory: 89720731,
     safeProposalHub: 90120743,
+    miniAppRegistry: 0,
   },
-  1337: { safeProposalHub: 4, safePolicyGuardV2: 2 },
+  1337: { safeProposalHub: 4, safePolicyGuardV2: 2, miniAppRegistry: 0 },
 }
 
 export const DEPLOYMENT_BLOCKS =
