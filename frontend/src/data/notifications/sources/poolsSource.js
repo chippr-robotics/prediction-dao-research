@@ -23,7 +23,28 @@ export const poolsSource = {
 
     let pools
     try {
-      const { createdPools = [], joinedPools = [] } = await loadMyWagersSources({ chainId, account })
+      const {
+        createdPools = [],
+        joinedPools = [],
+        poolsAvailable = false,
+      } = await loadMyWagersSources({ chainId, account })
+
+      /*
+       * AN UNREADABLE POOL SET IS NOT AN EMPTY ONE.
+       *
+       * `loadMyWagersSources` degrades a failed fetch to `[]` and never throws, so the `catch`
+       * below could not see a failure — this source reported `ok: true` with no pools, and the
+       * engine took that as a successful read: it replaced the pools snapshot map AND the
+       * action-needed map with `{}` on every 30s poll. A member whose pool had been cancelled got
+       * no "refund your buy-in" notification and an unlit badge, i.e. the app affirmatively said
+       * nothing needed attention, about money they could withdraw. The engine's own
+       * "couldn't refresh" disclosure stayed silent too, because nothing had reported a failure.
+       *
+       * `ok: false` retains the prior slice and the prior action-needed map, which is the honest
+       * answer to "I could not find out".
+       */
+      if (!poolsAvailable) return { ok: false }
+
       // Union created + joined, de-duped by pool address.
       const byAddr = new Map()
       for (const p of [...createdPools, ...joinedPools]) {

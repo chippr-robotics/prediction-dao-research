@@ -27,8 +27,8 @@
       "startBlock": 16422550
     },
     "WagerPoolFactory": {
-      "address": "0x0000000000000000000000000000000000000034",
-      "startBlock": 16404317
+      "address": "0xac78B4EdeF96e74a2653028dF93A26acFCfC613F",
+      "startBlock": 16495564
     }
   },
   "polygon-amoy": {
@@ -55,10 +55,6 @@
     "UMAOptimisticOracleV3Adapter": {
       "address": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88",
       "startBlock": 38841817
-    },
-    "WagerPoolFactory": {
-      "address": "0x0000000000000000000000000000000000000034",
-      "startBlock": 40521027
     }
   }
 }
