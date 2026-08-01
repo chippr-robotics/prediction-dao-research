@@ -30,7 +30,7 @@ describe('tenant config (spec 072)', () => {
     const brand = tenantBrand()
     expect(brand.displayName).toBe('FairWins')
     expect(brand.appUrl).toBe('https://fairwins.app')
-    expect(brand.htmlTitle).toBe('FairWins - Prediction Markets for Friends')
+    expect(brand.htmlTitle).toBe('FairWins - Multi-Chain Financial Platform')
     expect(brand.logo).toBe('/assets/logo_fairwins.svg')
     expect(brand.logoMark).toBe('/assets/fairwins_no-text_logo.svg')
     // Values from frontend/public/manifest.webmanifest

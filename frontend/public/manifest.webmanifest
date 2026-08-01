@@ -1,7 +1,7 @@
 {
   "name": "🍀FairWins",
   "short_name": "FairWins",
-  "description": "Open prediction markets where anyone can create, join, and resolve markets. Fair participation, transparent resolution, and privacy-preserving mechanisms for collective wisdom.",
+  "description": "A self-custody, multi-chain financial platform: payments, peer-to-peer wagers, prediction markets, collectibles, earning, swaps, bridging, Bitcoin, and multisig custody — one control plane, and you hold the keys.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",

@@ -6,8 +6,8 @@
   "identity": {
     "displayName": "FairWins",
     "legalName": "FairWins",
-    "tagline": "Prediction Markets for Friends",
-    "metaDescription": "FairWins - Open prediction markets where anyone can create, join, and resolve markets. Fair participation, transparent resolution, and privacy-preserving mechanisms for collective wisdom.",
+    "tagline": "Your multi-chain financial control plane — your money, your keys, every chain.",
+    "metaDescription": "FairWins is a self-custody, multi-chain financial platform: payments, peer-to-peer wagers, prediction markets, collectibles, earning, swaps, bridging, Bitcoin, and multisig custody — one control plane, and you hold the keys.",
     "domains": ["fairwins.app"],
     "appUrl": "https://fairwins.app",
     "docsUrl": "https://docs.FairWins.app",
@@ -16,7 +16,8 @@
     "social": {
       "x": "https://x.com/fairwins_app",
       "discord": "https://discord.gg/rkYvPFdRRr",
-      "github": "https://github.com/chippr-robotics/prediction-dao-research"
+      "github": "https://github.com/chippr-robotics/prediction-dao-research",
+      "instagram": "https://instagram.com/fairwinsapp"
     },
     "legal": { "termsPath": "/terms", "privacyPath": "/privacy", "riskPath": "/risk" }
   },
@@ -26,7 +27,7 @@
     "logoMark": "/assets/fairwins_no-text_logo.svg",
     "favicon": "/assets/logo_fairwins.svg",
     "appleTouchIcon": "/assets/fairwins_no-text_logo.svg",
-    "htmlTitle": "FairWins - Prediction Markets for Friends",
+    "htmlTitle": "FairWins - Multi-Chain Financial Platform",
     "pwa": {
       "name": "🍀FairWins",
       "shortName": "FairWins",
