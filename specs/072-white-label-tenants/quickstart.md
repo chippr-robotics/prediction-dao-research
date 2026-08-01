@@ -45,5 +45,8 @@ behavior; existing suites must pass unmodified.
 ## Lifecycle
 
 Edit `lifecycle` in the manifest via PR (auditable): `draft → live ⇄ suspended → retired`.
+Only a `live` tenant can produce a **production** build (the tenant-branding Vite plugin
+refuses otherwise); preview a `draft` tenant with a non-production mode, e.g.
+`VITE_TENANT_ID=<id> npx vite build --mode staging`.
 Suspension serves the unavailability shell and never traps value — members retain the
 documented direct-contract claim path.

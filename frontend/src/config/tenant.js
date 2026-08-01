@@ -9,14 +9,18 @@
  * (spec 072 FR-007), so a built instance physically contains only its own
  * tenant's identity.
  *
- * An unknown tenant id fails at module init (fail loudly, FR-008) — it must
- * never silently fall back to another tenant's identity.
+ * An unknown tenant id fails the BUILD (the tenant-branding Vite plugin throws
+ * while resolving the virtual module) — it must never silently fall back to
+ * another tenant's identity.
+ *
+ * Only the active tenant's manifest exists in the bundle: `virtual:tenant` is
+ * provided by frontend/vite-plugins/tenant-branding.js and injects exactly one
+ * manifest. A built instance physically contains no other tenant's identity
+ * (spec 072, research D2) — which is also why resolveTenant() can only answer
+ * for the active tenant.
  */
 
-// Eagerly bundle every manifest + the feature catalog at build time. The glob
-// is relative to this file (frontend/src/config/ -> repo root /tenants).
-const manifestModules = import.meta.glob('../../../tenants/*/manifest.json', { eager: true })
-const featureCatalogModules = import.meta.glob('../../../tenants/features.json', { eager: true })
+import { activeTenantManifest, featureCatalog } from 'virtual:tenant'
 
 export const DEFAULT_TENANT_ID = 'fairwins'
 
@@ -28,47 +32,23 @@ function deepFreeze(value) {
   return value
 }
 
-function buildManifestIndex() {
-  const index = {}
-  for (const [modulePath, module] of Object.entries(manifestModules)) {
-    const match = modulePath.match(/\/tenants\/([^/]+)\/manifest\.json$/)
-    if (!match) continue
-    const dirId = match[1]
-    const manifest = module.default ?? module
-    if (manifest.id !== dirId) {
-      throw new Error(
-        `[tenant] manifest id "${manifest.id}" does not match its directory "tenants/${dirId}/" — refusing to load`
-      )
-    }
-    index[dirId] = deepFreeze(manifest)
-  }
-  return index
-}
-
-const MANIFESTS = buildManifestIndex()
-
-const FEATURE_CATALOG = deepFreeze(
-  Object.values(featureCatalogModules).map((m) => m.default ?? m)[0]?.features ?? []
-)
+const ACTIVE_TENANT = deepFreeze(activeTenantManifest)
+const FEATURE_CATALOG = deepFreeze(featureCatalog ?? [])
 
 /**
- * Resolve a tenant id to its manifest. Throws on unknown ids — absence must
- * never resolve to another tenant's identity.
+ * Resolve a tenant id to its manifest. Only the active tenant is present in
+ * this build (one origin = one tenant, FR-007); any other id throws.
  */
 export function resolveTenant(tenantId) {
-  const manifest = MANIFESTS[tenantId]
-  if (!manifest) {
-    const known = Object.keys(MANIFESTS).sort().join(', ')
+  if (tenantId !== ACTIVE_TENANT.id) {
     throw new Error(
-      `[tenant] unknown tenant id "${tenantId}" (known: ${known}). ` +
-        'Author tenants/<id>/manifest.json and run `npm run tenants:validate`.'
+      `[tenant] unknown tenant id "${tenantId}" — this build serves only "${ACTIVE_TENANT.id}" ` +
+        '(one origin = one tenant, spec 072 FR-007). Build with VITE_TENANT_ID=<id> after authoring ' +
+        'tenants/<id>/manifest.json and running `npm run tenants:validate`.'
     )
   }
-  return manifest
+  return ACTIVE_TENANT
 }
-
-const ACTIVE_TENANT_ID = import.meta.env.VITE_TENANT_ID || DEFAULT_TENANT_ID
-const ACTIVE_TENANT = resolveTenant(ACTIVE_TENANT_ID)
 
 /** The full frozen manifest of the tenant this build serves. */
 export function getActiveTenant() {
