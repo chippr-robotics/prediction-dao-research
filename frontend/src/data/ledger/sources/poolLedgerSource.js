@@ -4,11 +4,24 @@
  *   PoolMember  → pool_join   (buy-in escrowed; out)
  *   PoolClaim   → pool_claim  (winning share paid; in)
  *   PoolRefund  → pool_refund (buy-in returned; in)
- * All three carry real txHash + block timestamp. On chains without a
- * subgraph the source returns [] — pool history there is a disclosed gap
- * until pools ship an RPC enumeration path (FR-013 disclosure).
+ * All three carry real txHash + block timestamp.
+ *
+ * ON A CHAIN WITH NO SUBGRAPH THIS SOURCE REFUSES rather than returning [].
+ * It used to return an empty array with the comment "disclosed gap" — but the
+ * disclosure did not exist: `ledgerRepository` records a class in
+ * `staleClasses` only when its promise REJECTS, and an empty array is a
+ * fulfilled one. So on Mordor, which has a LIVE WagerPoolFactory and no
+ * subgraph, every pool join, claim and refund was silently absent from the tax
+ * report, and the report presented its total as complete. There is no RPC
+ * enumeration path for pools, so this source is the only producer of
+ * LEDGER_CLASS.POOL anywhere — its silence was the whole class going missing.
+ *
+ * The refusal is CONDITIONAL on the factory actually being deployed on that
+ * chain. On Ethereum Classic there are no pools at all, so an empty result is
+ * the truth and flagging a gap would be a false alarm.
  */
 import { querySubgraph } from './subgraphClient'
+import { getContractAddressForChain } from '../../../config/contracts'
 import { onchainEntryId } from '../identity'
 import { LEDGER_CLASS, LEDGER_STATUS, PROVENANCE, TS_PROVENANCE } from '../constants'
 
@@ -65,7 +78,15 @@ export function createPoolLedgerSource(deps = {}) {
     class: LEDGER_CLASS.POOL,
     async list({ account, chainId }) {
       const data = await query(chainId, POOL_ACTIVITY_QUERY, { member: account })
-      if (!data) return [] // no subgraph on this chain — disclosed gap
+      if (!data) {
+        // No subgraph here. If pools exist on this chain, the member HAS pool
+        // history we cannot read — say so, so the report discloses the gap
+        // instead of totalling as if it were complete.
+        if (getContractAddressForChain('wagerPoolFactory', chainId)) {
+          throw new Error(`pool ledger: chain ${chainId} has pools but no subgraph to read them from`)
+        }
+        return [] // no pool factory on this chain — an empty result is the truth
+      }
       const entries = []
       for (const m of data.poolMembers || []) {
         entries.push(
