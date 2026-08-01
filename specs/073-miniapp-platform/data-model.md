@@ -10,10 +10,11 @@
 | `name` | `string` | Bounded (`MAX_NAME_LENGTH`); display identity, uniqueness on `nameKey = keccak256(lowercase)` |
 | `description` | `string` | Bounded (`MAX_DESCRIPTION_LENGTH`) |
 | `category` | `uint8` (`Category` enum) | TradeSettlement, Reconciliation, TreasuryLiquidity, IdentityCompliance, AssetServicing, ReportingAudit |
-| `status` | `uint8` (`Status` enum) | Pending, Approved, Suspended, Deprecated |
+| `status` | `uint8` (`Status` enum) | Pending, Approved, Suspended, Deprecated — the REVIEW state, not the serving decision (see `isLaunchable`) |
 | `approved` | `PackageRef` | **The only tuple ever served.** Zeroed until first approval |
-| `proposed` | `PackageRef` | Set by submit/update; zeroed on promotion or rejection-by-deprecate |
+| `proposed` | `PackageRef` | Set by submit/update; zeroed on promotion, rejection, or deprecation |
 | `submittedAt` / `approvedAt` / `updatedAt` | `uint64` | Block timestamps |
+| `lastVersion` | `uint64` | High-water mark of every version ever issued, including rejected ones (I6). Packs with the timestamps |
 
 ### PackageRef
 
@@ -35,22 +36,43 @@
 
 ### State transitions
 
+Every curator action on a package names the `manifestHash` it reviewed (`h`), and reverts
+`StaleProposal` if the record no longer holds it — see I2.
+
 ```text
 (none) --submitApp(vendor)--------------------> Pending   [proposed = tuple, approved = ∅]
-Pending --approveApp(curator)-----------------> Approved  [approved = proposed; proposed = ∅; approvedAt]
-Approved --submitUpdate(vendor)---------------> Pending   [proposed = new tuple; approved UNCHANGED — still served]
-Pending(w/ approved) --approveApp(curator)----> Approved  [promote proposed]
-Approved --suspendApp(curator)----------------> Suspended [approved retained, not served]
-Suspended --approveApp(curator)---------------> Approved  [reversible]
+Pending --approveApp(curator, h)--------------> Approved  [approved = proposed; proposed = ∅; approvedAt]
+Approved --submitUpdate(vendor)---------------> Pending   [proposed = new tuple; approved UNCHANGED — STILL SERVED]
+Pending(w/ approved) --approveApp(curator, h)-> Approved  [promote proposed]
+any(w/ proposed) --rejectProposal(curator, h)-> Approved if previously approved, else Pending [proposed = ∅]
+Approved|Pending --suspendApp(curator)--------> Suspended [approved retained, NOT served]
+Suspended --approveApp(curator, h)------------> Approved  [reversible; reject an armed proposal first]
 any except Deprecated --deprecateApp(curator)-> Deprecated [terminal; proposed = ∅]
 ```
 
+**Serving is not the same question as status.** `isLaunchable(id)` (mirrored as `AppView.launchable`)
+is the on-chain serving decision: `approved.cid != ""` AND status ∉ {Suspended, Deprecated}. A Pending
+record **can** be launchable — that is a live app with an update in review, still serving its last
+reviewed package (FR-003). Deriving launchability from `status == Approved` would hand every vendor an
+offline switch for their own live app.
+
 Invariants:
 - I1: `approved.cid` non-empty ⇔ the app has ever been Approved; hosts serve **only** `approved`.
-- I2: `submitUpdate` never touches `approved`; `approveApp` is the only promotion path.
+- I2: `submitUpdate` never touches `approved`, and `approveApp` — the only promotion path — is
+  **content-committed**: the curator passes the reviewed `manifestHash` and the call reverts if the
+  record has changed. An id-only approval is a time-of-check/time-of-use hole: multisig calldata is
+  public for as long as signatures take to collect, so a vendor could swap the tuple (or simply
+  front-run) and have unreviewed bytes promoted under a curator's signature. `rejectProposal` carries
+  the same guard so a fresh submission cannot be discarded by a stale rejection.
 - I3: Deprecated is terminal — every mutating call on a Deprecated app reverts.
 - I4: metadata edits (name/description/category) by vendor also force `status = Pending`.
-- I5: vendor-only for submit/update; curator-only for approve/suspend/deprecate; admin-only for gating config.
+- I5: vendor-only for submit/update; curator-only for approve/reject/suspend/deprecate; admin-only for
+  gating config. `APP_CURATOR_ROLE` **administers itself** (`_setRoleAdmin`), so the gate admin cannot
+  self-grant curation — without that, the separation would be decorative, since OpenZeppelin defaults
+  every role's admin to `DEFAULT_ADMIN_ROLE`. `UPGRADER_ROLE` remains a strict superset by construction.
+- I6: versions are monotonic per app and **never reused**, including across rejections — a persisted
+  high-water mark (`lastVersion`), not a value derived from the live tuples, so a compliance log cannot
+  say "v2 rejected" and later "v2 approved" about different bytes.
 
 ## 2. Package: manifest schema (`manifest.json`, hashed on-chain)
 
