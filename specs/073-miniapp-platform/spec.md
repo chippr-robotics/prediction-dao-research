@@ -133,9 +133,9 @@ The host is installable as a progressive web app on enterprise desktops. It prec
 
 **Registry & Lifecycle**
 
-- **FR-001**: The system MUST maintain an on-chain registry as the single source of truth for each mini-app's identity, vendor address, name, description, operational category, current package content identifier, manifest hash, version, lifecycle status, and submission/approval timestamps.
+- **FR-001**: The system MUST maintain an on-chain registry as the single source of truth for each mini-app's identity, vendor address, name, description, operational category, lifecycle status, submission/approval timestamps, and package artifacts. Each record holds up to two package tuples (content identifier + manifest hash + version): the **approved tuple** — the only one ever served to users — and, while an update awaits re-approval, a **proposed tuple**. Curator approval promotes the proposed tuple to approved; no off-chain state decides what is served.
 - **FR-002**: The registry MUST support the lifecycle states Pending, Approved, Suspended, and Deprecated, with transitions restricted to: submission → Pending; curator approval → Approved; curator suspension → Suspended (reversible to Approved); curator deprecation → Deprecated (terminal).
-- **FR-003**: Any change to an app's package content identifier, manifest hash, or reviewed metadata MUST immediately reset its status to Pending; the previously Approved version remains the served version until the new one is approved.
+- **FR-003**: Any change to an app's package content identifier, manifest hash, or reviewed metadata MUST immediately reset its status to Pending, recording the changed package as the record's proposed tuple; the approved tuple (the previously Approved version) remains the served version until the curator promotes the proposed tuple.
 - **FR-004**: Lifecycle actions (approve, suspend, deprecate) MUST be restricted on-chain to a curator role held by a multisig or governance account; vendor-of-record is the only non-platform account able to update its own app's submission fields.
 - **FR-005**: Every registry mutation MUST emit an event sufficient for off-chain indexing and reviewer notification.
 - **FR-006**: The registry MUST reject duplicate app identifiers and record the submitting vendor address immutably per app.
@@ -149,7 +149,7 @@ The host is installable as a progressive web app on enterprise desktops. It prec
 **Launch Integrity & Runtime**
 
 - **FR-010**: On every launch request the host MUST re-verify Approved status from the registry (or a registry-derived index whose staleness is bounded and disclosed) before any package code executes.
-- **FR-011**: The host MUST fetch packages only by the registry's current content identifier from configured private gateway(s), and MUST verify the package's manifest hash against the on-chain value before executing any of its code; on mismatch, nothing from the package executes and the failure is logged and shown to the user.
+- **FR-011**: The host MUST fetch packages only by the registry's **approved tuple** (never a proposed, not-yet-approved tuple) from configured private gateway(s), and MUST verify the package's manifest hash against the approved tuple's on-chain value before executing any of its code; on mismatch, nothing from the package executes and the failure is logged and shown to the user.
 - **FR-012**: The host MUST provide gateway failover: if the primary gateway is unreachable, configured fallbacks are tried before surfacing an availability error.
 - **FR-013**: Mounted mini-apps MUST receive only a controlled host context — wallet/transaction interface, their own namespaced shared store, audit logging, notification (toast) surface, and workspace navigation — and MUST NOT receive raw key material, unscoped storage access, or host-internal privileged interfaces.
 - **FR-014**: Mini-app styling MUST be scoped such that it cannot alter host or sibling-app presentation.
@@ -187,7 +187,7 @@ The host is installable as a progressive web app on enterprise desktops. It prec
 
 ### Key Entities
 
-- **Mini-App Record**: The on-chain unit of governance — identity, vendor address, name, description, operational category, current content identifier, manifest hash, version, lifecycle status, submission/approval timestamps.
+- **Mini-App Record**: The on-chain unit of governance — identity, vendor address, name, description, operational category, lifecycle status, submission/approval timestamps, an approved package tuple (content identifier + manifest hash + version; the only tuple ever served), and, while re-review is pending, a proposed package tuple awaiting curator promotion.
 - **Mini-App Package**: The content-addressed deliverable — manifest plus entry module and scoped assets; immutable per content identifier.
 - **Manifest**: The package's self-description and runtime contract — identity, entry point, version, declared permissions, shared-state keys; its hash is the on-chain integrity anchor.
 - **Catalog Entry**: The user-facing projection of an Approved record — display fields, category, launch affordance.
