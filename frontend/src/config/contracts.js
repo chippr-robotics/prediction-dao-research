@@ -297,11 +297,20 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   8453: { safeProposalHub: 49158472 }, // Base
   42161: { safeProposalHub: 488059169 }, // Arbitrum One
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
+  // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
+  // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
+  // a recorded block LATER than the real creation silently drops any event in between. The
+  // wagerRegistry bisection matched its recorded value exactly, which is what validates the rest.
   137: {
     friendGroupMarketFactory: 0,
     wagerRegistry: 89717915,
-    membershipVoucher: 89717915,
-    wagerPoolFactory: 89720731,
+    membershipVoucher: 89717905, // measured (was 89717915 — 10 blocks late)
+    membershipManager: 89717895, // measured
+    tokenFactory: 89717942, // measured
+    wagerPoolFactory: 89720740, // measured (was 89720731)
+    chainlinkDataFeedAdapter: 87937162, // measured
+    chainlinkFunctionsAdapter: 87937176, // measured
+    umaAdapter: 87937184, // measured
     safeProposalHub: 90120743,
     miniAppRegistry: 91265680,
   },

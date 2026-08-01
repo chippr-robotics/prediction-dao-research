@@ -23,32 +23,79 @@ or from the stakes recorded on the `Wager` at creation (opponent deposit, refund
 
 ## Per-network config (no genesis indexing)
 
-Addresses + start blocks live in [`networks.json`](./networks.json), sourced from
-`deployments/<net>-v2.json` (`deployBlocks.*`). Never `0x0` / `startBlock: 0`
-— indexing from genesis is what caused the RPC issue this work removes.
+Addresses + start blocks live in [`networks.json`](./networks.json). Never `0x0` /
+`startBlock: 0` — indexing from genesis is what caused the RPC issue this work removed.
+**Never a placeholder address either**: a sentinel like `0x…0034` indexes nothing forever
+and does it with a 200 and no errors, which is indistinguishable from a truthful empty
+result. `frontend/src/test/subgraphNetworksParity.test.js` fails the build on both.
 
-Use The Graph's **canonical** network ids (Studio rejects aliases): Polygon
-mainnet is `matic` (not `polygon`); Amoy is `polygon-amoy`.
+Use The Graph's **canonical** network ids (Studio rejects aliases): Polygon mainnet is
+`matic` (not `polygon`); Amoy is `polygon-amoy`.
 
-The manifest's inline defaults target **`polygon-amoy`** — the membership voucher
-feature (spec 026) is live on Amoy + Mordor only, so a bare `graph build` produces
-a valid, fully-featured subgraph. `matic` carries `WagerRegistry` only until the
-voucher + redemption manager ship to mainnet, so `graph build --network matic`
-fails by design (`'MembershipVoucher' was not found in the 'matic' configuration`).
+### `graph build --network <net>` requires EVERY data source (graph-cli 0.80)
 
-| Network (manifest id) | chainId | WagerRegistry | MembershipVoucher | MembershipManager | Oracle adapters¹ |
-|-----------------------|--------:|--------------:|------------------:|------------------:|-----------------:|
-| matic (Polygon mainnet) | 137 | 88118344 | — (deferred) | — (deferred) | — (deferred) |
-| mordor | 63 | 16404317 | 16404315 | 16404308 | n/a (no adapters) |
-| polygon-amoy | 80002 | 40521027 | 40521024 | 40521018 | 38841810 / 38841814 / 38841817 |
+The CLI does **not** defer a data source that is missing from the network config — it
+fails the build:
 
-¹ **Oracle adapters** (issue #751): `ChainlinkDataFeedOracleAdapter`,
-`ChainlinkFunctionsOracleAdapter`, `UMAOptimisticOracleV3Adapter`, indexed into
-`OracleCondition` + `OracleMarketLink`. They are deployed on Amoy + Polygon
-mainnet only — **Mordor has no oracle adapters** (oracle resolution is out of
-scope on ETC per spec 015), so `graph build --network mordor` does not carry
-these data sources. On `matic` they are deferred alongside the voucher/manager
-until the mainnet UUPS migration lands.
+```
+✖ Failed to update sources network: 'TokenFactory' was not found in the 'polygon-amoy'
+  configuration, please update!
+```
+
+So a network is buildable only when `networks.json` names all eight data sources.
+**Today only `matic` is.** `--network mordor` fails on the oracle adapters and
+`--network polygon-amoy` fails on `TokenFactory`; both were already true before the
+2026-08-01 Polygon redeploy. Note `graph build --network <net>` also REWRITES
+`subgraph.yaml` in place (network, address, startBlock) and strips its comments — the
+checked-in manifest therefore reflects whichever network was built last, currently
+`matic`, and durable guidance belongs in this README rather than in the manifest.
+
+### Where each network stands (measured 2026-08-01)
+
+| Network | chainId | Graph deployment | Buildable | Notes |
+|---|--:|---|---|---|
+| `matic` (Polygon) | 137 | `fairwins-polygon` **v0.3.0** | yes | all 8 data sources |
+| `mordor` | 63 | **none, and none planned** | no (adapters) | `subgraphUrl` is null; the app reads over RPC |
+| `polygon-amoy` | 80002 | `fairwins-amoy` v0.3.0 | no (TokenFactory) | no `WagerPoolFactory` exists on Amoy |
+
+**Mordor and Ethereum Classic have no subgraph and are not getting one.** The `mordor`
+block in `networks.json` is build config for a self-hosted node only; nothing the app
+reads is served from it. Consumers must degrade honestly there — see
+`frontend/src/components/tokens/tokenSubgraph.js` for the three-outcome pattern
+(`no-subgraph` / `not-indexed` / `unreachable`).
+
+### Start blocks are MEASURED, not reported
+
+Polygon's blocks were bisected with `eth_getCode` against an archive node rather than
+taken from a deploy script's report. The two disagreed by up to ten blocks, and a
+recorded block LATER than the real creation silently drops every event in between
+(`membershipVoucher` was reported ten blocks late). The `wagerRegistry` bisection matched
+its recorded value exactly, which is what validates the rest.
+
+| matic data source | address | startBlock |
+|---|---|--:|
+| `WagerRegistry` | `0xE878b628…` | 89717915 |
+| `MembershipVoucher` | `0xCB28DC43…` | 89717905 |
+| `MembershipManager` | `0xEfd1a880…` | 89717895 |
+| `TokenFactory` | `0x5806e76c…` | 89717942 |
+| `WagerPoolFactory` | `0x420aEC3c…` | 89720740 |
+| `ChainlinkDataFeedOracleAdapter` | `0x7ae8220D…` | 87937162 |
+| `ChainlinkFunctionsOracleAdapter` | `0x148C2E34…` | 87937176 |
+| `UMAOptimisticOracleV3Adapter` | `0x8224433d…` | 87937184 |
+
+### Why v0.2.0 was replaced
+
+`matic` indexed WagerRegistry `0x5023765809…` — the abandoned **pre-UUPS** registry
+(`nextWagerId() == 1`, no wager ever created) — while the app reads `0xE878b628…`
+(`nextWagerId() == 3`). The subgraph answered every Polygon wager query with an empty
+list: HTTP 200, no GraphQL errors, `hasIndexingErrors: false`, minutes behind head. The
+Account dashboard told members with live wagers "No activity yet", and the tax report
+omitted every Polygon wager with no coverage note.
+
+**No client-side defence can catch that** — a well-formed `{"data":{"wagers":[]}}` is
+byte-identical to a truthful zero. The only place the two are distinguishable is this
+config, which is why the parity test above compares every address and start block
+against `frontend/src/config/contracts.js`.
 
 ## Build, test, deploy
 
@@ -60,23 +107,35 @@ npm --prefix .. run sync:frontend-contracts:polygon   # emits ../frontend/src/ab
 
 # 2. Codegen + build + unit tests:
 npm run codegen
-npm run build            # default = polygon-amoy. Other nets: graph build --network <mordor|matic>
-                         # NOTE: `--network <net>` rewrites subgraph.yaml in place (and strips
-                         # comments). Restore it afterwards: git checkout -- subgraph.yaml
+npm run build            # builds subgraph.yaml AS CHECKED IN (currently matic)
+                         # NOTE: `--network <net>` rewrites subgraph.yaml in place and strips
+                         # its comments. Restore afterwards: git checkout -- subgraph.yaml
 npm test                 # Matchstick (graph test). On platforms whose prebuilt
                          # binary is unsupported, run: npx graph test -d  (Docker)
 
-# 3. Deploy one subgraph per network (Graph Studio). The Studio slug differs per
-#    network; build+deploy in one step with --network (reads networks.json):
-graph auth <DEPLOY_KEY>  # secret — keep in local .env, never commit
-graph deploy fairwins-amoy    --studio --network polygon-amoy -l <ver>   # Amoy testnet (80002) — wagers + vouchers
-# Polygon mainnet (matic, 137): wagers only until the voucher + redemption manager
-# ship to mainnet (add their matic entries to networks.json first):
-graph deploy fairwins-polygon --studio --network matic        -l <ver>
-# Mordor (63) is not supported by Studio -> no subgraph; the frontend uses the
-# bounded RPC fallback for it (research R2). `npm run build:mordor` is for a
-# self-hosted graph-node only.
+# 3. Deploy (Graph Studio). One subgraph per network; the slug differs per network.
+#    The deploy key lives in the repo-root .env as GRAPH_DEPLOY (NOT GRAPH_API_KEY,
+#    which is a query key) — secret, never committed.
+KEY=$(grep '^GRAPH_DEPLOY=' ../.env | cut -d= -f2-)
+
+# Polygon mainnet (matic, 137) — the live deployment, all 8 data sources:
+npx graph build --network matic
+npx graph deploy fairwins-polygon --node https://api.studio.thegraph.com/deploy/ \
+    --deploy-key "$KEY" --version-label v0.3.0
+# Do NOT pass --ipfs: the Studio node supplies its own. Passing an unrelated
+# gateway fails with "Failed to upload file to IPFS: fetch failed".
+
+# Amoy (80002): NOT currently buildable — networks.json has no TokenFactory entry
+# and the CLI refuses to defer it. Add one (or drop the data source) first.
+# Mordor (63): no Studio support and no deployment, by decision. `build:mordor`
+# is for a self-hosted graph-node only, and also fails today (no oracle adapters).
 ```
+
+**After deploying, wait for the new version to reach chain head before pointing the app
+at it.** A syncing subgraph answers with partial data and no error, which is the same
+class of silent wrongness the redeploy was fixing — check
+`{ _meta { block { number } hasIndexingErrors } }` against the chain head, then bump
+`subgraphUrl` in `frontend/src/config/networks.js`.
 
 Set the resulting endpoint as `VITE_SUBGRAPH_URL` (per network) in the frontend
 `.env`; see `frontend/.env.example`.
