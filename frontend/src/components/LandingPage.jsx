@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import Footer from './Footer'
-import { useChainTokens } from '../hooks/useChainTokens'
 import { tenantBrand, tenantLinks, isFeatureEnabled } from '../config/tenant'
 import './LandingPage.css'
 
@@ -34,7 +33,6 @@ const SOCIAL_ICONS = {
 function LandingPage() {
   const navigate = useNavigate()
   const [visibleSections, setVisibleSections] = useState(new Set())
-  const { native: nativeSymbol } = useChainTokens()
   const brand = tenantBrand()
   const { support, social } = tenantLinks()
 
@@ -79,19 +77,20 @@ function LandingPage() {
         <div className="hero-content">
           <div className="hero-badge">
             <span className="hero-badge-dot" />
-            Self-custody · Multi-chain
+            Self-Custody · Multi-Chain · White-Label
           </div>
 
           <h1 className="hero-headline">
-            Every Chain.<br />
-            <span className="hero-headline-accent">One Platform.</span><br />
-            Your Keys.
+            Digital Asset<br />
+            <span className="hero-headline-accent">Infrastructure.</span><br />
+            Your Brand.
           </h1>
 
           <p className="hero-subtitle">
-            Your financial control plane: pay, wager, trade prediction markets,
-            earn, swap, bridge, and manage Bitcoin and multisig vaults — across
-            every chain you use, and you hold the keys the whole time.
+            {brand.displayName} is the platform layer for digital asset products:
+            embedded wallets, policy-governed custody, payments and settlement,
+            markets connectivity, and built-in compliance — across major networks,
+            with keys your users hold.
           </p>
 
           <div className="hero-actions">
@@ -126,18 +125,18 @@ function LandingPage() {
           <div className="preview-card">
             <div className="preview-card-header">
               <div className="preview-status-live" />
-              <span className="preview-label">Live Wager</span>
+              <span className="preview-label">Vault Transfer</span>
             </div>
-            <div className="preview-question">Will BTC close above $150k on New Year&apos;s Eve?</div>
+            <div className="preview-question">Transfer 25,000 USDC · Operations vault</div>
             <div className="preview-stakes">
               <div className="preview-stake">
-                <span className="preview-stake-label">Your stake</span>
-                <span className="preview-stake-value">0.5 {nativeSymbol}</span>
+                <span className="preview-stake-label">Approvals</span>
+                <span className="preview-stake-value">2 of 3</span>
               </div>
-              <div className="preview-vs">VS</div>
+              <div className="preview-vs">→</div>
               <div className="preview-stake">
-                <span className="preview-stake-label">Their stake</span>
-                <span className="preview-stake-value">0.5 {nativeSymbol}</span>
+                <span className="preview-stake-label">Policy check</span>
+                <span className="preview-stake-value">Passed</span>
               </div>
             </div>
             <div className="preview-resolution">
@@ -145,23 +144,23 @@ function LandingPage() {
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              Escrowed on-chain · resolves with a challenge period
+              Signed by vault owners · settled on-chain
             </div>
           </div>
         </div>
       </section>
 
-      {/* The Platform - Feature Pillars */}
+      {/* The Platform - Capability Pillars */}
       <section className={`value-section ${isVisible('value-props') ? 'visible' : ''}`} id="features">
         <div className="container" id="value-props" data-animate>
           <div className="section-header">
             <span className="section-tag">The Platform</span>
-            <h2 className="section-title">Everything your money can do,<br />in one place</h2>
+            <h2 className="section-title">Everything a digital asset product needs,<br />in one stack</h2>
             <p className="section-subtitle">
-              {brand.displayName} started as peer-to-peer wagering. Today it is a
-              self-custody financial control plane spanning Polygon, Ethereum and its
-              L2s, Ethereum Classic, and Bitcoin — send, bet, trade, collect, earn,
-              swap, and bridge without ever handing over your funds.
+              {brand.displayName} combines the components you would otherwise assemble
+              from multiple vendors — wallets, custody, payments, markets, and
+              compliance — in one self-custody platform spanning Ethereum and its L2s,
+              Polygon, Ethereum Classic, and Bitcoin.
             </p>
           </div>
 
@@ -173,12 +172,12 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Your portfolio, your keys</h3>
+              <h3>Unified custody &amp; portfolio</h3>
               <p>
-                See every asset you actually hold on-chain — tokens, stablecoins, positions,
-                and collectibles — organized and priced in one portfolio, with your full
-                activity in a single ledger. Your wallet signs every action — the platform
-                never takes custody of your funds.
+                Every on-chain asset — tokens, stablecoins, positions, and collectibles —
+                organized and priced in one portfolio view, with a complete activity
+                ledger. Users sign every action with their own keys; the platform never
+                takes custody of funds.
               </p>
             </div>
 
@@ -189,24 +188,22 @@ function LandingPage() {
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
               </div>
-              <h3>Transfer</h3>
-              <p>Pay and request money like a payments app — big numpad, QR codes, address book, and USDC by default. Gasless sends mean no gas token required to move your money.</p>
+              <h3>Payments &amp; settlement</h3>
+              <p>Stablecoin transfers and requests with QR codes, address book, and gasless rails — recipients settle in USDC without holding a gas token, and every transfer is screened before it moves.</p>
             </div>
 
-            {isFeatureEnabled('wagers') && (
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M8 6h13M8 12h13M8 18h13" />
-                  <path d="M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
                 </svg>
               </div>
-              <h3>Wager</h3>
-              <p>Head-to-head bets, open challenges, and group pools. Smart contracts escrow the stakes; outcomes settle by oracle or by the people you choose, with challenge periods to keep it fair.</p>
+              <h3>Embedded wallets</h3>
+              <p>Passkey smart accounts open with a fingerprint or face — no seed phrases, no extensions, optional sponsored gas — alongside support for external wallets and hardware signers via WalletConnect.</p>
             </div>
-            )}
 
-            {isFeatureEnabled('predict') && (
+            {(isFeatureEnabled('predict') || isFeatureEnabled('wagers')) && (
             <div className="value-card">
               <div className="value-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -214,8 +211,8 @@ function LandingPage() {
                   <polyline points="17 6 23 6 23 12" />
                 </svg>
               </div>
-              <h3>Predict</h3>
-              <p>Browse and trade real Polymarket prediction markets without leaving the app. Your own wallet signs every order, and every fee is disclosed before you commit.</p>
+              <h3>Markets connectivity</h3>
+              <p>Direct order flow into Polymarket prediction markets and escrowed peer-to-peer settlement with oracle resolution (Polymarket, Chainlink, UMA) — user wallets sign every order, and every fee is disclosed before commitment.</p>
             </div>
             )}
 
@@ -228,8 +225,8 @@ function LandingPage() {
                   <polyline points="21 15 16 10 5 21" />
                 </svg>
               </div>
-              <h3>Collect</h3>
-              <p>Your NFTs, alongside the rest of your portfolio — with live floor prices and best offers. List and sell through OpenSea right from your collection.</p>
+              <h3>Digital collectibles</h3>
+              <p>NFT holdings with live floor prices and best offers, listed and sold through OpenSea from inside the platform — valuation and liquidity in the same view as the rest of the portfolio.</p>
             </div>
             )}
 
@@ -243,8 +240,8 @@ function LandingPage() {
                   <path d="M12 12c3 0 5-2 5-5-3 0-5 2-5 5z" />
                 </svg>
               </div>
-              <h3>Earn</h3>
-              <p>Put idle assets to work in audited third-party lending vaults. Watch positions grow, claim rewards, and withdraw whenever you want — explained in plain language.</p>
+              <h3>Yield</h3>
+              <p>Idle assets deployed into audited third-party lending vaults, liquid staking, and supplied liquidity — positions stay withdrawable, rates and fees are disclosed before signature.</p>
             </div>
             )}
 
@@ -258,11 +255,11 @@ function LandingPage() {
                   <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                 </svg>
               </div>
-              <h3>Swap</h3>
-              <p>Exchange tokens through the right DEX for whichever chain you&apos;re on — Uniswap on Polygon and Ethereum networks, ETCswap on Ethereum Classic. Always labeled honestly.</p>
+              <h3>Trading &amp; liquidity</h3>
+              <p>Token execution through the right venue per network — Uniswap on Ethereum, L2s, and Polygon; ETCswap on Ethereum Classic — with honest venue labeling on every quote.</p>
             </div>
             )}
-          
+
             {isFeatureEnabled('bridge') && (
             <div className="value-card">
               <div className="value-icon">
@@ -272,8 +269,8 @@ function LandingPage() {
                   <path d="M8 18v-4M12 18v-6M16 18v-4" />
                 </svg>
               </div>
-              <h3>Bridge</h3>
-              <p>Move assets between chains through Across. Deposits refund straight to you if they can&apos;t be filled — the router never holds your funds, by design.</p>
+              <h3>Cross-chain</h3>
+              <p>Asset bridging via Across with a no-custody router: deposits that cannot be filled refund straight to the sender, and platform contracts never hold funds in flight.</p>
             </div>
             )}
 
@@ -286,19 +283,19 @@ function LandingPage() {
                 </svg>
               </div>
               <h3>Bitcoin</h3>
-              <p>A real Bitcoin wallet beside your EVM accounts — rotating receive addresses, honest fee quotes before you sign, and keys that never leave your device.</p>
+              <p>A native Bitcoin wallet beside the EVM accounts — rotating receive addresses, honest fee quotes before signing, and keys derived and held on the user&apos;s device.</p>
             </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* How It Works - Visual Timeline */}
+      {/* White-label offering - Visual Timeline */}
       <section className={`steps-section ${isVisible('steps-area') ? 'visible' : ''}`} id="how-it-works">
         <div className="container" id="steps-area" data-animate>
           <div className="section-header">
-            <span className="section-tag">How It Works</span>
-            <h2 className="section-title">Three steps. That's it.</h2>
+            <span className="section-tag">White-Label</span>
+            <h2 className="section-title">Your platform, from configuration</h2>
           </div>
 
           <div className="steps-timeline">
@@ -309,11 +306,12 @@ function LandingPage() {
                 <span>1</span>
               </div>
               <div className="step-content">
-                <h3>Connect</h3>
+                <h3>Provision</h3>
                 <p>
-                  Create a passkey account with just your fingerprint or face — no seed
-                  phrase, no gas token needed to start. Already have a wallet? Connect
-                  your browser or mobile wallet instead.
+                  Stand up a branded instance from a validated configuration manifest:
+                  your identity, theme, domain, feature set, and networks — with a
+                  dedicated, isolated contract deployment where assets and
+                  administration must be yours alone.
                 </p>
               </div>
             </div>
@@ -323,11 +321,11 @@ function LandingPage() {
                 <span>2</span>
               </div>
               <div className="step-content">
-                <h3>Make your move</h3>
+                <h3>Onboard</h3>
                 <p>
-                  Pay a friend, lock in a wager, take a position on a prediction market,
-                  lend idle funds, swap tokens, or list a collectible. Every action lives
-                  in the same minimalist app.
+                  Users create passkey wallets in seconds or connect wallets they
+                  already hold. Sanctions screening and jurisdiction gating are built
+                  into every value flow — not bolted on.
                 </p>
               </div>
             </div>
@@ -337,11 +335,11 @@ function LandingPage() {
                 <span>3</span>
               </div>
               <div className="step-content">
-                <h3>Stay in control</h3>
+                <h3>Operate</h3>
                 <p>
-                  Your wallet signs everything, stakes sit in smart-contract escrow, and
-                  winnings, positions, and rewards are yours to claim or withdraw at any
-                  time. No middlemen holding your money.
+                  Payments, trading, custody, and yield run self-custody on audited
+                  contracts, while your operations console reads the whole estate —
+                  every network, every balance, every control — with honest state.
                 </p>
               </div>
             </div>
@@ -354,10 +352,11 @@ function LandingPage() {
         <div className="container" id="resolution-area" data-animate>
           <div className="section-header">
             <span className="section-tag">Custody, Your Way</span>
-            <h2 className="section-title">You hold the keys. Always.</h2>
+            <h2 className="section-title">Keys stay with your users. Always.</h2>
             <p className="section-subtitle">
-              {brand.displayName} never custodies your funds. Choose how you want to
-              control your account — from a simple passkey to a shared multisig vault.
+              {brand.displayName} never custodies funds. Accounts range from a simple
+              passkey to policy-governed multisig vaults — all self-custody, all
+              recoverable.
             </p>
           </div>
 
@@ -371,8 +370,8 @@ function LandingPage() {
                 </svg>
               </div>
               <h3>Passkey Accounts</h3>
-              <p>Your face or fingerprint creates an on-chain smart account — no seed phrase, no extensions. Everyday actions can run gas-free, with fees always disclosed when they&apos;re not.</p>
-              <span className="resolution-use-case">Best for: Getting started in seconds</span>
+              <p>A fingerprint or face creates an on-chain smart account — no seed phrase, no extensions. Everyday actions can run gas-sponsored, with fees always disclosed when they&apos;re not.</p>
+              <span className="resolution-use-case">Best for: Mainstream onboarding</span>
             </div>
 
             <div className="resolution-card resolution-initiator">
@@ -383,8 +382,8 @@ function LandingPage() {
                   <path d="M16 12h.01" />
                 </svg>
               </div>
-              <h3>Your Own Wallet</h3>
-              <p>Bring the wallet you already trust — browser extension or any WalletConnect-compatible mobile wallet. {brand.displayName} is just an interface to your keys.</p>
+              <h3>External Wallets</h3>
+              <p>Browser extensions, mobile wallets, and hardware signers connect over WalletConnect. {brand.displayName} is an interface to keys your users already control.</p>
               <span className="resolution-use-case">Best for: Existing crypto users</span>
             </div>
 
@@ -398,9 +397,9 @@ function LandingPage() {
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3>Shared Vaults</h3>
-              <p>Hold funds together in a Safe multisig where moving money takes co-owner approval. Wager as the vault, pay from the vault — governed by your group, not by us.</p>
-              <span className="resolution-use-case">Best for: Groups, clubs & treasuries</span>
+              <h3>Policy-Governed Vaults</h3>
+              <p>Safe multisig vaults with an on-chain policy engine: spending rules, approver requirements, and thresholds enforced by contract — moving funds takes the approvals your policy demands.</p>
+              <span className="resolution-use-case">Best for: Treasuries &amp; funds</span>
             </div>
 
             <div className="resolution-card resolution-thirdparty">
@@ -411,9 +410,9 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Encrypted Backup</h3>
-              <p>Your address book, vault references, and settings sync end-to-end encrypted. Recover on any device with your phrase — we couldn&apos;t read your data if we wanted to.</p>
-              <span className="resolution-use-case">Best for: Peace of mind</span>
+              <h3>Encrypted Backup &amp; Recovery</h3>
+              <p>Address books, vault references, and settings sync end-to-end encrypted; accounts recover on any device. Legacy keys can be imported, stored encrypted, and swept — nothing readable ever leaves the client.</p>
+              <span className="resolution-use-case">Best for: Operational resilience</span>
             </div>
           </div>
         </div>
@@ -423,57 +422,57 @@ function LandingPage() {
       <section className={`scenarios-section ${isVisible('scenarios-area') ? 'visible' : ''}`} id="use-cases">
         <div className="container" id="scenarios-area" data-animate>
           <div className="section-header">
-            <span className="section-tag">Use Cases</span>
-            <h2 className="section-title">What will you do first?</h2>
+            <span className="section-tag">Who It&apos;s For</span>
+            <h2 className="section-title">Built for digital asset businesses</h2>
           </div>
 
           <div className="scenario-grid">
             <div className="scenario-card">
-              <div className="scenario-emoji">&#127944;</div>
-              <h3>The Big Game</h3>
-              <p className="scenario-setup">"I bet you $50 the Chiefs win the Super Bowl."</p>
+              <div className="scenario-emoji">&#127970;</div>
+              <h3>Fintechs &amp; Neo-brokers</h3>
+              <p className="scenario-setup">"We want a digital asset offering without building custody from scratch."</p>
               <p className="scenario-resolution">
-                Lock a head-to-head wager. Smart-contract escrow holds both stakes, a challenge period keeps it honest, and the winner claims the pot.
+                Launch a branded instance from configuration — your domain, your theme, your feature set — on a dedicated, isolated contract deployment.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#128200;</div>
-              <h3>The Market Call</h3>
-              <p className="scenario-setup">"The polls are wrong and I'd stake money on it."</p>
+              <div className="scenario-emoji">&#127974;</div>
+              <h3>Corporate Treasury</h3>
+              <p className="scenario-setup">"No single employee should be able to move funds."</p>
               <p className="scenario-resolution">
-                Trade real prediction markets on elections, sports, and world events through Polymarket — signed by your wallet, fees shown up front.
+                Policy-governed multisig vaults enforce approver sets and spending rules on-chain, with a proposal flow and full audit trail.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#127829;</div>
-              <h3>The Dinner Debt</h3>
-              <p className="scenario-setup">"Just send me your half whenever."</p>
+              <div className="scenario-emoji">&#128184;</div>
+              <h3>Payments Operations</h3>
+              <p className="scenario-setup">"Settle in stablecoins without teaching anyone about gas."</p>
               <p className="scenario-resolution">
-                Pay or request USDC with a QR code in seconds — payments-app simple, no gas token required, straight between wallets.
+                Gasless USDC transfer rails with QR-based request flows, address books, and sanctions screening on every movement.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#127942;</div>
-              <h3>The Office Pool</h3>
-              <p className="scenario-setup">"Everyone in for the bracket. Winner takes all."</p>
+              <div className="scenario-emoji">&#128202;</div>
+              <h3>Trading Desks</h3>
+              <p className="scenario-setup">"One venue view across chains, with fees we can defend."</p>
               <p className="scenario-resolution">
-                Spin up a group wager pool. Everyone joins with USDC, the group approves the payout, and claims go straight to the winners' wallets.
+                Market connectivity into Polymarket, per-network DEX execution, and oracle-resolved settlement — every fee disclosed before signature.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#128444;&#65039;</div>
-              <h3>The Collection</h3>
-              <p className="scenario-setup">"What's my collection actually worth?"</p>
+              <div className="scenario-emoji">&#128737;&#65039;</div>
+              <h3>Compliance Teams</h3>
+              <p className="scenario-setup">"Screening has to be structural, not a checkbox."</p>
               <p className="scenario-resolution">
-                See your NFTs with live floor prices right beside your tokens — and list one for sale on OpenSea without leaving the app.
+                Chainalysis sanctions screening is enforced at the contract layer, jurisdiction gating at the edge, and activity is auditable end to end.
               </p>
             </div>
             <div className="scenario-card">
-              <div className="scenario-emoji">&#127793;</div>
-              <h3>The Idle Stack</h3>
-              <p className="scenario-setup">"My USDC is just sitting there between bets."</p>
+              <div className="scenario-emoji">&#128273;</div>
+              <h3>Product Teams</h3>
+              <p className="scenario-setup">"Onboarding dies at the seed phrase."</p>
               <p className="scenario-resolution">
-                Lend it into an audited vault and watch it earn. Withdraw any time, claim rewards when they land — your position, your call.
+                Embedded passkey wallets open with a fingerprint, run gas-sponsored, and recover across devices — self-custody without the sharp edges.
               </p>
             </div>
           </div>
@@ -487,8 +486,8 @@ function LandingPage() {
           <div className="cta-orb cta-orb-2" />
         </div>
         <div className="final-cta-content">
-          <h2>Ready to take control<br />of your money?</h2>
-          <p>Connect with a passkey and make your first move in under a minute.</p>
+          <h2>Ready to see the platform<br />in action?</h2>
+          <p>Step into the live app, or talk to us about a branded instance of your own.</p>
           <button onClick={handleGetStarted} className="hero-cta-primary cta-large">
             <span>Get Started</span>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -498,7 +497,7 @@ function LandingPage() {
           </button>
           {support.email && (
             <p className="cta-contact">
-              Questions? <a href={`mailto:${support.email}`}>{support.email}</a>
+              Platform &amp; white-label inquiries: <a href={`mailto:${support.email}`}>{support.email}</a>
             </p>
           )}
         </div>

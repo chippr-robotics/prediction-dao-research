@@ -52,7 +52,7 @@ export default function Footer({ variant = 'full' }) {
             <p>{brand.tagline}</p>
           </div>
           <div className="footer-section">
-            <h4>Oracles</h4>
+            <h4>Integrations</h4>
             <ul>
               <li><a href="https://polymarket.com" target="_blank" rel="noopener noreferrer">Polymarket</a></li>
               {SHOW_ALL_ORACLE_MODELS && (

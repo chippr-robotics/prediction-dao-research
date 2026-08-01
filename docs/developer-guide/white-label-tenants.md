@@ -1,10 +1,9 @@
 # White-Label Tenants
 
-Spec 072 turns the single-brand product into a platform of **tenant instances**: each
-tenant (customer) runs its own branded instance with its own configuration and — for
-tenants that need asset isolation — its own contract deployments. The FairWins product
-is the **default tenant** (`tenants/fairwins/manifest.json`) and behaves exactly as
-before.
+The platform is delivered as **tenant instances** (spec 072): each tenant (customer)
+runs its own branded instance with its own configuration and — for tenants that need
+asset isolation — its own contract deployments. The FairWins instance is the
+**default tenant** (`tenants/fairwins/manifest.json`).
 
 Full design: `specs/072-white-label-tenants/` (spec, plan, research D1–D11, data-model,
 quickstart, tasks).

@@ -1,7 +1,7 @@
 {
   "name": "🍀FairWins",
   "short_name": "FairWins",
-  "description": "A self-custody, multi-chain financial platform: payments, peer-to-peer wagers, prediction markets, collectibles, earning, swaps, bridging, Bitcoin, and multisig custody — one control plane, and you hold the keys.",
+  "description": "Self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",
