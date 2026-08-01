@@ -50,6 +50,13 @@ export default defineConfig({
     strictPort: true,
     host: true
   },
+  server: {
+    fs: {
+      // Tenant manifests (spec 072) live at the repo root in tenants/ and are
+      // imported by src/config/tenant.js; allow the dev server to serve them.
+      allow: ['..']
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',

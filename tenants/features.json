@@ -1,0 +1,19 @@
+{
+  "description": "Catalog of feature ids a tenant manifest may enable. Consumed by scripts/tenants/validate-tenant-manifest.js and frontend/src/config/tenant.js. Adding a feature here requires the corresponding surface to honor isFeatureEnabled().",
+  "features": [
+    "wagers",
+    "pools",
+    "predict",
+    "collect",
+    "earn",
+    "staking",
+    "swap",
+    "bridge",
+    "protect",
+    "callsigns",
+    "clearpath",
+    "token-mint",
+    "bitcoin",
+    "recovery"
+  ]
+}
