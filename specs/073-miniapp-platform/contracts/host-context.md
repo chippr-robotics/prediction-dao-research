@@ -25,9 +25,10 @@ or launch is refused.
     chainId: number | null,
     isConnected: boolean,
     submit(payload: { to, data?, value?, chainId }): Promise<SubmitResult>,
-    //  - routes through the active account (signer / Safe proposal / legacy key)
+    //  - routes through the active account (signer / passkey UserOp / Safe proposal / legacy key)
     //  - host auto-audits every call (miniapp_tx_submitted)
     //  - rejects when wallet absent or wrong network, with a typed error the app must surface
+    //  - RESOLVES AT BROADCAST, NOT CONFIRMATION — see "Submission is not confirmation"
     requestConnect(): void             // opens the host connect modal
   },
   readProvider(chainId?: number): Provider,   // spec-069-resolved read provider; default = wallet chain
@@ -41,6 +42,45 @@ or launch is refused.
   navigate(to: string): void           // in-app paths only; external URLs refused
 }
 ```
+
+## Submission is not confirmation
+
+`submit` resolves as soon as the transaction is **broadcast**. `kind: 'sent'` means the
+network accepted it, not that it mined, and not that it succeeded — it may still revert.
+`kind: 'proposed'` means nothing has moved at all: a vault action is waiting for its
+threshold, and there is no transaction hash yet.
+
+An app that awaits `submit` and then tells the member the action is done **is lying**, and
+`SubmitResult` deliberately carries no receipt to make that easy. To report confirmation,
+wait for it yourself:
+
+```js
+const { kind, txHash } = await host.wallet.submit({ to, data, chainId })
+if (kind === 'proposed') return showQueuedForVaultApproval()
+const receipt = await host.readProvider(chainId).waitForTransaction(txHash)
+if (receipt?.status !== 1) return showFailed()
+```
+
+Two caveats to design for rather than hide. The read provider is a **different endpoint**
+than the one the wallet broadcast through, so "not visible yet" and "not mined yet" are
+indistinguishable — impose your own timeout and say *still pending*, never spin forever.
+And `waitForTransaction` does not follow a wallet-side speed-up or cancel the way a
+`TransactionResponse.wait()` would.
+
+## The two write rails (why an app must not branch on the wallet)
+
+FairWins has two transaction rails. A classic wallet signs through an ethers signer; a
+**passkey smart account** (specs 041/050) has **no signer at all** and writes through an
+ERC-4337 UserOp batch. `submit` chooses between them, and that choice is the host's alone —
+`sendCalls` and `loginMethod` are deliberately absent from the `host` object, so a mini-app
+has nothing to branch on and needs nothing.
+
+Precedence is by **identity first, rail second**: a passkey member acting as a Safe vault
+still gets a vault *proposal*, not a UserOp from their own account.
+
+On the passkey rail `txHash` may be a UserOp hash or an intent id rather than a transaction
+hash, taken in decreasing order of finality. It is never fabricated: if the rail returns no
+identifier, `txHash` is `null`.
 
 ## Host obligations
 
@@ -67,4 +107,5 @@ or launch is refused.
 | Registry unreachable | Refuse launch; "verification unavailable" disclosure |
 | All gateways unreachable | Availability message; retry affordance |
 | Wallet absent / wrong network on `submit` | Typed rejection; host directs user |
+| Session offers no write rail (no signer, no `sendCalls`) | Typed rejection `no_write_rail` — distinct from "no wallet" and from "locked" |
 ```

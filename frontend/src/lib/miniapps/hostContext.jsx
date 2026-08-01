@@ -93,6 +93,14 @@ export const HOST_REFUSAL = Object.freeze({
   EXTERNAL_TARGET: 'external_target',
   /** A read provider member that would mutate the host's shared instance. */
   PROVIDER_MEMBER_BLOCKED: 'provider_member_blocked',
+  /**
+   * The connected wallet offers no transaction rail this host can drive — no
+   * signer and no `sendCalls`. Distinct from `WALLET_ABSENT` (there IS a
+   * wallet) and from `IDENTITY_LOCKED` (nothing is locked): the session simply
+   * cannot write, and saying which of the three it is, is the difference
+   * between a member reconnecting, unlocking, or giving up on this browser.
+   */
+  NO_WRITE_RAIL: 'no_write_rail',
 })
 
 /**
@@ -364,7 +372,14 @@ const MiniAppHostContext = createContext(null)
  *   mounts an id the catalog and the manifest both validated.
  */
 export function MiniAppHostProvider({ appId, children }) {
-  const { chainId: walletChainId, isConnected, openConnectModal } = useWallet()
+  const {
+    chainId: walletChainId,
+    isConnected,
+    openConnectModal,
+    loginMethod,
+    signer,
+    sendCalls,
+  } = useWallet()
   const { address, connectedAddress, chainId: identityChainId } = useEffectiveAccount()
   const { isVault, isLegacy, canActAsVault, canActAsLegacy, submit: submitAsActive } = useActiveAccount()
   const { showNotification } = useNotification()
@@ -502,6 +517,78 @@ export function MiniAppHostProvider({ appId, children }) {
       }
       const value = toWeiValue(payload.value)
 
+      /*
+       * THE TWO WRITE RAILS.
+       *
+       * FairWins has two ways to send a transaction and they are not
+       * interchangeable: a classic wallet signs through an ethers `signer`,
+       * while a passkey smart account (specs 041/050) has NO signer at all —
+       * `WalletContext` sets `signer` and `provider` to null for a passkey
+       * session — and writes through `sendCalls`, an ERC-4337 UserOp batch.
+       *
+       * Every first-party surface branches on this itself before it reaches
+       * `submitAsActiveAccount`, whose personal path does `ctx.signer
+       * .sendTransaction(...)` unconditionally. A mini-app CANNOT do the same:
+       * `sendCalls` lives on `WalletContext` and is deliberately not on the
+       * host object, and a bundled copy of that context would be a different
+       * context with no provider above it. So if the host does not choose the
+       * rail, nothing can — and a passkey member's every mini-app transaction
+       * dies on `null.sendTransaction`, surfacing as a raw TypeError that is
+       * not a `MiniAppHostError`, carries no refusal code and no member-facing
+       * sentence, and that the app has no way to branch on.
+       *
+       * Choosing the rail here is exactly the host's job as stated in rule 1 of
+       * the module header: an app sees one `submit` and no difference between
+       * the identities behind it.
+       *
+       * ORDER MATTERS. Vault and legacy come FIRST and keep going through
+       * `submitAsActive`: a passkey member acting as a Safe vault must still
+       * produce a vault PROPOSAL, not a UserOp from their own account, and a
+       * recovered legacy account carries its own unlocked signer. Only a
+       * passkey acting personally takes the UserOp rail — the same precedence
+       * the first-party surfaces use.
+       */
+      const isPasskeyPersonal = !isVault && !isLegacy && loginMethod === 'passkey'
+
+      if (isPasskeyPersonal) {
+        if (typeof sendCalls !== 'function') {
+          throw new MiniAppHostError(
+            HOST_REFUSAL.NO_WRITE_RAIL,
+            'miniapp host: passkey session exposes no sendCalls transport',
+            { userMessage: 'This wallet cannot send transactions in this browser session.' },
+          )
+        }
+        let sent
+        try {
+          sent = await sendCalls([{ target: to, data, value }])
+        } catch (error) {
+          safeAudit(() =>
+            captureMiniAppLog(address, requestedChain, {
+              appId,
+              kind: HOST_AUDIT_KIND.TX_FAILED,
+              refs: { to: to.toLowerCase(), reason: error?.shortMessage || error?.message || 'unknown' },
+            }),
+          )
+          throw error
+        }
+        // A UserOp has three possible identifiers depending on how far the
+        // bundler got; take them in decreasing order of finality, exactly as
+        // the first-party token path does. Never fabricate one.
+        const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId ?? null
+        safeAudit(() => captureMiniAppTxSubmitted(address, requestedChain, { appId, txHash, to }))
+        return Object.freeze({ kind: 'sent', txHash, safeTxHash: null })
+      }
+
+      // A classic personal session with no signer has no rail either — say so
+      // in the same typed way rather than letting the null reach ethers.
+      if (!isVault && !isLegacy && !signer) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.NO_WRITE_RAIL,
+          'miniapp host: no signer and no sendCalls transport on this session',
+          { userMessage: 'Reconnect your wallet before this app can send a transaction.' },
+        )
+      }
+
       // Rebuilt, never forwarded — see rule 2 in the module header. `batch` and
       // `operation` are host-only concepts and stop here.
       let result
@@ -549,6 +636,9 @@ export function MiniAppHostProvider({ appId, children }) {
       canActAsVault,
       canActAsLegacy,
       submitAsActive,
+      loginMethod,
+      signer,
+      sendCalls,
     ],
   )
 

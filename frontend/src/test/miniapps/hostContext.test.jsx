@@ -90,7 +90,17 @@ beforeEach(() => {
   localStorage.clear()
   __resetMiniAppStores()
   vi.clearAllMocks()
-  state.wallet = { chainId: CHAIN, isConnected: true, openConnectModal: vi.fn() }
+  // A CLASSIC wallet session: it has a signer, which is what makes the
+  // `submitAsActive` rail usable. A passkey session (signer: null +
+  // loginMethod: 'passkey') is set up per-test below.
+  state.wallet = {
+    chainId: CHAIN,
+    isConnected: true,
+    openConnectModal: vi.fn(),
+    loginMethod: 'injected',
+    signer: { sendTransaction: vi.fn() },
+    sendCalls: vi.fn(async () => ({ txHash: '0xbatch' })),
+  }
   state.effective = { address: ACCOUNT, connectedAddress: ACCOUNT, chainId: null }
   state.active = {
     isVault: false,
@@ -278,6 +288,120 @@ describe('wallet.submit routing and audit (FR-019)', () => {
       appId: APP_ID,
       txHash: '0xdead',
       to: TARGET,
+    })
+  })
+
+  /*
+   * The two write rails. A passkey smart account has NO ethers signer —
+   * WalletContext nulls it — and writes through `sendCalls`. Before this was
+   * handled, every mini-app transaction from a passkey member died inside
+   * submitAsActiveAccount on `null.sendTransaction`, reaching the app as a raw
+   * TypeError with no refusal code and no member-facing sentence. The app
+   * cannot fix that itself: `sendCalls` is deliberately not on the host object.
+   */
+  describe('passkey sessions (specs 041/050)', () => {
+    const asPasskey = (over = {}) => {
+      state.wallet = {
+        ...state.wallet,
+        loginMethod: 'passkey',
+        signer: null, // WalletContext.jsx nulls signer AND provider for passkey
+        ...over,
+      }
+    }
+
+    it('routes a personal submit through sendCalls instead of the signer rail', async () => {
+      asPasskey()
+      const { ref } = mountHost()
+
+      const result = await ref.current.wallet.submit({
+        to: TARGET, data: '0xabcd', value: '1000', chainId: CHAIN,
+      })
+
+      expect(state.wallet.sendCalls).toHaveBeenCalledWith([
+        { target: TARGET, data: '0xabcd', value: 1000n },
+      ])
+      // The signer rail must not be touched — it is the one that would throw.
+      expect(state.active.submit).not.toHaveBeenCalled()
+      expect(result).toEqual({ kind: 'sent', txHash: '0xbatch', safeTxHash: null })
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    it('audits the submission exactly as the signer rail does', async () => {
+      asPasskey()
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(state.captureTx).toHaveBeenCalledWith(ACCOUNT, CHAIN, {
+        appId: APP_ID, txHash: '0xbatch', to: TARGET,
+      })
+    })
+
+    it('takes the UserOp identifiers in decreasing order of finality', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => ({ userOpHash: '0xuop', intentId: '0xint' })) })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBe('0xuop')
+
+      asPasskey({ sendCalls: vi.fn(async () => ({ intentId: '0xint' })) })
+      const second = mountHost()
+      expect((await second.ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBe('0xint')
+    })
+
+    it('never fabricates a hash when the rail returns none', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => ({})) })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBeNull()
+    })
+
+    it('still PROPOSES when a passkey member is acting as a vault', async () => {
+      // A passkey identity operating as a Safe must produce a vault proposal,
+      // not a UserOp from their own account. Rail selection must not override
+      // which identity is acting.
+      asPasskey()
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: CHAIN }
+      state.active = {
+        ...state.active,
+        isVault: true,
+        canActAsVault: true,
+        submit: vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe' })),
+      }
+      const { ref } = mountHost()
+
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(result).toEqual({ kind: 'proposed', txHash: null, safeTxHash: '0xsafe' })
+      expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+      expect(state.active.submit).toHaveBeenCalled()
+    })
+
+    it('audits a failed UserOp and rethrows, like the signer rail', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => { throw new Error('bundler rejected') }) })
+      const { ref } = mountHost()
+
+      await expect(ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).rejects.toThrow('bundler rejected')
+      expect(state.captureLog).toHaveBeenCalledWith(
+        ACCOUNT, CHAIN,
+        expect.objectContaining({ appId: APP_ID, kind: 'host:tx_failed' }),
+      )
+    })
+
+    it('refuses with a typed code when the session offers no rail at all', async () => {
+      asPasskey({ sendCalls: undefined })
+      const { ref } = mountHost()
+
+      // The whole point: a typed refusal the app can branch on and the
+      // workspace can explain — not a TypeError from a null dereference.
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.NO_WRITE_RAIL)
+      expect(error.userMessage).toMatch(/cannot send transactions/i)
+    })
+
+    it('refuses a classic session that has lost its signer, rather than dereferencing null', async () => {
+      state.wallet = { ...state.wallet, loginMethod: 'injected', signer: null }
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.NO_WRITE_RAIL)
+      expect(state.active.submit).not.toHaveBeenCalled()
     })
   })
 
