@@ -1,12 +1,12 @@
 {
   "matic": {
     "WagerRegistry": {
-      "address": "0x5023765809fDA93ab9F11B684fdb76521eD31774",
-      "startBlock": 88118344
+      "address": "0xE878b62887fC8A5F739B8Ce61bC19546A280Ef89",
+      "startBlock": 89717915
     },
     "WagerPoolFactory": {
-      "address": "0x0000000000000000000000000000000000000034",
-      "startBlock": 88118344
+      "address": "0x420aEC3c76859eB74ab21c769c16AcdAB221f723",
+      "startBlock": 89720731
     }
   },
   "mordor": {

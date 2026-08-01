@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
-import { fetchActivity } from './tokenSubgraph'
+import { fetchActivity, SUBGRAPH_UNAVAILABLE } from './tokenSubgraph'
 
 // Spec 028 expansion (US12, FR-041/FR-043) — the per-token on-chain event history. Sourced from the subgraph
 // (Transfer + admin events); disables truthfully on subgraph-less networks (Mordor/ETC). Real indexed data
@@ -38,7 +38,7 @@ function fmtTime(unixSeconds) {
 
 export default function ActivityPanel({ token, caps, chainId }) {
   const reqKey = `${chainId}-${token.tokenAddress}`
-  const [state, setState] = useState({ key: null, available: true, activity: [], error: null })
+  const [state, setState] = useState({ key: null, available: true, unavailable: null, activity: [], error: null })
   const [filter, setFilter] = useState('all')
   const decimals = caps?.decimals ?? 18
   const explorer = getNetwork(chainId)?.explorer?.baseUrl || ''
@@ -50,10 +50,28 @@ export default function ActivityPanel({ token, caps, chainId }) {
     let cancelled = false
     fetchActivity(chainId, token.tokenAddress)
       .then((res) => {
-        if (!cancelled) setState({ key: reqKey, available: res.available, activity: res.activity, error: null })
+        if (!cancelled) {
+          setState({
+            key: reqKey,
+            available: res.available,
+            unavailable: res.unavailable,
+            activity: res.activity,
+            error: null,
+          })
+        }
       })
       .catch((e) => {
-        if (!cancelled) setState({ key: reqKey, available: true, activity: [], error: e?.message || 'Could not load activity.' })
+        // `fetchActivity` no longer throws for a subgraph outcome — it reports one. Anything
+        // reaching here is a genuine programming fault, so it stays an error banner.
+        if (!cancelled) {
+          setState({
+            key: reqKey,
+            available: true,
+            unavailable: null,
+            activity: [],
+            error: e?.message || 'Could not load activity.',
+          })
+        }
       })
     return () => {
       cancelled = true
@@ -80,13 +98,21 @@ export default function ActivityPanel({ token, caps, chainId }) {
 
   if (!state.available) {
     const net = getNetwork(chainId)
+    const network = net?.name || 'This network'
+    // Three different facts, three different sentences — see HoldersPanel. A transport failure
+    // must not be phrased as a limitation of the network.
+    const explanation = {
+      [SUBGRAPH_UNAVAILABLE.NO_SUBGRAPH]: `${network} has no subgraph deployed, so the event history is unavailable here.`,
+      [SUBGRAPH_UNAVAILABLE.NOT_INDEXED]: `${network}'s subgraph does not index token events, so the event history is unavailable here.`,
+      [SUBGRAPH_UNAVAILABLE.UNREACHABLE]: `${network}'s subgraph could not be reached just now, so the event history could not be loaded. This is a temporary problem, not a limitation of this network — try again shortly.`,
+    }[state.unavailable] || `The event history is unavailable on ${network}.`
+
     return (
       <div className="tm-card" role="tabpanel">
         <h4 style={{ marginBottom: '0.5rem' }}>Activity</h4>
         <p className="tm-intro" style={{ margin: 0 }}>
           The activity feed is built from indexed contract events, which require a subgraph.{' '}
-          {net?.name || 'This network'} has no subgraph deployed, so the event history is unavailable here.
-          Events are still emitted on-chain and visible in a block explorer.
+          {explanation} Events are still emitted on-chain and visible in a block explorer.
         </p>
       </div>
     )

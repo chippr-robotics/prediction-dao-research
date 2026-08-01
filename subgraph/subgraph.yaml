@@ -215,13 +215,34 @@ dataSources:
   # subgraph-less networks (Mordor/ETC) the frontend reads the factory registry
   # over RPC instead (the same fallback used elsewhere).
   #
-  # PENDING DEPLOYMENT: TokenFactory is not yet deployed to a subgraph-enabled
-  # network. The inline `address` below is a PLACEHOLDER (sentinel 0x..0028) with a
+  # NOT INDEXED ANYWHERE THAT REACHES MEMBERS — and the guidance that used to sit
+  # here named the wrong networks, so read this before "finishing" it:
+  #
+  #   * Mordor (63) and ETC (61) have NO Graph deployment and are not getting one.
+  #     The `mordor` TokenFactory entry in networks.json is therefore inert: it can
+  #     be built locally or against a self-hosted node, but nothing the app reads
+  #     is served from it. `subgraphUrl` is null for both chains.
+  #   * Polygon (`matic`) is the ONLY network whose subgraph members actually read,
+  #     and it has NO TokenFactory entry in networks.json — so `graph build
+  #     --network matic` defers this data source and the deployed schema has no
+  #     `holders` / `tokenActivities` fields at all. Verified live against the
+  #     v0.2.0 endpoint: both queries return "Type `Query` has no field ...".
+  #
+  # So the Holders and Activity tabs are unavailable on BOTH chains where
+  # tokenFactory is deployed. The frontend now says so honestly (see
+  # `frontend/src/components/tokens/tokenSubgraph.js` — a schema error is reported
+  # as `not-indexed`, never as an error banner).
+  #
+  # TO ACTUALLY ENABLE IT: add a `TokenFactory` entry to the `matic` block of
+  # networks.json with the real Polygon address
+  # (0x5806e76cA3c838524E7cF43db7625bdFBA0783a0 — see
+  # deployments/polygon-chain137-v2.json) and its CREATION BLOCK, then redeploy and
+  # reindex the Polygon subgraph. The creation block is not recorded in the
+  # deployment file and could not be bisected from the default public RPC (archive
+  # reads are gated), so it must be read from an archive node or Polygonscan first.
+  # The inline `address` below stays a PLACEHOLDER (sentinel 0x..0028) with a
   # recent, NON-genesis startBlock so a default `graph build` (CI codegen/build/
-  # matchstick) stays green and indexes nothing if accidentally deployed. Before
-  # deploying for real, add a `TokenFactory` entry (real address + deploy block) to
-  # networks.json for polygon-amoy / mordor and replace the inline default. Until
-  # then `graph build --network <net>` defers TokenFactory by design (like matic).
+  # matchstick) stays green and indexes nothing if accidentally deployed.
   # NEVER set startBlock 0 / address 0x0 (issue #703/#704 genesis-flood).
   # ---------------------------------------------------------------------------
   - kind: ethereum

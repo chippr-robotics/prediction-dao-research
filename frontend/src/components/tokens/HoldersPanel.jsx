@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
 import { getNetwork } from '../../config/networks'
 import { useNotification } from '../../hooks/useUI'
-import { fetchHolders } from './tokenSubgraph'
+import { fetchHolders, SUBGRAPH_UNAVAILABLE } from './tokenSubgraph'
 
 // Spec 028 expansion (US10, FR-039/FR-043) — the per-token holder cap table. Sourced from the subgraph
 // (Transfer indexing); on subgraph-less networks (Mordor/ETC) it disables truthfully rather than fabricate
@@ -22,7 +22,7 @@ function fmtDate(unixSeconds) {
 export default function HoldersPanel({ token, caps, chainId }) {
   const { showNotification } = useNotification()
   const reqKey = `${chainId}-${token.tokenAddress}`
-  const [state, setState] = useState({ key: null, available: true, holders: [], error: null })
+  const [state, setState] = useState({ key: null, available: true, unavailable: null, holders: [], error: null })
   const decimals = caps?.decimals ?? 18
   const loading = state.key !== reqKey
 
@@ -33,10 +33,28 @@ export default function HoldersPanel({ token, caps, chainId }) {
     let cancelled = false
     fetchHolders(chainId, token.tokenAddress)
       .then((res) => {
-        if (!cancelled) setState({ key: reqKey, available: res.available, holders: res.holders, error: null })
+        if (!cancelled) {
+          setState({
+            key: reqKey,
+            available: res.available,
+            unavailable: res.unavailable,
+            holders: res.holders,
+            error: null,
+          })
+        }
       })
       .catch((e) => {
-        if (!cancelled) setState({ key: reqKey, available: true, holders: [], error: e?.message || 'Could not load holders.' })
+        // `fetchHolders` no longer throws for a subgraph outcome — it reports one. Anything
+        // reaching here is a genuine programming fault, so it stays an error banner.
+        if (!cancelled) {
+          setState({
+            key: reqKey,
+            available: true,
+            unavailable: null,
+            holders: [],
+            error: e?.message || 'Could not load holders.',
+          })
+        }
       })
     return () => {
       cancelled = true
@@ -86,13 +104,23 @@ export default function HoldersPanel({ token, caps, chainId }) {
 
   if (!state.available) {
     const net = getNetwork(chainId)
+    const network = net?.name || 'This network'
+    // Three different facts, three different sentences. In particular a transport failure is NOT
+    // reported as "this network does not support it" — that would turn one bad fetch into a
+    // permanent-sounding claim about the chain.
+    const explanation = {
+      [SUBGRAPH_UNAVAILABLE.NO_SUBGRAPH]: `${network} has no subgraph deployed, so the cap table is unavailable here.`,
+      [SUBGRAPH_UNAVAILABLE.NOT_INDEXED]: `${network}'s subgraph does not index token transfers, so the cap table is unavailable here.`,
+      [SUBGRAPH_UNAVAILABLE.UNREACHABLE]: `${network}'s subgraph could not be reached just now, so the cap table could not be loaded. This is a temporary problem, not a limitation of this network — try again shortly.`,
+    }[state.unavailable] || `The cap table is unavailable on ${network}.`
+
     return (
       <div className="tm-card" role="tabpanel">
         <h4 style={{ marginBottom: '0.5rem' }}>Holder cap table</h4>
         <p className="tm-intro" style={{ margin: 0 }}>
           The holder cap table is built from indexed Transfer events, which require a subgraph.{' '}
-          {net?.name || 'This network'} has no subgraph deployed, so the cap table is unavailable here. Holder
-          balances are still enforced on-chain — only the aggregated view is unavailable.
+          {explanation} Holder balances are still enforced on-chain — only the aggregated view is
+          unavailable.
         </p>
       </div>
     )
