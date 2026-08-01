@@ -53,7 +53,7 @@ const MORDOR_CONTRACTS = {
   // Undeployed ⇒ the catalog says so and refuses every launch: a package is only ever fetched
   // and executed against an Approved on-chain record (FR-010/FR-011), so "no registry" can
   // never degrade into "run it anyway".
-  miniAppRegistry: '',
+  miniAppRegistry: '0xFEd626025225A3B1aB3BA72D429B8c9C74cb5058',
   // Staking control surface (spec 066). Empty until `deploy-staking-router.js` runs; sync populates it.
   // Undeployed ⇒ the member app falls back to spec-065 fee-free direct staking.
   stakingRouter: '',
@@ -284,7 +284,7 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
     membershipVoucher: 16404315,
     wagerPoolFactory: 16495564,
     safeProposalHub: 16645531,
-    miniAppRegistry: 0,
+    miniAppRegistry: 16685064,
   },
   // Custody-only chains (spec 068). `safeProposalHub` MUST carry a block on every custody chain or
   // useVaultProposals refuses to scan and proposal discovery is silently dead there.

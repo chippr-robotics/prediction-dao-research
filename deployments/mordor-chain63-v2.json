@@ -43,7 +43,9 @@
     "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     "accountFactory": "0xd519C25e9dEd0DAC586B764574100479CB318734",
     "accountImpl": "0xfC5086A397e4FbAAF8f73892807415Da8d255E61",
-    "p256Verifier": null
+    "p256Verifier": null,
+    "miniAppRegistry": "0xFEd626025225A3B1aB3BA72D429B8c9C74cb5058",
+    "miniAppRegistryImpl": "0xc8Dd8601b35aDa3AF367C9E41f24Fd0503Ced674"
   },
   "mocks": {
     "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
@@ -80,7 +82,8 @@
     "safePolicyGuardV2": [],
     "policyGuardSetup": [],
     "safeProposalHub": [],
-    "feeRouterImpl": []
+    "feeRouterImpl": [],
+    "miniAppRegistryImpl": []
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
   "timestamp": "2026-06-21T03:31:32.666Z",
@@ -95,7 +98,8 @@
     "safePolicyGuardV2": 16645528,
     "policyGuardSetup": 16645530,
     "safeProposalHub": 16645531,
-    "feeRouter": 16646334
+    "feeRouter": 16646334,
+    "miniAppRegistry": 16685064
   },
   "tokenMintDeployedAt": "2026-06-23T20:29:36.569Z",
   "tokenV2UpgradedAt": "2026-06-23T23:13:49.946Z",
@@ -107,5 +111,6 @@
   "poolTemplateResyncedAt": "2026-07-04T21:47:07.000Z",
   "gaslessIntentsUpgradedAt": "2026-07-05T17:35:37.300Z",
   "tier2PoolIntentsUpgradedAt": "2026-07-06T04:32:38.208Z",
-  "feeRouterDeployedAt": "2026-07-27T01:12:47.440Z"
+  "feeRouterDeployedAt": "2026-07-27T01:12:47.440Z",
+  "miniAppRegistryDeployedAt": "2026-08-01T16:48:44.235Z"
 }
