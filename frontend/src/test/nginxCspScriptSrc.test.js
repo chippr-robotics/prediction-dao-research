@@ -24,6 +24,19 @@ const CONFIGS = [
   resolve(__dirname, '../../nginx.conf.template'),
 ]
 
+/** The script-src directive value of a config's Content-Security-Policy header. */
+function scriptSrcOf(path) {
+  const conf = readFileSync(path, 'utf8')
+  const cspLine = conf
+    .split('\n')
+    .find((l) => l.includes('add_header Content-Security-Policy'))
+  expect(cspLine, `${path} is missing a Content-Security-Policy header`).toBeTruthy()
+
+  const scriptSrc = cspLine.match(/script-src\s+([^;]*)/)?.[1]
+  expect(scriptSrc, `${path} CSP has no script-src directive`).toBeTruthy()
+  return scriptSrc.trim()
+}
+
 describe('nginx CSP script-src WebAssembly grant', () => {
   it.each(CONFIGS)('%s no longer carries a WASM grant (Semaphore removed in spec 034)', (path) => {
     const conf = readFileSync(path, 'utf8')
@@ -48,5 +61,57 @@ describe('nginx CSP script-src WebAssembly grant', () => {
       scriptSrc,
       `${path} script-src must not contain the broad 'unsafe-eval'`,
     ).not.toContain("'unsafe-eval'")
+  })
+})
+
+// Spec 073 (T019) — the mini-app package grant.
+//
+// Mini-app packages are fetched as BYTES over connect-src, verified against the on-chain
+// manifestHash and the manifest's per-file sha256 digests, and only then wrapped in a Blob and
+// dynamically imported (src/lib/miniapps/loader.js, research R1). Without `blob:` in script-src the
+// browser blocks that import and every launch dies on a CSP violation the member cannot act on.
+//
+// The more important half is what script-src must NEVER carry. A bare `https:` scheme-source here
+// would mean ANY origin may serve executable code to this app — turning a compromised or hostile
+// gateway into remote code execution and dissolving the whole verify-before-execute chain the loader
+// exists to enforce. Spec 069 accepted the scheme-wide grant for `connect-src` alone (members run
+// their own RPC nodes); script-src is where that line is drawn, and this is what keeps it drawn.
+// `blob:` is safe in a way `https:` is not: a blob URL can only be minted by this app's own code,
+// after verification, so it admits no third party at all.
+describe('nginx CSP script-src mini-app package grant (spec 073)', () => {
+  it.each(CONFIGS)('%s grants blob: so verified mini-app packages can be imported', (path) => {
+    expect(
+      scriptSrcOf(path).split(/\s+/),
+      `${path} script-src is missing blob: — every mini-app launch would be blocked by CSP`,
+    ).toContain('blob:')
+  })
+
+  it.each(CONFIGS)('%s never grants a scheme-wide script source', (path) => {
+    const sources = scriptSrcOf(path).split(/\s+/)
+    // Scheme-sources (no host) let any origin serve script. Named hosts such as
+    // https://*.cloudflareinsights.com are a different thing and unaffected by this assertion.
+    for (const scheme of ['https:', 'http:', 'data:', '*']) {
+      expect(
+        sources,
+        `${path} script-src must not carry a bare ${scheme} grant — any origin could serve executable code`,
+      ).not.toContain(scheme)
+    }
+  })
+
+  it('keeps script-src byte-identical across both configs', () => {
+    const [first, ...rest] = CONFIGS.map(scriptSrcOf)
+    for (const value of rest) expect(value).toBe(first)
+  })
+
+  it.each(CONFIGS)('%s adds blob: to script-src only, not to frame-src', (path) => {
+    // img-src already carries blob: (avatars/QR codes render from object URLs). frame-src must stay
+    // narrow: spec 073 sandboxes nothing in an iframe, so a blob: frame source could only be an
+    // unreviewed new capability riding in on this change.
+    const conf = readFileSync(path, 'utf8')
+    const cspLine = conf
+      .split('\n')
+      .find((l) => l.includes('add_header Content-Security-Policy'))
+    const frameSrc = cspLine.match(/frame-src\s+([^;]*)/)?.[1] || ''
+    expect(frameSrc.split(/\s+/), `${path} frame-src must not carry blob:`).not.toContain('blob:')
   })
 })

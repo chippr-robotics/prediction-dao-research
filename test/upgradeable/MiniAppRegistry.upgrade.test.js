@@ -19,19 +19,27 @@ const CID_B = "bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
 const HASH_A = ethers.id("manifest-a");
 const HASH_B = ethers.id("manifest-b");
 
-const INIT_ARGS = (admin) => [admin, ethers.ZeroAddress, ethers.ZeroHash, Tier.None, ethers.ZeroAddress];
+const INIT_ARGS = (admin, curator) => [
+  admin,
+  curator,
+  ethers.ZeroAddress,
+  ethers.ZeroHash,
+  Tier.None,
+  ethers.ZeroAddress,
+];
 
 async function setup() {
   const [admin, outsider, vendor, curator] = await ethers.getSigners();
   const Registry = await ethers.getContractFactory("MiniAppRegistry");
-  const registry = await upgrades.deployProxy(Registry, INIT_ARGS(admin.address), { kind: "uups" });
+  const registry = await upgrades.deployProxy(Registry, INIT_ARGS(admin.address, curator.address), {
+    kind: "uups",
+  });
   await registry.waitForDeployment();
 
-  await registry.connect(admin).grantRole(await registry.APP_CURATOR_ROLE(), curator.address);
   // One Approved app, plus an update left in review — the exact state where `approved` and
   // `proposed` differ, so an upgrade that confused the two would be caught.
   await registry.connect(vendor).submitApp("Token Mint", "Mint tokens", Category.TreasuryLiquidity, CID_A, HASH_A);
-  await registry.connect(curator).approveApp(1);
+  await registry.connect(curator).approveApp(1, HASH_A);
   await registry.connect(vendor).submitUpdate(1, CID_B, HASH_B);
 
   return { admin, outsider, vendor, curator, registry };
@@ -83,7 +91,7 @@ describe("MiniAppRegistry — UUPS upgrade lifecycle", function () {
     });
 
     // The pending update promotes normally after the upgrade — curation is uninterrupted.
-    await upgraded.connect(curator).approveApp(1);
+    await upgraded.connect(curator).approveApp(1, HASH_B);
     const app = await upgraded.getApp(1);
     expect(app.status).to.equal(Status.Approved);
     expect(app.approved.cid).to.equal(CID_B);
@@ -104,18 +112,18 @@ describe("MiniAppRegistry — UUPS upgrade lifecycle", function () {
 
   it("rejects re-initialization of the proxy", async function () {
     const { registry, admin } = await setup();
-    await expect(registry.initialize(...INIT_ARGS(admin.address))).to.be.revertedWithCustomError(
+    await expect(registry.initialize(...INIT_ARGS(admin.address, admin.address))).to.be.revertedWithCustomError(
       registry,
       "InvalidInitialization"
     );
   });
 
   it("locks initialization of the bare implementation", async function () {
-    const [admin] = await ethers.getSigners();
+    const [admin, curator] = await ethers.getSigners();
     const Registry = await ethers.getContractFactory("MiniAppRegistry");
     const impl = await Registry.deploy();
     await impl.waitForDeployment();
-    await expect(impl.initialize(...INIT_ARGS(admin.address))).to.be.revertedWithCustomError(
+    await expect(impl.initialize(...INIT_ARGS(admin.address, curator.address))).to.be.revertedWithCustomError(
       impl,
       "InvalidInitialization"
     );

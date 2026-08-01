@@ -74,17 +74,24 @@ async function main() {
   }
 
   console.log("\nDeploying MiniAppRegistry behind a UUPS proxy...");
+  // The deployer is seeded as the first curator: APP_CURATOR_ROLE administers itself, so it cannot be
+  // granted later by an admin — the registry must launch with one, and it is handed over below.
   const proxy = await deployProxy({
     name: "MiniAppRegistry",
-    initArgs: [deployer.address, membershipManager, WAGER_PARTICIPANT_ROLE, minTier, sanctionsGuard],
+    initArgs: [
+      deployer.address,
+      deployer.address,
+      membershipManager,
+      WAGER_PARTICIPANT_ROLE,
+      minTier,
+      sanctionsGuard,
+    ],
   });
 
-  // Seed curation. The deployer holds DEFAULT_ADMIN_ROLE from initialize but NOT the curator role —
-  // it is granted deliberately here so the first-party apps can be approved, and handed over after.
   const reg = proxy.contract;
   const curatorRole = await reg.APP_CURATOR_ROLE();
-  await (await reg.grantRole(curatorRole, deployer.address)).wait();
-  console.log(`  ✓ granted APP_CURATOR_ROLE to the deployer (seeding only)`);
+  const adminRole = await reg.DEFAULT_ADMIN_ROLE();
+  const upgraderRole = await reg.UPGRADER_ROLE();
 
   // APPEND to the record (preserve everything already there).
   contracts.miniAppRegistry = proxy.proxy;
@@ -103,10 +110,24 @@ async function main() {
   console.log(`  miniAppRegistry     ${contracts.miniAppRegistry}`);
   console.log(`  miniAppRegistryImpl ${contracts.miniAppRegistryImpl}`);
   console.log(`  deployBlock         ${deployBlock}`);
-  console.log(`\n⚠️  HANDOVER REQUIRED — APP_CURATOR_ROLE decides what code operations staff execute.`);
-  console.log(`   Grant it to the compliance multisig and renounce the deployer's copy:`);
-  console.log(`     reg.grantRole("${curatorRole}", <multisig>)`);
-  console.log(`     reg.renounceRole("${curatorRole}", "${deployer.address}")`);
+  console.log(`\n${"!".repeat(60)}`);
+  console.log(`HANDOVER REQUIRED — the deployer EOA currently holds ALL THREE authorities.`);
+  console.log(`${"!".repeat(60)}`);
+  console.log(`APP_CURATOR_ROLE decides what code operations staff execute. UPGRADER_ROLE is a strict`);
+  console.log(`superset of it: an upgrader can install logic that marks anything Approved without`);
+  console.log(`emitting a lifecycle event. DEFAULT_ADMIN_ROLE owns the vendor gates. Handing over only`);
+  console.log(`the curator role would leave the trust boundary on this key by another route.`);
+  console.log(`\nMove all three to the compliance multisig / timelock, then renounce:`);
+  console.log(`  # curator role administers itself — grant from the DEPLOYER (a curator) before renouncing`);
+  console.log(`  reg.grantRole("${curatorRole}", <multisig>)`);
+  console.log(`  reg.grantRole("${adminRole}", <multisig>)`);
+  console.log(`  reg.grantRole("${upgraderRole}", <timelock>)`);
+  console.log(`  reg.renounceRole("${curatorRole}", "${deployer.address}")`);
+  console.log(`  reg.renounceRole("${upgraderRole}", "${deployer.address}")`);
+  console.log(`  reg.renounceRole("${adminRole}", "${deployer.address}")   # LAST — see below`);
+  console.log(`\n⚠️  Renounce the curator role LAST-but-one and DEFAULT_ADMIN last: once the deployer`);
+  console.log(`   holds no curator role it can never grant one again (the role is its own admin), so`);
+  console.log(`   verify the multisig's grant landed before renouncing.`);
   console.log(`\nNext: npm run sync:frontend-contracts (frontend reads the address)`);
 }
 

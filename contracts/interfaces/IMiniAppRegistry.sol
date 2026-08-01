@@ -52,7 +52,8 @@ interface IMiniAppRegistry {
         string name;
         string description;
         Category category;
-        Status status;
+        Status status; // REVIEW state — not the serving decision; see `launchable`
+        bool launchable; // may a host run this? (approved package present, not Suspended/Deprecated)
         PackageRef approved; // only tuple hosts may serve; empty until the first approval
         PackageRef proposed; // awaiting curator promotion; empty when nothing is in review
         uint64 submittedAt;
@@ -73,7 +74,13 @@ interface IMiniAppRegistry {
     function updateMetadata(uint256 id, string calldata name, string calldata description, Category category) external;
 
     // ---- Curator lifecycle (APP_CURATOR_ROLE) ----
-    function approveApp(uint256 id) external;
+    /// @param expectedManifestHash The hash the curator REVIEWED. Reverts {StaleProposal} if the record no
+    ///        longer holds it, so a vendor cannot swap the package under an in-flight (or front-run)
+    ///        approval. There is deliberately no id-only overload.
+    function approveApp(uint256 id, bytes32 expectedManifestHash) external;
+    /// @notice Discard a proposed package without shipping it — the review outcome "this must not go live".
+    /// @param expectedManifestHash The proposal the curator reviewed; same anti-swap guard as approval.
+    function rejectProposal(uint256 id, bytes32 expectedManifestHash) external;
     function suspendApp(uint256 id) external;
     function deprecateApp(uint256 id) external;
 
@@ -87,6 +94,9 @@ interface IMiniAppRegistry {
     function getAppsPaged(uint256 offset, uint256 limit) external view returns (AppView[] memory);
     function appIdsByVendor(address vendor) external view returns (uint256[] memory);
     function idByName(string calldata name) external view returns (uint256);
+    /// @notice THE serving decision, on-chain so no host re-derives it. A Pending record can be launchable:
+    ///         a live app with an update in review keeps serving its last reviewed package (FR-003).
+    function isLaunchable(uint256 id) external view returns (bool);
 
     // ---- Events (every mutation is indexable + reviewer-notifiable, FR-005) ----
     event AppSubmitted(
@@ -105,10 +115,21 @@ interface IMiniAppRegistry {
         bytes32 manifestHash,
         uint64 version
     );
-    event AppMetadataUpdated(uint256 indexed id, string name, Category category);
-    /// @dev Carries the tuple that is now SERVED (the promoted `proposed`, or the retained `approved` when a
-    ///      suspension is lifted) so an indexer never has to guess which package went live.
+    /// @dev Carries `description` too: an indexer that only replays events must be able to reconstruct the
+    ///      whole reviewed record (FR-005), and the description is a reviewed field.
+    event AppMetadataUpdated(uint256 indexed id, string name, string description, Category category);
+    /// @dev Carries the tuple that is now SERVED (the promoted `proposed`, or the retained `approved` on a
+    ///      metadata-only re-review) so an indexer never has to guess which package went live.
     event AppApproved(uint256 indexed id, address indexed curator, string cid, bytes32 manifestHash, uint64 version);
+    /// @dev Carries the DISCARDED tuple — the compliance record of what was refused, which is exactly the
+    ///      history a reviewer needs and the one an approval-only log cannot show.
+    event AppProposalRejected(
+        uint256 indexed id,
+        address indexed curator,
+        string cid,
+        bytes32 manifestHash,
+        uint64 version
+    );
     event AppSuspended(uint256 indexed id, address indexed curator);
     event AppDeprecated(uint256 indexed id, address indexed curator);
     event MembershipGateChanged(address manager, bytes32 role, uint8 minTier);
@@ -122,6 +143,12 @@ interface IMiniAppRegistry {
     error AppDeprecatedError();
     error DuplicateName();
     error EmptyName();
+    /// @dev Control bytes in a display name: invisible in a catalog card, so two listings could render
+    ///      identically to a member while holding different uniqueness keys.
+    error InvalidName();
+    /// @dev The record no longer holds the package the curator reviewed — the anti-swap guard on
+    ///      {approveApp} / {rejectProposal} fired. Re-review the current proposal before acting.
+    error StaleProposal(bytes32 expected, bytes32 actual);
     error EmptyCid();
     error EmptyManifestHash();
     error StringTooLong();

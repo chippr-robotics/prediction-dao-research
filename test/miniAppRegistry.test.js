@@ -48,12 +48,12 @@ async function fixture() {
 
   const reg = await deployProxy("MiniAppRegistry", [
     admin.address,
+    curator.address, // first curator — the role administers itself, so it must be seeded here
     ethers.ZeroAddress, // membership gate off
     ethers.ZeroHash,
     Tier.None,
     ethers.ZeroAddress, // sanctions screening off
   ]);
-  await reg.connect(admin).grantRole(await reg.APP_CURATOR_ROLE(), curator.address);
 
   return { reg, admin, curator, vendor, vendor2, outsider };
 }
@@ -82,12 +82,12 @@ async function gatedFixture() {
 
   const reg = await deployProxy("MiniAppRegistry", [
     admin.address,
+    curator.address,
     await membership.getAddress(),
     VENDOR_ROLE,
     Tier.Silver,
     await guard.getAddress(),
   ]);
-  await reg.connect(admin).grantRole(await reg.APP_CURATOR_ROLE(), curator.address);
 
   // vendor clears the Silver floor; vendor2 sits below it.
   await membership.connect(admin).grantMembership(vendor.address, VENDOR_ROLE, Tier.Gold, 365);
@@ -100,45 +100,65 @@ async function gatedFixture() {
 async function submitAndApprove(reg, vendor, curator, name = "Token Mint") {
   await reg.connect(vendor).submitApp(name, "Mint and distribute tokens", Category.AssetServicing, CID_A, HASH_A);
   const id = await reg.appCount();
-  await reg.connect(curator).approveApp(id);
+  await reg.connect(curator).approveApp(id, HASH_A);
   return id;
 }
 
 describe("MiniAppRegistry (spec 073)", function () {
   describe("initialization", function () {
-    it("grants admin roles but never the curator role", async function () {
-      const { reg, admin } = await fixture();
+    it("seeds the first curator and keeps the admin out of curation", async function () {
+      const { reg, admin, curator } = await fixture();
       expect(await reg.hasRole(await reg.DEFAULT_ADMIN_ROLE(), admin.address)).to.equal(true);
       expect(await reg.hasRole(await reg.UPGRADER_ROLE(), admin.address)).to.equal(true);
-      // Curation is the supply-chain trust boundary: it is only ever granted deliberately.
+      expect(await reg.hasRole(await reg.APP_CURATOR_ROLE(), curator.address)).to.equal(true);
       expect(await reg.hasRole(await reg.APP_CURATOR_ROLE(), admin.address)).to.equal(false);
     });
 
-    it("rejects a zero admin", async function () {
+    it("makes the curator role self-administering so admin cannot grant itself curation", async function () {
+      const { reg, admin, curator, vendor } = await fixture();
+      const curatorRole = await reg.APP_CURATOR_ROLE();
+
+      // The whole point of the separation: OZ would default this to DEFAULT_ADMIN_ROLE, which would let
+      // the gate administrator self-grant curation in one transaction and make the trust boundary a comment.
+      expect(await reg.getRoleAdmin(curatorRole)).to.equal(curatorRole);
+      await expect(reg.connect(admin).grantRole(curatorRole, admin.address)).to.be.revertedWithCustomError(
+        reg,
+        "AccessControlUnauthorizedAccount"
+      );
+      // Only a curator can create a curator.
+      await reg.connect(curator).grantRole(curatorRole, vendor.address);
+      expect(await reg.hasRole(curatorRole, vendor.address)).to.equal(true);
+    });
+
+    it("rejects a zero admin or a zero curator", async function () {
+      const [admin] = await ethers.getSigners();
       const Impl = await ethers.getContractFactory("MiniAppRegistry");
       const impl = await Impl.deploy();
       await impl.waitForDeployment();
-      const initData = Impl.interface.encodeFunctionData("initialize", [
-        ethers.ZeroAddress,
-        ethers.ZeroAddress,
-        ethers.ZeroHash,
-        Tier.None,
-        ethers.ZeroAddress,
-      ]);
       const Proxy = await ethers.getContractFactory("ERC1967Proxy");
-      await expect(Proxy.deploy(await impl.getAddress(), initData)).to.be.revertedWithCustomError(
-        Impl,
-        "ZeroAddress"
-      );
+
+      for (const args of [
+        [ethers.ZeroAddress, admin.address, ethers.ZeroAddress, ethers.ZeroHash, Tier.None, ethers.ZeroAddress],
+        // A registry with no curator could never be granted one (the role administers itself), so every
+        // listing would be stuck Pending forever.
+        [admin.address, ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroHash, Tier.None, ethers.ZeroAddress],
+      ]) {
+        const initData = Impl.interface.encodeFunctionData("initialize", args);
+        await expect(Proxy.deploy(await impl.getAddress(), initData)).to.be.revertedWithCustomError(
+          Impl,
+          "ZeroAddress"
+        );
+      }
     });
 
     it("rejects a membership manager configured without a role", async function () {
-      const [admin] = await ethers.getSigners();
+      const [admin, curator] = await ethers.getSigners();
       const Impl = await ethers.getContractFactory("MiniAppRegistry");
       const impl = await Impl.deploy();
       await impl.waitForDeployment();
       const initData = Impl.interface.encodeFunctionData("initialize", [
         admin.address,
+        curator.address,
         admin.address, // non-zero "manager"
         ethers.ZeroHash, // ...but no role: would gate every vendor on a role nobody holds
         Tier.None,
@@ -149,6 +169,206 @@ describe("MiniAppRegistry (spec 073)", function () {
         Impl,
         "InvalidGateConfig"
       );
+    });
+  });
+
+  // Regression suite for the findings of the spec-073 adversarial security review. Each test here
+  // reproduces an attack that the original implementation permitted; they are the reason approval is
+  // content-committed and launchability is expressed on-chain.
+  describe("supply-chain attacks (security review regressions)", function () {
+    it("refuses an approval whose reviewed package was swapped out from under it", async function () {
+      const { reg, vendor, curator } = await fixture();
+      await reg.connect(vendor).submitApp("Token Mint", "d", Category.AssetServicing, CID_A, HASH_A);
+
+      // The curator reviews package A. Before their (multisig, therefore slow and public) approval
+      // lands, the vendor swaps in package B — by front-running, or during the signing window.
+      await reg.connect(vendor).submitUpdate(1, CID_B, HASH_B);
+
+      // The approval names the hash that was REVIEWED, so it cannot promote the substitute.
+      await expect(reg.connect(curator).approveApp(1, HASH_A))
+        .to.be.revertedWithCustomError(reg, "StaleProposal")
+        .withArgs(HASH_A, HASH_B);
+
+      const app = await reg.getApp(1);
+      expect(app.status).to.equal(Status.Pending);
+      expect(app.approved.cid).to.equal(""); // nothing unreviewed became servable
+      expect(app.launchable).to.equal(false);
+    });
+
+    it("refuses a swapped-in package on an app that is already live", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B); // reviewed by the curator
+      await reg.connect(vendor).submitUpdate(id, CID_C, HASH_C); // swapped after review
+
+      await expect(reg.connect(curator).approveApp(id, HASH_B))
+        .to.be.revertedWithCustomError(reg, "StaleProposal")
+        .withArgs(HASH_B, HASH_C);
+      // The live package is untouched and still serving.
+      const app = await reg.getApp(id);
+      expect(app.approved.cid).to.equal(CID_A);
+      expect(app.launchable).to.equal(true);
+    });
+
+    it("does not silently promote an armed proposal when a curator reinstates an app", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B); // proposal left armed
+      await reg.connect(curator).suspendApp(id);
+
+      // Lifting the suspension by naming the package that was already approved must not ship B.
+      await expect(reg.connect(curator).approveApp(id, HASH_A))
+        .to.be.revertedWithCustomError(reg, "StaleProposal")
+        .withArgs(HASH_A, HASH_B);
+
+      // The honest path: reject the proposal, then reinstate.
+      await reg.connect(curator).rejectProposal(id, HASH_B);
+      await reg.connect(curator).approveApp(id, HASH_A);
+      const app = await reg.getApp(id);
+      expect(app.approved.cid).to.equal(CID_A);
+      expect(app.proposed.cid).to.equal("");
+      expect(app.launchable).to.equal(true);
+    });
+
+    it("keeps a live app launchable while its update is in review", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      expect(await reg.isLaunchable(id)).to.equal(true);
+
+      // Submitting an update must NOT be an offline switch a vendor can pull on their own live app.
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B);
+      const app = await reg.getApp(id);
+      expect(app.status).to.equal(Status.Pending); // review state
+      expect(app.launchable).to.equal(true); // ...but still serving the reviewed package (FR-003)
+      expect(app.approved.cid).to.equal(CID_A);
+
+      // Metadata edits likewise.
+      await reg.connect(vendor).updateMetadata(id, "Token Mint", "New copy", Category.AssetServicing);
+      expect(await reg.isLaunchable(id)).to.equal(true);
+    });
+
+    it("stops serving on suspension and deprecation, and never serves an unapproved app", async function () {
+      const { reg, vendor, curator } = await fixture();
+      await reg.connect(vendor).submitApp("Fresh", "d", Category.AssetServicing, CID_A, HASH_A);
+      expect(await reg.isLaunchable(1)).to.equal(false); // never approved
+
+      const id = await submitAndApprove(reg, vendor, curator, "Live");
+      await reg.connect(curator).suspendApp(id);
+      expect(await reg.isLaunchable(id)).to.equal(false);
+      await reg.connect(curator).approveApp(id, HASH_A);
+      expect(await reg.isLaunchable(id)).to.equal(true);
+      await reg.connect(curator).deprecateApp(id);
+      expect(await reg.isLaunchable(id)).to.equal(false);
+
+      expect(await reg.isLaunchable(999)).to.equal(false); // unknown id
+    });
+
+    it("gives the curator a reject path that neither ships nor retires the app", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B);
+
+      await expect(reg.connect(curator).rejectProposal(id, HASH_B))
+        .to.emit(reg, "AppProposalRejected")
+        .withArgs(id, curator.address, CID_B, HASH_B, 2);
+
+      const app = await reg.getApp(id);
+      expect(app.proposed.cid).to.equal(""); // no longer armed for the next approval
+      expect(app.status).to.equal(Status.Approved); // service restored, not suspended or retired
+      expect(app.approved.cid).to.equal(CID_A);
+      expect(app.launchable).to.equal(true);
+
+      // The vendor can try again; the rejected number is burned, so this is v3 — a compliance log
+      // that says "v2 rejected" must never later say "v2 approved".
+      await reg.connect(vendor).submitUpdate(id, CID_C, HASH_C);
+      expect((await reg.getApp(id)).proposed.version).to.equal(3);
+    });
+
+    it("rejects a first submission without making it servable", async function () {
+      const { reg, vendor, curator } = await fixture();
+      await reg.connect(vendor).submitApp("Token Mint", "d", Category.AssetServicing, CID_A, HASH_A);
+      await reg.connect(curator).rejectProposal(1, HASH_A);
+
+      const app = await reg.getApp(1);
+      expect(app.status).to.equal(Status.Pending); // never approved, so it stays in the queue
+      expect(app.approved.cid).to.equal("");
+      expect(app.launchable).to.equal(false);
+    });
+
+    it("guards rejection against the same swap attack, and refuses when nothing is proposed", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B);
+      await reg.connect(vendor).submitUpdate(id, CID_C, HASH_C);
+
+      // A vendor must not be able to have a fresh submission discarded by a stale rejection.
+      await expect(reg.connect(curator).rejectProposal(id, HASH_B))
+        .to.be.revertedWithCustomError(reg, "StaleProposal")
+        .withArgs(HASH_B, HASH_C);
+
+      await reg.connect(curator).rejectProposal(id, HASH_C);
+      await expect(reg.connect(curator).rejectProposal(id, HASH_C)).to.be.revertedWithCustomError(
+        reg,
+        "NothingProposed"
+      );
+    });
+
+    it("does not let a rejection quietly lift a suspension", async function () {
+      const { reg, vendor, curator } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B);
+      await reg.connect(curator).suspendApp(id);
+
+      await reg.connect(curator).rejectProposal(id, HASH_B);
+      const app = await reg.getApp(id);
+      expect(app.status).to.equal(Status.Suspended); // a curator decision about the listing outranks it
+      expect(app.launchable).to.equal(false);
+    });
+
+    it("restricts rejection to curators and refuses it on a deprecated record", async function () {
+      const { reg, vendor, curator, admin, outsider } = await fixture();
+      const id = await submitAndApprove(reg, vendor, curator);
+      await reg.connect(vendor).submitUpdate(id, CID_B, HASH_B);
+
+      for (const caller of [vendor, outsider, admin]) {
+        await expect(reg.connect(caller).rejectProposal(id, HASH_B)).to.be.revertedWithCustomError(
+          reg,
+          "AccessControlUnauthorizedAccount"
+        );
+      }
+      await reg.connect(curator).deprecateApp(id);
+      await expect(reg.connect(curator).rejectProposal(id, HASH_B)).to.be.revertedWithCustomError(
+        reg,
+        "AppDeprecatedError"
+      );
+    });
+
+    it("treats spacing and case variants of a name as one listing", async function () {
+      const { reg, vendor, vendor2 } = await fixture();
+      await reg.connect(vendor).submitApp("Token Mint", "d", Category.AssetServicing, CID_A, HASH_A);
+
+      // Case folding alone would leave these registrable — the cheapest impersonation there is.
+      for (const lookalike of ["  Token   Mint  ", "token  mint", "TOKEN MINT "]) {
+        await expect(
+          reg.connect(vendor2).submitApp(lookalike, "d", Category.AssetServicing, CID_B, HASH_B)
+        ).to.be.revertedWithCustomError(reg, "DuplicateName");
+        expect(await reg.idByName(lookalike)).to.equal(1);
+      }
+    });
+
+    it("refuses blank and control-character names", async function () {
+      const { reg, vendor } = await fixture();
+      // "   " passes a raw length check but normalizes to the empty key, which every later blank
+      // name would then collide with.
+      await expect(
+        reg.connect(vendor).submitApp("   ", "d", Category.AssetServicing, CID_A, HASH_A)
+      ).to.be.revertedWithCustomError(reg, "EmptyName");
+      // Invisible in a catalog card ⇒ two listings could render identically to a member.
+      for (const sneaky of ["Token\u0000Mint", "Token\tMint", "Token\nMint", "Token\u007fMint"]) {
+        await expect(
+          reg.connect(vendor).submitApp(sneaky, "d", Category.AssetServicing, CID_A, HASH_A)
+        ).to.be.revertedWithCustomError(reg, "InvalidName");
+      }
     });
   });
 
@@ -289,8 +509,8 @@ describe("MiniAppRegistry (spec 073)", function () {
       expect(app.proposed.manifestHash).to.equal(HASH_B);
       expect(app.proposed.version).to.equal(2);
 
-      // Only approval promotes it.
-      await expect(reg.connect(curator).approveApp(id))
+      // Only approval promotes it — and the curator names the hash they reviewed.
+      await expect(reg.connect(curator).approveApp(id, HASH_B))
         .to.emit(reg, "AppApproved")
         .withArgs(id, curator.address, CID_B, HASH_B, 2);
 
@@ -313,7 +533,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       expect(app.proposed.cid).to.equal(CID_C);
       expect(app.proposed.version).to.equal(3); // versions never reused
 
-      await reg.connect(curator).approveApp(id);
+      await reg.connect(curator).approveApp(id, HASH_C);
       app = await reg.getApp(id);
       expect(app.approved.cid).to.equal(CID_C);
       expect(app.approved.version).to.equal(3);
@@ -330,7 +550,7 @@ describe("MiniAppRegistry (spec 073)", function () {
 
       await expect(reg.connect(vendor).updateMetadata(id, "Token Mint Pro", "Better", Category.TreasuryLiquidity))
         .to.emit(reg, "AppMetadataUpdated")
-        .withArgs(id, "Token Mint Pro", Category.TreasuryLiquidity);
+        .withArgs(id, "Token Mint Pro", "Better", Category.TreasuryLiquidity);
 
       const app = await reg.getApp(id);
       expect(app.status).to.equal(Status.Pending); // invariant I4
@@ -340,7 +560,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       expect(app.proposed.cid).to.equal(""); // metadata-only: nothing new proposed
 
       // Re-approval reinstates the retained package rather than reverting on an empty proposal.
-      await expect(reg.connect(curator).approveApp(id))
+      await expect(reg.connect(curator).approveApp(id, HASH_A))
         .to.emit(reg, "AppApproved")
         .withArgs(id, curator.address, CID_A, HASH_A, 1);
       expect((await reg.getApp(id)).status).to.equal(Status.Approved);
@@ -369,7 +589,7 @@ describe("MiniAppRegistry (spec 073)", function () {
     it("promotes a first submission and stamps the approval time", async function () {
       const { reg, vendor, curator } = await fixture();
       await reg.connect(vendor).submitApp("Token Mint", "d", Category.AssetServicing, CID_A, HASH_A);
-      await reg.connect(curator).approveApp(1);
+      await reg.connect(curator).approveApp(1, HASH_A);
 
       const app = await reg.getApp(1);
       expect(app.status).to.equal(Status.Approved);
@@ -388,7 +608,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       expect(app.status).to.equal(Status.Suspended);
       expect(app.approved.cid).to.equal(CID_A); // retained, but the host must refuse to serve it
 
-      await reg.connect(curator).approveApp(id);
+      await reg.connect(curator).approveApp(id, HASH_A);
       app = await reg.getApp(id);
       expect(app.status).to.equal(Status.Approved);
       expect(app.approved.cid).to.equal(CID_A);
@@ -434,7 +654,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       expect(app.approved.cid).to.equal(CID_A); // kept as the explanation for members who used it
 
       // Invariant I3 — every mutating call reverts from here.
-      await expect(reg.connect(curator).approveApp(id)).to.be.revertedWithCustomError(reg, "AppDeprecatedError");
+      await expect(reg.connect(curator).approveApp(id, HASH_A)).to.be.revertedWithCustomError(reg, "AppDeprecatedError");
       await expect(reg.connect(curator).suspendApp(id)).to.be.revertedWithCustomError(reg, "AppDeprecatedError");
       await expect(reg.connect(curator).deprecateApp(id)).to.be.revertedWithCustomError(reg, "AppDeprecatedError");
       await expect(reg.connect(vendor).submitUpdate(id, CID_C, HASH_C)).to.be.revertedWithCustomError(
@@ -453,7 +673,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       const { reg, vendor, curator } = await fixture();
       const id = await submitAndApprove(reg, vendor, curator);
 
-      await expect(reg.connect(curator).approveApp(id)).to.be.revertedWithCustomError(reg, "InvalidStatus");
+      await expect(reg.connect(curator).approveApp(id, HASH_A)).to.be.revertedWithCustomError(reg, "InvalidStatus");
       await reg.connect(curator).suspendApp(id);
       await expect(reg.connect(curator).suspendApp(id)).to.be.revertedWithCustomError(reg, "InvalidStatus");
     });
@@ -465,7 +685,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       for (const caller of [vendor, outsider, admin]) {
         // Even DEFAULT_ADMIN_ROLE cannot approve: configuring gates and deciding what code runs
         // are deliberately different privileges.
-        await expect(reg.connect(caller).approveApp(1)).to.be.revertedWithCustomError(
+        await expect(reg.connect(caller).approveApp(1, HASH_A)).to.be.revertedWithCustomError(
           reg,
           "AccessControlUnauthorizedAccount"
         );
@@ -487,7 +707,7 @@ describe("MiniAppRegistry (spec 073)", function () {
       for (let i = 0; i < 5; i++) {
         await reg.connect(vendor).submitApp(`App ${i}`, "d", Category.Reconciliation, CID_A, HASH_A);
       }
-      await reg.connect(curator).approveApp(2);
+      await reg.connect(curator).approveApp(2, HASH_A);
 
       const firstTwo = await reg.getAppsPaged(0, 2);
       expect(firstTwo.length).to.equal(2);

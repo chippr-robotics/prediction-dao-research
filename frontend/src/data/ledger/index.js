@@ -17,6 +17,7 @@ import { createPoolLedgerSource } from './sources/poolLedgerSource'
 import { createMembershipLedgerSource } from './sources/membershipLedgerSource'
 import { createBridgeLedgerSource } from './sources/bridgeLedgerSource'
 import { createLiquidityLedgerSource } from './sources/liquidityLedgerSource'
+import { createMiniAppLedgerSource } from './sources/miniAppSource'
 import { getPrunedBefore } from './ledgerClientStore'
 import { migrateLegacyActivity } from './migrate'
 
@@ -46,6 +47,23 @@ export {
   liquidityEntryId,
   LIQUIDITY_ACTION,
 } from './sources/liquidityLedgerSource'
+// Spec 073 — mini-app audit records (launch, app-requested transaction,
+// integrity refusal, state change, app-contextual log). Attribution only: the
+// entries carry no value, so a mini-app transaction is still reported once, by
+// the domain source that can substantiate the amount.
+export {
+  createMiniAppLedgerSource,
+  captureMiniAppLaunch,
+  captureMiniAppTxSubmitted,
+  captureMiniAppIntegrityFailure,
+  captureMiniAppStateChange,
+  captureMiniAppLog,
+  listMiniAppEntries,
+  listAllMiniAppRecords,
+  readMiniAppEntry,
+  miniAppEntryId,
+  MINIAPP_KIND,
+} from './sources/miniAppSource'
 export * from './constants'
 export * from './identity'
 export { normalizeEntry, collapseBridgeEntries, bridgeLogicalKey } from './normalize'
@@ -71,6 +89,7 @@ export function getDefaultLedgerRepository() {
       createMembershipLedgerSource(),
       createBridgeLedgerSource(),
       createLiquidityLedgerSource(),
+      createMiniAppLedgerSource(),
     ],
     getPrunedBefore: ({ account, chainId }) => getPrunedBefore(account, chainId),
   })

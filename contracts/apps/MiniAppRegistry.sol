@@ -22,11 +22,26 @@ import {ISanctionsGuard} from "../interfaces/ISanctionsGuard.sol";
 ///         Invariants enforced by this contract (data-model.md §1):
 ///           I1 `approved.cid` is non-empty exactly when the app has ever been Approved, and it is the only
 ///              tuple a host may serve — `approveApp` can never leave an Approved record with no package;
-///           I2 `submitUpdate` writes `proposed` only; `approveApp` is the sole promotion path, so a vendor
-///              can never swap the bytes users are already running;
+///           I2 `submitUpdate` writes `proposed` only, and `approveApp` — the sole promotion path — is
+///              CONTENT-COMMITTED: the curator names the exact `manifestHash` they reviewed and the call
+///              reverts if the record no longer holds it. Naming the id alone would be a time-of-check /
+///              time-of-use hole: a multisig approval is public for as long as it takes to collect
+///              signatures, and a vendor who lands `submitUpdate` inside that window (or simply front-runs
+///              the approval transaction) would otherwise have unreviewed bytes promoted under a curator's
+///              signature — and the host's integrity chain would happily execute them, because the tampered
+///              manifest hashes correctly. Binding the approval to content is what makes "only reviewed
+///              bytes can become servable" true rather than merely intended;
 ///           I3 Deprecated is terminal — every mutating call on a Deprecated record reverts;
 ///           I4 vendor metadata edits also force `status = Pending` (reviewed fields changed ⇒ re-review);
 ///           I5 vendor-only submit/update, curator-only lifecycle, admin-only gate config.
+///
+///         SERVING vs REVIEW STATE. `status` is the REVIEW state; it is not by itself the answer to "may a
+///         host run this?". Ask `isLaunchable(id)` (also surfaced as `AppView.launchable`), which is true
+///         exactly when the record holds an approved package and is neither Suspended nor Deprecated. A
+///         listing whose vendor has an update in review is therefore Pending AND launchable — it keeps
+///         serving the last reviewed package (FR-003). Deriving launchability from `status == Approved`
+///         instead would hand every vendor an offline switch for their own live app: submitting any update
+///         would pull a reviewed, working package out of the catalog until a curator got around to it.
 ///         A Suspended listing is frozen for its vendor as well: allowing `submitUpdate` to move it back to
 ///         Pending would let a vendor clear a compliance suspension unilaterally.
 ///         Checks-effects-interactions is trivial — there are no external value calls at all. The only
@@ -39,10 +54,16 @@ import {ISanctionsGuard} from "../interfaces/ISanctionsGuard.sol";
 ///         `ExternalDAORegistry`, and `BridgeRouter` intent-free. `submitApp`/`submitUpdate` are the natural
 ///         `…WithSig` candidates if a gasless vendor rail is ever asked for.
 contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
-    /// @notice Holders may approve / suspend / deprecate listings. Held by the compliance multisig; granted
-    ///         post-deploy by the deploy script (the deployer self-grants only to seed the first-party apps,
-    ///         then hands the role over). Deliberately separate from DEFAULT_ADMIN_ROLE: configuring the
-    ///         gates and deciding what code may execute are different privileges.
+    /// @notice Holders may approve / reject / suspend / deprecate listings. Held by the compliance multisig.
+    ///         SELF-ADMINISTERING: `initialize` sets this role as its own admin, so only a curator can add or
+    ///         remove a curator. Without that, the separation from DEFAULT_ADMIN_ROLE would be decorative —
+    ///         OpenZeppelin defaults every role's admin to DEFAULT_ADMIN_ROLE, so the gate administrator
+    ///         could self-grant curation in one transaction and the "trust boundary" would be a comment.
+    /// @dev    The trade-off is deliberate: if every curator key is lost, curation freezes and the only way
+    ///         back is a UUPS upgrade. That is the loud, visible, auditable recovery path — preferable to a
+    ///         quiet one that doubles as a bypass. UPGRADER_ROLE remains a strict superset of this role by
+    ///         construction (it can install logic that writes anything), which is why the deploy runbook puts
+    ///         it on the multisig/timelock rather than an EOA.
     bytes32 public constant APP_CURATOR_ROLE = keccak256("APP_CURATOR_ROLE");
 
     // ---- Bounded inputs (caps per-write storage + event size; loosening one is an upgrade, never a setter) ----
@@ -53,7 +74,12 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
     uint256 public constant MAX_CID_LENGTH = 256;
     /// @notice Hard ceiling on `getAppsPaged` page size. Larger requests are CLAMPED, not rejected: a view
     ///         that silently truncates is honest as long as the caller can keep paging by `offset`.
-    uint256 public constant MAX_PAGE_LIMIT = 100;
+    /// @dev    Sized against the WORST case, not the typical one: each entry can carry a 64-byte name, a
+    ///         512-byte description and two 256-byte CIDs, all vendor-controlled, so a page of 100 could
+    ///         approach ~180 KB of ABI-encoded return data and blow past the `eth_call` gas caps public RPC
+    ///         providers actually enforce — the catalog would fail on exactly the networks members use.
+    ///         25 keeps a worst-case page inside a comfortable margin.
+    uint256 public constant MAX_PAGE_LIMIT = 25;
 
     struct AppRecord {
         address vendor; // immutable after submission; the only account that may update the listing
@@ -62,6 +88,12 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         uint64 submittedAt;
         uint64 approvedAt;
         uint64 updatedAt;
+        /// @dev High-water mark of every version ever ISSUED for this app, including ones that were
+        ///      rejected or superseded before approval. Derived state (max of the two tuples) would fall
+        ///      back the moment `proposed` is cleared, so a rejected v2 would be followed by a second,
+        ///      different v2 — and a compliance log that records "v2 rejected" then "v2 approved" cannot
+        ///      be read honestly. Packs with the timestamps above; costs no extra slot.
+        uint64 lastVersion;
         string name;
         string description;
         PackageRef approved; // the only tuple hosts may serve
@@ -93,21 +125,30 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
     }
 
     /// @notice One-time initializer (replaces the constructor for the UUPS proxy).
-    /// @param admin DEFAULT_ADMIN_ROLE + UPGRADER_ROLE holder. APP_CURATOR_ROLE is NOT granted here — the
-    ///        deploy script grants it explicitly so the curator set is always a deliberate, recorded act.
+    /// @param admin DEFAULT_ADMIN_ROLE + UPGRADER_ROLE holder (gate configuration and upgrades only).
+    /// @param curator The first APP_CURATOR_ROLE holder. REQUIRED and non-zero: the curator role administers
+    ///        itself, so a registry initialized without one could never be granted a curator at all and every
+    ///        listing would be stuck Pending forever. The deploy script passes the deployer here to seed the
+    ///        first-party catalog, then grants the compliance multisig and renounces.
     /// @param membershipManager_ Membership proxy, or address(0) to launch with the vendor tier gate off.
     /// @param membershipRole_ Role whose active tier is checked; must be non-zero when a manager is set.
     /// @param minTier_ Minimum `IMembershipManager.Tier` ordinal a vendor must hold (0 = None ⇒ no floor).
     /// @param sanctionsGuard_ Sanctions guard, or address(0) to disable screening.
     function initialize(
         address admin,
+        address curator,
         address membershipManager_,
         bytes32 membershipRole_,
         uint8 minTier_,
         address sanctionsGuard_
     ) external initializer {
-        if (admin == address(0)) revert ZeroAddress();
+        if (admin == address(0) || curator == address(0)) revert ZeroAddress();
         __UUPSManaged_init(admin);
+
+        // Curation administers itself — see APP_CURATOR_ROLE. This MUST precede the grant below, and the
+        // grant MUST happen here: once the role admin is the role itself, an empty curator set is terminal.
+        _setRoleAdmin(APP_CURATOR_ROLE, APP_CURATOR_ROLE);
+        _grantRole(APP_CURATOR_ROLE, curator);
 
         _setMembershipGate(membershipManager_, membershipRole_, minTier_);
         sanctionsGuard = ISanctionsGuard(sanctionsGuard_); // may be zero
@@ -144,7 +185,7 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         rec.status = Status.Pending;
         // `approved` stays zeroed: a brand-new listing has nothing servable until a curator promotes this
         // tuple (invariant I1).
-        rec.proposed = PackageRef({cid: cid, manifestHash: manifestHash, version: 1});
+        rec.proposed = PackageRef({cid: cid, manifestHash: manifestHash, version: _issueVersion(rec)});
         rec.submittedAt = uint64(block.timestamp);
         rec.updatedAt = uint64(block.timestamp);
 
@@ -163,7 +204,7 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         _requireEligibleVendor(msg.sender);
         _checkPackage(cid, manifestHash);
 
-        uint64 version = _nextVersion(rec);
+        uint64 version = _issueVersion(rec);
         rec.proposed = PackageRef({cid: cid, manifestHash: manifestHash, version: version});
         rec.status = Status.Pending;
         rec.updatedAt = uint64(block.timestamp);
@@ -196,7 +237,7 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         rec.status = Status.Pending;
         rec.updatedAt = uint64(block.timestamp);
 
-        emit AppMetadataUpdated(id, name, category);
+        emit AppMetadataUpdated(id, name, description, category);
     }
 
     // =========================================================================
@@ -204,10 +245,17 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
     // =========================================================================
 
     /// @inheritdoc IMiniAppRegistry
-    /// @dev The ONLY promotion path (invariant I2). Two shapes, one function: with a `proposed` tuple it
-    ///      promotes it and clears the slot; with none (a metadata-only re-review, or a suspension being
-    ///      lifted) it simply reinstates the retained `approved` tuple.
-    function approveApp(uint256 id) external onlyRole(APP_CURATOR_ROLE) {
+    /// @dev The ONLY promotion path (invariant I2), and it is CONTENT-COMMITTED: `expectedManifestHash` is
+    ///      the hash the curator actually reviewed, and the call reverts with {StaleProposal} if the record
+    ///      no longer holds it. This is the whole defence against a vendor swapping `proposed` out from
+    ///      under an in-flight approval — by front-running the transaction, or during the hours-to-days a
+    ///      multisig spends collecting signatures on public calldata. Never relax this to an id-only call.
+    ///
+    ///      Two shapes, one function: with a `proposed` tuple it promotes that; with none (a metadata-only
+    ///      re-review) it reinstates the retained `approved` tuple. Either way the curator names the hash,
+    ///      so "reinstate what was already approved" cannot silently promote a proposal that happens to be
+    ///      armed — to reinstate while a proposal is outstanding, {rejectProposal} it first.
+    function approveApp(uint256 id, bytes32 expectedManifestHash) external onlyRole(APP_CURATOR_ROLE) {
         AppRecord storage rec = _requireApp(id);
         if (rec.status == Status.Deprecated) revert AppDeprecatedError(); // I3
         // Nothing to promote and nothing to reinstate: approving again would emit a lifecycle event that
@@ -215,22 +263,60 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         if (rec.status == Status.Approved) revert InvalidStatus();
 
         PackageRef memory served = rec.proposed;
-        if (bytes(served.cid).length != 0) {
-            rec.approved = served;
-            delete rec.proposed;
-        } else {
+        bool promoting = bytes(served.cid).length != 0;
+        if (!promoting) {
             served = rec.approved;
             // Invariant I1: an Approved record must always have a servable package. Structurally
             // unreachable today (`submitApp` always writes `proposed`), kept as the guard that makes the
             // invariant hold for any future entrypoint rather than an unlaunchable catalog entry.
             if (bytes(served.cid).length == 0) revert NothingProposed();
         }
+        // The time-of-check / time-of-use guard. Checked BEFORE any state change.
+        if (served.manifestHash != expectedManifestHash) {
+            revert StaleProposal(expectedManifestHash, served.manifestHash);
+        }
 
+        if (promoting) {
+            rec.approved = served;
+            delete rec.proposed;
+        }
         rec.status = Status.Approved;
         rec.approvedAt = uint64(block.timestamp);
         rec.updatedAt = uint64(block.timestamp);
 
         emit AppApproved(id, msg.sender, served.cid, served.manifestHash, served.version);
+    }
+
+    /// @inheritdoc IMiniAppRegistry
+    /// @dev The review outcome that has to exist: "this package must not ship". Without it a curator's only
+    ///      options are to leave the tuple armed for the next approval, suspend the listing (which delists a
+    ///      known-good approved package as collateral damage), or deprecate it (terminal, for a fixable
+    ///      submission) — so a rejected proposal would linger as a trap. Content-committed for the same
+    ///      reason as {approveApp}: a vendor must not be able to swap in a different tuple and have it
+    ///      quietly discarded, or discard a fresh good-faith submission the curator has not seen.
+    ///
+    ///      A record that has been approved before returns to Approved and keeps serving its reviewed
+    ///      package; one that never has stays Pending with nothing servable. Either way the vendor may
+    ///      submit again.
+    function rejectProposal(uint256 id, bytes32 expectedManifestHash) external onlyRole(APP_CURATOR_ROLE) {
+        AppRecord storage rec = _requireApp(id);
+        if (rec.status == Status.Deprecated) revert AppDeprecatedError(); // I3
+
+        PackageRef memory rejected = rec.proposed;
+        if (bytes(rejected.cid).length == 0) revert NothingProposed();
+        if (rejected.manifestHash != expectedManifestHash) {
+            revert StaleProposal(expectedManifestHash, rejected.manifestHash);
+        }
+
+        delete rec.proposed;
+        // Suspended is a curator decision about the LISTING and outranks a proposal outcome — rejecting a
+        // proposal must not quietly un-suspend an app.
+        if (rec.status != Status.Suspended && bytes(rec.approved.cid).length != 0) {
+            rec.status = Status.Approved;
+        }
+        rec.updatedAt = uint64(block.timestamp);
+
+        emit AppProposalRejected(id, msg.sender, rejected.cid, rejected.manifestHash, rejected.version);
     }
 
     /// @inheritdoc IMiniAppRegistry
@@ -310,6 +396,18 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
     }
 
     /// @inheritdoc IMiniAppRegistry
+    /// @dev THE serving decision, expressed once on-chain so every host does not re-derive it (and get it
+    ///      subtly wrong). True exactly when the record holds a curator-approved package and the listing is
+    ///      neither Suspended nor Deprecated. Note a Pending record CAN be launchable: that is a live app
+    ///      with an update in review, still serving the last reviewed bytes (FR-003).
+    function isLaunchable(uint256 id) public view returns (bool) {
+        AppRecord storage rec = _apps[id];
+        if (rec.vendor == address(0)) return false;
+        if (rec.status == Status.Suspended || rec.status == Status.Deprecated) return false;
+        return bytes(rec.approved.cid).length != 0;
+    }
+
+    /// @inheritdoc IMiniAppRegistry
     function appIdsByVendor(address vendor) external view returns (uint256[] memory) {
         return _appsByVendor[vendor];
     }
@@ -372,10 +470,24 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         if (rec.status == Status.Suspended) revert InvalidStatus();
     }
 
+    /// @dev A name must be non-empty AFTER normalization — otherwise " " (or any run of spaces) passes a
+    ///      raw length check, normalizes to the empty key, and the first such submission claims the key
+    ///      keccak256("") that every later blank name would collide with. Control bytes are rejected
+    ///      outright: they are invisible in a catalog card, so they would let two listings render
+    ///      identically to a member while holding different keys.
     function _checkMetadata(string calldata name, string calldata description) internal pure {
-        uint256 nameLength = bytes(name).length;
-        if (nameLength == 0) revert EmptyName();
-        if (nameLength > MAX_NAME_LENGTH) revert StringTooLong();
+        bytes memory raw = bytes(name);
+        if (raw.length == 0 || raw.length > MAX_NAME_LENGTH) {
+            if (raw.length == 0) revert EmptyName();
+            revert StringTooLong();
+        }
+        bool hasVisible = false;
+        for (uint256 i = 0; i < raw.length; i++) {
+            uint8 char = uint8(raw[i]);
+            if (char < 0x20 || char == 0x7f) revert InvalidName(); // C0 controls + DEL
+            if (char != 0x20) hasVisible = true;
+        }
+        if (!hasVisible) revert EmptyName();
         if (bytes(description).length > MAX_DESCRIPTION_LENGTH) revert StringTooLong();
     }
 
@@ -389,27 +501,51 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
         if (manifestHash == bytes32(0)) revert EmptyManifestHash();
     }
 
-    /// @dev Versions are monotonic per app and never reused. The last issued number is whichever tuple holds
-    ///      the higher one: promotion moves `proposed` into `approved` and zeroes `proposed`, so no separate
-    ///      counter (and no extra storage slot) is needed.
-    function _nextVersion(AppRecord storage rec) internal view returns (uint64) {
-        uint64 approvedVersion = rec.approved.version;
-        uint64 proposedVersion = rec.proposed.version;
-        return (approvedVersion >= proposedVersion ? approvedVersion : proposedVersion) + 1;
+    /// @dev Versions are monotonic per app and NEVER reused — including across rejections. Reads the
+    ///      persisted high-water mark rather than deriving one from the live tuples, because clearing
+    ///      `proposed` (on rejection, or on promotion) would otherwise let the next submission reissue a
+    ///      number that already appeared in a lifecycle event.
+    function _issueVersion(AppRecord storage rec) internal returns (uint64 next) {
+        unchecked {
+            next = rec.lastVersion + 1; // uint64 exhaustion is unreachable: one increment per submission
+        }
+        rec.lastVersion = next;
     }
 
-    /// @dev Uniqueness key = keccak256 of the name with ASCII 'A'–'Z' folded to lower case. The rule is
-    ///      deliberately ASCII-only: bytes >= 0x80 pass through untouched, so no Unicode case folding or
-    ///      confusable mapping is attempted on-chain (the spec routes display-name lookalikes to human
-    ///      reviewers, which is where that judgement belongs). Enforced identically on every write and on
-    ///      `idByName`, so "Token Mint" and "token mint" are one listing.
+    /// @dev Uniqueness key = keccak256 of the name lower-cased (ASCII) with runs of spaces collapsed and
+    ///      leading/trailing spaces dropped, so "Token Mint", "token  mint" and " TOKEN MINT " are ONE
+    ///      listing. Folding case alone would leave the cheapest lookalikes — an extra space or a leading
+    ///      one — registrable as separate names, which is exactly the impersonation a duplicate-name guard
+    ///      is supposed to make expensive.
+    ///
+    ///      Deliberately ASCII-only beyond that: bytes >= 0x80 pass through untouched, so no Unicode case
+    ///      folding or confusable mapping is attempted on-chain (the spec routes lookalike display names to
+    ///      human reviewers, which is where that judgement belongs). This guard raises the cost of trivial
+    ///      collisions; it is NOT impersonation protection, and the review panel must not present it as one.
+    ///      Enforced identically on every write and on `idByName`.
     function _nameKey(string memory name) internal pure returns (bytes32) {
         bytes memory raw = bytes(name); // memory copy of the argument — safe to fold in place
+        bytes memory out = new bytes(raw.length);
+        uint256 n = 0;
+        bool pendingSpace = false;
         for (uint256 i = 0; i < raw.length; i++) {
-            bytes1 char = raw[i];
-            if (char >= 0x41 && char <= 0x5a) raw[i] = bytes1(uint8(char) + 32);
+            uint8 char = uint8(raw[i]);
+            if (char == 0x20) {
+                if (n != 0) pendingSpace = true; // never leading; collapses runs
+                continue;
+            }
+            if (pendingSpace) {
+                out[n++] = 0x20;
+                pendingSpace = false;
+            }
+            if (char >= 0x41 && char <= 0x5a) char += 32; // ASCII 'A'-'Z' -> lower
+            out[n++] = bytes1(char);
         }
-        return keccak256(raw);
+        // Trailing run discarded with `pendingSpace`. Shrink to the used prefix before hashing.
+        assembly {
+            mstore(out, n)
+        }
+        return keccak256(out);
     }
 
     function _toView(uint256 id, AppRecord storage rec) internal view returns (AppView memory) {
@@ -420,6 +556,9 @@ contract MiniAppRegistry is IMiniAppRegistry, UUPSManaged {
             description: rec.description,
             category: rec.category,
             status: rec.status,
+            // Carried in the view so a catalog page answers "may I run this?" without a second call per
+            // record — and so no client has to reimplement the rule.
+            launchable: isLaunchable(id),
             approved: rec.approved,
             proposed: rec.proposed,
             submittedAt: rec.submittedAt,

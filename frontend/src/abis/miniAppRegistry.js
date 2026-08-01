@@ -2,8 +2,12 @@
 // Hand-maintained (the repo does not auto-generate frontend ABIs; sync only does addresses). Refresh from
 // the compiled artifact after contract changes.
 
-// AppStatus: only Approved is launchable. Suspended and Deprecated records stay readable so the host can
-// explain a refusal instead of showing a member a blank surface.
+// AppStatus is the REVIEW state, NOT the answer to "may a host run this?" — read `launchable` (or call
+// isLaunchable) for that. A Pending record is launchable when it has been approved before: that is a live
+// app with an update in review, still serving its last reviewed package (FR-003). Gating launches on
+// `status === APPROVED` would hand every vendor an offline switch for their own live app.
+// Suspended and Deprecated records stay readable so the host can explain a refusal instead of showing a
+// member a blank surface.
 export const AppStatus = {
   PENDING: 0,
   APPROVED: 1,
@@ -38,10 +42,13 @@ export const APP_CURATOR_ROLE = '0xc242262718134333007a37a2e61483e7143f44e0144fb
 export const MINI_APP_REGISTRY_ABI = [
   // ---- Catalog reads (indexer-free; the launch path always re-reads the single record it runs) ----
   'function appCount() view returns (uint256)',
-  'function getApp(uint256 id) view returns ((uint256 id, address vendor, string name, string description, uint8 category, uint8 status, (string cid, bytes32 manifestHash, uint64 version) approved, (string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt))',
-  'function getAppsPaged(uint256 offset, uint256 limit) view returns ((uint256 id, address vendor, string name, string description, uint8 category, uint8 status, (string cid, bytes32 manifestHash, uint64 version) approved, (string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt)[] apps)',
+  'function getApp(uint256 id) view returns ((uint256 id, address vendor, string name, string description, uint8 category, uint8 status, bool launchable, (string cid, bytes32 manifestHash, uint64 version) approved, (string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt))',
+  'function getAppsPaged(uint256 offset, uint256 limit) view returns ((uint256 id, address vendor, string name, string description, uint8 category, uint8 status, bool launchable, (string cid, bytes32 manifestHash, uint64 version) approved, (string cid, bytes32 manifestHash, uint64 version) proposed, uint64 submittedAt, uint64 approvedAt, uint64 updatedAt)[] apps)',
   'function appIdsByVendor(address vendor) view returns (uint256[])',
   'function idByName(string name) view returns (uint256)',
+  // THE serving decision, on-chain. A Pending record CAN be launchable: a live app with an update in
+  // review keeps serving its last reviewed package (FR-003). Never derive this from status alone.
+  'function isLaunchable(uint256 id) view returns (bool)',
 
   // ---- Vendor submissions ----
   'function submitApp(string name, string description, uint8 category, string cid, bytes32 manifestHash) returns (uint256 id)',
@@ -49,7 +56,10 @@ export const MINI_APP_REGISTRY_ABI = [
   'function updateMetadata(uint256 id, string name, string description, uint8 category)',
 
   // ---- Curator lifecycle (APP_CURATOR_ROLE) ----
-  'function approveApp(uint256 id)',
+  // Content-committed: the curator names the manifestHash they REVIEWED, so a vendor cannot swap the
+  // package under an in-flight approval. Always pass the hash the reviewer actually saw.
+  'function approveApp(uint256 id, bytes32 expectedManifestHash)',
+  'function rejectProposal(uint256 id, bytes32 expectedManifestHash)',
   'function suspendApp(uint256 id)',
   'function deprecateApp(uint256 id)',
 
@@ -74,8 +84,9 @@ export const MINI_APP_REGISTRY_ABI = [
   // ---- Events ----
   'event AppSubmitted(uint256 indexed id, address indexed vendor, string name, uint8 category, string cid, bytes32 manifestHash, uint64 version)',
   'event AppUpdateSubmitted(uint256 indexed id, address indexed vendor, string cid, bytes32 manifestHash, uint64 version)',
-  'event AppMetadataUpdated(uint256 indexed id, string name, uint8 category)',
+  'event AppMetadataUpdated(uint256 indexed id, string name, string description, uint8 category)',
   'event AppApproved(uint256 indexed id, address indexed curator, string cid, bytes32 manifestHash, uint64 version)',
+  'event AppProposalRejected(uint256 indexed id, address indexed curator, string cid, bytes32 manifestHash, uint64 version)',
   'event AppSuspended(uint256 indexed id, address indexed curator)',
   'event AppDeprecated(uint256 indexed id, address indexed curator)',
   'event MembershipGateChanged(address manager, bytes32 role, uint8 minTier)',
@@ -89,6 +100,8 @@ export const MINI_APP_REGISTRY_ABI = [
   'error DuplicateName()',
   'error EmptyCid()',
   'error EmptyName()',
+  'error InvalidName()',
+  'error StaleProposal(bytes32 expected, bytes32 actual)',
   'error EmptyManifestHash()',
   'error StringTooLong()',
   'error NothingProposed()',
