@@ -58,6 +58,21 @@ describe('tenant config (spec 072)', () => {
     expect(tenantContractMode()).toBe('shared')
   })
 
+  it('shared-mode tenants have no tenant contract overlay (resolution unchanged)', async () => {
+    const { isDedicatedTenant, tenantContractsForChain } = await import('../config/tenant')
+    expect(isDedicatedTenant()).toBe(false)
+    expect(tenantContractsForChain(137)).toBeUndefined()
+    expect(tenantContractsForChain(63)).toBeUndefined()
+  })
+
+  it('shared-mode resolution through contracts.js is untouched (US3)', async () => {
+    const { getContractAddressForChain } = await import('../config/contracts')
+    // Mordor (63) is the test-pinned network with a live wagerRegistry record.
+    expect(getContractAddressForChain('wagerRegistry', 63)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    // A chain with no record still reads as not-deployed.
+    expect(getContractAddressForChain('wagerRegistry', 999999)).toBeUndefined()
+  })
+
   it('unknown tenant ids fail loudly instead of falling back', () => {
     expect(() => resolveTenant('not-a-tenant')).toThrow(/unknown tenant id "not-a-tenant"/)
   })

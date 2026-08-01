@@ -13,6 +13,10 @@
 // with their display info for getDeployedNetworks(). Safe from import cycles:
 // networks.js intentionally does NOT import from this file.
 import { NETWORKS } from './networks'
+// Tenant contract-set resolution (spec 072): a DEDICATED tenant resolves only
+// its own generated set; shared-mode tenants (incl. the default) fall through
+// to the per-chain maps below. tenant.js has no import back into this file.
+import { isDedicatedTenant, tenantContractsForChain } from './tenant'
 
 // Mordor (Ethereum Classic testnet, chainId 63) — v2 P2P betting deployment.
 // CORE ONLY: no oracle adapters (ETC has no Polymarket/Chainlink/UMA), so those
@@ -303,6 +307,13 @@ export function getDeploymentBlockForChain(contractName, chainId) {
  * @returns {string} Contract address
  */
 export function getContractAddress(contractName) {
+  // Dedicated tenant (spec 072): the tenant's own generated set is the ONLY
+  // source — no env overrides, no shared-estate fallback. Absence stays absence.
+  if (isDedicatedTenant()) {
+    const tenantSet = tenantContractsForChain(ACTIVE_CHAIN_ID)
+    return tenantSet ? tenantSet[contractName] : undefined
+  }
+
   // Check environment variables first (for custom deployments)
   // Support both legacy style (VITE_ROLEMANAGER_ADDRESS) and snake-case style (VITE_ROLE_MANAGER_ADDRESS)
   const upper = contractName.toUpperCase()
@@ -339,6 +350,13 @@ export function getContractAddress(contractName) {
  */
 export function getContractAddressForChain(contractName, chainId) {
   if (chainId == null) return getContractAddress(contractName)
+  // Dedicated tenant (spec 072): resolve ONLY from the tenant's own set —
+  // a chain absent from it reads as not-deployed for this tenant, never as
+  // the shared estate's deployment (FR-003/D6).
+  if (isDedicatedTenant()) {
+    const tenantSet = tenantContractsForChain(chainId)
+    return tenantSet ? tenantSet[contractName] : undefined
+  }
   const chainContracts = NETWORK_CONTRACTS[chainId]
   return chainContracts ? chainContracts[contractName] : undefined
 }

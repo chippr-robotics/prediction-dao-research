@@ -20,7 +20,7 @@
  * for the active tenant.
  */
 
-import { activeTenantManifest, featureCatalog } from 'virtual:tenant'
+import { activeTenantManifest, featureCatalog, tenantContractSets } from 'virtual:tenant'
 
 export const DEFAULT_TENANT_ID = 'fairwins'
 
@@ -34,6 +34,7 @@ function deepFreeze(value) {
 
 const ACTIVE_TENANT = deepFreeze(activeTenantManifest)
 const FEATURE_CATALOG = deepFreeze(featureCatalog ?? [])
+const CONTRACT_SETS = deepFreeze(tenantContractSets ?? {})
 
 /**
  * Resolve a tenant id to its manifest. Only the active tenant is present in
@@ -131,10 +132,25 @@ export function tenantThemeClass() {
 /**
  * Contract-set mode: 'shared' fronts the platform estate (existing
  * config/contracts.js resolution unchanged); 'dedicated' resolves ONLY the
- * tenant's own generated set (frontend/src/config/tenants/<id>.contracts.js,
- * written by sync-frontend-contracts --tenant). Dedicated resolution lands
- * with spec 072 T016; shared mode is a pass-through by design.
+ * tenant's own generated set (frontend/src/config/tenants/<id>.contracts.json,
+ * written by sync-frontend-contracts --tenant and injected via virtual:tenant).
  */
 export function tenantContractMode() {
   return ACTIVE_TENANT.contractSet.mode
+}
+
+export function isDedicatedTenant() {
+  return ACTIVE_TENANT.contractSet.mode === 'dedicated'
+}
+
+/**
+ * The active tenant's address record for a chain — DEDICATED tenants only.
+ * Returns undefined for shared-mode tenants (callers fall through to the
+ * shared estate's maps) AND for chains absent from a dedicated tenant's set
+ * (absence stays absence — a dedicated tenant never resolves the shared
+ * estate's addresses, spec 072 FR-003/D6).
+ */
+export function tenantContractsForChain(chainId) {
+  if (!isDedicatedTenant()) return undefined
+  return CONTRACT_SETS[chainId] ?? CONTRACT_SETS[String(chainId)]
 }

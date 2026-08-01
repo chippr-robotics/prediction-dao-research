@@ -52,6 +52,35 @@ function loadFeatureCatalog() {
   return JSON.parse(fs.readFileSync(catalogPath, 'utf8')).features
 }
 
+function tenantContractSetPath(tenantId) {
+  return path.join(REPO_ROOT, 'frontend', 'src', 'config', 'tenants', `${tenantId}.contracts.json`)
+}
+
+/**
+ * Load the generated per-chain contract set for a DEDICATED tenant
+ * (written by `sync-frontend-contracts --tenant <id>` from the tenant's
+ * deployments/tenants/<id>/ records). A live dedicated tenant without a
+ * generated set fails the build — a dedicated instance must never silently
+ * resolve the shared estate's addresses (spec 072 FR-003/D6). Shared-mode
+ * tenants get an empty set: their resolution stays the shared estate.
+ */
+function loadTenantContractSets(tenantId, manifest) {
+  if (manifest.contractSet.mode !== 'dedicated') return {}
+  const setPath = tenantContractSetPath(tenantId)
+  if (!fs.existsSync(setPath)) {
+    if (manifest.lifecycle === 'live') {
+      throw new Error(
+        `[tenant-branding] dedicated tenant "${tenantId}" has no generated contract set at ` +
+          `frontend/src/config/tenants/${tenantId}.contracts.json. Run ` +
+          `\`node scripts/utils/sync-frontend-contracts.js --tenant ${tenantId} --network <n> --chainId <id>\` ` +
+          'after deploying — a dedicated build must never fall back to the shared estate.'
+      )
+    }
+    return {}
+  }
+  return JSON.parse(fs.readFileSync(setPath, 'utf8'))
+}
+
 function escapeAttr(value) {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 }
@@ -150,9 +179,11 @@ export function tenantBrandingPlugin() {
     load(id) {
       if (id !== RESOLVED_VIRTUAL_ID) return
       this.addWatchFile(manifestPathFor(tenantId))
+      const contractSets = loadTenantContractSets(tenantId, manifest)
       return (
         `export const activeTenantManifest = ${JSON.stringify(manifest)};\n` +
-        `export const featureCatalog = ${JSON.stringify(featureCatalog)};\n`
+        `export const featureCatalog = ${JSON.stringify(featureCatalog)};\n` +
+        `export const tenantContractSets = ${JSON.stringify(contractSets)};\n`
       )
     },
   }

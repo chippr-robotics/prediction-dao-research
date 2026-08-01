@@ -54,7 +54,13 @@ and contract set (`shared` | `dedicated`). Rules:
 - **A tenant id is immutable once deployed** (salts derive from it).
 - A dedicated tenant resolves ONLY its own contract set; a contract absent from the
   set on a chain reads as not-deployed for that tenant there. No silent fallback to
-  the shared estate, ever.
+  the shared estate, ever. The set is generated:
+  `node scripts/utils/sync-frontend-contracts.js --tenant <id> --network <n> --chainId <c>`
+  merges the tenant's record into `frontend/src/config/tenants/<id>.contracts.json`,
+  which the tenant-branding plugin injects via `virtual:tenant`;
+  `getContractAddress`/`getContractAddressForChain` consult it before (instead of) the
+  shared maps whenever `isDedicatedTenant()`. A **live** dedicated tenant with no
+  generated set fails the build.
 - Per-tenant gateway: run a relay-gateway instance against the tenant's deployment
   records — its startup allowlist (spec 036 FR-025) then *is* the tenant scoping.
 
