@@ -26,6 +26,7 @@ import { getDefaultLedgerRepository } from '../../data/ledger'
 import { listClientRecords, __clearClientLedger } from '../../data/ledger/ledgerClientStore'
 import { normalizeEntry } from '../../data/ledger/normalize'
 import { LEDGER_CLASS, LEDGER_CLASSES, LEDGER_STATUS, LEDGER_DIRECTION } from '../../data/ledger/constants'
+import { classLabel, isNeutralDirection } from '../../data/reports/activityClassification'
 
 const ACCOUNT = '0xAbCd000000000000000000000000000000000073'
 const CHAIN = 137
@@ -279,6 +280,38 @@ describe('mini-app audit reads (FR-020)', () => {
   it('returns null from readMiniAppEntry for a record of another class', () => {
     expect(readMiniAppEntry({ class: LEDGER_CLASS.TRANSFER })).toBe(null)
     expect(readMiniAppEntry(null)).toBe(null)
+  })
+})
+
+describe('Reporting classification (T042)', () => {
+  it('labels the class "Mini-App", never the raw ledger key', () => {
+    // classLabel() falls back to the raw key for an unregistered class, so
+    // without the entry a member's report would show a row headed "miniapp".
+    expect(classLabel(LEDGER_CLASS.MINIAPP)).toBe('Mini-App')
+    expect(classLabel(LEDGER_CLASS.MINIAPP)).not.toBe(LEDGER_CLASS.MINIAPP)
+  })
+
+  it('is distinguishable from every other class label', () => {
+    const labels = LEDGER_CLASSES.map((c) => classLabel(c))
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('writes every kind as value-neutral, so audit entries can never be netted into totals', () => {
+    captureMiniAppLaunch(ACCOUNT, CHAIN, { appId: APP, version: '1.0.0', manifestHash: MANIFEST_HASH })
+    captureMiniAppTxSubmitted(ACCOUNT, CHAIN, { appId: APP, txHash: TX })
+    captureMiniAppIntegrityFailure(ACCOUNT, CHAIN, { appId: APP, cid: 'bafy', reason: 'manifest-hash' })
+    captureMiniAppStateChange(ACCOUNT, CHAIN, { appId: APP, storeKey: 'drafts' })
+    captureMiniAppLog(ACCOUNT, CHAIN, { appId: APP, kind: 'minted' })
+
+    const records = listClientRecords(ACCOUNT, CHAIN).filter((r) => r.class === LEDGER_CLASS.MINIAPP)
+    expect(records.length).toBe(5)
+    for (const record of records) {
+      // These entries are attribution, not valuation. A direction other than
+      // `none` on any of them would put a launch or a log line on the income
+      // or disposal side of a member's tax report.
+      expect(record.direction).toBe(LEDGER_DIRECTION.NONE)
+      expect(isNeutralDirection(record.direction)).toBe(true)
+    }
   })
 })
 
