@@ -37,6 +37,14 @@
  *   {@link LoadCancelledError} rather than an availability error blaming a
  *   network that was never at fault.
  *
+ * TWO ENTRY POINTS, ONE CHAIN OF CHECKS. {@link loadMiniApp} runs steps 1–6 for
+ * a launch. {@link verifyMiniAppPackage} runs steps 1–5 and stops — the
+ * curator's pre-approval check (FR-022), which must never execute the package it
+ * is judging. Both go through the same `fetchVerifiedPackage`, deliberately: a
+ * reviewer-only re-implementation of "fetch then verify" would drift, and the
+ * way that drift shows up is a curator approving on the strength of a
+ * verification that stopped testing what the launch tests.
+ *
  * The loader never reads the registry itself (`registryClient.js` owns that);
  * it is handed the record so the caller keeps the FR-010 status re-check where
  * it belongs — at launch time, in the workspace.
@@ -48,17 +56,25 @@
 import { AppStatus } from '../../abis/miniAppRegistry'
 import { IPFS_GATEWAY } from '../../constants/ipfs'
 import {
+  IntegrityError,
   ZERO_MANIFEST_HASH,
   normalizeBytes32Hex,
   verifyFileBytes,
   verifyManifestBytes,
 } from './integrity'
-import { ManifestError, MANIFEST_REFUSAL, manifestFileDigest, parseManifest } from './manifest'
+import {
+  HostApiError,
+  ManifestError,
+  MANIFEST_REFUSAL,
+  manifestFileDigest,
+  parseManifest,
+} from './manifest'
 
 // Re-exported so a caller catching launch failures imports one module. These are
 // the same classes, not copies — `instanceof` works across the three files.
-export { IntegrityError } from './integrity'
-export { HostApiError, ManifestError, MANIFEST_REFUSAL } from './manifest'
+// Imported locally as well as re-exported because `verifyMiniAppPackage` classifies
+// failures BY TYPE, and `export … from` alone creates no binding to test against.
+export { IntegrityError, HostApiError, ManifestError, MANIFEST_REFUSAL }
 
 /** The package file that anchors the integrity chain. */
 export const MANIFEST_FILENAME = 'manifest.json'
@@ -321,6 +337,41 @@ const defaultCreateObjectURL = (blob) => URL.createObjectURL(blob)
 const defaultRevokeObjectURL = (url) => URL.revokeObjectURL(url)
 
 /**
+ * Vet a `(cid, manifestHash)` tuple's SHAPE, without any opinion about whether
+ * it may be launched.
+ *
+ * Split out of {@link approvedPackageRef} so the reviewer's pre-approval
+ * verification ({@link verifyMiniAppPackage}) can reuse the exact same checks on
+ * a PROPOSED tuple — which by definition is not launchable, and which the
+ * launchable gate would therefore refuse before a reviewer ever saw a digest.
+ * Shape and permission are two different questions, and only the launch path
+ * asks both.
+ */
+function packageTuple(ref) {
+  const cid = typeof ref?.cid === 'string' ? ref.cid.trim() : ''
+  const manifestHash = normalizeBytes32Hex(ref?.manifestHash)
+
+  if (cid === '' || manifestHash === null || manifestHash === ZERO_MANIFEST_HASH) {
+    throw new AppNotLaunchableError(
+      'no_approved_package',
+      'miniapp loader: the tuple carries no package (cid + manifestHash) — there is nothing to fetch or serve'
+    )
+  }
+  if (!CID_PATTERN.test(cid)) {
+    throw new AppNotLaunchableError(
+      'invalid_cid',
+      `miniapp loader: cid "${cid}" is not a plain content identifier`,
+      {
+        userMessage:
+          'This app record points at a package address the platform cannot resolve, so it was not run. ' +
+          'Please report this to the platform team.',
+      }
+    )
+  }
+  return { cid, manifestHash }
+}
+
+/**
  * Read the approved package reference off a registry record, refusing anything
  * that is not launchable.
  *
@@ -357,28 +408,114 @@ function approvedPackageRef(record) {
     )
   }
 
-  const approved = record?.approved
-  const cid = typeof approved?.cid === 'string' ? approved.cid.trim() : ''
-  const manifestHash = normalizeBytes32Hex(approved?.manifestHash)
+  return packageTuple(record?.approved)
+}
 
-  if (cid === '' || manifestHash === null || manifestHash === ZERO_MANIFEST_HASH) {
-    throw new AppNotLaunchableError(
-      'no_approved_package',
-      'miniapp loader: the record carries no approved package (cid + manifestHash) — nothing has been approved to serve'
-    )
-  }
-  if (!CID_PATTERN.test(cid)) {
-    throw new AppNotLaunchableError(
-      'invalid_cid',
-      `miniapp loader: approved cid "${cid}" is not a plain content identifier`,
+/**
+ * Fetch a package and verify every byte of it — steps 1–5 of the chain in this
+ * file's header — WITHOUT making any of it executable.
+ *
+ * This exists as its own function so the launch path and the curator's
+ * pre-approval check are literally the same code. Two parallel implementations
+ * of "fetch then verify" would eventually disagree, and the way they disagree
+ * is that one of them stops checking something — which on the reviewer's side
+ * means a curator approving a package on the strength of a verification that
+ * did not test what the launch will test.
+ *
+ * Nothing here mints a Blob URL or calls `import()`. Turning verified bytes into
+ * code happens in exactly one place ({@link loadMiniApp}), after this returns.
+ *
+ * @param {{cid: string, manifestHash: string}} tuple - an already shape-vetted package reference
+ * @param {object} options - see {@link loadMiniApp}; plus `verifyAllDeclaredFiles`
+ * @param {boolean} [options.verifyAllDeclaredFiles] - also fetch and digest-check every OTHER path
+ *   the manifest declares. Off for a launch (the host executes the entry and injects the declared
+ *   stylesheets, and nothing else — fetching unused files would slow every launch and could refuse
+ *   one over a file it never runs), on for a review (a reviewer asking "do the per-file digests
+ *   match?" means the whole package, not the subset this host happens to execute).
+ * @returns {Promise<{manifest: object, entryBytes: Uint8Array, styles: Array<{path: string, css: string}>,
+ *   files: Array<{path: string, sha256: string, role: string}>, gateway: string}>}
+ */
+async function fetchVerifiedPackage({ cid, manifestHash }, options) {
+  const {
+    gateways,
+    fetchImpl,
+    timeoutMs,
+    signal,
+    expectedAppId,
+    supportedHostApi,
+    verifyAllDeclaredFiles = false,
+  } = options
+
+  const fetchOptions = { fetchImpl, timeoutMs, signal, maxBytes: MAX_MANIFEST_BYTES }
+
+  // (1) manifest bytes, with failover.
+  const { bytes: manifestBytes, gateway } = await fetchPackageFile(gateways, cid, MANIFEST_FILENAME, fetchOptions)
+
+  // (2) authenticate the bytes against the chain BEFORE they are parsed. Until
+  // this line returns, the manifest is untrusted gateway output — not a
+  // document whose `entry` field may be acted on.
+  verifyManifestBytes(manifestBytes, manifestHash)
+
+  // (3) now it is safe to read the package's own runtime contract.
+  const manifest = parseManifest(
+    manifestBytes,
+    supportedHostApi === undefined ? undefined : { supportedHostApi }
+  )
+
+  if (expectedAppId && manifest.id !== expectedAppId) {
+    // The app id is the namespace root for the per-app store and the ledger
+    // entry ids. A package claiming a different id than the record being
+    // launched would read and write another app's data.
+    throw new ManifestError(
+      MANIFEST_REFUSAL.IDENTITY_MISMATCH,
+      `miniapp loader: manifest id "${manifest.id}" does not match the launched app "${expectedAppId}"`,
       {
+        field: 'id',
         userMessage:
-          'This app record points at a package address the platform cannot resolve, so it was not run. ' +
+          'This package identifies itself as a different app than the one being launched, so it was not run. ' +
           'Please report this to the platform team.',
       }
     )
   }
-  return { cid, manifestHash }
+
+  // The verified manifest came from this gateway, so try it first for the rest
+  // of the package; the others stay in the list as fallbacks.
+  const ordered = [gateway, ...gateways.filter((g) => g !== gateway)]
+  const fileOptions = { ...fetchOptions, maxBytes: MAX_FILE_BYTES }
+  const files = []
+
+  /** Fetch one declared file and refuse it unless its bytes hash to the manifest's digest. */
+  const fetchVerified = async (path, role) => {
+    const expected = manifestFileDigest(manifest, path)
+    const { bytes } = await fetchPackageFile(ordered, cid, path, fileOptions)
+    verifyFileBytes(path, bytes, expected)
+    files.push({ path, sha256: expected, role })
+    return bytes
+  }
+
+  // (4) the executable bytes. Entry first — it is the critical path and a
+  // failure here makes fetching stylesheets pointless.
+  const entryBytes = await fetchVerified(manifest.entry, 'entry')
+
+  const styles = []
+  for (const path of manifest.styles) {
+    const bytes = await fetchVerified(path, 'style')
+    // Lenient decode on purpose: these bytes are already proven authentic, so a
+    // stray byte sequence is a cosmetic flaw in an approved package, not a
+    // reason to refuse a launch (unlike the manifest, where a decode surprise
+    // would change what the host acts on).
+    styles.push({ path, css: new TextDecoder('utf-8').decode(bytes) })
+  }
+
+  if (verifyAllDeclaredFiles) {
+    const checked = new Set(files.map((file) => file.path))
+    for (const path of Object.keys(manifest.files)) {
+      if (checked.has(path)) continue
+      await fetchVerified(path, 'declared')
+    }
+  }
+
+  return { manifest, entryBytes, styles, files, gateway }
 }
 
 /**
@@ -430,64 +567,12 @@ export async function loadMiniApp(record, options = {}) {
   if (gateways.length === 0) throw new GatewayUnavailableError(MANIFEST_FILENAME, [])
 
   const doFetch = fetchImpl || ((url, init) => globalThis.fetch(url, init))
-  const fetchOptions = { fetchImpl: doFetch, timeoutMs, signal, maxBytes: MAX_MANIFEST_BYTES }
 
-  // (1) manifest bytes, with failover.
-  const { bytes: manifestBytes, gateway } = await fetchPackageFile(gateways, cid, MANIFEST_FILENAME, fetchOptions)
-
-  // (2) authenticate the bytes against the chain BEFORE they are parsed. Until
-  // this line returns, the manifest is untrusted gateway output — not a
-  // document whose `entry` field may be acted on.
-  verifyManifestBytes(manifestBytes, manifestHash)
-
-  // (3) now it is safe to read the package's own runtime contract.
-  const manifest = parseManifest(
-    manifestBytes,
-    supportedHostApi === undefined ? undefined : { supportedHostApi }
+  // (1)–(4) fetch + verify, in the one place that order is defined.
+  const { manifest, entryBytes, styles, gateway } = await fetchVerifiedPackage(
+    { cid, manifestHash },
+    { gateways, fetchImpl: doFetch, timeoutMs, signal, expectedAppId, supportedHostApi }
   )
-
-  if (expectedAppId && manifest.id !== expectedAppId) {
-    // The app id is the namespace root for the per-app store and the ledger
-    // entry ids. A package claiming a different id than the record being
-    // launched would read and write another app's data.
-    throw new ManifestError(
-      MANIFEST_REFUSAL.IDENTITY_MISMATCH,
-      `miniapp loader: manifest id "${manifest.id}" does not match the launched app "${expectedAppId}"`,
-      {
-        field: 'id',
-        userMessage:
-          'This package identifies itself as a different app than the one being launched, so it was not run. ' +
-          'Please report this to the platform team.',
-      }
-    )
-  }
-
-  // The verified manifest came from this gateway, so try it first for the rest
-  // of the package; the others stay in the list as fallbacks.
-  const ordered = [gateway, ...gateways.filter((g) => g !== gateway)]
-  const fileOptions = { ...fetchOptions, maxBytes: MAX_FILE_BYTES }
-
-  /** Fetch one declared file and refuse it unless its bytes hash to the manifest's digest. */
-  const fetchVerified = async (path) => {
-    const expected = manifestFileDigest(manifest, path)
-    const { bytes } = await fetchPackageFile(ordered, cid, path, fileOptions)
-    verifyFileBytes(path, bytes, expected)
-    return bytes
-  }
-
-  // (4) the executable bytes. Entry first — it is the critical path and a
-  // failure here makes fetching stylesheets pointless.
-  const entryBytes = await fetchVerified(manifest.entry)
-
-  const styles = []
-  for (const path of manifest.styles) {
-    const bytes = await fetchVerified(path)
-    // Lenient decode on purpose: these bytes are already proven authentic, so a
-    // stray byte sequence is a cosmetic flaw in an approved package, not a
-    // reason to refuse a launch (unlike the manifest, where a decode surprise
-    // would change what the host acts on).
-    styles.push({ path, css: new TextDecoder('utf-8').decode(bytes) })
-  }
 
   // (5) EVERY check has passed. This is the first moment any package byte
   // becomes executable, and the Blob URL exists only for the duration of the
@@ -525,5 +610,139 @@ export async function loadMiniApp(record, options = {}) {
     gateway,
     cid,
     manifestHash,
+  }
+}
+
+/**
+ * Stable codes for a verification outcome, so a reviewer surface can branch on
+ * WHY a package could not be verified instead of reading a message.
+ *
+ * The distinction that matters most is `INTEGRITY` versus everything else.
+ * `INTEGRITY` is a PROVEN disagreement: the package at that CID is not the
+ * package the record's hash names, so nothing could ever launch from that tuple
+ * and no amount of retrying changes it. The others are all forms of "we could
+ * not establish that" — a gateway that would not answer, a cancelled check — or
+ * "the bytes are authentic but the package is defective". Those are different
+ * decisions for a curator, and a surface that collapsed them would either block
+ * approvals during an outage or wave through a hash mismatch.
+ */
+export const VERIFICATION_FAILURE = Object.freeze({
+  /** The tuple itself is unusable (empty/oversized CID, zero or malformed hash). */
+  INVALID_REF: 'invalid_ref',
+  /** Proven mismatch: manifest keccak or a file sha-256 disagrees with what was recorded. */
+  INTEGRITY: 'integrity',
+  /** Bytes are authentic, but the manifest is not a manifest this host can honor. */
+  MANIFEST: 'manifest',
+  /** Bytes are authentic; the package declares a host API newer than this build. */
+  HOST_API: 'host_api',
+  /** No gateway would serve the package — availability, not evidence about the package. */
+  GATEWAY: 'gateway',
+  /** The caller abandoned the check (navigation, a newer verification superseded it). */
+  CANCELLED: 'cancelled',
+  /** Anything unrecognised. Never treated as a pass. */
+  UNEXPECTED: 'unexpected',
+})
+
+/**
+ * Verify a package WITHOUT running any of it — the curator's pre-approval check
+ * (FR-022, and the spec.md edge case "reviewers can see fetch/verification
+ * failure before approving").
+ *
+ * Two properties make this worth having as its own entry point:
+ *
+ * 1. **It runs the launch path's checks, not a re-implementation of them.** The
+ *    fetch → hash → parse → per-file-digest sequence is shared with
+ *    {@link loadMiniApp} (see {@link fetchVerifiedPackage}), so a curator's
+ *    "verified" means the same thing the host will mean at launch. A separate
+ *    reviewer-only hasher would be the worst kind of drift: it would keep
+ *    passing while the thing it claims to predict started failing.
+ * 2. **It takes a TUPLE, not a record.** A reviewer verifies the *proposed*
+ *    tuple, which is by definition not launchable — {@link loadMiniApp} refuses
+ *    it, correctly, and would refuse it before fetching a byte. So the caller
+ *    names the tuple it is reviewing and this function has no opinion about
+ *    lifecycle at all.
+ *
+ * Nothing here can execute package code: there is no `importImpl` parameter, no
+ * Blob is constructed, and the entry bytes are discarded on the way out. The
+ * only thing a caller receives is a description of what was checked.
+ *
+ * Returns an OUTCOME rather than throwing, because every one of these failures
+ * is a thing the reviewer needs rendered next to the record — not an exception
+ * to be caught and flattened into "something went wrong".
+ *
+ * @param {{cid: string, manifestHash: string}} tuple - the package reference being reviewed
+ * @param {object} [options] - as {@link loadMiniApp} (`gateways`, `fetchImpl`, `timeoutMs`,
+ *   `signal`, `expectedAppId`, `supportedHostApi`)
+ * @returns {Promise<
+ *   {ok: true, manifest: object, files: Array<{path: string, sha256: string, role: string}>,
+ *    gateway: string, cid: string, manifestHash: string} |
+ *   {ok: false, code: string, reason: string|null, path: string|null, expected: string|null,
+ *    actual: string|null, message: string, userMessage: string, error: Error,
+ *    cid: string|null, manifestHash: string|null}
+ * >}
+ */
+export async function verifyMiniAppPackage(tuple, options = {}) {
+  const {
+    gateways: gatewayOption,
+    fetchImpl,
+    timeoutMs = GATEWAY_TIMEOUT_MS,
+    signal = null,
+    expectedAppId = null,
+    supportedHostApi,
+  } = options
+
+  /** Shape one failure the same way every time, so the caller has one branch to write. */
+  const failure = (code, error, detail = {}) => ({
+    ok: false,
+    code,
+    reason: error?.reason ?? null,
+    path: detail.path ?? error?.path ?? null,
+    expected: error?.expected ?? null,
+    actual: error?.actual ?? null,
+    message: error?.message || String(error),
+    userMessage: error?.userMessage || 'This package could not be verified.',
+    error: error instanceof Error ? error : new Error(String(error)),
+    cid: detail.cid ?? null,
+    manifestHash: detail.manifestHash ?? null,
+  })
+
+  let ref
+  try {
+    ref = packageTuple(tuple)
+  } catch (error) {
+    return failure(VERIFICATION_FAILURE.INVALID_REF, error)
+  }
+
+  const gateways = normalizeGateways(gatewayOption ?? resolveMiniAppGateways())
+  if (gateways.length === 0) {
+    return failure(VERIFICATION_FAILURE.GATEWAY, new GatewayUnavailableError(MANIFEST_FILENAME, []), ref)
+  }
+
+  const doFetch = fetchImpl || ((url, init) => globalThis.fetch(url, init))
+
+  try {
+    const { manifest, files, gateway } = await fetchVerifiedPackage(ref, {
+      gateways,
+      fetchImpl: doFetch,
+      timeoutMs,
+      signal,
+      expectedAppId,
+      supportedHostApi,
+      // A reviewer's question is about the whole package, not the subset this
+      // host executes — see the option's doc on `fetchVerifiedPackage`.
+      verifyAllDeclaredFiles: true,
+    })
+    return { ok: true, manifest, files, gateway, cid: ref.cid, manifestHash: ref.manifestHash }
+  } catch (error) {
+    if (error instanceof IntegrityError) return failure(VERIFICATION_FAILURE.INTEGRITY, error, ref)
+    if (error instanceof HostApiError) return failure(VERIFICATION_FAILURE.HOST_API, error, ref)
+    if (error instanceof ManifestError) return failure(VERIFICATION_FAILURE.MANIFEST, error, ref)
+    if (error instanceof LoadCancelledError) return failure(VERIFICATION_FAILURE.CANCELLED, error, ref)
+    if (error instanceof GatewayUnavailableError) return failure(VERIFICATION_FAILURE.GATEWAY, error, ref)
+    if (error instanceof AppNotLaunchableError) return failure(VERIFICATION_FAILURE.INVALID_REF, error, ref)
+    // Unrecognised: recorded as a failure, never as a pass. A verification that
+    // "passes" because nobody predicted the exception is the failure mode this
+    // whole surface exists to prevent.
+    return failure(VERIFICATION_FAILURE.UNEXPECTED, error, ref)
   }
 }

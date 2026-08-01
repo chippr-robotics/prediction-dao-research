@@ -85,9 +85,9 @@
 
 **Independent Test**: quickstart §4.5 + contract suite submission cases; submit → Pending record + event; update ⇒ Pending while approved version keeps serving.
 
-- [ ] T034 [US3] Create `frontend/src/components/miniapps/SubmitAppPanel.jsx` (entry point on CatalogPanel) — submit/update forms (name, description, category, CID, manifestHash, version display), writes `submitApp`/`submitUpdate`/`updateMetadata` on `miniAppChainId()` with wallet-chain check at submit time, client-side CID format + manifest fetch/hash pre-check as a courtesy (chain remains authoritative)
-- [ ] T035 [US3] Vendor status list in `SubmitAppPanel.jsx` via `registryClient.appIdsByVendor` — lifecycle state, approved vs proposed tuple, versions (FR-023)
-- [ ] T036 [US3] Tests `frontend/src/test/miniapps/SubmitAppPanel.test.jsx` — form validation, wrong-network block, Pending-after-update rendering
+- [x] T034 [US3] Create `frontend/src/components/miniapps/SubmitAppPanel.jsx` (entry point on CatalogPanel) — submit/update forms (name, description, category, CID, manifestHash, version display), writes `submitApp`/`submitUpdate`/`updateMetadata` on `miniAppChainId()` with wallet-chain check at submit time, client-side CID format + manifest fetch/hash pre-check as a courtesy (chain remains authoritative)
+- [x] T035 [US3] Vendor status list in `SubmitAppPanel.jsx` via `registryClient.appIdsByVendor` — lifecycle state, approved vs proposed tuple, versions (FR-023)
+- [x] T036 [US3] Tests `frontend/src/test/miniapps/SubmitAppPanel.test.jsx` — form validation, wrong-network block, Pending-after-update rendering
 
 ---
 
@@ -97,9 +97,10 @@
 
 **Independent Test**: quickstart §4.7; non-curator sees no controls and reverts on direct call (contract suite).
 
-- [ ] T037 [P] [US4] Add curator authority read: `frontend/src/lib/miniapps/registryAuthority.js` reading `hasRole(APP_CURATOR_ROLE, account)` from the registry itself (spec-067 per-contract-authority pattern; unconfirmed read ⇒ "could not verify" state, never a hidden control), wire `ROLES.MINIAPP_CURATOR` into `frontend/src/contexts/RoleContext.jsx` + `frontend/src/hooks/useRoles.js`
-- [ ] T038 [US4] Create `frontend/src/components/admin/MiniAppReviewTab.jsx` — Pending queue (metadata, vendor, tuple detail), per-app package fetch + hash verification result before approval (edge case: unverifiable package ⇒ approve blocked-or-warned), approve/suspend/deprecate writes on `miniAppChainId()` with wallet-chain check; preserves the "no role" vs "no chain answered" distinction
-- [ ] T039 [US4] Register the tab: `miniapp-review` in the Compliance group of `frontend/src/components/admin/adminNav.js` (+ `ADMIN_TAB_ICONS`), role boolean + nav arg + tabpanel branch in `frontend/src/components/AdminPanel.jsx` (three-edit pattern); tests `frontend/src/test/miniapps/MiniAppReviewTab.test.jsx` + adminNav test update
+- [x] T037 [P] [US4] Add curator authority read: `frontend/src/lib/miniapps/registryAuthority.js` reading `hasRole(APP_CURATOR_ROLE, account)` from the registry itself (spec-067 per-contract-authority pattern; unconfirmed read ⇒ "could not verify" state, never a hidden control), wire `ROLES.MINIAPP_CURATOR` into `frontend/src/contexts/RoleContext.jsx` + `frontend/src/hooks/useRoles.js`
+  - **Deviation (deliberate):** `ROLES.MINIAPP_CURATOR` was NOT added to `RoleContext`/`useRoles`. `APP_CURATOR_ROLE` administers itself on the MiniAppRegistry, so no app-wide role implies it and the role-storage sync those two files read could not truthfully report it — a flag there would be a second, weaker source of truth for the one authority that deliberately has no admin backdoor. `AdminPanel.jsx` asks the registry directly via `readCuratorAuthority` (the spec-067 per-contract-authority pattern the same task mandates) and fails closed on every uncertainty.
+- [x] T038 [US4] Create `frontend/src/components/admin/MiniAppReviewTab.jsx` — Pending queue (metadata, vendor, tuple detail), per-app package fetch + hash verification result before approval (edge case: unverifiable package ⇒ approve blocked-or-warned), approve/suspend/deprecate writes on `miniAppChainId()` with wallet-chain check; preserves the "no role" vs "no chain answered" distinction
+- [x] T039 [US4] Register the tab: `miniapp-review` in the Compliance group of `frontend/src/components/admin/adminNav.js` (+ `ADMIN_TAB_ICONS`), role boolean + nav arg + tabpanel branch in `frontend/src/components/AdminPanel.jsx` (three-edit pattern); tests `frontend/src/test/miniapps/MiniAppReviewTab.test.jsx` + adminNav test update
 
 ---
 

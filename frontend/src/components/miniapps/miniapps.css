@@ -329,3 +329,434 @@
 .miniapp-workspace-crash {
   border-left-color: var(--warning, #d98324);
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Submit surface (`?view=submit`) — the vendor's forms and their own submissions (T034/T035).
+ *
+ * Same theme-variable-with-literal-fallback approach as the catalog above, and the same
+ * distinguishable-without-colour rule (WCAG 1.4.1): every advisory, refusal and confirmation block
+ * carries its own title line and border weight, so none of them depends on hue to be read correctly.
+ *
+ * The blocks that state a *shared* fact — "no registry on this build", "we could not read that" —
+ * deliberately reuse the catalog's `.miniapp-catalog-unavailable` / `.miniapp-catalog-unverified`
+ * classes rather than re-skinning them here: the same fact should look the same wherever a member
+ * meets it, and a second visual language for it would suggest a second meaning.
+ * ------------------------------------------------------------------------------------------- */
+
+.miniapp-submit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* ---- Header ------------------------------------------------------------ */
+
+.miniapp-submit-header {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.miniapp-submit-header h3 {
+  margin: 0 0 0.25rem;
+}
+.miniapp-submit-subtitle {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.85rem;
+  margin: 0;
+  max-width: 44rem;
+}
+.miniapp-submit-back {
+  background: transparent;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #1f2933);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.miniapp-submit-back:hover {
+  border-color: var(--brand-primary, #36b37e);
+}
+.miniapp-submit-back:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+.miniapp-submit-location {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* ---- Sections ---------------------------------------------------------- */
+
+.miniapp-submit-section {
+  border-top: 1px solid var(--border-color, #e3e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.9rem;
+}
+.miniapp-submit-section h4 {
+  margin: 0;
+}
+.miniapp-submit-section-intro {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.85rem;
+  margin: 0;
+  max-width: 44rem;
+}
+
+.miniapp-submit-inline-status {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.85rem;
+  margin: 0;
+}
+.miniapp-submit-muted {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.82rem;
+  margin: 0;
+}
+.miniapp-submit-mono {
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+/* ---- Notices ----------------------------------------------------------- */
+
+.miniapp-submit-notice {
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-left-width: 4px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+}
+.miniapp-submit-notice.is-error {
+  border-left-color: var(--error-color, #d64545);
+}
+.miniapp-submit-notice.is-success {
+  border-left-color: var(--brand-primary, #36b37e);
+}
+.miniapp-submit-notice.is-info {
+  border-left-color: var(--text-secondary, #5a6772);
+}
+
+/* ---- Forms ------------------------------------------------------------- */
+
+.miniapp-submit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+  max-width: 44rem;
+}
+
+.miniapp-submit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.miniapp-submit-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.miniapp-submit-field input[type='text'],
+.miniapp-submit-field textarea,
+.miniapp-submit-field select {
+  background: var(--surface-color, #fff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #1f2933);
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.65rem;
+  width: 100%;
+}
+.miniapp-submit-field textarea {
+  resize: vertical;
+}
+.miniapp-submit-field input:focus-visible,
+.miniapp-submit-field textarea:focus-visible,
+.miniapp-submit-field select:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 1px;
+}
+/* An invalid field is marked by a heavier border AND its own message — never by colour alone. */
+.miniapp-submit-field.has-error input[type='text'],
+.miniapp-submit-field.has-error textarea {
+  border-color: var(--error-color, #d64545);
+  border-width: 2px;
+}
+.miniapp-submit-hint {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.miniapp-submit-counter {
+  white-space: nowrap;
+}
+.miniapp-submit-field-error {
+  color: var(--error-color, #d64545);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ---- Disclosures, advisories, pre-check verdicts ----------------------- */
+
+/* The FR-003 promise. Neutral and prominent: it is the most load-bearing sentence on the surface,
+   and it is information rather than a warning — an update never breaks anything. */
+.miniapp-submit-disclosure {
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-left: 4px solid var(--brand-primary, #36b37e);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  padding: 0.7rem 0.85rem;
+}
+.miniapp-submit-disclosure p {
+  margin: 0;
+}
+.miniapp-submit-disclosure p + p {
+  margin-top: 0.4rem;
+}
+.miniapp-submit-disclosure-title {
+  font-weight: 600;
+}
+
+.miniapp-submit-version-note {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* "The chain would accept this, but it will not work" — a real finding that does not block. */
+.miniapp-submit-advisory {
+  border: 1px solid color-mix(in srgb, var(--warning-color, #f59e0b) 45%, transparent);
+  border-left-width: 4px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.8rem;
+}
+.miniapp-submit-advisory-title {
+  font-weight: 600;
+  margin: 0 0 0.3rem;
+}
+.miniapp-submit-advisory-body p {
+  margin: 0;
+}
+
+.miniapp-submit-precheck {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.82rem;
+  margin: 0;
+}
+.miniapp-submit-precheck-ok {
+  border: 1px solid color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+  border-left-width: 4px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.8rem;
+}
+.miniapp-submit-precheck-ok p {
+  margin: 0;
+}
+.miniapp-submit-precheck-ok p + p {
+  margin-top: 0.35rem;
+}
+.miniapp-submit-precheck-note {
+  color: var(--text-secondary, #5a6772);
+}
+
+/* The one client-side finding that holds up a submission — heaviest treatment on the surface. */
+.miniapp-submit-mismatch {
+  border: 1px solid var(--error-color, #d64545);
+  border-left-width: 4px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  padding: 0.7rem 0.85rem;
+}
+.miniapp-submit-mismatch p {
+  margin: 0;
+}
+.miniapp-submit-mismatch p + p {
+  margin-top: 0.4rem;
+}
+
+.miniapp-submit-ack {
+  align-items: flex-start;
+  display: flex;
+  font-size: 0.83rem;
+  gap: 0.5rem;
+}
+.miniapp-submit-ack input {
+  margin-top: 0.2rem;
+}
+.miniapp-submit-ack label {
+  line-height: 1.4;
+}
+
+/* ---- Buttons ----------------------------------------------------------- */
+
+.miniapp-submit-primary {
+  align-self: flex-start;
+  background: var(--primary-button, var(--brand-primary, #36b37e));
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--primary-button-text, #fff);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 1.1rem;
+}
+.miniapp-submit-primary:hover {
+  background: var(--primary-button-hover, #2f9e6e);
+}
+.miniapp-submit-primary:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+.miniapp-submit-primary:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.miniapp-submit-secondary {
+  background: transparent;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.75rem;
+}
+.miniapp-submit-secondary:hover {
+  border-color: var(--brand-primary, #36b37e);
+}
+.miniapp-submit-secondary:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+
+/* ---- The vendor's own submissions (T035) ------------------------------- */
+
+.miniapp-submission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.miniapp-submission {
+  background: var(--surface-color, #fff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 0.9rem;
+}
+.miniapp-submission-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.miniapp-submission-name {
+  font-size: 0.98rem;
+  margin: 0;
+}
+.miniapp-submission-id {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.75rem;
+}
+.miniapp-submission-category {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* Review state and serving state side by side — the two answers must be readable together, because
+   the whole point is that they are different questions. */
+.miniapp-submission-state {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 0.25rem 1.5rem;
+  margin: 0.2rem 0 0;
+}
+.miniapp-submission-state > div {
+  align-items: baseline;
+  display: flex;
+  gap: 0.35rem;
+}
+.miniapp-submission-state dt {
+  color: var(--text-secondary, #5a6772);
+}
+.miniapp-submission-state dd {
+  font-weight: 600;
+  margin: 0;
+}
+
+.miniapp-submission-explainer {
+  background: var(--bg-primary, #f7f9fa);
+  border-left: 3px solid var(--border-color, #e3e7eb);
+  border-radius: 4px;
+  color: var(--text-primary, #1f2933);
+  font-size: 0.82rem;
+  margin: 0.15rem 0 0;
+  padding: 0.45rem 0.6rem;
+}
+
+.miniapp-submission-tuples {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin-top: 0.3rem;
+}
+.miniapp-submit-tuple {
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.miniapp-submit-tuple-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0 0 0.3rem;
+}
+.miniapp-submit-tuple-body {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  gap: 0.15rem;
+  margin: 0;
+}
+.miniapp-submit-tuple-body > div {
+  align-items: baseline;
+  display: flex;
+  gap: 0.35rem;
+}
+.miniapp-submit-tuple-body dt {
+  color: var(--text-secondary, #5a6772);
+  min-width: 6.5rem;
+}
+.miniapp-submit-tuple-body dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.miniapp-submission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
