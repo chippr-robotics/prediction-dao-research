@@ -1,12 +1,28 @@
 # Welcome to FairWins
 
-**Peer-to-peer wagers with friends, settled by smart-contract escrow and trustless oracles.**
+**A self-custody, multi-chain financial platform — one control plane for your
+money, and you hold the keys.**
 
-FairWins is a wager *management* layer — not a prediction market. Two people agree
-on a bet, both stakes are locked in an audited escrow contract on Polygon, and the
-wager is resolved either by the participants themselves, a neutral arbitrator, or
-an external oracle (Polymarket, Chainlink, UMA). There is no order book, no market
-making, and no house.
+FairWins began as a peer-to-peer wager management layer and has grown into a
+multi-chain financial control plane. One app now spans payments and requests
+(gasless USDC transfers), peer-to-peer wagers and group pools, Polymarket
+prediction-market trading, an NFT portfolio with OpenSea selling, lending and
+staking, DEX swaps, cross-chain bridging via Across, a native Bitcoin wallet,
+and Safe multisig custody vaults with an on-chain policy engine. The platform
+never takes custody: every value-bearing action is signed by the member's own
+wallet — passkey smart account, browser/mobile wallet, or multisig vault.
+
+The wager layer that started it all is unchanged in spirit: two people agree on
+a bet, both stakes are locked in an audited escrow contract, and the wager is
+resolved by the participants, a neutral arbitrator, or an external oracle
+(Polymarket, Chainlink, UMA). There is no order book, no market making, and no
+house.
+
+FairWins is also **white-label multi-tenant** (spec 072): the product you see
+at fairwins.app is the default tenant of a platform other operators can run
+under their own brand, domain, configuration, and — for full asset isolation —
+their own dedicated contract deployments. See the
+[White-Label Tenants guide](developer-guide/white-label-tenants.md).
 
 > **Important**: Before purchasing a tier or interacting with the protocol,
 > please read the [Roles and Tiers](system-overview/roles-and-tiers.md)
@@ -43,10 +59,14 @@ sequenceDiagram
 
 ## Where it runs
 
-| Network | Chain ID | Status |
-|---------|----------|--------|
-| Polygon Mainnet | 137 | **Live** — production at [fairwins.app](https://fairwins.app) |
-| Polygon Amoy | 80002 | Testnet (toggle in the wallet menu) |
+| Network | Chain ID | Role |
+|---------|----------|------|
+| Polygon Mainnet | 137 | **Live** — primary network + membership reference chain at [fairwins.app](https://fairwins.app) |
+| Ethereum Mainnet | 1 | Portfolio, custody, routers, bridge-LP |
+| Optimism / Base / Arbitrum | 10 / 8453 / 42161 | Portfolio, custody, routers |
+| Ethereum Classic | 61 | Custody + ETCswap trading |
+| Bitcoin | — | Native BTC wallet (portfolio/send/receive, spec 061) |
+| Polygon Amoy / Mordor | 80002 / 63 | Testnets (toggle in the wallet menu) |
 
 Recorded contract addresses live in [`deployments/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/deployments)
 — see the [Architecture guide](developer-guide/architecture.md) for the full map.

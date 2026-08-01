@@ -18,7 +18,28 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const DEFAULT_TENANT_ID = 'fairwins'
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+
+/**
+ * Locate the tenants/ manifest directory. Normally <repo root>/tenants (two
+ * levels up from this plugin), but containerized builds copy frontend/ and
+ * tenants/ as siblings of an arbitrary base, so walk upward until the
+ * directory is found; TENANTS_DIR overrides for exotic layouts. Failing to
+ * find it is a loud build failure — never a silent unbranded build.
+ */
+function findTenantsDir() {
+  if (process.env.TENANTS_DIR) return path.resolve(process.env.TENANTS_DIR)
+  let dir = path.dirname(fileURLToPath(import.meta.url))
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, 'tenants')
+    if (fs.existsSync(path.join(candidate, 'features.json'))) return candidate
+    dir = path.dirname(dir)
+  }
+  throw new Error(
+    '[tenant-branding] could not locate the tenants/ directory (looked upward from the plugin; set TENANTS_DIR to override)'
+  )
+}
+
+const TENANTS_DIR = findTenantsDir()
 
 // Virtual module consumed by src/config/tenant.js. Only the ACTIVE tenant's
 // manifest is injected into the bundle — a built instance must physically
@@ -27,7 +48,7 @@ const VIRTUAL_ID = 'virtual:tenant'
 const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID
 
 function manifestPathFor(tenantId) {
-  return path.join(REPO_ROOT, 'tenants', tenantId, 'manifest.json')
+  return path.join(TENANTS_DIR, tenantId, 'manifest.json')
 }
 
 function loadManifest(tenantId) {
@@ -48,12 +69,16 @@ function loadManifest(tenantId) {
 }
 
 function loadFeatureCatalog() {
-  const catalogPath = path.join(REPO_ROOT, 'tenants', 'features.json')
+  const catalogPath = path.join(TENANTS_DIR, 'features.json')
   return JSON.parse(fs.readFileSync(catalogPath, 'utf8')).features
 }
 
 function tenantContractSetPath(tenantId) {
-  return path.join(REPO_ROOT, 'frontend', 'src', 'config', 'tenants', `${tenantId}.contracts.json`)
+  // Lives inside the frontend source tree — resolve relative to this plugin,
+  // not the repo root, so containerized layouts (frontend copied standalone)
+  // keep working.
+  const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+  return path.join(frontendRoot, 'src', 'config', 'tenants', `${tenantId}.contracts.json`)
 }
 
 /**

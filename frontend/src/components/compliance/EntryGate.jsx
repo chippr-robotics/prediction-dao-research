@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getCurrentDocument } from '../../utils/legalDocs'
 import { readAck, writeAck } from '../../utils/entryGateAck'
 import { keepOnLanding } from '../../utils/appEntry'
+import { tenantBrand } from '../../config/tenant'
 import './EntryGate.css'
 
 /**
@@ -78,15 +79,15 @@ export default function EntryGate() {
         ref={dialogRef}
         onKeyDown={onKeyDown}
       >
-        <h2 id="entry-gate-title">Before you enter FairWins</h2>
+        <h2 id="entry-gate-title">Before you enter {tenantBrand().displayName}</h2>
         <p>
-          FairWins is peer-to-peer software. You wager directly against other participants;
-          FairWins is never your counterparty, sets no odds, and takes no share of any wager.
+          {tenantBrand().displayName} is peer-to-peer software. You wager directly against other participants;
+          {' '}{tenantBrand().displayName} is never your counterparty, sets no odds, and takes no share of any wager.
         </p>
         <p>By selecting <strong>Enter</strong>, you confirm that:</p>
         <ul>
           <li>You are at least 21 years old.</li>
-          <li>You are not accessing FairWins from any restricted jurisdiction listed in our Terms.</li>
+          <li>You are not accessing {tenantBrand().displayName} from any restricted jurisdiction listed in our Terms.</li>
           <li>You are not subject to sanctions and do not appear on any government restricted-party list.</li>
           <li>Accessing peer-to-peer wagering is lawful where you are located, and you accept full responsibility for compliance with your local laws.</li>
           <li>

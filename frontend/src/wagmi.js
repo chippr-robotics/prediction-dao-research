@@ -4,6 +4,7 @@ import { arbitrum, base, mainnet, optimism, sepolia } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { passkeyConnector } from './connectors/passkey'
 import { resolveRpcEndpoints } from './lib/network/rpcEndpoints'
+import { tenantBrand } from './config/tenant'
 
 // Define Hoodi — Ethereum's long-lived proof-of-stake testnet (spec 048). Not a
 // wagmi/chains built-in, so declared inline like the ETC-family chains. RPC/explorer
@@ -159,8 +160,8 @@ const resolveAppUrl = () => {
     return window.location.origin
   }
 
-  // As a last resort, return a fallback domain
-  return 'https://fairwins.app'
+  // As a last resort, return the active tenant's canonical URL (spec 072)
+  return tenantBrand().appUrl
 }
 
 const appUrl = resolveAppUrl()
@@ -234,10 +235,10 @@ export const config = createConfig({
     walletConnect({
       projectId: walletConnectProjectId,
       metadata: {
-        name: 'Prediction DAO',
-        description: 'Decentralized prediction markets and wagers',
+        name: tenantBrand().displayName,
+        description: tenantBrand().tagline || tenantBrand().displayName,
         url: appUrl,
-        icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
+        icons: [`${appUrl}${tenantBrand().logoMark}`]
       },
       showQrModal: true,
     }),

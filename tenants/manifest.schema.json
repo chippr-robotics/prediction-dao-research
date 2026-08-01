@@ -30,6 +30,8 @@
           "description": "Globally unique across all manifests (validator-enforced)."
         },
         "appUrl": { "type": "string", "pattern": "^https://" },
+        "docsUrl": { "type": "string", "pattern": "^https://" },
+        "copyrightNotice": { "type": "string" },
         "support": {
           "type": "object",
           "additionalProperties": false,

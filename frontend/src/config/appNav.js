@@ -26,9 +26,34 @@ export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'tren
 // (see AppNavDrawer's DRAWER_GROUPS).
 export const WAGERS_ITEM = { id: 'wagers', label: 'Wagers', icon: 'ticket', to: '/wagers' }
 
+import { isFeatureEnabled } from './tenant'
+
+// Tenant feature gating (spec 072 T019/FR-002): nav item id -> manifest feature id.
+// Items not listed are core platform surfaces every tenant gets (transfer,
+// address book, reporting). A feature the tenant does not enable is ABSENT from
+// nav and groups — never present-but-broken. The default tenant enables every
+// feature, so its nav is unchanged.
+const NAV_FEATURE_IDS = {
+  wagers: 'wagers',
+  earn: 'earn',
+  trade: 'swap',
+  collectibles: 'collect',
+  predict: 'predict',
+  custody: 'protect',
+  security: 'recovery',
+  clearpath: 'clearpath',
+  tokens: 'token-mint',
+}
+
+export function isNavItemEnabledForTenant(id) {
+  const featureId = NAV_FEATURE_IDS[id]
+  return featureId ? isFeatureEnabled(featureId) : true
+}
+
 // Grouped section rail. `id` matches the WalletPage tab id; `icon` drives both
-// the drawer and the mobile bottom nav.
-export const NAV_GROUPS = [
+// the drawer and the mobile bottom nav. Defined raw, then filtered to the
+// active tenant's feature set below.
+const RAW_NAV_GROUPS = [
   {
     label: 'Finance',
     items: [
@@ -78,6 +103,12 @@ export const NAV_GROUPS = [
     ],
   },
 ]
+
+// The tenant-scoped nav model every consumer reads. Chain-based visibility
+// still applies at render time via visibleNavGroups(visibility).
+export const NAV_GROUPS = RAW_NAV_GROUPS
+  .map((group) => ({ ...group, items: group.items.filter((item) => isNavItemEnabledForTenant(item.id)) }))
+  .filter((group) => group.items.length > 0)
 
 // Path a section item navigates to. Home and Wagers have their own absolute routes.
 export function pathForNavItem(id) {

@@ -1,3 +1,4 @@
+import { tenantBrand } from '../config/tenant'
 /**
  * @fileoverview Metadata generation utilities for creating OpenSea-compatible metadata
  * @module utils/metadataGenerator
@@ -52,7 +53,7 @@ export function generateMarketMetadata(params) {
   const metadata = {
     name,
     description, // Short question/title for the market
-    external_url: `https://fairwins.app/market/${marketId}`,
+    external_url: `${tenantBrand().appUrl}/market/${marketId}`,
     image: imageUrl,
     attributes: [
       {
@@ -216,7 +217,7 @@ export function generateTokenMetadata(params) {
     name,
     symbol,
     description,
-    external_url: links.website || `https://fairwins.app/token/${tokenAddress}`,
+    external_url: links.website || `${tenantBrand().appUrl}/token/${tokenAddress}`,
     image: imageUrl,
     attributes: [
       {
@@ -297,7 +298,7 @@ export function generateProposalMetadata(params) {
   const metadata = {
     name: title,
     description,
-    external_url: `https://fairwins.app/proposal/${proposalId}`,
+    external_url: `${tenantBrand().appUrl}/proposal/${proposalId}`,
     image: 'ipfs://QmDefaultProposalImage',
     attributes: [
       {
@@ -374,7 +375,7 @@ export function generateDAOMetadata(params) {
   const metadata = {
     name,
     description,
-    external_url: links.website || `https://fairwins.app/dao/${daoAddress}`,
+    external_url: links.website || `${tenantBrand().appUrl}/dao/${daoAddress}`,
     image: imageUrl,
     attributes: [
       {
