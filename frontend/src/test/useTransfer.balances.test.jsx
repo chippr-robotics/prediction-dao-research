@@ -7,15 +7,24 @@ const tokenBalanceOf = vi.fn()
 const contractCtor = vi.fn(() => ({ balanceOf: tokenBalanceOf }))
 const makeReadProvider = vi.fn()
 
-vi.mock('ethers', () => ({
-  ethers: {
-    Interface: class MockInterface {},
-    Contract: function MockContract(...args) { return contractCtor(...args) },
-    formatUnits: (value, decimals) => (Number(value) / (10 ** decimals)).toString(),
-    isAddress: () => true,
-    parseUnits: () => 0n,
-  },
-}))
+// Partial mock: only the pieces useTransfer drives are stubbed (Contract is a spy so the ERC-20
+// balance read can be asserted). The rest of `ethers` stays real — config modules pulled in
+// transitively import named exports from it at load time (e.g. `getAddress` in config/staking.js),
+// and a hand-listed mock silently breaks the whole file the moment the import graph grows.
+vi.mock('ethers', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    ethers: {
+      ...actual.ethers,
+      Interface: class MockInterface {},
+      Contract: function MockContract(...args) { return contractCtor(...args) },
+      formatUnits: (value, decimals) => (Number(value) / (10 ** decimals)).toString(),
+      isAddress: () => true,
+      parseUnits: () => 0n,
+    },
+  }
+})
 
 const wallet = {
   address: '0xAaAa000000000000000000000000000000000001',
@@ -41,7 +50,19 @@ vi.mock('../hooks/useChainTokens', () => ({
     stableAddress: '0xToken000000000000000000000000000000000001',
   }),
 }))
-vi.mock('../config/networks', () => ({ getNetwork: () => ({ stablecoin: { domainVersion: null }, rpcUrl: 'https://rpc.test' }) }))
+// Partial mock: only `getNetwork` is stubbed (a stablecoin with no EIP-3009 domain version, so the
+// classic path stays self-submit, plus a deterministic rpcUrl to assert the read-provider wiring).
+// Everything else stays REAL — modules pulled in transitively (constants/dex.js via data/wagers)
+// call `getCurrentChainId`/`NETWORKS` at module load, and hand-listing those exports here just
+// re-breaks the file the next time an import graph grows. The real module is safe to load: its
+// import-time `assertReferenceChainInCohort()` passes for the default (mainnet) build.
+vi.mock('../config/networks', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getNetwork: () => ({ stablecoin: { domainVersion: null }, rpcUrl: 'https://rpc.test' }),
+  }
+})
 vi.mock('../utils/rpcProvider', () => ({ makeReadProvider: (...args) => makeReadProvider(...args) }))
 vi.mock('../lib/transfer/eip3009Transfer', () => ({
   TRANSFER_ABI: ['function balanceOf(address) view returns (uint256)'],

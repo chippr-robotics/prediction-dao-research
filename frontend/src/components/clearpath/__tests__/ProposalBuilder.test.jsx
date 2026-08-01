@@ -15,8 +15,14 @@ import { ACTION_TYPE, newAction, assemble, predictProposalId } from '../proposal
 // Spec 030 (US5, FR-023/024) — the rich proposal builder: compose a Governor proposal without hand-writing
 // calldata, multi-action, asset-aware, with validation + the correct submitted payload.
 
-const proposeAction = vi.fn()
-vi.mock('../governorConnector', () => ({ proposeAction: (...a) => proposeAction(...a) }))
+// Spec 042 — the builder submits through the DAO's RESOLVED CONNECTOR (a prop), not a module import, so the
+// framework-correct propose() signature is used (OZ: targets/values/calldatas/description; Bravo: + the parallel
+// `signatures` array). `ozGovernorConnector.propose` is the same function the old module export was, and it is
+// handed the same (signer, governor, payload) arguments — so the payload assertions below are unchanged.
+// `framework` also gates the OZ-specific predicted-id duplicate pre-check (FR-025); ExternalDaoView always
+// resolves a connector (`getConnector(fw) || getConnector(0)`), so one is always present in the product.
+const propose = vi.fn()
+const ozConnector = { framework: 0, propose: (...a) => propose(...a) }
 
 // CpAddressField (recipient/target inputs) pulls in AddressBookButton → useWallet, which throws without a
 // WalletProvider. Stub the wallet-scoped hooks so the builder renders with the real fields in tests.
@@ -37,6 +43,7 @@ function renderBuilder(extra = {}) {
   render(
     <ProposalBuilder
       record={{ dao: '0x00000000000000000000000000000000000000d0' }}
+      connector={ozConnector}
       signer={{}}
       reader={null}
       usdcAddress={USDC}
@@ -51,11 +58,22 @@ function renderBuilder(extra = {}) {
   return { run, onSubmitted }
 }
 
+// The proposal id the builder derives for a 100-cUSD transfer to TO titled "Fund dev" (the OZ derivation:
+// keccak of targets/values/calldatas + descriptionHash).
+function fundDevProposalId() {
+  const A = assemble({
+    title: 'Fund dev', body: '',
+    actions: [{ ...newAction(ACTION_TYPE.TOKEN), tokenTo: TO, tokenAmount: '100' }],
+    usdcAddress: USDC, meta: () => ({ decimals: 6, symbol: 'cUSD' }),
+  })
+  return predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash)
+}
+
 describe('ProposalBuilder (spec 030 / US5)', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('composes and submits a USDC transfer without hand-written calldata', async () => {
-    proposeAction.mockResolvedValue({})
+    propose.mockResolvedValue({})
     const user = userEvent.setup()
     renderBuilder()
     await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
@@ -66,8 +84,8 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     const submit = screen.getByRole('button', { name: /submit proposal/i })
     await waitFor(() => expect(submit).toBeEnabled())
     await user.click(submit)
-    await waitFor(() => expect(proposeAction).toHaveBeenCalled())
-    const [, , payload] = proposeAction.mock.calls[0]
+    await waitFor(() => expect(propose).toHaveBeenCalled())
+    const [, , payload] = propose.mock.calls[0]
     expect(payload.targets).toEqual([USDC])
     expect(payload.values).toEqual([0n]) // ERC-20 transfer carries no native value
     expect(payload.description).toBe('# Fund dev')
@@ -102,21 +120,31 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
   })
 
   it('detects a duplicate proposal and blocks submit (FR-025)', async () => {
-    // Compute the id the builder will derive for a 100-USDC transfer to TO titled "Fund dev"…
-    const A = assemble({
-      title: 'Fund dev', body: '',
-      actions: [{ ...newAction(ACTION_TYPE.TOKEN), tokenTo: TO, tokenAmount: '100' }],
-      usdcAddress: USDC, meta: () => ({ decimals: 6, symbol: 'cUSD' }),
-    })
-    const dupId = predictProposalId(A.targets, A.values, A.calldatas, A.descriptionHash)
+    const dupId = fundDevProposalId() // the id the builder derives for this exact composition…
     const user = userEvent.setup()
-    renderBuilder({ proposals: [{ id: dupId }] }) // …and feed it as an already-existing proposal
+    renderBuilder({ proposals: [{ id: dupId }] }) // …fed back as an already-existing proposal
     await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
     await user.type(screen.getByLabelText(/^title$/i), 'Fund dev')
     await user.type(screen.getByLabelText(/recipient/i), TO)
     await user.type(screen.getByLabelText(/amount/i), '100')
     expect(await screen.findByText(/this exact proposal already exists/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /submit proposal/i })).toBeDisabled()
+  })
+
+  // Spec 042: the FR-025 pre-check derives the id the OpenZeppelin way (keccak of the payload + description
+  // hash). GovernorBravo assigns SEQUENTIAL ids, so that derivation is meaningless there — the check must stay
+  // OFF for framework 1 rather than match a coincidental id and block a legitimate proposal.
+  it('skips the predicted-id duplicate pre-check on a GovernorBravo DAO', async () => {
+    const dupId = fundDevProposalId()
+    const user = userEvent.setup()
+    renderBuilder({ connector: { framework: 1, propose: (...a) => propose(...a) }, proposals: [{ id: dupId }] })
+    await user.click(screen.getByRole('button', { name: /\+ new proposal/i }))
+    await user.type(screen.getByLabelText(/^title$/i), 'Fund dev')
+    await user.type(screen.getByLabelText(/recipient/i), TO)
+    await user.type(screen.getByLabelText(/amount/i), '100')
+    const submit = screen.getByRole('button', { name: /submit proposal/i })
+    await waitFor(() => expect(submit).toBeEnabled())
+    expect(screen.queryByText(/this exact proposal already exists/i)).not.toBeInTheDocument()
   })
 
   it('exposes address-book + QR-scan affordances on the recipient field', async () => {
@@ -186,7 +214,7 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
   it('builds an executeTreasury proposal via the "Fund from treasury" action (executor-gated DAO)', async () => {
     const EXECUTOR = '0x00000000000000000000000000000000000000e1'
     const EXEC_IFACE = new ethers.Interface(['function executeTreasury(address recipient, uint256 amount)'])
-    proposeAction.mockResolvedValue({})
+    propose.mockResolvedValue({})
     const user = userEvent.setup()
     // a governable funding source → opening pre-selects "Fund from treasury" (the correct path for this DAO)
     renderBuilder({ fundingSources: [{ executor: EXECUTOR, label: 'Olympia Treasury', address: '0x0000000000000000000000000000000000000333', native: ethers.parseEther('2') }] })
@@ -198,8 +226,8 @@ describe('ProposalBuilder (spec 030 / US5)', () => {
     const submit = screen.getByRole('button', { name: /submit proposal/i })
     await waitFor(() => expect(submit).toBeEnabled())
     await user.click(submit)
-    await waitFor(() => expect(proposeAction).toHaveBeenCalled())
-    const [, , payload] = proposeAction.mock.calls[0]
+    await waitFor(() => expect(propose).toHaveBeenCalled())
+    const [, , payload] = propose.mock.calls[0]
     expect(payload.targets).toEqual([EXECUTOR]) // targets the executor, not the recipient
     expect(payload.values).toEqual([0n])
     const [to, amount] = EXEC_IFACE.decodeFunctionData('executeTreasury', payload.calldatas[0])
