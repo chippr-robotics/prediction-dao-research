@@ -444,11 +444,18 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
-    // The Graph endpoint indexing the production WagerRegistry on Polygon.
-    // Override with VITE_SUBGRAPH_URL_POLYGON.
+    // The Graph endpoint indexing Polygon. Override with VITE_SUBGRAPH_URL_POLYGON.
+    //
+    // v0.3.0 (2026-08-01) replaced v0.2.0, which indexed the ABANDONED pre-UUPS
+    // WagerRegistry and therefore answered every wager query with an empty list —
+    // HTTP 200, no errors, healthy, minutes behind head — while members had live
+    // wagers. v0.3.0 indexes the live contracts and adds vouchers, redemptions,
+    // pools and token/holder/activity. Pin the version rather than tracking
+    // `/version/latest`: a freshly deployed version answers with PARTIAL data while
+    // it back-fills, which is the same silent wrongness v0.2.0 was.
     subgraphUrl:
       import.meta.env?.VITE_SUBGRAPH_URL_POLYGON ||
-      'https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0',
+      'https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0',
     // Native USDC on Polygon (Circle-issued, USDC.e is the bridged variant
     // and is not used here). Decimals=6.
     stablecoin: {
