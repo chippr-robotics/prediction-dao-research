@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import WagerQRCode from './WagerQRCode'
+import { tenantBrand } from '../../config/tenant'
 import './ShareModal.css'
 
 function ShareModal({ isOpen, onClose, market, marketUrl }) {
@@ -102,14 +103,14 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
           <div className="brand-section">
             <div className="brand-logo">
               <img
-                src="/assets/logo_fairwins.svg"
-                alt="FairWins"
+                src={tenantBrand().logo}
+                alt={tenantBrand().displayName}
                 className="logo-image"
                 width="48"
                 height="48"
               />
             </div>
-            <h2 className="brand-name">FairWins</h2>
+            <h2 className="brand-name">{tenantBrand().displayName}</h2>
             <p className="brand-tagline">Peer-to-Peer Wagers Between Friends.</p>
           </div>
 

@@ -71,6 +71,8 @@ export function tenantBrand() {
     displayName: ACTIVE_TENANT.identity.displayName,
     tagline: ACTIVE_TENANT.identity.tagline ?? '',
     appUrl: ACTIVE_TENANT.identity.appUrl,
+    docsUrl: ACTIVE_TENANT.identity.docsUrl ?? null,
+    copyrightNotice: ACTIVE_TENANT.identity.copyrightNotice ?? ACTIVE_TENANT.identity.legalName ?? ACTIVE_TENANT.identity.displayName,
     logo: ACTIVE_TENANT.brand.logo,
     logoMark: ACTIVE_TENANT.brand.logoMark,
     favicon: ACTIVE_TENANT.brand.favicon,

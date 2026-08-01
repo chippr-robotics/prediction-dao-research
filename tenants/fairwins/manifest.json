@@ -10,8 +10,14 @@
     "metaDescription": "FairWins - Open prediction markets where anyone can create, join, and resolve markets. Fair participation, transparent resolution, and privacy-preserving mechanisms for collective wisdom.",
     "domains": ["fairwins.app"],
     "appUrl": "https://fairwins.app",
+    "docsUrl": "https://docs.FairWins.app",
+    "copyrightNotice": "ChipprRobotics LLC. Apache License 2.0",
     "support": { "email": "Howdy@FairWins.App" },
-    "social": { "x": "https://x.com/fairwins_app" },
+    "social": {
+      "x": "https://x.com/fairwins_app",
+      "discord": "https://discord.gg/rkYvPFdRRr",
+      "github": "https://github.com/chippr-robotics/prediction-dao-research"
+    },
     "legal": { "termsPath": "/terms", "privacyPath": "/privacy", "riskPath": "/risk" }
   },
 

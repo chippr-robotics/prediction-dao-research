@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AddressQRCode from './AddressQRCode'
+import { tenantBrand } from '../../config/tenant'
 import { useClipboard } from '../../hooks/useClipboard'
 import { useBitcoinWallet } from '../../hooks/useBitcoinWallet'
 import { getBitcoinNetwork } from '../../config/bitcoinNetworks'
@@ -132,7 +133,7 @@ function BitcoinReceiveContent({ paletteId }) {
           </div>
 
           <p className="address-qr-wordmark" aria-hidden="true">
-            FairWins
+            {tenantBrand().displayName}
           </p>
 
           <p className="address-qr-address address-qr-address--bitcoin">{current.address}</p>
@@ -227,7 +228,7 @@ function AddressQRModal({ isOpen, onClose, address, variant = 'full', mode = 'ev
   // The full share payload: context line first, address alone on its own
   // line so recipients can copy it cleanly (research D7). Text-only — no
   // url/title, which messaging apps would turn into a mangling link preview.
-  const shareText = `My FairWins wallet address:\n${address}`
+  const shareText = `My ${tenantBrand().displayName} wallet address:\n${address}`
 
   const handleCopy = () => {
     copy(address)
@@ -322,7 +323,7 @@ function AddressQRModal({ isOpen, onClose, address, variant = 'full', mode = 'ev
             </div>
 
             <p className="address-qr-wordmark" aria-hidden="true">
-              FairWins
+              {tenantBrand().displayName}
             </p>
 
             {(!isQuick || copyError) && (
