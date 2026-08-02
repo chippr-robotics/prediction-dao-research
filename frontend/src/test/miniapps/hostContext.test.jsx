@@ -20,6 +20,7 @@ import {
   STATE_AUDIT_WINDOW_MS,
 } from '../../lib/miniapps/hostContext'
 import { appStoreStorageKey, __resetMiniAppStores } from '../../lib/miniapps/store'
+import { NETWORKS } from '../../config/networks'
 
 const ACCOUNT = '0xAbCd000000000000000000000000000000000073'
 const VAULT = '0x1111111111111111111111111111111111111111'
@@ -132,7 +133,7 @@ describe('the exposed surface (FR-013)', () => {
     expect(Object.keys(ref.current).sort()).toEqual(
       // hostApi 2 added `contracts` and `network`; both hand over inert public
       // data and neither can move value or read the member's own data.
-      ['appId', 'audit', 'contracts', 'navigate', 'network', 'readProvider', 'store', 'toast', 'wallet'].sort(),
+      ['appId', 'audit', 'contracts', 'navigate', 'network', 'networks', 'readProvider', 'store', 'toast', 'wallet'].sort(),
     )
     expect(Object.keys(ref.current.wallet).sort()).toEqual(
       // `switchChain` (hostApi 2) is the companion to submit's WRONG_CHAIN refusal — without it an
@@ -596,6 +597,31 @@ describe('wallet.submit routing and audit (FR-019)', () => {
       const error = await ref.current.wallet.switchChain('not-a-chain').catch((e) => e)
       expect(error.reason).toBe(HOST_REFUSAL.BAD_PAYLOAD)
       expect(state.wallet.switchNetwork).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('networks() (hostApi 2)', () => {
+    it('lists this build\'s cohort, and only that', () => {
+      const { ref } = mountHost()
+      const ids = ref.current.networks()
+      expect(Array.isArray(ids)).toBe(true)
+      expect(ids.length).toBeGreaterThan(0)
+      // Constitution III: a read may not cross the testnet/mainnet boundary. The host enforces it
+      // so a package does not have to remember it.
+      const testnetFlags = new Set(ids.map((id) => Boolean(NETWORKS[id]?.isTestnet)))
+      expect(testnetFlags.size).toBe(1)
+    })
+
+    it('hands back a frozen list an app cannot mutate under the host', () => {
+      const { ref } = mountHost()
+      expect(Object.isFrozen(ref.current.networks())).toBe(true)
+    })
+
+    it('agrees with network() for every id it returns', () => {
+      const { ref } = mountHost()
+      for (const id of ref.current.networks()) {
+        expect(ref.current.network(id)?.chainId).toBe(id)
+      }
     })
   })
 

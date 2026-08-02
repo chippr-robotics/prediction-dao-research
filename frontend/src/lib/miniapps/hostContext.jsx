@@ -66,7 +66,7 @@ import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useNotification } from '../../hooks/useUI'
 import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { getReadProvider } from '../../utils/rpcProvider'
-import { NETWORKS } from '../../config/networks'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
 import { getContractAddressForChain } from '../../config/contracts'
 import { createAppStore } from './store'
 import {
@@ -898,6 +898,27 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
    * must never be able to render one chain's explorer link against another
    * chain's data.
    */
+  /**
+   * The chains this build may read (hostApi 2), mainnets-first.
+   *
+   * ADDED AFTER BEING DECLINED ONCE, and the reversal is deliberate rather than drift. It was
+   * turned down for Token Mint's cross-chain deployments table — one informational card did not
+   * justify a permanent grant to every package. Two things make this different:
+   *
+   *   1. For an app that is network-agnostic BY DESIGN — an external-DAO list reads every capable
+   *      chain in parallel, independent of where the wallet sits — a roster is not a nicety, it is
+   *      the model. The alternative is a chain list frozen into an immutable package, so a new
+   *      network cannot appear without a re-publish, re-review and re-approve.
+   *   2. It grants essentially nothing new. `network(chainId)` already answers for any id an app
+   *      cares to try, so the roster is reachable today by enumeration — this only makes it
+   *      efficient and honest instead of a guessing loop.
+   *
+   * `cohortChainIds()` and never `listSupportedChainIds()`: constitution III forbids a read
+   * crossing the testnet/mainnet boundary, and that boundary is the host's to enforce rather than
+   * something each package has to remember.
+   */
+  const networks = useCallback(() => Object.freeze(cohortChainIds()), [])
+
   const network = useCallback(
     (requestedChainId) => {
       const target = evmChainId(requestedChainId == null ? walletChain : requestedChainId)
@@ -1007,6 +1028,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
       readProvider,
       contracts,
       network,
+      networks,
       store,
       audit,
       toast,
@@ -1024,6 +1046,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
     readProvider,
     contracts,
     network,
+    networks,
     store,
     audit,
     toast,
