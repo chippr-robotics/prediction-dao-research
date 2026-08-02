@@ -24,6 +24,16 @@ import ControllersPanel from '../ControllersPanel'
 const ACCOUNT = '0x00000000000000000000000000000000000A11CE'
 const WALLET = '0x' + 'c'.repeat(40)
 
+// The panel is a COLLAPSED accordion section on the Recovery tab, so every test
+// that touches an in-body control opens the section first — the same order a
+// member does it in. (jsdom does not enforce `inert`, so a test that skipped the
+// expand would pass here and fail in a browser.)
+function renderPanel(props = {}) {
+  const utils = render(<ControllersPanel {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: /devices & controllers/i }))
+  return utils
+}
+
 // The address entry lives INSIDE the link sheet: the panel's "Link a wallet"
 // button opens it, the address is typed there, and the sheet's "Link wallet"
 // button confirms. Queries are scoped to the dialog throughout.
@@ -71,7 +81,7 @@ beforeEach(() => {
 
 describe('ControllersPanel', () => {
   it('lists controllers and enables removal when more than one exists (FR-018/FR-020)', () => {
-    render(<ControllersPanel />)
+    renderPanel()
     expect(screen.getByTestId('controller-0')).toHaveTextContent('Key 0')
     expect(screen.getByTestId('controller-0')).toHaveTextContent('(this device)')
     expect(screen.getAllByRole('button', { name: /remove/i })[0]).toBeEnabled()
@@ -79,14 +89,14 @@ describe('ControllersPanel', () => {
 
   it('refuses last-controller removal in the UI (FR-020 client half)', () => {
     accountState = { ...accountState, controllers: [passkeyRow(0)], controllerCount: 1, singleControllerRisk: true }
-    render(<ControllersPanel />)
+    renderPanel()
     expect(screen.getByTestId('single-controller-warning')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /remove/i })).toBeDisabled()
   })
 
   it('shows an informed-consent sheet before linking, then links a CLEAR wallet through one sendCalls self-call (FR-019)', async () => {
     const screenController = vi.fn(async () => ({ clear: true, available: true }))
-    render(<ControllersPanel deps={{ screenController }} />)
+    renderPanel({ deps: { screenController } })
     // Opening the sheet and typing an address must NOT act — the member has to confirm first.
     const dialog = openLinkSheet()
     expect(dialog).toHaveTextContent(/full controller/i)
@@ -101,7 +111,7 @@ describe('ControllersPanel', () => {
 
   it('REFUSES a flagged wallet before any on-chain op (clarification Q2)', async () => {
     const screenController = vi.fn(async () => ({ clear: false, available: true }))
-    render(<ControllersPanel deps={{ screenController }} />)
+    renderPanel({ deps: { screenController } })
     confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/flagged/i))
     expect(walletState.sendCalls).not.toHaveBeenCalled()
@@ -113,7 +123,7 @@ describe('ControllersPanel', () => {
       ...accountState,
       controllers: [passkeyRow(0), { index: 1n, ownerBytes: '0x' + '0'.repeat(24) + 'c'.repeat(40), kind: 'wallet', address: WALLET, label: 'Wallet', credentialId: null, isThisDevice: false }],
     }
-    render(<ControllersPanel deps={{ screenController }} />)
+    renderPanel({ deps: { screenController } })
     confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/already a controller/i))
     expect(screenController).not.toHaveBeenCalled()
@@ -122,7 +132,7 @@ describe('ControllersPanel', () => {
 
   it('REFUSES when screening is unavailable — fail-closed', async () => {
     const screenController = vi.fn(async () => ({ clear: false, available: false }))
-    render(<ControllersPanel deps={{ screenController }} />)
+    renderPanel({ deps: { screenController } })
     confirmLink()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/fail-closed/i))
     expect(walletState.sendCalls).not.toHaveBeenCalled()
@@ -134,7 +144,7 @@ describe('ControllersPanel', () => {
       publicKey: { x: '0x' + '3'.repeat(64), y: '0x' + '4'.repeat(64) },
       prfCapable: true,
     }))
-    render(<ControllersPanel deps={{ createCredential }} />)
+    renderPanel({ deps: { createCredential } })
     fireEvent.click(screen.getByRole('button', { name: /add a passkey/i }))
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveTextContent(/full controller/i)
@@ -146,7 +156,7 @@ describe('ControllersPanel', () => {
   })
 
   it('confirms in a sheet before removing a controller — the Remove button alone never acts', async () => {
-    render(<ControllersPanel />)
+    renderPanel()
     fireEvent.click(screen.getAllByRole('button', { name: /remove key 1/i })[0])
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveTextContent(/no longer be able to approve actions/i)
@@ -176,7 +186,7 @@ describe('ControllersPanel', () => {
 
   it('gates mutations until the account is on-chain (counterfactual honesty, FR-007)', () => {
     accountState = { ...accountState, deployed: false, controllers: [], controllerCount: 0, singleControllerRisk: true }
-    render(<ControllersPanel />)
+    renderPanel()
     expect(screen.getByRole('note')).toHaveTextContent(/activates on-chain with your first action/i)
     expect(screen.getByRole('button', { name: /add a passkey/i })).toBeDisabled()
   })

@@ -11,6 +11,15 @@ vi.mock('../../../hooks/useOpenChallengeCodeVault', () => ({
 
 import RecoveryCodesPanel from '../RecoveryCodesPanel'
 
+// The panel is a COLLAPSED accordion section on the Recovery tab, so tests open
+// the section first — the same order a member does it in. (jsdom does not
+// enforce `inert`, so skipping the expand would pass here and fail in a browser.)
+function renderPanel() {
+  const utils = render(<RecoveryCodesPanel />)
+  fireEvent.click(screen.getByRole('button', { name: /recovery codes/i }))
+  return utils
+}
+
 describe('RecoveryCodesPanel (recovery codes in Security)', () => {
   beforeEach(() => {
     recoverCodes.mockReset()
@@ -24,7 +33,7 @@ describe('RecoveryCodesPanel (recovery codes in Security)', () => {
 
   it('prompts to sign in when the vault is unavailable', () => {
     vault = { ...vault, canUse: false }
-    render(<RecoveryCodesPanel />)
+    renderPanel()
     expect(screen.getByText(/sign in to recover/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /unlock/i })).toBeNull()
   })
@@ -33,7 +42,7 @@ describe('RecoveryCodesPanel (recovery codes in Security)', () => {
     recoverCodes.mockResolvedValue([
       { code: 'river amber tiger kite', wagerId: 9, description: 'Rain in Denver', savedAt: 1735689600000 },
     ])
-    render(<RecoveryCodesPanel />)
+    renderPanel()
     fireEvent.click(screen.getByRole('button', { name: /unlock my saved codes/i }))
     await waitFor(() => expect(screen.getByText('river amber tiger kite')).toBeInTheDocument())
     expect(recoverCodes).toHaveBeenCalledTimes(1)
@@ -43,14 +52,14 @@ describe('RecoveryCodesPanel (recovery codes in Security)', () => {
 
   it('shows an empty state when no codes are backed up on this device', async () => {
     recoverCodes.mockResolvedValue([])
-    render(<RecoveryCodesPanel />)
+    renderPanel()
     fireEvent.click(screen.getByRole('button', { name: /unlock my saved codes/i }))
     await waitFor(() => expect(screen.getByText(/no saved codes on this device yet/i)).toBeInTheDocument())
   })
 
   it('surfaces an unlock error without crashing', async () => {
     recoverCodes.mockRejectedValue(new Error('User rejected signature'))
-    render(<RecoveryCodesPanel />)
+    renderPanel()
     fireEvent.click(screen.getByRole('button', { name: /unlock my saved codes/i }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/user rejected signature/i))
   })

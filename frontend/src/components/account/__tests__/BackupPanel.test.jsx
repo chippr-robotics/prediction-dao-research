@@ -21,6 +21,16 @@ beforeEach(() => {
   }
 })
 
+// The panel is a COLLAPSED accordion section on the Recovery tab, so tests that
+// touch an in-body control open the section first — the same order a member does
+// it in. (jsdom does not enforce `inert`, so skipping the expand would pass here
+// and fail in a browser.)
+function renderExpanded() {
+  const utils = render(<BackupPanel />)
+  fireEvent.click(screen.getByRole('button', { name: /data backup/i }))
+  return utils
+}
+
 describe('BackupPanel', () => {
   it('starts collapsed and summarises that nothing is backed up yet', () => {
     render(<BackupPanel />)
@@ -39,7 +49,7 @@ describe('BackupPanel', () => {
 
   it('restores from a sheet and closes it on success', async () => {
     ctx = { ...ctx, hasRemote: true }
-    render(<BackupPanel />)
+    renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /restore my data/i }))
     const dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /confirm merge/i }))
@@ -49,7 +59,7 @@ describe('BackupPanel', () => {
 
   it('confirms before removing the stored backup — the button alone never deletes', async () => {
     ctx = { ...ctx, hasRemote: true }
-    render(<BackupPanel />)
+    renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /remove stored backup/i }))
     const dialog = screen.getByRole('dialog')
     expect(ctx.remove).not.toHaveBeenCalled()
@@ -66,6 +76,8 @@ describe('BackupPanel', () => {
     ctx = { ...ctx, available: false }
     render(<BackupPanel />)
     expect(screen.getByText('Not available on this network')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /data backup/i }))
+    expect(screen.getByRole('status')).toHaveTextContent(/isn’t available on this network yet/i)
     expect(screen.queryByRole('button', { name: /back up my data/i })).toBeNull()
   })
 })

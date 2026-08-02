@@ -8,7 +8,7 @@
  * standard address entry (browser-known hint chips).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 const mockWallet = {
@@ -87,6 +87,15 @@ beforeEach(() => {
   addOwnerPublicKey.mockResolvedValue({ wait: txWait })
 })
 
+// The panel is a COLLAPSED accordion section on the Recovery tab, so tests open
+// the section first — the same order a member does it in. (jsdom does not
+// enforce `inert`, so skipping the expand would pass here and fail in a browser.)
+function renderPanel(props) {
+  const utils = render(<RecoverAccountPanel {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: /recover a passkey account/i }))
+  return utils
+}
+
 describe('RecoverAccountPanel', () => {
   it('renders nothing for passkey sessions (they use the Controllers panel)', () => {
     mockWallet.loginMethod = 'passkey'
@@ -102,7 +111,7 @@ describe('RecoverAccountPanel', () => {
 
   it('walks the wizard: intro → account entry → verified confirm step', async () => {
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     // Sheet is closed until the member starts recovery.
     expect(screen.queryByLabelText('Passkey account address')).not.toBeInTheDocument()
     await enterAndVerify(user)
@@ -112,7 +121,7 @@ describe('RecoverAccountPanel', () => {
   it('refuses recovery when the wallet is not a controller and never reaches the ceremony', async () => {
     isOwnerAddress.mockResolvedValue(false)
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     await enterAndVerify(user)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/not a controller/i))
     // Stays on the account step — the confirm/ceremony button is not rendered.
@@ -125,7 +134,7 @@ describe('RecoverAccountPanel', () => {
       Object.assign(new Error('could not decode result data (value="0x")'), { code: 'BAD_DATA' })
     )
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     await enterAndVerify(user)
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/doesn't respond like a FairWins passkey account/i)
@@ -138,7 +147,7 @@ describe('RecoverAccountPanel', () => {
   it('flags an undeployed / wrong-network account before hitting the contract', async () => {
     mockWallet.provider = { getCode: vi.fn().mockResolvedValue('0x') }
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     await enterAndVerify(user)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/No passkey account is deployed/i))
     expect(isOwnerAddress).not.toHaveBeenCalled()
@@ -147,7 +156,7 @@ describe('RecoverAccountPanel', () => {
 
   it('recovers end-to-end: verify → new passkey → wallet tx → receipt → book record → done', async () => {
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     await enterAndVerify(user)
     await waitFor(() => expect(screen.getByTestId('recover-verified')).toBeInTheDocument())
 
@@ -165,7 +174,7 @@ describe('RecoverAccountPanel', () => {
   it('reports a reverted authorization honestly and does NOT record the credential', async () => {
     txWait.mockResolvedValue({ status: 0 })
     const user = userEvent.setup()
-    render(<RecoverAccountPanel deps={baseDeps()} />)
+    renderPanel({ deps: baseDeps() })
     await enterAndVerify(user)
     await waitFor(() => expect(screen.getByTestId('recover-verified')).toBeInTheDocument())
 
