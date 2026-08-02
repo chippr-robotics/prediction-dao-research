@@ -284,19 +284,29 @@ artifacts live under `specs/<feature>/`.
   registry). Never hardcode `137`: the catalog decides which packages the host EXECUTES, so
   crossing the cohort boundary would run mainnet-curated code against testnet wallets.
   (3) **The `host` object is the ENTIRE privileged surface** (`contracts/host-context.md`, hostApi
-  **2**): `appId`, `wallet`, `readProvider`, `contracts`, `network`, `store`, `audit`, `toast`,
+  **2**): `appId`, `wallet` (`address`, `chainId`, `isConnected`, `requestConnect`, `switchChain`,
+  `submit`), `readProvider`, `contracts`, `network`, `networks`, `store`, `audit`, `toast`,
   `navigate`. Wrappers, never handles — no signer, no context, no storage handle, and adding a key
   grants it permanently to every third-party package. `wallet.submit` chooses the write rail
   (classic signer vs passkey `sendCalls`) because an app cannot: identity first, so a passkey member
-  acting as a vault still gets a PROPOSAL. It resolves at **BROADCAST** — use `SubmitResult.wait()`,
-  never report success from `submit` alone. `contracts(name)` is gated by a per-package manifest
-  allowlist and **throws** for an undeclared name (returning `null` would read as "not deployed").
+  acting as a vault still gets a PROPOSAL. **Sanctions screening happens INSIDE `submit`**, before
+  any rail is touched — strictly stronger than an app-side pre-check, which a package could simply
+  skip. It resolves at **BROADCAST** — use `SubmitResult.wait()`, never report success from `submit`
+  alone, and note `wait()` takes NO timeout where `tx.wait(1, ms)` did, so each app must race its
+  own. `contracts(name)` is gated by a per-package manifest allowlist and **throws** for an
+  undeclared name (returning `null` would read as "not deployed"). `readProvider` is cached per
+  underlying provider — it must keep a STABLE identity, or any app using it as an effect dependency
+  spins.
   (4) **Never bundle host config into a package.** `config/contracts.js` reaches `virtual:tenant`
   (a hard build failure), and the preset's `envPrefix` turns any bundled `import.meta.env` read into
   `undefined` — a bundled `NETWORKS` would report every subgraph as absent, which is a fabricated
   fact, not an outage. Packages take configuration from the host at runtime. Equally: **nothing in
   `frontend/miniapps/` may import from `frontend/src/`** — a package is built separately, frozen at
-  an immutable CID, and a bundled copy of a React context is a DIFFERENT context.
+  an immutable CID, and a bundled copy of a React context is a DIFFERENT context. The reverse also
+  holds and is the direction that actually broke: **nothing in `frontend/src/` may import a tree
+  that was converted into a package.** Both are gated by
+  `frontend/src/test/miniapps/packageBoundary.test.js` — a scoped vitest run cannot catch a stale
+  import, because the module simply never loads; only the full suite or a build will.
   (5) **`blob:` in `script-src` is for mini-app packages ONLY** — verified bytes are imported from a
   Blob URL (R1). Never add `https:` to `script-src`. The SW package cache
   (`fairwins-miniapp-packages-v1`) is cache-first because CIDs are immutable, and is **not a trust
@@ -305,7 +315,16 @@ artifacts live under `specs/<feature>/`.
   declared stylesheets. It does NOT fetch files it will not use (`verifyAllDeclaredFiles` is off for
   a launch, on for a curator review), so do not restate this as "every file in the manifest": the
   invariant is that nothing unverified ever runs, not that everything declared is downloaded.
-  See `docs/developer-guide/miniapps.md` + `specs/073-miniapp-platform/`.
+  **Converted apps: Token Mint and ClearPath ONLY** (live on Polygon 137 and Mordor 63; ids are
+  per-registry and differ per chain — resolve by `idByName`/slug, never by id across cohorts).
+  **Wagers is deliberately NOT a mini-app and must not be converted** — 69% of its file closure
+  (22 of 32 files) is shared with the host-retained `HomeScreen`/Trade surfaces, because
+  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerCard`/
+  `WagerList`/`wagerVm` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
+  (`WAGERS_VIEW`/`WAGERS_PATH` in `config/appNav.js`, rendered by `PayTransferPanel`); `/wagers`
+  redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
+  See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
+  `specs/073-miniapp-platform/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE
