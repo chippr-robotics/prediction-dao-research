@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import ClearPathPanel from '../ClearPathPanel'
-import { hostRef, resetHost } from './_host'
+import { hostRef } from './_host'
 vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (T057) — axe accessibility (WCAG 2.1 AA) over the ClearPath module surfaces. Picked up by the gating

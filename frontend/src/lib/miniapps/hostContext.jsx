@@ -326,8 +326,26 @@ const BLOCKED_PROVIDER_MEMBERS = new Set(['destroy', 'removeAllListeners'])
  * @param {object} provider - the host's cached provider for a chain
  * @returns {object} proxy with the same interface
  */
+/**
+ * One guard per underlying provider, so the wrapper has a STABLE identity.
+ *
+ * Without this every `readProvider()` call returned a fresh Proxy, and any app that put the
+ * provider in a `useEffect`/`useMemo` dependency array — the obvious thing to do with it — re-ran
+ * that effect on every render. In a component whose effect also sets state, that is an infinite
+ * loop: it hangs the app, not just a test. Found exactly that way, as a worker that never
+ * finished.
+ *
+ * A WeakMap keyed on the provider preserves the reason the wrapper is not memoized by chain: the
+ * host resolves the endpoint on every call (spec 069 — a member who repoints must see the next
+ * read take it), and a repointed endpoint yields a DIFFERENT underlying provider, which gets its
+ * own wrapper. Same provider, same wrapper; new provider, new wrapper.
+ */
+const GUARDED_PROVIDERS = new WeakMap()
+
 function guardReadProvider(provider) {
-  return new Proxy(provider, {
+  const cached = GUARDED_PROVIDERS.get(provider)
+  if (cached) return cached
+  const guarded = new Proxy(provider, {
     get(target, prop, receiver) {
       if (BLOCKED_PROVIDER_MEMBERS.has(prop)) {
         // A stub that throws when CALLED, rather than a throw on the property
@@ -371,6 +389,8 @@ function guardReadProvider(provider) {
       )
     },
   })
+  GUARDED_PROVIDERS.set(provider, guarded)
+  return guarded
 }
 
 /** A positive integer EVM chain id, or null. Bitcoin ids are strings (spec 061) and never valid here. */

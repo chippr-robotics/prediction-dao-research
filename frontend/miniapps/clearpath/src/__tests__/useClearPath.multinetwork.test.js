@@ -15,7 +15,11 @@ vi.mock('../config/knownDaos', () => ({ knownDaosForChain: () => [] }))
 // chain) from making a real registry contract read against a live RPC.
 
 describe('useClearPath on a registry-less network (spec 042)', () => {
-  beforeEach(() => window.localStorage.clear())
+  beforeEach(() => {
+    window.localStorage.clear()
+    // Ethereum mainnet: in the cohort, no ExternalDAORegistry, no curated DAOs in this suite.
+    resetHost({ chainId: 1 })
+  })
 
   it('is supported on Ethereum mainnet despite having no on-chain registry', () => {
     const { result } = renderHook(() => useClearPath())
@@ -33,18 +37,6 @@ describe('useClearPath on a registry-less network (spec 042)', () => {
     expect(list[0].label).toBe('ENS')
     expect(list[0].source).toBe('local')
   })
-
-  it('defaults the read route to public and persists a wallet-managed override', () => {
-    const { result } = renderHook(() => useClearPath())
-    expect(result.current.readRoute).toBe('public')
-    act(() => result.current.setReadRoute('wallet'))
-    expect(result.current.readRoute).toBe('wallet')
-    expect(window.localStorage.getItem('clearpath.readRoute.v1')).toBe('wallet')
-  })
-})
-
-describe('useClearPath network-agnostic listing (network-agnostic follow-up to spec 042)', () => {
-  beforeEach(() => window.localStorage.clear())
 
   it('exposes every clearpath-capable chain, not just the connected one', () => {
     const { result } = renderHook(() => useClearPath())

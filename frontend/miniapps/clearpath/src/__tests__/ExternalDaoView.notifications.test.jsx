@@ -12,18 +12,15 @@ vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current 
 
 const h = vi.hoisted(() => ({
   showNotification: vi.fn(),
-  castVote: vi.fn(),
+  encode: vi.fn(() => ({ to: '0x00000000000000000000000000000000000000d0', data: '0xfeed' })),
   readGovernorSummary: vi.fn(),
   readTreasuries: vi.fn(),
   fetchGovernorProposals: vi.fn(),
-  screenStatus: 'clear',
 }))
 
 // The view now reads sendCalls/loginMethod/chainId from useWallet (passkey rail + switch-to-act gating); these
 // tests drive the classic signer-prop path on the SAME chain as the DAO (63, matching renderView below) by
 // default — a `mockReturnValue` override lets one test move the wallet to a different chain.
-const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
-const switchChainAsync = vi.fn().mockResolvedValue({})
 vi.mock('../governorConnector', () => ({
   readGovernorSummary: (...a) => h.readGovernorSummary(...a),
   readTreasuries: (...a) => h.readTreasuries(...a),
@@ -33,15 +30,18 @@ vi.mock('../governorConnector', () => ({
   readVoterState: () => Promise.resolve({ hasVoted: null, votingPower: null, support: null }),
   readProposalEta: () => Promise.resolve(null),
   explainTxError: (e) => e?.shortMessage || e?.reason || e?.message || 'Transaction failed.',
-  castVote: (...a) => h.castVote(...a),
+  encode: (...a) => h.encode(...a),
   queueProposal: vi.fn(),
   executeProposal: vi.fn(),
   proposeAction: vi.fn(),
 }))
 // Spec 042 — ExternalDaoView now resolves reads/actions through the pluggable connector layer + data-source
 // router, so drive those instead of the relocated governorConnector module.
-vi.mock('../connectors', () => ({
-  getConnector: () => ({
+// STABLE CONNECTOR INSTANCE. The real `getConnector` returns from a static per-framework map, so
+// its result has a fixed identity; a mock that built a fresh object per call made `connector` a
+// changing dependency of the view's effects, which re-ran, set state, re-rendered — an infinite
+// loop that exhausted the heap rather than failing an assertion.
+const CONNECTOR = {
     framework: 0,
     readSummary: (...a) => h.readGovernorSummary(...a),
     readTreasuries: (...a) => h.readTreasuries(...a),
@@ -50,11 +50,13 @@ vi.mock('../connectors', () => ({
     readVoterState: () => Promise.resolve({ hasVoted: null, votingPower: null, support: null }),
     readProposalEta: () => Promise.resolve(null),
     explainTxError: (e) => e?.shortMessage || e?.reason || e?.message || 'Transaction failed.',
-    castVote: (...a) => h.castVote(...a),
+    encode: (...a) => h.encode(...a),
     queue: vi.fn(),
     execute: vi.fn(),
     propose: vi.fn(),
-  }),
+}
+vi.mock('../connectors', () => ({
+  getConnector: () => CONNECTOR,
   detectFramework: () => Promise.resolve(0),
 }))
 vi.mock('../daoDataSource', () => ({
@@ -76,17 +78,18 @@ vi.mock('../daoDataSource', () => ({
 const record = { id: 1, dao: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', framework: 0, label: 'Olympia DAO' }
 const HASH = '0xabcdef0000000000000000000000000000000000000000000000000000001234' // short() → 0xabcd…1234
 
-function renderView(signer, account = '0x0000000000000000000000000000000000000Acc') {
+function renderView(_unusedSigner, account = '0x0000000000000000000000000000000000000Acc') {
   return render(
-    <ExternalDaoView record={record} reader={{}} signer={signer} account={account} chainId={63} usdcAddress="0x00000000000000000000000000000000000000dc" onBack={() => {}} />
+    <ExternalDaoView record={record} reader={{}} account={account} chainId={63} usdcAddress="0x00000000000000000000000000000000000000dc" onBack={() => {}} />
   )
 }
 
 describe('ExternalDaoView notifications (spec 030 / US5)', () => {
+  let toast
+
   beforeEach(() => {
     vi.clearAllMocks()
-    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 })
-    h.screenStatus = 'clear'
+    toast = resetHost({ chainId: 63 }).toast.show
     h.readGovernorSummary.mockResolvedValue({
       name: 'OlympiaGovernor', tokenAddr: '0x0000000000000000000000000000000000000111', tokenName: 'Olympia Member',
       tokenSymbol: 'OLYM', timelock: '0x0000000000000000000000000000000000000222', treasuryNative: 0n,
@@ -100,77 +103,102 @@ describe('ExternalDaoView notifications (spec 030 / US5)', () => {
   })
 
   it('surfaces confirm → submitted (persistent) → confirmed (with tx hash) for a vote', async () => {
-    h.castVote.mockReturnValue({ hash: HASH, wait: vi.fn().mockResolvedValue({ status: 1 }) })
     const user = userEvent.setup()
     renderView({})
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
-    await waitFor(() => expect(h.castVote).toHaveBeenCalled())
+    await waitFor(() => expect(hostRef.current.wallet.submit).toHaveBeenCalled())
     // in-flight toasts are sticky (duration 0) so they survive slow block times
-    expect(h.showNotification).toHaveBeenCalledWith('Vote For: confirm in your wallet…', 'info', 0)
-    expect(h.showNotification).toHaveBeenCalledWith('Vote For submitted — awaiting confirmation…', 'info', 0)
+    expect(toast).toHaveBeenCalledWith('Vote For: confirm in your wallet…', 'info')
+    expect(toast).toHaveBeenCalledWith('Vote For submitted — awaiting confirmation…', 'info')
     await waitFor(() =>
-      expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('Vote For confirmed · tx 0xabcd…1234'), 'success')
+      expect(toast).toHaveBeenCalledWith(expect.stringContaining('Vote For confirmed · tx 0xabcd…1234'), 'success')
     )
   })
 
   it('warns (does not send) when no wallet is connected', async () => {
+    // The wallet is the HOST's now — there is no signer prop to withhold.
+    toast = resetHost({ chainId: 63, wallet: { isConnected: false } }).toast.show
     const user = userEvent.setup()
     renderView(null)
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
-    expect(h.showNotification).toHaveBeenCalledWith('Connect a wallet to act on this DAO.', 'warning')
-    expect(h.castVote).not.toHaveBeenCalled()
+    expect(toast).toHaveBeenCalledWith('Connect a wallet to act on this DAO.', 'warning')
+    expect(hostRef.current.wallet.submit).not.toHaveBeenCalled()
   })
 
   it('surfaces a revert / rejection as an error toast', async () => {
-    h.castVote.mockReturnValue({ hash: HASH, wait: vi.fn().mockRejectedValue(new Error('execution reverted')) })
+    toast = resetHost({
+      chainId: 63,
+      wallet: {
+        submit: vi.fn(async () => {
+          const r = { kind: 'sent', txHash: '0xabcdef0000000000000000000000000000000000000000000000000000001234', safeTxHash: null }
+          Object.defineProperty(r, 'wait', { enumerable: false, value: () => Promise.reject(new Error('execution reverted')) })
+          return Object.freeze(r)
+        }),
+      },
+    }).toast.show
     const user = userEvent.setup()
     renderView({})
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
-    await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith('execution reverted', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('execution reverted', 'error'))
   })
 
-  it('spec 042 (FR-013): blocks a sanctions-restricted signer and does not send', async () => {
-    h.screenStatus = 'restricted'
-    h.castVote.mockReturnValue({ hash: HASH, wait: vi.fn().mockResolvedValue({ status: 1 }) })
+  /*
+   * Screening moved INTO `host.wallet.submit` (spec 073). The app no longer pre-screens, so it
+   * does call submit — and the host refuses before touching any rail. That is strictly stronger
+   * than the old app-side check, which a package could simply have skipped. What this test pins is
+   * that the refusal reaches the member in the host's words, not an internal string.
+   */
+  it('spec 042 (FR-013): surfaces the host refusal for a sanctions-restricted account', async () => {
+    toast = resetHost({ sanctioned: true }).toast.show
     const user = userEvent.setup()
     renderView({})
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
-    await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('restricted by sanctions'), 'error'))
-    expect(h.castVote).not.toHaveBeenCalled()
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining('restricted by sanctions'), 'error'))
+    // Nothing was CONFIRMED — the host refused inside submit, before any rail.
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('confirmed'), 'success')
   })
 
   it('treats a confirmation timeout as "may still confirm" (warning) and releases the busy lock', async () => {
     // A broadcast-but-dropped tx: wait() rejects with ethers v6 TIMEOUT — must NOT look like a failure or a
     // success, and must release busy so the controls are usable again (regression guard for the review finding).
-    const timeoutErr = Object.assign(new Error('wait for transaction timeout'), { code: 'TIMEOUT' })
-    h.castVote.mockReturnValue({ hash: HASH, wait: vi.fn().mockRejectedValue(timeoutErr) })
+    const timeoutErr = Object.assign(new Error('confirmation timed out'), { code: 'TIMEOUT' })
+    toast = resetHost({
+      chainId: 63,
+      wallet: {
+        submit: vi.fn(async () => {
+          const r = { kind: 'sent', txHash: '0xabcdef0000000000000000000000000000000000000000000000000000001234', safeTxHash: null }
+          Object.defineProperty(r, 'wait', { enumerable: false, value: () => Promise.reject(timeoutErr) })
+          return Object.freeze(r)
+        }),
+      },
+    }).toast.show
     const user = userEvent.setup()
     renderView({})
     await user.click(await screen.findByRole('button', { name: /vote for/i }))
     await waitFor(() =>
-      expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('taking longer than expected'), 'warning', 0)
+      expect(toast).toHaveBeenCalledWith(expect.stringContaining('taking longer than expected'), 'warning')
     )
     await waitFor(() => expect(screen.getByRole('button', { name: /vote for/i })).not.toBeDisabled())
-    expect(h.showNotification).not.toHaveBeenCalledWith(expect.stringContaining('confirmed'), 'success')
-    expect(h.showNotification).not.toHaveBeenCalledWith(expect.stringContaining('failed'), 'error')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('confirmed'), 'success')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('failed'), 'error')
   })
 
   it('network-agnostic follow-up: disables voting and offers a switch prompt when the wallet is on a different chain than the DAO', async () => {
-    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 }) // DAO is on 63 (renderView)
+    toast = resetHost({ chainId: 137 }).toast.show // the DAO is on 63 — wallet is elsewhere
     const user = userEvent.setup()
     renderView({})
     const voteFor = await screen.findByRole('button', { name: /vote for/i })
     expect(voteFor).toBeDisabled()
-    expect(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^switch to mordor$/i })).toBeInTheDocument()
     await user.click(voteFor)
-    expect(h.castVote).not.toHaveBeenCalled()
+    expect(hostRef.current.wallet.submit).not.toHaveBeenCalled()
   })
 
-  it('network-agnostic follow-up: the switch button calls switchChainAsync with the DAO’s own chain', async () => {
-    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 })
+  it('network-agnostic follow-up: the switch button asks the HOST to move to the DAO’s own chain', async () => {
+    toast = resetHost({ chainId: 137 }).toast.show
     const user = userEvent.setup()
     renderView({})
-    await user.click(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i }))
-    expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 63 })
+    await user.click(await screen.findByRole('button', { name: /^switch to mordor$/i }))
+    expect(hostRef.current.wallet.switchChain).toHaveBeenCalledWith(63)
   })
 })

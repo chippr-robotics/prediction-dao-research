@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import CpAddressField from '../CpAddressField'
-import { hostRef, resetHost } from './_host'
+import { hostRef } from './_host'
 vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US3/US5, FR-024) — the ClearPath address field wires the app's address book + QR scanner to any
@@ -13,22 +13,6 @@ vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current 
 const A_BOOK = '0x00000000000000000000000000000000000000a1'
 const A_SCAN = '0x00000000000000000000000000000000000000b2'
 
-vi.mock('../../ui/AddressBookButton', () => ({
-  default: ({ onSelect, disabled }) => (
-    <button type="button" disabled={disabled} onClick={() => onSelect({ address: A_BOOK })}>
-      book-pick
-    </button>
-  ),
-}))
-vi.mock('../../ui/QRScanner', () => ({
-  default: ({ isOpen, onScanSuccess }) =>
-    isOpen ? (
-      // emit an EIP-681 URI to prove the extractor pulls the bare address out
-      <button type="button" onClick={() => onScanSuccess(`ethereum:${A_SCAN}`)}>
-        scan-emit
-      </button>
-    ) : null,
-}))
 
 describe('CpAddressField (spec 030)', () => {
   it('typing forwards the raw string to onChange', async () => {
@@ -38,25 +22,6 @@ describe('CpAddressField (spec 030)', () => {
     await user.type(screen.getByLabelText('Recipient'), '0x')
     expect(onChange).toHaveBeenCalledWith('0')
     expect(onChange).toHaveBeenCalledWith('x')
-  })
-
-  it('picking from the address book fills the field with the contact address', async () => {
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<CpAddressField id="f1" label="Recipient" value="" onChange={onChange} />)
-    await user.click(screen.getByText('book-pick'))
-    expect(onChange).toHaveBeenCalledWith(A_BOOK)
-  })
-
-  it('scanning a QR code extracts the address from the payload and fills the field', async () => {
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<CpAddressField id="f1" label="Recipient" value="" onChange={onChange} />)
-    // scanner is closed until the scan button is pressed
-    expect(screen.queryByText('scan-emit')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /scan qr code/i }))
-    await user.click(screen.getByText('scan-emit'))
-    expect(onChange).toHaveBeenCalledWith(A_SCAN)
   })
 
   it('shows a "Self" button only when selfAddress is given, filling the field with it', async () => {
@@ -70,11 +35,24 @@ describe('CpAddressField (spec 030)', () => {
     expect(onChange).toHaveBeenCalledWith(SELF)
   })
 
-  it('disables the input and affordances when disabled', () => {
+  it('disables the input when disabled', () => {
     render(<CpAddressField id="f1" label="Recipient" value="" onChange={() => {}} disabled />)
     expect(screen.getByLabelText('Recipient')).toBeDisabled()
-    expect(screen.getByText('book-pick')).toBeDisabled()
-    expect(screen.getByRole('button', { name: /scan qr code/i })).toBeDisabled()
+  })
+
+  /*
+   * Two affordances left in the mini-app conversion (spec 073 T028), for different reasons, and
+   * both are pinned here so neither returns without the decision being re-made:
+   *
+   *   - the QR scanner, on SIZE: bundling it cost 710 KB of an 805 KB package — 88% of the bytes
+   *     every member fetches, forever, for one convenience on a field they can paste into;
+   *   - the address-book picker, on PRIVACY: it reads the member's contact list, and the value
+   *     entered here is a DAO CONTRACT address, not a person.
+   */
+  it('offers neither an address-book picker nor a QR scanner', () => {
+    render(<CpAddressField id="f1" label="Recipient" value="" onChange={() => {}} />)
+    expect(screen.queryByRole('button', { name: /scan qr code/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /address book|contacts/i })).not.toBeInTheDocument()
   })
 
   it('has no axe violations', async () => {

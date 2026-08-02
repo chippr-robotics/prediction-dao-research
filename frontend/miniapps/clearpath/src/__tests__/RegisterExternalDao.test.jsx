@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import RegisterExternalDao from '../RegisterExternalDao'
-import { hostRef, resetHost } from './_host'
+import { hostRef } from './_host'
 vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 042 US2 + network-agnostic follow-up — register/track flow, now with an explicit target-network picker
@@ -81,13 +81,13 @@ describe('RegisterExternalDao (spec 042 US2, network-agnostic)', () => {
     renderForm({ hasRegistryChainIds: [63], chainIds: [63, 137], connectedChainId: 137 })
     await user.selectOptions(screen.getByLabelText(/network/i), '63')
     expect(screen.queryByRole('button', { name: /^register dao$/i })).not.toBeInTheDocument()
-    const switchBtn = screen.getByRole('button', { name: /switch to network 63/i })
+    const switchBtn = screen.getByRole('button', { name: /switch to mordor to register/i })
     expect(switchBtn).toBeInTheDocument()
     await user.type(screen.getByLabelText(/governor address/i), ADDR)
     await user.click(screen.getByRole('button', { name: /validate/i }))
     await waitFor(() => expect(screen.getByText(/Recognized/i)).toBeInTheDocument())
-    await user.click(screen.getByRole('button', { name: /switch to network 63/i }))
-    expect(h.switchChainAsync).toHaveBeenCalledWith({ chainId: 63 })
+    await user.click(screen.getByRole('button', { name: /switch to mordor to register/i }))
+    expect(hostRef.current.wallet.switchChain).toHaveBeenCalledWith(63)
     expect(h.track).not.toHaveBeenCalled()
   })
 })

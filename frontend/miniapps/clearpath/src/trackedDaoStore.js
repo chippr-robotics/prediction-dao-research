@@ -92,6 +92,20 @@ function migrateLegacy(store, account) {
   store.set(MIGRATED_KEY, Math.floor(Date.now() / 1000))
 }
 
+/**
+ * The per-chain map itself, so a caller can see WHICH chains hold tracked DAOs.
+ *
+ * Exposed because the member's own list must be listable on a chain that has neither a registry
+ * nor curated DAOs — without this the aggregate scan would skip exactly the chains device-local
+ * tracking exists for.
+ */
+export function chainsWithEntries(store, account) {
+  const map = readMap(store, account)
+  return Object.fromEntries(
+    Object.entries(map).filter(([, entries]) => Array.isArray(entries) && entries.length > 0),
+  )
+}
+
 /** Read the per-chain map, importing legacy data on first use. */
 function readMap(store, account) {
   if (!store) return {}

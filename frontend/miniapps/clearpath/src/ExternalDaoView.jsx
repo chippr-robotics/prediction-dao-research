@@ -23,6 +23,30 @@ const SOURCE_LABEL = { subgraph: 'The Graph', onchain: 'On-chain scan' }
 // the live ClearPath networks (Mordor ~15s blocks), so it only ever trips on a genuinely stuck/dropped tx.
 const CONFIRM_TIMEOUT_MS = 120000
 
+/**
+ * `SubmitResult.wait()` takes no timeout, so the app imposes one — the runtime contract says as
+ * much: the host waits through the member's own read endpoint, a DIFFERENT endpoint from the one
+ * the wallet broadcast through, so a wait that never resolves is a real outcome rather than a
+ * hypothetical. A timeout is NOT a failure; the caller reports "may still confirm".
+ */
+async function waitWithTimeout(tx) {
+  let timer
+  try {
+    return await Promise.race([
+      tx.wait(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          const e = new Error('confirmation timed out')
+          e.code = 'TIMEOUT'
+          reject(e)
+        }, CONFIRM_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function short(a) {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—'
 }
@@ -104,7 +128,13 @@ function CopyableId({ id }) {
 
 export default function ExternalDaoView({ record, reader, account, chainId, usdcAddress, onBack }) {
   const host = useMiniAppHost()
-  const showNotification = useCallback((message, type, duration) => host.toast.show(message, type, duration), [host])
+  /*
+   * Two arguments, not three. The host's toast is ONE LINE and ephemeral — `toast.show(message,
+   * type)` takes no duration — so the persistent in-flight toasts this view used to raise are not
+   * expressible. Forwarding a duration the host discards would only look like it did something;
+   * the in-flight signal is carried by `busy`, which already disables the controls.
+   */
+  const showNotification = useCallback((message, type) => host.toast.show(message, type), [host])
   /*
    * `chainId` (the prop) is the DAO's OWN network; `host.wallet.chainId` is where the wallet sits.
    * ClearPath lists DAOs across every network at once, so those routinely differ — reads use the
@@ -267,7 +297,7 @@ export default function ExternalDaoView({ record, reader, account, chainId, usdc
      */
     setBusy(true)
     try {
-      showNotification(`${label}: confirm in your wallet…`, 'info', 0)
+      showNotification(`${label}: confirm in your wallet…`, 'info')
       const tx = await makeTx()
       // Spec 043 (US3): in vault mode makeTx returns a pending proposal (no on-chain tx to await).
       if (tx?.kind === 'proposed' || tx?.proposed) {
@@ -275,8 +305,8 @@ export default function ExternalDaoView({ record, reader, account, chainId, usdc
         await loadProposals()
         return true
       }
-      showNotification(`${label} submitted — awaiting confirmation…`, 'info', 0)
-      await tx.wait(1)
+      showNotification(`${label} submitted — awaiting confirmation…`, 'info')
+      await waitWithTimeout(tx)
       showNotification(`${label} confirmed${tx?.hash ? ` · tx ${short(tx.hash)}` : ''}.`, 'success')
       await loadProposals()
       return true
@@ -284,9 +314,14 @@ export default function ExternalDaoView({ record, reader, account, chainId, usdc
       // A timeout is NOT a confirmed revert — the tx may still mine. Surface that honestly (and dismissably)
       // rather than claiming failure; busy is released by finally so the user can Refresh once it lands.
       if (e?.code === 'TIMEOUT') {
-        showNotification(`${label} is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.`, 'warning', 0)
+        showNotification(`${label} is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.`, 'warning')
       } else {
-        showNotification(connector.explainTxError(e), 'error')
+        /*
+         * A HOST REFUSAL carries a sentence written for the member (`userMessage`) — sanctions,
+         * wrong chain, no write rail. `explainTxError` reads a CHAIN error and would reduce those
+         * to an internal string, so the host's own wording wins where it exists.
+         */
+        showNotification(e?.userMessage || connector.explainTxError(e), 'error')
       }
       return false
     } finally {

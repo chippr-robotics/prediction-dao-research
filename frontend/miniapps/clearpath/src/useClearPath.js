@@ -10,6 +10,31 @@ import { knownDaosForChain } from './config/knownDaos'
 const CONFIRM_TIMEOUT_MS = 120000
 
 /**
+ * `SubmitResult.wait()` takes a confirmation count but NO timeout, so the app imposes one — which
+ * is exactly what the runtime contract tells apps to do: the host waits through the member's own
+ * read endpoint, which is a different endpoint from the one the wallet broadcast through, so
+ * "not mined yet" and "not visible here yet" are indistinguishable and waiting forever is a real
+ * possibility. A timeout is NOT a failure; the caller reports "may still confirm".
+ */
+async function waitWithTimeout(result) {
+  let timer
+  try {
+    return await Promise.race([
+      result.wait(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          const e = new Error('confirmation timed out')
+          e.code = 'TIMEOUT'
+          reject(e)
+        }, CONFIRM_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
  * A read provider for any chain, or null when the host has no endpoint for it.
  *
  * `readProvider` THROWS for an unconfigured chain — a real condition, since the member owns their
@@ -65,6 +90,13 @@ function hasRegistryOn(host, targetChainId) {
 export function useClearPath() {
   const host = useMiniAppHost()
   const { address: account, chainId, isConnected } = host.wallet
+  /*
+   * The host's toast is ONE LINE and ephemeral — `toast.show(message, type)` takes no duration, so
+   * the persistent in-flight toasts this code used to raise (duration 0, kept up while a tx mined)
+   * are not expressible. That is a deliberate reduction rather than a missing feature: pinning
+   * host chrome is not something a package should be able to do, and the in-flight signal is
+   * already carried by this hook's own `status`/`busy` state, which the surfaces render.
+   */
   const showNotification = useCallback((message, type) => host.toast.show(message, type), [host])
 
   /** Declared in the manifest allowlist; anything else throws, which would be a packaging bug. */
@@ -88,13 +120,25 @@ export function useClearPath() {
    * operate: a chain qualifies if it carries an ExternalDAORegistry, or if this package ships
    * known DAOs for it. Adding a network becomes a host release again, not a re-publish.
    */
-  const chainIds = useMemo(
-    () =>
-      host
-        .networks()
-        .filter((id) => ethers.isAddress(resolve('externalDAORegistry', id) || '') || knownDaosForChain(id).length > 0),
-    [host, resolve],
-  )
+  const chainIds = useMemo(() => {
+    /*
+     * A chain is worth scanning when there is something on it to find:
+     *   - an ExternalDAORegistry, or
+     *   - DAOs this package ships as curated seeds, or
+     *   - DAOs the MEMBER has tracked there — their own list must always be listable, even on a
+     *     chain with neither of the above, which is the whole point of device-local tracking.
+     * The connected chain is always included so a member can track their first DAO anywhere.
+     */
+    const tracked = Object.keys(trackedDaoStore.chainsWithEntries(host.store, account) || {})
+    const roster = host.networks().filter(
+      (id) =>
+        ethers.isAddress(resolve('externalDAORegistry', id) || '') ||
+        knownDaosForChain(id).length > 0 ||
+        tracked.includes(String(id)),
+    )
+    const connected = Number(chainId)
+    return Number.isFinite(connected) && !roster.includes(connected) ? [...roster, connected] : roster
+  }, [host, resolve, chainId, account])
 
   const registryAddress = resolve('externalDAORegistry', chainId)
   const usdcAddress = resolve('paymentToken', chainId) // per-network USDC for treasury balances
@@ -111,11 +155,12 @@ export function useClearPath() {
   )
 
   /*
-   * Availability is decided by what this package can actually DO here, not by a host flag naming
-   * it: a chain qualifies if ClearPath can read on it and it is one of the chains this app
-   * operates on. Reads are pure client-side RPC/subgraph, so a deployed registry is NOT required.
+   * Availability is "can this package do anything here", not a host flag naming it. Reads are pure
+   * client-side RPC, and a member can track a Governor by address anywhere — so a read provider is
+   * the whole requirement. A deployed registry is NOT one (that only decides whether tracking is
+   * on-chain or device-local).
    */
-  const isSupported = chainIds.includes(Number(chainId)) && !!reader
+  const isSupported = !!reader
 
   /** On-chain registry entries for `targetChainId` (empty when no registry is deployed there, or on any read failure — never throws). */
   const listRegistryDAOsFor = useCallback(async (targetChainId) => {
@@ -191,9 +236,17 @@ export function useClearPath() {
    * and gate write actions on a network switch.
    */
   const listExternalDAOs = useCallback(async () => {
-    const settled = await Promise.allSettled(chainIds.map((id) => listExternalDAOsFor(id)))
+    /*
+     * The tracked chains are re-read HERE rather than taken from the `chainIds` memo. Tracking a
+     * DAO writes to the store without changing any memo dependency, so a member who has just
+     * tracked their first DAO on another network would otherwise not see it until something else
+     * forced a re-render — the list would be missing a row they had just created.
+     */
+    const tracked = Object.keys(trackedDaoStore.chainsWithEntries(host.store, account) || {}).map(Number)
+    const scan = [...new Set([...chainIds, ...tracked.filter(Number.isFinite)])]
+    const settled = await Promise.allSettled(scan.map((id) => listExternalDAOsFor(id)))
     return settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
-  }, [chainIds, listExternalDAOsFor])
+  }, [chainIds, listExternalDAOsFor, host.store, account])
 
   /** Register an external DAO on-chain (registry networks). Real tx, signed on the CONNECTED chain; honest state + notifications. */
   const registerExternalDAO = useCallback(
@@ -223,15 +276,23 @@ export function useClearPath() {
 
         showNotification('Register DAO submitted — awaiting confirmation…', 'info')
         // `submit` resolves at broadcast; confirmation is this app's job.
-        const receipt = await result.wait()
+        const receipt = await waitWithTimeout(result)
         if (receipt && receipt.status === 0) throw new Error('The registration reverted on-chain.')
         const hash = result.txHash
         const ref = hash ? ` · tx ${String(hash).slice(0, 6)}…${String(hash).slice(-4)}` : ''
         showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
         return receipt
       } catch (e) {
-        const text = e?.userMessage || e?.shortMessage || e?.reason || e?.message || 'Register failed.'
-        showNotification(text.length > 150 ? `${text.slice(0, 149)}…` : text, 'error')
+        // A timeout is NOT a confirmed failure — the tx may still mine. Say so, dismissably.
+        if (e?.code === 'TIMEOUT') {
+          showNotification(
+            'Register DAO is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.',
+            'warning',
+          )
+        } else {
+          const text = e?.userMessage || e?.shortMessage || e?.reason || e?.message || 'Register failed.'
+          showNotification(text.length > 150 ? `${text.slice(0, 149)}…` : text, 'error')
+        }
         throw e
       }
     },

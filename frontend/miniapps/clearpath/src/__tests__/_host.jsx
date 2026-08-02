@@ -36,6 +36,7 @@ class StubHostError extends Error {
 }
 
 const ACCOUNT = '0x00000000000000000000000000000000000000a1'
+const TX_HASH = '0xabcdef0000000000000000000000000000000000000000000000000000001234'
 
 /** An in-memory stand-in for the namespaced host store, with the same never-throws contract. */
 function makeStore(initial = {}) {
@@ -51,6 +52,14 @@ export function makeHost(over = {}) {
   const chainId = over.chainId ?? 63
   const receipt = over.receipt ?? { status: 1, logs: [] }
   const store = over.store ?? makeStore(over.storeData)
+
+  /*
+   * ONE PROVIDER PER CHAIN, with a STABLE identity — the real host guarantees this (it caches the
+   * guard wrapper per underlying provider), and a stub that handed back a fresh object per call
+   * would make every effect keyed on the provider re-run on every render. That is not a test
+   * artifact: it is an infinite loop, and it is how the real host's own instability was found.
+   */
+  const providers = new Map()
 
   const wallet = {
     address: ACCOUNT,
@@ -79,7 +88,9 @@ export function makeHost(over = {}) {
       const kind = over.proposed ? 'proposed' : 'sent'
       const result = {
         kind,
-        txHash: kind === 'sent' ? '0xdead' : null,
+        // A realistic 32-byte hash: surfaces abbreviate it (`0xabcd…1234`), and a short stub value
+        // would make those assertions read as nonsense.
+        txHash: kind === 'sent' ? (over.txHash ?? TX_HASH) : null,
         safeTxHash: kind === 'proposed' ? '0xsafe' : null,
       }
       Object.defineProperty(result, 'wait', { enumerable: false, value: async () => receipt })
@@ -91,7 +102,12 @@ export function makeHost(over = {}) {
   return Object.freeze({
     appId: 'clearpath',
     wallet: Object.freeze(wallet),
-    readProvider: over.readProvider ?? (() => ({ call: vi.fn(async () => '0x'), getBlockNumber: vi.fn(async () => 1) })),
+    readProvider: over.readProvider ?? ((forChain = chainId) => {
+      if (!providers.has(forChain)) {
+        providers.set(forChain, { call: vi.fn(async () => '0x'), getBlockNumber: vi.fn(async () => 1) })
+      }
+      return providers.get(forChain)
+    }),
     contracts: over.contracts ?? ((name, forChain = chainId) => {
       if (!DECLARED.includes(name)) {
         throw new StubHostError('undeclared_contract', `"${name}" is not declared`, 'Not approved to use that contract.')
@@ -99,7 +115,9 @@ export function makeHost(over = {}) {
       return DEPLOYMENTS[name]?.[forChain] ?? null
     }),
     network: over.network ?? ((forChain = chainId) => NETWORKS[forChain] ?? null),
-    networks: over.networks ?? (() => Object.freeze([63])),
+    // A realistic cohort, not just the connected chain: ClearPath is network-agnostic, and the
+    // app filters this roster itself into the chains it can actually operate on.
+    networks: over.networks ?? (() => Object.freeze([1, 63, 137])),
     store,
     audit: over.audit ?? { log: vi.fn() },
     toast: over.toast ?? { show: vi.fn() },

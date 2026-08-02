@@ -11,54 +11,76 @@ vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current 
 const REGISTRY = '0xb85dbc899472756470ef4033b9637ff8fa2fd23d' // lowercase → ethers.isAddress passes (no checksum)
 const HASH = '0xabcdef0000000000000000000000000000000000000000000000000000001234'
 
-const h = vi.hoisted(() => ({ showNotification: vi.fn(), registerExternalDAO: vi.fn() }))
-
-// Keep ethers.isAddress real; stub only Contract so the write goes to our fake. Contract is invoked with `new`,
-// so the mock implementation must be a real (constructable) function, not an arrow.
-vi.mock('ethers', async (importOriginal) => {
-  const actual = await importOriginal()
-  function FakeContract() {
-    return { registerExternalDAO: (...a) => h.registerExternalDAO(...a) }
-  }
-  return { ...actual, ethers: { ...actual.ethers, Contract: vi.fn(FakeContract) } }
-})
-
+// The write goes through `host.wallet.submit` now — there is no signer-bound contract to stub, and
+// no rail branching in the app at all. What is asserted is the toast CONTRACT the member sees.
 describe('useClearPath.registerExternalDAO notifications (spec 030 / US3)', () => {
-  beforeEach(() => vi.clearAllMocks())
+  let toast
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    window.localStorage.clear()
+    toast = resetHost().toast.show
+  })
 
   it('fires confirm → submitted (persistent) → confirmed (with tx hash)', async () => {
-    h.registerExternalDAO.mockResolvedValue({ hash: HASH, wait: vi.fn().mockResolvedValue({}) })
     const { result } = renderHook(() => useClearPath())
     expect(result.current.isSupported).toBe(true)
     await act(async () => {
       await result.current.registerExternalDAO({ dao: REGISTRY, framework: 0, label: 'Olympia' })
     })
-    expect(h.showNotification).toHaveBeenCalledWith('Register DAO: confirm in your wallet…', 'info', 0)
-    expect(h.showNotification).toHaveBeenCalledWith('Register DAO submitted — awaiting confirmation…', 'info', 0)
-    expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('Registered Olympia. · tx 0xabcd…1234'), 'success')
+    expect(hostRef.current.wallet.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ to: expect.any(String), data: expect.stringMatching(/^0x/), chainId: 63 }),
+    )
+    expect(toast).toHaveBeenCalledWith('Register DAO: confirm in your wallet…', 'info')
+    expect(toast).toHaveBeenCalledWith('Register DAO submitted — awaiting confirmation…', 'info')
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('Registered Olympia. · tx 0xabcd…1234'), 'success')
+  })
+
+  it('reports a vault action as PROPOSED, never as registered', async () => {
+    resetHost({ proposed: true })
+    toast = hostRef.current.toast.show
+    const { result } = renderHook(() => useClearPath())
+    await act(async () => {
+      await result.current.registerExternalDAO({ dao: REGISTRY, framework: 0, label: 'Olympia' })
+    })
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/proposed — it needs the vault/i), 'info')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('Registered Olympia'), 'success')
   })
 
   it('surfaces a failure as an error toast and rethrows', async () => {
-    h.registerExternalDAO.mockRejectedValue(new Error('boom'))
+    resetHost({ wallet: { submit: vi.fn(async () => { throw new Error('boom') }) } })
+    toast = hostRef.current.toast.show
     const { result } = renderHook(() => useClearPath())
     await act(async () => {
       await expect(
         result.current.registerExternalDAO({ dao: REGISTRY, framework: 0, label: 'X' })
       ).rejects.toThrow('boom')
     })
-    expect(h.showNotification).toHaveBeenCalledWith('boom', 'error')
+    expect(toast).toHaveBeenCalledWith('boom', 'error')
   })
 
   it('treats a confirmation timeout as a "may still confirm" warning (not a failure) and rethrows', async () => {
-    const timeoutErr = Object.assign(new Error('wait for transaction timeout'), { code: 'TIMEOUT' })
-    h.registerExternalDAO.mockResolvedValue({ hash: HASH, wait: vi.fn().mockRejectedValue(timeoutErr) })
+    // `SubmitResult.wait()` takes no timeout, so the APP imposes one — the host waits through the
+    // member's read endpoint, a different endpoint from the one the wallet broadcast through, so a
+    // wait that never resolves is a real possibility and would orphan the persistent toast.
+    const timeoutErr = Object.assign(new Error('confirmation timed out'), { code: 'TIMEOUT' })
+    resetHost({
+      wallet: {
+        submit: vi.fn(async () => {
+          const r = { kind: 'sent', txHash: HASH, safeTxHash: null }
+          Object.defineProperty(r, 'wait', { enumerable: false, value: () => Promise.reject(timeoutErr) })
+          return Object.freeze(r)
+        }),
+      },
+    })
+    toast = hostRef.current.toast.show
     const { result } = renderHook(() => useClearPath())
     await act(async () => {
       await expect(
         result.current.registerExternalDAO({ dao: REGISTRY, framework: 0, label: 'Olympia' })
-      ).rejects.toThrow('wait for transaction timeout')
+      ).rejects.toThrow('confirmation timed out')
     })
-    expect(h.showNotification).toHaveBeenCalledWith(expect.stringContaining('taking longer than expected'), 'warning', 0)
-    expect(h.showNotification).not.toHaveBeenCalledWith(expect.stringContaining('Registered'), 'success')
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('taking longer than expected'), 'warning')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('Registered'), 'success')
   })
 })

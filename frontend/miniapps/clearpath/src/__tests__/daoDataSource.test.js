@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => ({ endpoint: null, fetchProposals: vi.fn() }))
 
-vi.mock('../../../config/clearpath/daoSubgraphs', () => ({
+vi.mock('../config/daoSubgraphs', () => ({
   subgraphEndpointFor: () => h.endpoint,
 }))
 vi.mock('../connectors', () => ({
@@ -12,7 +12,7 @@ vi.mock('../connectors', () => ({
 }))
 
 import { resolveDataSource, fetchDaoProposals } from '../daoDataSource'
-import { hostRef, resetHost } from './_host'
+import { hostRef } from './_host'
 vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 const base = { chainId: 1, address: '0xdao', framework: 0, reader: {}, opts: {} }

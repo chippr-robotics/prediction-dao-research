@@ -11,7 +11,6 @@ vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current 
 // never disables). No mock data in the product — the tests mock the hook/connector to drive the components
 // deterministically.
 
-const switchChainAsync = vi.fn().mockResolvedValue({})
 
 // A stable reader instance — `readerFor` must return the SAME reference across renders (like the real hook's
 // cached provider), or an effect keyed on `reader` identity re-fires every render and loops forever.
@@ -37,7 +36,6 @@ vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 // ExternalDaoView (rendered within) now reads sendCalls/loginMethod/chainId from useWallet (passkey rail +
 // switch-to-act gating); these tests drive the classic signer-prop path on the SAME chain as the DAO (63) by
 // default — a `mockReturnValue` override lets one test move the wallet to a different chain.
-const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
 
 const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn(), detectTreasuryFunding: vi.fn() }
 vi.mock('../governorConnector', () => ({
@@ -57,8 +55,11 @@ vi.mock('../governorConnector', () => ({
 }))
 // Spec 042 — ExternalDaoView reads/acts through the connector resolver + data-source router; mock those with the
 // same fakes so the live tracking view renders deterministically.
-vi.mock('../connectors', () => ({
-  getConnector: () => ({
+// STABLE CONNECTOR INSTANCE. The real `getConnector` returns from a static per-framework map, so
+// its result has a fixed identity; a mock that built a fresh object per call made `connector` a
+// changing dependency of the view's effects, which re-ran, set state, re-rendered — an infinite
+// loop that exhausted the heap rather than failing an assertion.
+const CONNECTOR = {
     framework: 0,
     readSummary: (...a) => conn.readGovernorSummary(...a),
     readTreasuries: (...a) => conn.readTreasuries(...a),
@@ -71,7 +72,9 @@ vi.mock('../connectors', () => ({
     queue: vi.fn(),
     execute: vi.fn(),
     propose: vi.fn(),
-  }),
+}
+vi.mock('../connectors', () => ({
+  getConnector: () => CONNECTOR,
   detectFramework: () => Promise.resolve(0),
 }))
 vi.mock('../daoDataSource', () => ({
@@ -103,7 +106,7 @@ describe('ClearPathPanel (spec 030/042, network-agnostic)', () => {
     cp.isSupported = true
     cp.chainId = 63
     cp.chainIds = [63]
-    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 })
+    resetHost({ chainId: 63 })
     cp.listExternalDAOs.mockResolvedValue([olympiaRecord])
     conn.readGovernorSummary.mockResolvedValue({ clockMode: 'mode=blocknumber' })
     conn.fetchGovernorProposals.mockResolvedValue({ ok: true, proposals: [], scannedFrom: 16000000, scannedTo: 16500000, partial: false })
@@ -190,11 +193,12 @@ describe('ClearPathPanel (spec 030/042, network-agnostic)', () => {
     // Two networks in scope; the wallet is connected to the OTHER one (137, not the DAO's own 63).
     cp.chainId = 137
     cp.chainIds = [63, 137]
-    useWalletMock.mockReturnValue({ loginMethod: 'injected', sendCalls: undefined, chainId: 137 })
+    // The wallet lives on the HOST now, so moving it is a host reset rather than a hook mock.
+    resetHost({ chainId: 137 })
     const user = userEvent.setup()
     render(<ClearPathPanel />)
     await user.click(await screen.findByText('Olympia DAO'))
-    expect(await screen.findByRole('button', { name: /^switch to ethereum classic mordor$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^switch to mordor$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /vote for/i })).toBeDisabled()
   })
 
@@ -253,7 +257,11 @@ describe('ClearPathPanel (spec 030/042, network-agnostic)', () => {
     await user.click(screen.getByRole('tab', { name: /register/i }))
     await user.type(screen.getByLabelText(/governor address/i), OLYMPIA)
     await user.click(screen.getByRole('button', { name: /^validate$/i }))
-    expect(await screen.findByText(/Recognized governance contract/i)).toBeInTheDocument()
+    // The line is assembled from JSX interpolations, so it lives across several text nodes —
+    // match on the element's whole textContent rather than on one node.
+    expect(
+      await screen.findByText((_t, el) => /Recognized .* contract/i.test(el?.textContent || '') && el?.className === 'cp-ok'),
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /register dao/i }))
     await waitFor(() =>
       expect(cp.trackDAO).toHaveBeenCalledWith(
