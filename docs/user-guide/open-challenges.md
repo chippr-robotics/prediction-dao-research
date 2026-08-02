@@ -13,7 +13,9 @@ code."*
 > **home screen is the create-a-challenge view itself** — an amount keypad, a memo, and
 > a resolution choice (either side settles, a third-party arbitrator, or an oracle where
 > available). "Accept a challenge" and "My rewards" sit alongside it. Every other wager
-> type (1v1, Make an Offer, group pools) lives in the **Wagers** section from the menu.
+> type (1v1, Make an Offer, group pools) lives under **Transfer → Wagers** — the same
+> place you send and bridge money, because a wager is the third thing you can do with it.
+> (It used to be its own **Wagers** menu entry; old `/wagers` links still take you there.)
 
 ## How it works at a glance
 
