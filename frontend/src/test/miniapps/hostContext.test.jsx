@@ -41,6 +41,7 @@ const state = vi.hoisted(() => ({
   captureTx: null,
   captureLog: null,
   captureState: null,
+  screenOne: null,
 }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }))
@@ -51,6 +52,10 @@ vi.mock('../../hooks/useUI', () => ({
   useNotification: () => ({ showNotification: state.showNotification }),
 }))
 vi.mock('../../utils/rpcProvider', () => ({ getReadProvider: (chainId) => state.getReadProvider(chainId) }))
+// STABLE identity, like the real hook's `useCallback`. A fresh arrow per render would churn the
+// host object on every render and defeat the memoization the contract promises.
+const screeningApi = { screenOne: (...args) => state.screenOne(...args) }
+vi.mock('../../hooks/useAddressScreening', () => ({ useAddressScreening: () => screeningApi }))
 vi.mock('../../data/ledger/sources/miniAppSource', () => ({
   captureMiniAppTxSubmitted: (...args) => state.captureTx(...args),
   captureMiniAppLog: (...args) => state.captureLog(...args),
@@ -100,6 +105,7 @@ beforeEach(() => {
     loginMethod: 'injected',
     signer: { sendTransaction: vi.fn() },
     sendCalls: vi.fn(async () => ({ txHash: '0xbatch' })),
+    switchNetwork: vi.fn(async () => true),
   }
   state.effective = { address: ACCOUNT, connectedAddress: ACCOUNT, chainId: null }
   state.active = {
@@ -116,6 +122,8 @@ beforeEach(() => {
   state.captureTx = vi.fn(() => 'entry-tx')
   state.captureLog = vi.fn(() => 'entry-log')
   state.captureState = vi.fn(() => 'entry-state')
+  // Screening defaults to a positive 'clear'; individual tests make it restrict or fail.
+  state.screenOne = vi.fn(async () => 'clear')
 })
 
 describe('the exposed surface (FR-013)', () => {
@@ -127,7 +135,9 @@ describe('the exposed surface (FR-013)', () => {
       ['appId', 'audit', 'contracts', 'navigate', 'network', 'readProvider', 'store', 'toast', 'wallet'].sort(),
     )
     expect(Object.keys(ref.current.wallet).sort()).toEqual(
-      ['address', 'chainId', 'connectedAddress', 'isConnected', 'requestConnect', 'submit'].sort(),
+      // `switchChain` (hostApi 2) is the companion to submit's WRONG_CHAIN refusal — without it an
+      // app can name the problem and never offer the fix.
+      ['address', 'chainId', 'connectedAddress', 'isConnected', 'requestConnect', 'submit', 'switchChain'].sort(),
     )
     expect(Object.keys(ref.current.store).sort()).toEqual(['get', 'set', 'subscribe'])
     expect(Object.keys(ref.current.audit)).toEqual(['log'])
@@ -487,6 +497,105 @@ describe('wallet.submit routing and audit (FR-019)', () => {
     it('reports a testnet as a testnet', () => {
       const { ref } = mountHost()
       expect(ref.current.network(80002).isTestnet).toBe(true)
+    })
+  })
+
+  /*
+   * Screening is enforced HERE and not delegated to packages. FairWins' own contracts carry an
+   * on-chain sanctions guard, but a mini-app's whole point is calling contracts FairWins did not
+   * write, where none exists — and a package asked to call a screening function can simply not.
+   */
+  describe('sanctions screening (hostApi 2)', () => {
+    it('screens the ACTING account live before touching any rail', async () => {
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: null }
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      // The acting identity, not the connected one — a vault is what moves the value.
+      // `force` because a cached 'clear' would hide an account deny-listed since page load.
+      expect(state.screenOne).toHaveBeenCalledWith(VAULT, CHAIN, { force: true })
+    })
+
+    it('REFUSES a restricted account with a typed error, and never submits', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.SANCTIONED_ACCOUNT)
+      expect(error.userMessage).toMatch(/restricted by sanctions screening/i)
+      expect(state.active.submit).not.toHaveBeenCalled()
+    })
+
+    it('audits a screening refusal, so the trail shows why nothing was sent', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch(() => {})
+
+      expect(state.captureLog).toHaveBeenCalledWith(
+        ACCOUNT, CHAIN,
+        expect.objectContaining({ refs: expect.objectContaining({ reason: 'sanctioned_account' }) }),
+      )
+    })
+
+    it('ALLOWS on an uncertain result — an unreachable screener is not a finding', async () => {
+      // Treating uncertainty as a restriction would invent a compliance result the data does not
+      // support, which is the same class of lie as fabricating a clear one.
+      state.screenOne = vi.fn(async () => 'uncertain')
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).kind).toBe('sent')
+    })
+
+    it('ALLOWS when the screener throws outright', async () => {
+      state.screenOne = vi.fn(async () => { throw new Error('screening endpoint down') })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).kind).toBe('sent')
+    })
+
+    it('screens the passkey rail too — the rail is chosen after the check', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      state.wallet = { ...state.wallet, loginMethod: 'passkey', signer: null }
+      const { ref } = mountHost()
+
+      await expect(ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).rejects.toThrow(/restricted/i)
+      expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('wallet.switchChain (hostApi 2)', () => {
+    it('asks the wallet to move, and resolves when it does', async () => {
+      const { ref } = mountHost()
+      await ref.current.wallet.switchChain(63)
+      expect(state.wallet.switchNetwork).toHaveBeenCalledWith(63)
+    })
+
+    it('refuses with a typed error when the member declines', async () => {
+      state.wallet = {
+        ...state.wallet,
+        switchNetwork: vi.fn(async () => { throw new Error('Please manually switch to Mordor in your wallet') }),
+      }
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.switchChain(63).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.SWITCH_REFUSED)
+      // The wallet's own sentence is already member-facing; it is kept rather than replaced.
+      expect(error.userMessage).toMatch(/manually switch to Mordor/i)
+    })
+
+    it('refuses a session that cannot switch at all', async () => {
+      state.wallet = { ...state.wallet, switchNetwork: undefined }
+      const { ref } = mountHost()
+      const error = await ref.current.wallet.switchChain(63).catch((e) => e)
+      expect(error.reason).toBe(HOST_REFUSAL.SWITCH_REFUSED)
+      expect(error.userMessage).toMatch(/switch it manually/i)
+    })
+
+    it('refuses a chain id it cannot read', async () => {
+      const { ref } = mountHost()
+      const error = await ref.current.wallet.switchChain('not-a-chain').catch((e) => e)
+      expect(error.reason).toBe(HOST_REFUSAL.BAD_PAYLOAD)
+      expect(state.wallet.switchNetwork).not.toHaveBeenCalled()
     })
   })
 

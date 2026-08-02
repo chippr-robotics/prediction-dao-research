@@ -25,10 +25,12 @@ or launch is refused.
     chainId: number | null,
     isConnected: boolean,
     submit(payload: { to, data?, value?, chainId }): Promise<SubmitResult>,
+    switchChain(chainId: number): Promise<void>,  // hostApi 2 — asks the wallet to move
     //  - routes through the active account (signer / passkey UserOp / Safe proposal / legacy key)
     //  - host auto-audits every call (miniapp_tx_submitted)
     //  - rejects when wallet absent or wrong network, with a typed error the app must surface
     //  - RESOLVES AT BROADCAST, NOT CONFIRMATION — see "Submission is not confirmation"
+    //  - SCREENS the acting account for sanctions first; a positive restriction refuses
     requestConnect(): void             // opens the host connect modal
   },
   readProvider(chainId?: number): Provider,   // spec-069-resolved read provider; default = wallet chain
@@ -95,6 +97,29 @@ empty string, and an app must not have to know both spellings.
 never handles"). An unknown chain is `null`, **not** the default network: an app must be able
 to say "unknown network", and must never render one chain's explorer link against another
 chain's data.
+
+## Sanctions screening is the HOST's, not yours
+
+`submit` screens the **acting account** before it touches any rail, and refuses
+`sanctioned_account` on a positive restriction. Your app does nothing — and cannot opt out.
+
+That placement is deliberate. FairWins' own contracts carry an on-chain sanctions guard, but a
+mini-app's whole purpose is calling contracts FairWins did not write, where none exists. Screening
+in the app layer would be optional in practice: a package that simply never calls a screening
+function is unscreened, and the packages most worth screening are the least likely to cooperate.
+
+**Uncertainty allows.** Only a positive `restricted` refuses; an unreachable screening endpoint
+yields `uncertain` and the transaction proceeds. Treating uncertainty as a restriction would invent
+a compliance finding the data does not support. The read is forced live at submit time, so an
+account deny-listed since the page loaded is still caught.
+
+## Asking the wallet to switch networks
+
+`wallet.switchChain(chainId)` is the companion to `submit`'s `wrong_chain` refusal — without it an
+app can name the problem and never offer the fix, which matters for anything that browses across
+chains. It grants no authority: switching still requires the member's explicit approval in their
+own wallet, and a declined prompt is a typed `switch_refused` rather than a silent no-op, so your
+button can return to the right state.
 
 ## Submission is not confirmation
 
@@ -165,5 +190,7 @@ identifier, `txHash` is `null`.
 | All gateways unreachable | Availability message; retry affordance |
 | Wallet absent / wrong network on `submit` | Typed rejection; host directs user |
 | Session offers no write rail (no signer, no `sendCalls`) | Typed rejection `no_write_rail` — distinct from "no wallet" and from "locked" |
+| Acting account is sanctions-restricted | Typed rejection `sanctioned_account`; nothing is sent |
+| `switchChain` declined, or wallet cannot switch | Typed rejection `switch_refused` |
 | `contracts(name)` for an undeclared name | Typed rejection `undeclared_contract` — never `null`, which would read as "not deployed" |
 ```

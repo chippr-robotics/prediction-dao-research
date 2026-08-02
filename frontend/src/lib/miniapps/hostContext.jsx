@@ -64,6 +64,7 @@ import { useWallet } from '../../hooks/useWalletManagement'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useNotification } from '../../hooks/useUI'
+import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { getReadProvider } from '../../utils/rpcProvider'
 import { NETWORKS } from '../../config/networks'
 import { getContractAddressForChain } from '../../config/contracts'
@@ -109,6 +110,14 @@ export const HOST_REFUSAL = Object.freeze({
    * resolve this" can never be mistaken for "it is not deployed here".
    */
   UNDECLARED_CONTRACT: 'undeclared_contract',
+  /**
+   * Sanctions screening returned a positive restriction for the acting account.
+   * Distinct from every other refusal because the member cannot resolve it by
+   * reconnecting, switching, or retrying.
+   */
+  SANCTIONED_ACCOUNT: 'sanctioned_account',
+  /** `switchChain` was declined in the wallet, or the wallet cannot reach that chain. */
+  SWITCH_REFUSED: 'switch_refused',
 })
 
 /**
@@ -454,7 +463,9 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
     loginMethod,
     signer,
     sendCalls,
+    switchNetwork,
   } = useWallet()
+  const { screenOne } = useAddressScreening()
   const { address, connectedAddress, chainId: identityChainId } = useEffectiveAccount()
   const { isVault, isLegacy, canActAsVault, canActAsLegacy, submit: submitAsActive } = useActiveAccount()
   const { showNotification } = useNotification()
@@ -593,6 +604,43 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
       const value = toWeiValue(payload.value)
 
       /*
+       * SANCTIONS SCREENING, ENFORCED HERE AND NOT DELEGATED.
+       *
+       * FairWins' own contracts carry an on-chain `ISanctionsGuard`, but a mini-app's whole point
+       * is that it calls contracts FairWins did not write — an external Governor, a third-party
+       * router — where no such guard exists. Screening in the app layer would be optional in
+       * practice: a package that simply never calls a screening function is unscreened, and the
+       * packages most worth screening are the least likely to cooperate. The host cannot be
+       * skipped, so the check belongs here.
+       *
+       * FAIL-OPEN ON UNCERTAINTY, BY POLICY. Only a POSITIVE `restricted` refuses. An unreachable
+       * screening endpoint yields `uncertain`, and treating that as a restriction would invent a
+       * compliance finding the data does not support — the same rule the address book and the
+       * external-DAO surfaces already follow. `force: true` because a submission-time screen has
+       * to be a live read: an account deny-listed since the page loaded must still be refused.
+       */
+      let screening = 'uncertain'
+      try {
+        screening = await screenOne(address, requestedChain, { force: true })
+      } catch {
+        screening = 'uncertain'
+      }
+      if (screening === 'restricted') {
+        safeAudit(() =>
+          captureMiniAppLog(address, requestedChain, {
+            appId,
+            kind: HOST_AUDIT_KIND.TX_FAILED,
+            refs: { to: to.toLowerCase(), reason: 'sanctioned_account' },
+          }),
+        )
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SANCTIONED_ACCOUNT,
+          `miniapp host: acting account ${address} is restricted by sanctions screening`,
+          { userMessage: 'This wallet is restricted by sanctions screening and cannot send transactions.' },
+        )
+      }
+
+      /*
        * THE TWO WRITE RAILS.
        *
        * FairWins has two ways to send a transaction and they are not
@@ -714,12 +762,58 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
       loginMethod,
       signer,
       sendCalls,
+      screenOne,
     ],
   )
 
   const requestConnect = useCallback(() => {
     if (typeof openConnectModal === 'function') openConnectModal()
   }, [openConnectModal])
+
+  /**
+   * Ask the member's wallet to move to `chainId` (hostApi 2).
+   *
+   * The companion to `submit`'s WRONG_CHAIN refusal: without it an app can name the problem and
+   * never offer the fix, which matters for anything that browses across chains (an external-DAO
+   * list, a multi-chain portfolio) where the interesting network is routinely not the connected
+   * one. `wagmi`'s `useSwitchChain` is unreachable from a package — a bundled copy of wagmi is a
+   * different provider context — so the host has to do it.
+   *
+   * It grants no new authority. Switching networks already requires the member's explicit
+   * approval in their own wallet; this only asks. A declined prompt is a typed refusal, not a
+   * silent no-op, because the app has to be able to leave its button in the right state.
+   */
+  const switchChain = useCallback(
+    async (requestedChainId) => {
+      const target = evmChainId(requestedChainId)
+      if (target == null) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          `miniapp host: switchChain() needs an EVM chain id, got ${String(requestedChainId)}`,
+          { userMessage: 'This app asked to switch to a network the wallet does not recognise.' },
+        )
+      }
+      if (typeof switchNetwork !== 'function') {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SWITCH_REFUSED,
+          'miniapp host: this wallet session cannot switch networks',
+          { userMessage: 'This wallet cannot switch networks from inside the app — switch it manually.' },
+        )
+      }
+      try {
+        await switchNetwork(target)
+      } catch (error) {
+        // Declining is the common case and is not an error worth a stack trace; the wallet's own
+        // sentence ("Please manually switch to …") is already member-facing, so it is kept.
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SWITCH_REFUSED,
+          `miniapp host: switch to chain ${target} did not complete: ${error?.message || 'unknown'}`,
+          { userMessage: error?.message || `Switch your wallet to network ${target} to continue.` },
+        )
+      }
+    },
+    [switchNetwork],
+  )
 
   const readProvider = useCallback(
     (requestedChainId) => {
@@ -902,6 +996,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
       isConnected: Boolean(isConnected && address),
       submit,
       requestConnect,
+      switchChain,
     })
     // Frozen: the app receives a capability set, not an object it can re-point.
     // Everything reachable from here is a wrapper — no context, no router, no
@@ -925,6 +1020,7 @@ export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS
     isConnected,
     submit,
     requestConnect,
+    switchChain,
     readProvider,
     contracts,
     network,
