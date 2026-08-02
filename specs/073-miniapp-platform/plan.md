@@ -23,8 +23,11 @@ apps receive a restricted host context (active-account `submit`, namespaced
 under a new `miniapp` class, toasts, navigation). AdminPanel's Compliance group gains
 a curator review tab; a developer submission surface creates Pending records. The
 service worker adds a content-addressed package cache (cache-first, verification still
-on every launch). Token Mint converts first, then ClearPath, then (after refactor
-prerequisites) Wagers. Full decisions with rationale: [research.md](./research.md).
+on every launch). Token Mint converts first, then ClearPath. **Wagers does not convert** —
+scoping found 69% of its file closure shared with the host-retained home and trade
+surfaces, so it moved into Finance ▸ Transfer instead (see the FR-030 amendment in
+[spec.md](./spec.md) and tasks.md T030–T033). Full decisions with rationale:
+[research.md](./research.md).
 
 ## Technical Context
 
@@ -95,8 +98,8 @@ tools/miniapp-build/                    # shared Vite build preset: externals �
 frontend/
 ├── miniapps/
 │   ├── token-mint/                     # phase 1 conversion (from components/tokens/)
-│   ├── clearpath/                      # phase 2 conversion (from components/clearpath/)
-│   └── wagers/                         # phase 3 conversion (after refactor prerequisites)
+│   └── clearpath/                      # phase 2 conversion (from components/clearpath/)
+│                                       # (no wagers/ — see the FR-030 amendment)
 ├── src/lib/miniapps/
 │   ├── registryClient.js               # paged reads via getReadProvider(miniAppChainId())
 │   ├── manifest.js                     # manifest schema parse/validate
@@ -130,11 +133,12 @@ into the app, and `src/` code cannot deep-import them either.
 3. **Catalog + workspace surfaces** (US1): nav/tab/route, deep-link aliases, honest-degradation states.
 4. **Review + submission surfaces** (US3/US4): admin tab + curator role wiring, SubmitAppPanel.
 5. **PWA package cache** (US6): SW cache + eviction, relaunch fast-path.
-6. **Conversions** (US2): Token Mint → ClearPath (store migration) → Wagers (refactor prerequisites first; `/wagers` stays host-native until its phase completes — catalog stays honest, R11).
+6. **Conversions** (US2): Token Mint → ClearPath (store migration). Wagers was dropped from the conversion set once its shared-closure was measured; it moved into Finance ▸ Transfer and `/wagers` redirects there. The catalog never lists it, so it never claims a package that does not exist (R11's honesty rule, applied to absence).
 
 ## Complexity Tracking
 
 No constitution violations to justify. Two watched risks, mitigations chosen for
 simplicity: CSP change is confined to adding `blob:` to `script-src` (gated by config
-test, R1); Wagers conversion risk is isolated by making it the final phase behind
-explicit refactor tasks rather than stretching the runtime contract to fit it (R11).
+test, R1); Wagers conversion risk was isolated by making it the final phase behind explicit
+refactor tasks (R11) — and when that phase measured the cost, the answer was not to stretch
+the runtime contract to fit Wagers but to not convert it at all.

@@ -62,7 +62,9 @@
 
 ## Phase 4: User Story 2 — First-Party Apps Become Mini-Apps (P1)
 
-**Goal**: Token Mint, ClearPath, then Wagers delivered through the standard pipeline; legacy deep links keep resolving; catalog never lies about what is a verified package (R11 phasing).
+**Goal**: Token Mint and ClearPath delivered through the standard pipeline; legacy deep links keep resolving; catalog never lies about what is a verified package (R11 phasing).
+
+**Wagers is NOT converted** — see T030–T033 below.
 
 **Independent Test**: quickstart §7 per app + §4.6 deep links.
 
@@ -70,12 +72,40 @@
 - [x] T027 [US2] Token Mint cutover: alias `?tab=tokens` → `/apps/token-mint` in `TAB_ALIASES` (`frontend/src/pages/WalletPage.jsx` AND `frontend/src/components/nav/AppNavDrawer.jsx`, kept in parity), remove the `tokens` render branch, publish/seed the package in dev; parity + deep-link tests `frontend/src/test/miniapps/tokenMintConversion.test.jsx`
 - [x] T028 [US2] Convert ClearPath: move `frontend/src/components/clearpath/` + `frontend/src/config/clearpath/` into `frontend/miniapps/clearpath/`; migrate `trackedDaoStore.js` from raw `window.localStorage` to the namespaced host store (one-time client migration preserving `(chainId, account)` data); `daoSource.js` notification adapter stays host-side; scope `clearpath.css`
 - [x] T029 [US2] ClearPath cutover: alias `?tab=clearpath` → `/apps/clearpath` (both alias sites), remove render branch, publish/seed; parity + migration tests `frontend/src/test/miniapps/clearpathConversion.test.jsx`
-- [ ] T030 [US2] Wagers refactor prerequisite — extract `TradePanel` (used by the non-Apps `trade` tab) and `HomeScreen`'s imports (`MyMarketsModal`, `PolymarketTickerCrawler`, `UnifiedLookupModal`) out of `frontend/src/components/fairwins/` into host-retained locations (e.g. `frontend/src/components/trade/`, `frontend/src/components/home/`) with no behavior change; existing tests updated in place
-- [ ] T031 [US2] Wagers refactor prerequisite — scope `FriendMarketsProvider` (currently global in `frontend/src/main.jsx`) so the wagers tree receives it without a global mount requirement (provider wrapper inside the wagers entry, host keeps it only where still consumed)
-- [ ] T032 [US2] Convert Wagers: move the remaining `frontend/src/components/fairwins/` wager tree (Dashboard + modals + create/accept flows) into `frontend/miniapps/wagers/` on the host context; build + publish
-- [ ] T033 [US2] Wagers cutover: `/wagers` route in `frontend/src/App.jsx` redirects to `/apps/wagers` (drawer `WAGERS_ITEM` updated in `frontend/src/config/appNav.js`); until T032 lands the catalog lists Wagers as launching the host-native surface (honest label); parity tests `frontend/src/test/miniapps/wagersConversion.test.jsx`
+### Wagers — converted to a Transfer view instead of a mini-app (T030–T033 superseded)
 
-**Checkpoint**: all three apps launch from the catalog through the verified pipeline; SC-006 parity workflows pass
+T030–T033 planned to extract the wager tree into `frontend/miniapps/wagers/`. **That is not being
+done.** Scoping the extraction produced the measurement that killed it:
+
+```
+/wagers page closure : 32 files
+home + trade closure : 28 files
+SHARED BY BOTH       : 22 files  (69%)
+```
+
+The shared set is the *core* wager UI — `WagerCard`, `WagerList`, `WagerTable`, `wagerVm`, and the
+create / accept / resolve flows. The cause is structural, not incidental: **`HomeScreen` is itself a
+wager surface** (it imports `CreateChallengePanel`, `PayPanel`, `RequestPanel` directly) and
+`App.jsx` renders it at `/`. A package is frozen at an immutable CID and may not import from
+`frontend/src/`, so converting Wagers means the host keeps one copy of those 22 files and the
+package carries another. Every wager fix would become two edits plus a re-publish, and the two
+copies would drift — which is worse for members than not converting at all.
+
+T030/T031 were the prerequisites for exactly that extraction, so they retire with it. The three
+alternatives that would have created a real seam (rebuild HomeScreen without wager surfaces; move
+HomeScreen into the package; duplicate the 22 files) were each a bigger or worse change than the
+conversion was worth.
+
+**What shipped instead**: Wagers moved into **Finance ▸ Transfer** as a third view beside Transfer
+and Bridge — all three are ways money leaves that section (send it, move it across networks, stake
+it against a counterparty). It stays host-native, so nothing is duplicated and nothing drifts.
+
+- [x] T030 [US2] ~~Wagers refactor prerequisite — extract `TradePanel` / `HomeScreen` imports~~ — **retired**, see above
+- [x] T031 [US2] ~~Wagers refactor prerequisite — scope `FriendMarketsProvider`~~ — **retired**, see above (it stays global in `frontend/src/main.jsx`, which is correct now that the wager tree stays host-side)
+- [x] T032 [US2] ~~Convert Wagers to `frontend/miniapps/wagers/`~~ — **superseded**: Wagers is a view of the Transfer section (`WAGERS_VIEW` / `WAGERS_PATH` in `frontend/src/config/appNav.js`, rendered by `frontend/src/components/wallet/PayTransferPanel.jsx`), tenant-gated on the existing `wagers` manifest feature
+- [x] T033 [US2] Wagers cutover: `/wagers` in `frontend/src/App.jsx` redirects to `/wallet?tab=paytransfer&view=wagers` (the legacy link stays live — it is in bookmarks and shared links); `WAGERS_ITEM` removed from the drawer splice in `frontend/src/components/nav/AppNavDrawer.jsx`; `WagersPage.jsx` deleted; the catalog never lists Wagers, so it never claims a package that does not exist; tests `frontend/src/test/wagers/wagersInTransfer.test.jsx`
+
+**Checkpoint**: Token Mint and ClearPath launch from the catalog through the verified pipeline; SC-006 parity workflows pass; Wagers reachable at its new view and via the legacy route
 
 ---
 
@@ -145,7 +175,7 @@ Phase 1 (T001–T003) ──► Phase 2 (T004–T014) ──► US1 (T015–T025
                                               │                  ├─► US4 (T037–T039)  [T038 needs T015]
                                               │                  ├─► US5 (T040–T042)  [needs T020–T022]
                                               │                  └─► US6 (T043–T044)  [needs T018]
-US2 internal: T026→T027; T028→T029; T030,T031→T032→T033
+US2 internal: T026→T027; T028→T029. (T030–T033 retired: Wagers became a Transfer view, not a package.)
 Phase 9 last (T048 may run any time after T005).
 ```
 
@@ -159,4 +189,4 @@ US3–US6 are mutually independent once US1 is done; US2 conversion pairs are in
 
 ## Implementation Strategy
 
-**MVP** = Phases 1–3 + T026–T027 (US1 with Token Mint as the first real catalog entry): proves registry → publish → verify → mount end-to-end with one converted app. Then deliver US2 conversions incrementally (ClearPath next, Wagers last behind its refactor prerequisites T030/T031 — `/wagers` stays host-native and honestly labeled until T033), with US3/US4 landing the governance surfaces and US5/US6 hardening. Each phase checkpoint maps to a quickstart section, so every increment is independently demonstrable.
+**MVP** = Phases 1–3 + T026–T027 (US1 with Token Mint as the first real catalog entry): proves registry → publish → verify → mount end-to-end with one converted app. Then deliver US2 conversions incrementally (ClearPath next; Wagers was dropped from the conversion set — 69% of its file closure is shared with the host-retained home and trade surfaces, so it moved into Finance ▸ Transfer instead), with US3/US4 landing the governance surfaces and US5/US6 hardening. Each phase checkpoint maps to a quickstart section, so every increment is independently demonstrable.

@@ -8,9 +8,8 @@ import Footer from '../Footer'
 import {
   HOME_ITEM,
   PORTFOLIO_ITEM,
-  WAGERS_ITEM,
+  WAGERS_VIEW,
   NAV_GROUPS,
-  isNavItemEnabledForTenant,
   pathForNavItem,
   visibleNavGroups,
 } from '../../config/appNav'
@@ -30,7 +29,8 @@ import './AppNavDrawer.css'
 // (T029) — only in the conversion tasks that actually publish those packages, and not
 // before: an alias pointing at a mini-app nobody has registered turns a working deep link
 // into a dead end, and the catalog would be claiming a verified package that does not exist.
-// `/wagers` is untouched for the same reason (its conversion is T033, explicitly last — R11).
+// Wagers is NOT in this map and never will be — it did not become a package (see WAGERS_VIEW in
+// config/appNav.js); it moved into Finance ▸ Transfer, and `/wagers` redirects there from App.jsx.
 // This map must stay in parity with the copy in pages/WalletPage.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
@@ -41,37 +41,19 @@ const TAB_ALIASES = { swap: 'trade', backup: 'security' }
  */
 const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 
-// The label of the group Wagers is spliced into, below.
-const APPS_GROUP_LABEL = 'Apps'
-
-// The drawer list = a top "Quick Access" group (Home, Portfolio) + the section
-// groups, with Wagers moved down into the Apps group (it keeps its absolute
-// /wagers route). Built per render because item visibility is chain-aware
-// (spec 055: Collectibles hides entirely on networks OpenSea doesn't serve or
-// with no gateway configured).
+// The drawer list = a top "Quick Access" group (Home, Portfolio) + the section groups. Built per
+// render because item visibility is chain-aware (spec 055: Collectibles hides entirely on networks
+// OpenSea doesn't serve or with no gateway configured).
 //
-// Wagers is spliced in here rather than declared in NAV_GROUPS because it is not a
-// `/wallet?tab=` section — which also means it is not carried by that model's tenant
-// filter. Since spec 073 the Apps group holds exactly one item gated on the `miniapps`
-// feature, so on a tenant without mini-apps the group disappears from NAV_GROUPS entirely.
-// Re-adding the group for Wagers when that happens is what stops a mini-app feature flag
-// from silently deciding whether Wagers is reachable from the menu: a tenant with wagers and
-// no mini-apps still gets its Wagers entry, and a tenant with neither gets no Apps group.
+// Wagers used to be spliced into the Apps group here, because it was an absolute `/wagers` route
+// rather than a `/wallet?tab=` section and so was not carried by NAV_GROUPS' tenant filter. That
+// splice is gone: Wagers is now a view inside Finance ▸ Transfer (spec 073), reached through the
+// Transfer entry NAV_GROUPS already carries, and gated by PayTransferPanel on the same `wagers`
+// tenant feature. One fewer place for the menu and the routes to disagree.
 function buildDrawerGroups(visibility) {
-  const sections = visibleNavGroups(visibility, NAV_GROUPS)
-  const wagers = isNavItemEnabledForTenant(WAGERS_ITEM.id) ? [WAGERS_ITEM] : []
-  const withWagers = sections.map((group) =>
-    group.label === APPS_GROUP_LABEL
-      ? { ...group, items: [...wagers, ...group.items] }
-      : group,
-  )
-  const hasAppsGroup = withWagers.some((group) => group.label === APPS_GROUP_LABEL)
   return [
     { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM] },
-    ...withWagers,
-    ...(!hasAppsGroup && wagers.length > 0
-      ? [{ label: APPS_GROUP_LABEL, items: wagers }]
-      : []),
+    ...visibleNavGroups(visibility, NAV_GROUPS),
   ]
 }
 
@@ -86,8 +68,11 @@ function resolveActiveId(location) {
   if (pathname === '/app' || pathname === '/main' || pathname === '/fairwins') {
     return HOME_ITEM.id
   }
+  // `/wagers` redirects to the Transfer section (App.jsx). Resolved here anyway so the menu
+  // highlights Transfer for the render that happens BEFORE the redirect commits, rather than
+  // flashing nothing selected.
   if (pathname === '/wagers') {
-    return WAGERS_ITEM.id
+    return WAGERS_VIEW.tab
   }
   // A mounted mini-app (`/apps/<slug>`, spec 073) IS the Apps section — the workspace is
   // where a catalog launch lands. Highlighting the catalog entry keeps the menu pointing at

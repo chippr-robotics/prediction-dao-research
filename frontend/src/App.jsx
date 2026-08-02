@@ -13,7 +13,7 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 // Main flow
 import LandingRoute from './components/LandingRoute'
 import HomeScreen from './components/fairwins/HomeScreen'
-import WagersPage from './components/fairwins/WagersPage'
+import { WAGERS_PATH } from './config/appNav'
 import Header from './components/Header'
 import Footer from './components/Footer'
 
@@ -153,7 +153,12 @@ function AppContent() {
           <Route path="/app" element={<HomeScreen />} />
           <Route path="/main" element={<HomeScreen />} />
           <Route path="/fairwins" element={<HomeScreen />} />
-          <Route path="/wagers" element={<WagersPage />} />
+          {/* Wagers moved into Finance ▸ Transfer (spec 073) — it sits beside Transfer and
+              Bridge because all three are ways money leaves this section. `/wagers` stays a
+              live route rather than being deleted: it is on printed cards, saved links and
+              bookmarks, and a redirect costs nothing where a 404 costs a member their way in.
+              `replace` so Back returns where they came from instead of bouncing off it. */}
+          <Route path="/wagers" element={<Navigate to={WAGERS_PATH} replace />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/vouchers" element={<VouchersPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />

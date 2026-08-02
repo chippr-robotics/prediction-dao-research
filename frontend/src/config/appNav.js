@@ -21,10 +21,27 @@ export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 // is absent from the Finance group's bottom icon nav (see groupForTab).
 export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'trending' }
 
-// Wagers (spec 053) — the relocated create-types + actions grid. Like Home, it is an absolute
-// top-level route (not a `/wallet?tab=` section); it lives in the drawer's Apps group
-// (see AppNavDrawer's DRAWER_GROUPS).
-export const WAGERS_ITEM = { id: 'wagers', label: 'Wagers', icon: 'ticket', to: '/wagers' }
+/*
+ * Wagers — a VIEW inside Finance ▸ Transfer, not a nav item of its own.
+ *
+ * It was an absolute `/wagers` route spliced into the drawer's Apps group (spec 053), and spec 073
+ * planned to convert it into a mini-app package (T030–T033). Both are now superseded: creating a
+ * wager is moving money to a counterparty under conditions, which is the same family of action as
+ * a same-chain send and a cross-network bridge — so it belongs BESIDE them, as a third view of the
+ * Transfer section, rather than as a separate destination members have to know to go looking for.
+ *
+ * It is deliberately NOT re-added to `RAW_NAV_GROUPS`: a nav ITEM is a section, and a section owns
+ * a `?tab=`. Wagers owns a `?view=` within one. `groupForTab('wagers')` therefore stays null (no
+ * mobile bottom bar claims it as a sibling), and the only thing this constant governs is where
+ * `pathForNavItem('wagers')` and the legacy `/wagers` redirect point.
+ *
+ * `tab` is the section that hosts it; `view` is PayTransferPanel's own `?view=` id. Both live here
+ * so the route helper, the redirect, and the panel cannot drift into disagreeing about the URL.
+ */
+export const WAGERS_VIEW = { id: 'wagers', label: 'Wagers', tab: 'paytransfer', view: 'wagers' }
+
+/** The canonical location of the Wagers view — the one place that URL is spelled out. */
+export const WAGERS_PATH = `/wallet?tab=${WAGERS_VIEW.tab}&view=${WAGERS_VIEW.view}`
 
 import { isFeatureEnabled } from './tenant'
 
@@ -34,6 +51,9 @@ import { isFeatureEnabled } from './tenant'
 // nav and groups — never present-but-broken. The default tenant enables every
 // feature, so its nav is unchanged.
 const NAV_FEATURE_IDS = {
+  // Still listed although Wagers is no longer a nav item: the id → feature mapping stays in one
+  // place, and PayTransferPanel asks `isNavItemEnabledForTenant('wagers')` before offering the
+  // view — so a tenant without wagers gets no Wagers tab and `?view=wagers` falls back to Transfer.
   wagers: 'wagers',
   earn: 'earn',
   trade: 'swap',
@@ -131,10 +151,12 @@ export const NAV_GROUPS = RAW_NAV_GROUPS
   .map((group) => ({ ...group, items: group.items.filter((item) => isNavItemEnabledForTenant(item.id)) }))
   .filter((group) => group.items.length > 0)
 
-// Path a section item navigates to. Home and Wagers have their own absolute routes.
+// Path a section item navigates to. Home keeps its absolute route; Wagers resolves to its view
+// inside the Transfer section, so anything that still builds a link from the `wagers` id (saved
+// routes, notification deep links) lands where the surface actually lives now.
 export function pathForNavItem(id) {
   if (id === HOME_ITEM.id) return HOME_ITEM.to
-  if (id === WAGERS_ITEM.id) return WAGERS_ITEM.to
+  if (id === WAGERS_VIEW.id) return WAGERS_PATH
   return `/wallet?tab=${id}`
 }
 

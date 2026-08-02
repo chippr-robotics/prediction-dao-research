@@ -5,15 +5,29 @@ import TransferActivityList from './TransferActivityList'
 import BridgeView from './BridgeView'
 import BridgeStatusList from './BridgeStatusList'
 import BridgeUnavailableNotice from './BridgeUnavailableNotice'
+import Dashboard from '../fairwins/Dashboard'
 import InfoTip from '../ui/InfoTip'
 import { BRIDGE_UNAVAILABLE_REASON } from '../../hooks/useBridgeAvailability'
 import { bridgeGatewayUrl } from '../../lib/bridge/acrossQuotes'
 import { BRIDGE_AREA_DESC, BRIDGE_TIPS } from '../../lib/bridge/bridgeCopy'
+import { WAGERS_VIEW, isNavItemEnabledForTenant } from '../../config/appNav'
 import './PayTransfer.css'
+
+/*
+ * Wagers sits with the two other ways money leaves this section, ahead of Activity — the tabs read
+ * actions-then-history, and a wager is an action.
+ *
+ * It is TENANT-GATED, unlike its neighbours. Transfer and Bridge are core platform surfaces every
+ * tenant gets; wagers is an optional manifest feature (spec 072), so on a tenant without it the tab
+ * is ABSENT rather than present-and-broken — and because `?view=` only accepts ids that are in this
+ * list, a saved `?view=wagers` link for that tenant falls back to Transfer on its own.
+ */
+const WAGERS_ENABLED = isNavItemEnabledForTenant(WAGERS_VIEW.id)
 
 const TABS = [
   { id: 'transfer', label: 'Transfer' },
   { id: 'bridge', label: 'Bridge' },
+  ...(WAGERS_ENABLED ? [{ id: WAGERS_VIEW.view, label: WAGERS_VIEW.label }] : []),
   { id: 'activity', label: 'Activity' },
 ]
 
@@ -30,6 +44,11 @@ const TAB_IDS = TABS.map((t) => t.id)
  * Spec 067 FR-004 adds a third tab, Bridge, BESIDE Send and Activity — the same-chain send flow is
  * untouched and stays the default tab. The active tab is derived from `?view=` (the EarnPanel idiom)
  * so `/wallet?tab=paytransfer&view=bridge` is a direct link and back/forward keep working.
+ *
+ * Wagers joined the same row (spec 073): it was its own `/wagers` destination, and it is now the
+ * third way money leaves this section — send it, move it across networks, or stake it against a
+ * counterparty. `/wagers` redirects here so every saved link keeps working. Transfer is still the
+ * default view, so a member who came to send money sees the send form exactly as before.
  */
 export default function PayTransferPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -79,6 +98,14 @@ export default function PayTransferPanel() {
       {tab === 'bridge' && (
         <div role="tabpanel" aria-label="Bridge">
           <BridgeTab />
+        </div>
+      )}
+      {tab === WAGERS_VIEW.view && WAGERS_ENABLED && (
+        /* `pt-wagers` neutralises the page-level chrome Dashboard carries for its old absolute
+           route (its own padding + a full-height scroll region) — the same thing HomeScreen.css
+           does for the home surface. The component itself is untouched. */
+        <div role="tabpanel" aria-label="Wagers" className="pt-wagers">
+          <Dashboard />
         </div>
       )}
       {tab === 'activity' && (

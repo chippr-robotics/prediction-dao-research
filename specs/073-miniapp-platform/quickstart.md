@@ -60,7 +60,8 @@ Validate in the browser:
 5. **Update honesty**: `submitUpdate` with a new CID → status Pending, but launch still
    serves the previously approved package; `approveApp` → new version serves.
 6. **Deep links**: `/wallet?tab=tokens` and `?tab=clearpath` land on the corresponding
-   mini-app (or catalog entry); `/wagers` still resolves.
+   mini-app (or catalog entry); `/wagers` still resolves — it redirects to
+   `/wallet?tab=paytransfer&view=wagers` (Wagers is a Transfer view, not a mini-app).
 7. **Review tab** (`/admin` → Compliance → Mini-App Review, curator account): Pending
    queue shows metadata + fetch/hash verification result; approve/suspend/deprecate
    controls absent for non-curator accounts.
@@ -93,5 +94,7 @@ new version. Host update prompt behavior unchanged (existing `PwaUpdateNotificat
 - ClearPath: register/track an external DAO, open a proposal view; verify tracked DAOs
   survived migration into the namespaced store and appear in backup
   (`syncedObjects` `miniAppState`).
-- Wagers (final phase): dashboard renders, create + accept flows work; `/wagers`
-  redirects to the mini-app only after its conversion phase completes.
+- Wagers (NOT a mini-app — see the FR-030 amendment in spec.md): open
+  Finance ▸ Transfer ▸ Wagers; the quick-action grid renders and the create + accept flows
+  work exactly as they did at `/wagers`, which now redirects here. Wagers must NOT appear
+  in the catalog — it is not a package, and listing it would be the catalog claiming one.

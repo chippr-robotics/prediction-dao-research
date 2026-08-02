@@ -171,12 +171,14 @@ unreachable, per the file's own contract).
   `/wallet?tab=apps` (Catalog panel: search, six category filters, app cards, developer
   submission entry point). New tenant feature id `miniapps` gates it
   (`tenants/features.json` + `NAV_FEATURE_IDS`); first-party catalog entries also honor
-  their existing per-app feature ids (`clearpath`, `token-mint`, `wagers`).
+  their existing per-app feature ids (`clearpath`, `token-mint`). The `wagers` feature id
+  still gates Wagers, but now as a view of the Transfer section rather than a catalog entry.
 - Launch mounts at absolute route `/apps/:appId` (workspace) inside `AppLayout`, wrapped
   in an error boundary (FR-015) with unmount/remount-safe state (FR-016, R8 store).
 - Legacy deep links (FR-009): `TAB_ALIASES` (WalletPage + AppNavDrawer, kept in parity)
   gains redirect handling so `?tab=clearpath` → `/apps/clearpath`, `?tab=tokens` →
-  `/apps/token-mint`; `/wagers` continues to resolve (see R11 phasing).
+  `/apps/token-mint`. `/wagers` continues to resolve — as a redirect to
+  `?tab=paytransfer&view=wagers`, not to a mini-app (see R11).
 - Compliance review: AdminPanel **Compliance** group gains a `miniapp-review` tab
   (`adminNav.js` + the three-edit AdminPanel pattern), gated by a new
   `ROLES.MINIAPP_CURATOR` whose authority is read from the registry contract itself
@@ -207,13 +209,23 @@ Conversion order follows measured entanglement:
 2. **ClearPath** (~2.8k LOC, mostly self-contained) — second; its raw-localStorage
    `trackedDaoStore` migrates to the namespaced host store (fixing a known
    backup-registry gap), and its notification adapter (`daoSource.js`) stays host-side.
-3. **Wagers** (~13.5k LOC, entangled: global `FriendMarketsProvider` in `main.jsx`,
-   `TradePanel` shared with the Trade tab, `HomeScreen` imports) — **explicitly the last
-   phase**, preceded by refactor tasks that split shared pieces (TradePanel, HomeScreen
-   dependencies) out of `components/fairwins/` and scope the provider. Until that phase
-   lands, `/wagers` keeps serving the host-native surface and the catalog lists Wagers
-   as launching there — the catalog never lies about what is a verified package
-   (Constitution III).
+3. **Wagers** (~13.5k LOC) — planned as the last phase behind refactor tasks that would
+   split the shared pieces out of `components/fairwins/`. **Outcome: not converted.** The
+   phasing worked exactly as intended — deferring it meant the cost was measured before it
+   was paid. The measurement: **22 of the 32 files in the `/wagers` closure (69%) are shared**
+   with the host-retained home and trade surfaces, including `WagerCard`, `WagerList`,
+   `WagerTable`, `wagerVm`, and the create/accept/resolve flows. The entanglement is
+   structural rather than incidental — `HomeScreen`, which `App.jsx` renders at `/`, is
+   itself a wager surface (it imports `CreateChallengePanel`, `PayPanel`, `RequestPanel`) —
+   so no refactor short of rebuilding the home screen produces a seam. Since a package
+   cannot import from `frontend/src/` and is frozen at an immutable CID, converting would
+   leave the host and the package each holding a copy of those 22 files, drifting apart one
+   wager fix at a time.
+
+   Wagers therefore moved into **Finance ▸ Transfer**, beside Transfer and Bridge, and stays
+   host-native. It is never listed in the catalog, which is the same honesty rule
+   (Constitution III) read the other way: the catalog does not claim a package that does not
+   exist. `/wagers` redirects to the new view so every saved link keeps working.
 
 **Dev/test honesty**: local development serves *built, hashed* packages from a Vite
 middleware ("dev gateway") through the same loader/verification path — no mock loader

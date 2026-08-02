@@ -24,7 +24,7 @@
  */
 import { useEffect } from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 import { WalletContext, UIContext } from '../../contexts'
@@ -250,12 +250,14 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=apps')
   })
 
-  it('keeps Wagers in the group on its own absolute route', () => {
-    // Wagers is not a `/wallet?tab=` section and its conversion is last (T033) — the rewire must
-    // not have disturbed it.
+  it('offers no Wagers entry — it is a view inside Transfer now, reached through that entry', () => {
+    // Wagers did not become a package (T030–T033 retired); it moved into Finance ▸ Transfer. The
+    // drawer used to splice it into this group, and that splice must be gone, not merely repointed:
+    // a menu entry beside Apps that lands on a sub-view of Transfer would highlight neither.
     renderDrawer()
-    fireEvent.click(screen.getByRole('button', { name: 'Wagers' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/wagers')
+    expect(screen.queryByRole('button', { name: 'Wagers' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=paytransfer')
   })
 
   it('highlights Apps while a mini-app workspace is mounted', () => {
@@ -270,10 +272,16 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     expect(screen.getByRole('button', { name: 'Apps' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('leaves /wagers highlighting Wagers, not Apps', () => {
+  it('highlights Transfer — not Apps — for the legacy /wagers route and for the view it redirects to', () => {
+    // The redirect is App.jsx's job; the drawer resolves the pre-redirect render too, so the menu
+    // never flashes with nothing selected on the way through.
     renderDrawer('/wagers')
-    expect(screen.getByRole('button', { name: 'Wagers' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Transfer' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Apps' })).not.toHaveAttribute('aria-current')
+
+    cleanup()
+    renderDrawer('/wallet?tab=paytransfer&view=wagers')
+    expect(screen.getByRole('button', { name: 'Transfer' })).toHaveAttribute('aria-current', 'page')
   })
 })
 
@@ -322,11 +330,16 @@ describe('Apps is absent for a tenant without the miniapps feature', () => {
       </MemoryRouter>
     )
     expect(screen.queryByRole('button', { name: 'Apps' })).toBeNull()
-    // Wagers lives on its own route and is spliced into this group by the drawer, so a mini-app
-    // feature flag must not decide whether it is reachable from the menu.
-    expect(screen.getByRole('button', { name: 'Wagers' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Wagers' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/wagers')
+    /*
+     * A mini-app feature flag must not decide whether WAGERS is reachable. That used to need
+     * defending in the drawer, which spliced Wagers into this very group and so had to re-create
+     * the group when the flag removed it. Wagers now rides Finance ▸ Transfer — a core item no
+     * tenant flag touches — so the property holds by construction. Asserted anyway, because it is
+     * the property that matters and the next person to reorganise the menu should trip this test
+     * rather than discover it from a member.
+     */
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=paytransfer')
   })
 
   it('falls the ?tab=apps deep link back to Account instead of rendering an empty section', async () => {

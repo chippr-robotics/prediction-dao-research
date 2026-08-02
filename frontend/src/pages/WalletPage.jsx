@@ -72,9 +72,9 @@ const WALLET_TABS = [
 // Spec 073 (FR-009). The Apps nav group collapsed to the single mini-app catalog entry, and both
 // apps that used to live in it are packages now: `?tab=tokens` and `?tab=clearpath` REDIRECT to
 // `/apps/token-mint` (T027) and `/apps/clearpath` (T029) via TAB_REDIRECTS below, so saved deep
-// links land where the feature actually lives. `/wagers` is untouched — its conversion is T033,
-// explicitly last (R11), and redirecting before a package is registered turns a working link into
-// a dead end. This map must stay in parity with the copy in
+// links land where the feature actually lives. Wagers is absent from both maps and is NOT a
+// package: it moved into the Transfer section as `?tab=paytransfer&view=wagers`, and the legacy
+// `/wagers` route redirects there from App.jsx. This map must stay in parity with the copy in
 // components/nav/AppNavDrawer.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
