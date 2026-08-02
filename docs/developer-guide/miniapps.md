@@ -742,9 +742,18 @@ index stored *inside* the cache at an RFC 2606 `.invalid` host so it can never c
 gateway URL. Package URLs are classified by **shape** (`/ipfs/<cid>/<path>`, ≥3 segments), not by a
 gateway allowlist, because members bring their own nodes.
 
-The cache can neither execute poisoned bytes nor resurrect a suspended app: the loader re-verifies
-the manifest keccak and every file's SHA-256 after **every** retrieval, cached or not, and every
-launch re-reads the registry first.
+The cache can neither execute poisoned bytes nor resurrect a suspended app: after **every**
+retrieval, cached or not, the loader re-checks keccak(manifest bytes) against the chain and the
+SHA-256 of every byte it is about to execute or inject — the entry and the declared stylesheets.
+Every launch re-reads the registry first.
+
+Be precise about the scope, because it is narrower than "every file in the manifest" and
+deliberately so: a launch does not fetch files it will not use (`verifyAllDeclaredFiles` is `false`
+in `fetchVerifiedPackage`), since downloading unused assets would slow every launch and could refuse
+one over a file the host never runs. A curator review passes `true` and checks the whole package —
+"do the per-file digests match?" is a question about the package, not about the subset this host
+happens to execute. The invariant either way is that **nothing unverified ever runs**, not that
+everything declared is downloaded.
 
 ## hostApi versioning
 

@@ -300,7 +300,11 @@ artifacts live under `specs/<feature>/`.
   (5) **`blob:` in `script-src` is for mini-app packages ONLY** — verified bytes are imported from a
   Blob URL (R1). Never add `https:` to `script-src`. The SW package cache
   (`fairwins-miniapp-packages-v1`) is cache-first because CIDs are immutable, and is **not a trust
-  boundary**: the loader re-verifies manifest keccak + per-file sha256 after every retrieval.
+  boundary**: after every retrieval, cache or network, the loader re-checks keccak(manifest bytes)
+  against the chain and the sha256 of **every byte it executes or injects** — the entry and the
+  declared stylesheets. It does NOT fetch files it will not use (`verifyAllDeclaredFiles` is off for
+  a launch, on for a curator review), so do not restate this as "every file in the manifest": the
+  invariant is that nothing unverified ever runs, not that everything declared is downloaded.
   See `docs/developer-guide/miniapps.md` + `specs/073-miniapp-platform/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
