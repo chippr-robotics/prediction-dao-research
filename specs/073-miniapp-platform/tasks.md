@@ -163,7 +163,23 @@ it against a counterparty). It stays host-native, so nothing is duplicated and n
 - [x] T046 [P] Add the spec-073 guardrail entry to `CLAUDE.md` (registry chain rule, approved-tuple-only serving, blob:-only CSP rule, no privileged imports from `frontend/miniapps/`)
 - [x] T047 Accessibility pass on Catalog/Workspace/Review surfaces (axe/Lighthouse CI green, WCAG 2.1 AA)
 - [x] T048 Security review: run `.github/agents/smart-contract-security.agent.md` review over `contracts/apps/` + `contracts/interfaces/IMiniAppRegistry.sol`; Slither clean; document any accepted findings
-- [ ] T049 Full-suite gates: `npm test`, `npm run check:storage-layout`, CI frontend suite, `npm run tenants:validate`; quickstart executed end-to-end
+- [x] T049 Full-suite gates — all run 2026-08-02:
+  - `npm test` — 1079 passing, 4 pending. The 2 failures are both in `test/fork/`, gated on
+    `describe.skip` unless `POLYGON_RPC_URL` is set; the main CI workflow does not set it, so they
+    never run there. They ran locally only because `.env` sets it, unpinned to a fork block, which
+    makes the Chainalysis assertion depend on live sanctions-list state. No Solidity changed on this
+    branch. The dedicated `oracle-fork-tests.yml` workflow DOES set it from a secret, so they would
+    be red there — not investigated, out of scope for this spec.
+  - `npm run check:storage-layout` — green, and now actually checking: **26 live implementations
+    diffed across 7 chains** (it was diffing zero in CI before T048's rewrite), 4 declared
+    unverifiable with reasons.
+  - Full frontend suite — **557 files / 5690 tests, all passing** (`--pool=forks --maxWorkers=2`,
+    3 GB heap; the documented OOM was unbounded parallelism, not size). This run is what caught two
+    host hooks still importing the tree T028 moved, which every scoped run had missed.
+  - Frontend production build — succeeds (`VITE_PINATA_JWT= npx vite build`).
+  - `npm run tenants:validate` — 2 manifests valid.
+  - Quickstart — exercised against the live Mordor registry: catalog reads, the launchable/status
+    distinction, and a curator suspension (app id 1, the broken smoke-test listing).
 
 ---
 
