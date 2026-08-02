@@ -100,7 +100,10 @@ spec:
             - name: POLYMARKET_BUILDER_MAKER_FEE_BPS
               value: "0"
           resources:
-            limits: { cpu: "1", memory: 512Mi }
+          # Right-sized 2026-08-02: measured 30d p99 for the whole instance was 0.196 vCPU /
+          # 0.31 GiB against 2 vCPU + 1.25 GiB allocated. Container CPU must sum to a supported
+          # Cloud Run value (1/2/4/6/8) -> gateway 500m + engine 350m + redis 150m = exactly 1.
+            limits: { cpu: "500m", memory: 320Mi }
         # ---- sidecar: OZ Relayer engine (localhost:8080) ----
         - name: engine
           image: us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-engine:multichain-v1.5.0
@@ -133,7 +136,10 @@ spec:
           # ~25s boot would slow every cold start to ~26s. The engine still boots after redis;
           # gasless intents self-submit until it is up (never-stranded). Cold start: ~26s -> ~2s.
           resources:
-            limits: { cpu: 800m, memory: 512Mi }
+          # Right-sized 2026-08-02 (see the gateway container). cpu-throttling stays "false": the
+          # engine tracks inclusion and bumps gas between the SPA's 4s polls, so it needs CPU
+          # outside of requests. Revert to 800m if instance p99 exceeds 0.8 vCPU.
+            limits: { cpu: 350m, memory: 320Mi }
         # ---- sidecar: ephemeral redis (localhost:6379) ----
         - name: redis
           image: redis:7-alpine
@@ -145,7 +151,10 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 20
           resources:
-            limits: { cpu: 200m, memory: 256Mi }
+          # Right-sized 2026-08-02. Ephemeral by design (no persistence flags above), holds only
+          # in-flight engine state; 128Mi is ample. Legal below 512Mi because this service has no
+          # run.googleapis.com/execution-environment annotation (gen1). Adding gen2 invalidates it.
+            limits: { cpu: 150m, memory: 128Mi }
   traffic:
     - percent: 100
       latestRevision: true
