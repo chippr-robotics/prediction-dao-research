@@ -80,18 +80,36 @@ rather than trusting the date.
 | curator / admin / upgrader | all three on `0x52502d049571C7893447b86c4d8B38e6184bF6e1` | all three on the same EOA |
 | `getRoleAdmin(APP_CURATOR_ROLE)` | itself | itself |
 
-Mordor's three listings:
+Live listings, as of 2026-08-02. **Ids are per-registry** — Mordor was written to first, so the
+same two packages carry different ids on each chain. Never address a package by id across cohorts;
+resolve by name (`idByName`) or slug.
+
+Polygon 137 (`appCount() == 2`), both published 2026-08-02:
 
 | id | name | status | launchable | package |
 |---|---|---|---|---|
-| 1 | `Smoke 1785602984210` | Approved | yes | `bafybeihdwd…vyku` on-chain v2 — **a deploy smoke test (its on-chain description is literally "post-deploy verification", submitted 68s after the deploy block); its CID has no `manifest.json` (gateway 404)** |
+| 1 | Token Mint | Approved | yes | `bafybeiacl6…33bq` on-chain v1 (manifest `1.0.0`, `hostApi` 2) |
+| 2 | ClearPath | Approved | yes | `bafybeiglnx…efia` on-chain v1 (manifest `1.0.0`, `hostApi` 2) |
+
+Mordor 63 (`appCount() == 3`):
+
+| id | name | status | launchable | package |
+|---|---|---|---|---|
+| 1 | `Smoke 1785602984210` | **Suspended** | no | `bafybeihdwd…vyku` — a deploy smoke test, see below |
 | 2 | Token Mint | Approved | yes | `bafybeiacl6…33bq` on-chain v1 (manifest `1.0.0`, `hostApi` 2) |
 | 3 | ClearPath | Approved | yes | `bafybeiglnx…efia` on-chain v1 (manifest `1.0.0`, `hostApi` 2) |
 
-**Action item:** id 1 is exactly the failure mode this runbook warns about below — Approved,
-`launchable`, and unfetchable. Every testnet member sees it in the catalog and any launch fails
-at the gateway. Suspend it (`suspendApp(1)`); deprecate only if you accept that the name is then
-reserved forever, which for a junk name is fine.
+**Mordor id 1, resolved 2026-08-02.** It was a deploy smoke test (on-chain description literally
+"post-deploy verification", submitted 68 s after the deploy block) left **Approved and launchable
+with a CID that serves no `manifest.json`** — exactly the failure mode this runbook warns about
+below: every testnet member saw it in the catalog and every launch failed at the gateway. Suspended
+via `scripts/miniapps/suspend-app.js` (tx `0xac845147…`, block 16688955). Deprecation was avoided
+deliberately: it is terminal and would reserve the name forever.
+
+The record itself is permanent — nothing can delete it — which is why **no equivalent smoke write
+was ever made on Polygon**, and why the Polygon table above contains only real products. If you
+need post-deploy assurance on a mainnet registry, read (`appCount`, `minTier`, role checks); do not
+write.
 
 ---
 
@@ -391,6 +409,12 @@ MINIAPP_APPROVE=1 \
 npx hardhat run scripts/miniapps/submit-and-approve.js --network mordor
 ```
 
+The vendor must clear the tier gate first (§8) — `grant-vendor-tier.js` if the operator key holds
+`ROLE_MANAGER_ROLE`, otherwise a real purchase. Both first-party packages were published to
+**Polygon 137 on 2026-08-02** this way: Token Mint id 1, ClearPath id 2, both Approved and
+`launchable`. Ids are per-registry and Mordor was written first, so the same packages are ids 2
+and 3 there — **never address a package by id across cohorts**; resolve by name or slug.
+
 It fetches the manifest from a public gateway (Pinata, then ipfs.io, then cloudflare-ipfs.com)
 and aborts unless the wire bytes hash to `MINIAPP_MANIFEST_HASH`; calls `submitApp` or
 `submitUpdate` by `idByName`; and — with `MINIAPP_APPROVE=1` — checks `hasRole(APP_CURATOR_ROLE,
@@ -409,38 +433,46 @@ Statuses: `0` Pending · `1` Approved · `2` Suspended · `3` Deprecated.
 
 ## 8. Known blockers
 
-### Polygon publication is blocked on membership, not code
+### The vendor gate, and how the operator key clears it  *(resolved 2026-08-02)*
 
-`submitApp` on Polygon reverts `InsufficientMembershipTier` (`0xb83f500d`) for the operator key.
-The registry's vendor floor is **Silver (tier 2)** and `0x52502d…F6e1` holds **tier 0** on
-Polygon's MembershipManager `0xEfd1a880…D557a` (it holds Silver on Mordor). The gate is working
-exactly as designed.
+`submitApp` / `submitUpdate` gate on `getActiveTier(vendor, membershipRole) >= minTier()`. Both
+deployed registries set the floor at **Silver (tier 2)** on `WAGER_PARTICIPANT_ROLE`
+(`0x403988…a7fa`). A FairWins service account publishing first-party packages clears the same gate
+as any third party — there is no bypass, by design.
 
-Confirm before doing anything:
+Polygon publication was blocked on this until 2026-08-02: `0x52502d…F6e1` held **tier 0** on
+Polygon's MembershipManager `0xEfd1a880…D557a`. It was resolved by granting, not purchasing — the
+platform has no reason to buy a membership from itself, and the operator key already held
+`ROLE_MANAGER_ROLE` on that manager:
+
+```bash
+# reads the floor and the role off the registry, so it cannot drift from the gate it satisfies
+npx hardhat run scripts/miniapps/grant-vendor-tier.js --network polygon
+#   MINIAPP_VENDOR      vendor address (default: the signer)
+#   MINIAPP_GRANT_DAYS  duration in days (default 365)
+```
+
+Current grant: `0x52502d…F6e1`, Silver, **365 days from 2026-08-02** (tx `0x7e2358d1…`, block
+91313383). Re-running the script when it is already satisfied is a no-op read.
+
+**What expiry does and does not do.** `isLaunchable` is vendor + status + an approved CID — it
+does **not** read membership. An expired vendor grant therefore never takes a published app
+offline; it blocks the vendor's next `submitUpdate` with `InsufficientMembershipTier`. So the
+failure mode of forgetting to renew is a refused update with a clear revert, not a dark catalog.
+Check with:
 
 ```bash
 npx hardhat console --network polygon
 > const mm = await ethers.getContractAt('MembershipManager', '0xEfd1a880c6BfBf38A661A3F5fF6d5ECB296D557a')
-> await mm.getActiveTier('<vendor>', ethers.id('WAGER_PARTICIPANT_ROLE'))   // 0 None … 4 Platinum
+> await mm.getActiveTier('<vendor>', '0x403988147239f843e4645eff5d535d288767c3257f2d04762ecb5228d8e1a7fa')
 ```
 
-Three ways out, in the order they should be preferred:
-
-1. **Give the publishing address a real membership.** A purchase through the normal member flow,
-   or `grantMembership(user, WAGER_PARTICIPANT_ROLE, tier, durationDays)` from a key holding
-   `ROLE_MANAGER_ROLE` on the MembershipManager. `0x52502d…F6e1` *does* hold `ROLE_MANAGER_ROLE`
-   on the Polygon manager (read 2026-08-02), so it can grant itself the tier in one transaction —
-   which is exactly why this is a membership decision and not an engineering one.
-2. **Publish from a different vendor address that already holds Silver.** The vendor address is
-   recorded immutably per app, so choose it deliberately — there is no vendor rotation.
-3. **Lower the floor** — `setMembershipGate(manager, role, minTier)` from `DEFAULT_ADMIN_ROLE`.
-   Available, and the weakest option: the floor is what makes listing a deliberate act. Do not
-   set it to 0 to unblock one publish.
-
-Until this is resolved **Token Mint and ClearPath are unavailable to Polygon members**, because
-their host tabs are gone (`?tab=tokens` and `?tab=clearpath` redirect to `/apps/token-mint` and
-`/apps/clearpath`) and the Polygon catalog is empty. That is a member-visible gap, not a latent
-one.
+If the operator key ever loses `ROLE_MANAGER_ROLE` (it should, at multisig handoff — §6), the
+remaining options in order of preference are: purchase a membership through the normal member
+flow; publish from a different address that already holds Silver (**the vendor is recorded
+immutably per app and there is no rotation**, so choose deliberately); or lower the floor with
+`setMembershipGate(manager, role, minTier)` from `DEFAULT_ADMIN_ROLE` — available, and the weakest,
+because the floor is what makes listing a deliberate act. Never set it to 0 to unblock one publish.
 
 ### Other gaps, accepted and unfixed
 

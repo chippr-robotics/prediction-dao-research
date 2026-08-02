@@ -670,25 +670,32 @@ folded name is empty, already contains a hyphen (injectivity), or fails a round-
 
 ### Published today
 
-Mordor 63 carries **three** records (`appCount() == 3`), all Approved and all `launchable`:
+Both cohorts carry the same two first-party packages at v1.0.0, Approved and `launchable`.
+
+**Polygon 137** (`appCount() == 2`) — published 2026-08-02:
 
 | App | Id | CID | Manifest hash |
 |---|---|---|---|
-| `Smoke 1785602984210` | 1 | `bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku` | `0x1a8e89ca…5ba1bcef` |
-| Token Mint | 2 | `bafybeiacl6rrcqxt55gpkguekpa3uinzfbfyzigp4mrzzeek6gnlx433bq` | `0x5ec326f6…8c8b19ad` |
-| ClearPath | 3 | `bafybeiglnxswaxkdpvno6w7srohlcvc3clzqcydzu2umjomlga4i4jefia` | `0x7e511007…81caefdb` |
+| Token Mint | 1 | `bafybeiacl6rrcqxt55gpkguekpa3uinzfbfyzigp4mrzzeek6gnlx433bq` | `0x5ec326f6…8c8b19ad` |
+| ClearPath | 2 | `bafybeiglnxswaxkdpvno6w7srohlcvc3clzqcydzu2umjomlga4i4jefia` | `0x7e511007…81caefdb` |
 
-Token Mint and ClearPath are at package v1.0.0. **Id 1 is a deploy smoke test, not a product**, and
-it is stated here rather than quietly omitted: it is Approved and `launchable`, so every testnet
-member sees it in the catalog, and its CID serves no `manifest.json`, so every launch fails at the
-gateway. Suspending it is an open action item — see §1 of the
-[operator runbook](../runbooks/miniapp-registry-operations.md). It is also why the equivalent
-mainnet smoke write was deliberately not run: a junk listing is permanent, because names are never
-released and deprecation is terminal.
+**Mordor 63** (`appCount() == 3`):
 
-**Polygon has no published apps** (`appCount() == 0`). `submitApp` reverts
-`InsufficientMembershipTier` there: `minTier()` is 2 (Silver) and the deployer's
-`getActiveTier(deployer, WAGER_PARTICIPANT_ROLE)` reads 0.
+| App | Id | Status | CID |
+|---|---|---|---|
+| `Smoke 1785602984210` | 1 | **Suspended** | `bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku` |
+| Token Mint | 2 | Approved | `bafybeiacl6rrcqxt55gpkguekpa3uinzfbfyzigp4mrzzeek6gnlx433bq` |
+| ClearPath | 3 | Approved | `bafybeiglnxswaxkdpvno6w7srohlcvc3clzqcydzu2umjomlga4i4jefia` |
+
+The ids differ between cohorts because ids are per-registry and Mordor was written to first — never
+address a package by id across chains; resolve by name (`idByName`) or slug.
+
+**Mordor id 1 is a deploy smoke test, not a product**, and it is listed here rather than quietly
+omitted. It was left Approved and `launchable` while its CID serves no `manifest.json`, so for a
+while every testnet member saw a catalog card that could only ever fail at the gateway. It was
+suspended on 2026-08-02; the record itself is permanent, because names are never released and
+deprecation is terminal. That permanence is exactly why **no equivalent smoke write was made on
+Polygon** — and why the Polygon catalog above contains only real products.
 
 ## Integrity and serving
 
