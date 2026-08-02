@@ -6,8 +6,8 @@
   "identity": {
     "displayName": "FairWins",
     "legalName": "FairWins",
-    "tagline": "Your multi-chain financial control plane — your money, your keys, every chain.",
-    "metaDescription": "FairWins is a self-custody, multi-chain financial platform: payments, peer-to-peer wagers, prediction markets, collectibles, earning, swaps, bridging, Bitcoin, and multisig custody — one control plane, and you hold the keys.",
+    "tagline": "Enterprise-grade digital asset infrastructure — self-custody, multi-chain, white-label.",
+    "metaDescription": "FairWins is self-custody digital asset infrastructure: embedded wallets, policy-governed custody, payments and settlement, markets connectivity, and built-in compliance screening across major networks — available white-label under your own brand.",
     "domains": ["fairwins.app"],
     "appUrl": "https://fairwins.app",
     "docsUrl": "https://docs.FairWins.app",
@@ -27,7 +27,7 @@
     "logoMark": "/assets/fairwins_no-text_logo.svg",
     "favicon": "/assets/logo_fairwins.svg",
     "appleTouchIcon": "/assets/fairwins_no-text_logo.svg",
-    "htmlTitle": "FairWins - Multi-Chain Financial Platform",
+    "htmlTitle": "FairWins - Digital Asset Infrastructure",
     "pwa": {
       "name": "🍀FairWins",
       "shortName": "FairWins",

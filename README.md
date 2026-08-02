@@ -1,250 +1,129 @@
-# FairWins — Multi-Chain Financial Platform
+# FairWins — Digital Asset Infrastructure
 
-> A self-custody **financial control plane**: payments, peer-to-peer wagers,
-> prediction markets, collectibles, earning, swaps, bridging, Bitcoin, and
-> multisig custody — one app, many chains, and the member holds the keys the
-> whole time. Live at [fairwins.app](https://fairwins.app).
+> Self-custody digital asset infrastructure for modern financial products:
+> embedded wallets, policy-governed custody, payments and settlement, markets
+> connectivity, and built-in compliance — across major networks, available
+> **white-label** under your own brand. Live at [fairwins.app](https://fairwins.app).
 
-FairWins began as a peer-to-peer wager management layer. It has grown into a
-multi-chain platform where the wager escrow sits beside a full financial
-surface — while keeping the property it started with: **the platform never
-takes custody of member funds.** Every value-bearing action is signed by the
-member's own wallet (passkey smart account, browser/mobile wallet, or Safe
-multisig vault) against audited, deterministic-deployed contracts.
+FairWins is the platform layer a digital asset business would otherwise
+assemble from multiple vendors. One stack provides the wallet, custody,
+payment, trading, and compliance components — behind one interface, on
+audited, deterministically deployed smart contracts — with a property no
+aggregation of vendors gives you: **the platform never takes custody.** Every
+value-bearing action is signed by the end user's own keys (passkey smart
+account, external wallet, or multisig vault).
 
 📖 **Full documentation:** [docs/](docs/index.md) (MkDocs site — user guide,
 architecture, contract reference, runbooks)
 
-## The platform
+## Platform capabilities
 
-| Surface | What it does | Where |
-|---------|--------------|-------|
-| **Transfer** | Pay/request USDC like a payments app — QR codes, address book, gasless sends (EIP-3009 + relayer, spec 035/036) | All EVM networks |
-| **Wagers** | 1v1 wagers, open challenges, and group pools with smart-contract escrow and oracle/participant resolution | Polygon, Mordor/ETC |
-| **Predict** | Trade real Polymarket prediction markets, member wallet signs every order (spec 057) | Polygon |
-| **Collect** | NFT portfolio with live floors; list/sell via OpenSea (specs 055/056) | EVM mainnets |
-| **Earn** | Third-party lending vaults, liquid staking, supplied liquidity (specs 050/065/067) | Per-network |
-| **Swap** | DEX trading through the right venue per chain — Uniswap / ETCswap (spec 033) | Per-network |
-| **Bridge** | Cross-chain transfers via Across; unfilled deposits refund to the member (spec 067) | EVM mainnets |
-| **Bitcoin** | Native BTC wallet beside the EVM accounts — client-side keys, rotating addresses (spec 061) | Bitcoin |
-| **Protect** | Safe multisig custody vaults with an on-chain policy engine (specs 043/049/068) | Multi-chain |
-| **Recovery** | Encrypted backup/sync, legacy key recovery, asset sweeps (specs 032/062) | Client-side |
-| **ClearPath / Token Mint** | External DAO connections and token issuance (specs 028/030) | Per-network |
+| Capability | What it provides |
+|-----------|------------------|
+| **Embedded wallets** | Passkey (WebAuthn) ERC-4337 smart accounts — no seed phrases, optional sponsored gas — plus external wallets and hardware signers via WalletConnect |
+| **Custody & policy** | Safe multisig vaults with an on-chain policy engine: ordered rules, approver requirements, and thresholds enforced by contract, multi-chain |
+| **Payments & settlement** | Stablecoin transfer/request rails with QR flows, address book, and gasless (EIP-3009 + relayer) settlement |
+| **Portfolio & reporting** | Unified multi-chain portfolio (tokens, positions, NFTs) with a complete activity ledger and tax reporting |
+| **Markets connectivity** | Direct order flow into Polymarket prediction markets, plus escrowed peer-to-peer settlement with oracle resolution (Polymarket, Chainlink, UMA) |
+| **Trading & liquidity** | Per-network DEX execution (Uniswap, ETCswap), cross-chain bridging via Across (no-custody routers), supplied liquidity |
+| **Yield** | Third-party lending vaults, liquid staking, and reward claims — positions stay withdrawable |
+| **Bitcoin** | Native BTC wallet beside the EVM accounts: client-side key derivation, rotating addresses, hard fee ceilings |
+| **Collectibles** | NFT portfolio with live floors and OpenSea sell-side integration |
+| **Compliance** | Chainalysis sanctions screening enforced at the contract layer, jurisdiction gating at the edge, immutable audit records |
+| **Operations console** | Estate-wide reads across every network — balances, fees, roles, pauses — with honest `read / not-deployed / unreadable` state |
+| **Recovery** | End-to-end encrypted backup/sync, cross-device account recovery, legacy key import and asset sweeps |
 
-An **operations console** (spec 071) gives operators estate-wide reads across
-every chain — membership, fees, treasury, pauses — with honest
-`read / not-deployed / unreadable` states and single-chain writes.
+Every fee on the platform has one source of truth (an on-chain `FeeRouter`
+with per-service hard caps) and is disclosed to the user before signature.
 
-## White-label multi-tenant (spec 072)
+## White-label, multi-tenant
 
-FairWins is one tenant of its own platform. A **tenant manifest**
-(`tenants/<id>/manifest.json`) defines an instance's identity (brand, theme,
-domains), settings (features, chains, tiers, fees), and contract set:
+FairWins is delivered as **tenant instances**. A validated configuration
+manifest (`tenants/<id>/manifest.json`) defines an instance's identity (brand,
+theme, domains), settings (features, networks, membership tiers, fees), and
+contract set:
 
-- **Branding-only tenants** front the shared contract estate under their own
-  domain and brand.
-- **Dedicated tenants** get an isolated on-chain estate: tenant-salted CREATE2
-  deployments of the same audited contracts, recorded under
-  `deployments/tenants/<id>/`, with their own membership base, fee router,
-  treasury, and admin keys. Isolation is enforced by separate contract
-  instances — never by a frontend filter.
+- **Branding-only instances** front the shared contract estate under your
+  domain and brand — live in days.
+- **Dedicated instances** get an isolated on-chain estate: deterministic,
+  tenant-salted deployments of the same audited contracts, with your own
+  membership base, fee configuration, treasury, and admin keys. Isolation is
+  enforced by separate contract instances — never by an application filter.
 
-See `docs/developer-guide/white-label-tenants.md` and
-`docs/runbooks/tenant-operations.md`.
+One origin serves one tenant; an instance physically contains no other
+tenant's identity or addresses. See
+[White-Label Tenants](docs/developer-guide/white-label-tenants.md) and the
+[Tenant Operations runbook](docs/runbooks/tenant-operations.md).
 
-## The wager layer
+## Network coverage
 
-The original core, still central: private 1-v-1 wagers whose stakes are locked
-in escrow and settled by whoever the parties agreed to trust — themselves, a
-neutral arbitrator, or external oracles (Polymarket, Chainlink, UMA).
+| Network | Chain ID | Coverage |
+|---------|----------|----------|
+| Polygon | 137 | Full platform (primary network) |
+| Ethereum | 1 | Portfolio, custody, routers, bridge liquidity |
+| Optimism / Base / Arbitrum | 10 / 8453 / 42161 | Portfolio, custody, routers |
+| Ethereum Classic | 61 | Custody + DEX trading |
+| Bitcoin | — | Native wallet (portfolio / send / receive) |
+| Polygon Amoy / Mordor | 80002 / 63 | Test networks |
 
-### Eight resolution types
+## Security model
 
-| Type | Settled by |
-|------|-----------|
-| `Either` / `Creator` / `Opponent` | The participants themselves |
-| `ThirdParty` | A neutral arbitrator named at creation |
-| `Polymarket` | A linked Polymarket CTF condition |
-| `ChainlinkDataFeed` | A price feed threshold (GT/GTE/LT/LTE/EQ) |
-| `ChainlinkFunctions` | A custom off-chain computation via the DON |
-| `UMA` | An Optimistic Oracle V3 assertion |
-
-### Wager mechanics
-
-- **1v1 even-money or Make an Offer odds** — equal stakes, or asymmetric stakes
-  at a creator-set multiplier where the settler puts up the majority stake
-- **Open challenges** — post a wager with no named opponent, gated by a
-  four-word claim code; whoever you share the code with can take the other side
-- **Group pools** — multi-party wager pools resolved by a member-approved
-  payout matrix (spec 034)
-- **QR / deep-link sharing** — the opponent scans a code and accepts in-app
-- **Mutual draws** — both parties (or the arbitrator) can settle a push
-- **End-to-end encrypted terms** — envelope encryption (X-Wing post-quantum
-  hybrid KEM) with keys published in an on-chain `KeyRegistry`
-
-### Safety mechanisms
-
-- **Stake escrow** — both stakes locked in `WagerRegistry` until resolution
-- **Refund paths everywhere** — expired offers, declined wagers, and wagers
-  whose resolve deadline passes unresolved all return stakes; funds can never
-  get stuck
-- **Pull-based payouts** — the winner claims the pot; claims can't be redirected
-- **Sanctions screening** — `SanctionsGuard` checks the Chainalysis oracle on
-  every create and accept
-
-### Roles, tiers, and operator powers
-
-Wager participation requires a paid **Wager Participant** membership on
-`MembershipManager` (the default tier is **None** — no participation). The
-four-tier ladder is anchored at **$2 Bronze** in USDC:
-
-| Tier | Price | Wagers / month | Open wagers at once |
-|------|-------|----------------|---------------------|
-| None     | —    | 0         | 0         |
-| Bronze   | $2   | 15        | 5         |
-| Silver   | $8   | 30        | 10        |
-| Gold     | $25  | 100       | 30        |
-| Platinum | $100 | Unlimited | Unlimited |
-
-A membership can be **bought directly** (soulbound) or acquired by **redeeming
-a `MembershipVoucher`** — a transferable ERC-721 that is burned for the
-soulbound membership. Membership lives on one reference chain per environment
-(spec 071) and follows the member across networks.
-
-The operator team retains a narrow set of on-chain powers, each bound to a
-distinct OpenZeppelin AccessControl role (`GUARDIAN_ROLE`,
-`ACCOUNT_MODERATOR_ROLE`, `ROLE_MANAGER_ROLE`, `UPGRADER_ROLE`,
-`DEFAULT_ADMIN_ROLE`). See
-[Roles and Tiers](docs/system-overview/roles-and-tiers.md) for the full
-privilege matrix. **No role can move escrowed stakes.**
+1. **Self-custody, structurally** — no contract role or operator key can move
+   user funds; payouts are pull-based, and refund paths cover every timeout.
+   Policy guards for multisig vaults are deliberately non-upgradeable.
+2. **Deterministic deployments** — salted CREATE2 via the Safe Singleton
+   Factory; every address is recorded in-repo (`deployments/`, per-tenant
+   under `deployments/tenants/<id>/`) and version-pinned by consuming
+   services at startup.
+3. **Defense at every layer** — checks-effects-interactions, Slither/Medusa in
+   CI, storage-layout gates on upgrades, sanctions screening on value flows,
+   origin-locked serving, strict CSP.
+4. **Honest state** — fees disclosed before signature; absence rendered as
+   absence (never a zero); no mocked data in shipped paths. These rules are
+   binding: see `.specify/memory/constitution.md`.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        WagerRegistry                         │
-│   create · accept · declareWinner · draw · claim · refund    │
-└───────┬──────────────┬───────────────────────┬───────────────┘
-        │              │                       │
-        ▼              ▼                       ▼
-┌───────────────┐ ┌──────────────┐  ┌─────────────────────────┐
-│ Membership    │ │ Sanctions    │  │     Oracle adapters     │
-│ Manager       │ │ Guard        │  │ (IOracleAdapter)        │
-│ tiers, limits │ │ Chainalysis  │  │ Polymarket · Chainlink  │
-└───────────────┘ └──────────────┘  │ DataFeed · Functions ·  │
-                                    │ UMA OOv3                │
-┌───────────────┐  ┌──────────────┐ └─────────────────────────┘
-│ KeyRegistry   │  │ Membership   │  public keys (privacy) +
-│ (privacy)     │  │ Voucher      │  transferable ERC-721 voucher
-└───────────────┘  └──────────────┘  redeemed via MembershipManager
-```
+- **Contracts** (`contracts/`) — UUPS proxies at stable addresses for the
+  value-bearing registries (settlement engine, membership, fee router, token
+  factory, staking/bridge/liquidity routers), immutable clones for bearer
+  assets and per-group instances, non-upgradeable policy guards, ERC-4337
+  account stack, oracle adapters (Polymarket, Chainlink DataFeed/Functions,
+  UMA OOv3).
+- **Frontend** (`frontend/`) — React + Vite SPA, one build per tenant
+  instance, served by nginx on Cloud Run behind Cloudflare. No backend: state
+  lives on-chain, on IPFS, or client-side encrypted.
+- **Services** (`services/`) — optional per-tenant relay-gateway (gasless
+  intents + ERC-7677 paymaster with quotas and killswitch) and ERC-4337
+  bundler; The Graph subgraph for indexing.
+- **Tooling** (`scripts/`) — deterministic deploy scripts, tenant manifest
+  validation, frontend contract-artifact sync, operational runbooks under
+  `docs/runbooks/`.
 
-Around that core sit the platform contracts: `WagerPoolFactory` (group pools),
-`FeeRouter` (the single fee source of truth, spec 060), `CallsignRegistry`
-(optional naming, spec 054), `TokenFactory`, `StakingRouter`, `BridgeRouter` +
-`LiquidityRouter` (no-custody routers, spec 067), Safe policy guards
-(specs 049/068), and the ERC-4337 account stack (spec 041/050).
+Full picture: [Architecture guide](docs/developer-guide/architecture.md).
 
-`WagerRegistry` and `MembershipManager` are UUPS-upgradeable behind stable
-proxy addresses — logic is swappable in place while escrowed state is
-preserved (see [ADR 004](docs/adr/004-upgradeable-registry-uups.md)).
-
-Frontend: React + Vite SPA (no backend) served by nginx on Cloud Run behind
-Cloudflare, one build per tenant instance. Optional services: the
-relay-gateway (gasless intents + paymaster, per-tenant scoped) and subgraph.
-Deployed addresses are recorded in [`deployments/`](deployments/) (shared
-estate) and `deployments/tenants/<id>/` (dedicated tenant estates). Full
-picture: [Architecture guide](docs/developer-guide/architecture.md).
-
-## Quick Start
-
-### Installation
+## Quick start
 
 ```bash
 npm install
-npm run compile
-```
-
-### Run Tests
-
-```bash
-npm test                # contract suite
-npm run test:fork       # fork tests
-npm run test:coverage   # coverage
-npm run test:frontend   # frontend (Vitest)
+npm run compile          # contracts
+npm test                 # contract suite
+npm run test:frontend    # frontend (Vitest)
 npm run tenants:validate # tenant manifest validation
+npm run frontend         # run the app locally
 ```
 
-### Run the app locally
+To stand up an instance, see the
+[Tenant quickstart](specs/072-white-label-tenants/quickstart.md); to add
+integrations or contracts, see the
+[developer guide](docs/developer-guide/setup.md).
 
-```bash
-npm run frontend
-```
+## Development
 
-### Wager lifecycle (contract level)
-
-```solidity
-// Creator escrows their stake and defines the wager
-uint256 id = registry.createWager(
-    opponent, arbitrator, usdc,
-    creatorStake, opponentStake,
-    acceptDeadline, resolveDeadline,
-    ResolutionType.Polymarket,
-    polymarketConditionId, /* creatorIsYes */ true,
-    metadataHash, "ipfs://<cid>"
-);
-
-// Opponent escrows their stake
-registry.acceptWager(id);
-
-// After the linked Polymarket market settles, anyone can trigger resolution
-registry.autoResolveFromPolymarket(id);
-
-// Winner pulls the full pot
-registry.claimPayout(id);
-
-// — or, if it never resolved by the deadline, either party gets made whole
-registry.claimRefund(id);
-```
-
-### Adding a new oracle adapter
-
-1. Implement the `IOracleAdapter` interface
-2. Wire it into `WagerRegistry`'s adapter slot for its resolution type
-3. Write tests (unit + fork) and update the docs
-
-## Contracts
-
-| Contract | Location | Description |
-|----------|----------|-------------|
-| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow, incl. open challenges (UUPS proxy) |
-| `WagerPoolFactory` / `WagerPool` | `contracts/pools/` | Group wager pools (factory + immutable clones) |
-| `MembershipManager` | `contracts/access/` | Tiered memberships, rate limits, voucher redemption (UUPS proxy) |
-| `MembershipVoucher` | `contracts/access/` | Transferable ERC-721 voucher → soulbound membership (immutable) |
-| `SanctionsGuard` | `contracts/access/` | Chainalysis screening + deny list |
-| `FeeRouter` | `contracts/fees/` | Single source of truth for platform fees (UUPS proxy) |
-| `KeyRegistry` | `contracts/privacy/` | Encryption public keys |
-| `CallsignRegistry` | `contracts/identity/` | Optional %callsign naming (UUPS proxy) |
-| `BridgeRouter` / `LiquidityRouter` | `contracts/bridge/`, `contracts/liquidity/` | No-custody bridge + liquidity routers |
-| `SafePolicyGuard(V2)` | `contracts/custody/` | Multisig vault policy engines (non-upgradeable by design) |
-| Oracle adapters | `contracts/oracles/` | Polymarket · Chainlink DataFeed/Functions · UMA OOv3 |
-
-`contracts-archive/` holds superseded research — reference only, never deploy.
-
-Details: [Smart Contracts guide](docs/developer-guide/smart-contracts.md).
-
-## Design principles
-
-1. **Self-custody, always** — no contract or operator role can move member
-   funds; escrow is pull-based and refund paths cover every timeout.
-2. **Leverage, don't rebuild** — Polymarket, Chainlink, UMA, Uniswap, Across,
-   OpenSea, and Safe do what they're best at; FairWins is the control plane
-   that composes them under one honest UI.
-3. **Honest state** — fees disclosed before signature, absence shown as
-   absence, no mocked data in shipped paths (constitution III).
-4. **Deterministic operations** — salted CREATE2 deployments, repo-recorded
-   addresses, spec-driven development ([Spec Kit](https://github.com/github/spec-kit),
-   see [CLAUDE.md](CLAUDE.md) and `.specify/memory/constitution.md`).
+This repo uses [Spec Kit](https://github.com/github/spec-kit) for spec-driven
+development — see [CLAUDE.md](CLAUDE.md) and the binding standards in
+`.specify/memory/constitution.md`. Contract changes must follow
+checks-effects-interactions and pass Slither/Medusa in CI.
 
 ## License
 
