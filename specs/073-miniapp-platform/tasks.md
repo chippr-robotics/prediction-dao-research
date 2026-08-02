@@ -159,10 +159,10 @@ it against a counterparty). It stays host-native, so nothing is duplicated and n
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T045 [P] Write `docs/developer-guide/miniapps.md` (runtime contract, build preset, publish flow, hostApi versioning) and `docs/runbooks/miniapp-registry-operations.md` (curator ops, suspension, deprecation, gateway config)
+- [x] T045 [P] Write `docs/developer-guide/miniapps.md` (runtime contract, build preset, publish flow, hostApi versioning) and `docs/runbooks/miniapp-registry-operations.md` (curator ops, suspension, deprecation, gateway config)
 - [x] T046 [P] Add the spec-073 guardrail entry to `CLAUDE.md` (registry chain rule, approved-tuple-only serving, blob:-only CSP rule, no privileged imports from `frontend/miniapps/`)
-- [ ] T047 Accessibility pass on Catalog/Workspace/Review surfaces (axe/Lighthouse CI green, WCAG 2.1 AA)
-- [ ] T048 Security review: run `.github/agents/smart-contract-security.agent.md` review over `contracts/apps/` + `contracts/interfaces/IMiniAppRegistry.sol`; Slither clean; document any accepted findings
+- [x] T047 Accessibility pass on Catalog/Workspace/Review surfaces (axe/Lighthouse CI green, WCAG 2.1 AA)
+- [x] T048 Security review: run `.github/agents/smart-contract-security.agent.md` review over `contracts/apps/` + `contracts/interfaces/IMiniAppRegistry.sol`; Slither clean; document any accepted findings
 - [ ] T049 Full-suite gates: `npm test`, `npm run check:storage-layout`, CI frontend suite, `npm run tenants:validate`; quickstart executed end-to-end
 
 ---
