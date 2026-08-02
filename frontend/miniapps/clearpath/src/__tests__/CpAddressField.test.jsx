@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import CpAddressField from '../CpAddressField'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US3/US5, FR-024) — the ClearPath address field wires the app's address book + QR scanner to any
 // address entry. Stub the heavy app components (which need the wallet provider / camera) so this stays a

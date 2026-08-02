@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ExternalDaoView from '../ExternalDaoView'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US5) — every on-chain WRITE in the tracking view routes through run(label, makeTx), which must keep
 // the user aware of the activity via the app notification system: a persistent "confirm in your wallet" prompt,
@@ -17,14 +19,11 @@ const h = vi.hoisted(() => ({
   screenStatus: 'clear',
 }))
 
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: h.showNotification }) }))
 // The view now reads sendCalls/loginMethod/chainId from useWallet (passkey rail + switch-to-act gating); these
 // tests drive the classic signer-prop path on the SAME chain as the DAO (63, matching renderView below) by
 // default — a `mockReturnValue` override lets one test move the wallet to a different chain.
 const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
-vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: (...a) => useWalletMock(...a) }))
 const switchChainAsync = vi.fn().mockResolvedValue({})
-vi.mock('wagmi', () => ({ useSwitchChain: () => ({ switchChainAsync, isPending: false }) }))
 vi.mock('../governorConnector', () => ({
   readGovernorSummary: (...a) => h.readGovernorSummary(...a),
   readTreasuries: (...a) => h.readTreasuries(...a),
@@ -72,18 +71,6 @@ vi.mock('../daoDataSource', () => ({
       error: r.error,
     }
   },
-}))
-vi.mock('../../../config/networks', () => ({
-  getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { baseUrl: 'https://etc-mordor.blockscout.com' }, nativeCurrency: { symbol: 'ETC' } }),
-}))
-// ProposalBuilder → CpAddressField → AddressBookButton → useWallet would throw without a provider.
-vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-// Spec 043: default the active identity to personal mode for these tests.
-vi.mock('../../../hooks/useActiveAccount', () => ({
-  useActiveAccount: () => ({ isVault: false, canActAsVault: false, identity: { mode: 'personal' }, submit: vi.fn(), operateAsPersonal: vi.fn() }),
-}))
-vi.mock('../../../hooks/useAddressScreening', () => ({
-  useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve(h.screenStatus) }),
 }))
 
 const record = { id: 1, dao: '0xB85dbc899472756470EF4033b9637ff8fa2FD23D', framework: 0, label: 'Olympia DAO' }

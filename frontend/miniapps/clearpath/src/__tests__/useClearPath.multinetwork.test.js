@@ -1,21 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useClearPath } from '../useClearPath'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 042 — ClearPath availability is capability-driven (NOT registry-gated). On Ethereum mainnet (1) there is
 // no ExternalDAORegistry, yet the module is available and a member tracks a DAO device-local.
 
 const ACCT = '0xMember0000000000000000000000000000000009'
 
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ account: ACCT, signer: {}, provider: {}, chainId: 1, isConnected: true }),
-}))
 // Isolate the tracked-list behavior from the curated known-DAO seeds (ENS/Uniswap) on mainnet.
-vi.mock('../../../config/clearpath/knownDaos', () => ({ knownDaosForChain: () => [] }))
+vi.mock('../config/knownDaos', () => ({ knownDaosForChain: () => [] }))
 // No on-chain registry anywhere in this suite — keeps the network-agnostic aggregate scan (every clearpath
 // chain) from making a real registry contract read against a live RPC.
-vi.mock('../../../config/contracts', () => ({ getContractAddressForChain: () => null }))
 
 describe('useClearPath on a registry-less network (spec 042)', () => {
   beforeEach(() => window.localStorage.clear())

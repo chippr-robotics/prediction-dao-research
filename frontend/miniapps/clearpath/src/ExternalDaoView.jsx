@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import { ethers } from 'ethers'
-import { useSwitchChain } from 'wagmi'
-import { getNetwork } from '../../config/networks'
-import { useNotification } from '../../hooks/useUI'
-import { useWallet } from '../../hooks/useWalletManagement'
-import { useAddressScreening } from '../../hooks/useAddressScreening'
-import { useActiveAccount } from '../../hooks/useActiveAccount'
-import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from '../../abis/externalDAORegistry'
+import { DAO_FRAMEWORK_LABEL, PROPOSAL_STATE_LABEL, VOTE_SUPPORT } from './externalDAORegistryAbi'
 import { getConnector, detectFramework } from './connectors'
 import { fetchDaoProposals } from './daoDataSource'
 import ProposalBuilder from './ProposalBuilder'
@@ -107,30 +102,32 @@ function CopyableId({ id }) {
   )
 }
 
-export default function ExternalDaoView({ record, reader, signer, account, chainId, usdcAddress, onBack }) {
-  const { showNotification } = useNotification()
-  const { screenOne } = useAddressScreening()
-  // Spec 041/050: a passkey smart-account session has no ethers signer — its writes go through `sendCalls`
-  // (one sponsored ERC-4337 UserOp) instead of `signer`. `loginMethod` picks the rail.
-  // `chainId` here is the CONNECTED wallet's chain — `chainId` (the prop) is the DAO's own network, which may
-  // differ now that ClearPath lists DAOs across every network at once (network-agnostic). A write can only be
-  // signed on the connected chain, so every action below is gated on the two matching.
-  const { chainId: connectedChainId, sendCalls, loginMethod } = useWallet()
-  const isPasskey = loginMethod === 'passkey'
-  const { switchChainAsync, isPending: switching } = useSwitchChain()
+export default function ExternalDaoView({ record, reader, account, chainId, usdcAddress, onBack }) {
+  const host = useMiniAppHost()
+  const showNotification = useCallback((message, type, duration) => host.toast.show(message, type, duration), [host])
+  /*
+   * `chainId` (the prop) is the DAO's OWN network; `host.wallet.chainId` is where the wallet sits.
+   * ClearPath lists DAOs across every network at once, so those routinely differ — reads use the
+   * DAO's chain, and a write is gated on the two matching (the host refuses a cross-chain submit
+   * anyway, but refusing after the member has pressed the button is the worse order).
+   */
+  const connectedChainId = host.wallet.chainId
   const onConnectedChain = Number(chainId) === Number(connectedChainId)
-  // Spec 043 (US3, FR-022a): acting on a DAO while operating as a vault becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
-  const net = getNetwork(chainId)
+  const [switching, setSwitching] = useState(false)
+  const net = host.network(chainId)
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
 
   const handleSwitch = useCallback(async () => {
+    setSwitching(true)
     try {
-      await switchChainAsync({ chainId })
+      await host.wallet.switchChain(chainId)
     } catch (e) {
-      showNotification(e?.shortMessage || e?.message || 'Could not switch network.', 'error')
+      // The host's refusal already carries a member-facing sentence; prefer it to the raw message.
+      showNotification(e?.userMessage || e?.message || 'Could not switch network.', 'error')
+    } finally {
+      setSwitching(false)
     }
-  }, [switchChainAsync, chainId, showNotification])
+  }, [host, chainId, showNotification])
 
   // Resolve the per-framework connector. A registry entry may carry a coarse framework and a device-local entry
   // the detected one; if it's absent/unknown, detect it live. Fall back to the OZ connector (framework 0) while
@@ -247,30 +244,27 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
   // confirmed, so callers can gate success-only UI (e.g. the proposal builder must not reset/close on a reverted
   // propose — that would imply a success the chain didn't give).
   async function run(label, makeTx) {
-    // A passkey session has no `signer` but can still act via `sendCalls`; only block when neither rail exists.
-    if (!isPasskey && !signer) {
+    if (!host.wallet.isConnected) {
       showNotification('Connect a wallet to act on this DAO.', 'warning')
       return false
     }
-    // A write can only be signed on the DAO's own chain — the UI already gates the buttons behind a "Switch to
-    // X" prompt, but a passkey session's `sendCalls` targets the wallet's account on whatever chain it's on, so
-    // this is checked again here as the last line of defense (never send a signed action to the wrong network).
+    // A write can only be signed on the DAO's own chain. The host refuses a cross-chain submit
+    // anyway, but refusing AFTER the member has pressed the button is the worse order — and on a
+    // batch rail the call would otherwise target whatever chain the wallet happens to be on.
     if (!onConnectedChain) {
       showNotification(`Switch your wallet to ${net?.name || 'this DAO’s network'} to act on this DAO.`, 'warning')
       return false
     }
-    // Sanctions posture (FR-013, spec 042): screen the connected signer where a platform sanctions source exists.
-    // A confirmed `restricted` result (only possible where a SanctionsGuard is deployed) blocks the action,
-    // fail-closed. `uncertain` (no source on this network, e.g. Ethereum mainnet, or an unreadable guard) does
-    // NOT block — external-DAO governance proceeds under the DAO's own rules, since ClearPath is non-custodial
-    // and must not fabricate a screening result it cannot produce.
-    if (account && screenOne) {
-      const status = await screenOne(account, chainId).catch(() => 'uncertain')
-      if (status === 'restricted') {
-        showNotification('This wallet is restricted by sanctions screening — it cannot act on this DAO.', 'error')
-        return false
-      }
-    }
+    /*
+     * SANCTIONS SCREENING IS THE HOST'S NOW, and this app deliberately does not repeat it.
+     *
+     * `host.wallet.submit` screens the acting account live on every call and refuses
+     * `sanctioned_account`, which is strictly stronger than the check that used to live here: a
+     * package can forget to call a screening function, but it cannot skip the submit path. The
+     * fail-open-on-uncertain policy this code relied on is preserved there — an unreachable
+     * screener does not block external-DAO governance, because ClearPath is non-custodial and must
+     * not fabricate a result it cannot produce.
+     */
     setBusy(true)
     try {
       showNotification(`${label}: confirm in your wallet…`, 'info', 0)
@@ -282,7 +276,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
         return true
       }
       showNotification(`${label} submitted — awaiting confirmation…`, 'info', 0)
-      await tx.wait(1, CONFIRM_TIMEOUT_MS)
+      await tx.wait(1)
       showNotification(`${label} confirmed${tx?.hash ? ` · tx ${short(tx.hash)}` : ''}.`, 'success')
       await loadProposals()
       return true
@@ -300,28 +294,25 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
     }
   }
 
-  // Spec 043 (US3): build the tx factory for a management action — a normal signer call in personal mode, or
-  // a threshold-gated vault proposal (via the connector's `encode`) when operating as a vault.
-  const managedTx = (action, encodeArgs, personalFn) => async () => {
-    if (operatingAsVault) {
-      if (!canActAsVault) throw new Error("Switch to the vault's network to act as the vault.")
-      if (typeof connector.encode !== 'function') {
-        throw new Error('This DAO framework does not support acting as a vault yet.')
-      }
-      const { to, data } = connector.encode(record.dao, action, encodeArgs)
-      return submitAsActive({ to, value: 0n, data })
+  /**
+   * Build the tx factory for a management action (vote / queue / execute).
+   *
+   * ONE PATH FOR EVERY RAIL. Host-native this branched three ways — vault proposal, passkey
+   * UserOp, signer call — on host internals a package cannot reach. `connector.encode` already
+   * yields the framework-correct calldata for each action, and `host.wallet.submit` decides how it
+   * travels, so the branching is gone rather than reimplemented.
+   */
+  const managedTx = (action, encodeArgs) => async () => {
+    if (typeof connector.encode !== 'function') {
+      throw new Error('This DAO framework cannot be acted on from the app yet.')
     }
-    // Spec 041/050 passkey rail: reuse the connector's exact calldata encoding (castVote/queue/execute), then
-    // send it as one sponsored UserOp via `sendCalls` instead of the signer. `sendCalls` already awaits
-    // inclusion, so the returned `wait` is a no-op that keeps `run()`'s `tx.wait(...)` from crashing.
-    if (isPasskey) {
-      if (typeof connector.encode !== 'function') throw new Error('This DAO framework does not support passkey accounts yet.')
-      if (typeof sendCalls !== 'function') throw new Error('This wallet cannot act on the current transaction rail.')
-      const { to, data } = connector.encode(record.dao, action, encodeArgs)
-      const sent = await sendCalls([{ target: to, data, value: 0n }])
-      return { hash: sent?.txHash ?? sent?.userOpHash ?? sent?.intentId, wait: async () => {} }
+    const { to, data } = connector.encode(record.dao, action, encodeArgs)
+    const result = await host.wallet.submit({ to, data, value: 0n, chainId })
+    if (result.kind === 'proposed') {
+      // `run()` reports this as "proposed to your vault", not as confirmed.
+      return { proposed: true, safeTxHash: result.safeTxHash, wait: async () => null }
     }
-    return personalFn()
+    return { hash: result.txHash, wait: () => result.wait() }
   }
 
   return (
@@ -406,7 +397,6 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
           <ProposalBuilder
             record={record}
             connector={connector}
-            signer={signer}
             reader={reader}
             account={account}
             usdcAddress={usdcAddress}
@@ -494,12 +484,12 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
               <div className="cp-row-actions" style={{ marginTop: '0.6rem' }}>
                 {canVote && (
                   <>
-                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote For', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.For }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.For)))}>Vote For</button>
-                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Against', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Against }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Against)))}>Against</button>
-                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Abstain', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Abstain }, () => connector.castVote(signer, record.dao, p.id, VOTE_SUPPORT.Abstain)))}>Abstain</button>
+                    <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote For', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.For }))}>Vote For</button>
+                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Against', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Against }))}>Against</button>
+                    <button type="button" className="cp-btn" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to vote`} onClick={() => run('Vote Abstain', managedTx('castVote', { proposalId: p.id, support: VOTE_SUPPORT.Abstain }))}>Abstain</button>
                   </>
                 )}
-                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to queue`} onClick={() => run('Queue', managedTx('queue', { p }, () => connector.queue(signer, record.dao, p)))}>Queue</button>}
+                {p.state === 4 && <button type="button" className="cp-btn cp-btn-primary" disabled={busy || !onConnectedChain} title={onConnectedChain ? undefined : `Switch to ${net?.name || 'this network'} to queue`} onClick={() => run('Queue', managedTx('queue', { p }))}>Queue</button>}
                 {p.state === 5 && (
                   <button
                     type="button"
@@ -507,7 +497,7 @@ export default function ExternalDaoView({ record, reader, signer, account, chain
                     disabled={busy || !executeReady || !onConnectedChain}
                     aria-disabled={busy || !executeReady || !onConnectedChain}
                     title={!onConnectedChain ? `Switch to ${net?.name || 'this network'} to execute` : executeReady ? undefined : 'Waiting for the timelock delay to elapse'}
-                    onClick={() => run('Execute', managedTx('execute', { p }, () => connector.execute(signer, record.dao, p)))}
+                    onClick={() => run('Execute', managedTx('execute', { p }))}
                   >
                     Execute
                   </button>

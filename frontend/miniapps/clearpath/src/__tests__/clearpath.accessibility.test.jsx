@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
-import ClearPathPanel from '../components/clearpath/ClearPathPanel'
+import ClearPathPanel from '../ClearPathPanel'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (T057) — axe accessibility (WCAG 2.1 AA) over the ClearPath module surfaces. Picked up by the gating
 // CI step `npm test -- --run accessibility.test`.
@@ -24,9 +26,9 @@ const cp = {
   trackDAO: vi.fn(),
   untrackDAO: vi.fn(),
 }
-vi.mock('../components/clearpath/useClearPath', () => ({ useClearPath: () => cp }))
+vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
 vi.mock('../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
-vi.mock('../components/clearpath/governorConnector', () => ({
+vi.mock('../governorConnector', () => ({
   validateGovernor: vi.fn(),
   readGovernorSummary: vi.fn().mockResolvedValue({
     name: 'OlympiaGovernor', tokenAddr: '0x0000000000000000000000000000000000000111',

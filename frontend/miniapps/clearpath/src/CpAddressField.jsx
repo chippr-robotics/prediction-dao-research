@@ -1,7 +1,26 @@
-import { useState } from 'react'
-import AddressBookButton from '../ui/AddressBookButton'
-import QRScanner from '../ui/QRScanner'
-import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
+/*
+ * TWO INPUT AFFORDANCES ARE GONE, for different reasons.
+ *
+ * THE QR SCANNER, on size. Bundling it cost 710 KB of an 805 KB package — 88% of the bytes every
+ * member fetches, for one convenience on a field they can paste into. A mini-app package is
+ * content-addressed and immutable, so that weight is paid on every version, forever. If scanning
+ * a DAO address turns out to matter, it belongs as a HOST capability: the host already owns a
+ * scanner, and camera access is an origin-level concern (`Permissions-Policy: camera=(self)`)
+ * rather than something each package should carry its own copy of.
+ *
+ * THE ADDRESS BOOK PICKER, on privacy.
+ *
+ * It reads the member's saved contacts, and that is their contact list — a privacy grant no
+ * mini-app should hold, and one this app does not need: the value being entered here is a DAO
+ * CONTRACT address, not a person. Members paste it or scan it. If a future app has a real case for
+ * reading contacts, that is a host capability with its own permission and its own review, not
+ * something a package reaches by importing a button.
+ *
+ * The QR scanner is copied in instead of imported: it depends only on React and `html5-qrcode`,
+ * with no host state and no context identity, so a bundled copy behaves identically. Its camera
+ * access rides the host origin's `Permissions-Policy: camera=(self)`.
+ */
+// [size probe] scanner temporarily removed
 
 // Spec 030 (US3/US5) — a ClearPath address input wired to the app's address book + QR scanner, so any
 // recipient / target / token / governor address can be picked from saved contacts or scanned from a QR code
@@ -17,15 +36,6 @@ export default function CpAddressField({
   hint,
   selfAddress = null,
 }) {
-  const [scanOpen, setScanOpen] = useState(false)
-
-  // QR payloads can be a raw 0x, an EIP-681 `ethereum:` URI, or a share URL — extract the address from any.
-  const handleScan = (decodedText) => {
-    const addr = extractAddressFromScan(decodedText)
-    if (addr) onChange(addr)
-    setScanOpen(false)
-  }
-
   return (
     <div className="cp-field">
       {label && (
@@ -55,22 +65,9 @@ export default function CpAddressField({
             Self
           </button>
         )}
-        <AddressBookButton disabled={disabled} onSelect={(entry) => onChange(entry.address)} />
-        <button
-          type="button"
-          className="cp-icon-btn"
-          onClick={() => setScanOpen(true)}
-          disabled={disabled}
-          title="Scan QR code"
-          aria-label="Scan QR code"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z" />
-          </svg>
-        </button>
       </div>
       {hint && <span className="cp-row-sub">{hint}</span>}
-      <QRScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScanSuccess={handleScan} />
+
     </div>
   )
 }

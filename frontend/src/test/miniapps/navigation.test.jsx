@@ -38,9 +38,6 @@ import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 vi.mock('../../components/miniapps/CatalogPanel', () => ({
   default: () => <div data-testid="catalog-panel" />,
 }))
-vi.mock('../../components/clearpath/ClearPathPanel', () => ({
-  default: () => <div data-testid="clearpath-panel" />,
-}))
 vi.mock('../../components/fairwins/TradePanel', () => ({
   default: () => <div data-testid="trade-panel" />,
 }))
@@ -176,14 +173,10 @@ describe('WalletPage — the Apps tab hosts the mini-app catalog (spec 073 FR-00
 // --- Legacy deep links (the point of this file) -------------------------------------------------
 
 describe('WalletPage — legacy Apps deep links keep working (spec 073 FR-009, R11 phasing)', () => {
-  it('?tab=clearpath still renders the host-native ClearPath panel', () => {
+  it('?tab=clearpath REDIRECTS to the ClearPath mini-app (T029 cutover)', () => {
     const { container } = renderWalletPage('/wallet?tab=clearpath')
-    expect(screen.getByTestId('clearpath-panel')).toBeInTheDocument()
-    expect(container.querySelector('.clearpath-section')).toBeTruthy()
-    // The tab was NOT redirected to a mini-app: ClearPath's package is published in T029, and
-    // routing there now would land on a slug the registry has never heard of.
-    expect(screen.queryByTestId('catalog-panel')).toBeNull()
-    expect(container.querySelector('.profile-section')).toBeNull()
+    expect(screen.getByTestId('loc')).toHaveTextContent('/apps/clearpath')
+    expect(container.querySelector('.clearpath-section')).toBeNull()
   })
 
   it('?tab=tokens REDIRECTS to the Token Mint mini-app (T027 cutover)', () => {
@@ -344,19 +337,15 @@ describe('Apps is absent for a tenant without the miniapps feature', () => {
     expect(container.querySelector('.profile-section')).toBeTruthy()
   })
 
-  it('still serves the legacy ClearPath tab to that tenant', async () => {
-    // The `miniapps` feature governs the CATALOG. It was never what made this tab work, and gating
-    // it on the feature would break deep links for a tenant that simply opted out of mini-apps.
-    //
-    // Token Mint is deliberately NOT asserted here any more. It is a package now, so a tenant
-    // without mini-apps has nothing to serve — a real consequence of the conversion, and one that
-    // belongs in that tenant's feature decision rather than in a fallback quietly keeping a second
-    // copy of the feature alive in the host bundle.
+  it('redirects the legacy tabs for that tenant too, rather than resurrecting a panel', async () => {
+    // The `miniapps` feature governs the CATALOG. Both former tabs are packages now, so a tenant
+    // that opted out of mini-apps has nothing to serve either way — and the redirect landing on
+    // the catalog's honest unavailable state beats a tab silently falling back to Account.
     const reimported = await withoutMiniApps('../../pages/WalletPage')
     expect(
       renderReimportedWalletPage('/wallet?tab=clearpath', reimported).container.querySelector(
         '.clearpath-section'
       )
-    ).toBeTruthy()
+    ).toBeNull()
   })
 })

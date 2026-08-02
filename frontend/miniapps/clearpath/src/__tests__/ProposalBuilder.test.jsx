@@ -5,12 +5,9 @@ import { axe } from 'vitest-axe'
 import { ethers } from 'ethers'
 import ProposalBuilder from '../ProposalBuilder'
 
-// The component now reads sendCalls/loginMethod from useWallet (passkey rail, spec 041/050); these
-// tests drive the classic signer-prop path, so return a non-passkey session.
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ loginMethod: 'injected', sendCalls: undefined }),
-}))
 import { ACTION_TYPE, newAction, assemble, predictProposalId } from '../proposalEncoding'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US5, FR-023/024) — the rich proposal builder: compose a Governor proposal without hand-writing
 // calldata, multi-action, asset-aware, with validation + the correct submitted payload.
@@ -26,8 +23,6 @@ const ozConnector = { framework: 0, propose: (...a) => propose(...a) }
 
 // CpAddressField (recipient/target inputs) pulls in AddressBookButton → useWallet, which throws without a
 // WalletProvider. Stub the wallet-scoped hooks so the builder renders with the real fields in tests.
-vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
 
 const USDC = '0x00000000000000000000000000000000000000dc'
 const TO = '0x00000000000000000000000000000000000000a1'

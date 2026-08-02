@@ -6,7 +6,7 @@
 // interface.md), so ExternalDaoView and daoSource never branch on the source. Never fabricates — a subgraph
 // failure falls back to on-chain, and an on-chain failure surfaces honestly.
 
-import { subgraphEndpointFor } from '../../config/clearpath/daoSubgraphs'
+import { subgraphEndpointFor } from './config/daoSubgraphs'
 import { getConnector } from './connectors'
 
 /** Which source will serve (chainId, dao): a configured+keyed subgraph, else on-chain. */

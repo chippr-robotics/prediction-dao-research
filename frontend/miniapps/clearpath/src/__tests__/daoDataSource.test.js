@@ -12,6 +12,8 @@ vi.mock('../connectors', () => ({
 }))
 
 import { resolveDataSource, fetchDaoProposals } from '../daoDataSource'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 const base = { chainId: 1, address: '0xdao', framework: 0, reader: {}, opts: {} }
 

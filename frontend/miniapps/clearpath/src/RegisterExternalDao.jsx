@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import { ethers } from 'ethers'
-import { useSwitchChain } from 'wagmi'
-import { getNetwork } from '../../config/networks'
-import { DAO_FRAMEWORK_LABEL } from '../../abis/externalDAORegistry'
+import { DAO_FRAMEWORK_LABEL } from './externalDAORegistryAbi'
 import { detectFramework, getConnector } from './connectors'
 import CpAddressField from './CpAddressField'
 
@@ -15,7 +14,10 @@ import CpAddressField from './CpAddressField'
 // custody; you sign every governance action. The contract / DAO's own rules remain the source of truth.
 
 export default function RegisterExternalDao({ connectedChainId, connectedReader, chainIds = [], hasRegistryFor, readerFor, track, onRegistered }) {
-  const { switchChainAsync, isPending: switching } = useSwitchChain()
+  const host = useMiniAppHost()
+  // The host asks the wallet; wagmi is unreachable from a package. It tracks its own pending state
+  // because `switchChain` is a plain promise rather than a hook with `isPending`.
+  const [switching, setSwitching] = useState(false)
   const [targetChainId, setTargetChainId] = useState(() =>
     chainIds.includes(connectedChainId) ? connectedChainId : chainIds[0]
   )
@@ -69,7 +71,12 @@ export default function RegisterExternalDao({ connectedChainId, connectedReader,
 
   async function doSwitch() {
     try {
-      await switchChainAsync({ chainId: targetChainId })
+      setSwitching(true)
+      try {
+        await host.wallet.switchChain(targetChainId)
+      } finally {
+        setSwitching(false)
+      }
     } catch {
       /* the wallet's own reject/error UI already surfaces this */
     }
@@ -100,7 +107,7 @@ export default function RegisterExternalDao({ connectedChainId, connectedReader,
           disabled={busy}
         >
           {chainIds.map((id) => (
-            <option key={id} value={id}>{getNetwork(id)?.name || id}</option>
+            <option key={id} value={id}>{host.network(id)?.name || id}</option>
           ))}
         </select>
       </div>
@@ -114,7 +121,7 @@ export default function RegisterExternalDao({ connectedChainId, connectedReader,
         <button type="button" className="cp-btn" disabled={!ethers.isAddress(addr.trim()) || busy} onClick={doValidate}>Validate</button>
         {needsSwitch ? (
           <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy || switching} onClick={doSwitch}>
-            {switching ? 'Switching…' : `Switch to ${getNetwork(targetChainId)?.name || 'this network'} to register`}
+            {switching ? 'Switching…' : `Switch to ${host.network(targetChainId)?.name || 'this network'} to register`}
           </button>
         ) : (
           <button type="button" className="cp-btn cp-btn-primary" disabled={!valid || busy} onClick={doTrack}>

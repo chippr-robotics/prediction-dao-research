@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ClearPathPanel from '../ClearPathPanel'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030/042 + network-agnostic follow-up — the ClearPath panel: lists external DAOs across every supported
 // network at once, opens a live tracking view (Olympia), registers/tracks a new DAO on a chosen network, and
@@ -10,7 +12,6 @@ import ClearPathPanel from '../ClearPathPanel'
 // deterministically.
 
 const switchChainAsync = vi.fn().mockResolvedValue({})
-vi.mock('wagmi', () => ({ useSwitchChain: () => ({ switchChainAsync, isPending: false }) }))
 
 // A stable reader instance — `readerFor` must return the SAME reference across renders (like the real hook's
 // cached provider), or an effect keyed on `reader` identity re-fires every render and loops forever.
@@ -33,12 +34,10 @@ const cp = {
   untrackDAO: vi.fn(),
 }
 vi.mock('../useClearPath', () => ({ useClearPath: () => cp }))
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 // ExternalDaoView (rendered within) now reads sendCalls/loginMethod/chainId from useWallet (passkey rail +
 // switch-to-act gating); these tests drive the classic signer-prop path on the SAME chain as the DAO (63) by
 // default — a `mockReturnValue` override lets one test move the wallet to a different chain.
 const useWalletMock = vi.fn(() => ({ loginMethod: 'injected', sendCalls: undefined, chainId: 63 }))
-vi.mock('../../../hooks/useWalletManagement', () => ({ useWallet: (...a) => useWalletMock(...a) }))
 
 const conn = { validateGovernor: vi.fn(), readGovernorSummary: vi.fn(), fetchGovernorProposals: vi.fn(), readTreasuries: vi.fn(), readVoterState: vi.fn(), readProposalEta: vi.fn(), detectTreasuryFunding: vi.fn() }
 vi.mock('../governorConnector', () => ({
@@ -91,19 +90,9 @@ vi.mock('../daoDataSource', () => ({
   },
 }))
 
-vi.mock('../../../config/networks', () => ({
-  getNetwork: () => ({
-    name: 'Ethereum Classic Mordor',
-    explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' },
-    nativeCurrency: { symbol: 'ETC' },
-  }),
-}))
-vi.mock('../../../config/contracts', () => ({ getContractAddressForChain: () => null }))
 
 // CpAddressField (governor/recipient inputs) pulls in AddressBookButton → useWallet, which throws without a
 // WalletProvider. Stub the wallet-scoped hooks so register + tracking views render the real fields in tests.
-vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn(), screenOne: () => Promise.resolve('clear') }) }))
 
 const OLYMPIA = '0xB85dbc899472756470EF4033b9637ff8fa2FD23D'
 const olympiaRecord = { id: 1, dao: OLYMPIA, framework: 0, label: 'Olympia DAO', registrant: '0xabc', registeredAt: 1700000000, chainId: 63, networkName: 'Ethereum Classic Mordor' }

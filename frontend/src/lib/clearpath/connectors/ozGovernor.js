@@ -5,7 +5,7 @@ import {
   ERC20_BALANCE_ABI,
   GOVERNOR_PROPOSAL_ABI,
   GOVERNOR_WRITE_ABI,
-} from '../externalDAORegistryAbi'
+} from '../../../abis/externalDAORegistry'
 
 /**
  * Per-DAO extra treasury vaults that are NOT the OZ timelock. Some platforms (Olympia) hold funds in a separate

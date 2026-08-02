@@ -39,7 +39,7 @@ const TAB_ALIASES = { swap: 'trade', backup: 'security' }
  * `pages/WalletPage.jsx`, which performs the actual redirect. Here it only affects which nav item
  * reads as active, so a member arriving on `?tab=tokens` sees Apps highlighted rather than nothing.
  */
-const TAB_TO_MINIAPP = { tokens: 'apps' }
+const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 
 // The label of the group Wagers is spliced into, below.
 const APPS_GROUP_LABEL = 'Apps'

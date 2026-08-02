@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useClearPath } from '../useClearPath'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US3) — registerExternalDAO is a real on-chain write; it must keep the user aware via the app
 // notification system: a persistent "confirm in your wallet" + "awaiting confirmation" toast, then a confirmed
@@ -11,11 +13,6 @@ const HASH = '0xabcdef0000000000000000000000000000000000000000000000000000001234
 
 const h = vi.hoisted(() => ({ showNotification: vi.fn(), registerExternalDAO: vi.fn() }))
 
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: h.showNotification }) }))
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ account: '0xacc', signer: {}, provider: {}, chainId: 63, isConnected: true }),
-}))
-vi.mock('../../../config/contracts', () => ({ getContractAddressForChain: () => REGISTRY }))
 // Keep ethers.isAddress real; stub only Contract so the write goes to our fake. Contract is invoked with `new`,
 // so the mock implementation must be a real (constructable) function, not an arrow.
 vi.mock('ethers', async (importOriginal) => {

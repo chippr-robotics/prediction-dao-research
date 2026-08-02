@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ethers } from 'ethers'
 import { getLogsRange, parseProposalLog, readVoterState, readVoteSupport, explainTxError, detectTreasuryFunding } from '../governorConnector'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (US5) — the subgraph-less proposal indexer must survive RPC block-range caps. ETC/Mordor public
 // nodes (and many wallet RPC backends) reject an `eth_getLogs` window wider than a provider-specific limit;

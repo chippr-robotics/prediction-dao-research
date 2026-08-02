@@ -1,46 +1,49 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet } from '../../hooks/useWalletManagement'
-import { useNotification } from '../../hooks/useUI'
-import { getContractAddressForChain } from '../../config/contracts'
-import { getNetwork, getClearPathChainIds } from '../../config/networks'
-import { makeReadProvider } from '../../utils/rpcProvider'
-import { EXTERNAL_DAO_REGISTRY_ABI } from '../../abis/externalDAORegistry'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
+import { EXTERNAL_DAO_REGISTRY_ABI } from './externalDAORegistryAbi'
 import * as trackedDaoStore from './trackedDaoStore'
-import { knownDaosForChain } from '../../config/clearpath/knownDaos'
+import { knownDaosForChain } from './config/knownDaos'
 
 // Upper bound on awaiting a confirmation — a broadcast-but-dropped tx must not hang wait() forever (it would
 // orphan the persistent in-flight toast). 120s is well beyond a normal confirmation on the live networks.
 const CONFIRM_TIMEOUT_MS = 120000
 
-const READ_ROUTE_KEY = 'clearpath.readRoute.v1'
-const readStoredRoute = () => {
+/**
+ * A read provider for any chain, or null when the host has no endpoint for it.
+ *
+ * `readProvider` THROWS for an unconfigured chain — a real condition, since the member owns their
+ * endpoints (spec 069) — and null is how every read path below already spells "cannot read here".
+ */
+function readerForChain(host, chainId) {
+  if (chainId == null) return null
   try {
-    return typeof window !== 'undefined' && window.localStorage.getItem(READ_ROUTE_KEY) === 'wallet'
-      ? 'wallet'
-      : 'public'
+    return host.readProvider(chainId)
   } catch {
-    return 'public'
+    return null
   }
 }
 
-// Cache read providers by (chainId → rpcUrl) so the same network always yields the SAME provider instance
-// across renders — dependent effects (ExternalDaoView keys reads on `reader`) must not see a fresh provider
-// every render. A plain memoized factory keeps referential stability without a hook (React-Compiler friendly).
-const READ_PROVIDERS = new Map()
-function cachedReadProvider(rpcUrl, chainId) {
-  const key = `${chainId}:${rpcUrl}`
-  let p = READ_PROVIDERS.get(key)
-  if (!p) {
-    p = makeReadProvider(rpcUrl, chainId)
-    READ_PROVIDERS.set(key, p)
-  }
-  return p
-}
+/*
+ * THE READ-ROUTE TOGGLE IS GONE, and its absence is the correct outcome rather than a casualty.
+ *
+ * Host-native this offered 'public' vs 'wallet' reads and hand-built providers from
+ * `NETWORKS[chainId].rpcUrl` — something the platform's own guardrails forbid, because it bypasses
+ * the member's configured endpoints. A package cannot do it at all: no wallet provider is
+ * reachable, and no network config is bundled.
+ *
+ * `host.readProvider(chainId)` is the spec-069-resolved endpoint — the member's override first,
+ * the build default behind it — so the choice the toggle used to offer now lives in one place, the
+ * member's own Network settings, and applies everywhere instead of only here.
+ */
 
 /** Whether an on-chain ExternalDAORegistry is deployed on `targetChainId`. */
-function hasRegistryOn(targetChainId) {
-  return ethers.isAddress(getContractAddressForChain('externalDAORegistry', targetChainId) || '')
+function hasRegistryOn(host, targetChainId) {
+  try {
+    return ethers.isAddress(host.contracts('externalDAORegistry', targetChainId) || '')
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -60,61 +63,66 @@ function hasRegistryOn(targetChainId) {
  * caller before invoking `registerExternalDAO`, and by `ExternalDaoView` before a vote/queue/execute).
  */
 export function useClearPath() {
-  // Spec 041/050: passkey smart-account sessions have no `signer`; their writes go through `sendCalls`
-  // (one sponsored ERC-4337 UserOp). `loginMethod` picks the rail for the on-chain register write.
-  const { account, signer, provider, chainId, isConnected, sendCalls, loginMethod } = useWallet()
-  const isPasskey = loginMethod === 'passkey'
-  const { showNotification } = useNotification()
+  const host = useMiniAppHost()
+  const { address: account, chainId, isConnected } = host.wallet
+  const showNotification = useCallback((message, type) => host.toast.show(message, type), [host])
 
-  const chainIds = useMemo(() => getClearPathChainIds(), [])
-  const net = getNetwork(chainId)
-  const registryAddress = getContractAddressForChain('externalDAORegistry', chainId)
-  const usdcAddress = getContractAddressForChain('paymentToken', chainId) // per-network USDC for treasury balances
-  const hasRegistry = ethers.isAddress(registryAddress || '')
-  const hasSanctionsSource = ethers.isAddress(getContractAddressForChain('sanctionsGuard', chainId) || '')
-
-  const [readRoute, setReadRouteState] = useState(readStoredRoute)
-
-  // Read routing (FR-019) applies to the CONNECTED chain only: 'public' → the network's own RPC (default;
-  // handles the wide eth_getLogs scans that injected/mobile wallet backends reject; `makeReadProvider` also
-  // disables batching on ETC/Mordor). 'wallet' → the connected wallet's provider. Every OTHER network (scanned
-  // for the aggregated list) always reads via its own public RPC — there is no wallet provider for a chain the
-  // wallet isn't on. Writes ALWAYS use `signer`, independent of this setting.
-  const reader = useMemo(() => {
-    if (readRoute === 'wallet') return provider || signer?.provider || (net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : null)
-    return net?.rpcUrl ? cachedReadProvider(net.rpcUrl, chainId) : provider || signer?.provider || null
-  }, [readRoute, provider, signer, net, chainId])
-
-  /** A read provider for any clearpath-capable chain, honoring the read-route setting on the connected chain. */
-  const readerFor = useCallback(
-    (targetChainId) => {
-      if (Number(targetChainId) === Number(chainId)) return reader
-      const targetNet = getNetwork(targetChainId)
-      return targetNet?.rpcUrl ? cachedReadProvider(targetNet.rpcUrl, targetChainId) : null
+  /** Declared in the manifest allowlist; anything else throws, which would be a packaging bug. */
+  const resolve = useCallback(
+    (name, forChain) => {
+      try {
+        return host.contracts(name, forChain)
+      } catch {
+        return null
+      }
     },
-    [chainId, reader]
+    [host],
   )
 
-  // Spec 042: available when the network declares ClearPath AND we have something to read with — NOT gated on a
-  // deployed registry (its reads are pure client-side RPC/subgraph).
-  const isSupported = Boolean(net?.capabilities?.clearpath) && !!reader
+  /*
+   * The chains ClearPath reads, decided by the APP rather than by a host flag.
+   *
+   * Host-native this filtered on `NETWORKS[id].capabilities.clearpath` — host configuration naming
+   * this one app, which is exactly the coupling a mini-app platform should not have. The package
+   * now asks the host which chains exist in this cohort and works out for itself where it can
+   * operate: a chain qualifies if it carries an ExternalDAORegistry, or if this package ships
+   * known DAOs for it. Adding a network becomes a host release again, not a re-publish.
+   */
+  const chainIds = useMemo(
+    () =>
+      host
+        .networks()
+        .filter((id) => ethers.isAddress(resolve('externalDAORegistry', id) || '') || knownDaosForChain(id).length > 0),
+    [host, resolve],
+  )
 
-  const setReadRoute = useCallback((route) => {
-    const next = route === 'wallet' ? 'wallet' : 'public'
-    try {
-      if (typeof window !== 'undefined') window.localStorage.setItem(READ_ROUTE_KEY, next)
-    } catch {
-      // storage unavailable — keep the in-memory setting
-    }
-    setReadRouteState(next)
-  }, [])
+  const registryAddress = resolve('externalDAORegistry', chainId)
+  const usdcAddress = resolve('paymentToken', chainId) // per-network USDC for treasury balances
+  const hasRegistry = ethers.isAddress(registryAddress || '')
+  const hasSanctionsSource = ethers.isAddress(resolve('sanctionsGuard', chainId) || '')
+
+  const reader = useMemo(() => readerForChain(host, chainId), [host, chainId])
+
+  /** A read provider for any chain this app operates on. */
+  const readerFor = useCallback(
+    (targetChainId) =>
+      (Number(targetChainId) === Number(chainId) ? reader : readerForChain(host, targetChainId)),
+    [host, chainId, reader],
+  )
+
+  /*
+   * Availability is decided by what this package can actually DO here, not by a host flag naming
+   * it: a chain qualifies if ClearPath can read on it and it is one of the chains this app
+   * operates on. Reads are pure client-side RPC/subgraph, so a deployed registry is NOT required.
+   */
+  const isSupported = chainIds.includes(Number(chainId)) && !!reader
 
   /** On-chain registry entries for `targetChainId` (empty when no registry is deployed there, or on any read failure — never throws). */
   const listRegistryDAOsFor = useCallback(async (targetChainId) => {
-    if (!hasRegistryOn(targetChainId)) return []
+    if (!hasRegistryOn(host, targetChainId)) return []
     const targetReader = readerFor(targetChainId)
     if (!targetReader) return []
-    const regAddr = getContractAddressForChain('externalDAORegistry', targetChainId)
+    const regAddr = resolve('externalDAORegistry', targetChainId)
     const reg = new ethers.Contract(regAddr, EXTERNAL_DAO_REGISTRY_ABI, targetReader)
     const n = Number(await reg.externalCount())
     const out = []
@@ -131,7 +139,7 @@ export function useClearPath() {
       })
     }
     return out
-  }, [readerFor])
+  }, [host, resolve, readerFor])
 
   /**
    * Every external DAO on `targetChainId`: on-chain registry entries (if deployed) MERGED with the member's
@@ -141,7 +149,7 @@ export function useClearPath() {
   const listExternalDAOsFor = useCallback(
     async (targetChainId) => {
       const registryList = await listRegistryDAOsFor(targetChainId).catch(() => [])
-      const localList = trackedDaoStore.list(targetChainId, account).map((e) => ({
+      const localList = trackedDaoStore.list(host.store, account, targetChainId).map((e) => ({
         id: `local:${targetChainId}:${String(e.address).toLowerCase()}`,
         dao: e.address,
         framework: e.framework,
@@ -170,10 +178,10 @@ export function useClearPath() {
           seen.add(lc)
         }
       }
-      const targetNet = getNetwork(targetChainId)
+      const targetNet = host.network(targetChainId)
       return merged.map((d) => ({ ...d, chainId: targetChainId, networkName: targetNet?.name || String(targetChainId) }))
     },
-    [listRegistryDAOsFor, account]
+    [listRegistryDAOsFor, account, host]
   )
 
   /**
@@ -194,50 +202,40 @@ export function useClearPath() {
         showNotification('This network has no on-chain DAO registry.', 'warning')
         throw new Error('no registry')
       }
-      // A passkey session has no `signer` but can register via `sendCalls`; only block when neither rail exists.
-      if (!isPasskey && !signer) {
-        showNotification('Connect a wallet to register a DAO.', 'warning')
-        throw new Error('no signer')
-      }
-      // Spec 041/050 passkey rail: encode the same registerExternalDAO calldata and send it as one sponsored
-      // UserOp via `sendCalls` (which already awaits inclusion) instead of a signer-backed contract call.
-      if (isPasskey) {
-        if (typeof sendCalls !== 'function') {
-          showNotification('This wallet cannot register a DAO on the current transaction rail.', 'error')
-          throw new Error('no sendCalls')
-        }
-        try {
-          showNotification('Register DAO: confirm in your wallet…', 'info', 0)
-          const data = new ethers.Interface(EXTERNAL_DAO_REGISTRY_ABI).encodeFunctionData('registerExternalDAO', [dao, framework, label])
-          const sent = await sendCalls([{ target: registryAddress, data, value: 0n }])
-          const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId
-          const ref = txHash ? ` · tx ${String(txHash).slice(0, 6)}…${String(txHash).slice(-4)}` : ''
-          showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
-          return sent
-        } catch (e) {
-          showNotification(e?.shortMessage || e?.reason || e?.message || 'Register failed.', 'error')
-          throw e
-        }
-      }
-      const reg = new ethers.Contract(registryAddress, EXTERNAL_DAO_REGISTRY_ABI, signer)
+      /*
+       * ONE PATH FOR EVERY RAIL. Host-native this branched on `loginMethod` between a signer-bound
+       * contract call and an ERC-4337 batch; a package can reach neither, and does not need to —
+       * `host.wallet.submit` picks the rail and reports which one answered.
+       */
       try {
-        showNotification('Register DAO: confirm in your wallet…', 'info', 0)
-        const tx = await reg.registerExternalDAO(dao, framework, label)
-        showNotification('Register DAO submitted — awaiting confirmation…', 'info', 0)
-        const receipt = await tx.wait(1, CONFIRM_TIMEOUT_MS)
-        const ref = tx?.hash ? ` · tx ${tx.hash.slice(0, 6)}…${tx.hash.slice(-4)}` : ''
+        showNotification('Register DAO: confirm in your wallet…', 'info')
+        const data = new ethers.Interface(EXTERNAL_DAO_REGISTRY_ABI).encodeFunctionData(
+          'registerExternalDAO',
+          [dao, framework, label],
+        )
+        const result = await host.wallet.submit({ to: registryAddress, data, value: 0n, chainId })
+
+        if (result.kind === 'proposed') {
+          // The Safe still has to approve it; no DAO is registered yet.
+          showNotification(`Register ${label || 'DAO'} proposed — it needs the vault's approvals.`, 'info')
+          return result
+        }
+
+        showNotification('Register DAO submitted — awaiting confirmation…', 'info')
+        // `submit` resolves at broadcast; confirmation is this app's job.
+        const receipt = await result.wait()
+        if (receipt && receipt.status === 0) throw new Error('The registration reverted on-chain.')
+        const hash = result.txHash
+        const ref = hash ? ` · tx ${String(hash).slice(0, 6)}…${String(hash).slice(-4)}` : ''
         showNotification(`Registered ${label || 'DAO'}.${ref}`, 'success')
         return receipt
       } catch (e) {
-        if (e?.code === 'TIMEOUT') {
-          showNotification('Register DAO is taking longer than expected — it may still confirm. Check your wallet or the explorer, then Refresh.', 'warning', 0)
-        } else {
-          showNotification(e?.shortMessage || e?.reason || e?.message || 'Register failed.', 'error')
-        }
+        const text = e?.userMessage || e?.shortMessage || e?.reason || e?.message || 'Register failed.'
+        showNotification(text.length > 150 ? `${text.slice(0, 149)}…` : text, 'error')
         throw e
       }
     },
-    [hasRegistry, isPasskey, sendCalls, signer, registryAddress, showNotification]
+    [hasRegistry, host, chainId, registryAddress, showNotification],
   )
 
   /**
@@ -249,9 +247,9 @@ export function useClearPath() {
    */
   const trackDAO = useCallback(
     async ({ address, framework = null, label = '', chainId: targetChainId = chainId }) => {
-      if (hasRegistryOn(targetChainId)) {
+      if (hasRegistryOn(host, targetChainId)) {
         if (Number(targetChainId) !== Number(chainId)) {
-          const targetName = getNetwork(targetChainId)?.name || 'that network'
+          const targetName = host.network(targetChainId)?.name || 'that network'
           showNotification(`Switch your wallet to ${targetName} to register this DAO.`, 'warning')
           throw new Error('wrong network')
         }
@@ -261,7 +259,7 @@ export function useClearPath() {
         showNotification('Connect a wallet to track a DAO.', 'warning')
         throw new Error('no account')
       }
-      const res = trackedDaoStore.add(targetChainId, account, { address, framework, label })
+      const res = trackedDaoStore.add(host.store, account, targetChainId, { address, framework, label })
       if (!res.added && res.reason === 'exists') {
         showNotification('That DAO is already tracked.', 'warning')
         return res
@@ -273,13 +271,13 @@ export function useClearPath() {
       showNotification(`Tracking ${label || 'DAO'} on this device.`, 'success')
       return res
     },
-    [chainId, registerExternalDAO, account, showNotification]
+    [chainId, registerExternalDAO, account, showNotification, host]
   )
 
   /** Remove a device-local tracked DAO on `targetChainId` (defaults to the connected chain; on-chain registry entries are not removable here). */
   const untrackDAO = useCallback(
-    (address, targetChainId = chainId) => trackedDaoStore.remove(targetChainId, account, address),
-    [chainId, account]
+    (address, targetChainId = chainId) => trackedDaoStore.remove(host.store, account, targetChainId, address),
+    [chainId, account, host.store]
   )
 
   return {
@@ -295,9 +293,6 @@ export function useClearPath() {
     isConnected,
     reader,
     readerFor,
-    signer,
-    readRoute,
-    setReadRoute,
     listExternalDAOs,
     registerExternalDAO,
     trackDAO,

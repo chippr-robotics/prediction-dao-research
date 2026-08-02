@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
+
+/**
+ * Resolve a declared deployment, or null. The host THROWS for a name outside this package's
+ * manifest allowlist, which would be a packaging bug rather than a runtime condition — but a
+ * throw here would take the panel down, so it is converted to the same absence every caller
+ * already handles.
+ */
+function hostContract(host, name, chainId) {
+  try {
+    return host.contracts(name, chainId)
+  } catch {
+    return null
+  }
+}
 import './clearpath.css'
-import { getNetwork } from '../../config/networks'
-import { getContractAddressForChain } from '../../config/contracts'
-import { DAO_FRAMEWORK_LABEL } from '../../abis/externalDAORegistry'
+import { DAO_FRAMEWORK_LABEL } from './externalDAORegistryAbi'
 import { useClearPath } from './useClearPath'
 import RegisterExternalDao from './RegisterExternalDao'
 import ExternalDaoView from './ExternalDaoView'
-import ReadRouteToggle from './ReadRouteToggle'
 
 // Spec 030/042 + network-agnostic follow-up — ClearPath module (external-DAO pillar), embedded as the My
 // Account "ClearPath" tab. Lists DAOs across EVERY clearpath-capable network at once (mirroring the Portfolio
@@ -18,6 +30,7 @@ import ReadRouteToggle from './ReadRouteToggle'
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 export default function ClearPathPanel() {
+  const host = useMiniAppHost()
   const {
     isSupported,
     chainId,
@@ -27,8 +40,6 @@ export default function ClearPathPanel() {
     readerFor,
     signer,
     account,
-    readRoute,
-    setReadRoute,
     listExternalDAOs,
     trackDAO,
     untrackDAO,
@@ -38,7 +49,7 @@ export default function ClearPathPanel() {
   const [daos, setDaos] = useState([])
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
-  const net = getNetwork(chainId)
+  const net = host.network(chainId)
 
   // Loads every clearpath network's DAOs in parallel (network-agnostic). Does NOT setState synchronously (the
   // first statement is the async read) so it is safe to call from the effect; the Refresh button flips
@@ -76,7 +87,7 @@ export default function ClearPathPanel() {
           signer={signer}
           account={account}
           chainId={selected.chainId}
-          usdcAddress={getContractAddressForChain('paymentToken', selected.chainId)}
+          usdcAddress={hostContract(host, 'paymentToken', selected.chainId)}
           onBack={() => setSelected(null)}
         />
       ) : (
@@ -108,7 +119,6 @@ export default function ClearPathPanel() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                 <span className="cp-row-sub">DAOs across every supported network</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <ReadRouteToggle value={readRoute} onChange={setReadRoute} />
                   <button type="button" className="cp-btn" onClick={refresh} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
                 </div>
               </div>

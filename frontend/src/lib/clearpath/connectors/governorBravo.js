@@ -4,7 +4,7 @@ import {
   BRAVO_TOKEN_ABI,
   BRAVO_WRITE_ABI,
   ERC20_BALANCE_ABI,
-} from '../externalDAORegistryAbi'
+} from '../../../abis/externalDAORegistry'
 import {
   getLogsRange,
   parseProposalLog,

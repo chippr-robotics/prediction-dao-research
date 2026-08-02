@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import RegisterExternalDao from '../RegisterExternalDao'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 042 US2 + network-agnostic follow-up — register/track flow, now with an explicit target-network picker
 // (any clearpath-capable chain, not just the connected one). Client-side framework detection (OZ vs Bravo) gates
@@ -16,11 +18,7 @@ vi.mock('../connectors', () => ({
   detectFramework: (...a) => h.detect(...a),
   getConnector: (fw) => ({ framework: fw, validate: async () => ({ ok: true, name: 'Uniswap Governor Bravo' }) }),
 }))
-vi.mock('wagmi', () => ({ useSwitchChain: () => ({ switchChainAsync: h.switchChainAsync, isPending: false }) }))
-vi.mock('../../../config/networks', () => ({ getNetwork: (id) => ({ name: `Network ${id}` }) }))
 // CpAddressField → AddressBookButton → wallet hooks would throw without a provider.
-vi.mock('../../../hooks/useAddressBook', () => ({ useAddressBook: () => ({ search: () => [] }) }))
-vi.mock('../../../hooks/useAddressScreening', () => ({ useAddressScreening: () => ({ getStatus: () => 'clear', screen: vi.fn() }) }))
 
 const ADDR = '0x408ED6354d4973f66138C91495F2f2FCbd8724C3'
 const STABLE_READER = {} // referential stability matters — see useClearPath's own cachedReadProvider comment

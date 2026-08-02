@@ -9,6 +9,8 @@ import {
   assemble,
   predictProposalId,
 } from '../proposalEncoding'
+import { hostRef, resetHost } from './_host'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 
 // Spec 030 (FR-023/FR-025) — proposal encoding correctness: the riskiest part of the builder (a mis-encoded
 // action executes the wrong thing). Pure unit tests.
