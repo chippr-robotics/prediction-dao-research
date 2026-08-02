@@ -29,6 +29,8 @@ import PrivacyPreferencesPanel from '../components/account/PrivacyPreferencesPan
 import AddressBookPanel from '../components/account/AddressBookPanel'
 import CallsignPanel from '../components/account/CallsignPanel'
 import BackupPanel from '../components/account/BackupPanel'
+import AccordionGroup from '../components/account/AccordionGroup'
+import AccordionSection from '../components/account/AccordionSection'
 import NetworkPanel from '../components/account/NetworkPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
@@ -423,70 +425,90 @@ function WalletPage() {
 
                 {activeTab === 'security' && (
                   <div className="security-section" role="tabpanel">
-                    {/* Backup + Security combined into one panel: the data-backup
-                        controls sit above the account-security controls. */}
-                    <BackupPanel />
-                    {/* Spec 045 US5/US6 — account controllers & recovery.
-                        ControllersPanel renders for passkey sessions (add a
-                        passkey / link a wallet as recovery); the recovery
-                        panel renders for wallet sessions (regain passkey
-                        access using a linked wallet). Each self-gates. */}
-                    <ControllersPanel />
-                    <RecoverAccountPanel />
-                    {/* Recover an account from a legacy private key or word
-                        list, store it encrypted on-device, and move its funds
-                        to a smart account. Self-gates to connected sessions. */}
-                    <LegacyKeyRecoveryPanel />
-                    <div className="section">
-                      <h3>Encryption Key</h3>
-                      <p className="section-description">
-                        Your encryption key allows you to send and receive encrypted wagers. It is derived from
-                        {isPasskey ? ' your passkey' : ' your wallet signature'} and registered on-chain.
-                      </p>
+                    {/* Recovery collects several independent, high-stakes features. Each one
+                        renders as a COLLAPSED AccordionSection that states its own status in a
+                        line, so the tab opens as a scannable list rather than a stack of fully
+                        expanded panels; one section is open at a time, and every consequential
+                        or destructive action confirms in a bottom sheet. */}
+                    <p className="security-section__intro">
+                      Everything that protects your access to this account. Open a section to see or change it.
+                    </p>
+                    <AccordionGroup>
+                      {/* Data backup — encrypted backup/restore of device-local data (spec 032). */}
+                      <BackupPanel />
+                      {/* Spec 045 US5/US6 — account controllers & recovery.
+                          ControllersPanel renders for passkey sessions (add a
+                          passkey / link a wallet as recovery); the recovery
+                          panel renders for wallet sessions (regain passkey
+                          access using a linked wallet). Each self-gates. */}
+                      <ControllersPanel />
+                      <RecoverAccountPanel />
+                      {/* Recover an account from a legacy private key or word
+                          list, store it encrypted on-device, and move its funds
+                          to a smart account. Self-gates to connected sessions. */}
+                      <LegacyKeyRecoveryPanel />
+                      <AccordionSection
+                        id="encryption-key"
+                        title="Encryption key"
+                        summary={
+                          keyRegistered
+                            ? 'Registered on-chain'
+                            : isInitialized
+                              ? 'Derived on this device'
+                              : 'Not initialized'
+                        }
+                        badge={keyRegistered === false ? 'Not registered' : null}
+                        badgeTone="warn"
+                      >
+                        <p className="section-description">
+                          Your encryption key allows you to send and receive encrypted wagers. It is derived from
+                          {isPasskey ? ' your passkey' : ' your wallet signature'} and registered on-chain.
+                        </p>
 
-                      <div className="key-status-card">
-                        <div className="key-status-row">
-                          <span className="key-status-label">Local Keys:</span>
-                          <span className={`key-status-value ${isInitialized ? 'active' : 'inactive'}`}>
-                            {isInitializing ? 'Initializing...' : isInitialized ? 'Derived' : 'Not initialized'}
-                          </span>
+                        <div className="key-status-card">
+                          <div className="key-status-row">
+                            <span className="key-status-label">Local Keys:</span>
+                            <span className={`key-status-value ${isInitialized ? 'active' : 'inactive'}`}>
+                              {isInitializing ? 'Initializing...' : isInitialized ? 'Derived' : 'Not initialized'}
+                            </span>
+                          </div>
+                          <div className="key-status-row">
+                            <span className="key-status-label">On-chain Registration:</span>
+                            <span className={`key-status-value ${keyRegistered ? 'active' : keyRegistered === false ? 'inactive' : ''}`}>
+                              {keyCheckLoading ? 'Checking...' : keyRegistered === null ? 'Not checked' : keyRegistered ? 'Registered' : 'Not registered'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="key-status-row">
-                          <span className="key-status-label">On-chain Registration:</span>
-                          <span className={`key-status-value ${keyRegistered ? 'active' : keyRegistered === false ? 'inactive' : ''}`}>
-                            {keyCheckLoading ? 'Checking...' : keyRegistered === null ? 'Not checked' : keyRegistered ? 'Registered' : 'Not registered'}
-                          </span>
-                        </div>
-                      </div>
 
-                      {keyError && (
-                        <div className="key-error" role="alert">
-                          {keyError}
-                        </div>
-                      )}
-
-                      <div className="key-actions">
-                        <button
-                          onClick={handleCheckKeyStatus}
-                          className="key-action-btn secondary"
-                          disabled={keyCheckLoading}
-                        >
-                          {keyCheckLoading ? 'Checking...' : 'Check Status'}
-                        </button>
-
-                        {!keyRegistered && (
-                          <button
-                            onClick={handleRegisterKey}
-                            className="key-action-btn primary"
-                            disabled={keyRegisterLoading}
-                          >
-                            {keyRegisterLoading ? 'Registering...' : 'Register Encryption Key'}
-                          </button>
+                        {keyError && (
+                          <div className="key-error" role="alert">
+                            {keyError}
+                          </div>
                         )}
-                      </div>
-                    </div>
 
-                    <RecoveryCodesPanel />
+                        <div className="key-actions">
+                          <button
+                            onClick={handleCheckKeyStatus}
+                            className="key-action-btn secondary"
+                            disabled={keyCheckLoading}
+                          >
+                            {keyCheckLoading ? 'Checking...' : 'Check Status'}
+                          </button>
+
+                          {!keyRegistered && (
+                            <button
+                              onClick={handleRegisterKey}
+                              className="key-action-btn primary"
+                              disabled={keyRegisterLoading}
+                            >
+                              {keyRegisterLoading ? 'Registering...' : 'Register Encryption Key'}
+                            </button>
+                          )}
+                        </div>
+                      </AccordionSection>
+
+                      <RecoveryCodesPanel />
+                    </AccordionGroup>
                   </div>
                 )}
 

@@ -26,6 +26,7 @@ import { captureLegacyRecovery } from '../../data/ledger/sources/legacyRecoveryS
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
 import ActionSheet from './ActionSheet'
+import AccordionSection from './AccordionSection'
 import CrossChainRecoveryPanel from './CrossChainRecoveryPanel'
 import {
   classifySecret,
@@ -55,7 +56,7 @@ const STEP_TITLES = {
   done: 'Funds moved',
 }
 
-function LegacyKeyRecoveryPanel({ deps = {} }) {
+function LegacyKeyRecoveryPanel({ deps = {}, defaultOpen = false }) {
   const { address: sessionAddress, provider, loginMethod, chainId, isConnected } = useWallet()
   const { findByAddress, addContact, updateContact } = useAddressBook()
   // Stable module import ⇒ the memo is preservable and re-derives only when the
@@ -69,6 +70,8 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const [stored, setStored] = useState(() => vault.list())
   // Spec 063: which stored account (if any) has its cross-chain "Other chains" scan expanded.
   const [scanAddr, setScanAddr] = useState(null)
+  // Stored key queued for deletion — removal drops the only on-device copy, so it confirms in a sheet.
+  const [pendingRemoval, setPendingRemoval] = useState(null)
 
   // Import working state.
   const [rawSecret, setRawSecret] = useState('')
@@ -330,6 +333,7 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
   const removeStored = useCallback((address) => {
     vault.delete(address)
     refreshStored()
+    setPendingRemoval(null)
   }, [vault, refreshStored])
 
   if (!isConnected) return null
@@ -356,58 +360,70 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
     )
 
   return (
-    <section className="legacy-recovery section" aria-label="Recover a legacy key or word list">
-      <h3>Legacy key &amp; word-list recovery</h3>
-      <p className="section-description">
-        Moving from an older wallet? Bring in a legacy <strong>private key</strong> or <strong>word list</strong>{' '}
-        (recovery phrase). FairWins stores it encrypted on this device; you can then optionally move its funds to
-        a smart account and save it to your address book.
-      </p>
-      <button type="button" className="btn btn-primary legacy-recovery__start" onClick={openWizard}>
-        Recover a legacy key
-      </button>
+    <>
+      <AccordionSection
+        id="legacy-recovery"
+        title="Legacy key & word-list recovery"
+        summary={
+          stored.length > 0
+            ? `${stored.length} recovered ${stored.length === 1 ? 'account' : 'accounts'} on this device`
+            : 'Bring in an old private key or word list'
+        }
+        defaultOpen={defaultOpen}
+        className="legacy-recovery"
+      >
+        <p className="section-description">
+          Moving from an older wallet? Bring in a legacy <strong>private key</strong> or <strong>word list</strong>{' '}
+          (recovery phrase). FairWins stores it encrypted on this device; you can then optionally move its funds to
+          a smart account and save it to your address book.
+        </p>
+        <button type="button" className="btn btn-primary legacy-recovery__start" onClick={openWizard}>
+          Recover a legacy key
+        </button>
 
-      {stored.length > 0 && (
-        <ul className="lkr-stored" aria-label="Recovered legacy keys stored on this device">
-          {stored.map((e) => (
-            <li key={e.address} className="lkr-stored__item">
-              <div className="lkr-stored__meta">
-                <code className="lkr-stored__addr" title={e.address}>{shortAddr(e.address)}</code>
-                <span className="lkr-stored__sub">
-                  {KIND_LABEL[e.kind] || 'key'}
-                  {e.importedAt ? ` · saved ${new Date(e.importedAt).toLocaleDateString()}` : ''}
-                </span>
-              </div>
-              <div className="lkr-stored__actions">
-                <button type="button" className="btn btn-small" onClick={() => startTransferStored(e)}>
-                  Move funds
-                </button>
-                {e.kind === 'mnemonic' && (
+        {stored.length > 0 && (
+          <ul className="lkr-stored" aria-label="Recovered legacy keys stored on this device">
+            {stored.map((e) => (
+              <li key={e.address} className="lkr-stored__item">
+                <div className="lkr-stored__meta">
+                  <code className="lkr-stored__addr" title={e.address}>{shortAddr(e.address)}</code>
+                  <span className="lkr-stored__sub">
+                    {KIND_LABEL[e.kind] || 'key'}
+                    {e.importedAt ? ` · saved ${new Date(e.importedAt).toLocaleDateString()}` : ''}
+                  </span>
+                </div>
+                <div className="lkr-stored__actions">
+                  <button type="button" className="btn btn-small" onClick={() => startTransferStored(e)}>
+                    Move funds
+                  </button>
+                  {e.kind === 'mnemonic' && (
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      onClick={() => setScanAddr(scanAddr === e.address ? null : e.address)}
+                      aria-expanded={scanAddr === e.address}
+                    >
+                      Other chains
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="btn btn-small"
-                    onClick={() => setScanAddr(scanAddr === e.address ? null : e.address)}
-                    aria-expanded={scanAddr === e.address}
+                    className="btn btn-small lkr-stored__remove"
+                    onClick={() => setPendingRemoval(e)}
+                    aria-haspopup="dialog"
+                    aria-label={`Remove stored key ${shortAddr(e.address)}`}
                   >
-                    Other chains
+                    Remove
                   </button>
+                </div>
+                {scanAddr === e.address && e.kind === 'mnemonic' && (
+                  <CrossChainRecoveryPanel entry={e} />
                 )}
-                <button
-                  type="button"
-                  className="btn btn-small lkr-stored__remove"
-                  onClick={() => removeStored(e.address)}
-                  aria-label={`Remove stored key ${shortAddr(e.address)}`}
-                >
-                  Remove
-                </button>
-              </div>
-              {scanAddr === e.address && e.kind === 'mnemonic' && (
-                <CrossChainRecoveryPanel entry={e} />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </AccordionSection>
 
       <ActionSheet open={open} onClose={closeWizard} title={STEP_TITLES[step]} closeDisabled={busy}>
         {/* Step 1 — what this does + the honest warning. */}
@@ -761,12 +777,38 @@ function LegacyKeyRecoveryPanel({ deps = {} }) {
           </div>
         )}
       </ActionSheet>
-    </section>
+
+      {/* Deleting the on-device copy of a legacy key is irreversible from here — confirm it. */}
+      <ActionSheet
+        open={Boolean(pendingRemoval)}
+        onClose={() => setPendingRemoval(null)}
+        title="Remove this recovered key?"
+        closeDisabled={busy}
+      >
+        <p className="action-sheet__text">
+          The encrypted copy stored on this device is deleted. Anything still held by this account stays where it
+          is — you would need the original private key or word list to reach it again.
+        </p>
+        {pendingRemoval?.address && <code className="action-sheet__addr">{pendingRemoval.address}</code>}
+        <div className="action-sheet__actions">
+          <button type="button" className="btn" onClick={() => setPendingRemoval(null)}>Keep it</button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => removeStored(pendingRemoval.address)}
+          >
+            Remove key
+          </button>
+        </div>
+      </ActionSheet>
+    </>
   )
 }
 
 LegacyKeyRecoveryPanel.propTypes = {
   deps: PropTypes.object,
+  /** Start expanded (the Recovery tab keeps every section collapsed by default). */
+  defaultOpen: PropTypes.bool,
 }
 
 export default LegacyKeyRecoveryPanel

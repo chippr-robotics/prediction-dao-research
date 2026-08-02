@@ -18,6 +18,7 @@
   justify-content: center;
   z-index: 1500;
   padding: 16px;
+  animation: action-sheet-fade 160ms ease-out;
 }
 
 .action-sheet {
@@ -31,6 +32,24 @@
   border-radius: 16px;
   box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
   outline: none;
+  animation: action-sheet-pop 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes action-sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Desktop: a card that settles in. Mobile overrides this with a rise from the
+   bottom edge (see the media query below). */
+@keyframes action-sheet-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes action-sheet-rise {
+  from { transform: translateY(100%); }
+  to { transform: none; }
 }
 
 .action-sheet__handle {
@@ -158,6 +177,52 @@
   flex: 1;
 }
 
+/* There is no global `.btn` rule in this app — only scoped ones — so the sheet
+   paints its own three tones. Without this, the global `button {}` fills them
+   with --bg-secondary (darker than the sheet surface) and primary/destructive
+   look identical to cancel. */
+.action-sheet .btn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 26%, transparent);
+  color: var(--text-primary, #1f2933);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast, 0.15s ease), border-color var(--transition-fast, 0.15s ease);
+}
+
+.action-sheet .btn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36b37e);
+}
+
+.action-sheet .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-sheet .btn-primary {
+  background: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary, #36b37e);
+  color: #fff;
+}
+
+.action-sheet .btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 88%, #000);
+}
+
+.action-sheet .btn-danger {
+  background: var(--semantic-loss, #e5533d);
+  border-color: var(--semantic-loss, #e5533d);
+  color: #fff;
+}
+
+.action-sheet .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--semantic-loss, #e5533d) 88%, #000);
+  border-color: color-mix(in srgb, var(--semantic-loss, #e5533d) 88%, #000);
+}
+
 /* Bottom sheet on mobile, like the connect surface. */
 @media (max-width: 640px) {
   .action-sheet__backdrop {
@@ -169,6 +234,7 @@
     max-width: 100%;
     max-height: calc(85vh - 64px);
     border-radius: 20px 20px 0 0;
+    animation: action-sheet-rise 260ms cubic-bezier(0.2, 0, 0, 1);
     /* Reserve room so the last actions clear the fixed icon nav (z-index 1200)
        and stay visible/tappable (#938). */
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
@@ -181,5 +247,12 @@
     border-radius: 999px;
     background: var(--border-color, #e3e7eb);
     margin: 8px auto 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-sheet__backdrop,
+  .action-sheet {
+    animation: none;
   }
 }

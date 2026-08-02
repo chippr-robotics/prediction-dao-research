@@ -147,6 +147,30 @@ counterparty public keys in `KeyRegistry`, and envelope-encrypts wager terms
 before pinning to IPFS. Decryption is lazy — triggered when the user opens a
 wager's details. See [Encryption Architecture](encryption-architecture.md).
 
+### Settings surfaces: collapsed sections + sheets
+
+The **Recovery** tab (`?tab=security`) hosts several independent, high-stakes
+features (data backup, controllers, wallet-based recovery, legacy keys, the
+encryption key, recovery codes). Each panel renders itself as an
+`AccordionSection` inside the tab's `AccordionGroup`
+(`components/account/AccordionSection.jsx`, `AccordionGroup.jsx`):
+
+- **Collapsed by default**, with a one-line `summary` of the panel's current
+  state and an optional `badge` when it needs attention — the tab opens as a
+  scannable list, not a wall of controls.
+- **One section open at a time** (`exclusive`, the group default). Group state
+  is in memory, so returning to the tab always starts tidy.
+- Children stay **mounted** while collapsed (that is what the
+  `grid-template-rows: 0fr → 1fr` animation needs) but the region is `inert`, so
+  nothing inside is focusable or announced until it opens.
+- Panels keep their own `return null` gating: wrap the accordion **inside** the
+  panel, and render `ActionSheet`s as **siblings** of the section, never inside
+  the collapsible region (an inert ancestor would disable the sheet).
+- Consequential or destructive actions — restore, remove a backup, link a
+  wallet, remove a controller, delete a recovered key — confirm in an
+  `ActionSheet` (centered card on desktop, bottom sheet on mobile) that states
+  the consequence first.
+
 ### Network handling
 
 `config/wagmi.js` defines the default chain (Polygon 137, overridable via

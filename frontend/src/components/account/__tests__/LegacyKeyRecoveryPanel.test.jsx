@@ -313,12 +313,19 @@ describe('LegacyKeyRecoveryPanel', () => {
     expect(await screen.findByLabelText('Destination smart account')).toBeInTheDocument()
   })
 
-  it('removes a stored key', async () => {
+  it('removes a stored key only after the confirmation sheet is confirmed', async () => {
     lib.store.set(LEGACY_ADDR.toLowerCase(), { kind: 'privateKey', address: LEGACY_ADDR, importedAt: 42, ct: 'x' })
     const user = userEvent.setup()
     render(<LegacyKeyRecoveryPanel />)
     expect(screen.getByRole('listitem')).toBeInTheDocument()
+
+    // Backing out of the confirmation keeps the key.
     await user.click(screen.getByRole('button', { name: /Remove stored key/i }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /keep it/i }))
+    expect(screen.getByRole('listitem')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Remove stored key/i }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /remove key/i }))
     await waitFor(() => expect(screen.queryByRole('listitem')).not.toBeInTheDocument())
   })
 
