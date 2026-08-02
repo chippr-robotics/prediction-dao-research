@@ -105,6 +105,15 @@ export default function PayTransferPanel() {
            route (its own padding + a full-height scroll region) — the same thing HomeScreen.css
            does for the home surface. The component itself is untouched. */
         <div role="tabpanel" aria-label="Wagers" className="pt-wagers">
+          {/* Says the one thing that makes this different from its two neighbours. A send leaves
+              the wallet and is gone; a bridge leaves and arrives elsewhere; a wager is ESCROWED and
+              comes back — or doesn't — on an outcome. A member who read the Transfer blurb and
+              clicked across should not have to infer that. */}
+          <p className="pt-intro">
+            Stake against someone on an outcome. The stake is held in escrow by the contract until the
+            wager resolves — it is not sent to the other party, and an unaccepted or unresolved wager is
+            refundable.
+          </p>
           <Dashboard />
         </div>
       )}
