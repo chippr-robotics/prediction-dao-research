@@ -75,7 +75,12 @@
   outline: 2px solid var(--brand-primary, #36b37e);
   outline-offset: 2px;
 }
-.miniapp-catalog-refresh:disabled {
+/* An in-flight refresh keeps the control focusable (`aria-disabled`, not `disabled`) so the member
+   who pressed it does not lose focus to <body> — see the button. It still has to LOOK inert, so the
+   two states are styled identically. `cursor: default` rather than `not-allowed`: the press is
+   refused for a second, not forbidden. */
+.miniapp-catalog-refresh:disabled,
+.miniapp-catalog-refresh[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
 }
@@ -499,8 +504,17 @@
 .miniapp-submit-counter {
   white-space: nowrap;
 }
+/* Field errors are carried by the WORD, at full text contrast, not by a red tint (T047).
+   `--error-color` is referenced in several places in this app and defined in none of them, so
+   every one of them silently renders its literal fallback: #d64545 measures 4.4:1 on the light
+   surface and 3.35:1 on the dark one, and this is 12.8px bold — under the 18.7px that would let
+   it qualify as large text. Both miss 1.4.3 AA. The red stays where it is legitimate: on the
+   input's own 2px border, which is a non-text state indicator needing 3:1 and clearing it in both
+   themes. That leaves the error marked three ways — the border, the weight, and the sentence
+   itself — and dependent on colour for none of them, which is the rule the rest of this
+   stylesheet already follows. */
 .miniapp-submit-field-error {
-  color: var(--error-color, #d64545);
+  color: var(--text-primary, #1f2933);
   font-size: 0.8rem;
   font-weight: 600;
   margin: 0;
@@ -620,7 +634,10 @@
   outline: 2px solid var(--brand-primary, #36b37e);
   outline-offset: 2px;
 }
-.miniapp-submit-primary:disabled {
+/* As with the catalog's Refresh: `aria-disabled` while a write is in flight keeps focus on the
+   control the vendor pressed, so both spellings get the same inert appearance. */
+.miniapp-submit-primary:disabled,
+.miniapp-submit-primary[aria-disabled='true'] {
   cursor: default;
   opacity: 0.6;
 }
@@ -759,4 +776,49 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.35rem;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Curator review queue (admin → Mini-app review) — accessibility corrections only (T047).
+ *
+ * That tab is built from the shared AdminPanel classes and deliberately keeps them, so it looks
+ * like every other admin surface. Two of those shared rules do not survive a WCAG 2.1 AA reading
+ * on THIS surface, and both are corrected here rather than in `AdminPanel.css` because that file
+ * dresses twelve other tabs whose copy and layout have not been audited: a scoped fix is a change
+ * to one surface, an unscoped one is a change to all of them.
+ * ------------------------------------------------------------------------------------------- */
+
+/* 1.4.3 CONTRAST. `.card-info.warning-text` tints the TEXT with `--warning-color` over a 10% wash
+   of the same hue. In dark mode that is light-on-dark and fine; in the default light theme it is
+   #f59e0b on ~#fef5e6, which measures about 2:1 against a 4.5:1 requirement. On this surface that
+   colour carries the stale-proposal notice, the failed-verification verdict, the unverified-
+   authority warning and the permanent-retirement confirmation — the four sentences a curator can
+   least afford to skim. The amber wash and the block treatment stay (they are what makes a
+   warning recognisable at a glance); only the text returns to full contrast, which is the same
+   decision `.miniapp-catalog-unverified` above already documents.
+
+   TARGET SIZE. The same shared rule is `display: flex` in ROW direction, which lays a warning's
+   paragraph and its buttons side by side and lets the buttons shrink — on a narrow viewport the
+   confirm and cancel controls in the retirement block compress well under a usable target. They
+   are stacked here, which is what the block was written to read as anyway. */
+.miniapp-review .card-info.warning-text {
+  align-items: flex-start;
+  color: var(--text-primary, #1f2933);
+  flex-direction: column;
+}
+
+/* The retirement confirmation takes focus when it opens (see `ReviewRecord`), so it needs a
+   visible focus indicator of its own — the global `*:focus-visible` outline is drawn on the
+   element, and `outline-offset` keeps it clear of the block's own edge. */
+.miniapp-review-confirm:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 3px;
+}
+
+/* `aria-disabled` marks the transient "a write is in flight" state on this tab's controls, so it
+   has to look exactly as inert as `:disabled` does. */
+.miniapp-review .confirm-btn[aria-disabled='true'],
+.miniapp-review .refresh-btn[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
 }

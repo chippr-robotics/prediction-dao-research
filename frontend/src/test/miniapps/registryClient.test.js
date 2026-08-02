@@ -11,6 +11,8 @@
  * network yet, and `getContractAddressForChain('miniAppRegistry', …)` returns '' everywhere.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const m = vi.hoisted(() => ({
   /** Contract method name -> implementation. Unset methods throw, so a test can't pass by accident. */
@@ -61,6 +63,7 @@ import { AppStatus, AppCategory } from '../../abis/miniAppRegistry'
 import {
   CATALOG_CACHE_TTL_MS,
   CATALOG_PAGE_SIZE,
+  MINIAPP_MAX_PAGE_LIMIT,
   REGISTRY_STATUS,
   UNREACHABLE_REASON,
   appIdsByVendor,
@@ -252,8 +255,30 @@ describe('fetchCatalog — the registry answered', () => {
     expect(m.calls.filter((c) => c.method === 'getAppsPaged')).toHaveLength(1)
   })
 
-  it('requests a page well under the contract’s MAX_PAGE_LIMIT of 100', () => {
-    expect(CATALOG_PAGE_SIZE).toBeLessThan(100)
+  /*
+   * The guard this replaced asserted `CATALOG_PAGE_SIZE < 100` — against a contract cap of 25. It
+   * would have passed for any value up to 99 while the chain served at most 25, and the mock
+   * `serveCatalog` has no clamp, so no client test could observe the difference. A maintainer
+   * raising the page size on the authority of that green test would have shipped silent truncation:
+   * the contract clamps, `readAllRecords` reads the short page as the end of the catalog, and apps
+   * vanish with `status: 'ok'`.
+   *
+   * So the cap is read out of the Solidity source rather than restated. A number copied into a test
+   * is a number that can drift from the one it is guarding, which is exactly how this broke.
+   */
+  it('never asks for more than the contract will serve (MAX_PAGE_LIMIT, read from the source)', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../../../contracts/apps/MiniAppRegistry.sol'),
+      'utf8',
+    )
+    const match = source.match(/uint256\s+public\s+constant\s+MAX_PAGE_LIMIT\s*=\s*(\d+)\s*;/)
+    expect(match, 'MAX_PAGE_LIMIT not found in MiniAppRegistry.sol').toBeTruthy()
+    const onChainCap = Number(match[1])
+
+    // The mirrored constant has to be right before it can be useful.
+    expect(MINIAPP_MAX_PAGE_LIMIT).toBe(onChainCap)
+    // And the page size has to be servable. Equality is fine; exceeding it is silent truncation.
+    expect(CATALOG_PAGE_SIZE).toBeLessThanOrEqual(onChainCap)
   })
 })
 

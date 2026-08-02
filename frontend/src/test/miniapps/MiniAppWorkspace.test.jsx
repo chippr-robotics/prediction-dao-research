@@ -18,6 +18,7 @@
  *  - every refusal is its own specific message, and a mini-app that throws is
  *    contained to its own surface (FR-015).
  */
+import { useState } from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -525,6 +526,72 @@ describe('accessibility (WCAG 2.1 AA)', () => {
     const { container } = renderWorkspace()
     await screen.findByText('token mint surface')
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  /**
+   * T047 — a launch is a route change with a wait in the middle, and React Router moves focus for
+   * neither half. Left alone, the member who pressed "Launch" is standing on `<body>` by the time
+   * there is anything to read, and the polite "Verifying and loading…" region simply disappears:
+   * a whole new surface arrives announced by nothing. Focus lands on the heading of whatever
+   * settled instead — which announces it AND puts the member at the top of the surface rather
+   * than the top of the host chrome.
+   */
+  describe('focus follows the launch', () => {
+    it('lands on the app heading once the package is mounted', async () => {
+      renderWorkspace()
+      await screen.findByText('token mint surface')
+      const heading = screen.getByRole('heading', { name: NAME })
+      expect(document.activeElement).toBe(heading)
+      // Focusable as a target, never as a Tab stop.
+      expect(heading).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('lands on the refusal heading when the launch is refused', async () => {
+      m.outcome = found(record({ status: AppStatus.SUSPENDED, launchable: false }))
+      renderWorkspace()
+      const heading = await screen.findByRole('heading', { name: /this app is suspended/i })
+      await waitFor(() => expect(document.activeElement).toBe(heading))
+    })
+
+    it('follows a retry rather than leaving the member on the button it destroyed', async () => {
+      // "Try again" re-keys the whole launch, so the button holding focus is unmounted by the
+      // press that used it.
+      m.outcome = { status: 'unreachable', chainId: CHAIN, registryAddress: REGISTRY, reason: 'read_failed' }
+      renderWorkspace()
+      await screen.findByRole('button', { name: /try again/i })
+
+      m.outcome = found(record())
+      await userEvent.click(screen.getByRole('button', { name: /try again/i }))
+
+      await screen.findByText('token mint surface')
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: NAME }))
+    })
+
+    it('lands on the crash notice when the package throws under the member', async () => {
+      // A crash the member CAUSED, which is the case the notice exists for: the control they
+      // pressed goes down with the app, so without this they are left on <body>, a page-length
+      // of Tab away from the restart control. (A package that throws on its very first render is
+      // slightly different — the workspace's own ready-focus effect runs last in that commit and
+      // wins, leaving focus on the app heading with the crash still announced by its `alert`.)
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const Flaky = () => {
+        const [boom, setBoom] = useState(false)
+        if (boom) throw new Error('mini-app blew up during render')
+        return (
+          <button type="button" onClick={() => setBoom(true)}>
+            break the app
+          </button>
+        )
+      }
+      m.load = () => loaded({ component: Flaky })
+
+      renderWorkspace()
+      await userEvent.click(await screen.findByRole('button', { name: 'break the app' }))
+
+      const heading = await screen.findByRole('heading', { name: /this app stopped working/i })
+      await waitFor(() => expect(document.activeElement).toBe(heading))
+      consoleError.mockRestore()
+    })
   })
 
   it('has no violations on a refusal, and announces it', async () => {

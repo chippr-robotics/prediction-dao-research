@@ -48,7 +48,7 @@
  * signer, one sponsored UserOp) and a classic injected wallet both work without a second code path.
  */
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Contract, Interface } from 'ethers'
 
@@ -771,6 +771,43 @@ function useDuplicateNameCheck(name, ownId = null) {
 // Forms.
 // ---------------------------------------------------------------------------
 
+/**
+ * Make a refused submission perceivable (T047 · WCAG 3.3.1, 2.4.3).
+ *
+ * Every form here validates on the first submit attempt and then renders the failures beside
+ * their fields, wired with `aria-invalid` and `aria-describedby`. That is correct and it is also
+ * completely silent: a member who presses Submit and cannot see the page gets no page change to
+ * notice, no live region, and no reason to suspect the button did anything at all — the form just
+ * does not submit. Pointer users see the red borders appear; screen-reader and keyboard users
+ * were told nothing.
+ *
+ * Moving focus to the first refused control fixes both halves at once — the failure is announced
+ * (the control's own label, error text and invalid state are read on arrival) and the member is
+ * standing on the thing they have to change. It is preferred over an error-summary live region
+ * because it leaves them somewhere useful rather than somewhere informative.
+ *
+ * Returns a ref for the `<form>` and a `reportBlocked()` to call when a submit is refused. The
+ * attempt counter is what makes a SECOND refused press re-announce: the DOM does not change
+ * between two identical failures, so without it nothing would happen the second time.
+ */
+function useFocusFirstInvalid() {
+  const formRef = useRef(null)
+  const [blockedAttempt, setBlockedAttempt] = useState(0)
+
+  useEffect(() => {
+    if (blockedAttempt === 0) return
+    // Read after the render that added `aria-invalid`, in DOM order, so "first" means the
+    // topmost refused control rather than whichever check happens to be listed first. The
+    // acknowledgement box is in the selector because a hash mismatch is the one refusal with no
+    // invalid FIELD behind it — the thing to go to is the consent the submission is waiting on,
+    // and it always sits below the fields, so a genuinely invalid field still wins.
+    const first = formRef.current?.querySelector('[aria-invalid="true"], .miniapp-submit-ack input')
+    if (first) first.focus()
+  }, [blockedAttempt])
+
+  return { formRef, reportBlocked: () => setBlockedAttempt((n) => n + 1) }
+}
+
 /** Shared metadata inputs (name / description / category), used by both the new and the edit form. */
 function MetadataFields({ idPrefix, values, onChange, errors, duplicate }) {
   const slugWarning = nameSlugWarning(values.name)
@@ -898,7 +935,15 @@ function PackageFields({ idPrefix, values, onChange, errors, precheck }) {
         )}
       </Field>
 
-      <PrecheckVerdict result={precheck} />
+      {/* Keyed on the state (T047), for the reason the notice above is. The verdict's four
+          renderings carry three different roles — `status` while checking and on a match,
+          `alert` on a mismatch, `note` when no gateway answered — and three of them are a
+          `<div>` at the same position, which React would reconcile into one node with a
+          rewritten `role`. That the hook currently routes every change through the CHECKING
+          `<p>` (so a remount happens anyway) is a property of the hook, not of this render; the
+          key makes the announcement hold regardless. The verdict this protects is the mismatch
+          one, which is the only client-side finding that holds up a submission. */}
+      <PrecheckVerdict key={precheck.state} result={precheck} />
     </>
   )
 }
@@ -923,9 +968,35 @@ function MismatchAcknowledgement({ id, checked, onChange }) {
   )
 }
 
+/**
+ * The submit button, shared by all three forms.
+ *
+ * `aria-disabled` rather than `disabled` while the write is in flight (T047), for the reason the
+ * catalog's Refresh control gives: a control that goes `disabled` under the press that activated
+ * it leaves the tab order, and focus falls to <body> — so a keyboard member is thrown to the top
+ * of the page at exactly the moment the wallet prompt appears, and never hears the outcome. Kept
+ * focusable, the label change and `aria-busy` are announced on the control they are still
+ * standing on. The submit handler refuses re-entry, so a second press during the write is a
+ * no-op rather than a second transaction.
+ */
+function SubmitButton({ busy, blockedNote, children, busyLabel }) {
+  return (
+    <button
+      type="submit"
+      className="miniapp-submit-primary"
+      aria-disabled={busy || undefined}
+      aria-busy={busy || undefined}
+      aria-describedby={blockedNote}
+    >
+      {busy ? busyLabel : children}
+    </button>
+  )
+}
+
 /** New listing (`submitApp`). */
 function NewListingForm({ onSubmit, busy, fetchImpl, blockedNote }) {
   const idPrefix = useId()
+  const { formRef, reportBlocked } = useFocusFirstInvalid()
   const [values, setValues] = useState({
     name: '',
     description: '',
@@ -970,8 +1041,12 @@ function NewListingForm({ onSubmit, busy, fetchImpl, blockedNote }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (busy) return
     setSubmitted(true)
-    if (blocked) return
+    if (blocked) {
+      reportBlocked()
+      return
+    }
     const sent = await onSubmit({
       name: values.name,
       description: values.description,
@@ -987,7 +1062,7 @@ function NewListingForm({ onSubmit, busy, fetchImpl, blockedNote }) {
   }
 
   return (
-    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate>
+    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate ref={formRef}>
       <MetadataFields idPrefix={idPrefix} values={values} onChange={update} errors={errors} duplicate={duplicate} />
       <PackageFields idPrefix={idPrefix} values={values} onChange={update} errors={errors} precheck={precheck} />
 
@@ -1008,16 +1083,17 @@ function NewListingForm({ onSubmit, busy, fetchImpl, blockedNote }) {
         <MismatchAcknowledgement id={`${idPrefix}-ack`} checked={acknowledged} onChange={setAcknowledged} />
       )}
 
-      <button type="submit" className="miniapp-submit-primary" disabled={busy} aria-describedby={blockedNote}>
-        {busy ? 'Submitting…' : 'Submit listing for review'}
-      </button>
+      <SubmitButton busy={busy} blockedNote={blockedNote} busyLabel="Submitting…">
+        Submit listing for review
+      </SubmitButton>
     </form>
   )
 }
 
 /** New package for an existing listing (`submitUpdate`). */
-function PackageUpdateForm({ app, onSubmit, busy, fetchImpl, blockedNote }) {
+function PackageUpdateForm({ app, onSubmit, busy, fetchImpl, blockedNote, formId }) {
   const idPrefix = useId()
+  const { formRef, reportBlocked } = useFocusFirstInvalid()
   const [values, setValues] = useState({ cid: '', manifestHash: '' })
   const [submitted, setSubmitted] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
@@ -1047,8 +1123,12 @@ function PackageUpdateForm({ app, onSubmit, busy, fetchImpl, blockedNote }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (busy) return
     setSubmitted(true)
-    if (blocked) return
+    if (blocked) {
+      reportBlocked()
+      return
+    }
     const sent = await onSubmit({
       id: app.id,
       cid: values.cid.trim(),
@@ -1062,7 +1142,7 @@ function PackageUpdateForm({ app, onSubmit, busy, fetchImpl, blockedNote }) {
   }
 
   return (
-    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate>
+    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate ref={formRef} id={formId}>
       <UpdateDisclosure live={app.launchable} />
       <PackageFields idPrefix={idPrefix} values={values} onChange={update} errors={errors} precheck={precheck} />
       <p className="miniapp-submit-version-note">
@@ -1073,16 +1153,17 @@ function PackageUpdateForm({ app, onSubmit, busy, fetchImpl, blockedNote }) {
       {mismatch && (
         <MismatchAcknowledgement id={`${idPrefix}-ack`} checked={acknowledged} onChange={setAcknowledged} />
       )}
-      <button type="submit" className="miniapp-submit-primary" disabled={busy} aria-describedby={blockedNote}>
-        {busy ? 'Submitting…' : 'Submit package for review'}
-      </button>
+      <SubmitButton busy={busy} blockedNote={blockedNote} busyLabel="Submitting…">
+        Submit package for review
+      </SubmitButton>
     </form>
   )
 }
 
 /** Reviewed metadata for an existing listing (`updateMetadata`). */
-function MetadataUpdateForm({ app, onSubmit, busy, blockedNote }) {
+function MetadataUpdateForm({ app, onSubmit, busy, blockedNote, formId }) {
   const idPrefix = useId()
+  const { formRef, reportBlocked } = useFocusFirstInvalid()
   const [values, setValues] = useState({
     name: app.name,
     description: app.description,
@@ -1106,8 +1187,12 @@ function MetadataUpdateForm({ app, onSubmit, busy, blockedNote }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (busy) return
     setSubmitted(true)
-    if (blocked) return
+    if (blocked) {
+      reportBlocked()
+      return
+    }
     await onSubmit({
       id: app.id,
       name: values.name,
@@ -1117,7 +1202,7 @@ function MetadataUpdateForm({ app, onSubmit, busy, blockedNote }) {
   }
 
   return (
-    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate>
+    <form className="miniapp-submit-form" onSubmit={handleSubmit} noValidate ref={formRef} id={formId}>
       <UpdateDisclosure live={app.launchable} />
       <p className="miniapp-submit-version-note">
         Name, description and category are reviewed fields, so editing them sends the listing back to
@@ -1125,9 +1210,9 @@ function MetadataUpdateForm({ app, onSubmit, busy, blockedNote }) {
         about what members are running in the meantime.
       </p>
       <MetadataFields idPrefix={idPrefix} values={values} onChange={update} errors={errors} duplicate={duplicate} />
-      <button type="submit" className="miniapp-submit-primary" disabled={busy} aria-describedby={blockedNote}>
-        {busy ? 'Submitting…' : 'Submit details for review'}
-      </button>
+      <SubmitButton busy={busy} blockedNote={blockedNote} busyLabel="Submitting…">
+        Submit details for review
+      </SubmitButton>
     </form>
   )
 }
@@ -1179,6 +1264,8 @@ function PackageTuple({ label, tuple, note }) {
  */
 function VendorAppCard({ app, openAction, onToggle, onSubmitPackage, onSubmitMetadata, busy, fetchImpl, blockedNote }) {
   const headingId = `miniapp-submission-${app.id}-name`
+  const packageFormId = `miniapp-submission-${app.id}-package-form`
+  const metadataFormId = `miniapp-submission-${app.id}-metadata-form`
   const statusLabel = STATUS_LABELS[app.status] ?? `Status ${app.status}`
   const categoryLabel = APP_CATEGORY_LABELS[app.category] ?? `Category ${app.category}`
   // The contract freezes a listing for its vendor once it is suspended or retired — offering the
@@ -1252,10 +1339,15 @@ function VendorAppCard({ app, openAction, onToggle, onSubmitPackage, onSubmitMet
 
       {editable && (
         <div className="miniapp-submission-actions">
+          {/* `aria-expanded` says a control reveals something; `aria-controls` says WHAT, which
+              is what lets a screen reader jump to the form these buttons open instead of
+              hunting for it. The ids are per-listing, so two expanded cards never claim the
+              same target (T047). */}
           <button
             type="button"
             className="miniapp-submit-secondary"
             aria-expanded={open === 'package'}
+            aria-controls={open === 'package' ? packageFormId : undefined}
             onClick={() => onToggle(app.id, 'package')}
           >
             {open === 'package' ? 'Cancel package update' : 'Submit a package update'}
@@ -1264,6 +1356,7 @@ function VendorAppCard({ app, openAction, onToggle, onSubmitPackage, onSubmitMet
             type="button"
             className="miniapp-submit-secondary"
             aria-expanded={open === 'metadata'}
+            aria-controls={open === 'metadata' ? metadataFormId : undefined}
             onClick={() => onToggle(app.id, 'metadata')}
           >
             {open === 'metadata' ? 'Cancel details edit' : 'Edit listing details'}
@@ -1274,6 +1367,7 @@ function VendorAppCard({ app, openAction, onToggle, onSubmitPackage, onSubmitMet
       {open === 'package' && (
         <PackageUpdateForm
           app={app}
+          formId={packageFormId}
           onSubmit={onSubmitPackage}
           busy={busy}
           fetchImpl={fetchImpl}
@@ -1281,7 +1375,13 @@ function VendorAppCard({ app, openAction, onToggle, onSubmitPackage, onSubmitMet
         />
       )}
       {open === 'metadata' && (
-        <MetadataUpdateForm app={app} onSubmit={onSubmitMetadata} busy={busy} blockedNote={blockedNote} />
+        <MetadataUpdateForm
+          app={app}
+          formId={metadataFormId}
+          onSubmit={onSubmitMetadata}
+          busy={busy}
+          blockedNote={blockedNote}
+        />
       )}
     </li>
   )
@@ -1527,7 +1627,14 @@ export default function SubmitAppPanel({ fetchImpl } = {}) {
       )}
 
       {notice && (
+        // Keyed on the kind (T047). Success and failure are two DIFFERENT live regions at one
+        // position — `status` and `alert` — and React reconciling them as a single `<p>` would
+        // rewrite `role` in place, which no screen reader treats as a new announcement. Today
+        // `send` clears the notice before every write, so the node does unmount in between and
+        // the announcement survives; the key is what stops that guarantee depending on the
+        // ordering inside an unrelated function. Cheap here, silent failure if it ever changes.
         <p
+          key={notice.kind}
           className={`miniapp-submit-notice is-${notice.kind}`}
           role={notice.kind === 'error' ? 'alert' : 'status'}
         >

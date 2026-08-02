@@ -831,6 +831,75 @@ describe('SubmitAppPanel — accessibility (WCAG 2.1 AA)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
+  it('sends focus to the first refused field when a submission is blocked (T047)', async () => {
+    // A refused submit is otherwise completely silent: the button does nothing a screen reader
+    // can perceive, the page does not navigate, and the errors appear beside fields nobody was
+    // told to go and look at. Landing on the first refused control both announces the failure
+    // (its label, its error and its invalid state are read on arrival) and puts the vendor on
+    // the thing they have to change.
+    await renderSettled()
+    const form = formFor(NEW_LISTING)
+    // Description filled, name and package left empty: the FIRST refusal in DOM order is name.
+    setField(form, 'Description', 'Matches and settles bilateral trades.')
+    fireEvent.click(within(form).getByRole('button', { name: NEW_LISTING }))
+
+    const name = within(form).getByLabelText('Listing name')
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(name).toHaveAttribute('aria-invalid', 'true')
+    // The error is the field's own description, not a message elsewhere on the page.
+    const describedBy = (name.getAttribute('aria-describedby') || '').split(/\s+/)
+    const errorId = describedBy.find((id) => document.getElementById(id)?.textContent?.includes('Enter a name'))
+    expect(errorId).toBeTruthy()
+    expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+  })
+
+  it('re-announces a second identical refusal rather than going quiet', async () => {
+    // Nothing in the DOM changes between two identical failed presses, so without the attempt
+    // counter behind the focus move the second press would produce no perceivable response at
+    // all — the classic "I pressed it and nothing happened" for a non-sighted vendor.
+    await renderSettled()
+    const form = formFor(NEW_LISTING)
+    fireEvent.click(within(form).getByRole('button', { name: NEW_LISTING }))
+    const name = within(form).getByLabelText('Listing name')
+    await waitFor(() => expect(document.activeElement).toBe(name))
+
+    // Move away, press again: focus must come back.
+    within(form).getByLabelText('Description').focus()
+    fireEvent.click(within(form).getByRole('button', { name: NEW_LISTING }))
+    await waitFor(() => expect(document.activeElement).toBe(name))
+  })
+
+  it('sends focus to the acknowledgement when a hash mismatch is the only thing blocking', async () => {
+    // The one refusal with no invalid FIELD behind it: every value is acceptable to the chain,
+    // and what the submission is waiting on is the vendor's consent.
+    state.fetchImpl = servesManifest()
+    await renderSettled()
+    const form = fillValidListing({ manifestHash: WRONG_HASH })
+    await within(form).findByText(/does not hash to what you entered/i, undefined, { timeout: 3000 })
+
+    fireEvent.click(within(form).getByRole('button', { name: NEW_LISTING }))
+    const ack = within(form).getByRole('checkbox')
+    await waitFor(() => expect(document.activeElement).toBe(ack))
+    expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+  })
+
+  it('names the form each disclosure button opens', async () => {
+    // `aria-expanded` alone says a control reveals SOMETHING; `aria-controls` is what lets a
+    // screen-reader user jump to the form instead of hunting for it below the card.
+    state.vendorApps = vi.fn(async () => vendorOk([appRecord({ id: 7, name: 'Settle Desk' })]))
+    await renderSettled()
+
+    const toggle = screen.getByRole('button', { name: 'Submit a package update' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+
+    const expanded = screen.getByRole('button', { name: 'Cancel package update' })
+    expect(expanded).toHaveAttribute('aria-expanded', 'true')
+    const controlled = expanded.getAttribute('aria-controls')
+    expect(controlled).toBeTruthy()
+    expect(document.getElementById(controlled)).toBe(formFor('Submit package for review'))
+  })
+
   it('labels every category option with its on-chain enum order', async () => {
     await renderSettled()
     const options = within(formFor(NEW_LISTING))

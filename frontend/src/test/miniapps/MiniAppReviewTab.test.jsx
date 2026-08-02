@@ -527,6 +527,41 @@ describe('deprecation is terminal, so it takes two deliberate steps', () => {
     expect(state.calls[0]).toEqual({ method: 'deprecateApp', args: [2] })
   })
 
+  it('carries focus into the warning and back out to the trigger (T047)', async () => {
+    // The trigger REPLACES itself with the confirmation, so the element holding focus is
+    // destroyed by the press that opened it — untouched, focus falls to <body> and a keyboard
+    // curator is thrown to the top of the admin page, with the permanence warning now somewhere
+    // below them. Cancel does the same in reverse. Focus has to follow the disclosure both ways.
+    const user = userEvent.setup()
+    renderTab()
+    const card = await recordCard('Ledger Sync')
+
+    const trigger = within(card).getByRole('button', { name: /Retire permanently…/ })
+    trigger.focus()
+    await user.keyboard('{Enter}')
+
+    // The warning itself, not the destructive button: the second step exists so it is READ.
+    const confirm = within(card).getByRole('alert')
+    expect(document.activeElement).toBe(confirm)
+    expect(confirm).toHaveTextContent(/Retiring Ledger Sync is permanent\./)
+    // And it is a focus target, never a Tab stop reachable from elsewhere.
+    expect(confirm).toHaveAttribute('tabindex', '-1')
+
+    await user.click(within(card).getByRole('button', { name: 'Cancel' }))
+    expect(document.activeElement).toBe(
+      within(card).getByRole('button', { name: /Retire permanently…/ }),
+    )
+    expect(state.calls).toHaveLength(0)
+  })
+
+  it('does not steal focus on first render just because a card can be retired', async () => {
+    // The effect that moves focus into the confirmation must not fire on mount, or every card in
+    // the queue would fight for focus the moment the tab loads.
+    renderTab()
+    await recordCard('Ledger Sync')
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it('offers no lifecycle control at all on an already-retired record', async () => {
     const retired = appRecord({
       id: 9,
@@ -685,5 +720,75 @@ describe('a decision has to be signed on the registry chain', () => {
     const settledCard = await recordCard('Ledger Sync')
     expect(within(settledCard).getByRole('button', { name: 'Suspend' })).toBeDisabled()
     expect(state.calls).toHaveLength(0)
+  })
+
+  it('every withheld control NAMES the reason it is withheld (T047)', async () => {
+    // A sentence sitting above the queue explains a disabled button only to someone who can see
+    // both at once. `aria-describedby` is what makes the explanation the button's own.
+    const user = userEvent.setup()
+    renderTab({ chainId: OTHER_CHAIN })
+    const card = await recordCard('Token Mint')
+
+    const note = screen.getByText(/recording a decision needs your wallet on/i)
+    expect(note.id).toBeTruthy()
+
+    const describes = (button) => (button.getAttribute('aria-describedby') || '').split(/\s+/)
+    expect(describes(within(card).getByRole('button', { name: /Reject proposed v2/ }))).toContain(note.id)
+    const settledCard = await recordCard('Ledger Sync')
+    expect(describes(within(settledCard).getByRole('button', { name: 'Suspend' }))).toContain(note.id)
+    expect(describes(within(settledCard).getByRole('button', { name: /Retire permanently…/ }))).toContain(note.id)
+
+    // Approve is refused for two independent reasons here, and points at BOTH: the wrong network
+    // and the unverified package. Naming only one would send a curator to fix half a problem.
+    const approve = within(card).getByRole('button', { name: /^Approve v2/ })
+    const gateNote = within(card).getByText(/Verify the package before approving it/i)
+    expect(describes(approve)).toEqual(expect.arrayContaining([gateNote.id, note.id]))
+
+    // Verification is a read, so it works from any network — and the button that is genuinely
+    // inoperable (no package on the record) names that instead.
+    await user.click(within(card).getByRole('button', { name: /Verify proposed package/ }))
+    await waitFor(() => expect(within(card).getByText(/Package verified\./)).toBeInTheDocument())
+  })
+
+  it('names the "no package to check" sentence from the Verify control it disables', async () => {
+    const empty = appRecord({ id: 4, name: 'Empty Record', status: AppStatus.PENDING })
+    state.catalogOutcomes = [okOutcome([empty])]
+    renderTab()
+    const card = await recordCard('Empty Record')
+
+    const verify = within(card).getByRole('button', { name: /Verify (proposed|approved) package/ })
+    // Durable inoperability: `disabled` is right here, but the reason has to be reachable.
+    expect(verify).toBeDisabled()
+    const note = within(card).getByText(/holds no package to check/i)
+    expect(verify).toHaveAttribute('aria-describedby', note.id)
+  })
+
+  it('keeps focus on Verify while it runs, rather than dropping it to the body', async () => {
+    // The fetch-and-hash of a whole package is the longest wait on this surface. Disabling the
+    // control for its duration removes it from the tab order and loses the curator's place in a
+    // queue that can be long; `aria-disabled` + `aria-busy` reports the wait where they stand.
+    let releaseVerify
+    const { verifyMiniAppPackage } = await import('../../lib/miniapps/loader')
+    verifyMiniAppPackage.mockImplementationOnce(
+      () => new Promise((resolve) => { releaseVerify = () => resolve(verifiedOk) }),
+    )
+
+    const user = userEvent.setup()
+    renderTab()
+    const card = await recordCard('Token Mint')
+
+    const verify = within(card).getByRole('button', { name: /Verify proposed package/ })
+    verify.focus()
+    await user.keyboard('{Enter}')
+
+    const busy = within(card).getByRole('button', { name: 'Verifying…' })
+    expect(document.activeElement).toBe(busy)
+    expect(busy).toHaveAttribute('aria-busy', 'true')
+    // Focusable is not operable: a second press must not start a second verification.
+    await user.keyboard('{Enter}')
+    expect(verifyMiniAppPackage).toHaveBeenCalledTimes(1)
+
+    releaseVerify()
+    await waitFor(() => expect(within(card).getByText(/Package verified\./)).toBeInTheDocument())
   })
 })

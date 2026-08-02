@@ -279,11 +279,23 @@ function CatalogView() {
             affordance that leads nowhere. */}
         {outcome && outcome.status !== REGISTRY_STATUS.NOT_DEPLOYED && (
           <div className="miniapp-catalog-actions">
+            {/* `aria-disabled` rather than `disabled` while the re-read is in flight (T047).
+                A control that goes `disabled` under the pointer that just activated it is
+                removed from the tab order, and the browser drops focus to <body> — so a
+                keyboard member loses their place mid-refresh and has to tab in from the top of
+                the page. Staying focusable keeps them where they were AND makes the outcome
+                audible: `aria-busy` announces the wait, and the label returning to "Refresh"
+                on the still-focused button announces that it finished. The click is refused in
+                the handler, so a second press during the read is still a no-op. */}
             <button
               type="button"
               className="miniapp-catalog-refresh"
-              onClick={() => setReloadKey((key) => key + 1)}
-              disabled={refreshing}
+              onClick={() => {
+                if (refreshing) return
+                setReloadKey((key) => key + 1)
+              }}
+              aria-disabled={refreshing || undefined}
+              aria-busy={refreshing || undefined}
             >
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>

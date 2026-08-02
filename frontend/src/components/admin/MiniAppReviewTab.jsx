@@ -44,7 +44,7 @@
  * between render and click would otherwise sign against a registry the curator was not looking
  * at.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ethers } from 'ethers'
 
 import { APP_CATEGORY_LABELS, AppStatus, MINI_APP_REGISTRY_ABI } from '../../abis/miniAppRegistry'
@@ -65,6 +65,10 @@ import {
   fetchCatalog,
   registryLocation,
 } from '../../lib/miniapps/registryClient'
+// The mini-app section's shared stylesheet. Imported here for the `.miniapp-review` block at its
+// foot, which fixes the contrast of the admin `warning-text` treatment on this surface — see the
+// comment there for why the fix is scoped rather than applied to every admin tab.
+import '../miniapps/miniapps.css'
 
 /** Review-state labels. Never used to decide whether an app is being served — see rule 4. */
 const STATUS_LABELS = {
@@ -197,6 +201,15 @@ export default function MiniAppReviewTab({ signer, account, chainId, runTx, pend
   // and where a write has to be signed.
   const { chainId: registryChainId, registryAddress } = useMemo(() => registryLocation(), [])
   const onRegistryChain = Number(chainId) === Number(registryChainId)
+  /**
+   * The wrong-network paragraph's id, so every control it disables can point AT it.
+   *
+   * A disabled button with its reason written somewhere further up the page is only an
+   * explanation for someone who can see both at once. `aria-describedby` is what turns the
+   * sentence into the button's own explanation — the same seam `SubmitAppPanel` calls
+   * `blockedNote` (T047 · WCAG 3.3.2 / 4.1.2).
+   */
+  const networkNoteId = useId()
 
   /**
    * The last completed catalog read, tagged with the request it answered — the CatalogPanel
@@ -425,14 +438,29 @@ export default function MiniAppReviewTab({ signer, account, chainId, runTx, pend
       }
       onAction={(action, options) => submitAction(app, action, options)}
       onConfirmDeprecate={(open) => setConfirmingDeprecate(open ? app.id : null)}
+      // Only when the wallet is elsewhere: an id that resolves to nothing is worse than no
+      // description at all, and the paragraph it names is rendered only in that case.
+      networkNoteId={onRegistryChain ? undefined : networkNoteId}
     />
   )
 
   return (
-    <section aria-labelledby="miniapp-review-heading" className="admin-card full-width">
+    <section aria-labelledby="miniapp-review-heading" className="admin-card full-width miniapp-review">
       <div className="admin-card-header">
         <h3 id="miniapp-review-heading">Mini-app review</h3>
-        <button type="button" className="refresh-btn" onClick={refreshAll} disabled={refreshing}>
+        {/* `aria-disabled` rather than `disabled` while the queue re-reads (T047): a control the
+            member just pressed must not leave the tab order under them, or focus drops to
+            <body> and they lose their place in a long queue. The handler refuses re-entry. */}
+        <button
+          type="button"
+          className="refresh-btn"
+          onClick={() => {
+            if (refreshing) return
+            refreshAll()
+          }}
+          aria-disabled={refreshing || undefined}
+          aria-busy={refreshing || undefined}
+        >
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
@@ -452,7 +480,7 @@ export default function MiniAppReviewTab({ signer, account, chainId, runTx, pend
       />
 
       {isCurator && !onRegistryChain && (
-        <p role="status" className="card-info">
+        <p role="status" className="card-info" id={networkNoteId}>
           You are reading {networkName(registryChainId)} while your wallet is on {networkName(chainId)}.
           Reviewing and verifying packages work from here; recording a decision needs your wallet on{' '}
           {networkName(registryChainId)}.
@@ -789,6 +817,7 @@ function ReviewRecord({
   acknowledgedHash,
   staleNotice,
   confirmingDeprecate,
+  networkNoteId,
   onVerify,
   onAcknowledge,
   onAction,
@@ -798,14 +827,45 @@ function ReviewRecord({
   const actions = offeredActions(app)
   const decisionHash = decision.ref?.manifestHash ?? null
   const acked = Boolean(decisionHash) && acknowledgedHash === decisionHash
+  const checking = verification?.state === 'checking'
+
+  // Per-record ids for the two sentences that explain a withheld control, so the control can name
+  // its own reason (T047 · WCAG 3.3.2). Ids are per-record because the queue renders many cards
+  // and a duplicated id would point every card's button at the first card's sentence.
+  const gateNoteId = `miniapp-review-${app.id}-gate-note`
+  const noPackageNoteId = `miniapp-review-${app.id}-no-package`
+
+  /**
+   * Retirement's two-step confirmation, made keyboard-survivable (T047 · WCAG 2.4.3).
+   *
+   * "Retire permanently…" REPLACES itself with the confirmation block, so the element holding
+   * focus is destroyed by the press that opened it — focus lands on `<body>` and a keyboard
+   * curator is thrown to the top of the admin page, with the warning they were meant to read now
+   * somewhere below them. Cancel does the same in reverse. So focus follows the disclosure: into
+   * the warning when it opens (the container, not the destructive button — the point of the
+   * second step is that the curator reads it and then chooses, not that Enter twice retires an
+   * app), and back to the trigger when it closes.
+   */
+  const confirmRef = useRef(null)
+  const deprecateTriggerRef = useRef(null)
+  const wasConfirming = useRef(false)
+  useEffect(() => {
+    if (confirmingDeprecate) confirmRef.current?.focus()
+    // Only on a real close, never on mount: every card in the queue would otherwise fight for
+    // focus on first render.
+    else if (wasConfirming.current) deprecateTriggerRef.current?.focus()
+    wasConfirming.current = confirmingDeprecate
+  }, [confirmingDeprecate])
   // A verification only counts as evidence about the tuple it actually checked. Anything else —
   // a result left over from the package a vendor has since replaced — is discarded HERE, before
   // the gate sees it, so the gate can never report "allowed" about bytes that are no longer on
   // the record and the button can never be disabled without a sentence saying why.
   const verificationApplies = Boolean(decisionHash) && verification?.hash === decisionHash
   const gate = approvalGate(verificationApplies ? verification : null)
-  const canApprove =
-    canWrite && !pendingTx && actions.approve && (gate.allowed || (gate.needsAck && acked))
+  // The DURABLE half of the approval gate only. `pendingTx` is deliberately not folded in here
+  // any more: a write in flight is transient and is carried by `aria-disabled` on the button, so
+  // the control the curator just pressed keeps focus. See the note above the buttons.
+  const canApprove = canWrite && actions.approve && (gate.allowed || (gate.needsAck && acked))
   // An on-chain enum may gain values ahead of this build's label map. Naming the raw ordinal is
   // honest; folding an unknown category into a familiar one would misfile the app.
   const categoryLabel = APP_CATEGORY_LABELS[app.category] ?? `Category ${app.category}`
@@ -879,20 +939,32 @@ function ReviewRecord({
       )}
 
       <div className="miniapp-review-actions">
+        {/* Two different reasons this control can be inoperable, treated differently. A record
+            with no package is a DURABLE fact — `disabled` is right, and the sentence beside it is
+            named by `aria-describedby` so the refusal is reachable rather than merely adjacent. A
+            verification in flight is TRANSIENT and was caused by this very press, so it stays
+            focusable under `aria-disabled` and reports itself with `aria-busy`; dropping focus to
+            <body> for the length of a gateway fetch is how a curator loses their place. */}
         <button
           type="button"
           className="confirm-btn"
-          onClick={onVerify}
-          disabled={!decision.ref || verification?.state === 'checking'}
+          onClick={() => {
+            if (checking) return
+            onVerify()
+          }}
+          disabled={!decision.ref}
+          aria-disabled={checking || undefined}
+          aria-busy={checking || undefined}
+          aria-describedby={decision.ref ? undefined : noPackageNoteId}
         >
-          {verification?.state === 'checking'
+          {checking
             ? 'Verifying…'
             : decision.kind === 'proposed'
               ? 'Verify proposed package'
               : 'Verify approved package'}
         </button>
         {!decision.ref && (
-          <p className="card-info">
+          <p className="card-info" id={noPackageNoteId}>
             This record holds no package to check — its vendor has not submitted one.
           </p>
         )}
@@ -917,7 +989,11 @@ function ReviewRecord({
           )}
 
           {gate.note && actions.approve && (
-            <p className={gate.blocked ? 'card-info warning-text' : 'card-info'} role={gate.blocked ? 'alert' : undefined}>
+            <p
+              id={gateNoteId}
+              className={gate.blocked ? 'card-info warning-text' : 'card-info'}
+              role={gate.blocked ? 'alert' : undefined}
+            >
               {gate.note}
             </p>
           )}
@@ -937,12 +1013,26 @@ function ReviewRecord({
             </label>
           )}
 
+          {/* Every lifecycle control below follows one rule (T047). `disabled` carries the
+              DURABLE refusals — no curator role, the wrong wallet network, an unverified
+              package — because those are states the curator has to leave before the control
+              means anything, and each is named through `aria-describedby` so the reason is the
+              button's own rather than a sentence that happens to be nearby. `aria-disabled`
+              carries the TRANSIENT one, a write already in flight: that state was caused by the
+              press itself, and a control that leaves the tab order under the finger that
+              activated it drops focus to <body>. The handlers refuse re-entry, so a second
+              press during a write is a no-op rather than a second transaction. */}
           {actions.approve && (
             <button
               type="button"
               className="confirm-btn primary"
               disabled={!canApprove}
-              onClick={() => onAction('approve', { expectedHash: decisionHash })}
+              aria-disabled={pendingTx || undefined}
+              aria-describedby={[gate.note ? gateNoteId : null, networkNoteId].filter(Boolean).join(' ') || undefined}
+              onClick={() => {
+                if (pendingTx) return
+                onAction('approve', { expectedHash: decisionHash })
+              }}
             >
               {decision.kind === 'proposed'
                 ? `Approve v${decision.ref.version} on ${networkName(registryChainId)}`
@@ -954,8 +1044,13 @@ function ReviewRecord({
             <button
               type="button"
               className="confirm-btn"
-              disabled={!canWrite || pendingTx}
-              onClick={() => onAction('reject', { expectedHash: app.proposed.manifestHash })}
+              disabled={!canWrite}
+              aria-disabled={pendingTx || undefined}
+              aria-describedby={networkNoteId}
+              onClick={() => {
+                if (pendingTx) return
+                onAction('reject', { expectedHash: app.proposed.manifestHash })
+              }}
             >
               Reject proposed v{app.proposed.version}
             </button>
@@ -973,8 +1068,13 @@ function ReviewRecord({
               <button
                 type="button"
                 className="confirm-btn danger"
-                disabled={!canWrite || pendingTx}
-                onClick={() => onAction('suspend')}
+                disabled={!canWrite}
+                aria-disabled={pendingTx || undefined}
+                aria-describedby={networkNoteId}
+                onClick={() => {
+                  if (pendingTx) return
+                  onAction('suspend')
+                }}
               >
                 Suspend
               </button>
@@ -989,18 +1089,35 @@ function ReviewRecord({
           {actions.deprecate && !confirmingDeprecate && (
             <button
               type="button"
+              ref={deprecateTriggerRef}
               className="confirm-btn danger"
-              disabled={!canWrite || pendingTx}
-              onClick={() => onConfirmDeprecate(true)}
+              disabled={!canWrite}
+              aria-disabled={pendingTx || undefined}
+              aria-describedby={networkNoteId}
+              onClick={() => {
+                if (pendingTx) return
+                onConfirmDeprecate(true)
+              }}
             >
               Retire permanently…
             </button>
           )}
 
           {/* Deprecation is TERMINAL on-chain — there is no un-deprecate — so it gets a second,
-              explicit step that says so in words rather than a button that looks like the others. */}
+              explicit step that says so in words rather than a button that looks like the others.
+              `tabIndex={-1}` makes it a focus TARGET rather than a focus stop: the effect above
+              sends focus here when it opens, so the warning is what a curator lands on and reads,
+              and it is still not reachable by Tab from anywhere else. */}
           {actions.deprecate && confirmingDeprecate && (
-            <div role="alert" className="card-info warning-text">
+            // Deliberately unnamed: `role="alert"` announces its SUBTREE, and giving the
+            // container an `aria-label` is how you get some screen readers to read the label
+            // instead of the warning it exists to deliver.
+            <div
+              role="alert"
+              ref={confirmRef}
+              tabIndex={-1}
+              className="card-info warning-text miniapp-review-confirm"
+            >
               <p>
                 <strong>Retiring {app.name} is permanent.</strong> The registry has no way to undo it:
                 the app can never be approved, reinstated or resubmitted under this record again, its
@@ -1010,8 +1127,13 @@ function ReviewRecord({
               <button
                 type="button"
                 className="confirm-btn danger"
-                disabled={!canWrite || pendingTx}
-                onClick={() => onAction('deprecate')}
+                disabled={!canWrite}
+                aria-disabled={pendingTx || undefined}
+                aria-describedby={networkNoteId}
+                onClick={() => {
+                  if (pendingTx) return
+                  onAction('deprecate')
+                }}
               >
                 Yes, retire {app.name} permanently
               </button>

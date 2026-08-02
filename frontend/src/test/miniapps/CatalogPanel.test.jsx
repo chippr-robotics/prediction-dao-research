@@ -470,12 +470,47 @@ describe('CatalogPanel — honest degradation (spec.md edge cases)', () => {
     // While the re-read is in flight the member keeps the list they were reading — blanking it to a
     // loading line would make a refresh look like the catalog had emptied.
     expect(listedApps()).toEqual(['Settle Desk'])
-    expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeDisabled()
+    // `aria-disabled`, NOT `disabled` (T047): see the keyboard case below for why.
+    expect(screen.getByRole('button', { name: 'Refreshing…' })).toHaveAttribute('aria-disabled', 'true')
     expect(screen.queryByText('Loading the app catalog…')).toBeNull()
 
     releaseRefresh()
     await screen.findByRole('button', { name: 'Refresh' })
     expect(listedApps()).toEqual(['Settle Desk'])
+  })
+
+  it('keeps focus on Refresh for the whole read, and refuses a second press during it', async () => {
+    // The `disabled` attribute would take this control out of the tab order the instant it was
+    // pressed, dropping focus to <body>: a keyboard member is thrown to the top of the page
+    // mid-refresh, and never hears that it finished because the label change happens on a
+    // control they are no longer standing on. `aria-disabled` keeps them there — which only
+    // works if the handler itself refuses the repeat press.
+    const settled = okOutcome([appRecord({ id: 1, name: 'Settle Desk' })])
+    let releaseRefresh
+    state.fetchCatalog = vi
+      .fn()
+      .mockResolvedValueOnce(settled)
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseRefresh = () => resolve(settled) }))
+
+    const user = userEvent.setup()
+    await renderSettled()
+
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    refresh.focus()
+    await user.keyboard('{Enter}')
+
+    const inFlight = screen.getByRole('button', { name: 'Refreshing…' })
+    expect(document.activeElement).toBe(inFlight)
+    expect(inFlight).toHaveAttribute('aria-busy', 'true')
+
+    // Focusable does not mean operable: a second read must not be started.
+    await user.keyboard('{Enter}')
+    expect(state.fetchCatalog).toHaveBeenCalledTimes(2)
+
+    releaseRefresh()
+    const settledBtn = await screen.findByRole('button', { name: 'Refresh' })
+    // Still the same element, still focused — so the label returning to "Refresh" is announced.
+    expect(document.activeElement).toBe(settledBtn)
   })
 })
 
