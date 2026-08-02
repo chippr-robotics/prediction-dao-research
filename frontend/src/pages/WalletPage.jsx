@@ -16,7 +16,6 @@ import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
 import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
-import TokensPanel from '../components/tokens/TokensPanel'
 import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import CatalogPanel from '../components/miniapps/CatalogPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
@@ -67,7 +66,6 @@ const WALLET_TABS = [
   // Mint stay listed below because their tabs still RENDER: they left the menu, not the app.
   { id: 'apps', label: 'Apps' },
   { id: 'clearpath', label: 'ClearPath' },
-  { id: 'tokens', label: 'Token Mint' },
 ]
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
@@ -84,6 +82,14 @@ const WALLET_TABS = [
 // (its conversion is T033, explicitly last — R11). This map must stay in parity with the copy in
 // components/nav/AppNavDrawer.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
+
+/**
+ * Tabs that have BECOME mini-apps (spec 073 T027). Unlike `TAB_ALIASES`, which renames a tab
+ * within this page, these leave the page entirely — the feature is now a package served from
+ * /apps/<appId>, so a saved `?tab=tokens` deep link has to land there rather than on a tab that
+ * no longer exists. Kept in parity with the same map in `components/nav/AppNavDrawer.jsx`.
+ */
+const TAB_REDIRECTS = { tokens: '/apps/token-mint' }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
@@ -138,8 +144,19 @@ function WalletPage() {
   const [searchParams] = useSearchParams()
   // The section is driven by `?tab=` so the global nav drawer and the account
   // button can route straight to a panel (e.g. the update toast → ?tab=preferences).
+  const requestedTab = searchParams.get('tab')
+  /*
+   * A tab that has become a mini-app leaves this page. Done as an effect rather than during
+   * render because a redirect is a side effect, and done with `replace` so the member's Back
+   * button returns to wherever they came from rather than bouncing off the dead tab again.
+   */
+  const redirectTo = TAB_REDIRECTS[requestedTab] || null
+  useEffect(() => {
+    if (redirectTo) navigate(redirectTo, { replace: true })
+  }, [redirectTo, navigate])
+
   const [activeTab, setActiveTab] = useState(() => {
-    const requested = searchParams.get('tab')
+    const requested = requestedTab
     const resolved = TAB_ALIASES[requested] || requested
     if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
     if (resolved === 'predict' && !predictEnabled) return 'account'
@@ -643,15 +660,11 @@ function WalletPage() {
                   </div>
                 )}
 
-                {/* ClearPath and Token Mint left the Apps MENU in spec 073, not the app: these two
-                    branches keep every saved `?tab=clearpath` / `?tab=tokens` link resolving to the
-                    same host-native panel it resolved to before. They are removed only when their
-                    packages are published and the tabs become aliases (T027 / T029). */}
-                {activeTab === 'tokens' && (
-                  <div className="tokens-section" role="tabpanel">
-                    <TokensPanel />
-                  </div>
-                )}
+                {/* ClearPath left the Apps MENU in spec 073, not the app: this branch keeps every
+                    saved `?tab=clearpath` link resolving to the same host-native panel it resolved
+                    to before. It is removed when its package is published (T029). Token Mint has
+                    already made that move — `?tab=tokens` now REDIRECTS to /apps/token-mint (see
+                    TAB_REDIRECTS above). */}
                 {activeTab === 'clearpath' && (
                   <div className="clearpath-section" role="tabpanel">
                     <ClearPathPanel />

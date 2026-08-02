@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DistributePanel from '../DistributePanel'
 import { parseDistribution } from '../distributeUtils'
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
+import { hostRef } from './_host'
 
 // Phase 12 (P3-a, US11, T086): batch distribute / airdrop UI — preview math, MAX_BATCH surfacing (no silent
 // truncation), and the real batchMint/batchTransfer call.

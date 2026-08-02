@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
-import { useWallet } from '../../hooks/useWalletManagement'
-import { useActiveAccount } from '../../hooks/useActiveAccount'
-import { getContractAddressForChain } from '../../config/contracts'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import {
   TOKEN_FACTORY_ABI,
   OPEN_ERC20_ABI,
@@ -12,7 +10,7 @@ import {
   OPEN_ERC721_V2_ABI,
   RESTRICTED_ERC20_V2_ABI,
   TOKEN_STANDARD,
-} from '../../abis/tokenFactory'
+} from './tokenFactoryAbi'
 
 /** The role-based v2 ABI for a token of the given standard. */
 export function v2AbiForStandard(standard) {
@@ -35,14 +33,29 @@ export function v1AbiForStandard(standard) {
  * honest pending/confirmed/failed state (FR-006/FR-024 — no token is surfaced before its tx confirms).
  */
 export function useTokenFactory() {
-  const { account, signer, provider, chainId, isConnected, sendCalls, loginMethod } = useWallet()
-  // Passkey smart-account sessions (spec 041/050) have NO ethers signer; their writes go through
-  // sendCalls (one sponsored ERC-4337 UserOp). loginMethod is informational — the batch rail is authoritative.
-  const isPasskey = loginMethod === 'passkey'
-  // Spec 043 (US3): creating a token while operating as a vault becomes a threshold-gated vault proposal.
-  const { isVault: operatingAsVault, canActAsVault, submit: submitAsActive } = useActiveAccount()
+  const host = useMiniAppHost()
+  const { address: account, chainId, isConnected } = host.wallet
 
-  const factoryAddress = getContractAddressForChain('tokenFactory', chainId)
+  /*
+   * THE RAIL IS THE HOST'S PROBLEM, NOT THIS APP'S.
+   *
+   * Host-native, this hook branched three ways before it could send anything: a
+   * passkey smart account (no ethers signer — writes go through an ERC-4337
+   * batch), a Safe vault (the call becomes a threshold-gated proposal), and a
+   * classic signer. None of that is here any more, and none of it CAN be:
+   * `sendCalls` and `useActiveAccount` are host internals a package cannot
+   * reach. `host.wallet.submit` picks the rail and reports which one answered
+   * through `result.kind`, so this file only has to know how to encode a call.
+   */
+  const factoryAddress = useMemo(() => {
+    // Declared in the manifest's `contracts` allowlist; the host throws for a
+    // name this package never declared, which would be a packaging bug.
+    try {
+      return host.contracts('tokenFactory', chainId)
+    } catch {
+      return null
+    }
+  }, [host, chainId])
   const isSupported = ethers.isAddress(factoryAddress || '')
 
   const [canIssue, setCanIssue] = useState(false)
@@ -50,7 +63,20 @@ export function useTokenFactory() {
   const [error, setError] = useState(null)
   const [lastTxHash, setLastTxHash] = useState(null)
 
-  const reader = provider || signer?.provider || null
+  /**
+   * Reads go through the member's own resolved endpoint (spec 069), never a
+   * wallet-bound provider. `readProvider` throws when the chain names no
+   * endpoint; a null reader is how every read path below already spells
+   * "cannot read yet", so the refusal is converted rather than propagated.
+   */
+  const reader = useMemo(() => {
+    if (chainId == null) return null
+    try {
+      return host.readProvider(chainId)
+    } catch {
+      return null
+    }
+  }, [host, chainId])
 
   // Resolve whether the connected account may issue (TOKEN_ISSUER_ROLE), so the UI can gate the create flow
   // truthfully rather than letting an unauthorized tx fail on-chain unexpectedly.
@@ -239,53 +265,57 @@ export function useTokenFactory() {
     [reader, account]
   )
 
-  // Shared write wrapper: enforces support + signer, tracks honest tx state, returns the created token address.
+  // Shared write wrapper: checks availability, tracks honest tx state, and returns the created
+  // token address once the transaction has actually confirmed.
   const runCreate = useCallback(
     async (method, args) => {
       if (!isSupported) throw new Error('Token issuance is not available on this network.')
-      if (!isPasskey && !signer) throw new Error('Connect a wallet to create a token.')
       setStatus('creating')
       setError(null)
       setLastTxHash(null)
       try {
-        // Encoding needs no signer (interface only), so this contract is safe to build on the passkey rail.
-        const factory = new ethers.Contract(factoryAddress, TOKEN_FACTORY_ABI, signer)
-        // Spec 043 (US3, FR-022a): create AS a vault → propose the factory call as a threshold-gated vault
-        // transaction (the Safe becomes the token issuer). Only in the vault queue until executed.
-        if (operatingAsVault) {
-          if (!canActAsVault) throw new Error("Switch to the vault's network to create a token as the vault.")
-          const data = factory.interface.encodeFunctionData(method, args)
-          const res = await submitAsActive({ to: factoryAddress, value: 0n, data })
+        // Encoding only — no signer is involved, and none is reachable from a
+        // package. The host turns this call into whichever rail the member's
+        // session actually has.
+        const iface = new ethers.Interface(TOKEN_FACTORY_ABI)
+        const data = iface.encodeFunctionData(method, args)
+        const result = await host.wallet.submit({ to: factoryAddress, data, value: 0n, chainId })
+
+        // A vault action is a PROPOSAL: nothing has moved, no token exists yet,
+        // and there is no hash to wait on. Saying "created" here would be the
+        // lie the host's own result shape exists to prevent.
+        if (result.kind === 'proposed') {
           setStatus('success')
-          return { proposed: true, safeTxHash: res.safeTxHash }
+          return { proposed: true, safeTxHash: result.safeTxHash }
         }
-        // Passkey smart-account operating personally (not as vault): route the factory call through the
-        // batched, sponsored ERC-4337 UserOp. No receipt logs come back, so the created address is resolved
-        // later by re-reading the registry — the tx hash is the honest confirmation signal here.
-        if (isPasskey) {
-          if (typeof sendCalls !== 'function') {
-            throw new Error('This wallet cannot create tokens on the current transaction rail.')
-          }
-          const call = {
-            target: factoryAddress,
-            data: factory.interface.encodeFunctionData(method, args),
-            value: 0n,
-          }
-          const sent = await sendCalls([call])
-          const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId ?? null
-          setLastTxHash(txHash)
+
+        setLastTxHash(result.txHash)
+
+        // `submit` resolves at BROADCAST. Confirmation is this app's job
+        // (contracts/host-context.md), so wait before claiming anything.
+        let receipt = null
+        try {
+          receipt = await result.wait()
+        } catch {
+          // Either the rail reported no hash, or the read endpoint could not
+          // see the transaction. It was still SENT — report that honestly and
+          // let the caller resolve the new token by re-reading the registry.
           setStatus('success')
-          return { txHash }
+          return { txHash: result.txHash }
         }
-        const tx = await factory[method](...args)
-        setLastTxHash(tx.hash)
-        const receipt = await tx.wait()
-        // Pull the deployed token address from the TokenCreated event (only finalized after confirmation).
+        if (receipt && receipt.status === 0) {
+          throw new Error('The token creation transaction reverted on-chain.')
+        }
+
+        // The deployed address comes from the factory event, and only after
+        // confirmation (FR-006/FR-024). On the UserOp rail the receipt belongs
+        // to a bundle whose logs may cover several operations, so a miss here
+        // is expected rather than an error — the caller re-reads the registry.
         let tokenAddress = null
         let id = null
-        for (const log of receipt.logs || []) {
+        for (const log of receipt?.logs || []) {
           try {
-            const parsed = factory.interface.parseLog(log)
+            const parsed = iface.parseLog(log)
             if (parsed?.name === 'TokenCreated') {
               tokenAddress = parsed.args.token
               id = parsed.args.id.toString()
@@ -296,14 +326,14 @@ export function useTokenFactory() {
           }
         }
         setStatus('success')
-        return { id, tokenAddress, txHash: tx.hash }
+        return { id, tokenAddress, txHash: result.txHash }
       } catch (e) {
         setStatus('error')
         setError(e?.shortMessage || e?.reason || e?.message || 'Token creation failed.')
         throw e
       }
     },
-    [isSupported, factoryAddress, signer, isPasskey, sendCalls, operatingAsVault, canActAsVault, submitAsActive]
+    [isSupported, factoryAddress, host, chainId]
   )
 
   const createOpenERC20 = useCallback(
@@ -372,7 +402,6 @@ export function useTokenFactory() {
     readTokenLive,
     detectCapabilities,
     reader,
-    signer,
     // writes (v1)
     createOpenERC20,
     createOpenERC721,

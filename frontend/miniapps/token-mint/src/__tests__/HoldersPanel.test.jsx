@@ -3,16 +3,20 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HoldersPanel from '../HoldersPanel'
 import { fetchHolders } from '../tokenSubgraph'
+import { hostRef, resetHost } from './_host'
 
 // Phase 13 (P3-b, US10, T092): holder cap table — renders ranked holders + % of supply from the subgraph, and
 // disables truthfully (no fabricated rows) on subgraph-less networks (FR-043). The user-initiated CSV export
 // reports through the app notification system (Phase 14 cohesion).
 
 const showNotification = vi.fn()
-vi.mock('../tokenSubgraph', () => ({ fetchHolders: vi.fn(), fetchActivity: vi.fn() }))
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification }) }))
-vi.mock('../../../config/networks', () => ({
-  getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { baseUrl: '' } }),
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
+vi.mock('../tokenSubgraph', async (importOriginal) => ({
+  // Keep the REAL SUBGRAPH_UNAVAILABLE codes — the panels branch on them to choose which of the
+  // three unavailable sentences to show, so a stubbed-out enum makes that branch unreachable.
+  ...(await importOriginal()),
+  fetchHolders: vi.fn(),
+  fetchActivity: vi.fn(),
 }))
 
 const A = (n) => '0x' + String(n).padStart(40, '0')
@@ -20,7 +24,10 @@ const token = { tokenAddress: A(170), symbol: 'TKN' }
 const caps = { decimals: 18 }
 
 describe('HoldersPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+  vi.clearAllMocks()
+  resetHost({ toast: { show: showNotification } })
+})
 
   it('renders a ranked cap table with % of supply', async () => {
     fetchHolders.mockResolvedValue({
@@ -53,7 +60,7 @@ describe('HoldersPanel', () => {
   })
 
   it('disables truthfully on a subgraph-less network', async () => {
-    fetchHolders.mockResolvedValue({ available: false, holders: [] })
+    fetchHolders.mockResolvedValue({ available: false, unavailable: 'no-subgraph', holders: [] })
     render(<HoldersPanel token={token} caps={caps} chainId={63} />)
     await waitFor(() =>
       expect(screen.getByText(/no subgraph deployed, so the cap table is unavailable/i)).toBeInTheDocument()

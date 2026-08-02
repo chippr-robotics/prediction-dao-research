@@ -5,18 +5,18 @@
  * The nav change itself is small: the Apps group stopped naming apps and now names the catalog.
  * The part worth a test file is the half that must be INVISIBLE. Existing members have
  * `?tab=clearpath` and `?tab=tokens` in bookmarks, in shared links, and in browser history, and
- * the two mini-apps those tabs will eventually become do not exist yet — Token Mint converts in
- * T027, ClearPath in T029, Wagers last in T033 (research R11 phasing). So the rule this file
- * pins down is:
+ * the rule this file pins down is:
  *
  *   removing a tab from the MENU is not the same as removing the tab.
  *
- * A redirect to `/apps/token-mint` today would be worse than the status quo it replaced: the
- * workspace would resolve a slug the registry has never heard of and refuse it, turning a link
- * that worked yesterday into a dead end — and the catalog would be implying a verified package
- * exists when none has been registered. The alternative failure, leaving the tab in the menu
- * while it is mid-conversion, is the one the nav change is fixing. Hence: menu changes now,
- * routing changes when the packages land.
+ * The two legacy tabs are at DIFFERENT stages, and the difference is the point:
+ *
+ *   - `?tab=tokens` REDIRECTS to /apps/token-mint. Token Mint's tree has moved into
+ *     `frontend/miniapps/token-mint/`, so the host has nothing left to render on that tab — the
+ *     saved link has to go where the feature actually lives (T026/T027).
+ *   - `?tab=clearpath` still renders its host-native panel. Its package is built in T029, and
+ *     redirecting before then would resolve a slug the registry has never heard of, turning a
+ *     link that worked yesterday into a dead end.
  *
  * The catalog panel and the workspace are exercised by their own suites (CatalogPanel.test.jsx,
  * MiniAppWorkspace.test.jsx). Here the panel is a stub — what is under test is which section the
@@ -40,9 +40,6 @@ vi.mock('../../components/miniapps/CatalogPanel', () => ({
 }))
 vi.mock('../../components/clearpath/ClearPathPanel', () => ({
   default: () => <div data-testid="clearpath-panel" />,
-}))
-vi.mock('../../components/tokens/TokensPanel', () => ({
-  default: () => <div data-testid="tokens-panel" />,
 }))
 vi.mock('../../components/fairwins/TradePanel', () => ({
   default: () => <div data-testid="trade-panel" />,
@@ -128,6 +125,9 @@ function renderWalletPage(route) {
       <UIContext.Provider value={uiContext}>
         <WalletContext.Provider value={walletContext}>
           <WalletPage />
+          {/* Renders the live path, so a REDIRECT can be asserted rather than inferred from
+              whichever section happened to render. */}
+          <LocationProbe />
         </WalletContext.Provider>
       </UIContext.Provider>
     </MemoryRouter>
@@ -186,13 +186,12 @@ describe('WalletPage — legacy Apps deep links keep working (spec 073 FR-009, R
     expect(container.querySelector('.profile-section')).toBeNull()
   })
 
-  it('?tab=tokens still renders the host-native Token Mint panel', () => {
+  it('?tab=tokens REDIRECTS to the Token Mint mini-app (T027 cutover)', () => {
+    // Token Mint is a package now, so the old tab cannot render it — the saved deep link has to
+    // resolve to the workspace instead of silently falling back to the account tab.
     const { container } = renderWalletPage('/wallet?tab=tokens')
-    expect(screen.getByTestId('tokens-panel')).toBeInTheDocument()
-    expect(container.querySelector('.tokens-section')).toBeTruthy()
-    // Same reasoning as ClearPath — Token Mint converts in T027.
-    expect(screen.queryByTestId('catalog-panel')).toBeNull()
-    expect(container.querySelector('.profile-section')).toBeNull()
+    expect(screen.getByTestId('loc')).toHaveTextContent('/apps/token-mint')
+    expect(container.querySelector('.tokens-section')).toBeNull()
   })
 
   it('keeps every other saved tab resolving exactly as before', () => {
@@ -345,18 +344,18 @@ describe('Apps is absent for a tenant without the miniapps feature', () => {
     expect(container.querySelector('.profile-section')).toBeTruthy()
   })
 
-  it('still serves the legacy ClearPath / Token Mint tabs to that tenant', async () => {
-    // The `miniapps` feature governs the CATALOG. It was never what made these two tabs work, and
-    // gating them on it would break deep links for a tenant that simply opted out of mini-apps.
+  it('still serves the legacy ClearPath tab to that tenant', async () => {
+    // The `miniapps` feature governs the CATALOG. It was never what made this tab work, and gating
+    // it on the feature would break deep links for a tenant that simply opted out of mini-apps.
+    //
+    // Token Mint is deliberately NOT asserted here any more. It is a package now, so a tenant
+    // without mini-apps has nothing to serve — a real consequence of the conversion, and one that
+    // belongs in that tenant's feature decision rather than in a fallback quietly keeping a second
+    // copy of the feature alive in the host bundle.
     const reimported = await withoutMiniApps('../../pages/WalletPage')
     expect(
       renderReimportedWalletPage('/wallet?tab=clearpath', reimported).container.querySelector(
         '.clearpath-section'
-      )
-    ).toBeTruthy()
-    expect(
-      renderReimportedWalletPage('/wallet?tab=tokens', reimported).container.querySelector(
-        '.tokens-section'
       )
     ).toBeTruthy()
   })

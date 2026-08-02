@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
-import { useWallet } from '../../hooks/useWalletManagement'
-import { useNotification } from '../../hooks/useUI'
-import { TOKEN_STANDARD_LABEL } from '../../abis/tokenFactory'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
+import { TOKEN_STANDARD_LABEL } from './tokenFactoryAbi'
 import {
   useTokenFactory,
   tokenRuleSummary,
@@ -28,12 +27,9 @@ const ROLE_LABELS = [
 ]
 
 export default function TokenDetailView({ token, onBack }) {
-  const { signer, sendCalls, loginMethod } = useWallet()
-  // Passkey smart-account sessions (spec 041/050) have NO ethers signer; their writes go through
-  // sendCalls (one sponsored ERC-4337 UserOp) instead of a signer-bound contract call.
-  const isPasskey = loginMethod === 'passkey'
+  const host = useMiniAppHost()
   const { detectCapabilities, readTokenLive, reader, chainId } = useTokenFactory()
-  const { showNotification } = useNotification()
+  const showNotification = useCallback((message, type) => host.toast.show(message, type), [host])
 
   const [caps, setCaps] = useState(null)
   const [live, setLive] = useState(null)
@@ -69,50 +65,60 @@ export default function TokenDetailView({ token, onBack }) {
     }
   }, [token, detectCapabilities, readTokenLive, refresh])
 
-  const contractFor = useCallback(
-    (withSigner) => {
-      const abi = caps?.model === 'v2' ? v2AbiForStandard(std) : v1AbiForStandard(std)
-      return new ethers.Contract(token.tokenAddress, abi, withSigner ? signer : reader)
-    },
-    [caps, std, token, signer, reader]
-  )
+  const contractFor = useCallback(() => {
+    const abi = caps?.model === 'v2' ? v2AbiForStandard(std) : v1AbiForStandard(std)
+    return new ethers.Contract(token.tokenAddress, abi, reader)
+  }, [caps, std, token, reader])
 
   const run = useCallback(
     async (label, fn) => {
-      if (!isPasskey && !signer) return showNotification('Connect a wallet to administer this token.', 'warning')
       setStatus('working')
       try {
-        // Passkey smart-account (no ethers signer): reuse the SAME `fn(c) => c.method(...)` closure the
-        // classic path uses, but hand it a populating contract so it yields the {to,data} calldata instead
-        // of sending, then route that as one sponsored ERC-4337 UserOp via sendCalls.
-        if (isPasskey) {
-          if (typeof sendCalls !== 'function') {
-            throw new Error('This wallet cannot administer tokens on the current transaction rail.')
-          }
-          const populated = await fn(populatingContract(contractFor(false)))
-          showNotification(`${label} submitted — awaiting confirmation…`, 'info')
-          await sendCalls([{
-            target: populated?.to ?? token.tokenAddress,
-            data: populated.data,
-            value: populated?.value ?? 0n,
-          }])
+        /*
+         * ONE PATH FOR EVERY RAIL. Host-native this branched on `loginMethod`
+         * and reached for `sendCalls`; a package can do neither, and does not
+         * need to — `host.wallet.submit` chooses the rail. The `populatingContract`
+         * proxy turns the caller's `fn(c) => c.method(...)` closure into calldata
+         * instead of a send, which is exactly what `submit` takes.
+         *
+         * This also fixes a live bug the host-native panel had: it built its
+         * contract from the CONNECTED signer and never consulted the acting
+         * account, so administering a vault-owned token sent from the member's
+         * own EOA — and transferOwnership/renounceOwnership simply reverted.
+         * Routing through the host means the acting identity is honoured.
+         */
+        const populated = await fn(populatingContract(contractFor()))
+        const result = await host.wallet.submit({
+          to: populated?.to ?? token.tokenAddress,
+          data: populated.data,
+          value: populated?.value ?? 0n,
+          chainId,
+        })
+
+        if (result.kind === 'proposed') {
+          // Nothing has moved: a vault action waits for its threshold. Saying
+          // "confirmed" here would be a claim about state that has not changed.
           setStatus('idle')
-          showNotification(`${label} confirmed.`, 'success')
-          setRefresh((n) => n + 1)
+          showNotification(`${label} proposed — it needs the vault's approvals before it takes effect.`, 'info')
           return
         }
-        const tx = await fn(contractFor(true))
+
         showNotification(`${label} submitted — awaiting confirmation…`, 'info')
-        await tx.wait()
+        // `submit` resolves at broadcast; confirmation is the app's job.
+        const receipt = await result.wait()
+        if (receipt && receipt.status === 0) throw new Error(`${label} reverted on-chain.`)
         setStatus('idle')
         showNotification(`${label} confirmed.`, 'success')
         setRefresh((n) => n + 1)
       } catch (e) {
         setStatus('idle')
-        showNotification(e?.shortMessage || e?.reason || e?.message || `${label} failed.`, 'error')
+        // Revert strings run long; the host's toast is one line. Keep it short
+        // and honest about the truncation rather than letting it be cut silently.
+        const raw = e?.shortMessage || e?.reason || e?.message || `${label} failed.`
+        showNotification(raw.length > 150 ? `${raw.slice(0, 149)}…` : raw, 'error')
       }
     },
-    [isPasskey, signer, sendCalls, contractFor, token, showNotification]
+    [contractFor, token, chainId, host, showNotification]
   )
 
   const tabs = useMemo(() => {
@@ -311,7 +317,7 @@ function ControlsPanel({ caps, contractFor, run, busy, isErc721, isRestricted, c
     let cancelled = false
     async function load() {
       try {
-        const c = contractFor(false)
+        const c = contractFor()
         const count = caps?.model === 'v2' || isRestricted ? Number(await c.frozenCount().catch(() => 0)) : 0
         const list = []
         for (let i = 0; i < count; i++) list.push(await c.frozenAt(i))
@@ -369,7 +375,7 @@ function CompliancePanel({ contractFor, run, busy, canManage, showNotification }
   const [msg, setMsg] = useState('')
   async function doCheck() {
     try {
-      const c = contractFor(false)
+      const c = contractFor()
       const code = Number(await c.detectTransferRestriction(from, to, 1))
       const m = await c.messageForTransferRestriction(code)
       setCheck({ code, m })
@@ -418,7 +424,7 @@ function RolesPanel({ caps, contractFor, run, busy, isAdmin }) {
     async function load() {
       if (!isV2) return
       try {
-        const c = contractFor(false)
+        const c = contractFor()
         const out = []
         for (const r of ROLE_LABELS) {
           // COMPLIANCE only on restricted; skip if call reverts

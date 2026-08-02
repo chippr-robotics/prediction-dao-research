@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CreateTokenWizard from '../CreateTokenWizard'
+import { hostRef, resetHost } from './_host'
 
 // Phase 11 (T084): the rebuilt role-based v2 create flow — standard cards, params, optional cap, deployment
 // summary rail. Mock the data hook so form/validation/gating logic is tested in isolation.
@@ -13,8 +14,8 @@ const hook = vi.hoisted(() => ({
   createRestrictedERC20V2: vi.fn().mockResolvedValue({ id: '1', tokenAddress: '0xtok' }),
 }))
 
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: hook.showNotification }) }))
 
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 vi.mock('../useTokenFactory', () => ({
   useTokenFactory: () => ({
     isSupported: true, canIssue: true, status: 'idle', error: null, lastTxHash: null,
@@ -26,7 +27,11 @@ vi.mock('../useTokenFactory', () => ({
 }))
 
 describe('CreateTokenWizard (v2)', () => {
-  beforeEach(() => { vi.clearAllMocks(); hook.state = {} })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    hook.state = {}
+    resetHost()
+  })
 
   it('disables on an unsupported network (FR-023)', () => {
     hook.state = { isSupported: false }
@@ -74,7 +79,9 @@ describe('CreateTokenWizard (v2)', () => {
     expect(hook.createOpenERC20V2.mock.calls[0][0]).toMatchObject({ name: 'Acme', symbol: 'ACME', initialSupply: '500', cap: '1000' })
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     // fires the cohesive app-level notification on success
-    await waitFor(() => expect(hook.showNotification).toHaveBeenCalledWith(expect.stringMatching(/created on-chain/i), 'success'))
+    // Through the host's toast now — the package has no notification hook of its own.
+    await waitFor(() =>
+      expect(hostRef.current.toast.show).toHaveBeenCalledWith(expect.stringMatching(/created on-chain/i), 'success'))
   })
 
   it('selecting ERC-721 switches the create entrypoint + fields', async () => {

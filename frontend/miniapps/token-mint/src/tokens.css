@@ -1,20 +1,32 @@
 /*
- * Spec 028 — Token Mint module styling (Phase 11 / T076).
- * Adapts the imported "TokenMint.dc.html" design (IBM Plex + a calm, card-based admin portal) onto the app's
- * own theme variables (frontend/src/theme.css), so the module respects light/dark mode rather than hardcoding
- * the mockup's light-only palette. Everything is scoped under `.token-mint`; IBM Plex is loaded only here.
+ * Spec 028 — Token Mint module styling, now a mini-app package stylesheet (spec 073 T026).
+ *
+ * Everything is scoped under `.token-mint`, and the host additionally wraps this whole sheet in
+ * `@scope (#miniapp-root-…)` when it injects it, so no rule here can reach host chrome (FR-014).
+ *
+ * NO `@import`. The host's `@scope` wrapper makes one invalid — `@import` is only legal at the top
+ * level of a stylesheet, before other rules, so nested inside an at-rule block it is DROPPED. The
+ * fonts would have silently fallen back with nothing to explain why. Dropping it deliberately also
+ * removes a third-party network dependency from a package whose whole premise is that it is
+ * content-addressed and self-contained: a package that renders correctly only when a CDN answers
+ * is not really the bytes its hash says it is. The families below keep their real fallbacks, so
+ * IBM Plex is used when the host already has it and a sane stack is used when it does not.
+ *
+ * Host theme custom properties are read WITH FALLBACKS. They cascade in from `:root` today, but
+ * nothing in the runtime contract promises them, and this package is frozen at an immutable CID —
+ * it can never be patched in step with a host theme refactor. A renamed token must degrade to this
+ * palette, not to `unset`.
  */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap');
 
 .token-mint {
   /* Local tokens derived from the app theme so light/dark both work. */
-  --tm-accent: var(--brand-primary);
-  --tm-surface: var(--surface-color);
-  --tm-canvas: var(--bg-primary);
-  --tm-text: var(--text-primary);
-  --tm-text-2: var(--text-secondary);
-  --tm-text-3: var(--text-muted);
-  --tm-border: var(--border-color);
+  --tm-accent: var(--brand-primary, #4f46e5);
+  --tm-surface: var(--surface-color, #ffffff);
+  --tm-canvas: var(--bg-primary, #f6f7f9);
+  --tm-text: var(--text-primary, #14161a);
+  --tm-text-2: var(--text-secondary, #4a5058);
+  --tm-text-3: var(--text-muted, #7a828c);
+  --tm-border: var(--border-color, #e3e6ea);
   --tm-radius: var(--radius-md, 8px);
   --tm-radius-lg: var(--radius-lg, 12px);
   --tm-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));

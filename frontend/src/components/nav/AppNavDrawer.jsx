@@ -34,6 +34,13 @@ import './AppNavDrawer.css'
 // This map must stay in parity with the copy in pages/WalletPage.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
+/**
+ * Tabs that have become mini-apps (spec 073 T027) — kept in parity with the same map in
+ * `pages/WalletPage.jsx`, which performs the actual redirect. Here it only affects which nav item
+ * reads as active, so a member arriving on `?tab=tokens` sees Apps highlighted rather than nothing.
+ */
+const TAB_TO_MINIAPP = { tokens: 'apps' }
+
 // The label of the group Wagers is spliced into, below.
 const APPS_GROUP_LABEL = 'Apps'
 
@@ -73,6 +80,7 @@ function resolveActiveId(location) {
   const { pathname, search } = location
   if (pathname === '/wallet') {
     const requested = new URLSearchParams(search).get('tab')
+    if (TAB_TO_MINIAPP[requested]) return TAB_TO_MINIAPP[requested]
     return TAB_ALIASES[requested] || requested
   }
   if (pathname === '/app' || pathname === '/main' || pathname === '/fairwins') {

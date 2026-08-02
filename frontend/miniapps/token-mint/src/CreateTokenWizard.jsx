@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import { ethers } from 'ethers'
-import { useNotification } from '../../hooks/useUI'
 import { useTokenFactory } from './useTokenFactory'
 
 // Spec 028 (US1 + US6 + FR-045) — create flow for role-based v2 tokens: pick a standard, configure it, optionally
@@ -15,9 +15,10 @@ const STANDARDS = [
 const MAX_DECIMALS = 36
 
 export default function CreateTokenWizard({ onCreated, onViewMine }) {
+  const host = useMiniAppHost()
   const { isSupported, canIssue, createOpenERC20V2, createOpenERC721V2, createRestrictedERC20V2, status, lastTxHash } =
     useTokenFactory()
-  const { showNotification } = useNotification()
+  const showNotification = (message, type) => host.toast.show(message, type)
 
   const [created, setCreated] = useState(null)
   const [standard, setStandard] = useState('erc20')
@@ -64,7 +65,20 @@ export default function CreateTokenWizard({ onCreated, onViewMine }) {
         result = await createRestrictedERC20V2({ ...common, decimals: form.decimals, initialSupply: form.initialSupply || '0', cap: form.cap || '0', metadataURI: form.metadataURI.trim(), initialEligible: parseList(form.initialEligible) })
       }
       setCreated(result)
-      showNotification(`${form.symbol.trim() || 'Token'} created on-chain`, 'success')
+      /*
+       * A VAULT ACTION HAS NOT CREATED ANYTHING YET. Host-native this said "created on-chain"
+       * unconditionally, so a member operating as a Safe was told a token existed while the call
+       * was still sitting in the vault queue awaiting approvals — and the summary rail below
+       * rendered a token address that was never assigned. The host reports which happened; say it.
+       */
+      if (result?.proposed) {
+        showNotification(
+          `${form.symbol.trim() || 'Token'} proposed — it needs the vault's approvals before the token is created.`,
+          'info',
+        )
+      } else {
+        showNotification(`${form.symbol.trim() || 'Token'} created on-chain`, 'success')
+      }
       if (onCreated) onCreated(result)
     } catch (e) {
       showNotification(e?.shortMessage || e?.reason || e?.message || 'Token creation failed', 'error')

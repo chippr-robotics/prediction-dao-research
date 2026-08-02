@@ -1,10 +1,8 @@
 import { useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useNotification } from '../../hooks/useUI'
-import useClipboard from '../../hooks/useClipboard'
-import { getNetwork, listSupportedChainIds, NETWORKS } from '../../config/networks'
-import { getContractAddressForChain } from '../../config/contracts'
-import { TOKEN_STANDARD, TOKEN_STANDARD_LABEL } from '../../abis/tokenFactory'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
+import useClipboard from './useClipboard'
+import { TOKEN_STANDARD, TOKEN_STANDARD_LABEL } from './tokenFactoryAbi'
 import { v2AbiForStandard, v1AbiForStandard } from './useTokenFactory'
 
 // Spec 028 expansion (US13, FR-044) — the per-token Contract surface: metadata, source-verification status +
@@ -24,10 +22,11 @@ function fmtDate(unixSeconds) {
 }
 
 export default function ContractPanel({ token, caps, chainId }) {
-  const { showNotification } = useNotification()
+  const host = useMiniAppHost()
+  const net = host.network(chainId)
+  const showNotification = (message, type) => host.toast.show(message, type)
   const { copy } = useClipboard()
 
-  const net = getNetwork(chainId)
   const explorerName = net?.explorer?.name || 'the block explorer'
   const explorerBase = (net?.explorer?.baseUrl || '').replace(/\/$/, '')
   // Blockscout selects the source tab with ?tab=contract; Etherscan-family explorers use the #code fragment.
@@ -50,16 +49,26 @@ export default function ContractPanel({ token, caps, chainId }) {
     }
   }, [caps, token.standard])
 
-  // Truthful per-network deployment list: only chains that actually carry a tokenFactory (excludes the local
-  // sandbox). With the current deployments this is Mordor only — do NOT imply availability elsewhere.
-  const deployments = useMemo(
-    () =>
-      listSupportedChainIds()
-        .filter((id) => id !== 1337)
-        .map((id) => ({ chainId: id, name: NETWORKS[id]?.name || `Chain ${id}`, address: getContractAddressForChain('tokenFactory', id) }))
-        .filter((n) => ethers.isAddress(n.address || '')),
-    []
-  )
+  /*
+   * SCOPED TO THE ACTIVE CHAIN — a deliberate reduction from the host-native panel,
+   * which listed the factory across every supported network.
+   *
+   * Rebuilding that list needs a roster of the build's chains, and the only way to
+   * give a package one is a new host capability. It was proposed and DECLINED: the
+   * host object is granted permanently to EVERY package, including third-party
+   * ones, and a chain roster is not worth that for one informational card. The
+   * member loses a cross-chain table; nobody gains a wider privileged surface.
+   */
+  const deployment = useMemo(() => {
+    let address = null
+    try {
+      address = host.contracts('tokenFactory', chainId)
+    } catch {
+      address = null
+    }
+    if (!ethers.isAddress(address || '')) return null
+    return { chainId, name: net?.name || `Chain ${chainId}`, address }
+  }, [host, chainId, net])
 
   async function handleCopy(text, label) {
     if (!text) return showNotification(`No ${label.toLowerCase()} to copy.`, 'warning')
@@ -103,17 +112,17 @@ export default function ContractPanel({ token, caps, chainId }) {
       </div>
 
       <div className="tm-card">
-        <h4 style={{ marginBottom: '0.6rem' }}>Factory deployments</h4>
-        <p className="tm-intro" style={{ margin: '0 0 0.6rem' }}>Networks where the FairWins token factory is deployed. This token lives on {net?.name || 'the active network'}.</p>
-        {deployments.length === 0 ? (
-          <p className="tm-row-sub">No factory deployments are configured.</p>
+        <h4 style={{ marginBottom: '0.6rem' }}>Factory deployment</h4>
+        <p className="tm-intro" style={{ margin: '0 0 0.6rem' }}>
+          The FairWins token factory this token was issued by. It lives on {net?.name || 'the active network'}.
+        </p>
+        {deployment === null ? (
+          <p className="tm-row-sub">No factory is deployed on this network.</p>
         ) : (
-          deployments.map((d) => (
-            <div key={d.chainId} className="tm-kv">
-              <span className="k">{d.name}{d.chainId === chainId ? ' · this token' : ''}</span>
-              <code className="tm-mono">{short(d.address)}</code>
-            </div>
-          ))
+          <div className="tm-kv">
+            <span className="k">{deployment.name} · this token</span>
+            <code className="tm-mono">{short(deployment.address)}</code>
+          </div>
         )}
       </div>
 

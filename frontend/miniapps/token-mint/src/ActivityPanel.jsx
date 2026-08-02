@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
-import { getNetwork } from '../../config/networks'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import { fetchActivity, SUBGRAPH_UNAVAILABLE } from './tokenSubgraph'
 
 // Spec 028 expansion (US12, FR-041/FR-043) — the per-token on-chain event history. Sourced from the subgraph
@@ -37,18 +37,23 @@ function fmtTime(unixSeconds) {
 }
 
 export default function ActivityPanel({ token, caps, chainId }) {
+  const host = useMiniAppHost()
+  // A chain DESCRIPTOR, not the host's NETWORKS entry: name, explorer and subgraph
+  // endpoint only. Null for a chain the host does not recognise, which every consumer
+  // below already treats as 'unknown network' rather than guessing another chain's.
+  const net = host.network(chainId)
   const reqKey = `${chainId}-${token.tokenAddress}`
   const [state, setState] = useState({ key: null, available: true, unavailable: null, activity: [], error: null })
   const [filter, setFilter] = useState('all')
   const decimals = caps?.decimals ?? 18
-  const explorer = getNetwork(chainId)?.explorer?.baseUrl || ''
+  const explorer = net?.explorer?.baseUrl || ''
   const loading = state.key !== reqKey
 
   // Passive background load (fires on tab-open and on token/chain navigation). A failure is surfaced inline as a
   // role="alert" banner below — NOT as a toast, which would double-feedback and spam on navigation.
   useEffect(() => {
     let cancelled = false
-    fetchActivity(chainId, token.tokenAddress)
+    fetchActivity(net?.subgraphUrl ?? null, token.tokenAddress)
       .then((res) => {
         if (!cancelled) {
           setState({
@@ -76,7 +81,9 @@ export default function ActivityPanel({ token, caps, chainId }) {
     return () => {
       cancelled = true
     }
-  }, [chainId, token.tokenAddress, reqKey])
+    // `net?.subgraphUrl` and not just `chainId`: the endpoint is what the read actually
+    // depends on, and the host resolves it (a member repointing one must take effect).
+  }, [chainId, net?.subgraphUrl, token.tokenAddress, reqKey])
 
   const rows = useMemo(() => {
     return state.activity
@@ -97,7 +104,6 @@ export default function ActivityPanel({ token, caps, chainId }) {
   }, [state.activity, filter, decimals])
 
   if (!state.available) {
-    const net = getNetwork(chainId)
     const network = net?.name || 'This network'
     // Three different facts, three different sentences — see HoldersPanel. A transport failure
     // must not be phrased as a limitation of the network.

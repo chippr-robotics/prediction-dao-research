@@ -2,32 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ContractPanel from '../ContractPanel'
+import { hostRef, resetHost } from './_host'
 
 // Phase 14 (P3-c, US13, T094): contract surface — metadata renders; source verification reported truthfully
 // (NEVER implied "verified", only an explorer deep link); copy address/ABI fire the app notification system.
 
 const showNotification = vi.fn()
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification }) }))
 
 const copy = vi.fn().mockResolvedValue(true)
-vi.mock('../../../hooks/useClipboard', () => ({ default: () => ({ copied: false, error: null, copy }) }))
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
+vi.mock('../useClipboard', () => ({ default: () => ({ copied: false, error: null, copy }) }))
 
-vi.mock('../../../config/networks', () => ({
-  getNetwork: vi.fn(() => ({ name: 'Ethereum Classic Mordor', explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' } })),
-  listSupportedChainIds: () => [80002, 63, 137, 1337],
-  NETWORKS: {
-    80002: { name: 'Polygon Amoy' },
-    63: { name: 'Ethereum Classic Mordor' },
-    137: { name: 'Polygon' },
-    1337: { name: 'Hardhat' },
-  },
-}))
 
-// Only Mordor (63) carries a tokenFactory — the panel must not imply deployments elsewhere.
-vi.mock('../../../config/contracts', () => ({
-  getContractAddressForChain: (name, chainId) =>
-    name === 'tokenFactory' && chainId === 63 ? '0x5bdf74Ce98D41bf35192c20B25ACd561C75CFe62' : undefined,
-}))
+// Deployment resolution is the HOST's now: `_host.jsx` answers `contracts('tokenFactory', …)`
+// per chain and throws for any name outside the manifest allowlist, exactly as the real host does.
 
 const TOKEN = '0x00000000000000000000000000000000000000aa'
 const token = {
@@ -42,7 +30,10 @@ const token = {
 const caps = { model: 'v2', standard: 0, decimals: 18, capped: false, cap: 0n }
 
 describe('ContractPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+  vi.clearAllMocks()
+  resetHost({ toast: { show: showNotification } })
+})
 
   it('renders metadata and a truthful (not implied-verified) verification link', () => {
     render(<ContractPanel token={token} caps={caps} chainId={63} />)
@@ -57,21 +48,40 @@ describe('ContractPanel', () => {
   })
 
   it('shows a truthful no-explorer message (and no source link) on an explorer-less network', async () => {
-    const { getNetwork } = await import('../../../config/networks')
-    getNetwork.mockReturnValueOnce({ name: 'Hardhat', explorer: { name: 'Local', baseUrl: '' } })
+    // The host answers with the descriptor; an explorer-less chain is one whose `explorer` is null.
+    resetHost({ network: () => ({ chainId: 1337, name: 'Hardhat', isTestnet: true, nativeCurrency: { symbol: 'ETH', decimals: 18 }, explorer: null, subgraphUrl: null }) })
     render(<ContractPanel token={token} caps={caps} chainId={1337} />)
     expect(screen.getByText(/no block explorer configured/i)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /view source/i })).not.toBeInTheDocument()
   })
 
-  it('lists only networks that actually carry a factory (Mordor) — with its address — not Polygon/Amoy', () => {
+  /*
+   * SCOPED TO THE ACTIVE CHAIN as of the mini-app conversion (spec 073 T026). The host-native panel
+   * listed the factory across every supported network; rebuilding that needs a chain roster, and the
+   * only way to give a package one is a new host capability granted permanently to EVERY package,
+   * including third-party. That was proposed and declined for one informational card. These tests
+   * pin the reduction so it stays a decision rather than drifting back by accident.
+   */
+  it('shows the factory for the ACTIVE chain, with its address', () => {
     render(<ContractPanel token={token} caps={caps} chainId={63} />)
-    const card = screen.getByText('Factory deployments').closest('.tm-card')
-    // The Mordor deployment ROW (short factory address) must actually render — not just the intro line.
+    const card = screen.getByText('Factory deployment').closest('.tm-card')
     expect(card).toHaveTextContent('0x5bdf…Fe62')
-    expect(card).not.toHaveTextContent('No factory deployments are configured.')
-    expect(card).not.toHaveTextContent('Polygon Amoy')
-    expect(card).not.toHaveTextContent(/Polygon\b(?! Amoy)/)
+    expect(card).toHaveTextContent('Mordor')
+    expect(card).not.toHaveTextContent('No factory is deployed on this network.')
+  })
+
+  it('does not name any other network — the roster is not reachable from a package', () => {
+    render(<ContractPanel token={token} caps={caps} chainId={63} />)
+    const card = screen.getByText('Factory deployment').closest('.tm-card')
+    expect(card).not.toHaveTextContent('Polygon')
+    expect(card).not.toHaveTextContent('Amoy')
+  })
+
+  it('says so plainly when no factory is deployed on the active chain', () => {
+    // `host.contracts()` returns null for a DECLARED name with no deployment — an absence, not an error.
+    resetHost({ contracts: () => null })
+    render(<ContractPanel token={token} caps={caps} chainId={1337} />)
+    expect(screen.getByText('No factory is deployed on this network.')).toBeInTheDocument()
   })
 
   it('copies the address and the v2 role-based JSON ABI, notifying via the app system', async () => {

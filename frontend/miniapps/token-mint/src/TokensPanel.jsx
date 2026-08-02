@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import './tokens.css'
-import { TOKEN_STANDARD, TOKEN_STANDARD_LABEL } from '../../abis/tokenFactory'
-import { useNotification } from '../../hooks/useUI'
+import { TOKEN_STANDARD, TOKEN_STANDARD_LABEL } from './tokenFactoryAbi'
 import { useTokenFactory } from './useTokenFactory'
 import CreateTokenWizard from './CreateTokenWizard'
 import TokenDetailView from './TokenDetailView'
@@ -25,8 +25,11 @@ function badgeClass(std) {
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '')
 
 function TokenTable({ mode, onOpen, refreshKey }) {
+  const host = useMiniAppHost()
   const { isSupported, isConnected, listMyTokens, listAllTokens, readTokenLive } = useTokenFactory()
-  const { showNotification } = useNotification()
+  // Bound to the host's stable `toast.show`; kept out of the effect deps below because a
+  // fresh closure each render would re-trigger the read on every render.
+  const showNotification = useCallback((message, type) => host.toast.show(message, type), [host])
   const [rows, setRows] = useState([])
   const [supply, setSupply] = useState({})
   const [meta, setMeta] = useState({ total: 0, truncated: false })
@@ -66,7 +69,16 @@ function TokenTable({ mode, onOpen, refreshKey }) {
   useEffect(() => { load() }, [load, refreshKey])
 
   if (mode === 'mine' && !isConnected) {
-    return <div className="tm-notice" role="status">Connect a wallet to see the tokens you administer.</div>
+    // The host-native version was a dead end: it named the fix without offering
+    // it. `wallet.requestConnect` opens the host's own connect modal.
+    return (
+      <div className="tm-notice" role="status">
+        <span>Connect a wallet to see the tokens you administer.</span>{' '}
+        <button type="button" className="tm-btn" onClick={() => host.wallet.requestConnect()}>
+          Connect wallet
+        </button>
+      </div>
+    )
   }
   return (
     <div>

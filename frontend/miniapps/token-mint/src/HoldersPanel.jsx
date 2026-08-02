@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ethers } from 'ethers'
-import { getNetwork } from '../../config/networks'
-import { useNotification } from '../../hooks/useUI'
+import { useMiniAppHost } from '@fairwins/miniapp-sdk'
 import { fetchHolders, SUBGRAPH_UNAVAILABLE } from './tokenSubgraph'
 
 // Spec 028 expansion (US10, FR-039/FR-043) — the per-token holder cap table. Sourced from the subgraph
@@ -20,7 +19,12 @@ function fmtDate(unixSeconds) {
 }
 
 export default function HoldersPanel({ token, caps, chainId }) {
-  const { showNotification } = useNotification()
+  const host = useMiniAppHost()
+  // A chain DESCRIPTOR, not the host's NETWORKS entry: name, explorer and subgraph
+  // endpoint only. Null for a chain the host does not recognise, which every consumer
+  // below already treats as 'unknown network' rather than guessing another chain's.
+  const net = host.network(chainId)
+  const showNotification = (message, type) => host.toast.show(message, type)
   const reqKey = `${chainId}-${token.tokenAddress}`
   const [state, setState] = useState({ key: null, available: true, unavailable: null, holders: [], error: null })
   const decimals = caps?.decimals ?? 18
@@ -31,7 +35,7 @@ export default function HoldersPanel({ token, caps, chainId }) {
   // are reserved for the user-initiated CSV export.
   useEffect(() => {
     let cancelled = false
-    fetchHolders(chainId, token.tokenAddress)
+    fetchHolders(net?.subgraphUrl ?? null, token.tokenAddress)
       .then((res) => {
         if (!cancelled) {
           setState({
@@ -59,7 +63,9 @@ export default function HoldersPanel({ token, caps, chainId }) {
     return () => {
       cancelled = true
     }
-  }, [chainId, token.tokenAddress, reqKey])
+    // `net?.subgraphUrl` and not just `chainId`: the endpoint is what the read actually
+    // depends on, and the host resolves it (a member repointing one must take effect).
+  }, [chainId, net?.subgraphUrl, token.tokenAddress, reqKey])
 
   // Rank holders + compute each one's share of total indexed supply (BigInt math → no float drift).
   const ranked = useMemo(() => {
@@ -103,7 +109,6 @@ export default function HoldersPanel({ token, caps, chainId }) {
   }
 
   if (!state.available) {
-    const net = getNetwork(chainId)
     const network = net?.name || 'This network'
     // Three different facts, three different sentences. In particular a transport failure is NOT
     // reported as "this network does not support it" — that would turn one bad fetch into a

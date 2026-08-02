@@ -3,14 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ActivityPanel from '../ActivityPanel'
 import { fetchActivity } from '../tokenSubgraph'
+import { hostRef, resetHost } from './_host'
 
 // Phase 13 (P3-b, US12, T092): activity feed — renders indexed events with category filtering, and disables
 // truthfully on subgraph-less networks (FR-043).
 
-vi.mock('../tokenSubgraph', () => ({ fetchHolders: vi.fn(), fetchActivity: vi.fn() }))
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
-vi.mock('../../../config/networks', () => ({
-  getNetwork: () => ({ name: 'Ethereum Classic Mordor', explorer: { baseUrl: 'https://explorer.test' } }),
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
+vi.mock('../tokenSubgraph', async (importOriginal) => ({
+  // Keep the REAL SUBGRAPH_UNAVAILABLE codes — the panels branch on them to choose which of the
+  // three unavailable sentences to show, so a stubbed-out enum makes that branch unreachable.
+  ...(await importOriginal()),
+  fetchHolders: vi.fn(),
+  fetchActivity: vi.fn(),
 }))
 
 const A = (n) => '0x' + String(n).padStart(40, '0')
@@ -18,7 +22,10 @@ const token = { tokenAddress: A(170), symbol: 'TKN' }
 const caps = { decimals: 18 }
 
 describe('ActivityPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+  vi.clearAllMocks()
+  resetHost()
+})
 
   it('renders activity rows and filters by category', async () => {
     fetchActivity.mockResolvedValue({
@@ -40,7 +47,7 @@ describe('ActivityPanel', () => {
   })
 
   it('disables truthfully on a subgraph-less network', async () => {
-    fetchActivity.mockResolvedValue({ available: false, activity: [] })
+    fetchActivity.mockResolvedValue({ available: false, unavailable: 'no-subgraph', activity: [] })
     render(<ActivityPanel token={token} caps={caps} chainId={63} />)
     await waitFor(() =>
       expect(screen.getByText(/no subgraph deployed, so the event history is unavailable/i)).toBeInTheDocument()

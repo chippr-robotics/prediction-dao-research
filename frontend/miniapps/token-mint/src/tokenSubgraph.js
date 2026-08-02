@@ -9,13 +9,10 @@
  * string "Subgraph: Type `Query` has no field `holders`" — an error message for something that is
  * not an error.
  *
- * Where each occurs today:
- *   - `no-subgraph`  — Mordor (63) and Ethereum Classic (61). Neither has a Graph deployment and
- *                      neither will; `subgraphUrl` is null and the app reads the chain directly.
- *   - `not-indexed`  — Polygon (137). It HAS a subgraph, but `subgraph/networks.json` gives the
- *                      `matic` network no TokenFactory data source, so `graph build` defers it and
- *                      the deployed schema has no `holders`/`tokenActivities` fields at all.
- *                      (Verified live against the v0.2.0 endpoint.)
+ * Where each occurs:
+ *   - `no-subgraph`  — the host reports no endpoint for this chain (Mordor, Ethereum Classic).
+ *   - `not-indexed`  — an endpoint exists but its deployed schema has no token entities. Amoy is
+ *                      like this today; Polygon was until the v0.3.0 redeploy added TokenFactory.
  *   - `unreachable`  — any transport failure, anywhere.
  *
  * The distinction that matters most is the last one: `not-indexed` is a durable fact about the
@@ -23,7 +20,14 @@
  * reported as "this network does not support it". Claiming a permanent absence because one fetch
  * failed is the same class of lie as fabricating rows.
  */
-import { getSubgraphUrl } from '../../config/networks'
+/*
+ * The endpoint is PASSED IN, not resolved here. A package cannot import the
+ * host's network config (`config/networks.js` reads `import.meta.env` dozens of
+ * times, and the build preset deliberately inlines none of it — a bundled copy
+ * would report every subgraph as absent, which is a fabricated fact rather than
+ * an outage). The host answers instead, via `host.network(chainId).subgraphUrl`,
+ * and passing the resolved value keeps this module pure and directly testable.
+ */
 
 /** Why the indexed view is unavailable. Rendered differently for each — see the panels. */
 export const SUBGRAPH_UNAVAILABLE = Object.freeze({
@@ -92,8 +96,7 @@ const ACTIVITY_QUERY = `
   }`
 
 /** Shared shape so both readers degrade identically. */
-async function fetchIndexed(chainId, tokenAddress, query, key) {
-  const url = getSubgraphUrl(chainId)
+async function fetchIndexed(url, tokenAddress, query, key) {
   if (!url) return { available: false, unavailable: SUBGRAPH_UNAVAILABLE.NO_SUBGRAPH, detail: '', [key]: [] }
 
   const result = await postGraphQL(url, query, { token: String(tokenAddress).toLowerCase() })
@@ -105,13 +108,16 @@ async function fetchIndexed(chainId, tokenAddress, query, key) {
   return { available: true, unavailable: null, detail: '', [key]: result.data[key] || [] }
 }
 
-/** Holder cap table. `{ available, unavailable, detail, holders }`. */
-export async function fetchHolders(chainId, tokenAddress) {
-  return fetchIndexed(chainId, tokenAddress, HOLDERS_QUERY, 'holders')
+/**
+ * Holder cap table. `{ available, unavailable, detail, holders }`.
+ * @param {string|null} subgraphUrl - from `host.network(chainId)?.subgraphUrl`
+ */
+export async function fetchHolders(subgraphUrl, tokenAddress) {
+  return fetchIndexed(subgraphUrl, tokenAddress, HOLDERS_QUERY, 'holders')
 }
 
 /** Activity feed. `{ available, unavailable, detail, tokenActivities }` — aliased to `activity`. */
-export async function fetchActivity(chainId, tokenAddress) {
-  const result = await fetchIndexed(chainId, tokenAddress, ACTIVITY_QUERY, 'tokenActivities')
+export async function fetchActivity(subgraphUrl, tokenAddress) {
+  const result = await fetchIndexed(subgraphUrl, tokenAddress, ACTIVITY_QUERY, 'tokenActivities')
   return { ...result, activity: result.tokenActivities }
 }

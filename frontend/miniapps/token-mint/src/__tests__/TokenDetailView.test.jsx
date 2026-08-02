@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import TokenDetailView from '../TokenDetailView'
+import { hostRef } from './_host'
 
 // Phase 11 (T083): the per-token detail view detects the token's model + the caller's authority and renders ONLY
 // valid sub-tabs/controls (FR-028/SC-014). Mock the data hook so gating is tested in isolation; sub-panel
@@ -8,12 +9,12 @@ import TokenDetailView from '../TokenDetailView'
 const STD = { OPEN_ERC20: 0, OPEN_ERC721: 1, RESTRICTED_ERC1404: 2, PERMISSIONED_ERC3643: 3 }
 const h = vi.hoisted(() => ({ caps: {}, live: { owner: '0xowner', supplyDisplay: '500.0 REG', paused: false }, fail: null }))
 
+vi.mock('@fairwins/miniapp-sdk', () => ({ useMiniAppHost: () => hostRef.current }))
 vi.mock('../useTokenFactory', () => ({
   useTokenFactory: () => ({
     detectCapabilities: vi.fn(() => (h.fail ? Promise.reject(new Error(h.fail)) : Promise.resolve(h.caps))),
     readTokenLive: vi.fn(() => (h.fail ? Promise.reject(new Error(h.fail)) : Promise.resolve(h.live))),
     reader: {},
-    signer: {},
   }),
   tokenRuleSummary: () => 'Governing rule summary.',
   v2AbiForStandard: () => [],
@@ -22,11 +23,9 @@ vi.mock('../useTokenFactory', () => ({
   TOKEN_STANDARD: { OPEN_ERC20: 0, OPEN_ERC721: 1, RESTRICTED_ERC1404: 2, PERMISSIONED_ERC3643: 3 },
 }))
 
-vi.mock('../../../hooks/useWalletManagement', () => ({
-  useWallet: () => ({ account: '0xowner', signer: {} }),
-}))
+// The wallet is the HOST's: `_host.jsx` supplies the acting address and a `submit` that resolves
+// at broadcast with a `wait()`, matching the frozen contract.
 
-vi.mock('../../../hooks/useUI', () => ({ useNotification: () => ({ showNotification: vi.fn() }) }))
 
 const restrictedToken = { id: '1', standard: STD.RESTRICTED_ERC1404, tokenAddress: '0x00000000000000000000000000000000000000a1', issuer: '0x00000000000000000000000000000000000000bb', name: 'Meridian', symbol: 'MRDN' }
 
