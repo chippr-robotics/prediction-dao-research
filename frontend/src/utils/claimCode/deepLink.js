@@ -16,3 +16,23 @@ export function parseTakeChallengeParams(search) {
   if (params.get('oc') === 'take' && params.get('code')) return params.get('code')
   return null
 }
+
+/**
+ * The same query string with ONLY the take-a-challenge params removed, ready to navigate to.
+ *
+ * Consuming a code has to clear it from the URL — otherwise it re-fires on re-render and gets
+ * bookmarked with the secret in it. The obvious way to do that is to navigate to `location.pathname`
+ * and drop the query wholesale, which is what the wager surface did while it owned a whole route
+ * (`/wagers`) where nothing else lived in the query. It now renders inside `/wallet`, where the
+ * query is what selects the section and the view — so dropping it would land the member on the
+ * Account tab in the middle of accepting a challenge. Strip the two params, keep everything else.
+ *
+ * @returns {string} `''` when nothing is left, otherwise a leading-`?` query string
+ */
+export function stripTakeChallengeParams(search) {
+  const params = new URLSearchParams(search || '')
+  params.delete('oc')
+  params.delete('code')
+  const rest = params.toString()
+  return rest ? `?${rest}` : ''
+}

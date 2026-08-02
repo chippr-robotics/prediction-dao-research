@@ -12,7 +12,7 @@ vi.mock('../../hooks/useOpenChallengeCreate', async (importOriginal) => {
 })
 
 import OpenChallengeModal from '../../components/fairwins/OpenChallengeModal'
-import { buildTakeChallengeUrl, parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
+import { buildTakeChallengeUrl, parseTakeChallengeParams, stripTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 
 // Enter a stake amount on the payments-style number pad (spec 052). Each pad key
 // is a button named for its digit; the decimal key is named "Decimal point".
@@ -104,6 +104,25 @@ describe('OpenChallengeModal (create-only; taking moved to the unified lookup, s
     const { search } = new URL(url)
     expect(parseTakeChallengeParams(search)).toBe('river tiger kite zoo')
     expect(parseTakeChallengeParams('?foo=bar')).toBeNull()
+  })
+
+  /*
+   * Consuming a code must clear it from the URL — it is a secret, and leaving it there re-fires the
+   * effect and gets it bookmarked. The wager surface used to do that by navigating to the bare
+   * pathname, which was safe only while it owned a whole route (`/wagers`) with nothing else in the
+   * query. It renders inside `/wallet` now, where the query is what selects the section and the
+   * view, so a wholesale drop would land the member on Account mid-accept.
+   */
+  it('strips only the code params, leaving the rest of the query intact', () => {
+    expect(stripTakeChallengeParams('?tab=paytransfer&view=wagers&oc=take&code=river%20tiger'))
+      .toBe('?tab=paytransfer&view=wagers')
+    // Nothing else in the query → no stray '?' left behind.
+    expect(stripTakeChallengeParams('?oc=take&code=river+tiger')).toBe('')
+    expect(stripTakeChallengeParams('')).toBe('')
+    // Idempotent, and harmless on a query that never carried a code.
+    expect(stripTakeChallengeParams('?tab=paytransfer')).toBe('?tab=paytransfer')
+    // The code is gone for real — re-parsing the result finds nothing to consume again.
+    expect(parseTakeChallengeParams(stripTakeChallengeParams('?oc=take&code=abc&tab=x'))).toBeNull()
   })
 })
 
