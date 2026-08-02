@@ -12,7 +12,7 @@ import OpenChallengeModal from './OpenChallengeModal'
 import { OPEN_RESOLUTION_TYPES } from '../../hooks/useOpenChallengeCreate'
 import GroupPoolModal from './GroupPoolModal'
 import UnifiedLookupModal from './UnifiedLookupModal'
-import { parseTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
+import { parseTakeChallengeParams, stripTakeChallengeParams } from '../../utils/claimCode/deepLink.js'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketTickerCrawler from './PolymarketTickerCrawler'
 import QRScanner from '../ui/QRScanner'
@@ -519,20 +519,25 @@ function Dashboard() {
     if (openWagerId == null) return
     setInitialWagerId(String(openWagerId))
     setShowMyWagers(true)
-    navigate(location.pathname, { replace: true, state: {} })
-  }, [location.state, location.pathname, navigate])
+    // Clears the history STATE only — `location.search` is carried through unchanged. This surface
+    // renders inside `/wallet?tab=paytransfer&view=wagers` now, where the query is what selects the
+    // section; navigating to the bare pathname would drop it and bounce the member to Account.
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} })
+  }, [location.state, location.pathname, location.search, navigate])
 
   // Shared-phrase deep link (feature 024 / spec 037): a shared QR / link of the form
   // /app?oc=take&code=<four words> now opens the unified phrase lookup, pre-filled and auto-resolved,
-  // which finds whichever thing the words point to (challenge or pool). After consuming it we strip the
-  // query so it doesn't re-trigger on re-render or get bookmarked with the code.
+  // which finds whichever thing the words point to (challenge or pool). After consuming it we strip
+  // the CODE from the query so it doesn't re-trigger on re-render or get bookmarked with the secret
+  // in it — but only the code: everything else in the query stays, because this surface now lives
+  // inside `/wallet?tab=paytransfer&view=wagers` and those params are what keep the member here.
   useEffect(() => {
     const code = parseTakeChallengeParams(location.search)
     if (code) {
       setUnifiedInitialPhrase(code)
       setUnifiedAutoResolve(true)
       setShowUnifiedLookup(true)
-      navigate(location.pathname, { replace: true, state: {} })
+      navigate(`${location.pathname}${stripTakeChallengeParams(location.search)}`, { replace: true, state: {} })
     }
   }, [location.search, location.pathname, navigate])
 

@@ -268,6 +268,63 @@ artifacts live under `specs/<feature>/`.
   absence stays absence, no fallback to the shared estate. Manifests never contain secrets;
   `npm run tenants:validate` gates in CI. See `docs/developer-guide/white-label-tenants.md`
   + `specs/072-white-label-tenants/`.
+- **Mini-apps (spec 073) are UNTRUSTED third-party code, and the host object is the whole of what
+  they get.** The Apps section serves packages published to IPFS and curated on-chain by the
+  `MiniAppRegistry` (UUPS proxy, keys `miniAppRegistry` / `miniAppRegistryImpl`). Five rules:
+  (1) **`launchable` IS the serving decision, NEVER `status`.** A Pending record with a prior
+  approval is a LIVE app whose update is in review (FR-003); gating on `status === Approved` would
+  let any vendor take their own app offline by submitting anything. `registryClient.normalizeApp`
+  READS the chain's `launchable` — never re-derive it. Approval is **content-committed**:
+  `approveApp(id, expectedManifestHash)` reverts `StaleProposal`, because reading the proposed tuple
+  at execution time let a vendor swap the package after review. **Never add an id-only overload.**
+  (2) **The registry has ONE home per cohort** — `miniAppChainId()`: **Polygon 137** on a mainnet
+  build, **Mordor 63** on a testnet one. Deployment targets are **Polygon and Mordor ONLY; Amoy is
+  deliberately not one**, which is why this is the one reference chain in the estate that does NOT
+  derive from `TESTNET_CHAIN_ID` (that would resolve every testnet build to a chain with no
+  registry). Never hardcode `137`: the catalog decides which packages the host EXECUTES, so
+  crossing the cohort boundary would run mainnet-curated code against testnet wallets.
+  (3) **The `host` object is the ENTIRE privileged surface** (`contracts/host-context.md`, hostApi
+  **2**): `appId`, `wallet` (`address`, `chainId`, `isConnected`, `requestConnect`, `switchChain`,
+  `submit`), `readProvider`, `contracts`, `network`, `networks`, `store`, `audit`, `toast`,
+  `navigate`. Wrappers, never handles — no signer, no context, no storage handle, and adding a key
+  grants it permanently to every third-party package. `wallet.submit` chooses the write rail
+  (classic signer vs passkey `sendCalls`) because an app cannot: identity first, so a passkey member
+  acting as a vault still gets a PROPOSAL. **Sanctions screening happens INSIDE `submit`**, before
+  any rail is touched — strictly stronger than an app-side pre-check, which a package could simply
+  skip. It resolves at **BROADCAST** — use `SubmitResult.wait()`, never report success from `submit`
+  alone, and note `wait()` takes NO timeout where `tx.wait(1, ms)` did, so each app must race its
+  own. `contracts(name)` is gated by a per-package manifest allowlist and **throws** for an
+  undeclared name (returning `null` would read as "not deployed"). `readProvider` is cached per
+  underlying provider — it must keep a STABLE identity, or any app using it as an effect dependency
+  spins.
+  (4) **Never bundle host config into a package.** `config/contracts.js` reaches `virtual:tenant`
+  (a hard build failure), and the preset's `envPrefix` turns any bundled `import.meta.env` read into
+  `undefined` — a bundled `NETWORKS` would report every subgraph as absent, which is a fabricated
+  fact, not an outage. Packages take configuration from the host at runtime. Equally: **nothing in
+  `frontend/miniapps/` may import from `frontend/src/`** — a package is built separately, frozen at
+  an immutable CID, and a bundled copy of a React context is a DIFFERENT context. The reverse also
+  holds and is the direction that actually broke: **nothing in `frontend/src/` may import a tree
+  that was converted into a package.** Both are gated by
+  `frontend/src/test/miniapps/packageBoundary.test.js` — a scoped vitest run cannot catch a stale
+  import, because the module simply never loads; only the full suite or a build will.
+  (5) **`blob:` in `script-src` is for mini-app packages ONLY** — verified bytes are imported from a
+  Blob URL (R1). Never add `https:` to `script-src`. The SW package cache
+  (`fairwins-miniapp-packages-v1`) is cache-first because CIDs are immutable, and is **not a trust
+  boundary**: after every retrieval, cache or network, the loader re-checks keccak(manifest bytes)
+  against the chain and the sha256 of **every byte it executes or injects** — the entry and the
+  declared stylesheets. It does NOT fetch files it will not use (`verifyAllDeclaredFiles` is off for
+  a launch, on for a curator review), so do not restate this as "every file in the manifest": the
+  invariant is that nothing unverified ever runs, not that everything declared is downloaded.
+  **Converted apps: Token Mint and ClearPath ONLY** (live on Polygon 137 and Mordor 63; ids are
+  per-registry and differ per chain — resolve by `idByName`/slug, never by id across cohorts).
+  **Wagers is deliberately NOT a mini-app and must not be converted** — 69% of its file closure
+  (22 of 32 files) is shared with the host-retained `HomeScreen`/Trade surfaces, because
+  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerCard`/
+  `WagerList`/`wagerVm` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
+  (`WAGERS_VIEW`/`WAGERS_PATH` in `config/appNav.js`, rendered by `PayTransferPanel`); `/wagers`
+  redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
+  See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +
+  `specs/073-miniapp-platform/`.
 - **RPC endpoints belong to the MEMBER (spec 069), and network settings live in the user panel.**
   The `network` tab moved off the Tools nav group onto the account button beside Preferences (tab id +
   `/wallet?tab=network` unchanged); `NAV_GROUPS` must not carry it again. Endpoint resolution has ONE

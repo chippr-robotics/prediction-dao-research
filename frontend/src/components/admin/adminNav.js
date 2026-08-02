@@ -14,6 +14,7 @@ export const ADMIN_TAB_ICONS = {
   emergency: 'alert',
   moderation: 'shieldOff',
   'deny-list': 'ban',
+  'miniapp-review': 'grid',
   tiers: 'layers',
   members: 'users',
   treasury: 'bank',
@@ -38,6 +39,13 @@ export function buildAdminNavGroups({
   isFeeAdmin,
   isStakingAdmin,
   isLiquidityAdmin,
+  // Spec 073: NOT one of the app-wide role flags above. `APP_CURATOR_ROLE` administers itself
+  // on the MiniAppRegistry, so no other role implies it and it cannot be synced into the role
+  // storage the rest of this file reads. The AdminPanel resolves it by asking the registry
+  // (`lib/miniapps/registryAuthority.js`) and passes the definite answer through here, which is
+  // why it defaults to false: an unread registry must gate like "not a curator" in the NAV,
+  // while the tab itself says which of the two it actually is.
+  isAppCurator,
 }) {
   const item = (id, label) => ({ id, label, icon: ADMIN_TAB_ICONS[id] })
 
@@ -57,6 +65,13 @@ export function buildAdminNavGroups({
       label: 'Compliance',
       items: [
         (isSanctionsAdmin || isAdmin) && item('deny-list', 'Deny-list'),
+        // Mini-app curation (spec 073 FR-022). Compliance rather than Protocol Config: the
+        // decision being made is "may members run this vendor's code", which is a review
+        // judgement, not protocol wiring. ADMIN enters read-only for transparency — the tab
+        // offers lifecycle controls only to accounts the REGISTRY reports as curators, which is
+        // a different question from being a platform administrator (the role administers itself
+        // precisely so an admin cannot grant it).
+        (isAppCurator || isAdmin) && item('miniapp-review', 'Mini-App Review'),
       ].filter(Boolean),
     },
     {

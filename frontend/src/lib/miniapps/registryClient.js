@@ -63,7 +63,16 @@ export const UNREACHABLE_REASON = Object.freeze({
 })
 
 /**
- * Records per `getAppsPaged` call. Deliberately well under the contract's `MAX_PAGE_LIMIT` (100).
+ * Records per `getAppsPaged` call. This value must never EXCEED the contract's `MAX_PAGE_LIMIT`,
+ * which is **25** (`MiniAppRegistry.sol:82`) — the same number, so this page size sits exactly AT
+ * the cap, not under it.
+ *
+ * That equality is load-bearing and is why `MINIAPP_MAX_PAGE_LIMIT` below exists to pin it. Ask for
+ * more than the cap and the contract silently clamps the page (`if (limit > MAX_PAGE_LIMIT) limit =
+ * MAX_PAGE_LIMIT`), `readAllRecords` sees a page shorter than it asked for, takes that as the end of
+ * the catalog and stops — reporting a TRUNCATED list as a complete one, with `status: 'ok'`. A
+ * fabricated-completeness failure is the one outcome the rest of this module is built to avoid, and
+ * it would be invisible: no error, no partial flag, just apps missing from the catalog.
  *
  * An `AppView` is mostly bounded STRINGS, so a page is far heavier than the record count suggests:
  * worst case per record is name 64 B + description 512 B + two package tuples at 256 B of CID each,
@@ -77,6 +86,16 @@ export const UNREACHABLE_REASON = Object.freeze({
  * apps, so this is one or two round trips either way.
  */
 export const CATALOG_PAGE_SIZE = 25
+
+/**
+ * The contract's own `MAX_PAGE_LIMIT`, mirrored here so the invariant above is checkable.
+ *
+ * Duplicating a contract constant in the client is normally a smell; here it is the only way to
+ * state the relationship at all, since the client cannot read a constant it has not called. The
+ * test that pins `CATALOG_PAGE_SIZE <= MINIAPP_MAX_PAGE_LIMIT` reads BOTH numbers out of the
+ * Solidity source, so raising the cap on chain without raising it here — or vice versa — fails.
+ */
+export const MINIAPP_MAX_PAGE_LIMIT = 25
 
 /**
  * How long a catalog snapshot is served from memory before the next `fetchCatalog` re-reads.

@@ -20,6 +20,7 @@ import {
   STATE_AUDIT_WINDOW_MS,
 } from '../../lib/miniapps/hostContext'
 import { appStoreStorageKey, __resetMiniAppStores } from '../../lib/miniapps/store'
+import { NETWORKS } from '../../config/networks'
 
 const ACCOUNT = '0xAbCd000000000000000000000000000000000073'
 const VAULT = '0x1111111111111111111111111111111111111111'
@@ -41,6 +42,7 @@ const state = vi.hoisted(() => ({
   captureTx: null,
   captureLog: null,
   captureState: null,
+  screenOne: null,
 }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }))
@@ -51,6 +53,10 @@ vi.mock('../../hooks/useUI', () => ({
   useNotification: () => ({ showNotification: state.showNotification }),
 }))
 vi.mock('../../utils/rpcProvider', () => ({ getReadProvider: (chainId) => state.getReadProvider(chainId) }))
+// STABLE identity, like the real hook's `useCallback`. A fresh arrow per render would churn the
+// host object on every render and defeat the memoization the contract promises.
+const screeningApi = { screenOne: (...args) => state.screenOne(...args) }
+vi.mock('../../hooks/useAddressScreening', () => ({ useAddressScreening: () => screeningApi }))
 vi.mock('../../data/ledger/sources/miniAppSource', () => ({
   captureMiniAppTxSubmitted: (...args) => state.captureTx(...args),
   captureMiniAppLog: (...args) => state.captureLog(...args),
@@ -90,7 +96,18 @@ beforeEach(() => {
   localStorage.clear()
   __resetMiniAppStores()
   vi.clearAllMocks()
-  state.wallet = { chainId: CHAIN, isConnected: true, openConnectModal: vi.fn() }
+  // A CLASSIC wallet session: it has a signer, which is what makes the
+  // `submitAsActive` rail usable. A passkey session (signer: null +
+  // loginMethod: 'passkey') is set up per-test below.
+  state.wallet = {
+    chainId: CHAIN,
+    isConnected: true,
+    openConnectModal: vi.fn(),
+    loginMethod: 'injected',
+    signer: { sendTransaction: vi.fn() },
+    sendCalls: vi.fn(async () => ({ txHash: '0xbatch' })),
+    switchNetwork: vi.fn(async () => true),
+  }
   state.effective = { address: ACCOUNT, connectedAddress: ACCOUNT, chainId: null }
   state.active = {
     isVault: false,
@@ -106,16 +123,22 @@ beforeEach(() => {
   state.captureTx = vi.fn(() => 'entry-tx')
   state.captureLog = vi.fn(() => 'entry-log')
   state.captureState = vi.fn(() => 'entry-state')
+  // Screening defaults to a positive 'clear'; individual tests make it restrict or fail.
+  state.screenOne = vi.fn(async () => 'clear')
 })
 
 describe('the exposed surface (FR-013)', () => {
   it('exposes exactly the documented keys and nothing more', () => {
     const { ref } = mountHost()
     expect(Object.keys(ref.current).sort()).toEqual(
-      ['appId', 'audit', 'navigate', 'readProvider', 'store', 'toast', 'wallet'].sort(),
+      // hostApi 2 added `contracts` and `network`; both hand over inert public
+      // data and neither can move value or read the member's own data.
+      ['appId', 'audit', 'contracts', 'navigate', 'network', 'networks', 'readProvider', 'store', 'toast', 'wallet'].sort(),
     )
     expect(Object.keys(ref.current.wallet).sort()).toEqual(
-      ['address', 'chainId', 'connectedAddress', 'isConnected', 'requestConnect', 'submit'].sort(),
+      // `switchChain` (hostApi 2) is the companion to submit's WRONG_CHAIN refusal — without it an
+      // app can name the problem and never offer the fix.
+      ['address', 'chainId', 'connectedAddress', 'isConnected', 'requestConnect', 'submit', 'switchChain'].sort(),
     )
     expect(Object.keys(ref.current.store).sort()).toEqual(['get', 'set', 'subscribe'])
     expect(Object.keys(ref.current.audit)).toEqual(['log'])
@@ -278,6 +301,378 @@ describe('wallet.submit routing and audit (FR-019)', () => {
       appId: APP_ID,
       txHash: '0xdead',
       to: TARGET,
+    })
+  })
+
+  /*
+   * The two write rails. A passkey smart account has NO ethers signer —
+   * WalletContext nulls it — and writes through `sendCalls`. Before this was
+   * handled, every mini-app transaction from a passkey member died inside
+   * submitAsActiveAccount on `null.sendTransaction`, reaching the app as a raw
+   * TypeError with no refusal code and no member-facing sentence. The app
+   * cannot fix that itself: `sendCalls` is deliberately not on the host object.
+   */
+  describe('passkey sessions (specs 041/050)', () => {
+    const asPasskey = (over = {}) => {
+      state.wallet = {
+        ...state.wallet,
+        loginMethod: 'passkey',
+        signer: null, // WalletContext.jsx nulls signer AND provider for passkey
+        ...over,
+      }
+    }
+
+    it('routes a personal submit through sendCalls instead of the signer rail', async () => {
+      asPasskey()
+      const { ref } = mountHost()
+
+      const result = await ref.current.wallet.submit({
+        to: TARGET, data: '0xabcd', value: '1000', chainId: CHAIN,
+      })
+
+      expect(state.wallet.sendCalls).toHaveBeenCalledWith([
+        { target: TARGET, data: '0xabcd', value: 1000n },
+      ])
+      // The signer rail must not be touched — it is the one that would throw.
+      expect(state.active.submit).not.toHaveBeenCalled()
+      expect(result).toEqual({ kind: 'sent', txHash: '0xbatch', safeTxHash: null })
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    it('audits the submission exactly as the signer rail does', async () => {
+      asPasskey()
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(state.captureTx).toHaveBeenCalledWith(ACCOUNT, CHAIN, {
+        appId: APP_ID, txHash: '0xbatch', to: TARGET,
+      })
+    })
+
+    it('takes the UserOp identifiers in decreasing order of finality', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => ({ userOpHash: '0xuop', intentId: '0xint' })) })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBe('0xuop')
+
+      asPasskey({ sendCalls: vi.fn(async () => ({ intentId: '0xint' })) })
+      const second = mountHost()
+      expect((await second.ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBe('0xint')
+    })
+
+    it('never fabricates a hash when the rail returns none', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => ({})) })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).txHash).toBeNull()
+    })
+
+    it('still PROPOSES when a passkey member is acting as a vault', async () => {
+      // A passkey identity operating as a Safe must produce a vault proposal,
+      // not a UserOp from their own account. Rail selection must not override
+      // which identity is acting.
+      asPasskey()
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: CHAIN }
+      state.active = {
+        ...state.active,
+        isVault: true,
+        canActAsVault: true,
+        submit: vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe' })),
+      }
+      const { ref } = mountHost()
+
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(result).toEqual({ kind: 'proposed', txHash: null, safeTxHash: '0xsafe' })
+      expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+      expect(state.active.submit).toHaveBeenCalled()
+    })
+
+    it('audits a failed UserOp and rethrows, like the signer rail', async () => {
+      asPasskey({ sendCalls: vi.fn(async () => { throw new Error('bundler rejected') }) })
+      const { ref } = mountHost()
+
+      await expect(ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).rejects.toThrow('bundler rejected')
+      expect(state.captureLog).toHaveBeenCalledWith(
+        ACCOUNT, CHAIN,
+        expect.objectContaining({ appId: APP_ID, kind: 'host:tx_failed' }),
+      )
+    })
+
+    it('refuses with a typed code when the session offers no rail at all', async () => {
+      asPasskey({ sendCalls: undefined })
+      const { ref } = mountHost()
+
+      // The whole point: a typed refusal the app can branch on and the
+      // workspace can explain — not a TypeError from a null dereference.
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.NO_WRITE_RAIL)
+      expect(error.userMessage).toMatch(/cannot send transactions/i)
+    })
+
+    it('refuses a classic session that has lost its signer, rather than dereferencing null', async () => {
+      state.wallet = { ...state.wallet, loginMethod: 'injected', signer: null }
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.NO_WRITE_RAIL)
+      expect(state.active.submit).not.toHaveBeenCalled()
+    })
+  })
+
+  /*
+   * hostApi 2. Both accessors hand over inert PUBLIC data, and both exist
+   * because the alternative is worse: a package cannot bundle the host's config
+   * (it reaches `virtual:tenant`, a plugin the package preset does not
+   * register), and a hand-copied table frozen into immutable bytes would turn a
+   * routine redeploy into a re-publish/re-review/re-approve for every app.
+   */
+  describe('contracts() and network() (hostApi 2)', () => {
+    const withContracts = (names) => {
+      const ref = { current: null }
+      function Probe() { ref.current = useMiniAppHost(); return null }
+      render(
+        <MiniAppHostProvider appId={APP_ID} declaredContracts={names}>
+          <Probe />
+        </MiniAppHostProvider>,
+      )
+      return ref
+    }
+
+    it('resolves a declared name on a chain that has a deployment', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      // Polygon 137 carries the spec-073 registry.
+      expect(host.contracts('miniAppRegistry', 137)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    })
+
+    it('returns null — not "" — for a declared name with no deployment on that chain', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      // Amoy has the key seeded but empty. '' is how the address book spells
+      // absence; the contract spells it `null`, and an app must not have to
+      // know both.
+      expect(host.contracts('miniAppRegistry', 80002)).toBeNull()
+    })
+
+    it('THROWS for an undeclared name rather than answering null', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      const error = (() => { try { host.contracts('wagerRegistry', 137) } catch (e) { return e } })()
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.UNDECLARED_CONTRACT)
+      // "you are not approved for this" must never read as "not deployed here".
+      expect(host.contracts('miniAppRegistry', 80002)).toBeNull()
+    })
+
+    it('defaults to the wallet chain and never guesses another one', () => {
+      const { current: host } = withContracts(['miniAppRegistry'])
+      expect(host.contracts('miniAppRegistry')).toBe(host.contracts('miniAppRegistry', CHAIN))
+      expect(host.contracts('miniAppRegistry', 999999)).toBeNull()
+    })
+
+    it('declares nothing by default, so the gate fails closed', () => {
+      const { ref } = mountHost()
+      expect(() => ref.current.contracts('miniAppRegistry', 137)).toThrow(/not declared/)
+    })
+
+    it('projects a chain descriptor, never the NETWORKS entry', () => {
+      const { ref } = mountHost()
+      const net = ref.current.network(137)
+      expect(Object.keys(net).sort()).toEqual(
+        ['chainId', 'explorer', 'isTestnet', 'name', 'nativeCurrency', 'subgraphUrl'].sort(),
+      )
+      expect(net.chainId).toBe(137)
+      expect(net.isTestnet).toBe(false)
+      // The NETWORKS entry also carries rpcUrl, dex, polymarket and passkey
+      // config; handing it over would break "wrappers, never handles".
+      expect(net.rpcUrl).toBeUndefined()
+      expect(net.dex).toBeUndefined()
+      expect(net.stablecoin).toBeUndefined()
+      expect(Object.isFrozen(net)).toBe(true)
+    })
+
+    it('returns null for an unknown chain instead of falling back to the default network', () => {
+      const { ref } = mountHost()
+      // getNetwork() would answer with chain 137 here. An app must be able to
+      // say "unknown network", and must never render one chain's explorer link
+      // against another chain's data.
+      expect(ref.current.network(999999)).toBeNull()
+    })
+
+    it('reports a testnet as a testnet', () => {
+      const { ref } = mountHost()
+      expect(ref.current.network(80002).isTestnet).toBe(true)
+    })
+  })
+
+  /*
+   * Screening is enforced HERE and not delegated to packages. FairWins' own contracts carry an
+   * on-chain sanctions guard, but a mini-app's whole point is calling contracts FairWins did not
+   * write, where none exists — and a package asked to call a screening function can simply not.
+   */
+  describe('sanctions screening (hostApi 2)', () => {
+    it('screens the ACTING account live before touching any rail', async () => {
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: null }
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      // The acting identity, not the connected one — a vault is what moves the value.
+      // `force` because a cached 'clear' would hide an account deny-listed since page load.
+      expect(state.screenOne).toHaveBeenCalledWith(VAULT, CHAIN, { force: true })
+    })
+
+    it('REFUSES a restricted account with a typed error, and never submits', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.SANCTIONED_ACCOUNT)
+      expect(error.userMessage).toMatch(/restricted by sanctions screening/i)
+      expect(state.active.submit).not.toHaveBeenCalled()
+    })
+
+    it('audits a screening refusal, so the trail shows why nothing was sent', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      const { ref } = mountHost()
+      await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN }).catch(() => {})
+
+      expect(state.captureLog).toHaveBeenCalledWith(
+        ACCOUNT, CHAIN,
+        expect.objectContaining({ refs: expect.objectContaining({ reason: 'sanctioned_account' }) }),
+      )
+    })
+
+    it('ALLOWS on an uncertain result — an unreachable screener is not a finding', async () => {
+      // Treating uncertainty as a restriction would invent a compliance result the data does not
+      // support, which is the same class of lie as fabricating a clear one.
+      state.screenOne = vi.fn(async () => 'uncertain')
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).kind).toBe('sent')
+    })
+
+    it('ALLOWS when the screener throws outright', async () => {
+      state.screenOne = vi.fn(async () => { throw new Error('screening endpoint down') })
+      const { ref } = mountHost()
+      expect((await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).kind).toBe('sent')
+    })
+
+    it('screens the passkey rail too — the rail is chosen after the check', async () => {
+      state.screenOne = vi.fn(async () => 'restricted')
+      state.wallet = { ...state.wallet, loginMethod: 'passkey', signer: null }
+      const { ref } = mountHost()
+
+      await expect(ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })).rejects.toThrow(/restricted/i)
+      expect(state.wallet.sendCalls).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('wallet.switchChain (hostApi 2)', () => {
+    it('asks the wallet to move, and resolves when it does', async () => {
+      const { ref } = mountHost()
+      await ref.current.wallet.switchChain(63)
+      expect(state.wallet.switchNetwork).toHaveBeenCalledWith(63)
+    })
+
+    it('refuses with a typed error when the member declines', async () => {
+      state.wallet = {
+        ...state.wallet,
+        switchNetwork: vi.fn(async () => { throw new Error('Please manually switch to Mordor in your wallet') }),
+      }
+      const { ref } = mountHost()
+
+      const error = await ref.current.wallet.switchChain(63).catch((e) => e)
+      expect(error).toBeInstanceOf(MiniAppHostError)
+      expect(error.reason).toBe(HOST_REFUSAL.SWITCH_REFUSED)
+      // The wallet's own sentence is already member-facing; it is kept rather than replaced.
+      expect(error.userMessage).toMatch(/manually switch to Mordor/i)
+    })
+
+    it('refuses a session that cannot switch at all', async () => {
+      state.wallet = { ...state.wallet, switchNetwork: undefined }
+      const { ref } = mountHost()
+      const error = await ref.current.wallet.switchChain(63).catch((e) => e)
+      expect(error.reason).toBe(HOST_REFUSAL.SWITCH_REFUSED)
+      expect(error.userMessage).toMatch(/switch it manually/i)
+    })
+
+    it('refuses a chain id it cannot read', async () => {
+      const { ref } = mountHost()
+      const error = await ref.current.wallet.switchChain('not-a-chain').catch((e) => e)
+      expect(error.reason).toBe(HOST_REFUSAL.BAD_PAYLOAD)
+      expect(state.wallet.switchNetwork).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('networks() (hostApi 2)', () => {
+    it('lists this build\'s cohort, and only that', () => {
+      const { ref } = mountHost()
+      const ids = ref.current.networks()
+      expect(Array.isArray(ids)).toBe(true)
+      expect(ids.length).toBeGreaterThan(0)
+      // Constitution III: a read may not cross the testnet/mainnet boundary. The host enforces it
+      // so a package does not have to remember it.
+      const testnetFlags = new Set(ids.map((id) => Boolean(NETWORKS[id]?.isTestnet)))
+      expect(testnetFlags.size).toBe(1)
+    })
+
+    it('hands back a frozen list an app cannot mutate under the host', () => {
+      const { ref } = mountHost()
+      expect(Object.isFrozen(ref.current.networks())).toBe(true)
+    })
+
+    it('agrees with network() for every id it returns', () => {
+      const { ref } = mountHost()
+      for (const id of ref.current.networks()) {
+        expect(ref.current.network(id)?.chainId).toBe(id)
+      }
+    })
+  })
+
+  describe('SubmitResult.wait() (hostApi 2)', () => {
+    it('resolves the receipt through the host read provider', async () => {
+      state.provider.waitForTransaction = vi.fn(async () => ({ status: 1, hash: '0xdead' }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      expect(await result.wait()).toEqual({ status: 1, hash: '0xdead' })
+      expect(state.provider.waitForTransaction).toHaveBeenCalledWith('0xdead', 1)
+    })
+
+    it('passes a confirmation count through', async () => {
+      state.provider.waitForTransaction = vi.fn(async () => ({ status: 1 }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      await result.wait(3)
+      expect(state.provider.waitForTransaction).toHaveBeenCalledWith('0xdead', 3)
+    })
+
+    it('is NON-ENUMERABLE, so the result stays a plain serialisable object', async () => {
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      expect(Object.keys(result)).toEqual(['kind', 'txHash', 'safeTxHash'])
+      expect(JSON.parse(JSON.stringify(result))).toEqual({
+        kind: 'sent', txHash: '0xdead', safeTxHash: null,
+      })
+      expect(result).toEqual({ kind: 'sent', txHash: '0xdead', safeTxHash: null })
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    it('rejects for a vault proposal rather than waiting for a transaction that does not exist', async () => {
+      state.effective = { address: VAULT, connectedAddress: ACCOUNT, chainId: CHAIN }
+      state.active = {
+        ...state.active,
+        isVault: true,
+        canActAsVault: true,
+        submit: vi.fn(async () => ({ kind: 'proposed', safeTxHash: '0xsafe' })),
+      }
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+
+      await expect(result.wait()).rejects.toThrow(/no transaction to wait for/)
+    })
+
+    it('rejects when the rail reported no hash, instead of waiting on null', async () => {
+      state.active.submit = vi.fn(async () => ({ kind: 'sent', txHash: null }))
+      const { ref } = mountHost()
+      const result = await ref.current.wallet.submit({ to: TARGET, chainId: CHAIN })
+      await expect(result.wait()).rejects.toThrow(/no hash to wait for/)
     })
   })
 

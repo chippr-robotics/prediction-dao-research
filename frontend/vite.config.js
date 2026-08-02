@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { tenantBrandingPlugin } from './vite-plugins/tenant-branding.js'
@@ -62,8 +63,22 @@ export default defineConfig({
       'node_modules/**',
       'dist/**',
       'cypress/**',
+      // Spec 073: mini-app packages are built artifacts and their own installs;
+      // neither holds tests, and both would be scanned on every run.
+      'miniapps/*/dist/**',
+      'miniapps/*/node_modules/**',
       '**/useIpfs.test.js'
     ],
+    alias: {
+      // Spec 073: `@fairwins/miniapp-sdk` is not an npm package — at runtime the
+      // build preset rewrites it to a read from the host's shared-module scope.
+      // Vitest imports package SOURCE, so the specifier reaches the resolver and
+      // needs somewhere to land. Aliased to the REAL hook, so package tests
+      // exercise the actual host contract rather than a stub that would drift.
+      '@fairwins/miniapp-sdk': fileURLToPath(
+        new URL('./src/lib/miniapps/sdkTestShim.js', import.meta.url)
+      )
+    },
     env: {
       NODE_ENV: 'test',
       VITE_SKIP_BLOCKCHAIN_CALLS: 'true',

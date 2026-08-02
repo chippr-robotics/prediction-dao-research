@@ -20,6 +20,7 @@ const NO_ROLES = {
   isFeeAdmin: false,
   isStakingAdmin: false,
   isLiquidityAdmin: false,
+  isAppCurator: false,
 }
 
 const ids = (groups) => flattenNavGroups(groups).map((i) => i.id)
@@ -159,6 +160,81 @@ describe('buildAdminNavGroups', () => {
     })
   })
 
+  // Spec 073 (FR-004 / FR-022): the mini-app curation queue.
+  describe('Mini-App Review (spec 073)', () => {
+    it('a curator with no platform role reaches the review queue', () => {
+      // The curator multisig is a COMPLIANCE function. `APP_CURATOR_ROLE` administers itself on
+      // the MiniAppRegistry, so an admin cannot grant it and a curator may legitimately hold no
+      // other role at all — if that operator could not reach the queue, the live registry could
+      // only be operated by scripts, which is the thing this tab exists to replace.
+      const groups = buildAdminNavGroups({ ...NO_ROLES, isAppCurator: true })
+      expect(ids(groups)).toContain('miniapp-review')
+      expect(labels(groups)).toContain('Compliance')
+    })
+
+    it('curation is not a licence to touch anything else', () => {
+      const flat = ids(buildAdminNavGroups({ ...NO_ROLES, isAppCurator: true }))
+      expect(flat).not.toContain('deny-list')
+      expect(flat).not.toContain('emergency')
+      expect(flat).not.toContain('admin-roles')
+      expect(flat).not.toContain('tiers')
+      expect(flat).not.toContain('protocol-config')
+      expect(flat).not.toContain('fees')
+    })
+
+    it('a full admin reaches it too — read-only transparency, not curation', () => {
+      // Entry is broad on purpose; the TAB reads authority from the registry and offers no
+      // lifecycle control to an admin who is not a curator.
+      expect(ids(buildAdminNavGroups({ ...NO_ROLES, isAdmin: true }))).toContain('miniapp-review')
+    })
+
+    it('is invisible to every other operator role', () => {
+      const flat = ids(
+        buildAdminNavGroups({
+          ...NO_ROLES,
+          isGuardian: true,
+          isAccountModerator: true,
+          isRoleManager: true,
+          isSanctionsAdmin: true,
+          isFeeAdmin: true,
+          isStakingAdmin: true,
+          isLiquidityAdmin: true,
+        }),
+      )
+      expect(flat).not.toContain('miniapp-review')
+    })
+
+    it('sits in Compliance — a review judgement, not protocol wiring', () => {
+      const groups = buildAdminNavGroups({ ...NO_ROLES, isAdmin: true })
+      const compliance = groups.find((g) => g.label === 'Compliance')
+      const protocolConfig = groups.find((g) => g.label === 'Protocol Config')
+      expect(compliance.items.map((i) => i.id)).toContain('miniapp-review')
+      expect(protocolConfig.items.map((i) => i.id)).not.toContain('miniapp-review')
+    })
+
+    it('carries a glyph for the mobile quick-nav', () => {
+      expect(ADMIN_TAB_ICONS['miniapp-review']).toBe('grid')
+    })
+
+    it('the AdminPanel gates the tab body exactly like the nav item', () => {
+      // No direct-id bypass: typing the tab id must render nothing for an operator who is
+      // neither a curator nor an admin.
+      expect(adminPanelSource).toContain(
+        "activeTab === 'miniapp-review' && (isAppCurator || isAdmin)",
+      )
+    })
+
+    it('reads curator authority from the REGISTRY, never from the app-wide role flags', () => {
+      // The whole security property of this flag. `APP_CURATOR_ROLE` administers itself on-chain
+      // so that a platform administrator cannot grant it to themselves; resolving it through
+      // `hasRole(ROLES.…)` — which reads the WagerRegistry/MembershipManager role sets — would
+      // make that separation decorative in the one place a human acts on it.
+      expect(adminPanelSource).toContain('readCuratorAuthority({ account })')
+      expect(adminPanelSource).toContain('curatorAuthority?.held === true')
+      expect(adminPanelSource).not.toMatch(/hasRole\(ROLES\.(APP_)?(MINIAPP_)?CURATOR/)
+    })
+  })
+
   it('every view carries a known NavIcon glyph for the mobile quick-nav', () => {
     const groups = buildAdminNavGroups({
       isAdmin: true,
@@ -213,7 +289,12 @@ describe('LIQUIDITY_ADMIN_ROLE resolution (spec 067)', () => {
 
   it('the AdminPanel reads the flag and passes it to the nav builder', () => {
     expect(adminPanelSource).toContain('hasRole(ROLES.LIQUIDITY_ADMIN)')
-    expect(adminPanelSource).toMatch(/isLiquidityAdmin,\s*\}\)/)
+    // Matched inside the nav-builder CALL rather than by "is the last argument": spec 073 added
+    // `isAppCurator` after it, and a positional assertion would have failed for a change that
+    // does not touch what this test is about — that the flag reaches the nav builder at all.
+    const navCall = adminPanelSource.match(/buildAdminNavGroups\(\{[\s\S]*?\n {2}\}\)/)
+    expect(navCall, 'buildAdminNavGroups call not found in AdminPanel.jsx').toBeTruthy()
+    expect(navCall[0]).toContain('isLiquidityAdmin,')
   })
 
   it('grants target one router at a time — the role lives on both', () => {

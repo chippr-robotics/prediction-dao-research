@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { getNetwork, getSelectableNetworks, isSupportedChainId } from '../config/networks'
 import { getContractAddressForChain } from '../config/contracts'
 import { getNetworkFeatures } from '../config/networkCapabilities'
-import { knownDaosForChain } from '../config/clearpath/knownDaos'
+import { knownDaosForChain } from '../lib/clearpath/knownDaos'
 import { getPortfolioChainIds } from '../config/assetTaxonomy'
 
 // Ethereum mainnet (1) is a first-class VALUE network (spec 048): selectable, portfolio-eligible,

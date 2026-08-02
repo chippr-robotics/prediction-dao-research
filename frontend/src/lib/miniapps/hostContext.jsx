@@ -64,7 +64,10 @@ import { useWallet } from '../../hooks/useWalletManagement'
 import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useEffectiveAccount } from '../../hooks/useEffectiveAccount'
 import { useNotification } from '../../hooks/useUI'
+import { useAddressScreening } from '../../hooks/useAddressScreening'
 import { getReadProvider } from '../../utils/rpcProvider'
+import { NETWORKS, cohortChainIds } from '../../config/networks'
+import { getContractAddressForChain } from '../../config/contracts'
 import { createAppStore } from './store'
 import {
   captureMiniAppLog,
@@ -93,6 +96,28 @@ export const HOST_REFUSAL = Object.freeze({
   EXTERNAL_TARGET: 'external_target',
   /** A read provider member that would mutate the host's shared instance. */
   PROVIDER_MEMBER_BLOCKED: 'provider_member_blocked',
+  /**
+   * The connected wallet offers no transaction rail this host can drive — no
+   * signer and no `sendCalls`. Distinct from `WALLET_ABSENT` (there IS a
+   * wallet) and from `IDENTITY_LOCKED` (nothing is locked): the session simply
+   * cannot write, and saying which of the three it is, is the difference
+   * between a member reconnecting, unlocking, or giving up on this browser.
+   */
+  NO_WRITE_RAIL: 'no_write_rail',
+  /**
+   * `contracts(name)` was asked for a name the package's manifest never
+   * declared. Refused rather than answered `null`, so "you are not approved to
+   * resolve this" can never be mistaken for "it is not deployed here".
+   */
+  UNDECLARED_CONTRACT: 'undeclared_contract',
+  /**
+   * Sanctions screening returned a positive restriction for the acting account.
+   * Distinct from every other refusal because the member cannot resolve it by
+   * reconnecting, switching, or retrying.
+   */
+  SANCTIONED_ACCOUNT: 'sanctioned_account',
+  /** `switchChain` was declined in the wallet, or the wallet cannot reach that chain. */
+  SWITCH_REFUSED: 'switch_refused',
 })
 
 /**
@@ -208,6 +233,73 @@ const HOST_AUDIT_KIND = Object.freeze({
  */
 export const STATE_AUDIT_WINDOW_MS = 60_000
 
+/**
+ * Attach `wait()` to a submission result (hostApi 2).
+ *
+ * `submit` resolves at BROADCAST — `kind: 'sent'` means the network accepted
+ * the transaction, not that it mined, and not that it succeeded. An app that
+ * awaits `submit` and reports success is lying, which is the trap this removes.
+ *
+ * It grants NO new capability: `host.readProvider(chainId).waitForTransaction`
+ * already allows exactly this read, and this is that call with the chain and
+ * hash filled in. It is NON-ENUMERABLE so the result stays a plain serialisable
+ * data object — `JSON.stringify`, structured clone and equality assertions all
+ * see the same three fields they saw before.
+ *
+ * A `proposed` result rejects rather than hanging: nothing was broadcast, a
+ * vault action is waiting on its threshold, and there is no hash to wait for.
+ * Waiting forever on a transaction that does not exist is the worst answer.
+ *
+ * The provider is resolved INTERNALLY and never handed to the app, so the raw
+ * instance is used rather than the guarded wrapper — there is nothing here for
+ * an app to call `destroy()` on.
+ *
+ * @param {{kind: string, txHash: string|null, safeTxHash: string|null}} result
+ * @param {number} chainId - the chain the submission named
+ */
+function withWait(result, chainId) {
+  Object.defineProperty(result, 'wait', {
+    enumerable: false,
+    value: async (confirmations = 1) => {
+      if (result.kind === 'proposed') {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          'miniapp host: a proposed vault action has no transaction to wait for',
+          {
+            userMessage:
+              'This action is waiting for the vault’s approvals; there is no transaction to confirm yet.',
+          },
+        )
+      }
+      if (!result.txHash) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          'miniapp host: the transaction rail returned no hash to wait for',
+          { userMessage: 'This transaction was sent, but the wallet did not report an identifier for it.' },
+        )
+      }
+      const provider = getReadProvider(chainId)
+      if (!provider) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.NO_READ_PROVIDER,
+          `miniapp host: no RPC endpoint configured for chain ${chainId}`,
+          { userMessage: `No network connection is configured for network ${chainId}.` },
+        )
+      }
+      return provider.waitForTransaction(result.txHash, confirmations)
+    },
+  })
+  return Object.freeze(result)
+}
+
+/**
+ * Default contract allowlist: empty. A package that declared nothing can
+ * resolve nothing — the gate fails closed, so a workspace that forgot to pass
+ * the manifest's list withholds the capability rather than opening the whole
+ * address book. Module-level and frozen so it is a stable dependency identity.
+ */
+const EMPTY_CONTRACTS = Object.freeze([])
+
 /** `to` must be a plain EVM address; the contract has no deployment form. */
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/
 
@@ -234,8 +326,26 @@ const BLOCKED_PROVIDER_MEMBERS = new Set(['destroy', 'removeAllListeners'])
  * @param {object} provider - the host's cached provider for a chain
  * @returns {object} proxy with the same interface
  */
+/**
+ * One guard per underlying provider, so the wrapper has a STABLE identity.
+ *
+ * Without this every `readProvider()` call returned a fresh Proxy, and any app that put the
+ * provider in a `useEffect`/`useMemo` dependency array — the obvious thing to do with it — re-ran
+ * that effect on every render. In a component whose effect also sets state, that is an infinite
+ * loop: it hangs the app, not just a test. Found exactly that way, as a worker that never
+ * finished.
+ *
+ * A WeakMap keyed on the provider preserves the reason the wrapper is not memoized by chain: the
+ * host resolves the endpoint on every call (spec 069 — a member who repoints must see the next
+ * read take it), and a repointed endpoint yields a DIFFERENT underlying provider, which gets its
+ * own wrapper. Same provider, same wrapper; new provider, new wrapper.
+ */
+const GUARDED_PROVIDERS = new WeakMap()
+
 function guardReadProvider(provider) {
-  return new Proxy(provider, {
+  const cached = GUARDED_PROVIDERS.get(provider)
+  if (cached) return cached
+  const guarded = new Proxy(provider, {
     get(target, prop, receiver) {
       if (BLOCKED_PROVIDER_MEMBERS.has(prop)) {
         // A stub that throws when CALLED, rather than a throw on the property
@@ -279,6 +389,8 @@ function guardReadProvider(provider) {
       )
     },
   })
+  GUARDED_PROVIDERS.set(provider, guarded)
+  return guarded
 }
 
 /** A positive integer EVM chain id, or null. Bitcoin ids are strings (spec 061) and never valid here. */
@@ -363,8 +475,17 @@ const MiniAppHostContext = createContext(null)
  *   (FR-015) is the right place for that to surface. A workspace only ever
  *   mounts an id the catalog and the manifest both validated.
  */
-export function MiniAppHostProvider({ appId, children }) {
-  const { chainId: walletChainId, isConnected, openConnectModal } = useWallet()
+export function MiniAppHostProvider({ appId, declaredContracts = EMPTY_CONTRACTS, children }) {
+  const {
+    chainId: walletChainId,
+    isConnected,
+    openConnectModal,
+    loginMethod,
+    signer,
+    sendCalls,
+    switchNetwork,
+  } = useWallet()
+  const { screenOne } = useAddressScreening()
   const { address, connectedAddress, chainId: identityChainId } = useEffectiveAccount()
   const { isVault, isLegacy, canActAsVault, canActAsLegacy, submit: submitAsActive } = useActiveAccount()
   const { showNotification } = useNotification()
@@ -502,6 +623,115 @@ export function MiniAppHostProvider({ appId, children }) {
       }
       const value = toWeiValue(payload.value)
 
+      /*
+       * SANCTIONS SCREENING, ENFORCED HERE AND NOT DELEGATED.
+       *
+       * FairWins' own contracts carry an on-chain `ISanctionsGuard`, but a mini-app's whole point
+       * is that it calls contracts FairWins did not write — an external Governor, a third-party
+       * router — where no such guard exists. Screening in the app layer would be optional in
+       * practice: a package that simply never calls a screening function is unscreened, and the
+       * packages most worth screening are the least likely to cooperate. The host cannot be
+       * skipped, so the check belongs here.
+       *
+       * FAIL-OPEN ON UNCERTAINTY, BY POLICY. Only a POSITIVE `restricted` refuses. An unreachable
+       * screening endpoint yields `uncertain`, and treating that as a restriction would invent a
+       * compliance finding the data does not support — the same rule the address book and the
+       * external-DAO surfaces already follow. `force: true` because a submission-time screen has
+       * to be a live read: an account deny-listed since the page loaded must still be refused.
+       */
+      let screening = 'uncertain'
+      try {
+        screening = await screenOne(address, requestedChain, { force: true })
+      } catch {
+        screening = 'uncertain'
+      }
+      if (screening === 'restricted') {
+        safeAudit(() =>
+          captureMiniAppLog(address, requestedChain, {
+            appId,
+            kind: HOST_AUDIT_KIND.TX_FAILED,
+            refs: { to: to.toLowerCase(), reason: 'sanctioned_account' },
+          }),
+        )
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SANCTIONED_ACCOUNT,
+          `miniapp host: acting account ${address} is restricted by sanctions screening`,
+          { userMessage: 'This wallet is restricted by sanctions screening and cannot send transactions.' },
+        )
+      }
+
+      /*
+       * THE TWO WRITE RAILS.
+       *
+       * FairWins has two ways to send a transaction and they are not
+       * interchangeable: a classic wallet signs through an ethers `signer`,
+       * while a passkey smart account (specs 041/050) has NO signer at all —
+       * `WalletContext` sets `signer` and `provider` to null for a passkey
+       * session — and writes through `sendCalls`, an ERC-4337 UserOp batch.
+       *
+       * Every first-party surface branches on this itself before it reaches
+       * `submitAsActiveAccount`, whose personal path does `ctx.signer
+       * .sendTransaction(...)` unconditionally. A mini-app CANNOT do the same:
+       * `sendCalls` lives on `WalletContext` and is deliberately not on the
+       * host object, and a bundled copy of that context would be a different
+       * context with no provider above it. So if the host does not choose the
+       * rail, nothing can — and a passkey member's every mini-app transaction
+       * dies on `null.sendTransaction`, surfacing as a raw TypeError that is
+       * not a `MiniAppHostError`, carries no refusal code and no member-facing
+       * sentence, and that the app has no way to branch on.
+       *
+       * Choosing the rail here is exactly the host's job as stated in rule 1 of
+       * the module header: an app sees one `submit` and no difference between
+       * the identities behind it.
+       *
+       * ORDER MATTERS. Vault and legacy come FIRST and keep going through
+       * `submitAsActive`: a passkey member acting as a Safe vault must still
+       * produce a vault PROPOSAL, not a UserOp from their own account, and a
+       * recovered legacy account carries its own unlocked signer. Only a
+       * passkey acting personally takes the UserOp rail — the same precedence
+       * the first-party surfaces use.
+       */
+      const isPasskeyPersonal = !isVault && !isLegacy && loginMethod === 'passkey'
+
+      if (isPasskeyPersonal) {
+        if (typeof sendCalls !== 'function') {
+          throw new MiniAppHostError(
+            HOST_REFUSAL.NO_WRITE_RAIL,
+            'miniapp host: passkey session exposes no sendCalls transport',
+            { userMessage: 'This wallet cannot send transactions in this browser session.' },
+          )
+        }
+        let sent
+        try {
+          sent = await sendCalls([{ target: to, data, value }])
+        } catch (error) {
+          safeAudit(() =>
+            captureMiniAppLog(address, requestedChain, {
+              appId,
+              kind: HOST_AUDIT_KIND.TX_FAILED,
+              refs: { to: to.toLowerCase(), reason: error?.shortMessage || error?.message || 'unknown' },
+            }),
+          )
+          throw error
+        }
+        // A UserOp has three possible identifiers depending on how far the
+        // bundler got; take them in decreasing order of finality, exactly as
+        // the first-party token path does. Never fabricate one.
+        const txHash = sent?.txHash ?? sent?.userOpHash ?? sent?.intentId ?? null
+        safeAudit(() => captureMiniAppTxSubmitted(address, requestedChain, { appId, txHash, to }))
+        return withWait({ kind: 'sent', txHash, safeTxHash: null }, requestedChain)
+      }
+
+      // A classic personal session with no signer has no rail either — say so
+      // in the same typed way rather than letting the null reach ethers.
+      if (!isVault && !isLegacy && !signer) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.NO_WRITE_RAIL,
+          'miniapp host: no signer and no sendCalls transport on this session',
+          { userMessage: 'Reconnect your wallet before this app can send a transaction.' },
+        )
+      }
+
       // Rebuilt, never forwarded — see rule 2 in the module header. `batch` and
       // `operation` are host-only concepts and stop here.
       let result
@@ -529,13 +759,13 @@ export function MiniAppHostProvider({ appId, children }) {
         )
         // Nothing has moved yet: a vault action waits for its threshold. Saying
         // so in the result is the only way an app can report it honestly.
-        return Object.freeze({ kind: 'proposed', txHash: null, safeTxHash: result.safeTxHash ?? null })
+        return withWait({ kind: 'proposed', txHash: null, safeTxHash: result.safeTxHash ?? null }, requestedChain)
       }
 
       safeAudit(() =>
         captureMiniAppTxSubmitted(address, requestedChain, { appId, txHash: result?.txHash, to }),
       )
-      return Object.freeze({ kind: 'sent', txHash: result?.txHash ?? null, safeTxHash: null })
+      return withWait({ kind: 'sent', txHash: result?.txHash ?? null, safeTxHash: null }, requestedChain)
     },
     [
       appId,
@@ -549,12 +779,61 @@ export function MiniAppHostProvider({ appId, children }) {
       canActAsVault,
       canActAsLegacy,
       submitAsActive,
+      loginMethod,
+      signer,
+      sendCalls,
+      screenOne,
     ],
   )
 
   const requestConnect = useCallback(() => {
     if (typeof openConnectModal === 'function') openConnectModal()
   }, [openConnectModal])
+
+  /**
+   * Ask the member's wallet to move to `chainId` (hostApi 2).
+   *
+   * The companion to `submit`'s WRONG_CHAIN refusal: without it an app can name the problem and
+   * never offer the fix, which matters for anything that browses across chains (an external-DAO
+   * list, a multi-chain portfolio) where the interesting network is routinely not the connected
+   * one. `wagmi`'s `useSwitchChain` is unreachable from a package — a bundled copy of wagmi is a
+   * different provider context — so the host has to do it.
+   *
+   * It grants no new authority. Switching networks already requires the member's explicit
+   * approval in their own wallet; this only asks. A declined prompt is a typed refusal, not a
+   * silent no-op, because the app has to be able to leave its button in the right state.
+   */
+  const switchChain = useCallback(
+    async (requestedChainId) => {
+      const target = evmChainId(requestedChainId)
+      if (target == null) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.BAD_PAYLOAD,
+          `miniapp host: switchChain() needs an EVM chain id, got ${String(requestedChainId)}`,
+          { userMessage: 'This app asked to switch to a network the wallet does not recognise.' },
+        )
+      }
+      if (typeof switchNetwork !== 'function') {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SWITCH_REFUSED,
+          'miniapp host: this wallet session cannot switch networks',
+          { userMessage: 'This wallet cannot switch networks from inside the app — switch it manually.' },
+        )
+      }
+      try {
+        await switchNetwork(target)
+      } catch (error) {
+        // Declining is the common case and is not an error worth a stack trace; the wallet's own
+        // sentence ("Please manually switch to …") is already member-facing, so it is kept.
+        throw new MiniAppHostError(
+          HOST_REFUSAL.SWITCH_REFUSED,
+          `miniapp host: switch to chain ${target} did not complete: ${error?.message || 'unknown'}`,
+          { userMessage: error?.message || `Switch your wallet to network ${target} to continue.` },
+        )
+      }
+    },
+    [switchNetwork],
+  )
 
   const readProvider = useCallback(
     (requestedChainId) => {
@@ -580,6 +859,107 @@ export function MiniAppHostProvider({ appId, children }) {
       return guardReadProvider(provider)
     },
     [walletChain, walletChainId],
+  )
+
+  /**
+   * Resolve a FairWins deployment address (hostApi 2).
+   *
+   * WHY THE HOST OWNS THIS. A package cannot carry the address book: importing
+   * `config/contracts.js` reaches `config/tenant.js`, which imports the
+   * `virtual:tenant` module supplied by a Vite plugin the package preset does
+   * not register — a hard build failure. And a hand-copied table frozen into
+   * immutable IPFS bytes would turn a routine redeploy into a re-publish,
+   * re-review and re-approve cycle for every installed app, while `npm run
+   * sync:frontend-contracts` kept the host's own copy correct beside it. Here,
+   * a redeploy is a host release.
+   *
+   * WHAT IT REFUSES, AND WHY THE TWO CASES DIFFER:
+   *   - an UNDECLARED name throws. The manifest allowlist is what a reviewer
+   *     approved; a name outside it is the package asking for something nobody
+   *     signed off on, and answering `null` would let that pass as "not
+   *     deployed here".
+   *   - a DECLARED name with no deployment on that chain returns `null`. That
+   *     is a fact about the estate, and the app is expected to render its own
+   *     honest unavailable state from it.
+   *
+   * Never a guess and never a fallback chain: `getContractAddressForChain` is
+   * asked about the chain the app named, and nothing else.
+   */
+  const contracts = useCallback(
+    (name, requestedChainId) => {
+      if (!declaredContracts.includes(name)) {
+        throw new MiniAppHostError(
+          HOST_REFUSAL.UNDECLARED_CONTRACT,
+          `miniapp host: "${String(name)}" is not declared in this package's manifest contracts`,
+          { userMessage: 'This app asked for a contract it is not approved to use.' },
+        )
+      }
+      const target = evmChainId(requestedChainId == null ? walletChain : requestedChainId)
+      if (target == null) return null
+      const address = getContractAddressForChain(name, target)
+      // '' is how the address book spells "not deployed here"; `null` is how
+      // this contract spells it, and the two must not be confused by the app.
+      return address ? address : null
+    },
+    [declaredContracts, walletChain],
+  )
+
+  /**
+   * A chain descriptor (hostApi 2) — display name, testnet flag, native
+   * currency, explorer, subgraph endpoint.
+   *
+   * A flat VALUE PROJECTION, never the `NETWORKS` entry itself: that object also
+   * carries rpcUrl, dex, polymarket and passkey configuration, and handing it
+   * over would break the host's own rule that an app receives wrappers, never
+   * handles.
+   *
+   * Returns `null` for an unknown chain rather than reproducing `getNetwork`'s
+   * default-network fallback. An app must be able to say "unknown network", and
+   * must never be able to render one chain's explorer link against another
+   * chain's data.
+   */
+  /**
+   * The chains this build may read (hostApi 2), mainnets-first.
+   *
+   * ADDED AFTER BEING DECLINED ONCE, and the reversal is deliberate rather than drift. It was
+   * turned down for Token Mint's cross-chain deployments table — one informational card did not
+   * justify a permanent grant to every package. Two things make this different:
+   *
+   *   1. For an app that is network-agnostic BY DESIGN — an external-DAO list reads every capable
+   *      chain in parallel, independent of where the wallet sits — a roster is not a nicety, it is
+   *      the model. The alternative is a chain list frozen into an immutable package, so a new
+   *      network cannot appear without a re-publish, re-review and re-approve.
+   *   2. It grants essentially nothing new. `network(chainId)` already answers for any id an app
+   *      cares to try, so the roster is reachable today by enumeration — this only makes it
+   *      efficient and honest instead of a guessing loop.
+   *
+   * `cohortChainIds()` and never `listSupportedChainIds()`: constitution III forbids a read
+   * crossing the testnet/mainnet boundary, and that boundary is the host's to enforce rather than
+   * something each package has to remember.
+   */
+  const networks = useCallback(() => Object.freeze(cohortChainIds()), [])
+
+  const network = useCallback(
+    (requestedChainId) => {
+      const target = evmChainId(requestedChainId == null ? walletChain : requestedChainId)
+      if (target == null) return null
+      const net = NETWORKS[target]
+      if (!net) return null
+      return Object.freeze({
+        chainId: target,
+        name: net.name ?? null,
+        isTestnet: Boolean(net.isTestnet),
+        nativeCurrency: Object.freeze({
+          symbol: net.nativeCurrency?.symbol ?? null,
+          decimals: net.nativeCurrency?.decimals ?? null,
+        }),
+        explorer: net.explorer?.baseUrl
+          ? Object.freeze({ name: net.explorer.name ?? null, baseUrl: net.explorer.baseUrl })
+          : null,
+        subgraphUrl: net.subgraphUrl ?? null,
+      })
+    },
+    [walletChain],
   )
 
   const audit = useMemo(
@@ -657,6 +1037,7 @@ export function MiniAppHostProvider({ appId, children }) {
       isConnected: Boolean(isConnected && address),
       submit,
       requestConnect,
+      switchChain,
     })
     // Frozen: the app receives a capability set, not an object it can re-point.
     // Everything reachable from here is a wrapper — no context, no router, no
@@ -665,6 +1046,9 @@ export function MiniAppHostProvider({ appId, children }) {
       appId,
       wallet,
       readProvider,
+      contracts,
+      network,
+      networks,
       store,
       audit,
       toast,
@@ -678,7 +1062,11 @@ export function MiniAppHostProvider({ appId, children }) {
     isConnected,
     submit,
     requestConnect,
+    switchChain,
     readProvider,
+    contracts,
+    network,
+    networks,
     store,
     audit,
     toast,

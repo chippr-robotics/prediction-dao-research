@@ -195,6 +195,13 @@ describe('the committed bytes are what the build tool emitted', () => {
     for (const dep of manifest.sharedDeps) expect(HOST_SHARED_MODULES).toContain(dep)
     expect(manifest.sharedDeps).toContain('react')
     expect(manifest.sharedDeps).toContain('@fairwins/miniapp-sdk')
+    // hostApi 2. The assertion above (hostApi === SUPPORTED_HOST_API) is what
+    // keeps the PRESET and the HOST from drifting apart on the contract
+    // version: this fixture is real preset output, so a preset still emitting
+    // the old number fails here rather than at a member's launch. The
+    // allowlist is emitted even when empty, so its absence is a preset bug and
+    // not mistaken for "declared nothing".
+    expect(manifest.contracts).toEqual([])
   })
 
   it('ships no copy of a host-owned dependency (research R2)', () => {

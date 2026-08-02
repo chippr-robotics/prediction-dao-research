@@ -57,6 +57,11 @@ vi.mock('../../components/wallet/TransferForm', () => ({
 vi.mock('../../components/wallet/TransferActivityList', () => ({
   default: () => <div data-testid="transfer-activity">activity</div>,
 }))
+// Wagers joined this tab row (spec 073). Stubbed like every other sibling — a real Dashboard would
+// drag the whole wager tree, its providers and its chain reads into a test about tab placement.
+vi.mock('../../components/fairwins/Dashboard', () => ({
+  default: () => <div data-testid="wagers-dashboard">wagers</div>,
+}))
 
 import PayTransferPanel from '../../components/wallet/PayTransferPanel'
 
@@ -86,7 +91,8 @@ describe('Bridge tab placement (FR-004)', () => {
   it('sits beside Transfer and Activity without displacing the send flow', async () => {
     renderPanel()
     const tabs = screen.getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['Transfer', 'Bridge', 'Activity'])
+    // Wagers was added between Bridge and Activity (spec 073): actions first, history last.
+    expect(tabs.map((t) => t.textContent)).toEqual(['Transfer', 'Bridge', 'Wagers', 'Activity'])
     // Default tab is unchanged: the same-chain send flow.
     expect(screen.getByTestId('transfer-form')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Transfer' })).toHaveAttribute('aria-selected', 'true')

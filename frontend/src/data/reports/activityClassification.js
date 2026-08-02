@@ -49,6 +49,13 @@ export const CLASS_LABELS = Object.freeze({
   [LEDGER_CLASS.MEMBERSHIP]: 'Membership',
   [LEDGER_CLASS.BRIDGE]: 'Bridge',
   [LEDGER_CLASS.LIQUIDITY]: 'Liquidity',
+  // Spec 073 — mini-app audit entries. These are ATTRIBUTION, not valuation:
+  // every one carries direction `none`, so the class can appear in a report
+  // with a count and no value without ever being netted into income or
+  // disposal. A transaction a mini-app submitted is reported by the on-chain
+  // entry it folds into, under that entry's own class — never here, and never
+  // twice.
+  [LEDGER_CLASS.MINIAPP]: 'Mini-App',
 })
 
 /** Display label for a class (falls back to the raw key for a future class). */

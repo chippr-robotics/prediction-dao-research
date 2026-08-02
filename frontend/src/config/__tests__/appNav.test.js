@@ -98,9 +98,9 @@ describe('appNav — Apps group is the mini-app catalog (spec 073 FR-009)', () =
     expect(groupForTab('tokens')).toBeNull()
   })
 
-  it('keeps Wagers out of the group model (the drawer splices it in on its absolute route)', () => {
+  it('keeps Wagers out of the group model — it is a view inside Transfer, not a section', () => {
     expect(groupNamed('Apps').items.map((item) => item.id)).not.toContain('wagers')
-    expect(pathForNavItem('wagers')).toBe('/wagers')
+    expect(pathForNavItem('wagers')).toBe('/wallet?tab=paytransfer&view=wagers')
   })
 
   it('drops the catalog entry through the chain-aware filter like any other item', () => {

@@ -62,20 +62,50 @@
 
 ## Phase 4: User Story 2 — First-Party Apps Become Mini-Apps (P1)
 
-**Goal**: Token Mint, ClearPath, then Wagers delivered through the standard pipeline; legacy deep links keep resolving; catalog never lies about what is a verified package (R11 phasing).
+**Goal**: Token Mint and ClearPath delivered through the standard pipeline; legacy deep links keep resolving; catalog never lies about what is a verified package (R11 phasing).
+
+**Wagers is NOT converted** — see T030–T033 below.
 
 **Independent Test**: quickstart §7 per app + §4.6 deep links.
 
-- [ ] T026 [US2] Convert Token Mint: move `frontend/src/components/tokens/` tree into `frontend/miniapps/token-mint/` with an `entry.jsx` default-exporting the panel; replace `useWallet`/`useNotification`/direct config imports with `host` context equivalents (wallet.submit, readProvider, toast); scope `tokens.css`; build with the T011 preset; keep the notification adapter (`frontend/src/data/notifications/sources/tokenSource.js`) host-side
-- [ ] T027 [US2] Token Mint cutover: alias `?tab=tokens` → `/apps/token-mint` in `TAB_ALIASES` (`frontend/src/pages/WalletPage.jsx` AND `frontend/src/components/nav/AppNavDrawer.jsx`, kept in parity), remove the `tokens` render branch, publish/seed the package in dev; parity + deep-link tests `frontend/src/test/miniapps/tokenMintConversion.test.jsx`
-- [ ] T028 [US2] Convert ClearPath: move `frontend/src/components/clearpath/` + `frontend/src/config/clearpath/` into `frontend/miniapps/clearpath/`; migrate `trackedDaoStore.js` from raw `window.localStorage` to the namespaced host store (one-time client migration preserving `(chainId, account)` data); `daoSource.js` notification adapter stays host-side; scope `clearpath.css`
-- [ ] T029 [US2] ClearPath cutover: alias `?tab=clearpath` → `/apps/clearpath` (both alias sites), remove render branch, publish/seed; parity + migration tests `frontend/src/test/miniapps/clearpathConversion.test.jsx`
-- [ ] T030 [US2] Wagers refactor prerequisite — extract `TradePanel` (used by the non-Apps `trade` tab) and `HomeScreen`'s imports (`MyMarketsModal`, `PolymarketTickerCrawler`, `UnifiedLookupModal`) out of `frontend/src/components/fairwins/` into host-retained locations (e.g. `frontend/src/components/trade/`, `frontend/src/components/home/`) with no behavior change; existing tests updated in place
-- [ ] T031 [US2] Wagers refactor prerequisite — scope `FriendMarketsProvider` (currently global in `frontend/src/main.jsx`) so the wagers tree receives it without a global mount requirement (provider wrapper inside the wagers entry, host keeps it only where still consumed)
-- [ ] T032 [US2] Convert Wagers: move the remaining `frontend/src/components/fairwins/` wager tree (Dashboard + modals + create/accept flows) into `frontend/miniapps/wagers/` on the host context; build + publish
-- [ ] T033 [US2] Wagers cutover: `/wagers` route in `frontend/src/App.jsx` redirects to `/apps/wagers` (drawer `WAGERS_ITEM` updated in `frontend/src/config/appNav.js`); until T032 lands the catalog lists Wagers as launching the host-native surface (honest label); parity tests `frontend/src/test/miniapps/wagersConversion.test.jsx`
+- [x] T026 [US2] Convert Token Mint: move `frontend/src/components/tokens/` tree into `frontend/miniapps/token-mint/` with an `entry.jsx` default-exporting the panel; replace `useWallet`/`useNotification`/direct config imports with `host` context equivalents (wallet.submit, readProvider, toast); scope `tokens.css`; build with the T011 preset; keep the notification adapter (`frontend/src/data/notifications/sources/tokenSource.js`) host-side
+- [x] T027 [US2] Token Mint cutover: alias `?tab=tokens` → `/apps/token-mint` in `TAB_ALIASES` (`frontend/src/pages/WalletPage.jsx` AND `frontend/src/components/nav/AppNavDrawer.jsx`, kept in parity), remove the `tokens` render branch, publish/seed the package in dev; parity + deep-link tests `frontend/src/test/miniapps/tokenMintConversion.test.jsx`
+- [x] T028 [US2] Convert ClearPath: move `frontend/src/components/clearpath/` + `frontend/src/config/clearpath/` into `frontend/miniapps/clearpath/`; migrate `trackedDaoStore.js` from raw `window.localStorage` to the namespaced host store (one-time client migration preserving `(chainId, account)` data); `daoSource.js` notification adapter stays host-side; scope `clearpath.css`
+- [x] T029 [US2] ClearPath cutover: alias `?tab=clearpath` → `/apps/clearpath` (both alias sites), remove render branch, publish/seed; parity + migration tests `frontend/src/test/miniapps/clearpathConversion.test.jsx`
+### Wagers — converted to a Transfer view instead of a mini-app (T030–T033 superseded)
 
-**Checkpoint**: all three apps launch from the catalog through the verified pipeline; SC-006 parity workflows pass
+T030–T033 planned to extract the wager tree into `frontend/miniapps/wagers/`. **That is not being
+done.** Scoping the extraction produced the measurement that killed it:
+
+```
+/wagers page closure : 32 files
+home + trade closure : 28 files
+SHARED BY BOTH       : 22 files  (69%)
+```
+
+The shared set is the *core* wager UI — `WagerCard`, `WagerList`, `WagerTable`, `wagerVm`, and the
+create / accept / resolve flows. The cause is structural, not incidental: **`HomeScreen` is itself a
+wager surface** (it imports `CreateChallengePanel`, `PayPanel`, `RequestPanel` directly) and
+`App.jsx` renders it at `/`. A package is frozen at an immutable CID and may not import from
+`frontend/src/`, so converting Wagers means the host keeps one copy of those 22 files and the
+package carries another. Every wager fix would become two edits plus a re-publish, and the two
+copies would drift — which is worse for members than not converting at all.
+
+T030/T031 were the prerequisites for exactly that extraction, so they retire with it. The three
+alternatives that would have created a real seam (rebuild HomeScreen without wager surfaces; move
+HomeScreen into the package; duplicate the 22 files) were each a bigger or worse change than the
+conversion was worth.
+
+**What shipped instead**: Wagers moved into **Finance ▸ Transfer** as a third view beside Transfer
+and Bridge — all three are ways money leaves that section (send it, move it across networks, stake
+it against a counterparty). It stays host-native, so nothing is duplicated and nothing drifts.
+
+- [x] T030 [US2] ~~Wagers refactor prerequisite — extract `TradePanel` / `HomeScreen` imports~~ — **retired**, see above
+- [x] T031 [US2] ~~Wagers refactor prerequisite — scope `FriendMarketsProvider`~~ — **retired**, see above (it stays global in `frontend/src/main.jsx`, which is correct now that the wager tree stays host-side)
+- [x] T032 [US2] ~~Convert Wagers to `frontend/miniapps/wagers/`~~ — **superseded**: Wagers is a view of the Transfer section (`WAGERS_VIEW` / `WAGERS_PATH` in `frontend/src/config/appNav.js`, rendered by `frontend/src/components/wallet/PayTransferPanel.jsx`), tenant-gated on the existing `wagers` manifest feature
+- [x] T033 [US2] Wagers cutover: `/wagers` in `frontend/src/App.jsx` redirects to `/wallet?tab=paytransfer&view=wagers` (the legacy link stays live — it is in bookmarks and shared links); `WAGERS_ITEM` removed from the drawer splice in `frontend/src/components/nav/AppNavDrawer.jsx`; `WagersPage.jsx` deleted; the catalog never lists Wagers, so it never claims a package that does not exist; tests `frontend/src/test/wagers/wagersInTransfer.test.jsx`
+
+**Checkpoint**: Token Mint and ClearPath launch from the catalog through the verified pipeline; SC-006 parity workflows pass; Wagers reachable at its new view and via the legacy route
 
 ---
 
@@ -85,9 +115,9 @@
 
 **Independent Test**: quickstart §4.5 + contract suite submission cases; submit → Pending record + event; update ⇒ Pending while approved version keeps serving.
 
-- [ ] T034 [US3] Create `frontend/src/components/miniapps/SubmitAppPanel.jsx` (entry point on CatalogPanel) — submit/update forms (name, description, category, CID, manifestHash, version display), writes `submitApp`/`submitUpdate`/`updateMetadata` on `miniAppChainId()` with wallet-chain check at submit time, client-side CID format + manifest fetch/hash pre-check as a courtesy (chain remains authoritative)
-- [ ] T035 [US3] Vendor status list in `SubmitAppPanel.jsx` via `registryClient.appIdsByVendor` — lifecycle state, approved vs proposed tuple, versions (FR-023)
-- [ ] T036 [US3] Tests `frontend/src/test/miniapps/SubmitAppPanel.test.jsx` — form validation, wrong-network block, Pending-after-update rendering
+- [x] T034 [US3] Create `frontend/src/components/miniapps/SubmitAppPanel.jsx` (entry point on CatalogPanel) — submit/update forms (name, description, category, CID, manifestHash, version display), writes `submitApp`/`submitUpdate`/`updateMetadata` on `miniAppChainId()` with wallet-chain check at submit time, client-side CID format + manifest fetch/hash pre-check as a courtesy (chain remains authoritative)
+- [x] T035 [US3] Vendor status list in `SubmitAppPanel.jsx` via `registryClient.appIdsByVendor` — lifecycle state, approved vs proposed tuple, versions (FR-023)
+- [x] T036 [US3] Tests `frontend/src/test/miniapps/SubmitAppPanel.test.jsx` — form validation, wrong-network block, Pending-after-update rendering
 
 ---
 
@@ -97,9 +127,10 @@
 
 **Independent Test**: quickstart §4.7; non-curator sees no controls and reverts on direct call (contract suite).
 
-- [ ] T037 [P] [US4] Add curator authority read: `frontend/src/lib/miniapps/registryAuthority.js` reading `hasRole(APP_CURATOR_ROLE, account)` from the registry itself (spec-067 per-contract-authority pattern; unconfirmed read ⇒ "could not verify" state, never a hidden control), wire `ROLES.MINIAPP_CURATOR` into `frontend/src/contexts/RoleContext.jsx` + `frontend/src/hooks/useRoles.js`
-- [ ] T038 [US4] Create `frontend/src/components/admin/MiniAppReviewTab.jsx` — Pending queue (metadata, vendor, tuple detail), per-app package fetch + hash verification result before approval (edge case: unverifiable package ⇒ approve blocked-or-warned), approve/suspend/deprecate writes on `miniAppChainId()` with wallet-chain check; preserves the "no role" vs "no chain answered" distinction
-- [ ] T039 [US4] Register the tab: `miniapp-review` in the Compliance group of `frontend/src/components/admin/adminNav.js` (+ `ADMIN_TAB_ICONS`), role boolean + nav arg + tabpanel branch in `frontend/src/components/AdminPanel.jsx` (three-edit pattern); tests `frontend/src/test/miniapps/MiniAppReviewTab.test.jsx` + adminNav test update
+- [x] T037 [P] [US4] Add curator authority read: `frontend/src/lib/miniapps/registryAuthority.js` reading `hasRole(APP_CURATOR_ROLE, account)` from the registry itself (spec-067 per-contract-authority pattern; unconfirmed read ⇒ "could not verify" state, never a hidden control), wire `ROLES.MINIAPP_CURATOR` into `frontend/src/contexts/RoleContext.jsx` + `frontend/src/hooks/useRoles.js`
+  - **Deviation (deliberate):** `ROLES.MINIAPP_CURATOR` was NOT added to `RoleContext`/`useRoles`. `APP_CURATOR_ROLE` administers itself on the MiniAppRegistry, so no app-wide role implies it and the role-storage sync those two files read could not truthfully report it — a flag there would be a second, weaker source of truth for the one authority that deliberately has no admin backdoor. `AdminPanel.jsx` asks the registry directly via `readCuratorAuthority` (the spec-067 per-contract-authority pattern the same task mandates) and fails closed on every uncertainty.
+- [x] T038 [US4] Create `frontend/src/components/admin/MiniAppReviewTab.jsx` — Pending queue (metadata, vendor, tuple detail), per-app package fetch + hash verification result before approval (edge case: unverifiable package ⇒ approve blocked-or-warned), approve/suspend/deprecate writes on `miniAppChainId()` with wallet-chain check; preserves the "no role" vs "no chain answered" distinction
+- [x] T039 [US4] Register the tab: `miniapp-review` in the Compliance group of `frontend/src/components/admin/adminNav.js` (+ `ADMIN_TAB_ICONS`), role boolean + nav arg + tabpanel branch in `frontend/src/components/AdminPanel.jsx` (three-edit pattern); tests `frontend/src/test/miniapps/MiniAppReviewTab.test.jsx` + adminNav test update
 
 ---
 
@@ -109,9 +140,9 @@
 
 **Independent Test**: two-app collision test; cross-namespace denial; state-change + app-contextual entries filterable in Reporting.
 
-- [ ] T040 [P] [US5] Add `miniAppState` synced object to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: false`, per-app shallow-union merge) per data-model.md §3; test in `frontend/src/test/backup/`
-- [ ] T041 [P] [US5] Isolation hardening + tests: cross-namespace access impossible through the store interface (two-app collision scenario), host-internal stores unreachable from the `host` object — `frontend/src/test/miniapps/storeIsolation.test.js`
-- [ ] T042 [US5] Complete audit: auto `miniapp_state_changed` entries on significant store writes (debounced), `audit.log` → `miniapp_app_logged`, class label in `frontend/src/data/reports/activityClassification.js`, filterable by app/account/time in Reporting; tests extend `frontend/src/test/ledger/miniAppSource.test.js`
+- [x] T040 [P] [US5] Add `miniAppState` synced object to `frontend/src/lib/backup/syncedObjects.js` (`networkScoped: false`, per-app shallow-union merge) per data-model.md §3; test in `frontend/src/test/backup/`
+- [x] T041 [P] [US5] Isolation hardening + tests: cross-namespace access impossible through the store interface (two-app collision scenario), host-internal stores unreachable from the `host` object — `frontend/src/test/miniapps/storeIsolation.test.js`
+- [x] T042 [US5] Complete audit: auto `miniapp_state_changed` entries on significant store writes (debounced), `audit.log` → `miniapp_app_logged`, class label in `frontend/src/data/reports/activityClassification.js`, filterable by app/account/time in Reporting; tests extend `frontend/src/test/ledger/miniAppSource.test.js`
 
 ---
 
@@ -121,18 +152,34 @@
 
 **Independent Test**: quickstart §6.
 
-- [ ] T043 [US6] Extend `frontend/public/sw.js` with `fairwins-miniapp-packages-v1`: cache-first for gateway package URLs (immutable CIDs), LRU bound + `activate` sweep; loader (T018) verifies after cache retrieval so stale cache can never bypass FR-010/FR-011 (R10)
-- [ ] T044 [P] [US6] Cache behavior tests where feasible (`frontend/src/test/miniapps/packageCache.test.js` — URL classification, LRU policy as pure functions extracted from sw.js) and a new-CID-bypasses-old-cache loader test
+- [x] T043 [US6] Extend `frontend/public/sw.js` with `fairwins-miniapp-packages-v1`: cache-first for gateway package URLs (immutable CIDs), LRU bound + `activate` sweep; loader (T018) verifies after cache retrieval so stale cache can never bypass FR-010/FR-011 (R10)
+- [x] T044 [P] [US6] Cache behavior tests where feasible (`frontend/src/test/miniapps/packageCache.test.js` — URL classification, LRU policy as pure functions extracted from sw.js) and a new-CID-bypasses-old-cache loader test
 
 ---
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T045 [P] Write `docs/developer-guide/miniapps.md` (runtime contract, build preset, publish flow, hostApi versioning) and `docs/runbooks/miniapp-registry-operations.md` (curator ops, suspension, deprecation, gateway config)
-- [ ] T046 [P] Add the spec-073 guardrail entry to `CLAUDE.md` (registry chain rule, approved-tuple-only serving, blob:-only CSP rule, no privileged imports from `frontend/miniapps/`)
-- [ ] T047 Accessibility pass on Catalog/Workspace/Review surfaces (axe/Lighthouse CI green, WCAG 2.1 AA)
-- [ ] T048 Security review: run `.github/agents/smart-contract-security.agent.md` review over `contracts/apps/` + `contracts/interfaces/IMiniAppRegistry.sol`; Slither clean; document any accepted findings
-- [ ] T049 Full-suite gates: `npm test`, `npm run check:storage-layout`, CI frontend suite, `npm run tenants:validate`; quickstart executed end-to-end
+- [x] T045 [P] Write `docs/developer-guide/miniapps.md` (runtime contract, build preset, publish flow, hostApi versioning) and `docs/runbooks/miniapp-registry-operations.md` (curator ops, suspension, deprecation, gateway config)
+- [x] T046 [P] Add the spec-073 guardrail entry to `CLAUDE.md` (registry chain rule, approved-tuple-only serving, blob:-only CSP rule, no privileged imports from `frontend/miniapps/`)
+- [x] T047 Accessibility pass on Catalog/Workspace/Review surfaces (axe/Lighthouse CI green, WCAG 2.1 AA)
+- [x] T048 Security review: run `.github/agents/smart-contract-security.agent.md` review over `contracts/apps/` + `contracts/interfaces/IMiniAppRegistry.sol`; Slither clean; document any accepted findings
+- [x] T049 Full-suite gates — all run 2026-08-02:
+  - `npm test` — 1079 passing, 4 pending. The 2 failures are both in `test/fork/`, gated on
+    `describe.skip` unless `POLYGON_RPC_URL` is set; the main CI workflow does not set it, so they
+    never run there. They ran locally only because `.env` sets it, unpinned to a fork block, which
+    makes the Chainalysis assertion depend on live sanctions-list state. No Solidity changed on this
+    branch. The dedicated `oracle-fork-tests.yml` workflow DOES set it from a secret, so they would
+    be red there — not investigated, out of scope for this spec.
+  - `npm run check:storage-layout` — green, and now actually checking: **26 live implementations
+    diffed across 7 chains** (it was diffing zero in CI before T048's rewrite), 4 declared
+    unverifiable with reasons.
+  - Full frontend suite — **557 files / 5690 tests, all passing** (`--pool=forks --maxWorkers=2`,
+    3 GB heap; the documented OOM was unbounded parallelism, not size). This run is what caught two
+    host hooks still importing the tree T028 moved, which every scoped run had missed.
+  - Frontend production build — succeeds (`VITE_PINATA_JWT= npx vite build`).
+  - `npm run tenants:validate` — 2 manifests valid.
+  - Quickstart — exercised against the live Mordor registry: catalog reads, the launchable/status
+    distinction, and a curator suspension (app id 1, the broken smoke-test listing).
 
 ---
 
@@ -144,7 +191,7 @@ Phase 1 (T001–T003) ──► Phase 2 (T004–T014) ──► US1 (T015–T025
                                               │                  ├─► US4 (T037–T039)  [T038 needs T015]
                                               │                  ├─► US5 (T040–T042)  [needs T020–T022]
                                               │                  └─► US6 (T043–T044)  [needs T018]
-US2 internal: T026→T027; T028→T029; T030,T031→T032→T033
+US2 internal: T026→T027; T028→T029. (T030–T033 retired: Wagers became a Transfer view, not a package.)
 Phase 9 last (T048 may run any time after T005).
 ```
 
@@ -158,4 +205,4 @@ US3–US6 are mutually independent once US1 is done; US2 conversion pairs are in
 
 ## Implementation Strategy
 
-**MVP** = Phases 1–3 + T026–T027 (US1 with Token Mint as the first real catalog entry): proves registry → publish → verify → mount end-to-end with one converted app. Then deliver US2 conversions incrementally (ClearPath next, Wagers last behind its refactor prerequisites T030/T031 — `/wagers` stays host-native and honestly labeled until T033), with US3/US4 landing the governance surfaces and US5/US6 hardening. Each phase checkpoint maps to a quickstart section, so every increment is independently demonstrable.
+**MVP** = Phases 1–3 + T026–T027 (US1 with Token Mint as the first real catalog entry): proves registry → publish → verify → mount end-to-end with one converted app. Then deliver US2 conversions incrementally (ClearPath next; Wagers was dropped from the conversion set — 69% of its file closure is shared with the host-retained home and trade surfaces, so it moved into Finance ▸ Transfer instead), with US3/US4 landing the governance surfaces and US5/US6 hardening. Each phase checkpoint maps to a quickstart section, so every increment is independently demonstrable.

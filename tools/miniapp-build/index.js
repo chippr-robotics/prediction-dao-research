@@ -34,6 +34,7 @@
  *   root: import.meta.dirname,
  *   permissions: ['wallet:submit', 'store', 'audit', 'toast'],
  *   storeKeys: ['drafts'],
+ *   contracts: ['tokenFactory'],   // hostApi 2; needs the 'contracts' permission
  *   plugins: [react()]
  * })
  * ```
@@ -47,8 +48,10 @@ import path from 'node:path'
 
 import {
   APP_ID_PATTERN,
+  CONTRACT_NAME_PATTERN,
   ENTRY_FILENAME,
   HOST_PERMISSIONS,
+  MAX_DECLARED_CONTRACTS,
   MINIAPP_ENV_PREFIX,
   SHARED_MODULES,
   STORE_KEY_PATTERN,
@@ -98,7 +101,7 @@ function assetFileNames(assetInfo) {
   return source.endsWith('.css') ? STYLE_FILENAME : 'assets/[name][extname]'
 }
 
-function validateOptions({ appId, version, permissions, storeKeys, root }) {
+function validateOptions({ appId, version, permissions, storeKeys, contracts, root }) {
   if (typeof appId !== 'string' || !APP_ID_PATTERN.test(appId)) {
     fail(`appId "${appId}" must match ${APP_ID_PATTERN} — it is also the URL segment, store namespace and audit key`)
   }
@@ -123,6 +126,20 @@ function validateOptions({ appId, version, permissions, storeKeys, root }) {
       fail(`store key "${key}" must match ${STORE_KEY_PATTERN}`)
     }
   }
+  // hostApi 2. Unlike storeKeys this is an ACCESS GATE at runtime, so a build
+  // that gets it wrong produces an app that is refused mid-flight rather than
+  // one that merely under-documents itself — fail here instead.
+  if (!Array.isArray(contracts) || contracts.length > MAX_DECLARED_CONTRACTS) {
+    fail(`contracts must be an array of at most ${MAX_DECLARED_CONTRACTS} contract names`)
+  }
+  for (const contractName of contracts) {
+    if (typeof contractName !== 'string' || !CONTRACT_NAME_PATTERN.test(contractName)) {
+      fail(`contract name "${contractName}" must match ${CONTRACT_NAME_PATTERN}`)
+    }
+  }
+  if (contracts.length > 0 && !permissions.includes('contracts')) {
+    fail('declaring `contracts` also requires the "contracts" permission — the host refuses every lookup without it')
+  }
 }
 
 /**
@@ -137,6 +154,7 @@ function validateOptions({ appId, version, permissions, storeKeys, root }) {
  * @param {string} [options.outDir] - build output; defaults to `<root>/dist`
  * @param {string[]} [options.permissions] - declared host capabilities (subset of HOST_PERMISSIONS)
  * @param {string[]} [options.storeKeys] - declared namespaced-store keys
+ * @param {string[]} [options.contracts] - deployment names `host.contracts()` may resolve (hostApi 2)
  * @param {import('vite').PluginOption[]} [options.plugins] - package plugins, e.g. `react()`
  * @param {Array<{specifier: string, package: string, exports?: string[]}>} [options.sharedModules]
  *   Override the host-owned module table; must stay in step with the host scope
@@ -155,6 +173,7 @@ export function createMiniAppConfig(options = {}) {
     outDir,
     permissions = [],
     storeKeys = [],
+    contracts = [],
     plugins = [],
     sharedModules = SHARED_MODULES,
     minify = 'esbuild',
@@ -162,7 +181,7 @@ export function createMiniAppConfig(options = {}) {
     define = {}
   } = options
 
-  validateOptions({ appId, version, permissions, storeKeys, root })
+  validateOptions({ appId, version, permissions, storeKeys, contracts, root })
 
   const packageRoot = path.resolve(root)
   const entryPath = resolveEntry(packageRoot, entry)
@@ -177,7 +196,7 @@ export function createMiniAppConfig(options = {}) {
     envPrefix: MINIAPP_ENV_PREFIX,
     publicDir: false,
 
-    plugins: [hostScopePlugin({ sharedModules }), ...plugins, manifestPlugin({ appId, name, version, permissions, storeKeys })],
+    plugins: [hostScopePlugin({ sharedModules }), ...plugins, manifestPlugin({ appId, name, version, permissions, storeKeys, contracts })],
 
     define: {
       // Bundled pure libraries routinely branch on this; a mini-app package has
@@ -223,12 +242,14 @@ export function createMiniAppConfig(options = {}) {
 
 export {
   APP_ID_PATTERN,
+  CONTRACT_NAME_PATTERN,
   ENTRY_FILENAME,
   HOST_API_VERSION,
   HOST_PERMISSIONS,
   HOST_SCOPE_SYMBOL_KEY,
   MANIFEST_FILENAME,
   MANIFEST_SCHEMA,
+  MAX_DECLARED_CONTRACTS,
   SHARED_MODULES,
   SHARED_MODULE_SPECIFIERS,
   STYLE_FILENAME

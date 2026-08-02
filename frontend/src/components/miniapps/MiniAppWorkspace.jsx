@@ -330,6 +330,38 @@ function describeLaunchFailure(error) {
 }
 
 /**
+ * The contained-crash surface (FR-015), as its own component so it can take focus.
+ *
+ * When a package throws, everything the member was standing on is unmounted with it — focus falls
+ * to `<body>`, and the only thing announcing the crash is the `role="alert"`, which says what
+ * happened but leaves a keyboard member at the top of the host page with no route back to the
+ * restart control. Focusing this block's heading on mount puts them on the explanation, one Tab
+ * from "Restart app" (T047 · WCAG 2.4.3).
+ */
+function CrashNotice({ appName, onRestart }) {
+  const headingRef = useRef(null)
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [])
+
+  return (
+    <div className="miniapp-workspace-crash" role="alert">
+      <h3 ref={headingRef} tabIndex={-1}>
+        This app stopped working
+      </h3>
+      <p>
+        {appName} ran into an error and was stopped. Nothing else on the platform was affected, and
+        anything the app saved is still there. You can start it again, or report the problem to the
+        platform team if it keeps happening.
+      </p>
+      <Button variant="secondary" onClick={onRestart}>
+        Restart app
+      </Button>
+    </div>
+  )
+}
+
+/**
  * The mounted app itself.
  *
  * Reads the host object from the context it is already inside and passes it as
@@ -398,6 +430,31 @@ function MiniAppLaunch({ slug, onRetry }) {
   // stylesheets, so this id has to be usable in one.
   const generatedId = useId()
   const rootId = useMemo(() => `miniapp-root-${generatedId.replace(/[^a-zA-Z0-9_-]/g, '')}`, [generatedId])
+
+  /**
+   * Where focus goes when the launch settles (T047 · WCAG 2.4.3).
+   *
+   * A launch is a route change with a wait in the middle, and React Router moves focus for
+   * neither half. The member pressed "Launch" on a card that no longer exists, or "Try again" on
+   * a button this component's own remount destroyed — so by the time there is something to read,
+   * focus is on `<body>` and a keyboard member has to tab in from the top of the host chrome to
+   * reach the app they just opened. A screen-reader member is worse off again: the polite
+   * "Verifying and loading…" region disappears and nothing replaces it, so the arrival of a whole
+   * new surface is announced by nothing at all.
+   *
+   * Moving focus to the heading of whatever settled fixes both: it is announced on arrival (the
+   * app's name, or the refusal's title inside its `role="alert"`), and it puts the member at the
+   * top of the surface rather than the top of the page. This is the same idiom `ProfileWizard`
+   * uses per step — a `tabIndex={-1}` heading, focused by an effect — not a new one.
+   */
+  const headingRef = useRef(null)
+  useEffect(() => {
+    if (launch.phase !== 'ready' && launch.phase !== 'refused') return
+    headingRef.current?.focus()
+    // `mountKey` is in the deps so "Restart app" lands somewhere too: it re-keys the error
+    // boundary without changing the phase, and the crash fallback holding focus is unmounted by
+    // the very click that restarts it.
+  }, [launch.phase, mountKey])
 
   useEffect(() => {
     let live = true
@@ -545,7 +602,9 @@ function MiniAppLaunch({ slug, onRetry }) {
     return (
       <div className="miniapp-workspace section">
         <div className="miniapp-workspace-refusal" role="alert" data-refusal={refusal.code}>
-          <h2>{refusal.title}</h2>
+          <h2 ref={headingRef} tabIndex={-1}>
+            {refusal.title}
+          </h2>
           <p>{refusal.message}</p>
           {refusal.retryable && (
             <Button variant="secondary" onClick={onRetry}>
@@ -562,7 +621,9 @@ function MiniAppLaunch({ slug, onRetry }) {
   return (
     <div className="miniapp-workspace section">
       <header className="miniapp-workspace-header">
-        <h2>{manifest.name}</h2>
+        <h2 ref={headingRef} tabIndex={-1}>
+          {manifest.name}
+        </h2>
         <p>
           Version {manifest.version} — verified against the package approved on the registry before it
           was run.
@@ -589,20 +650,13 @@ function MiniAppLaunch({ slug, onRetry }) {
           key={mountKey}
           onError={handleAppError}
           fallback={
-            <div className="miniapp-workspace-crash" role="alert">
-              <h3>This app stopped working</h3>
-              <p>
-                {manifest.name} ran into an error and was stopped. Nothing else on the platform was
-                affected, and anything the app saved is still there. You can start it again, or report
-                the problem to the platform team if it keeps happening.
-              </p>
-              <Button variant="secondary" onClick={() => setMountKey((n) => n + 1)}>
-                Restart app
-              </Button>
-            </div>
+            <CrashNotice appName={manifest.name} onRestart={() => setMountKey((n) => n + 1)} />
           }
         >
-          <MiniAppHostProvider appId={namespaceKey}>
+          {/* The contract allowlist comes from the VERIFIED manifest — the same
+              bytes whose hash the registry committed to and a curator approved
+              — so what the app can resolve is exactly what was reviewed. */}
+          <MiniAppHostProvider appId={namespaceKey} declaredContracts={manifest.contracts}>
             <MiniAppSurface component={component} />
           </MiniAppHostProvider>
         </ErrorBoundary>

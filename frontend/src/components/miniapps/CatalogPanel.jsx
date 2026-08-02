@@ -32,8 +32,9 @@
  * so a screen-reader user learns that a filter changed the list rather than having to go find out.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
+import SubmitAppPanel from './SubmitAppPanel'
 import EmptyState from '../account/EmptyState'
 import { APP_CATEGORY_LABELS } from '../../abis/miniAppRegistry'
 import { networkName } from '../../lib/chains/estate'
@@ -159,7 +160,7 @@ function AppCard({ app, launchable }) {
   )
 }
 
-export default function CatalogPanel() {
+function CatalogView() {
   /**
    * The last completed read, tagged with the request it answered.
    *
@@ -278,11 +279,23 @@ export default function CatalogPanel() {
             affordance that leads nowhere. */}
         {outcome && outcome.status !== REGISTRY_STATUS.NOT_DEPLOYED && (
           <div className="miniapp-catalog-actions">
+            {/* `aria-disabled` rather than `disabled` while the re-read is in flight (T047).
+                A control that goes `disabled` under the pointer that just activated it is
+                removed from the tab order, and the browser drops focus to <body> — so a
+                keyboard member loses their place mid-refresh and has to tab in from the top of
+                the page. Staying focusable keeps them where they were AND makes the outcome
+                audible: `aria-busy` announces the wait, and the label returning to "Refresh"
+                on the still-focused button announces that it finished. The click is refused in
+                the handler, so a second press during the read is still a no-op. */}
             <button
               type="button"
               className="miniapp-catalog-refresh"
-              onClick={() => setReloadKey((key) => key + 1)}
-              disabled={refreshing}
+              onClick={() => {
+                if (refreshing) return
+                setReloadKey((key) => key + 1)
+              }}
+              aria-disabled={refreshing || undefined}
+              aria-busy={refreshing || undefined}
             >
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
@@ -400,4 +413,21 @@ export default function CatalogPanel() {
       )}
     </section>
   )
+}
+
+/**
+ * The Apps tab has two surfaces, and this chooses between them.
+ *
+ * The developer submission surface (FR-021/FR-023) lives behind `?view=submit` — the entry point
+ * {@link SUBMIT_ROUTE} already links to — so a developer never leaves the Apps section to reach it and
+ * a browser Back returns them to the catalog. They are mutually exclusive rather than stacked: the
+ * catalog's registry paging has no business running behind a form someone is filling in, and the
+ * submission panel's own reads have no business running behind a catalog nobody asked to leave.
+ *
+ * The switch is a wrapper rather than an early return inside the catalog, because an early return
+ * would make every hook below it conditional — the view can change without remounting the route.
+ */
+export default function CatalogPanel() {
+  const [searchParams] = useSearchParams()
+  return searchParams.get('view') === 'submit' ? <SubmitAppPanel /> : <CatalogView />
 }

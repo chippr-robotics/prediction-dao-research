@@ -185,7 +185,22 @@ The host is installable as a progressive web app on enterprise desktops. It prec
 
 **Migration**
 
-- **FR-030**: Wagers, Token Mint, and ClearPath MUST be delivered as mini-apps through the standard registry/gateway/verification pipeline, using only the documented host context, with no loss of existing user-facing capability.
+- **FR-030**: Token Mint and ClearPath MUST be delivered as mini-apps through the standard registry/gateway/verification pipeline, using only the documented host context, with no loss of existing user-facing capability.
+
+  > **Amended during implementation — Wagers is excluded, and stays host-native.**
+  > This requirement originally named Wagers as a third conversion. Scoping the extraction
+  > measured **69% of the `/wagers` file closure (22 of 32 files) as shared** with the
+  > host-retained home and trade surfaces — including `WagerCard`, `WagerList`, `WagerTable`,
+  > `wagerVm`, and the create/accept/resolve flows — because `HomeScreen`, which `App.jsx`
+  > renders at `/`, is itself a wager surface. A package may not import from `frontend/src/`
+  > and is frozen at an immutable CID, so conversion would mean the host and the package each
+  > carrying their own copy of those 22 files: two edits and a re-publish per wager fix, with
+  > guaranteed drift. That is a worse outcome for members than not converting.
+  >
+  > Wagers instead moved into **Finance ▸ Transfer** as a third view beside Transfer and
+  > Bridge — the three ways money leaves that section. It is never listed in the catalog, so
+  > the catalog never claims a package that does not exist (FR-003's honesty rule, applied to
+  > absence). The legacy `/wagers` route redirects to it. See tasks.md T030–T033.
 
 ### Key Entities
 
@@ -207,7 +222,7 @@ The host is installable as a progressive web app on enterprise desktops. It prec
 - **SC-003**: Zero instances of package code executing without a current Approved status and a matching on-chain hash — including under tampered-package, suspended-app, and stale-cache test conditions.
 - **SC-004**: Zero cross-app shared-state collisions in concurrent multi-app testing.
 - **SC-005**: 100% of mini-app transaction requests produce a timestamped, attributable audit entry.
-- **SC-006**: All three first-party apps (Wagers, Token Mint, ClearPath) complete their representative existing workflows as mini-apps with no capability regressions, and legacy deep links resolve.
+- **SC-006**: Both converted first-party apps (Token Mint, ClearPath) complete their representative existing workflows as mini-apps with no capability regressions, and legacy deep links resolve. Wagers is measured against the same no-regression and deep-link bars in its new location (Finance ▸ Transfer) rather than as a mini-app — see the FR-030 amendment.
 - **SC-007**: A developer can complete a submission in under 5 minutes, and a curator can complete a review action in under 2 minutes from opening the queue; median submission-to-decision time is measurable from on-chain timestamps.
 - **SC-008**: With the primary gateway down and a fallback configured, app launches succeed; with all gateways down, 100% of failures present a clear availability message rather than a blank or broken surface.
 

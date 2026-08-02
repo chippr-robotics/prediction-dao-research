@@ -16,8 +16,6 @@ import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
 import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
-import TokensPanel from '../components/tokens/TokensPanel'
-import ClearPathPanel from '../components/clearpath/ClearPathPanel'
 import CatalogPanel from '../components/miniapps/CatalogPanel'
 import AccountDashboard from '../components/account/AccountDashboard'
 import ControllersPanel from '../components/account/ControllersPanel'
@@ -66,24 +64,27 @@ const WALLET_TABS = [
   // Apps (spec 073) — the mini-app catalog, and the only Apps nav item. ClearPath and Token
   // Mint stay listed below because their tabs still RENDER: they left the menu, not the app.
   { id: 'apps', label: 'Apps' },
-  { id: 'clearpath', label: 'ClearPath' },
-  { id: 'tokens', label: 'Token Mint' },
 ]
 
 // Legacy deep-link aliases → canonical tab ids (the Swap tab is now "Trade"; the
 // old standalone Backup tab is now part of the combined "Recovery" panel).
 //
-// Spec 073 (FR-009) — what this map deliberately does NOT contain yet. The Apps nav group
-// collapsed to the single mini-app catalog entry, so ClearPath and Token Mint no longer appear
-// in the menu; their `?tab=clearpath` / `?tab=tokens` deep links keep rendering the host-native
-// panels below, unchanged. They become aliases to the mini-app routes — `tokens` →
-// `/apps/token-mint` (T027) and `clearpath` → `/apps/clearpath` (T029) — only in the conversion
-// tasks that actually publish those packages, and not before: an alias pointing at a mini-app
-// nobody has registered turns a working deep link into a dead end, and the catalog would be
-// claiming a verified package that does not exist. `/wagers` is untouched for the same reason
-// (its conversion is T033, explicitly last — R11). This map must stay in parity with the copy in
+// Spec 073 (FR-009). The Apps nav group collapsed to the single mini-app catalog entry, and both
+// apps that used to live in it are packages now: `?tab=tokens` and `?tab=clearpath` REDIRECT to
+// `/apps/token-mint` (T027) and `/apps/clearpath` (T029) via TAB_REDIRECTS below, so saved deep
+// links land where the feature actually lives. Wagers is absent from both maps and is NOT a
+// package: it moved into the Transfer section as `?tab=paytransfer&view=wagers`, and the legacy
+// `/wagers` route redirects there from App.jsx. This map must stay in parity with the copy in
 // components/nav/AppNavDrawer.jsx.
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
+
+/**
+ * Tabs that have BECOME mini-apps (spec 073 T027). Unlike `TAB_ALIASES`, which renames a tab
+ * within this page, these leave the page entirely — the feature is now a package served from
+ * /apps/<appId>, so a saved `?tab=tokens` deep link has to land there rather than on a tab that
+ * no longer exists. Kept in parity with the same map in `components/nav/AppNavDrawer.jsx`.
+ */
+const TAB_REDIRECTS = { tokens: '/apps/token-mint', clearpath: '/apps/clearpath' }
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
@@ -119,10 +120,10 @@ function WalletPage() {
   // chain-gated tabs above, and for the same reason: a tab reachable by URL but absent from every
   // menu is exactly how a "dead tab" gets shipped.
   //
-  // Only the NEW tab is gated. The `?tab=clearpath` / `?tab=tokens` branches further down are
-  // knowingly left un-tenant-filtered, as they are today — tightening them here would change
-  // behavior for existing tenants that no task asked to change, and their conversions (T027/T029)
-  // remove those branches outright.
+  // Only the NEW tab is gated. The `?tab=clearpath` / `?tab=tokens` redirects above are not
+  // tenant-filtered: a tenant without mini-apps has no package to serve either way, and the
+  // redirect landing on the catalog's honest unavailable state is a better answer than a tab that
+  // silently falls back to Account.
   const miniAppsEnabled = isNavItemEnabledForTenant('apps')
   const {
     isStandalone: pwaStandalone,
@@ -138,8 +139,19 @@ function WalletPage() {
   const [searchParams] = useSearchParams()
   // The section is driven by `?tab=` so the global nav drawer and the account
   // button can route straight to a panel (e.g. the update toast → ?tab=preferences).
+  const requestedTab = searchParams.get('tab')
+  /*
+   * A tab that has become a mini-app leaves this page. Done as an effect rather than during
+   * render because a redirect is a side effect, and done with `replace` so the member's Back
+   * button returns to wherever they came from rather than bouncing off the dead tab again.
+   */
+  const redirectTo = TAB_REDIRECTS[requestedTab] || null
+  useEffect(() => {
+    if (redirectTo) navigate(redirectTo, { replace: true })
+  }, [redirectTo, navigate])
+
   const [activeTab, setActiveTab] = useState(() => {
-    const requested = searchParams.get('tab')
+    const requested = requestedTab
     const resolved = TAB_ALIASES[requested] || requested
     if (resolved === 'collectibles' && !collectiblesEnabled) return 'account'
     if (resolved === 'predict' && !predictEnabled) return 'account'
@@ -640,21 +652,6 @@ function WalletPage() {
                 {activeTab === 'apps' && miniAppsEnabled && (
                   <div className="apps-section" role="tabpanel">
                     <CatalogPanel />
-                  </div>
-                )}
-
-                {/* ClearPath and Token Mint left the Apps MENU in spec 073, not the app: these two
-                    branches keep every saved `?tab=clearpath` / `?tab=tokens` link resolving to the
-                    same host-native panel it resolved to before. They are removed only when their
-                    packages are published and the tabs become aliases (T027 / T029). */}
-                {activeTab === 'tokens' && (
-                  <div className="tokens-section" role="tabpanel">
-                    <TokensPanel />
-                  </div>
-                )}
-                {activeTab === 'clearpath' && (
-                  <div className="clearpath-section" role="tabpanel">
-                    <ClearPathPanel />
                   </div>
                 )}
                 {activeTab === 'trade' && (

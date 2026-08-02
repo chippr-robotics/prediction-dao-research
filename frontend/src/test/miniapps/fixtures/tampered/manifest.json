@@ -7,7 +7,7 @@
   "styles": [
     "style.css"
   ],
-  "hostApi": 1,
+  "hostApi": 2,
   "sharedDeps": [
     "@fairwins/miniapp-sdk",
     "react",
@@ -20,6 +20,7 @@
   "storeKeys": [
     "notes"
   ],
+  "contracts": [],
   "files": {
     "entry.js": {
       "sha256": "15ef1504497c3c1ea59952de7a1b4c6e01ba75eb5fb987e2718e60cc46977c7c"

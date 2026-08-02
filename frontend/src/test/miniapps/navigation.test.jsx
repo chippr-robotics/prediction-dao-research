@@ -5,18 +5,18 @@
  * The nav change itself is small: the Apps group stopped naming apps and now names the catalog.
  * The part worth a test file is the half that must be INVISIBLE. Existing members have
  * `?tab=clearpath` and `?tab=tokens` in bookmarks, in shared links, and in browser history, and
- * the two mini-apps those tabs will eventually become do not exist yet — Token Mint converts in
- * T027, ClearPath in T029, Wagers last in T033 (research R11 phasing). So the rule this file
- * pins down is:
+ * the rule this file pins down is:
  *
  *   removing a tab from the MENU is not the same as removing the tab.
  *
- * A redirect to `/apps/token-mint` today would be worse than the status quo it replaced: the
- * workspace would resolve a slug the registry has never heard of and refuse it, turning a link
- * that worked yesterday into a dead end — and the catalog would be implying a verified package
- * exists when none has been registered. The alternative failure, leaving the tab in the menu
- * while it is mid-conversion, is the one the nav change is fixing. Hence: menu changes now,
- * routing changes when the packages land.
+ * The two legacy tabs are at DIFFERENT stages, and the difference is the point:
+ *
+ *   - `?tab=tokens` REDIRECTS to /apps/token-mint. Token Mint's tree has moved into
+ *     `frontend/miniapps/token-mint/`, so the host has nothing left to render on that tab — the
+ *     saved link has to go where the feature actually lives (T026/T027).
+ *   - `?tab=clearpath` still renders its host-native panel. Its package is built in T029, and
+ *     redirecting before then would resolve a slug the registry has never heard of, turning a
+ *     link that worked yesterday into a dead end.
  *
  * The catalog panel and the workspace are exercised by their own suites (CatalogPanel.test.jsx,
  * MiniAppWorkspace.test.jsx). Here the panel is a stub — what is under test is which section the
@@ -24,7 +24,7 @@
  */
 import { useEffect } from 'react'
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 import { WalletContext, UIContext } from '../../contexts'
@@ -37,12 +37,6 @@ import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 // a given URL, and a real CatalogPanel would drag a registry read into a routing test.
 vi.mock('../../components/miniapps/CatalogPanel', () => ({
   default: () => <div data-testid="catalog-panel" />,
-}))
-vi.mock('../../components/clearpath/ClearPathPanel', () => ({
-  default: () => <div data-testid="clearpath-panel" />,
-}))
-vi.mock('../../components/tokens/TokensPanel', () => ({
-  default: () => <div data-testid="tokens-panel" />,
 }))
 vi.mock('../../components/fairwins/TradePanel', () => ({
   default: () => <div data-testid="trade-panel" />,
@@ -128,6 +122,9 @@ function renderWalletPage(route) {
       <UIContext.Provider value={uiContext}>
         <WalletContext.Provider value={walletContext}>
           <WalletPage />
+          {/* Renders the live path, so a REDIRECT can be asserted rather than inferred from
+              whichever section happened to render. */}
+          <LocationProbe />
         </WalletContext.Provider>
       </UIContext.Provider>
     </MemoryRouter>
@@ -176,23 +173,18 @@ describe('WalletPage — the Apps tab hosts the mini-app catalog (spec 073 FR-00
 // --- Legacy deep links (the point of this file) -------------------------------------------------
 
 describe('WalletPage — legacy Apps deep links keep working (spec 073 FR-009, R11 phasing)', () => {
-  it('?tab=clearpath still renders the host-native ClearPath panel', () => {
+  it('?tab=clearpath REDIRECTS to the ClearPath mini-app (T029 cutover)', () => {
     const { container } = renderWalletPage('/wallet?tab=clearpath')
-    expect(screen.getByTestId('clearpath-panel')).toBeInTheDocument()
-    expect(container.querySelector('.clearpath-section')).toBeTruthy()
-    // The tab was NOT redirected to a mini-app: ClearPath's package is published in T029, and
-    // routing there now would land on a slug the registry has never heard of.
-    expect(screen.queryByTestId('catalog-panel')).toBeNull()
-    expect(container.querySelector('.profile-section')).toBeNull()
+    expect(screen.getByTestId('loc')).toHaveTextContent('/apps/clearpath')
+    expect(container.querySelector('.clearpath-section')).toBeNull()
   })
 
-  it('?tab=tokens still renders the host-native Token Mint panel', () => {
+  it('?tab=tokens REDIRECTS to the Token Mint mini-app (T027 cutover)', () => {
+    // Token Mint is a package now, so the old tab cannot render it — the saved deep link has to
+    // resolve to the workspace instead of silently falling back to the account tab.
     const { container } = renderWalletPage('/wallet?tab=tokens')
-    expect(screen.getByTestId('tokens-panel')).toBeInTheDocument()
-    expect(container.querySelector('.tokens-section')).toBeTruthy()
-    // Same reasoning as ClearPath — Token Mint converts in T027.
-    expect(screen.queryByTestId('catalog-panel')).toBeNull()
-    expect(container.querySelector('.profile-section')).toBeNull()
+    expect(screen.getByTestId('loc')).toHaveTextContent('/apps/token-mint')
+    expect(container.querySelector('.tokens-section')).toBeNull()
   })
 
   it('keeps every other saved tab resolving exactly as before', () => {
@@ -258,12 +250,14 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=apps')
   })
 
-  it('keeps Wagers in the group on its own absolute route', () => {
-    // Wagers is not a `/wallet?tab=` section and its conversion is last (T033) — the rewire must
-    // not have disturbed it.
+  it('offers no Wagers entry — it is a view inside Transfer now, reached through that entry', () => {
+    // Wagers did not become a package (T030–T033 retired); it moved into Finance ▸ Transfer. The
+    // drawer used to splice it into this group, and that splice must be gone, not merely repointed:
+    // a menu entry beside Apps that lands on a sub-view of Transfer would highlight neither.
     renderDrawer()
-    fireEvent.click(screen.getByRole('button', { name: 'Wagers' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/wagers')
+    expect(screen.queryByRole('button', { name: 'Wagers' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=paytransfer')
   })
 
   it('highlights Apps while a mini-app workspace is mounted', () => {
@@ -278,10 +272,16 @@ describe('AppNavDrawer — the Apps group after the rewire (spec 073 FR-009)', (
     expect(screen.getByRole('button', { name: 'Apps' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('leaves /wagers highlighting Wagers, not Apps', () => {
+  it('highlights Transfer — not Apps — for the legacy /wagers route and for the view it redirects to', () => {
+    // The redirect is App.jsx's job; the drawer resolves the pre-redirect render too, so the menu
+    // never flashes with nothing selected on the way through.
     renderDrawer('/wagers')
-    expect(screen.getByRole('button', { name: 'Wagers' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Transfer' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Apps' })).not.toHaveAttribute('aria-current')
+
+    cleanup()
+    renderDrawer('/wallet?tab=paytransfer&view=wagers')
+    expect(screen.getByRole('button', { name: 'Transfer' })).toHaveAttribute('aria-current', 'page')
   })
 })
 
@@ -330,11 +330,16 @@ describe('Apps is absent for a tenant without the miniapps feature', () => {
       </MemoryRouter>
     )
     expect(screen.queryByRole('button', { name: 'Apps' })).toBeNull()
-    // Wagers lives on its own route and is spliced into this group by the drawer, so a mini-app
-    // feature flag must not decide whether it is reachable from the menu.
-    expect(screen.getByRole('button', { name: 'Wagers' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Wagers' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/wagers')
+    /*
+     * A mini-app feature flag must not decide whether WAGERS is reachable. That used to need
+     * defending in the drawer, which spliced Wagers into this very group and so had to re-create
+     * the group when the flag removed it. Wagers now rides Finance ▸ Transfer — a core item no
+     * tenant flag touches — so the property holds by construction. Asserted anyway, because it is
+     * the property that matters and the next person to reorganise the menu should trip this test
+     * rather than discover it from a member.
+     */
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=paytransfer')
   })
 
   it('falls the ?tab=apps deep link back to Account instead of rendering an empty section', async () => {
@@ -345,19 +350,15 @@ describe('Apps is absent for a tenant without the miniapps feature', () => {
     expect(container.querySelector('.profile-section')).toBeTruthy()
   })
 
-  it('still serves the legacy ClearPath / Token Mint tabs to that tenant', async () => {
-    // The `miniapps` feature governs the CATALOG. It was never what made these two tabs work, and
-    // gating them on it would break deep links for a tenant that simply opted out of mini-apps.
+  it('redirects the legacy tabs for that tenant too, rather than resurrecting a panel', async () => {
+    // The `miniapps` feature governs the CATALOG. Both former tabs are packages now, so a tenant
+    // that opted out of mini-apps has nothing to serve either way — and the redirect landing on
+    // the catalog's honest unavailable state beats a tab silently falling back to Account.
     const reimported = await withoutMiniApps('../../pages/WalletPage')
     expect(
       renderReimportedWalletPage('/wallet?tab=clearpath', reimported).container.querySelector(
         '.clearpath-section'
       )
-    ).toBeTruthy()
-    expect(
-      renderReimportedWalletPage('/wallet?tab=tokens', reimported).container.querySelector(
-        '.tokens-section'
-      )
-    ).toBeTruthy()
+    ).toBeNull()
   })
 })

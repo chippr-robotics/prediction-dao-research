@@ -121,7 +121,11 @@ const AMOY_CONTRACTS = {
   membershipVoucher: '0x33C8Ccacf6442Cf4238f01419e38C781cB859769',
   voucherBatchMinter: '0x929A8E9778f26eC49Ba6ed66343e6788f4c689C1',
   callsignRegistry: '', // spec 054 — %callsign naming registry (synced after deploy)
-  miniAppRegistry: '', // spec 073 — mini-app catalog registry (synced after deploy)
+  // Spec 073 — deliberately NOT a deployment target, and NOT "pending". The mini-app registry
+  // ships to Polygon and Mordor only, and `miniAppChainId()` sends every testnet build to
+  // Mordor 63. The key stays for shape parity with the other chains; deploying one here would
+  // create a second testnet catalog that nothing reads.
+  miniAppRegistry: '',
   stakingRouter: '', // spec 066 — staking control surface + liquid fee router (synced after deploy)
   // Cross-chain bridge + liquidity supply (spec 067). Empty until
   // `deploy-bridge-liquidity.js` runs; `npm run sync:frontend-contracts` populates them.
@@ -293,11 +297,20 @@ const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   8453: { safeProposalHub: 49158472 }, // Base
   42161: { safeProposalHub: 488059169 }, // Arbitrum One
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0, membershipVoucher: 40521024, miniAppRegistry: 0 },
+  // Polygon. Blocks marked (measured) were bisected with `eth_getCode` against an archive node
+  // rather than taken from a deploy script's report — the two disagreed by up to ten blocks, and
+  // a recorded block LATER than the real creation silently drops any event in between. The
+  // wagerRegistry bisection matched its recorded value exactly, which is what validates the rest.
   137: {
     friendGroupMarketFactory: 0,
     wagerRegistry: 89717915,
-    membershipVoucher: 89717915,
-    wagerPoolFactory: 89720731,
+    membershipVoucher: 89717905, // measured (was 89717915 — 10 blocks late)
+    membershipManager: 89717895, // measured
+    tokenFactory: 89717942, // measured
+    wagerPoolFactory: 89720740, // measured (was 89720731)
+    chainlinkDataFeedAdapter: 87937162, // measured
+    chainlinkFunctionsAdapter: 87937176, // measured
+    umaAdapter: 87937184, // measured
     safeProposalHub: 90120743,
     miniAppRegistry: 91265680,
   },

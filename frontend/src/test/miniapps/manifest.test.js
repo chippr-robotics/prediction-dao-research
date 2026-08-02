@@ -346,5 +346,54 @@ describe('declared capabilities must be ones the host actually has', () => {
     expect(manifest.sharedDeps).toEqual([])
     expect(manifest.permissions).toEqual([])
     expect(manifest.storeKeys).toEqual([])
+    // A hostApi-1 package predates the field entirely and must still validate —
+    // with an EMPTY allowlist, so it can resolve nothing.
+    expect(manifest.contracts).toEqual([])
+  })
+})
+
+/*
+ * hostApi 2. `contracts` is unlike every other declared list in this manifest:
+ * `permissions`, `storeKeys` and `sharedDeps` describe the package, but this one
+ * is an ACCESS GATE the host enforces at runtime. What a reviewer reads on this
+ * line is exactly what the app can resolve.
+ */
+describe('declared contract allowlist (hostApi 2)', () => {
+  const withContracts = (contracts, permissions = ['contracts']) =>
+    goodManifest({ contracts, permissions })
+
+  it('accepts a declared allowlist alongside the permission', () => {
+    const manifest = validateManifest(withContracts(['tokenFactory', 'miniAppRegistry']))
+    expect(manifest.contracts).toEqual(['tokenFactory', 'miniAppRegistry'])
+    expect(Object.isFrozen(manifest.contracts)).toBe(true)
+  })
+
+  it('REFUSES names without the permission that reads them', () => {
+    // Otherwise the manifest misdescribes itself: a reviewer sees an allowlist
+    // and assumes the app resolves addresses, while the host refuses every call.
+    expectRefusal(
+      () => validateManifest(withContracts(['tokenFactory'], ['toast'])),
+      MANIFEST_REFUSAL.BAD_CONTRACTS
+    )
+  })
+
+  it('REFUSES a malformed name and bounds the list', () => {
+    for (const bad of [['token factory'], ['token-factory'], ['0factory'], [''], [null], ['x'.repeat(65)]]) {
+      expectRefusal(() => validateManifest(withContracts(bad)), MANIFEST_REFUSAL.BAD_CONTRACTS)
+    }
+    expectRefusal(() => validateManifest(withContracts('tokenFactory')), MANIFEST_REFUSAL.BAD_CONTRACTS)
+    expectRefusal(
+      () => validateManifest(withContracts(Array.from({ length: 17 }, (_, i) => `c${i}`))),
+      MANIFEST_REFUSAL.BAD_CONTRACTS
+    )
+  })
+
+  it('allows the permission with no names — a package may declare intent and resolve nothing', () => {
+    expect(validateManifest(goodManifest({ permissions: ['contracts'], contracts: [] })).contracts).toEqual([])
+  })
+
+  it('exposes contracts and network as real host capabilities', () => {
+    expect(HOST_PERMISSIONS).toContain('contracts')
+    expect(HOST_PERMISSIONS).toContain('network')
   })
 })

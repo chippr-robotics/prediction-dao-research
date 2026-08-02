@@ -19,7 +19,7 @@
 import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
-import { getLogsRange } from '../components/clearpath/connectors/ozGovernor'
+import { getLogsRange } from '../lib/clearpath/connectors/ozGovernor'
 
 const CHUNK = 45_000
 const MAX_SPAN = 3_000_000

@@ -14,6 +14,7 @@ import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
 import DenyListAdmin from './admin/DenyListAdmin'
+import MiniAppReviewTab from './admin/MiniAppReviewTab'
 import CallsignRegistryAdmin from './admin/CallsignRegistryAdmin'
 import MembershipTreasuryOverview from './admin/MembershipTreasuryOverview'
 import ProtocolConfigTab from './admin/ProtocolConfigTab'
@@ -26,6 +27,7 @@ import ServiceHealthCard from './admin/ServiceHealthCard'
 import PaymasterOpsCard from './admin/PaymasterOpsCard'
 import { buildAdminNavGroups } from './admin/adminNav'
 import { networkName, readProviderFor } from '../lib/chains/estate'
+import { readCuratorAuthority } from '../lib/miniapps/registryAuthority'
 import { isRead, isNotDeployed, formatUnitAmount } from '../lib/chains/chainReadResult'
 import { useFeeEstate } from '../hooks/useFeeEstate'
 import { estateNetworks } from '../lib/chains/estate'
@@ -126,7 +128,31 @@ function AdminPanel() {
   // network before offering a write, and the control state the tabs read is
   // per-network regardless of which network the wallet sits on (FR-050).
   const isLiquidityAdmin = hasRole(ROLES.LIQUIDITY_ADMIN)
-  const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
+
+  /**
+   * Mini-app curation (spec 073). Deliberately NOT a `hasRole(ROLES.…)` flag like every other
+   * line above, and that difference is the point: `APP_CURATOR_ROLE` lives on the
+   * MiniAppRegistry and **administers itself** on-chain, so no admin role implies it and nothing
+   * in the role-storage sync could truthfully report it. It is asked of the registry that will
+   * enforce it (the spec-067 `readRouterAuthority` pattern), and only a definite yes counts —
+   * `readCuratorAuthority` fails closed on every uncertainty and the tab itself explains which
+   * uncertainty it was ("could not verify" is not "you are not a curator").
+   *
+   * It also opens the console for a curator who holds nothing else: the curator multisig is a
+   * compliance function, not a platform-admin one, so requiring an ADMIN_ROLES grant to reach
+   * the queue would mean the registry can only be operated by scripts.
+   */
+  const [curatorAuthority, setCuratorAuthority] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    readCuratorAuthority({ account }).then((result) => {
+      if (!cancelled) setCuratorAuthority(result)
+    })
+    return () => { cancelled = true }
+  }, [account])
+  const isAppCurator = curatorAuthority?.held === true
+
+  const hasAdminAccess = hasAnyRole(ADMIN_ROLES) || isAppCurator
   // The Bridge/Supply fee cards link across to where a rate is actually editable — but only for
   // an operator who can open that tab. Offering the link to someone the Fees tab is closed to
   // would send them to a blank panel, so they get the same sentence without a dead control.
@@ -485,6 +511,7 @@ function AdminPanel() {
     isFeeAdmin,
     isStakingAdmin,
     isLiquidityAdmin,
+    isAppCurator,
   })
 
   // On mobile the expanded rail sits ON TOP of the view it just switched to, so
@@ -1161,6 +1188,24 @@ function AdminPanel() {
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}
+            chainId={chainId}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {/*
+          Mini-app review (spec 073 FR-022). Gated exactly like the nav item, so a hand-typed tab
+          id renders nothing for an operator who is neither a curator nor an admin. `isAppCurator`
+          comes from the REGISTRY, not from the app-wide role flags — see its definition above.
+          The tab is not gated on the wallet's active chain: reviewing and verifying packages work
+          from anywhere, and only recording a decision needs the wallet on the registry chain,
+          which the tab checks itself at submit time.
+        */}
+        {activeTab === 'miniapp-review' && (isAppCurator || isAdmin) && (
+          <MiniAppReviewTab
+            signer={signer}
+            account={account}
             chainId={chainId}
             runTx={runTx}
             pendingTx={pendingTx}

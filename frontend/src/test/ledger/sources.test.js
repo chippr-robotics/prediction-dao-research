@@ -205,9 +205,26 @@ describe('poolLedgerSource', () => {
     expect(claim.refs.poolId).toBe('3')
   })
 
-  it('returns an honest empty list when the chain has no subgraph', async () => {
+  /*
+   * This used to assert that a missing subgraph "returns an honest empty list". It was not
+   * honest, and the word was doing the damage: `ledgerRepository` records a class in
+   * `staleClasses` only when its promise REJECTS, so a fulfilled `[]` disclosed nothing. On
+   * Mordor — live WagerPoolFactory, no subgraph — every pool join, claim and refund was silently
+   * absent from the tax report while the report presented its total as complete. Pools have no
+   * RPC enumeration path, so this source is the only producer of LEDGER_CLASS.POOL: its silence
+   * was the whole class going missing from a financial document.
+   */
+  it('REFUSES when the chain has pools but no subgraph, so the gap is disclosed', async () => {
     const src = createPoolLedgerSource({ querySubgraph: async () => null })
-    expect(await src.list(CTX)).toEqual([])
+    // 137 has a wagerPoolFactory, so an empty result here would be a claim the data cannot support.
+    await expect(src.list(CTX)).rejects.toThrow(/no subgraph/)
+  })
+
+  it('returns an empty list when the chain has no pool factory at all', async () => {
+    // Ethereum Classic is custody-only: there are no pools, so nothing is missing and flagging a
+    // gap would be a false alarm.
+    const src = createPoolLedgerSource({ querySubgraph: async () => null })
+    expect(await src.list({ ...CTX, chainId: 61 })).toEqual([])
   })
 })
 

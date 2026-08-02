@@ -39,10 +39,11 @@ import { buildFileDigests } from './packageIntegrity.js'
  * @param {string} options.version - display version string
  * @param {string[]} options.permissions - declared host capabilities
  * @param {string[]} options.storeKeys - declared namespaced-store keys
+ * @param {string[]} options.contracts - deployment names the app may resolve (hostApi 2)
  * @returns {import('vite').Plugin} Vite/rollup plugin
  */
 export function manifestPlugin(options) {
-  const { appId, name, version, permissions, storeKeys } = options
+  const { appId, name, version, permissions, storeKeys, contracts = [] } = options
 
   return {
     name: 'fairwins-miniapp-manifest',
@@ -85,6 +86,7 @@ export function manifestPlugin(options) {
         sharedDeps: sharedDepsFromBundle(bundle),
         permissions: [...permissions].sort(),
         storeKeys: [...storeKeys].sort(),
+        contracts: [...contracts].sort(),
         files: buildFileDigests(outDir)
       }
 

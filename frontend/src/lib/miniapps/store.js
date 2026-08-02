@@ -355,6 +355,199 @@ export function createAppStore(account, appId) {
   return Object.freeze({ get, set, subscribe })
 }
 
+/* ------------------------------------------------------------------------ *
+ * Backup seam (spec 073 T040 · spec 032)
+ *
+ * The backup carries app state as ONE object keyed by app id
+ * (`{ [appId]: { <storeKey>: value } }`) rather than one synced object per app,
+ * because the set of installed apps is open-ended: a registry listing added
+ * next week must ride the existing backup with no edit to
+ * `lib/backup/syncedObjects.js`.
+ *
+ * Not network-scoped. App data is chain-agnostic unless an app chooses to
+ * namespace its own keys by chain, and claiming otherwise would make the
+ * restore UI offer a per-network choice this data cannot honor.
+ *
+ * Everything crossing this seam is UNTRUSTED, in both directions. A backup blob
+ * may have been hand-edited, may come from a build with different apps
+ * installed, and — because it is restored into namespaces that third-party code
+ * reads — is exactly the input a hostile package would want to influence. So the
+ * same `APP_ID_PATTERN` / `isStoreKey` / size checks that guard a live `set`
+ * guard a restore, and anything failing them is dropped rather than repaired.
+ * ------------------------------------------------------------------------- */
+
+/** Bound on the whole restored bundle, mirroring the per-namespace budget. */
+const MAX_APPS_IN_BUNDLE = 128
+
+/**
+ * The app ids with something persisted for `account`.
+ *
+ * Read by scanning localStorage rather than from a registry read: the backup
+ * must capture the state of an app that has since been suspended, deprecated,
+ * or delisted. State the member's own apps wrote is the member's, and it does
+ * not stop being theirs because a curator changed a listing.
+ */
+export function listStoredAppIds(account) {
+  if (!account || typeof window === 'undefined') return []
+  const prefix = `${USER_STORAGE_PREFIX}${String(account).toLowerCase()}_miniapp_`
+  const out = []
+  let storage
+  try {
+    storage = window.localStorage
+    if (!storage) return []
+  } catch {
+    return [] // storage disabled — no durable state to back up
+  }
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (typeof key !== 'string' || !key.startsWith(prefix) || !key.endsWith('_v1')) continue
+      // `APP_ID_PATTERN` admits no underscore, so this slice is unambiguous.
+      const appId = key.slice(prefix.length, -'_v1'.length)
+      if (APP_ID_PATTERN.test(appId)) out.push(appId)
+    }
+  } catch {
+    return out
+  }
+  return out.sort()
+}
+
+/**
+ * Every app's persisted state for `account`, as plain JSON for the backup.
+ *
+ * Reads the DURABLE tier directly, not the session tier: a backup should
+ * describe what a reload would restore, and an app mounted right now may hold
+ * session-only state (no account) that was deliberately never persisted.
+ * Namespaces that are empty are omitted — an empty bag in a backup is noise
+ * that survives forever once written.
+ */
+export function loadMiniAppState(account) {
+  const out = {}
+  if (!account) return out
+  for (const appId of listStoredAppIds(account)) {
+    const data = readPersisted(account, appId)
+    const entries = Object.entries(data)
+    if (entries.length === 0) continue
+    out[appId] = Object.fromEntries(entries)
+  }
+  return out
+}
+
+/** Accept only what a live `set` would have accepted, per app. */
+function sanitizeBundle(value) {
+  const out = {}
+  if (!isPlainObject(value)) return out
+  let apps = 0
+  for (const [appId, data] of Object.entries(value)) {
+    if (apps >= MAX_APPS_IN_BUNDLE) break
+    if (!APP_ID_PATTERN.test(appId) || !isPlainObject(data)) continue
+    const clean = {}
+    for (const [key, v] of Object.entries(data)) {
+      if (!isStoreKey(key)) continue
+      clean[key] = v
+    }
+    if (Object.keys(clean).length === 0) continue
+    // One app's restored namespace is held to the same ceiling a live write is,
+    // so a crafted backup cannot do what `set` refuses to.
+    try {
+      if (JSON.stringify(clean).length > MAX_NAMESPACE_BYTES) continue
+    } catch {
+      continue // unserializable — it could never have been written by `set`
+    }
+    out[appId] = clean
+    apps += 1
+  }
+  return out
+}
+
+/**
+ * Merge two bundles: union of apps, and within an app a SHALLOW union of keys
+ * (data-model.md §3). Incoming wins a same-key disagreement and the
+ * disagreement is reported, which is the addressBook convention — a restore
+ * that silently discarded local state would be the one failure mode a member
+ * cannot detect afterwards.
+ *
+ * Shallow is deliberate. These values are opaque app-defined JSON; a deep merge
+ * would invent a semantics for them (array concat? object union?) that no app
+ * agreed to, and could hand a package a shape it never wrote.
+ */
+export function mergeMiniAppState(current, incoming) {
+  const base = sanitizeBundle(current)
+  const next = sanitizeBundle(incoming)
+  const value = {}
+  const conflicts = []
+  for (const [appId, data] of Object.entries(base)) value[appId] = { ...data }
+  for (const [appId, data] of Object.entries(next)) {
+    const existing = value[appId]
+    if (!existing) {
+      value[appId] = { ...data }
+      continue
+    }
+    for (const [key, v] of Object.entries(data)) {
+      if (
+        Object.prototype.hasOwnProperty.call(existing, key) &&
+        JSON.stringify(existing[key]) !== JSON.stringify(v)
+      ) {
+        conflicts.push({ appId, key })
+      }
+      existing[key] = v
+    }
+  }
+  return { value, conflicts }
+}
+
+/**
+ * Write a restored bundle back to the durable tier.
+ *
+ * `mode: 'replace'` clears namespaces the bundle does not mention, so a restore
+ * reproduces the backed-up device rather than leaving orphan state from this
+ * one; `'merge'` is additive and reports conflicts.
+ *
+ * Mounted apps are refreshed and their subscribers notified. Without this, a
+ * restore performed while an app is on screen would land in storage but leave
+ * the session tier — the tier `get` actually reads — serving pre-restore values
+ * until the member reloaded, which reads as "the restore did nothing".
+ */
+export function applyMiniAppState(account, value, mode = 'merge') {
+  if (!account) return { conflicts: [] }
+  const incoming = sanitizeBundle(value)
+  let bundle = incoming
+  let conflicts = []
+
+  if (mode === 'replace') {
+    for (const appId of listStoredAppIds(account)) {
+      if (Object.prototype.hasOwnProperty.call(incoming, appId)) continue
+      try {
+        saveUserPreference(account, appStoreFeatureKey(appId), { version: STORE_VERSION, data: {} }, true)
+      } catch {
+        // Best-effort, as everywhere else in this module.
+      }
+    }
+  } else {
+    const merged = mergeMiniAppState(loadMiniAppState(account), incoming)
+    bundle = merged.value
+    conflicts = merged.conflicts
+  }
+
+  for (const [appId, data] of Object.entries(bundle)) {
+    try {
+      saveUserPreference(account, appStoreFeatureKey(appId), { version: STORE_VERSION, data }, true)
+    } catch {
+      // Best-effort.
+    }
+  }
+
+  // Re-hydrate anything mounted for this account and tell it state moved.
+  const owner = String(account).toLowerCase()
+  for (const ns of namespaces.values()) {
+    if (!ns.account || String(ns.account).toLowerCase() !== owner) continue
+    ns.data = readPersisted(ns.account, ns.appId)
+    notify(ns)
+  }
+
+  return { conflicts }
+}
+
 /**
  * Test/util seam: forget every session namespace and detach the cross-tab
  * listener, so the next read hits storage again (the `endpointStore` seam).

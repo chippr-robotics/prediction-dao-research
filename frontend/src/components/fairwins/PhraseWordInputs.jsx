@@ -41,11 +41,29 @@ export default function PhraseWordInputs({ words, onChange, disabled = false, id
 
   const suggestionsFor = (i) => (focused === i ? suggestWords(words[i], MAX_SUGGESTIONS) : [])
 
+  const tokenize = (text) => text
+    .normalize('NFKC').toLowerCase().replace(/[-_]+/g, ' ').trim()
+    .split(/\s+/).filter(Boolean)
+
+  // Lay `tokens` into consecutive slots starting at `start` and leave focus on the last one filled.
+  const spreadWords = (start, tokens) => {
+    const next = words.slice()
+    for (let k = 0; k < tokens.length && start + k < SLOTS; k += 1) next[start + k] = tokens[k]
+    onChange(next)
+    setActiveSuggestion(0)
+    focusSlot(Math.min(start + tokens.length, SLOTS - 1))
+  }
+
   const handleChange = (i, raw) => {
-    // A space finalizes the current word and jumps to the next slot.
     if (/\s/.test(raw)) {
-      const head = raw.split(/\s+/)[0]
-      setWord(i, head.toLowerCase())
+      const tokens = tokenize(raw)
+      // A whole phrase can land in one box without a paste event — autofill, voice typing, or a
+      // paste the browser gave us no clipboardData for. Spread it like a paste; keeping only the
+      // first word would silently discard three quarters of a valid phrase.
+      if (tokens.length > 1) { spreadWords(i, tokens); return }
+      // A single word plus a space finalizes it and jumps to the next slot.
+      const head = tokens[0] || ''
+      setWord(i, head)
       if (head && i < SLOTS - 1) focusSlot(i + 1)
       return
     }
@@ -55,16 +73,10 @@ export default function PhraseWordInputs({ words, onChange, disabled = false, id
 
   // Pasting a whole phrase into any slot spreads its words across the remaining slots.
   const handlePaste = (i, e) => {
-    const text = e.clipboardData?.getData('text') || ''
-    const tokens = text
-      .normalize('NFKC').toLowerCase().replace(/[-_]+/g, ' ').trim()
-      .split(/\s+/).filter(Boolean)
+    const tokens = tokenize(e.clipboardData?.getData('text') || '')
     if (tokens.length <= 1) return // single word → let the default paste land in this box
     e.preventDefault()
-    const next = words.slice()
-    for (let k = 0; k < tokens.length && i + k < SLOTS; k += 1) next[i + k] = tokens[k]
-    onChange(next)
-    focusSlot(Math.min(i + tokens.length, SLOTS - 1))
+    spreadWords(i, tokens)
   }
 
   const handleKeyDown = (i, e) => {

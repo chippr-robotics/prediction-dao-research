@@ -54,8 +54,11 @@ describe('Home modes (spec 058)', () => {
     cy.get('section[aria-label="Create a challenge"]').should('be.visible')
     cy.get('nav[aria-label="Home mode"] button').contains('Pay').click()
     cy.get('section[aria-label="Pay"]').should('be.visible')
-    // The bar is a home-surface pattern, not app-wide.
+    // The bar is a home-surface pattern, not app-wide. `/wagers` is now a redirect into the
+    // Transfer section (spec 073), so this also pins that the legacy link still resolves.
     cy.visit('/wagers')
+    cy.location('search').should('include', 'tab=paytransfer')
+    cy.location('search').should('include', 'view=wagers')
     cy.get('nav[aria-label="Home mode"]').should('not.exist')
   })
 

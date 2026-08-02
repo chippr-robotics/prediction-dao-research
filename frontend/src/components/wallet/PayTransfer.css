@@ -484,3 +484,29 @@
   font-size: 1.2rem;
   text-decoration: none;
 }
+
+/* ── Wagers view (spec 073) ───────────────────────────────────────────────────────────────────
+   Dashboard was built for the absolute `/wagers` route, so it brings page chrome with it: its own
+   horizontal padding and a `height:100%; overflow-y:auto` scroll region. Inside a tab panel that
+   padding doubles up with the wallet page's, and the nested scroller would trap the wheel wherever
+   an ancestor happens to have a definite height. Both are neutralised here rather than in
+   Dashboard.css, which still has to serve the surface it was written for (the same split
+   HomeScreen.css already uses). The specificity is deliberate — `.dashboard-container` sets these
+   on the element itself, so a single class cannot outrank it without the parent in the selector. */
+.pt-wagers .dashboard-container {
+  padding: 0;
+  height: auto;
+  overflow-y: visible;
+  max-width: none;
+}
+
+/* "Quick Actions" was the title of a page that no longer exists, and as an <h1> two levels into a
+   tab panel it is also a second top-level heading on the document. The heading goes; the header ROW
+   stays, because it also carries the Demo Mode badge — hiding the whole row would take a live
+   status indicator with it. */
+.pt-wagers .dashboard-header h1 {
+  display: none;
+}
+.pt-wagers .dashboard-header:not(:has(.demo-mode-badge)) {
+  display: none;
+}

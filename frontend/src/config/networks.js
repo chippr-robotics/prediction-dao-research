@@ -444,11 +444,18 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
-    // The Graph endpoint indexing the production WagerRegistry on Polygon.
-    // Override with VITE_SUBGRAPH_URL_POLYGON.
+    // The Graph endpoint indexing Polygon. Override with VITE_SUBGRAPH_URL_POLYGON.
+    //
+    // v0.3.0 (2026-08-01) replaced v0.2.0, which indexed the ABANDONED pre-UUPS
+    // WagerRegistry and therefore answered every wager query with an empty list —
+    // HTTP 200, no errors, healthy, minutes behind head — while members had live
+    // wagers. v0.3.0 indexes the live contracts and adds vouchers, redemptions,
+    // pools and token/holder/activity. Pin the version rather than tracking
+    // `/version/latest`: a freshly deployed version answers with PARTIAL data while
+    // it back-fills, which is the same silent wrongness v0.2.0 was.
     subgraphUrl:
       import.meta.env?.VITE_SUBGRAPH_URL_POLYGON ||
-      'https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.2.0',
+      'https://api.studio.thegraph.com/query/1755381/fairwins-polygon/v0.3.0',
     // Native USDC on Polygon (Circle-issued, USDC.e is the bridged variant
     // and is not used here). Decimals=6.
     stablecoin: {
@@ -927,26 +934,44 @@ export function membershipChainId() {
 }
 
 /**
+ * The testnet home of the mini-app registry.
+ *
+ * NOT `TESTNET_CHAIN_ID`, and this is the one place in the estate where those differ. The
+ * `MiniAppRegistry` is deployed to **Polygon and Mordor only** — Amoy is deliberately not a
+ * deployment target for spec 073 — so the testnet cohort's registry lives on Mordor.
+ *
+ * Deriving it from `TESTNET_CHAIN_ID` (Amoy) instead would be the more symmetrical code and the
+ * wrong answer: Amoy has no `miniAppRegistry` address, so every testnet build would report the
+ * catalog "not deployed" while a real registry sat unread on Mordor. The asymmetry is a fact
+ * about where the contract is, and the constant states it rather than hiding it behind a shared
+ * literal that no longer means what its name says.
+ *
+ * Still inside the cohort: Mordor is `isTestnet: true`, so a testnet build reads a testnet
+ * registry and constitution III's testnet/mainnet boundary holds.
+ */
+const MINIAPP_TESTNET_CHAIN_ID = 63
+
+/**
  * The single chain that hosts the mini-app registry for this build (spec 073 FR-025, research R5).
  *
- * DERIVED from the same mainnet/testnet pair as `membershipChainId()` above — never a second
- * literal. A hardcoded `137` here would make a testnet build read the MAINNET catalog, and the
- * catalog is not a display detail: it decides which packages the host will fetch, verify, and
- * EXECUTE (FR-010/FR-011). Reading approvals from the wrong side of the cohort boundary would
- * run mainnet-curated code against testnet wallets.
+ * One home per cohort, in the `membershipChainId()` shape above — but over its OWN pair, because
+ * the registry's testnet deployment is Mordor rather than Amoy (see `MINIAPP_TESTNET_CHAIN_ID`).
+ * What must never happen is a hardcoded `137`: the catalog is not a display detail, it decides
+ * which packages the host will fetch, verify, and EXECUTE (FR-010/FR-011), and reading approvals
+ * from the wrong side of the cohort boundary would run mainnet-curated code against testnet
+ * wallets.
  *
  * Deliberately its own function rather than an alias of `membershipChainId()`: the two answer
  * different questions — where membership is sold and read, versus where app curation is
- * governed — so a caller naming this one states which authority it means. They resolve to the
- * same chain today precisely because both derive from the pair; if the estate ever splits them,
- * only this function moves and every mini-app caller follows automatically.
+ * governed — and as of the Polygon+Mordor deployment decision they no longer even resolve to the
+ * same chain on a testnet build.
  *
  * Not runtime-configurable, deliberately. The registry is the trust boundary for what code the
  * host executes, so a runtime-swappable registry chain would let a misconfiguration (or a
  * tampered preference) point verification at a chain anyone can write to.
  */
 export function miniAppChainId() {
-  return buildIsTestnet() ? TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
+  return buildIsTestnet() ? MINIAPP_TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
 }
 
 /**

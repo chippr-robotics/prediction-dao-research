@@ -121,11 +121,26 @@ export default function TaxReportsPanel({ hookOptions } = {}) {
       {status === REPORT_STATUS.READY && report && (
         <div className="report-result">
           {isEmpty ? (
-            <p className="report-empty">
-              {report.source === 'ledger'
-                ? 'No activity in this period.'
-                : 'No wager activity in this period.'}
-            </p>
+            <>
+              <p className="report-empty">
+                {report.source === 'ledger'
+                  ? 'No activity in this period.'
+                  : 'No wager activity in this period.'}
+              </p>
+              {/*
+                The coverage note used to live only in the non-empty branch, which suppressed it
+                exactly when it mattered most: a period in which EVERY class failed to load
+                rendered as a bare "No activity in this period." — a total data-collection failure
+                presented as a truthful zero, and the one case a member cannot detect. An empty
+                report with unread classes is not a report of no activity; it is a report that
+                could not look.
+              */}
+              {report.staleClasses?.length > 0 && (
+                <p className="report-note" role="status">
+                  {`This is not a confirmed zero: ${report.staleClasses.join(', ')} could not be read for this network, so activity in those categories would not appear here.`}
+                </p>
+              )}
+            </>
           ) : (
             <>
               <p>
