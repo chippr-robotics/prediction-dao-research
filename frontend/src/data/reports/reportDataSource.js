@@ -27,7 +27,7 @@ import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { getDefaultWagerRepository } from '../wagers/WagerRepository'
 import { getSubgraphUrl, hasSubgraph } from '../../config/networks'
-import { makeReadProvider } from '../../utils/rpcProvider'
+import { getReadProvider } from '../../utils/rpcProvider'
 
 const INITIAL_CHUNK = 5000
 const MIN_CHUNK = 200
@@ -108,11 +108,28 @@ function transferToPreItem(row) {
   }
 }
 
+/**
+ * Read provider for the chain the report is being built FOR.
+ *
+ * This used to be `makeReadProvider(NETWORK_CONFIG.rpcUrl, opts.chainId)` — the URL came from the
+ * build's default network while the chain id came from the caller. Whenever those disagreed the
+ * report read one chain's transaction hashes against another chain's node: a Mordor report asked
+ * Polygon about Mordor tx hashes, got nothing back, and reported the gas fees as absent rather than
+ * as unread. Passing a URL and a chain id that can contradict each other is exactly what spec 069
+ * forbids, and `getReadProvider(chainId)` cannot be called that way.
+ *
+ * It returns null for a chain with no endpoint at all. That is surfaced as a refusal here rather
+ * than passed on: a null provider would reach ethers as "use the default network", which is the
+ * same wrong-chain read by another route.
+ */
 function getProvider(opts = {}) {
-  return (
-    opts.provider ||
-    makeReadProvider(NETWORK_CONFIG.rpcUrl, opts.chainId ?? NETWORK_CONFIG.chainId)
-  )
+  if (opts.provider) return opts.provider
+  const chainId = opts.chainId ?? NETWORK_CONFIG.chainId
+  const provider = getReadProvider(chainId)
+  if (!provider) {
+    throw new Error(`No RPC endpoint is configured for network ${chainId}, so this report cannot read the chain.`)
+  }
+  return provider
 }
 
 /** Resolve the escrow contract (prefer v2 WagerRegistry, fall back to v1 factory). */
@@ -197,7 +214,7 @@ async function scanAdaptive(contract, filter, fromBlock, toBlock, label, budget)
  *
  * @param {object} [opts]
  * @param {number} [opts.chainId] - active chain id
- * @param {object} [opts.provider] - ethers provider (defaults to NETWORK_CONFIG rpc)
+ * @param {object} [opts.provider] - ethers provider (defaults to the member's endpoint for `chainId`)
  * @param {object} [opts.contract] - escrow contract override (testing)
  * @param {object} [opts.repository] - WagerRepository override (testing)
  * @returns {object} dataSource
