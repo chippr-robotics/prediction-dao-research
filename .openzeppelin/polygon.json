@@ -44,6 +44,11 @@
       "address": "0x13762c059c2A22E3bCd8A44F36EA44e8e3B22B31",
       "txHash": "0x253343a9bce8118a965896cbae6af6b940926492c2ccc4901f4870f81f1013fa",
       "kind": "uups"
+    },
+    {
+      "address": "0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2",
+      "txHash": "0x1d0ef7786501b846496e7aedf80b3026f9787df02f00dc6466e421b47ccc1601",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -4108,6 +4113,361 @@
               "slot": "0"
             }
           ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "1ddc946781ec667e860e8aa31617bd9aa71badf5be5e8410cd3495abc88d37b1": {
+      "address": "0x41858006aD6dd0788b84F9fb17A28d8167C7b331",
+      "txHash": "0x71d6ab49a19b9e48af976e9a633398f960d2092bf080397cae486c3327e9f29b",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSManaged",
+            "src": "contracts/upgradeable/UUPSManaged.sol:46"
+          },
+          {
+            "label": "membershipManager",
+            "offset": 0,
+            "slot": "50",
+            "type": "t_contract(IMembershipManager)3535",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:105"
+          },
+          {
+            "label": "membershipRole",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bytes32",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:108"
+          },
+          {
+            "label": "minTier",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_uint8",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:110"
+          },
+          {
+            "label": "sanctionsGuard",
+            "offset": 1,
+            "slot": "52",
+            "type": "t_contract(ISanctionsGuard)3911",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:112"
+          },
+          {
+            "label": "appCount",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:116"
+          },
+          {
+            "label": "_apps",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_mapping(t_uint256,t_struct(AppRecord)1799_storage)",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:116"
+          },
+          {
+            "label": "_idByNameKey",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_mapping(t_bytes32,t_uint256)",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:117"
+          },
+          {
+            "label": "_appsByVendor",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:118"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_array(t_uint256)43_storage",
+            "contract": "MiniAppRegistry",
+            "src": "contracts/apps/MiniAppRegistry.sol:122"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)26_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)36_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)26_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)147_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)26_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)43_storage": {
+            "label": "uint256[43]",
+            "numberOfBytes": "1376"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IMembershipManager)3535": {
+            "label": "contract IMembershipManager",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISanctionsGuard)3911": {
+            "label": "contract ISanctionsGuard",
+            "numberOfBytes": "20"
+          },
+          "t_enum(Category)3552": {
+            "label": "enum IMiniAppRegistry.Category",
+            "members": [
+              "TradeSettlement",
+              "Reconciliation",
+              "TreasuryLiquidity",
+              "IdentityCompliance",
+              "AssetServicing",
+              "ReportingAudit"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(Status)3544": {
+            "label": "enum IMiniAppRegistry.Status",
+            "members": [
+              "Pending",
+              "Approved",
+              "Suspended",
+              "Deprecated"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_array(t_uint256)dyn_storage)": {
+            "label": "mapping(address => uint256[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(AppRecord)1799_storage)": {
+            "label": "mapping(uint256 => struct MiniAppRegistry.AppRecord)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AppRecord)1799_storage": {
+            "label": "struct MiniAppRegistry.AppRecord",
+            "members": [
+              {
+                "label": "vendor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "category",
+                "type": "t_enum(Category)3552",
+                "offset": 20,
+                "slot": "0"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(Status)3544",
+                "offset": 21,
+                "slot": "0"
+              },
+              {
+                "label": "submittedAt",
+                "type": "t_uint64",
+                "offset": 22,
+                "slot": "0"
+              },
+              {
+                "label": "approvedAt",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "updatedAt",
+                "type": "t_uint64",
+                "offset": 8,
+                "slot": "1"
+              },
+              {
+                "label": "lastVersion",
+                "type": "t_uint64",
+                "offset": 16,
+                "slot": "1"
+              },
+              {
+                "label": "name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "description",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "approved",
+                "type": "t_struct(PackageRef)3560_storage",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "proposed",
+                "type": "t_struct(PackageRef)3560_storage",
+                "offset": 0,
+                "slot": "7"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_struct(PackageRef)3560_storage": {
+            "label": "struct IMiniAppRegistry.PackageRef",
+            "members": [
+              {
+                "label": "cid",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "manifestHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "version",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
           "erc7201:openzeppelin.storage.AccessControl": [
             {
               "contract": "AccessControlUpgradeable",

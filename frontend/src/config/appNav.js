@@ -41,6 +41,15 @@ const NAV_FEATURE_IDS = {
   predict: 'predict',
   custody: 'protect',
   security: 'recovery',
+  // Apps (spec 073) — the mini-app catalog as a whole. A tenant that has not enabled
+  // 'miniapps' gets no Apps group, no `?tab=apps` panel, and no catalog: the platform
+  // is optional infrastructure, not a surface every tenant inherits.
+  apps: 'miniapps',
+  // ClearPath and Token Mint are no longer nav items (spec 073 FR-009 collapsed the Apps
+  // group to the catalog entry above), but their tab ids still resolve as deep links and
+  // their per-app feature ids still govern their first-party catalog entries once they are
+  // published as packages (research R9). Kept here so the id → feature mapping stays in
+  // one place rather than being re-derived at each conversion.
   clearpath: 'clearpath',
   tokens: 'token-mint',
 }
@@ -98,8 +107,20 @@ const RAW_NAV_GROUPS = [
   {
     label: 'Apps',
     items: [
-      { id: 'clearpath', label: 'ClearPath', icon: 'compass' },
-      { id: 'tokens', label: 'Token Mint', icon: 'coin' },
+      // Apps (spec 073 FR-009) — ONE entry for the whole mini-app catalog, replacing the
+      // hardcoded per-app items this group used to carry (ClearPath, Token Mint). The section
+      // is no longer a fixed list the host ships: which apps exist is decided by the on-chain
+      // registry, so the nav can only name the door, not the rooms behind it. `?tab=apps`
+      // renders CatalogPanel (what the registry says is launchable); launching mounts the
+      // verified package at the absolute route `/apps/<slug>` (MiniAppWorkspace).
+      //
+      // ClearPath and Token Mint keep their `?tab=clearpath` / `?tab=tokens` panels and deep
+      // links exactly as they are today — they are simply no longer surfaced here. They become
+      // aliases to `/apps/<slug>` only in the conversion tasks that actually publish those
+      // packages (T027 token-mint, T029 clearpath; Wagers last, T033). Pointing the nav at a
+      // mini-app that has not been registered would make the catalog claim a verified package
+      // exists when none does — the one thing this surface must never do.
+      { id: 'apps', label: 'Apps', icon: 'grid' },
     ],
   },
 ]

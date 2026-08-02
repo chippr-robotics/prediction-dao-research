@@ -927,6 +927,29 @@ export function membershipChainId() {
 }
 
 /**
+ * The single chain that hosts the mini-app registry for this build (spec 073 FR-025, research R5).
+ *
+ * DERIVED from the same mainnet/testnet pair as `membershipChainId()` above — never a second
+ * literal. A hardcoded `137` here would make a testnet build read the MAINNET catalog, and the
+ * catalog is not a display detail: it decides which packages the host will fetch, verify, and
+ * EXECUTE (FR-010/FR-011). Reading approvals from the wrong side of the cohort boundary would
+ * run mainnet-curated code against testnet wallets.
+ *
+ * Deliberately its own function rather than an alias of `membershipChainId()`: the two answer
+ * different questions — where membership is sold and read, versus where app curation is
+ * governed — so a caller naming this one states which authority it means. They resolve to the
+ * same chain today precisely because both derive from the pair; if the estate ever splits them,
+ * only this function moves and every mini-app caller follows automatically.
+ *
+ * Not runtime-configurable, deliberately. The registry is the trust boundary for what code the
+ * host executes, so a runtime-swappable registry chain would let a misconfiguration (or a
+ * tampered preference) point verification at a chain anyone can write to.
+ */
+export function miniAppChainId() {
+  return buildIsTestnet() ? TESTNET_CHAIN_ID : MAINNET_CHAIN_ID
+}
+
+/**
  * Every chain this build may read, mainnets-first. The ONLY roster an estate read may use —
  * `listSupportedChainIds()` spans both cohorts and would leak across the boundary.
  */

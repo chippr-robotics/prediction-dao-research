@@ -55,7 +55,7 @@ function renderDrawer(route = '/app') {
 
 describe('AppNavDrawer (global nav drawer)', () => {
   it('lists Home plus the Finance / Tools / Apps sections', () => {
-    renderDrawer()
+    const { container } = renderDrawer()
 
     // Drawer entries navigate between routes, so they use navigation (button)
     // semantics with aria-current — not tablist/tab.
@@ -67,9 +67,13 @@ describe('AppNavDrawer (global nav drawer)', () => {
     // Not a tablist.
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
 
-    expect(screen.getByText('Finance')).toBeInTheDocument()
-    expect(screen.getByText('Tools')).toBeInTheDocument()
-    expect(screen.getByText('Apps')).toBeInTheDocument()
+    // Group headings are matched as headings rather than by bare text: since spec 073 the Apps
+    // group holds a single entry that is also labelled "Apps" (the mini-app catalog), so the
+    // string appears twice in the drawer and a text lookup is ambiguous.
+    const groupLabels = Array.from(container.querySelectorAll('.portal-nav-group-label')).map(
+      (el) => el.textContent
+    )
+    expect(groupLabels).toEqual(expect.arrayContaining(['Finance', 'Tools', 'Apps']))
 
     // Removed Admin group / personal-account entries are absent from the menu.
     expect(screen.queryByRole('button', { name: 'Preferences' })).not.toBeInTheDocument()

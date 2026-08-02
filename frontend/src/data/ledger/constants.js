@@ -23,6 +23,12 @@ export const LEDGER_CLASS = Object.freeze({
   // Spec 067 — cross-chain bridging and Earn → Supply liquidity positions.
   BRIDGE: 'bridge',
   LIQUIDITY: 'liquidity',
+  // Spec 073 — mini-app audit records: launches, app-requested transactions,
+  // integrity refusals, state changes and app-contextual log entries. The class
+  // carries no value of its own (FR-019/FR-020): a mini-app transaction that
+  // moves money is reported by the domain source that can substantiate the
+  // amount, and this record is the attribution — which app, which account, when.
+  MINIAPP: 'miniapp',
 })
 
 export const LEDGER_CLASSES = Object.freeze(Object.values(LEDGER_CLASS))

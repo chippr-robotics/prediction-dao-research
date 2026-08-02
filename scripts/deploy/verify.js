@@ -341,6 +341,16 @@ const CATALOG = {
     args: () => [],
   },
 
+  // --- Mini-app platform (spec 073) ----------------------------------------------------
+  miniAppRegistry: { kind: "proxy", label: "MiniAppRegistry", implKey: "miniAppRegistryImpl" },
+  miniAppRegistryImpl: {
+    kind: "impl",
+    label: "MiniAppRegistry (implementation)",
+    fqn: "contracts/apps/MiniAppRegistry.sol:MiniAppRegistry",
+    proxyKey: "miniAppRegistry",
+    args: () => [],
+  },
+
   // --- DAO connector (spec 030) --------------------------------------------------------
   externalDAORegistry: { kind: "proxy", label: "ExternalDAORegistry", implKey: "externalDAORegistryImpl" },
   externalDAORegistryImpl: {
