@@ -13,7 +13,7 @@
 import { useCallback, useState } from 'react'
 import { ethers } from 'ethers'
 import { CALLSIGN_REGISTRY_ABI, CallsignStatus } from '../abis/callsignRegistry'
-import { getLogsRange } from '../components/clearpath/connectors/ozGovernor'
+import { getLogsRange } from '../lib/clearpath/connectors/ozGovernor'
 
 const CHUNK = 45_000
 const MAX_SPAN = 3_000_000
