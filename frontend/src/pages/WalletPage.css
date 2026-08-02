@@ -749,11 +749,39 @@
   gap: 6px;
 }
 
-/* Security Section */
+/* Security Section (Recovery tab).
+   Every panel here is a collapsible AccordionSection, so the tab opens as a
+   scannable list of headings; the styles below apply to what each section shows
+   once it is expanded. */
+.security-section__intro {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary, #5a6772);
+}
+
+/* Section headings come from the accordion trigger — in-body headings (nested
+   sub-panels) stay smaller so they never compete with it. */
 .security-section h3 {
   margin: 0 0 8px;
   font-size: 18px;
   color: var(--color-text);
+}
+
+.security-section .acc h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.security-section .acc__body h3,
+.security-section .acc__body h4 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+
+.security-section .acc__body > .section-description:first-child,
+.security-section .acc__body > p:first-child {
+  margin-top: 0;
 }
 
 .security-section .section-description {
@@ -855,17 +883,12 @@
   flex-shrink: 0;
 }
 
-.controllers-panel__link {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
+/* Address entry inside the link-wallet sheet (input + address book + QR scan). */
 .controllers-panel__link-row {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  margin-bottom: 12px;
 }
 
 .controllers-panel__address-wrap {
@@ -882,15 +905,15 @@
   min-width: 42px;
   height: 42px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-secondary);
-  color: var(--color-text);
+  border: 1px solid var(--border-color, #e3e7eb);
+  background: var(--bg-primary, #f7f9fa);
+  color: var(--text-primary, #1f2933);
   cursor: pointer;
 }
 
 .controllers-panel__scan-btn:hover:not(:disabled) {
-  border-color: var(--color-primary, #36B37E);
-  color: var(--color-primary, #36B37E);
+  border-color: var(--brand-primary, #36b37e);
+  color: var(--brand-primary, #36b37e);
 }
 
 .controllers-panel__scan-btn:disabled {

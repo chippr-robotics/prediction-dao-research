@@ -9,7 +9,7 @@
  * component's orchestration; their internals are covered in their own suites.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
@@ -90,6 +90,15 @@ async function importToSaved(user, kind = 'privateKey') {
   await screen.findByTestId('lkr-saved')
 }
 
+// The panel is a COLLAPSED accordion section on the Recovery tab, so tests open
+// the section first — the same order a member does it in. (jsdom does not
+// enforce `inert`, so skipping the expand would pass here and fail in a browser.)
+function renderPanel(props = {}) {
+  const utils = render(<LegacyKeyRecoveryPanel {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: /legacy key & word-list recovery/i }))
+  return utils
+}
+
 describe('LegacyKeyRecoveryPanel', () => {
   it('renders nothing when disconnected', () => {
     mockWallet.isConnected = false
@@ -101,7 +110,7 @@ describe('LegacyKeyRecoveryPanel', () => {
   it('completes recovery at SAVED without any transfer, and writes the audit record', async () => {
     const user = userEvent.setup()
     lib.encryptLegacySecret.mockResolvedValue({ v: 1, kind: 'privateKey', address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
 
     // Recovery is complete on its own — the SAVED screen, no transfer required.
@@ -153,7 +162,7 @@ describe('LegacyKeyRecoveryPanel', () => {
     lib.decryptLegacySecretWithPasskey.mockResolvedValue('0xkey')
     lib.quoteAllAssets.mockResolvedValue({ from: LEGACY_ADDR, holdings: [], nativeGasReserve: 1n, hasNative: false })
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await user.click(screen.getByRole('button', { name: 'Move funds' }))
     // No passphrase field — biometric unlock button instead.
     expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()
@@ -164,7 +173,7 @@ describe('LegacyKeyRecoveryPanel', () => {
 
   it('suggests BIP-39 completions while typing a word list', async () => {
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await user.click(screen.getByRole('button', { name: 'Recover a legacy key' }))
     await user.click(screen.getByRole('button', { name: 'Get started' }))
     lib.classifySecret.mockReturnValue({ kind: 'invalid' })
@@ -177,7 +186,7 @@ describe('LegacyKeyRecoveryPanel', () => {
 
   it('blocks continuing when passphrases do not match', async () => {
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await user.click(screen.getByRole('button', { name: 'Recover a legacy key' }))
     await user.click(screen.getByRole('button', { name: 'Get started' }))
     lib.classifySecret.mockReturnValue({ kind: 'mnemonic', address: LEGACY_ADDR, secret: 'a b c' })
@@ -193,7 +202,7 @@ describe('LegacyKeyRecoveryPanel', () => {
     const user = userEvent.setup()
     lib.encryptLegacySecret.mockResolvedValue({ v: 1, address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
     book.findByAddress.mockReturnValue(null) // not yet in book → addContact
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
 
     await user.click(screen.getByRole('button', { name: 'Save to address book' }))
@@ -219,7 +228,7 @@ describe('LegacyKeyRecoveryPanel', () => {
       { asset: { symbol: 'USDC' }, status: 'sent', txHash: '0x1' },
       { asset: { symbol: 'MATIC' }, status: 'sent', txHash: '0x2' },
     ])
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
@@ -248,7 +257,7 @@ describe('LegacyKeyRecoveryPanel', () => {
       { asset: { symbol: 'USDC' }, status: 'failed', error: 'reverted' },
       { asset: { symbol: 'MATIC' }, status: 'sent', txHash: '0x2' },
     ])
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
     await user.click(screen.getByRole('button', { name: 'Check balances' }))
@@ -269,7 +278,7 @@ describe('LegacyKeyRecoveryPanel', () => {
       nativeGasReserve: 0n,
       hasNative: false,
     })
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
     await user.click(screen.getByRole('button', { name: 'Check balances' }))
@@ -289,7 +298,7 @@ describe('LegacyKeyRecoveryPanel', () => {
       nativeGasLimit: 25200n,
       hasNative: true,
     })
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await importToSaved(user)
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move funds' }))
     await user.click(screen.getByRole('button', { name: 'Check balances' }))
@@ -302,7 +311,7 @@ describe('LegacyKeyRecoveryPanel', () => {
     lib.decryptLegacySecret.mockResolvedValue('word list secret')
     lib.quoteAllAssets.mockResolvedValue({ from: LEGACY_ADDR, holdings: [], nativeGasReserve: 1n, hasNative: false })
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
 
     const item = screen.getByRole('listitem')
     expect(within(item).getByText(/word list/i)).toBeInTheDocument()
@@ -313,19 +322,26 @@ describe('LegacyKeyRecoveryPanel', () => {
     expect(await screen.findByLabelText('Destination smart account')).toBeInTheDocument()
   })
 
-  it('removes a stored key', async () => {
+  it('removes a stored key only after the confirmation sheet is confirmed', async () => {
     lib.store.set(LEGACY_ADDR.toLowerCase(), { kind: 'privateKey', address: LEGACY_ADDR, importedAt: 42, ct: 'x' })
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     expect(screen.getByRole('listitem')).toBeInTheDocument()
+
+    // Backing out of the confirmation keeps the key.
     await user.click(screen.getByRole('button', { name: /Remove stored key/i }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /keep it/i }))
+    expect(screen.getByRole('listitem')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Remove stored key/i }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /remove key/i }))
     await waitFor(() => expect(screen.queryByRole('listitem')).not.toBeInTheDocument())
   })
 
   it('has no accessibility violations on the entry and SAVED screens', async () => {
     const user = userEvent.setup()
     lib.encryptLegacySecret.mockResolvedValue({ v: 1, address: LEGACY_ADDR, importedAt: 1, ct: 'x' })
-    const { container } = render(<LegacyKeyRecoveryPanel />)
+    const { container } = renderPanel()
     expect(await axe(container)).toHaveNoViolations()
     await importToSaved(user)
     expect(await axe(container)).toHaveNoViolations()
@@ -335,7 +351,7 @@ describe('LegacyKeyRecoveryPanel', () => {
     lib.store.set(LEGACY_ADDR.toLowerCase(), { kind: 'privateKey', address: LEGACY_ADDR, importedAt: 42, ct: 'x' })
     lib.decryptLegacySecret.mockRejectedValue(new Error('That passphrase did not unlock this key.'))
     const user = userEvent.setup()
-    render(<LegacyKeyRecoveryPanel />)
+    renderPanel()
     await user.click(screen.getByRole('button', { name: 'Move funds' }))
     await user.type(screen.getByLabelText('Passphrase'), 'wrongpass1')
     await user.click(screen.getByRole('button', { name: 'Unlock' }))

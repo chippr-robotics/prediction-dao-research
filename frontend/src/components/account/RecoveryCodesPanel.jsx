@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react'
+import PropTypes from 'prop-types'
+import AccordionSection from './AccordionSection'
 import { useOpenChallengeCodeVault } from '../../hooks/useOpenChallengeCodeVault'
 import '../fairwins/FriendMarketsModal.css'
 import '../fairwins/OpenChallengeModal.css'
@@ -11,7 +13,7 @@ import '../fairwins/OpenChallengeModal.css'
  * (useOpenChallengeCodeVault), so codes saved before the move remain accessible with no
  * migration and the existing unlock (one wallet signature) is preserved.
  */
-export default function RecoveryCodesPanel() {
+export default function RecoveryCodesPanel({ defaultOpen = false }) {
   const { canUse, recoverCodes, busy } = useOpenChallengeCodeVault()
   const [entries, setEntries] = useState(null) // null = not unlocked yet
   const [error, setError] = useState(null)
@@ -98,12 +100,25 @@ export default function RecoveryCodesPanel() {
   }
 
   return (
-    <div className="section">
-      <h3>Recovery codes</h3>
+    <AccordionSection
+      id="recovery-codes"
+      title="Recovery codes"
+      summary={
+        entries == null
+          ? 'Open-challenge codes saved on this device'
+          : `${entries.length} saved ${entries.length === 1 ? 'code' : 'codes'}`
+      }
+      defaultOpen={defaultOpen}
+    >
       <p className="section-description">
         Recover the four-word codes for open challenges you created and backed up on this device.
       </p>
       <div className="fm-form">{body}</div>
-    </div>
+    </AccordionSection>
   )
+}
+
+RecoveryCodesPanel.propTypes = {
+  /** Start expanded (the Recovery tab keeps every section collapsed by default). */
+  defaultOpen: PropTypes.bool,
 }

@@ -33,6 +33,7 @@ import AddressBookButton from '../ui/AddressBookButton'
 import QRScanner from '../ui/QRScanner'
 import { extractAddressFromScan } from '../../lib/addressBook/scanAddress'
 import ActionSheet from './ActionSheet'
+import AccordionSection from './AccordionSection'
 import './RecoverAccountPanel.css'
 
 // Human-readable fragments for the vendored Coinbase Smart Wallet MultiOwnable
@@ -56,7 +57,7 @@ const STEP_TITLES = {
   done: 'Recovery complete',
 }
 
-function RecoverAccountPanel({ deps = {} }) {
+function RecoverAccountPanel({ deps = {}, defaultOpen = false }) {
   const { address: walletAddress, signer, provider, loginMethod, isConnected, chainId } = useWallet()
 
   const [open, setOpen] = useState(false)
@@ -228,19 +229,27 @@ function RecoverAccountPanel({ deps = {} }) {
   const passkeyBlocked = capability && capability.available === false
 
   return (
-    <section className="recover-account-panel section" aria-label="Recover passkey account">
-      <h3>Recover a passkey account</h3>
-      <p className="section-description">
-        Lost your passkeys? If this wallet was linked to your passkey account as a controller, it can
-        authorize a new passkey — no FairWins involvement required.{' '}
-        <a href={RECOVERY_DOCS_URL} target="_blank" rel="noopener noreferrer">
-          Learn how account recovery works →
-        </a>
-      </p>
-      <button type="button" className="btn btn-primary recover-account-panel__start" onClick={openWizard}>
-        Recover an account
-      </button>
+    <>
+      <AccordionSection
+        id="recover-account"
+        title="Recover a passkey account"
+        summary="Use this wallet to authorize a new passkey"
+        defaultOpen={defaultOpen}
+        className="recover-account-panel"
+      >
+        <p className="section-description">
+          Lost your passkeys? If this wallet was linked to your passkey account as a controller, it can
+          authorize a new passkey — no FairWins involvement required.{' '}
+          <a href={RECOVERY_DOCS_URL} target="_blank" rel="noopener noreferrer">
+            Learn how account recovery works →
+          </a>
+        </p>
+        <button type="button" className="btn btn-primary recover-account-panel__start" onClick={openWizard}>
+          Recover an account
+        </button>
+      </AccordionSection>
 
+      {/* The wizard lives outside the collapsible region so it is never inside an inert subtree. */}
       <ActionSheet open={open} onClose={closeWizard} title={STEP_TITLES[step]} closeDisabled={busy}>
         {/* Step 1 — what this does + prerequisites, checked while it's fresh. */}
         {step === 'intro' && (
@@ -423,12 +432,14 @@ function RecoverAccountPanel({ deps = {} }) {
           </div>
         )}
       </ActionSheet>
-    </section>
+    </>
   )
 }
 
 RecoverAccountPanel.propTypes = {
   deps: PropTypes.object,
+  /** Start expanded (the Recovery tab keeps every section collapsed by default). */
+  defaultOpen: PropTypes.bool,
 }
 
 export default RecoverAccountPanel

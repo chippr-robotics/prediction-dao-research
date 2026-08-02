@@ -13,15 +13,25 @@ vi.mock('../../hooks/useDataBackup', () => ({ useDataBackup: () => ctx }))
 
 import BackupPanel from '../../components/account/BackupPanel'
 
+// The panel is a COLLAPSED accordion section — open it the way a member does
+// before reaching the controls inside (jsdom does not enforce `inert`).
+function renderExpanded() {
+  const utils = render(<BackupPanel />)
+  fireEvent.click(screen.getByRole('button', { name: /data backup/i }))
+  return utils
+}
+
 describe('BackupPanel accessibility', () => {
-  it('has no axe violations (default view)', async () => {
+  it('has no axe violations collapsed, or expanded on the default view', async () => {
     const { container } = render(<BackupPanel />)
+    expect(await axe(container)).toHaveNoViolations()
+    fireEvent.click(screen.getByRole('button', { name: /data backup/i }))
     expect(screen.getByRole('button', { name: /back up my data/i })).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('has no axe violations with the restore merge/replace region open (replace warning shown)', async () => {
-    const { container } = render(<BackupPanel />)
+    const { container } = renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /restore my data/i }))
     fireEvent.click(screen.getByRole('radio', { name: /replace/i }))
     expect(screen.getByRole('alert')).toBeInTheDocument() // replace warning
@@ -29,7 +39,7 @@ describe('BackupPanel accessibility', () => {
   })
 
   it('resets to the safe default (merge) after selecting Replace then cancelling/reopening', () => {
-    render(<BackupPanel />)
+    renderExpanded()
     fireEvent.click(screen.getByRole('button', { name: /restore my data/i }))
     fireEvent.click(screen.getByRole('radio', { name: /replace/i }))
     expect(screen.getByRole('radio', { name: /replace/i }).checked).toBe(true)
