@@ -40,6 +40,28 @@ import { createBitcoinGatewayClient, bitcoinGatewayUrl } from '../lib/bitcoin/ga
 
 const POLL_MS = 60_000
 
+/**
+ * Session-scoped snapshot cache (post-launch feedback on spec 074): the
+ * portfolio view unmounts on every tab switch, and a cold multi-chain scan
+ * left the member staring at "Loading portfolio…" each time. Remounting for
+ * an account we've already read hydrates the LAST REAL snapshot immediately
+ * (its lastUpdated timestamp intact — never fabricated data) while a fresh
+ * read runs in the background. Keyed by account + scan scope so a snapshot
+ * can never leak across accounts or across the testnet-visibility boundary.
+ * In-memory only — nothing is persisted, and a reload starts cold.
+ */
+const SNAPSHOT_CACHE_MAX = 8
+const snapshotCache = new Map()
+
+function cacheSnapshot(key, snapshot) {
+  // Refresh insertion order so the eviction below is least-recently-written.
+  snapshotCache.delete(key)
+  snapshotCache.set(key, snapshot)
+  if (snapshotCache.size > SNAPSHOT_CACHE_MAX) {
+    snapshotCache.delete(snapshotCache.keys().next().value)
+  }
+}
+
 // Works for ERC-20 balances and ERC-721 item counts alike.
 const BALANCE_OF_ABI = ['function balanceOf(address) view returns (uint256)']
 
@@ -114,6 +136,12 @@ export function usePortfolio({ accountAddress } = {}) {
     [bitcoinNetworkIds],
   )
 
+  // Cache identity: the account being scanned plus the exact scan scope.
+  const cacheKey = useMemo(
+    () => `${String(address || '').toLowerCase()}|${chainIds.join(',')}|${bitcoinNetworkIds.join(',')}`,
+    [address, chainIds, bitcoinNetworkIds],
+  )
+
   const [reads, setReads] = useState({ balances: null, failedAssets: [], error: null, bitcoinEntries: [] })
   const [priceMap, setPriceMap] = useState(() => new Map())
   const [isLoading, setIsLoading] = useState(false)
@@ -166,16 +194,19 @@ export function usePortfolio({ accountAddress } = {}) {
         // never a $0 portfolio (unchanged pre-bitcoin semantics).
         setReads({ balances: null, failedAssets, error: 'Unable to read balances from the supported networks.', bitcoinEntries: [] })
       } else {
-        setReads({
+        const nextReads = {
           balances,
           // Bitcoin failures ride the same honest-degradation channel the EVM
           // reads use: named in failedAssets, never rendered as zero.
           failedAssets: [...failedAssets, ...bitcoinRes.failed],
           error: null,
           bitcoinEntries: bitcoinRes.holdings,
-        })
+        }
+        const now = Date.now()
+        setReads(nextReads)
         setPriceMap(priced)
-        setLastUpdated(Date.now())
+        setLastUpdated(now)
+        cacheSnapshot(cacheKey, { reads: nextReads, priceMap: priced, lastUpdated: now })
       }
     } catch (err) {
       if (reqId !== reqIdRef.current) return
@@ -183,18 +214,28 @@ export function usePortfolio({ accountAddress } = {}) {
     } finally {
       if (reqId === reqIdRef.current) setIsLoading(false)
     }
-  }, [isConnected, address, providers, registry, bitcoinAssets, bitcoinNetworkIds])
+  }, [isConnected, address, providers, registry, bitcoinAssets, bitcoinNetworkIds, cacheKey])
 
-  // Reset synchronously on account or scan-scope change so a stale snapshot
-  // (e.g. testnet rows after the preference flips off) can never render.
+  // On account or scan-scope change: hydrate the last real snapshot for THIS
+  // key if one exists (instant data on remount, background refresh follows);
+  // otherwise reset synchronously so another key's stale snapshot (e.g.
+  // testnet rows after the preference flips off, or another account's
+  // balances) can never render.
   useEffect(() => {
     reqIdRef.current++
-    setReads({ balances: null, failedAssets: [], error: null, bitcoinEntries: [] })
-    setPriceMap(new Map())
-    setLastUpdated(null)
+    const cached = snapshotCache.get(cacheKey)
+    if (cached) {
+      setReads(cached.reads)
+      setPriceMap(cached.priceMap)
+      setLastUpdated(cached.lastUpdated)
+    } else {
+      setReads({ balances: null, failedAssets: [], error: null, bitcoinEntries: [] })
+      setPriceMap(new Map())
+      setLastUpdated(null)
+    }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, chainIds])
+  }, [cacheKey])
 
   useEffect(() => {
     if (!isConnected || !address) return undefined

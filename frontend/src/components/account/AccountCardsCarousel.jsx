@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import NavIcon from '../nav/NavIcon'
 import LegacyUnlockDialog from './LegacyUnlockDialog'
+import SensitiveValue from '../common/SensitiveValue'
 import { useAccountSwitcher, ACCOUNT_KIND_TAG, shortAccountAddr } from '../../hooks/useAccountSwitcher'
 import { NETWORKS } from '../../config/networks'
 import './AccountCardsCarousel.css'
@@ -32,7 +33,20 @@ function chainLabel(chainId) {
 
 const KIND_LABEL = { personal: 'Personal', vault: 'Multisig', legacy: 'Recovered' }
 
-function AccountCardsCarousel() {
+// Full-precision USD, matching the Portfolio view's own total formatting.
+function formatUsdFull(n) {
+  return `$${Number(n || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+/**
+ * @param {number|null} activeTotalUsd — the ACTIVE account's portfolio total,
+ * shown on its card for quick access. Null hides the line (still loading /
+ * unavailable) — a card must never show a fabricated $0 while data loads.
+ */
+function AccountCardsCarousel({ activeTotalUsd = null }) {
   const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked } = useAccountSwitcher()
   const trackRef = useRef(null)
   const [scrollIndex, setScrollIndex] = useState(0)
@@ -120,6 +134,14 @@ function AccountCardsCarousel() {
                   <span className="account-card-kind">{KIND_LABEL[acc.kind] || acc.kind}</span>
                 </span>
                 <span className="account-card-label">{acc.label || shortAccountAddr(acc.address)}</span>
+                {isActive && activeTotalUsd != null && (
+                  <span className="account-card-balance">
+                    <span className="account-card-balance-label">Total balance</span>
+                    <SensitiveValue className="account-card-balance-value">
+                      {formatUsdFull(activeTotalUsd)}
+                    </SensitiveValue>
+                  </span>
+                )}
                 <span className="account-card-bottom">
                   <span className="account-card-address">{shortAccountAddr(acc.address)}</span>
                   {network && <span className="account-card-network">{network}</span>}

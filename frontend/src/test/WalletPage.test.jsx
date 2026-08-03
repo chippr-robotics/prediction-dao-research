@@ -59,8 +59,30 @@ vi.mock('../utils/keyRegistryService', () => ({
   ensureKeyRegistered: vi.fn(),
 }))
 // Spec 074 — the Account tab body renders the unified view (card carousel +
-// Activity/Portfolio/Stats). Mock the switcher seam so this entry-point test
-// stays free of the custody/legacy async loads behind it.
+// Portfolio/Activity/Stats). Mock the portfolio seams (the default view) and
+// the switcher seam so this entry-point test stays free of the multi-chain
+// scans and custody/legacy async loads behind them.
+vi.mock('../components/wallet/PortfolioPanel', () => ({
+  default: () => <div data-testid="portfolio-panel" />,
+}))
+vi.mock('../hooks/usePortfolio', () => {
+  const usePortfolio = () => ({
+    status: 'ready',
+    isLoading: false,
+    error: null,
+    holdings: [],
+    aggregates: [],
+    categories: [],
+    totalUsd: 0,
+    failedAssets: [],
+    priceMap: new Map(),
+    showTestnetAssets: false,
+    showZeroBalances: false,
+    lastUpdated: null,
+    refresh: vi.fn(),
+  })
+  return { default: usePortfolio, usePortfolio }
+})
 vi.mock('../hooks/useAccountSwitcher', () => {
   const useAccountSwitcher = () => ({
     accounts: [

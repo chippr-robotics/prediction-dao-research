@@ -270,4 +270,24 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
     })
     expect(calls).toBeGreaterThan(callsAfterLoad)
   })
+
+  it('remounting hydrates the last real snapshot instantly while a refresh runs (spec 074 follow-up)', async () => {
+    // First mount: a real read lands and warms the session snapshot cache.
+    fixtures.nativeBalances.set(137, 2n * 10n ** 18n)
+    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    const first = await renderPortfolio()
+    await waitFor(() => expect(latest.status).toBe('ready'))
+    expect(latest.totalUsd).toBeCloseTo(1)
+    const firstUpdated = latest.lastUpdated
+    first.unmount()
+
+    // Second mount with the background read HANGING: the member still sees the
+    // last real snapshot (status ready, same figures, same honest timestamp)
+    // instead of "Loading portfolio…".
+    fixtures.nativeBalances.set(137, () => new Promise(() => {}))
+    await renderPortfolio()
+    expect(latest.status).toBe('ready')
+    expect(latest.totalUsd).toBeCloseTo(1)
+    expect(latest.lastUpdated).toBe(firstUpdated)
+  })
 })

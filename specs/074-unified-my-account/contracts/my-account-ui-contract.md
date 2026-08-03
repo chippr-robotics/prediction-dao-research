@@ -2,15 +2,18 @@
 
 The externally observable behavior of `/wallet?tab=account`. Consumed by the
 Vitest suites named per item; IDs referenced from tasks.md.
+Amended 2026-08-03 (post-launch feedback): Portfolio is the default view, the
+breakdowns moved to Stats, and the feed grew filter/search tools (F*).
 
 ## URLs
 
-- **U1** `/wallet?tab=account` (and bare `/wallet`) → unified view, Activity
-  view active.
-- **U2** `/wallet?tab=account&view=portfolio` → Portfolio view active.
+- **U1** `/wallet?tab=account` (and bare `/wallet`) → unified view,
+  **Portfolio** view active (amended — was Activity).
+- **U2** `/wallet?tab=account&view=activity` → Activity view active
+  (`&view=portfolio` stays a valid explicit link to the default).
 - **U3** `/wallet?tab=account&view=stats` → Stats view active.
-- **U4** `/wallet?tab=account&view=<unknown>` → Activity view (fallback, no
-  blank panel).
+- **U4** `/wallet?tab=account&view=<unknown>` → Portfolio view (fallback, no
+  blank panel; amended — was Activity).
 - **U5** `/wallet?tab=portfolio` → replaced-history redirect to U2.
 - **U6** Drawer Quick Access "Portfolio" → navigates to U2's URL
   (`pathForNavItem('portfolio') === PORTFOLIO_PATH`).
@@ -36,16 +39,25 @@ Vitest suites named per item; IDs referenced from tasks.md.
   account render; with exactly 1 account neither renders.
 - **C6** The active marker follows `currentId` even when the switch happened
   in the WalletButton dropdown (both read the same hook).
+- **C7** (amended) The ACTIVE card shows the portfolio total (`Total
+  balance`) once the shared portfolio instance is `ready`; no balance line
+  renders while loading (never a fabricated $0), and non-active cards carry
+  none.
+- **C8** (amended) Cards use theme surface tokens with a per-kind accent
+  (light + dark aware); position dots are minimal (≈6px visual) with a padded
+  touch target, pinned against the app-wide button/tap-target CSS.
 
 ## Views (V)
 
-- **V1** Activity view = FreshnessIndicator + ActivityBreakdowns +
-  RecentActivityFeed (ledger entries), preserving the existing
-  unsupported-network and no-activity EmptyStates.
-- **V2** Portfolio view = existing `PortfolioPanel` unchanged (its own
-  loading/error/disconnected states, asset detail sheet, disclosures).
-- **V3** Stats view = FreshnessIndicator + SummaryTiles + PnlChart with the
-  same EmptyStates as V1.
+- **V1** Activity view = FreshnessIndicator + RecentActivityFeed (ledger
+  entries), preserving the existing unsupported-network and no-activity
+  EmptyStates. (Amended: the breakdowns moved to V3.)
+- **V2** Portfolio view = existing `PortfolioPanel` (its own loading/error/
+  disconnected states, asset detail sheet, disclosures), fed the view-owned
+  portfolio instance.
+- **V3** Stats view = FreshnessIndicator + SummaryTiles + PnlChart +
+  ActivityBreakdowns (amended: by-status / by-token / by-resolution live
+  here) with the same EmptyStates as V1.
 - **V4** Wallet utilities (QR / disconnect) render below every view.
 - **V5** Exactly one view switcher is visible at any width: SectionIconNav
   (≤768px, fed `ACCOUNT_VIEWS` while the Account tab is active) or the
@@ -62,6 +74,28 @@ Vitest suites named per item; IDs referenced from tasks.md.
   wallet context's connected-wallet balance.
 - **A4** Changing the effective address clears held balances before the next
   load (no cross-account stale figures).
+
+## Feed tools (F) — amended 2026-08-03
+
+- **F1** The class filters (All activity / Wagers / Transfers / Earn / Pools /
+  Membership) live behind a Filter button: `aria-haspopup="menu"`, options as
+  `role="menuitemradio"` with `aria-checked`; picking one closes the menu and
+  the active class shows on the button.
+- **F2** A Search icon toggles a search field (focused on open) that matches
+  entries by kind/label, class, token symbol, amount (raw or USD-formatted),
+  tx hash, status, or failure reason; collapsing the field clears the query.
+- **F3** A filter/search combination with no matches shows a "no matching
+  activity" state distinct from the no-history empty state.
+
+## Portfolio freshness (P) — amended 2026-08-03
+
+- **P1** A remount for an account+scope already read this session hydrates
+  the last real snapshot immediately (status `ready`, original `lastUpdated`)
+  while a background refresh runs.
+- **P2** Snapshots are keyed by account + scan scope: switching accounts or
+  toggling testnet visibility can never render another key's data.
+- **P3** The cache is session-memory only (bounded, LRU-ish); a reload starts
+  cold.
 
 ## Accessibility (X)
 
