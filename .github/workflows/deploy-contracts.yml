@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'contracts/**'
-      - 'scripts/deploy-deterministic.js'
+      - 'scripts/deploy/archive/deploy-deterministic.js'
       - 'hardhat.config.js'
       - '.github/workflows/deploy-contracts.yml'
 
@@ -40,7 +40,7 @@ jobs:
         run: npm ci
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       - name: Deploy contracts (Deterministic)
         env:
@@ -58,7 +58,7 @@ jobs:
           echo "Factory Address: 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7"
           echo ""
 
-          npx hardhat run scripts/deploy-deterministic.js --network amoy | tee deployment.log
+          npx hardhat run scripts/deploy/archive/deploy-deterministic.js --network amoy | tee deployment.log
 
           if [ $? -eq 0 ]; then
             echo "✅ Deployment completed successfully!"

@@ -32,6 +32,25 @@ jobs:
       - name: Validate tenant manifests
         run: node scripts/tenants/validate-tenant-manifest.js
 
+  # Gate (spec 075, FR-003/FR-015): version skew across manifests and undeclared (phantom)
+  # imports. Both invariants were fixed by hand once and had nothing preventing recurrence, which
+  # is precisely the failure mode spec 075 exists to remove. Dependency-free, so no npm ci.
+  dependency-hygiene:
+    name: Dependency Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check dependency hygiene
+        run: npm run check:deps
+
   smart-contract-tests:
     name: Smart Contract Tests
     runs-on: ubuntu-latest
@@ -220,6 +239,12 @@ jobs:
 
       - name: Run tests
         run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+        env:
+          # Parity with frontend-testing.yml, which runs the IDENTICAL suite (spec 075, T027).
+          # Without the heap bump the full suite OOMs; TZ is pinned because several suites
+          # hard-code UTC datetime strings and would pass or fail on the runner's locale.
+          NODE_OPTIONS: --max-old-space-size=4096
+          TZ: UTC
 
       - name: Summarize test results
         if: always()

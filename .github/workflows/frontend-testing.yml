@@ -54,6 +54,7 @@ jobs:
         run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          TZ: UTC
 
       - name: Summarize test results
         if: always()
@@ -80,6 +81,7 @@ jobs:
         continue-on-error: true
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          TZ: UTC
 
       - name: Summarize coverage
         if: always()

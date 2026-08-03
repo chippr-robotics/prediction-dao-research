@@ -179,3 +179,4 @@ site/
 
 # Blockscout solc standard-json inputs emitted by scripts/deploy/lib/helpers.js (spec 074)
 blockscout/
+.dependencygraph/

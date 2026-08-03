@@ -17,10 +17,10 @@ this feature *is* gates.
 
 **No baseline, no merge.** These run on an unmodified tree and gate every later phase.
 
-- [ ] T001 Record the bytecode baseline on unmodified `main` per quickstart S0, writing sha256 of `bytecode`+`deployedBytecode` per artifact to `specs/075-monorepo-workspaces/baseline-bytecode.json`
+- [X] T001 Record the bytecode baseline on unmodified `main` per quickstart S0, writing sha256 of `bytecode`+`deployedBytecode` per artifact to `specs/075-monorepo-workspaces/baseline-bytecode.json`
 - [ ] T002 [P] Record the current pipeline job inventory (count per commit, duration, pass/fail) from run history to `specs/075-monorepo-workspaces/baseline-ci.md` — the comparison set for T077
 - [ ] T003 [P] Record per-job install size and wall-clock for `fairwins-relay-gateway` and `frontend` to `specs/075-monorepo-workspaces/baseline-installs.md` (gateway is ~299 packages today)
-- [ ] T004 Verify the baseline is reproducible: re-run T001 on a clean tree and confirm the digests match; a non-reproducible baseline invalidates every downstream gate
+- [X] T004 Verify the baseline is reproducible: re-run T001 on a clean tree and confirm the digests match; a non-reproducible baseline invalidates every downstream gate
 
 **Checkpoint**: baselines committed. Nothing else may start until T001 and T004 pass.
 
@@ -41,23 +41,23 @@ the stated order. **Do not** reorder US3 before US1/US2 — US3's verification d
 
 ### Tests for US1
 
-- [ ] T005 [P] [US1] Create `test/config/CompilerTargets.test.js` asserting every entry in `hre.config.solidity.compilers` **and** every value in `overrides` declares an explicit `evmVersion` (FR-002)
+- [X] T005 [P] [US1] Create `test/config/CompilerTargets.test.js` asserting every entry in `hre.config.solidity.compilers` **and** every value in `overrides` declares an explicit `evmVersion` (FR-002)
 - [ ] T006 [P] [US1] Extend `test/` coverage for `scripts/deploy/check-storage-layout.js` to assert it exits non-zero when `compared === 0` (FR-004)
 
 ### Implementation for US1
 
-- [ ] T007 [US1] Add `evmVersion: "paris"` to the 0.8.24 compiler settings block in `hardhat.config.js` (~line 311-320), matching the 0.8.23 profile at line 332 (FR-001)
-- [ ] T008 [US1] **GATE** — run quickstart S1: `npm run clean && npm run compile`, re-snapshot, diff against `baseline-bytecode.json`. **`DIFFERING: 0` required. On any difference STOP, do not merge, and escalate as an incident against the 33 live implementations** (FR-005, SC-001)
-- [ ] T009 [P] [US1] Declare `@openzeppelin/upgrades-core` in root `package.json` at its currently-resolved exact version — required at `scripts/deploy/check-storage-layout.js:43`, a merge gate running on an undeclared transitive (FR-003)
-- [ ] T010 [P] [US1] Declare `@solana-program/system` in `frontend/package.json` — imported at `frontend/src/lib/solana/send.js:23`, a shipped path resolving only by hoisting (FR-003)
-- [ ] T011 [P] [US1] Add `engines: { node: ">=22.0.0" }` to root `package.json` and add `.nvmrc` (FR-006)
-- [ ] T012 [US1] Make `scripts/deploy/check-storage-layout.js` fail hard when `compared === 0`; its own header documents it previously passed while checking nothing (FR-004)
-- [ ] T013 [P] [US1] Delete `frontend/src/thirdweb.js` and `frontend/src/components/wallet/ThirdWebWalletButton.jsx` — they import `thirdweb`, which is in no manifest and no lockfile
-- [ ] T014 [P] [US1] Commit `services/relayer/package-lock.json` and change `services/relayer/Dockerfile:7` from `npm install --omit=dev` to `npm ci --omit=dev` (FR-014)
-- [ ] T015 [P] [US1] Change `.github/workflows/subgraph-build.yml:45` from `npm install` to `npm ci` and add `cache-dependency-path`
-- [ ] T016 [P] [US1] Delete tracked `.probe-tmp.js` and `.dependencygraph/`; add `blockscout/` to `.gitignore`
-- [ ] T017 [P] [US1] Delete `frontend/Dockerfile` — it cannot build post-spec-072 (its context lacks `tenants/`, and `tenant-branding.js:42` runs `findTenantsDir()` at module top level) and no workflow references it
-- [ ] T018 [US1] Run the full-gauntlet regression from quickstart before opening the PR
+- [X] T007 [US1] Add `evmVersion: "paris"` to the 0.8.24 compiler settings block in `hardhat.config.js` (~line 311-320), matching the 0.8.23 profile at line 332 (FR-001)
+- [X] T008 [US1] **GATE** — run quickstart S1: `npm run clean && npm run compile`, re-snapshot, diff against `baseline-bytecode.json`. **`DIFFERING: 0` required. On any difference STOP, do not merge, and escalate as an incident against the 33 live implementations** (FR-005, SC-001)
+- [X] T009 [P] [US1] Declare `@openzeppelin/upgrades-core` in root `package.json` at its currently-resolved exact version — required at `scripts/deploy/check-storage-layout.js:43`, a merge gate running on an undeclared transitive (FR-003)
+- [X] T010 [P] [US1] Declare `@solana-program/system` in `frontend/package.json` — imported at `frontend/src/lib/solana/send.js:23`, a shipped path resolving only by hoisting (FR-003)
+- [X] T011 [P] [US1] Add `engines: { node: ">=22.0.0" }` to root `package.json` and add `.nvmrc` (FR-006)
+- [X] T012 [US1] Make `scripts/deploy/check-storage-layout.js` fail hard when `compared === 0`; its own header documents it previously passed while checking nothing (FR-004)
+- [X] T013 [P] [US1] Delete `frontend/src/thirdweb.js` and `frontend/src/components/wallet/ThirdWebWalletButton.jsx` — they import `thirdweb`, which is in no manifest and no lockfile
+- [X] T014 [P] [US1] Commit `services/relayer/package-lock.json` and change `services/relayer/Dockerfile:7` from `npm install --omit=dev` to `npm ci --omit=dev` (FR-014)
+- [X] T015 [P] [US1] Change `.github/workflows/subgraph-build.yml:45` from `npm install` to `npm ci` and add `cache-dependency-path`
+- [X] T016 [P] [US1] Delete tracked `.probe-tmp.js` and `.dependencygraph/`; add `blockscout/` to `.gitignore`
+- [X] T017 [P] [US1] Delete `frontend/Dockerfile` — it cannot build post-spec-072 (its context lacks `tenants/`, and `tenant-branding.js:42` runs `findTenantsDir()` at module top level) and no workflow references it
+- [X] T018 [US1] Run the full-gauntlet regression from quickstart before opening the PR
 
 **Checkpoint**: US1 merges alone. The compiler target is now declared by this repository.
 
@@ -71,21 +71,27 @@ the stated order. **Do not** reorder US3 before US1/US2 — US3's verification d
 
 ### Tests for US2
 
-- [ ] T019 [P] [US2] Add a CI assertion that no workflow step under lint/test/build/security carries `continue-on-error: true` without a justifying comment (FR-007, constitution IV)
+- [X] T019 [P] [US2] Add a CI assertion that no workflow step under lint/test/build/security carries `continue-on-error: true` without a justifying comment (FR-007, constitution IV)
 
 ### Implementation for US2
 
-- [ ] T020 [US2] Remove `continue-on-error: true` at `.github/workflows/test.yml:362` and delete the dead `grep -q "failing"` step at `:397-400`; let Cypress's exit code gate (FR-008)
-- [ ] T021 [US2] Apply the same repair to `.github/workflows/torture-test.yml:390` and `:427-432`
-- [ ] T022 [US2] Remove `|| true` from the Slither step — it violates constitution IV directly (FR-007)
+- [X] T020 [US2] Remove `continue-on-error: true` at `.github/workflows/test.yml:362` and delete the dead `grep -q "failing"` step at `:397-400`; let Cypress's exit code gate (FR-008)
+- [X] T021 [US2] Apply the same repair to `.github/workflows/torture-test.yml:390` and `:427-432`
+- [X] T022 [US2] Add a Slither **severity gate** (`scripts/security/check-slither-findings.js`, High-impact blocks; wired into `security-testing.yml` + `torture-test.yml`) (FR-007)
+      > **Revised during implementation.** As originally written this task said "remove `|| true`", which is wrong:
+      > slither exits non-zero on ANY finding including Informational, so a bare removal fails CI on notes and gets
+      > reverted within a day. `|| true` is retained on report *generation*; the blocking decision moved to a gate on
+      > IMPACT. Measured at adoption: 0 High / 1 Medium / 2 Informational. Mutation-tested both ways.
 - [ ] T023 [US2] **Expect red.** Triage the real e2e failures the gate has been swallowing (review reports ~63, dominated by one `.entry-gate-overlay` click interception) and fix at the source. **Never weaken the gate to get green** (FR-011)
-- [ ] T024 [US2] Delete the `pull_request:` and `push:` triggers from `test.yml` and `security-testing.yml` so `ci-manager.yml` is their sole entry point — both currently declare those triggers **and** `workflow_call` (FR-009)
-- [ ] T025 [P] [US2] Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }` to every PR-triggered workflow (FR-010)
-- [ ] T026 [P] [US2] Change `.github/actions/setup-hardhat-solc` to accept a version **list**, include all versions in the cache key, and pre-seed both 0.8.24 and 0.8.23; apply it at the 5 compile sites still calling bare `npm run compile` (torture-test ×3, oracle-fork-tests, deploy-contracts)
-- [ ] T027 [P] [US2] Set `NODE_OPTIONS=--max-old-space-size=4096` and `TZ=UTC` on the frontend vitest run in `test.yml` (`frontend-testing.yml` has the former; `test.yml` has neither, for the identical suite)
-- [ ] T028 [P] [US2] Fix the broken CI script paths — `deploy-contracts.yml:10,61` → `scripts/deploy/archive/deploy-deterministic.js`; `torture-test.yml:195` → `scripts/utils/patch-wasm-types.py`; `torture-test.yml:200,207,214,221,228,235,242` → `scripts/utils/run-manticore.py` (10 call sites; the two Python files are live, only the deploy one is archived)
-- [ ] T029 [P] [US2] Delete the 7 broken root npm script targets (`deploy:amoy`'s six `01`–`06` scripts, `deploy:deterministic`)
+- [X] T024 [US2] Delete the `pull_request:` and `push:` triggers from `test.yml` and `security-testing.yml` so `ci-manager.yml` is their sole entry point — both currently declare those triggers **and** `workflow_call` (FR-009)
+- [X] T025 [P] [US2] Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }` to every PR-triggered workflow (FR-010)
+- [X] T026 [P] [US2] Change `.github/actions/setup-hardhat-solc` to accept a version **list**, include all versions in the cache key, and pre-seed both 0.8.24 and 0.8.23; apply it at the 5 compile sites still calling bare `npm run compile` (torture-test ×3, oracle-fork-tests, deploy-contracts)
+- [X] T027 [P] [US2] Set `NODE_OPTIONS=--max-old-space-size=4096` and `TZ=UTC` on the frontend vitest run in `test.yml` (`frontend-testing.yml` has the former; `test.yml` has neither, for the identical suite)
+- [X] T028 [P] [US2] Fix the broken CI script paths — `deploy-contracts.yml:10,61` → `scripts/deploy/archive/deploy-deterministic.js`; `torture-test.yml:195` → `scripts/utils/patch-wasm-types.py`; `torture-test.yml:200,207,214,221,228,235,242` → `scripts/utils/run-manticore.py` (10 call sites; the two Python files are live, only the deploy one is archived)
+- [X] T029 [P] [US2] Delete the 7 broken root npm script targets (`deploy:amoy`'s six `01`–`06` scripts, `deploy:deterministic`)
 - [ ] T030 [US2] Run quickstart S2 and record the new job count against `baseline-ci.md` (SC-005, SC-006)
+- [X] T095 [US2] Add `test/config/CiGates.test.js` — standing guards that no merge-gating workflow carries `continue-on-error`, that `grep -q "failing"` is never reintroduced, and that Slither always has a severity gate. Mutation-tested (**analyze finding I1/G1**)
+- [X] T096 [US1] Add `test/config/CiGates.test.js` assertions that `paths.sources` still covers all of `contracts/` and that `.solcover.js` never excludes `contracts/test` or `contracts/account/lib` — FR-048 previously had **no guard at all** (**analyze finding U1**)
 
 **Checkpoint**: US2 merges alone. Every later phase is now verifiable.
 
@@ -113,7 +119,8 @@ bytes.**
 
 - [ ] T036 [US3] Add `"private": true`, `"engines"`, and the `workspaces` array to root `package.json` per [contracts/workspace-layout.md](./contracts/workspace-layout.md) — including the nested glob `frontend/miniapps/*` (verified accepted by npm 11.6.0) (FR-012)
 - [ ] T037 [US3] Create `frontend/miniapps/token-mint/package.json` and `frontend/miniapps/clearpath/package.json` declaring `@fairwins/miniapp-build`/`vite`/`@vitejs/plugin-react` as devDeps and `react`/`ethers` as peerDeps, with a **real `version`** replacing the hardcoded `'1.0.0'` literal (FR-023)
-- [ ] T038 [US3] Align the `ethers` ranges across root/frontend/gateway/relayer. **Do NOT add a bare root `overrides.ethers`** — the lockfile carries ethers 5.8.0 ×9 and 4.0.49 ×2 for `@uma/core`, `@chainlink/contracts`, `@across-protocol/contracts`; an unscoped override forces an incompatible major onto all of them. Scope per-package if a pin is needed (FR-015, research R4)
+- [X] T097 [US3] Add `scripts/deps/check-dependency-hygiene.js` + `npm run check:deps` + a CI job — a **standing** check for version skew (FR-015) and phantom imports (FR-003/SC-003). Both invariants were previously fixed by hand once with nothing preventing recurrence (**analyze finding G1**)
+- [X] T038 [US3] Align the `ethers` ranges across root/frontend/gateway/relayer. **Do NOT add a bare root `overrides.ethers`** — the lockfile carries ethers 5.8.0 ×9 and 4.0.49 ×2 for `@uma/core`, `@chainlink/contracts`, `@across-protocol/contracts`; an unscoped override forces an incompatible major onto all of them. Scope per-package if a pin is needed (FR-015, research R4)
 - [ ] T039 [US3] Delete `frontend/`, `services/relay-gateway/`, `subgraph/` lockfiles and regenerate one root `package-lock.json` (FR-013)
 - [ ] T040 [US3] **GATE** — before T039's subgraph deletion is final, run `graph codegen && graph build` under the merged tree. `subgraph/package-lock.json` is the only record of how graph-cli 0.80.0 + graph-ts 0.35.1 + matchstick-as 0.6.0 resolve, and graph-cli bundles its own AssemblyScript stack (research R12.4)
 - [ ] T041 [P] [US3] Switch all 6 relative imports of `tools/miniapp-build` to the package name `@fairwins/miniapp-build` (2 mini-app vite configs; `buildPreset.test.js:24`, `hostScope.test.js:45`, `fixtures/regenerate.mjs:50`, `fixtures/source/vite.config.js:21`)
@@ -123,7 +130,11 @@ bytes.**
 - [ ] T045 [US3] Update the ~27 `npm ci` sites across 9 workflows and every `cache-dependency-path` pointing at a deleted lockfile; service jobs use `npm ci --workspace <name> --include-workspace-root=false` so the gateway does not regress from ~299 to ~2,100 packages (FR-016)
 - [ ] T046 [P] [US3] Update the 4 remaining Dockerfiles (root, `services/relay-gateway/Dockerfile:12-13`, `services/relayer/Dockerfile:7`, `subgraph/matchstick.Dockerfile`) and `.dockerignore` so the root lockfile is present in every build context
 - [ ] T047 [P] [US3] Correct `cd frontend && npm install` in the 5 documents that carry it — `docs/developer-guide/{contributing,frontend,setup}.md`, `frontend/README.md:71`, `README.md:108` (FR-017)
-- [ ] T048 [P] [US3] Delete `services/relayer/{Dockerfile,docker-compose.yml,deploy.sh}` OR give the unit a build recipe — spec 036 says do not promote it, and keeping source with no recipe is dishonest state (FR-014)
+- [ ] T048 [P] [US3] Keep `services/relayer`'s build recipe and bring it under the workspace (FR-014).
+      > **Resolved contradiction.** This previously offered "delete the Dockerfile OR give it a recipe", which conflicts
+      > with the already-completed T014 (commit its lockfile; switch its Dockerfile to `npm ci`). T014 won: the unit now
+      > has a lockfile and a reproducible install, so deleting the recipe would discard work and leave source with no
+      > build. Retiring the service, if wanted, is a separate decision — not a side effect of a build-system change.
 
 ### The three blocking gates
 

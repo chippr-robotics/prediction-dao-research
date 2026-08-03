@@ -18,8 +18,6 @@
     "test:coverage": "COVERAGE=true TZ=UTC hardhat coverage --testfiles '{test/*.test.js,test/access/**/*.test.js,test/account/**/*.test.js,test/bridge/**/*.test.js,test/clearpath/**/*.test.js,test/custody/**/*.test.js,test/intent/**/*.test.js,test/liquidity/**/*.test.js,test/oracles/**/*.test.js,test/pools/**/*.test.js,test/staking/**/*.test.js,test/tokens/**/*.test.js,test/upgradeable/**/*.test.js,test/integration/**/*.test.js}'",
     "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
     "deploy:mordor": "hardhat run scripts/deploy/deploy.js --network mordor",
-    "deploy:deterministic": "hardhat run scripts/deploy/deploy-deterministic.js",
-    "deploy:amoy": "hardhat run scripts/deploy/01-deploy-core.js --network amoy && hardhat run scripts/deploy/02-deploy-rbac.js --network amoy && hardhat run scripts/deploy/03-deploy-markets.js --network amoy && hardhat run scripts/deploy/04-deploy-registries.js --network amoy && hardhat run scripts/deploy/05-configure.js --network amoy && hardhat run scripts/deploy/06-verify.js --network amoy",
     "deploy:polygon": "hardhat run scripts/deploy/deploy.js --network polygon",
     "deploy:etc": "hardhat run scripts/deploy/deploy.js --network etc",
     "verify:mordor": "hardhat run scripts/deploy/verify.js --network mordor",
@@ -50,7 +48,8 @@
     "floppy:info": "node ./scripts/operations/floppy-key/index.js info",
     "floppy:store-admin": "node ./scripts/operations/floppy-key/store-admin-key.js",
     "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
-    "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor"
+    "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
+    "check:deps": "node scripts/deps/check-dependency-hygiene.js"
   },
   "keywords": [
     "futarchy",
@@ -93,9 +92,10 @@
     "chai": "^4.5.0",
     "dotenv": "^17.2.4",
     "ethereum-cryptography": "^2.2.1",
-    "ethers": "^6.16.0",
+    "ethers": "^6.17.0",
     "hardhat": "^2.28.2",
     "hardhat-gas-reporter": "^2.3.0",
+    "js-yaml": "^4.1.1",
     "solc": "0.8.24",
     "solidity-coverage": "^0.8.17",
     "ts-node": "^10.9.2",

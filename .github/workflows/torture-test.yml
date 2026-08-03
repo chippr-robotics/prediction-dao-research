@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       - name: Run tests with gas reporting
         env:
@@ -176,7 +176,7 @@ jobs:
         run: npm ci
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -198,54 +198,54 @@ jobs:
           solc-select use 0.8.24
 
       - name: Patch wasm package for Python 3.10+ compatibility
-        run: python scripts/patch-wasm-types.py
+        run: python scripts/utils/patch-wasm-types.py
 
       - name: Run Manticore on WagerRegistry
         run: |
           echo "Running Manticore on WagerRegistry..."
-          timeout 600 python scripts/run-manticore.py contracts/wagers/WagerRegistry.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/wagers/WagerRegistry.sol \
             --contract WagerRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on MembershipManager
         run: |
           echo "Running Manticore on MembershipManager..."
-          timeout 600 python scripts/run-manticore.py contracts/access/MembershipManager.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/access/MembershipManager.sol \
             --contract MembershipManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on KeyRegistry
         run: |
           echo "Running Manticore on KeyRegistry..."
-          timeout 600 python scripts/run-manticore.py contracts/privacy/KeyRegistry.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/privacy/KeyRegistry.sol \
             --contract KeyRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on PolymarketOracleAdapter
         run: |
           echo "Running Manticore on PolymarketOracleAdapter..."
-          timeout 600 python scripts/run-manticore.py contracts/oracles/PolymarketOracleAdapter.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/oracles/PolymarketOracleAdapter.sol \
             --contract PolymarketOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on ChainlinkDataFeedOracleAdapter
         run: |
           echo "Running Manticore on ChainlinkDataFeedOracleAdapter..."
-          timeout 600 python scripts/run-manticore.py contracts/oracles/ChainlinkDataFeedOracleAdapter.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/oracles/ChainlinkDataFeedOracleAdapter.sol \
             --contract ChainlinkDataFeedOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on ChainlinkFunctionsOracleAdapter
         run: |
           echo "Running Manticore on ChainlinkFunctionsOracleAdapter..."
-          timeout 600 python scripts/run-manticore.py contracts/oracles/ChainlinkFunctionsOracleAdapter.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/oracles/ChainlinkFunctionsOracleAdapter.sol \
             --contract ChainlinkFunctionsOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on UMAOptimisticOracleV3Adapter
         run: |
           echo "Running Manticore on UMAOptimisticOracleV3Adapter..."
-          timeout 600 python scripts/run-manticore.py contracts/oracles/UMAOptimisticOracleV3Adapter.sol \
+          timeout 600 python scripts/utils/run-manticore.py contracts/oracles/UMAOptimisticOracleV3Adapter.sol \
             --contract UMAOptimisticOracleV3Adapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
@@ -296,7 +296,7 @@ jobs:
           pip install crytic-compile
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       - name: Run Medusa fuzzing (extended)
         run: |

@@ -59,7 +59,7 @@ jobs:
         run: npm ci
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       # Soft check: fork tests rely on an archive-mode Amoy RPC. Without the
       # AMOY_RPC_URL secret the test file enters describe.skip and the job
