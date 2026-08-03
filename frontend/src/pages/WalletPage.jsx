@@ -12,12 +12,11 @@ import { hasRegisteredKey } from '../utils/keyRegistryService'
 import TradePanel from '../components/fairwins/TradePanel'
 import EarnPanel from '../components/earn/EarnPanel'
 import PayTransferPanel from '../components/wallet/PayTransferPanel'
-import PortfolioPanel from '../components/wallet/PortfolioPanel'
 import CollectiblesPanel from '../components/collectibles/CollectiblesPanel'
 import PredictPanel from '../components/predict/PredictPanel'
 import CustodyPanel from '../components/custody/CustodyPanel'
 import CatalogPanel from '../components/miniapps/CatalogPanel'
-import AccountDashboard from '../components/account/AccountDashboard'
+import MyAccountView from '../components/account/MyAccountView'
 import ControllersPanel from '../components/account/ControllersPanel'
 import RecoverAccountPanel from '../components/account/RecoverAccountPanel'
 import LegacyKeyRecoveryPanel from '../components/account/LegacyKeyRecoveryPanel'
@@ -35,7 +34,14 @@ import NetworkPanel from '../components/account/NetworkPanel'
 import RecoveryCodesPanel from '../components/account/RecoveryCodesPanel'
 import TaxReportsPanel from '../components/wallet/TaxReportsPanel'
 import SectionIconNav from '../components/nav/SectionIconNav'
-import { groupForTab, isNavItemEnabledForTenant } from '../config/appNav'
+import {
+  groupForTab,
+  isNavItemEnabledForTenant,
+  ACCOUNT_VIEWS,
+  ACCOUNT_DEFAULT_VIEW,
+  accountViewFromParam,
+  PORTFOLIO_PATH,
+} from '../config/appNav'
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
@@ -54,7 +60,6 @@ const WALLET_TABS = [
   { id: 'network', label: 'Network' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'security', label: 'Recovery' },
-  { id: 'portfolio', label: 'Portfolio' },
   { id: 'earn', label: 'Earn' },
   { id: 'trade', label: 'Trade' },
   { id: 'collectibles', label: 'Collect' },
@@ -81,12 +86,19 @@ const WALLET_TABS = [
 const TAB_ALIASES = { swap: 'trade', backup: 'security' }
 
 /**
- * Tabs that have BECOME mini-apps (spec 073 T027). Unlike `TAB_ALIASES`, which renames a tab
- * within this page, these leave the page entirely — the feature is now a package served from
- * /apps/<appId>, so a saved `?tab=tokens` deep link has to land there rather than on a tab that
- * no longer exists. Kept in parity with the same map in `components/nav/AppNavDrawer.jsx`.
+ * Tabs that have BECOME mini-apps (spec 073 T027) or moved into another section. Unlike
+ * `TAB_ALIASES`, which renames a tab within this page, these leave the tab entirely — the
+ * feature now lives elsewhere, so a saved deep link has to land there rather than on a tab
+ * that no longer exists. Kept in parity with the same map in `components/nav/AppNavDrawer.jsx`.
+ *
+ * Portfolio (spec 074): the standalone tab folded into the unified My Account view as its
+ * `?view=portfolio`, so `?tab=portfolio` redirects to `/wallet?tab=account&view=portfolio`.
  */
-const TAB_REDIRECTS = { tokens: '/apps/token-mint', clearpath: '/apps/clearpath' }
+const TAB_REDIRECTS = {
+  tokens: '/apps/token-mint',
+  clearpath: '/apps/clearpath',
+  portfolio: PORTFOLIO_PATH,
+}
 
 // Canonical Polymarket category slugs — kept here to keep WalletPage
 // self-contained. Order matches PolymarketBrowser's quick-filter row.
@@ -286,12 +298,21 @@ function WalletPage() {
   }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
 
   // Sibling sub-items for the mobile bottom icon nav — the group the active tab
-  // belongs to (Finance / Tools / Apps). Absent for account/membership/etc.
+  // belongs to (Finance / Tools / Apps). Absent for membership/network/etc.
+  //
+  // Spec 074: the Account tab has no section group (deliberately — it lives on
+  // the account button), so its bottom bar carries the unified view's THREE
+  // views (Activity / Portfolio / Stats) instead, in lockstep with
+  // MyAccountView's desktop tab strip via the shared ACCOUNT_VIEWS ids.
   const currentSectionGroup = groupForTab(activeTab)
-  const sectionNavItems = (currentSectionGroup?.items || []).filter(
-    (item) =>
-      (item.id !== 'collectibles' || collectiblesEnabled) && (item.id !== 'predict' || predictEnabled),
-  )
+  const isAccountTab = activeTab === 'account'
+  const accountView = accountViewFromParam(searchParams.get('view'))
+  const sectionNavItems = isAccountTab
+    ? ACCOUNT_VIEWS
+    : (currentSectionGroup?.items || []).filter(
+        (item) =>
+          (item.id !== 'collectibles' || collectiblesEnabled) && (item.id !== 'predict' || predictEnabled),
+      )
 
   return (
     <div className="wallet-page-wrapper">
@@ -324,7 +345,10 @@ function WalletPage() {
                 <div className="tab-content">
                 {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
-                    <AccountDashboard />
+                    {/* Spec 074 — the unified My Account experience: account card
+                        carousel + Activity/Portfolio/Stats views. The standalone
+                        Portfolio tab folded into it (see TAB_REDIRECTS). */}
+                    <MyAccountView />
 
                     {hasRole(ROLES.ADMIN) && (
                       <div className="section admin-section">
@@ -333,12 +357,6 @@ function WalletPage() {
                         <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {activeTab === 'portfolio' && (
-                  <div className="portfolio-section" role="tabpanel">
-                    <PortfolioPanel />
                   </div>
                 )}
 
@@ -692,9 +710,21 @@ function WalletPage() {
                     sibling views (Finance / Tools / Apps), pinned to the bottom. */}
                 <SectionIconNav
                   items={sectionNavItems}
-                  activeId={activeTab}
-                  onSelect={(id) => navigate(`/wallet?tab=${id}`)}
-                  ariaLabel={currentSectionGroup ? `${currentSectionGroup.label} sections` : 'Section navigation'}
+                  activeId={isAccountTab ? accountView : activeTab}
+                  onSelect={(id) =>
+                    navigate(
+                      isAccountTab
+                        ? `/wallet?tab=account${id === ACCOUNT_DEFAULT_VIEW ? '' : `&view=${id}`}`
+                        : `/wallet?tab=${id}`,
+                    )
+                  }
+                  ariaLabel={
+                    isAccountTab
+                      ? 'Account views'
+                      : currentSectionGroup
+                        ? `${currentSectionGroup.label} sections`
+                        : 'Section navigation'
+                  }
                 />
               </div>
             </div>

@@ -58,6 +58,35 @@ vi.mock('../utils/keyRegistryService', () => ({
   hasRegisteredKey: vi.fn().mockResolvedValue(false),
   ensureKeyRegistered: vi.fn(),
 }))
+// Spec 074 — the Account tab body renders the unified view (card carousel +
+// Activity/Portfolio/Stats). Mock the switcher seam so this entry-point test
+// stays free of the custody/legacy async loads behind it.
+vi.mock('../hooks/useAccountSwitcher', () => {
+  const useAccountSwitcher = () => ({
+    accounts: [
+      {
+        id: 'personal',
+        kind: 'personal',
+        // Literal (not the ADDRESS const): vi.mock factories run before the
+        // test file body, so file-scope consts are still in their TDZ here.
+        address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+        label: 'Personal wallet',
+      },
+    ],
+    currentId: 'personal',
+    choose: vi.fn(),
+    unlockEntry: null,
+    setUnlockEntry: vi.fn(),
+    onUnlocked: vi.fn(),
+    hasChoices: false,
+  })
+  return {
+    useAccountSwitcher,
+    default: useAccountSwitcher,
+    ACCOUNT_KIND_TAG: { vault: 'Multisig', legacy: 'Recovered' },
+    shortAccountAddr: (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ''),
+  }
+})
 
 const ADDRESS = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
