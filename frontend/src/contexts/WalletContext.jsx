@@ -198,8 +198,16 @@ export function WalletProvider({ children }) {
             name: walletClient.chain?.name || 'Unknown'
           })
 
-          // Get signer for the specific account that wagmi has authorized
-          const ethersSigner = await ethersProvider.getSigner(walletClient.account.address)
+          // Build the signer directly for the account wagmi already authorized, instead
+          // of `ethersProvider.getSigner(address)` — ethers v6's BrowserProvider.getSigner()
+          // issues its own `eth_requestAccounts` round-trip to re-verify authorization. That
+          // round-trip fires every time this effect re-runs (e.g. right after the auto
+          // chain-switch below changes `walletClient`), and MetaMask can surface it as a
+          // fresh permission prompt even though the account is already connected. A tester
+          // rejecting that redundant prompt threw here, which nulled out a signer that was
+          // already valid — breaking every signer-dependent action (encryption key backup/
+          // registration included) while the wallet still showed "connected".
+          const ethersSigner = new ethers.JsonRpcSigner(ethersProvider, walletClient.account.address)
           if (cancelled) return
           setProvider(ethersProvider)
           setSigner(ethersSigner)
@@ -251,7 +259,13 @@ export function WalletProvider({ children }) {
 
     updateProviderAndSigner()
     return () => { cancelled = true }
-  }, [isConnected, address, walletClient, loginMethod])
+    // Keyed on the wallet's own address/chain rather than the `walletClient` object
+    // itself: wagmi hands back a new `walletClient` reference on unrelated refetches
+    // (balance polls, focus revalidation, ...), and re-running this effect for no
+    // semantic change was what made the redundant getSigner() re-authorization above
+    // fire so often in the first place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address, walletClient?.account?.address, walletClient?.chain?.id, loginMethod])
 
   // Auto-switch to Polygon (PRIMARY_CHAIN_ID) when the wallet connects on an
   // unsupported chain. If the switch fails, show a network error instead.
