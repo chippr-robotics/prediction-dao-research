@@ -34,14 +34,14 @@ export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'tren
  * `icon` is a NavIcon name.
  */
 export const ACCOUNT_VIEWS = [
-  // Activity first — the default view: the ledger feed + breakdowns, mirroring
-  // the "recent transactions under your cards" shape of the reference design.
-  { id: 'activity', label: 'Activity', icon: 'clock' },
+  // Portfolio first — the default view (post-launch feedback on spec 074):
+  // what a member owns is the first thing they look for under their cards.
   { id: 'portfolio', label: 'Portfolio', icon: 'trending' },
+  { id: 'activity', label: 'Activity', icon: 'clock' },
   { id: 'stats', label: 'Stats', icon: 'reports' },
 ]
 
-export const ACCOUNT_DEFAULT_VIEW = 'activity'
+export const ACCOUNT_DEFAULT_VIEW = 'portfolio'
 
 /** Resolve a raw `?view=` param to a known account view (unknown/missing → default). */
 export function accountViewFromParam(param) {

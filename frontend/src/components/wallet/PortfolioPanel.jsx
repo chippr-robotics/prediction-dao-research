@@ -180,12 +180,27 @@ function CollectiblesEstimateRow({ valuationState, priceMap }) {
  * the asset detail sheet (instances + actions). Category explainers live in
  * InfoTip bubbles; testnet and zero-balance visibility follow the
  * Preferences → Portfolio settings.
+ *
+ * Spec 074 follow-up: the panel can be handed an externally-owned `portfolio`
+ * (MyAccountView mounts ONE usePortfolio so the account card's quick-access
+ * total and this panel read the same snapshot — no duplicate scans). Without
+ * the prop it self-loads exactly as before. Split into a self-loading wrapper
+ * and a body so the hook is never called conditionally.
  */
-export default function PortfolioPanel() {
+export default function PortfolioPanel({ portfolio = null }) {
+  if (portfolio) return <PortfolioBody portfolio={portfolio} />
+  return <SelfLoadingPortfolioPanel />
+}
+
+function SelfLoadingPortfolioPanel() {
   // Spec 063 (US1): the portfolio shows the account the member is acting as (a vault or recovered
   // account), not always the connected wallet. Personal mode passes its own address → unchanged.
   const { address: actingAddress, isActingAccount } = useEffectiveAccount()
   const portfolio = usePortfolio(isActingAccount ? { accountAddress: actingAddress } : undefined)
+  return <PortfolioBody portfolio={portfolio} />
+}
+
+function PortfolioBody({ portfolio }) {
   // Decided HERE (not inside the row) so the Digital Collectibles section keeps
   // its honest "No assets in this category." message when the row is absent.
   const collectiblesValuation = useCollectiblesValuation()

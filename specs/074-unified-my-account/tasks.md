@@ -160,6 +160,35 @@ Quick Access navigates to the new path.
       override, and the portfolio redirect; note the change in
       `CLAUDE.md` guardrails if reviewers deem it durable.
 
+## Phase 8: Post-launch feedback amendment (2026-08-03)
+
+**Goal**: first-use feedback — Portfolio-first, cleaner Activity, theme-aware
+cards, minimal dots, instant portfolio data, card total (contract U1/U2/U4,
+C7/C8, V1/V3, F1–F3, P1–P3).
+
+- [X] T020 Reorder `ACCOUNT_VIEWS` (Portfolio first) and set
+      `ACCOUNT_DEFAULT_VIEW = 'portfolio'` in `frontend/src/config/appNav.js`.
+- [X] T021 Theme-aware account cards + minimal position dots in
+      `frontend/src/components/account/AccountCardsCarousel.css` (surface
+      tokens + per-kind accent edge; dots pinned against App.css's mobile
+      tap-target rule with a clipped-background 6px visual / 22px hit area).
+- [X] T022 Quick-access total on the active card:
+      `AccountCardsCarousel({ activeTotalUsd })`, rendered only when real
+      data is ready; wired from MyAccountView's shared portfolio instance.
+- [X] T023 Move `ActivityBreakdowns` from the Activity view to the Stats view
+      in `frontend/src/components/account/MyAccountView.jsx`.
+- [X] T024 Rework `frontend/src/components/account/RecentActivityFeed.jsx`:
+      filter chips → Filter-button dropdown (menuitemradio), search behind a
+      Search icon (kind/token/amount/txHash/reason matching), honest
+      "no matching activity" state; `search` glyph added to NavIcon.
+- [X] T025 Portfolio snapshot cache in `frontend/src/hooks/usePortfolio.js`
+      (session-memory, keyed account+scope, hydrate-then-refresh) and ONE
+      shared portfolio instance in MyAccountView handed to `PortfolioPanel`
+      (new optional `portfolio` prop, self-loading wrapper preserved).
+- [X] T026 Update Vitest suites (MyAccountView, axe, carousel, feed,
+      usePortfolio cache, WalletPage/collectibles portfolio mocks) and the
+      spec/contract/docs artifacts for the amendment.
+
 ## Dependencies
 
 ```text

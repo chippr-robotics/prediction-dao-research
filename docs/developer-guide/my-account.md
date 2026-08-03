@@ -25,25 +25,46 @@ and every recovered legacy account.
   dots track the nearest card. The card button itself is the
   `role="option"` inside a labelled `role="listbox"` — don't reintroduce an
   interactive wrapper (axe nested-interactive).
-- **Cards show identity only** (avatar, label, kind chip, short address,
-  vault network via strict `NETWORKS[chainId]` lookup). Balances deliberately
-  have one home — the views below. Per-card balances would re-create the
-  split asset view this feature removed, and would need a fake zero or
-  spinner for accounts on unreachable networks.
+- **Theme-aware, and pinned against global button CSS**: cards render on the
+  theme surface tokens with a per-kind accent edge (light + dark). The dots
+  and cards use two-class selectors deliberately — App.css's mobile rule
+  `button:not([role="switch"]) { min-width/min-height: 44px; padding: … }`
+  outranks a single class and once inflated the dots into page-dominating
+  circles. The dot is a 6px visual inside a ~22px `background-clip:
+  content-box` touch target.
+- **Cards show identity plus one number**: avatar, label, kind chip, short
+  address, vault network (strict `NETWORKS[chainId]` lookup) — and on the
+  ACTIVE card only, the portfolio total (`activeTotalUsd`), rendered only
+  when the shared portfolio instance is `ready` (never a fabricated $0 while
+  loading). Full balances still have one home — the views below.
 
 ## The three views
 
 Defined once as `ACCOUNT_VIEWS` in `frontend/src/config/appNav.js`
-(`activity` — default, `portfolio`, `stats`) and driven by `?view=` on the
+(`portfolio` — default, `activity`, `stats`) and driven by `?view=` on the
 Account tab (the PayTransferPanel idiom): `/wallet?tab=account&view=stats` is
-a direct link; unknown values fall back to Activity via
+a direct link; unknown values fall back to Portfolio via
 `accountViewFromParam()`.
 
-- **Activity** — `FreshnessIndicator` + `ActivityBreakdowns` +
-  `RecentActivityFeed` from the unified ledger.
-- **Portfolio** — the existing `PortfolioPanel`, unchanged (own honest
-  states, asset detail sheet, disclosures).
-- **Stats** — `SummaryTiles` + `PnlChart`.
+- **Portfolio** (default) — the existing `PortfolioPanel` (own honest states,
+  asset detail sheet, disclosures), fed MyAccountView's shared portfolio
+  instance via its optional `portfolio` prop (it self-loads without one).
+- **Activity** — `FreshnessIndicator` + `RecentActivityFeed`: a clean feed.
+  Class filters live behind the Filter button (menu of `menuitemradio`
+  options) and search behind the Search icon (matches kind, token, amount,
+  tx hash, failure reason); no matches → an honest "no matching activity"
+  state.
+- **Stats** — `SummaryTiles` + `PnlChart` + `ActivityBreakdowns` (the
+  by-status / by-token / by-resolution groups are stats, not a log).
+
+**Portfolio freshness**: `usePortfolio` keeps a session-memory snapshot cache
+keyed by account + scan scope. A remount hydrates the last real snapshot
+immediately (original `lastUpdated` intact) while a fresh read runs in the
+background — the member never stares at "Loading portfolio…" for data the
+session already has. Snapshots never cross accounts or the testnet-visibility
+boundary, and nothing persists across reloads. MyAccountView mounts ONE
+portfolio instance for the card total and the Portfolio view together, and it
+starts warming as soon as My Account opens, whichever view is showing.
 
 The switcher renders exactly once per width: WalletPage feeds
 `SectionIconNav` (the mobile bottom bar) the `ACCOUNT_VIEWS` items while the

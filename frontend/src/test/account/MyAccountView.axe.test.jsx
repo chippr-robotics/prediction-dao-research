@@ -43,6 +43,24 @@ vi.mock('../../components/account/LegacyUnlockDialog', () => ({ default: () => n
 vi.mock('../../components/wallet/PortfolioPanel', () => ({
   default: () => <div data-testid="portfolio-panel" />,
 }))
+vi.mock('../../hooks/usePortfolio', () => {
+  const usePortfolio = () => ({
+    status: 'ready',
+    isLoading: false,
+    error: null,
+    holdings: [],
+    aggregates: [],
+    categories: [],
+    totalUsd: 42.5,
+    failedAssets: [],
+    priceMap: new Map(),
+    showTestnetAssets: false,
+    showZeroBalances: false,
+    lastUpdated: Date.now(),
+    refresh: vi.fn(),
+  })
+  return { default: usePortfolio, usePortfolio }
+})
 
 const stats = {
   summary: {
@@ -93,8 +111,14 @@ function renderView(route = '/wallet?tab=account') {
 }
 
 describe('MyAccountView accessibility (spec 074 SC-005, ports the spec 020 FR-018 gate)', () => {
-  it('has no axe violations on the default (Activity) view', async () => {
+  it('has no axe violations on the default (Portfolio) view', async () => {
     const { container } = renderView()
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no axe violations on the Activity view', async () => {
+    const { container } = renderView('/wallet?tab=account&view=activity')
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

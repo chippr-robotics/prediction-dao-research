@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getNetwork } from '../../config/networks'
 import { formatUsd, formatRelativeTime } from '../../lib/account/format'
 import SensitiveValue from '../common/SensitiveValue'
+import NavIcon from '../nav/NavIcon'
 import EmptyState from './EmptyState'
 import './RecentActivityFeed.css'
 
@@ -46,50 +47,171 @@ function amountLine(e) {
 }
 
 /**
+ * Case-insensitive search across everything a member might remember about a
+ * transaction: what it was (label/kind/class), the token, the amounts (raw and
+ * USD-formatted), the tx hash, and a failure reason.
+ */
+function entryMatchesQuery(e, meta, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const haystack = [
+    meta.label,
+    e.kind,
+    e.class,
+    e.tokenSymbol,
+    e.amount != null ? String(e.amount) : null,
+    e.valueUsd != null ? formatUsd(e.valueUsd) : null,
+    e.txHash,
+    e.failureReason,
+    e.status,
+  ]
+  return haystack.some((v) => v != null && String(v).toLowerCase().includes(q))
+}
+
+/**
  * RecentActivityFeed — the Account tab's canonical activity record
- * (spec 051 US1): every ledger class, newest first, with class filters,
- * honest failed states, and an explicit "date unavailable" state instead of
- * a fabricated relative time (FR-006).
+ * (spec 051 US1): every ledger class, newest first, with honest failed states
+ * and an explicit "date unavailable" state instead of a fabricated relative
+ * time (FR-006).
+ *
+ * Spec 074 follow-up: the class-filter chip row moved behind a Filter button
+ * (dropdown), and a search field lives behind a Search icon — the feed leads
+ * with the transactions themselves, and the tools appear on demand.
  */
 function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBefore = null }) {
   const [classFilter, setClassFilter] = useState(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const filterRef = useRef(null)
+  const searchInputRef = useRef(null)
 
-  const rows = useMemo(
-    () => (classFilter ? entries.filter((e) => e.class === classFilter) : entries),
-    [entries, classFilter],
-  )
+  // Close the filter dropdown on outside click / Escape.
+  useEffect(() => {
+    if (!filterOpen) return undefined
+    const onDown = (event) => {
+      if (filterRef.current && !filterRef.current.contains(event.target)) setFilterOpen(false)
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') setFilterOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [filterOpen])
 
-  const filterChips = (
-    <div className="account-feed-filters" role="group" aria-label="Filter activity by type">
-      {CLASS_FILTERS.map((f) => (
-        <button
-          key={f.label}
-          type="button"
-          className={`account-feed-filter${classFilter === f.key ? ' active' : ''}`}
-          aria-pressed={classFilter === f.key}
-          onClick={() => setClassFilter(f.key)}
-        >
-          {f.label}
-        </button>
-      ))}
-    </div>
-  )
+  // Opening search focuses the field so "icon → type" is one motion.
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  const rows = useMemo(() => {
+    const byClass = classFilter ? entries.filter((e) => e.class === classFilter) : entries
+    if (!query.trim()) return byClass
+    return byClass.filter((e) =>
+      entryMatchesQuery(e, KIND_META[e.kind] || { label: e.kind }, query),
+    )
+  }, [entries, classFilter, query])
+
+  const activeFilter = CLASS_FILTERS.find((f) => f.key === classFilter) || CLASS_FILTERS[0]
+  const isFiltering = classFilter != null || query.trim() !== ''
 
   return (
     <section className="account-feed" aria-label="Recent activity">
-      <h3 className="account-feed-title">Recent activity</h3>
-      {filterChips}
+      <div className="account-feed-header">
+        <h3 className="account-feed-title">Recent activity</h3>
+        <div className="account-feed-tools">
+          <button
+            type="button"
+            className={`account-feed-tool${searchOpen || query ? ' active' : ''}`}
+            aria-label={searchOpen ? 'Hide activity search' : 'Search activity'}
+            aria-expanded={searchOpen}
+            onClick={() => {
+              setSearchOpen((open) => {
+                if (open) setQuery('')
+                return !open
+              })
+            }}
+          >
+            <NavIcon name="search" size={16} />
+          </button>
+          <div className="account-feed-filter-wrap" ref={filterRef}>
+            <button
+              type="button"
+              className={`account-feed-tool${classFilter != null ? ' active' : ''}`}
+              aria-label="Filter activity by type"
+              aria-haspopup="menu"
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen((o) => !o)}
+            >
+              <NavIcon name="sliders" size={16} />
+              {classFilter != null && (
+                <span className="account-feed-tool-badge">{activeFilter.label}</span>
+              )}
+            </button>
+            {filterOpen && (
+              <ul className="account-feed-filter-menu" role="menu" aria-label="Filter activity by type">
+                {CLASS_FILTERS.map((f) => (
+                  <li key={f.label} role="none">
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={classFilter === f.key}
+                      className={`account-feed-filter-option${classFilter === f.key ? ' active' : ''}`}
+                      onClick={() => {
+                        setClassFilter(f.key)
+                        setFilterOpen(false)
+                      }}
+                    >
+                      <span className="account-feed-filter-check" aria-hidden="true">
+                        {classFilter === f.key ? <NavIcon name="check" size={14} /> : null}
+                      </span>
+                      {f.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {searchOpen && (
+        <div className="account-feed-search">
+          <input
+            ref={searchInputRef}
+            type="search"
+            className="account-feed-search-input"
+            placeholder="Search by type, token, amount, or tx hash"
+            aria-label="Search activity"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      )}
+
       {staleClasses.length > 0 && (
         <p className="account-feed-stale" role="status">
           Some activity may be out of date: {staleClasses.join(', ')} could not be refreshed.
         </p>
       )}
       {rows.length === 0 ? (
-        <EmptyState
-          compact
-          title="No recent activity"
-          message="Your wagers, transfers, earn, pool, and membership activity will appear here."
-        />
+        isFiltering ? (
+          <EmptyState
+            compact
+            title="No matching activity"
+            message="Nothing matches the current filter or search. Clear them to see all activity."
+          />
+        ) : (
+          <EmptyState
+            compact
+            title="No recent activity"
+            message="Your wagers, transfers, earn, pool, and membership activity will appear here."
+          />
+        )
       ) : (
         <ul className="account-feed-list">
           {rows.map((e) => {

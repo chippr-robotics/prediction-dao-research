@@ -241,10 +241,39 @@ entries for Portfolio point at the new location.
 - **SC-005**: The unified view introduces no new accessibility violations
   (axe audit passes, as for the surfaces it replaces).
 
+## Amendment — post-launch feedback (2026-08-03)
+
+First-use feedback on the shipped view, superseding the original text where
+they conflict:
+
+- **FR-006a**: Portfolio is the FIRST view — the default lower half and the
+  first entry in the view switcher (supersedes the "Activity is default"
+  assumption below).
+- **FR-006b**: The by-status / by-token / by-resolution breakdowns belong to
+  the **Stats** view, not Activity — Activity is a clean transaction feed.
+- **FR-014**: The activity feed's class filters live behind a **filter
+  button** (dropdown), and a **search** field lives behind a search icon,
+  matching transactions by type, token, amount, tx hash, or failure reason.
+  An active filter/search with no matches shows an honest "no matching
+  activity" state.
+- **FR-015**: The account cards MUST be theme-aware (light + dark), using the
+  app's surface tokens with a per-kind accent rather than a fixed dark
+  palette; the carousel position dots MUST be visually minimal and never
+  dominate the page (while keeping a usable touch target).
+- **FR-016**: Reopening My Account for an account already read this session
+  MUST show the last real portfolio snapshot immediately (with its honest
+  timestamp) while a fresh read runs in the background — never a bare
+  "Loading portfolio…" for data the session already has. Snapshots never
+  cross accounts or the testnet-visibility boundary, and nothing persists
+  beyond the session.
+- **FR-017**: The ACTIVE account's card carries its portfolio total for quick
+  access, appearing only once real data is available (never a fabricated $0
+  while loading).
+
 ## Assumptions
 
-- The Activity view is the default lower-half view (mirrors the reference
-  design, where recent transactions sit directly under the cards).
+- ~~The Activity view is the default lower-half view~~ — superseded by
+  FR-006a above: Portfolio is the default (post-launch feedback).
 - The wallet-button dropdown's account switcher remains in place as a quick
   shortcut; this feature unifies the *viewing* experience without removing
   the dropdown (both drive the same underlying selection).

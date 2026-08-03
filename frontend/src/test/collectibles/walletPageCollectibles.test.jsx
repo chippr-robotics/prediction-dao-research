@@ -25,8 +25,28 @@ vi.mock('../../components/ui/BlockiesAvatar', () => ({
   default: () => <div data-testid="blockies-avatar" />,
 }))
 // Spec 074 — the Account tab body is the unified view (card carousel +
-// Activity/Portfolio/Stats). Mock the switcher seam so the fallback-to-Account
-// cases stay free of the custody/legacy async loads behind it.
+// Portfolio/Activity/Stats). Mock the portfolio hook (the default view's data
+// seam, also mounted for the card total) and the switcher seam so the
+// fallback-to-Account cases stay free of multi-chain scans and custody/legacy
+// async loads.
+vi.mock('../../hooks/usePortfolio', () => {
+  const usePortfolio = () => ({
+    status: 'ready',
+    isLoading: false,
+    error: null,
+    holdings: [],
+    aggregates: [],
+    categories: [],
+    totalUsd: 0,
+    failedAssets: [],
+    priceMap: new Map(),
+    showTestnetAssets: false,
+    showZeroBalances: false,
+    lastUpdated: null,
+    refresh: vi.fn(),
+  })
+  return { default: usePortfolio, usePortfolio }
+})
 vi.mock('../../hooks/useAccountSwitcher', () => {
   const useAccountSwitcher = () => ({
     accounts: [

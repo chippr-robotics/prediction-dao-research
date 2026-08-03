@@ -127,4 +127,18 @@ describe('AccountCardsCarousel (spec 074 US1)', () => {
     expect(screen.queryByRole('button', { name: 'Previous account' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Go to / })).not.toBeInTheDocument()
   })
+
+  it('shows the quick-access total on the ACTIVE card only (post-launch feedback)', () => {
+    render(<AccountCardsCarousel activeTotalUsd={1234.5} />)
+    expect(screen.getAllByText(/total balance/i)).toHaveLength(1)
+    expect(screen.getByText('$1,234.50')).toBeInTheDocument()
+    const options = screen.getAllByRole('option')
+    expect(options[0]).toHaveTextContent('Total balance')
+    expect(options[1]).not.toHaveTextContent('Total balance')
+  })
+
+  it('renders no balance line without a total (loading / unavailable)', () => {
+    render(<AccountCardsCarousel />)
+    expect(screen.queryByText(/total balance/i)).not.toBeInTheDocument()
+  })
 })
