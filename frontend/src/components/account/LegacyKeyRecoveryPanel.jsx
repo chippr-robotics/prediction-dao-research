@@ -416,6 +416,7 @@ function LegacyKeyRecoveryPanel({ deps = {}, defaultOpen = false }) {
                   <div className="lkr-stored__row">
                     <BlockiesAvatar address={e.address} size={40} className="lkr-stored__avatar" />
                     <div className="lkr-stored__meta">
+                      <span className="lkr-stored__kind">Recovered</span>
                       <span className="lkr-stored__name">{displayName}</span>
                       <code className="lkr-stored__addr" title={e.address}>{shortAddr(e.address)}</code>
                       <span className="lkr-stored__sub">

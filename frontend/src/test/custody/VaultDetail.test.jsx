@@ -6,6 +6,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 
+// Protect-accordion-refresh — VaultList now embeds VaultProposalsPanel inline for the open vault,
+// so opening a card in these unit tests reaches useWallet() even without a proposals prop.
+vi.mock('../../hooks', () => ({ useWallet: () => ({ chainId: 63, address: undefined, switchNetwork: vi.fn() }) }))
+
 vi.mock('../../lib/custody/policy', () => ({
   getPolicyStatus: vi.fn(async () => 'unsupported'),
   readPolicy: vi.fn(async () => null),
@@ -119,12 +123,17 @@ describe('VaultDetail', () => {
 })
 
 describe('VaultList', () => {
-  it('marks the active vault and calls onSelect', () => {
+  // Protect-accordion-refresh — the active vault's card is the one expanded (AccordionSection's
+  // aria-expanded), and re-clicking its trigger collapses it by selecting nothing, matching the
+  // Recovery tab's exclusive open-one-at-a-time accordion behavior.
+  it('expands the active vault as an accordion card and toggles via onSelect', () => {
     const onSelect = vi.fn()
     const vaults = [{ chainId: 63, address: A, label: 'One', isSafe: true, owners: [A], threshold: 1, owner: true }]
     render(<VaultList vaults={vaults} activeAddress={A} onSelect={onSelect} />)
-    const item = screen.getByRole('button', { name: /One/i })
-    expect(item).toHaveAttribute('aria-current', 'true')
+    const trigger = screen.getByRole('button', { name: /One/i })
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(trigger)
+    expect(onSelect).toHaveBeenCalledWith(null)
   })
 
   it('renders an empty state with no vaults', () => {

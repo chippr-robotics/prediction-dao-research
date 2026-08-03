@@ -4,10 +4,41 @@
 // Spec 068 (US1) — the list spans EVERY chain the member has vaults on, so each row states its
 // chain (FR-002) and an unreachable chain degrades to an honest per-row notice rather than
 // disappearing or blanking the list.
+//
+// Protect-accordion-refresh — the list reuses the Recovery tab's AccordionSection (one vault
+// expanded at a time, detail inline in the card body instead of a side column) so the two
+// collapsible surfaces behave identically. The card itself borrows the account-card visual
+// language (avatar, kind pill, per-kind accent border, active-state ring) from the My Account
+// carousel, so a vault reads as the same "account" everywhere it's shown in the app.
 
+import { useMemo } from 'react'
+import AccordionSection from '../account/AccordionSection'
+import { AccordionGroupContext } from '../account/accordionContext'
+import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PolicyBadge from './PolicyBadge'
+import VaultDetail from './VaultDetail'
+import VaultProposalsPanel from './VaultProposalsPanel'
 
-export default function VaultList({ vaults, activeAddress, onSelect }) {
+export default function VaultList({
+  vaults,
+  activeAddress,
+  onSelect,
+  onForget,
+  onSwitchNetwork,
+  proposals,
+  isActiveIdentity = () => false,
+}) {
+  // One vault open at a time, driven by the existing selection state rather than
+  // AccordionGroup's own — selecting a vault IS expanding its card, matching the exclusive
+  // open-one-at-a-time behavior of the Recovery tab's AccordionGroup.
+  const groupValue = useMemo(
+    () => ({
+      isOpen: (id) => id === activeAddress,
+      toggle: (id) => onSelect(id === activeAddress ? null : id),
+    }),
+    [activeAddress, onSelect],
+  )
+
   if (!vaults?.length) {
     return (
       <p className="custody-hint" role="status">
@@ -15,47 +46,60 @@ export default function VaultList({ vaults, activeAddress, onSelect }) {
       </p>
     )
   }
+
   return (
-    <ul className="custody-vault-list" aria-label="Your vaults">
-      {vaults.map((v) => {
-        const selected = v.address === activeAddress
-        const label = v.label || 'Unnamed vault'
-        return (
-          <li key={`${v.chainId}:${v.address}`}>
-            <button
-              type="button"
-              className={`custody-vault-item${selected ? ' is-selected' : ''}`}
-              aria-current={selected ? 'true' : undefined}
-              onClick={() => onSelect(v.address)}
+    <AccordionGroupContext.Provider value={groupValue}>
+      <div className="accordion-group custody-vault-list" aria-label="Your vaults">
+        {vaults.map((v) => {
+          const open = v.address === activeAddress
+          const label = v.label || 'Unnamed vault'
+          const summary = [
+            v.isSafe && v.threshold != null
+              ? `${v.threshold}-of-${v.owners.length}${v.owner ? ' · owner' : ' · view-only'}`
+              : null,
+            v.reachable === false
+              ? `${v.chainName || `chain ${v.chainId}`} unreachable`
+              : v.isSafe === false
+                ? 'unreadable'
+                : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+
+          return (
+            <AccordionSection
+              key={`${v.chainId}:${v.address}`}
+              id={v.address}
+              className={`custody-vault-card${v.isTestnet ? ' is-testnet' : ''}`}
+              icon={<BlockiesAvatar address={v.address} size={28} />}
+              title={
+                <span className="custody-vault-card__title">
+                  <span className="custody-vault-card__kind">Multisig</span>
+                  <span className="custody-vault-card__label">{label}</span>
+                  <span className="custody-vault-card__addr">{shorten(v.address)}</span>
+                  <PolicyBadge status={v.policyStatus} summary={v.policySummary} />
+                </span>
+              }
+              summary={summary}
+              badge={`${v.chainName || `Chain ${v.chainId}`}${v.isTestnet ? ' · testnet' : ''}`}
+              badgeTone={v.isTestnet ? 'warn' : 'info'}
             >
-              <span className="custody-vault-label">{label}</span>
-              <span className="custody-vault-addr">{shorten(v.address)}</span>
-              {/* Chain identity is never optional on a custody surface (FR-002): approving on the
-                  wrong network is the mistake this whole feature exists to prevent. */}
-              <span className={`custody-chain-badge${v.isTestnet ? ' is-testnet' : ''}`}>
-                {v.chainName || `Chain ${v.chainId}`}
-                {v.isTestnet ? ' · testnet' : ''}
-              </span>
-              {v.isSafe && (
-                <span className="custody-vault-meta">
-                  {v.threshold}-of-{v.owners.length}
-                  {v.owner ? ' · owner' : ' · view-only'}
-                </span>
-              )}
-              {v.reachable === false && (
-                <span className="custody-vault-meta custody-error">
-                  {v.chainName || `chain ${v.chainId}`} unreachable
-                </span>
-              )}
-              {v.reachable !== false && v.isSafe === false && (
-                <span className="custody-vault-meta custody-error">unreadable</span>
-              )}
-              <PolicyBadge status={v.policyStatus} summary={v.policySummary} />
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+              <VaultDetail
+                vault={v}
+                onForget={onForget}
+                isActiveIdentity={isActiveIdentity(v)}
+                onProposePolicy={open && v.owner && v.onVaultChain ? proposals?.propose : undefined}
+                onSwitchNetwork={onSwitchNetwork}
+                // FR-019 — the policy panel needs the live queue to refuse a second pending change;
+                // only the open vault's own queue applies (the shared instance tracks activeVault).
+                proposalQueue={open ? (proposals?.queue ?? []) : []}
+              />
+              {open && <VaultProposalsPanel vault={v} proposals={proposals} />}
+            </AccordionSection>
+          )
+        })}
+      </div>
+    </AccordionGroupContext.Provider>
   )
 }
 

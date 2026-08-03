@@ -15,8 +15,6 @@ import { useVaultProposals } from '../../hooks/useVaultProposals'
 import { isCustodySupported, CUSTODY_SUPPORTED_CHAIN_IDS } from '../../config/safeContracts'
 import { NETWORKS } from '../../config/networks'
 import VaultList from './VaultList'
-import VaultDetail from './VaultDetail'
-import VaultProposalsPanel from './VaultProposalsPanel'
 import CreateVaultWizard from './CreateVaultWizard'
 import LoadVaultForm from './LoadVaultForm'
 import './Custody.css'
@@ -48,7 +46,6 @@ function OnChainSection() {
   // Spec 049 — one shared proposal-queue instance for the active vault, so policy-change proposals
   // (VaultDetail → PolicyPanel) land in the same queue the VaultProposalsPanel renders.
   const proposals = useVaultProposals(activeVault)
-  const onVaultChain = Boolean(activeVault && Number(chainId) === Number(activeVault.chainId))
   const canCreateHere = isCustodySupported(chainId)
   const elsewhere = otherCustodyChains(chainId)
 
@@ -101,23 +98,17 @@ function OnChainSection() {
         </p>
       )}
 
-      <div className="custody-onchain-body">
-        <VaultList vaults={vaults} activeAddress={activeAddress} onSelect={selectVault} />
-        {activeVault && (
-          <div className="custody-vault-column">
-            <VaultDetail
-              vault={activeVault}
-              onForget={forget}
-              isActiveIdentity={active.mode === 'vault' && active.vaultAddress === activeVault.address}
-              onProposePolicy={activeVault.owner && onVaultChain ? proposals.propose : undefined}
-              onSwitchNetwork={switchNetwork}
-              // FR-019 — the policy panel needs the live queue to refuse a second pending change.
-              proposalQueue={proposals.queue}
-            />
-            <VaultProposalsPanel vault={activeVault} proposals={proposals} />
-          </div>
-        )}
-      </div>
+      {/* Spec 074/protect-accordion-refresh — one vault expanded at a time, its detail inline in the
+          card body, the same collapsible pattern as the Recovery tab (AccordionSection). */}
+      <VaultList
+        vaults={vaults}
+        activeAddress={activeAddress}
+        onSelect={selectVault}
+        onForget={forget}
+        onSwitchNetwork={switchNetwork}
+        proposals={proposals}
+        isActiveIdentity={(v) => active.mode === 'vault' && active.vaultAddress === v.address}
+      />
     </div>
   )
 }
