@@ -78,8 +78,20 @@ sys.exit(1 if bad else 0)" >/tmp/.probe_runway 2>/dev/null \
         || bad "runway below 48h: $(cat /tmp/.probe_runway 2>/dev/null)"
     fi
 
-    # The engine is the piece whose death is invisible from the public surface.
-    if curl -fsS -m 10 http://127.0.0.1:8080/health >/dev/null 2>&1; then
+    # The engine is the piece whose death is invisible from the public surface: the gateway keeps
+    # serving /status, the paymaster and the proxies without it, so every outside-in check stays green
+    # while relaying is dead.
+    #
+    # Two things this check must get right, both learned the hard way:
+    #   1. The engine's port is NOT published to the host. Only the namespace owner (gateway) publishes
+    #      (127.0.0.1:8788); engine and redis join that namespace, so :8080 is reachable only from
+    #      inside it. A host-side curl returns 000 no matter how healthy the engine is.
+    #   2. /api/v1/health is the ONLY unauthenticated engine route (matching the client's /api/v1/...
+    #      base, engine/client.js:61). /health, /v1/health and / all return 401 -- and `curl -fsS`
+    #      treats 401 as failure, so probing those reports a healthy engine as down.
+    # Getting either wrong makes this a permanent false page.
+    if docker exec fairwins-gateway-gateway \
+         wget -qO- --timeout=8 http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
       ok engine
     else
       bad "OZ relayer engine not answering — relaying is down (intents will self-submit)"

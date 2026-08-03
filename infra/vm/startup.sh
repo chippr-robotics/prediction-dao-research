@@ -18,7 +18,9 @@ echo "provisioning role=${ROLE}"
 # ---- packages ---------------------------------------------------------------------------------
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl gnupg git nginx jq python3
+# rsync is NOT present on the Debian 12 GCE image and is used below to sync the repo into
+# /opt/fairwins — omitting it cost one provisioning run with a bare "exit status 127".
+apt-get install -y -qq ca-certificates curl gnupg git nginx jq python3 rsync
 
 if ! command -v docker >/dev/null; then
   install -m0755 -d /etc/apt/keyrings
@@ -34,6 +36,19 @@ systemctl enable --now docker
 # Ops Agent — required for VM memory and disk metrics (the default agentless metrics give CPU only).
 if ! systemctl is-active --quiet google-cloud-ops-agent; then
   curl -fsS https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh | bash -s -- --also-install
+fi
+
+# A missing binary here surfaces as a bare "exit status 127" in the serial console, with no clue
+# which command was missing. Name it instead. (gcloud IS present on the Google Debian image; rsync
+# is not, which is exactly how this check earned its place.)
+missing=""
+for c in rsync gcloud git docker jq python3 curl logger; do
+  command -v "$c" >/dev/null 2>&1 || missing="${missing} ${c}"
+done
+[ -x /usr/sbin/nginx ] || missing="${missing} nginx"
+if [ -n "$missing" ]; then
+  echo "FATAL: required commands missing:${missing}"
+  exit 1
 fi
 
 # ---- repo + layout ----------------------------------------------------------------------------
