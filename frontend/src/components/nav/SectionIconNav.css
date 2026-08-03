@@ -61,8 +61,12 @@
 }
 
 .section-icon-nav-item:focus-visible {
-  outline: 2px solid var(--brand-primary, var(--color-primary, #36B37E));
-  outline-offset: -2px;
+  outline: none;
+}
+
+.section-icon-nav-item:focus-visible .section-icon-nav-icon {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--bg-secondary, var(--color-surface, #fff)), 0 0 0 4px var(--brand-primary, var(--color-primary, #36B37E));
 }
 
 .section-icon-nav-icon {
