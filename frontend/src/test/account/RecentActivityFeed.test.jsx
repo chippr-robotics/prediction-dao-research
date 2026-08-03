@@ -145,6 +145,33 @@ describe('RecentActivityFeed (spec 051 US1)', () => {
     expect(within(rows[0]).getByText('Payout')).toBeInTheDocument()
   })
 
+  it('groups activity by day by default, with an "Undated" bucket for missing timestamps', () => {
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    // Default grouping shouldn't badge the button — "By day" is the baseline.
+    expect(screen.queryByText('By day')).not.toBeInTheDocument()
+    expect(screen.getByText('Today')).toBeInTheDocument()
+    expect(screen.getByText('Undated')).toBeInTheDocument()
+    // Group headers are presentational, not list rows — order-of-rows checks stay unaffected.
+    const rows = screen.getAllByRole('listitem')
+    expect(within(rows[0]).getByText('Payout')).toBeInTheDocument()
+  })
+
+  it('switches grouping via the Group control (spec 074 follow-up)', async () => {
+    const user = userEvent.setup()
+    render(<RecentActivityFeed entries={entries} chainId={80002} />)
+    await user.click(screen.getByRole('button', { name: /group activity/i }))
+    expect(screen.getByRole('menuitemradio', { name: 'By day' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('menuitemradio', { name: 'No grouping' }))
+    expect(screen.queryByText('Today')).not.toBeInTheDocument()
+    expect(screen.queryByText('Undated')).not.toBeInTheDocument()
+    expect(screen.getByText('No grouping')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /group activity/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'By week' }))
+    expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('Undated')).toBeInTheDocument()
+  })
+
   it('discloses stale classes and the pruning marker', () => {
     render(
       <RecentActivityFeed
