@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAccountStats } from '../../hooks/useAccountStats'
 import usePortfolio from '../../hooks/usePortfolio'
@@ -66,6 +67,24 @@ function MyAccountView() {
   }
   const goCreate = () => navigate('/app')
 
+  // The account selection (cards + view switcher) stays frozen at the top
+  // while the view below scrolls. It pins under the site header — itself
+  // sticky with a height that isn't a constant (dev banner, wrap points) —
+  // so the offset is measured from the header's live box, not hardcoded.
+  const stickyRef = useRef(null)
+  useLayoutEffect(() => {
+    const el = stickyRef.current
+    if (!el) return undefined
+    const measure = () => {
+      const header = document.querySelector('.site-header')
+      const bottom = header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : 0
+      el.style.setProperty('--my-account-sticky-top', `${bottom}px`)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
   // The Activity and Stats views share the honest unsupported/empty states the
   // dashboard always had; Portfolio keeps its own (it reads every supported
   // network, so "network not supported" does not apply to it).
@@ -95,23 +114,25 @@ function MyAccountView() {
 
   return (
     <div className="my-account">
-      <AccountCardsCarousel activeTotalUsd={activeTotalUsd} />
+      <div className="my-account-sticky" ref={stickyRef}>
+        <AccountCardsCarousel activeTotalUsd={activeTotalUsd} />
 
-      {/* Desktop view switcher (the pt-tabs idiom); hidden ≤768px where
-          WalletPage's bottom icon bar carries the same three views. */}
-      <div className="my-account-tabs" role="tablist" aria-label="Account views">
-        {ACCOUNT_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            role="tab"
-            aria-selected={view === v.id}
-            className={`my-account-tab ${view === v.id ? 'active' : ''}`}
-            onClick={() => setView(v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
+        {/* Desktop view switcher (the pt-tabs idiom); hidden ≤768px where
+            WalletPage's bottom icon bar carries the same three views. */}
+        <div className="my-account-tabs" role="tablist" aria-label="Account views">
+          {ACCOUNT_VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="tab"
+              aria-selected={view === v.id}
+              className={`my-account-tab ${view === v.id ? 'active' : ''}`}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {view === 'portfolio' && (

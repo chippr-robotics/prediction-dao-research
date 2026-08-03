@@ -9,7 +9,11 @@
   background: var(--color-surface);
   border-radius: 12px;
   padding: 0;
-  overflow: hidden;
+  /* `clip`, not `hidden`: identical corner clipping, but hidden makes this a
+     scroll container, which silently kills `position: sticky` for every
+     descendant — the My Account frozen header (spec 074) sticks to the window
+     scroll and must not be captured here. */
+  overflow: clip;
   position: relative;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }

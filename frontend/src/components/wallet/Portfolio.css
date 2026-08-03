@@ -236,3 +236,101 @@
   white-space: nowrap;
   width: 1px;
 }
+
+/* --- spec 074 follow-up: loading skeleton --- */
+/* The bones of the portfolio while a cold load runs: real header/section/row
+   geometry with shimmering placeholders. Never rendered over real data — the
+   session snapshot cache serves remounts, so this appears only when the
+   session genuinely has nothing yet. */
+
+.portfolio-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.portfolio-skeleton-bar {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--border-color, #e3e7eb);
+}
+
+.portfolio-skeleton-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: portfolio-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes portfolio-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-skeleton-bar::after {
+    animation: none;
+  }
+}
+
+.portfolio-skeleton-total {
+  width: 160px;
+  height: 34px;
+  margin: 4px auto 12px;
+}
+
+.portfolio-skeleton-heading {
+  width: 180px;
+  height: 16px;
+  margin: 12px 0 10px;
+}
+
+.portfolio-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portfolio-skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: var(--border-color, #e3e7eb);
+}
+
+.portfolio-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+}
+
+.portfolio-skeleton-lines-end {
+  flex: 0 0 auto;
+  align-items: flex-end;
+  min-width: 72px;
+}
+
+.portfolio-skeleton-line-wide {
+  width: 60%;
+  max-width: 180px;
+  height: 12px;
+}
+
+.portfolio-skeleton-line-narrow {
+  width: 40%;
+  max-width: 110px;
+  min-width: 48px;
+  height: 10px;
+}
+
+.portfolio-updated {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, var(--text-secondary, #5a6772));
+}

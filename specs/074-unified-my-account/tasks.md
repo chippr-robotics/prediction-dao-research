@@ -189,6 +189,29 @@ C7/C8, V1/V3, F1–F3, P1–P3).
       usePortfolio cache, WalletPage/collectibles portfolio mocks) and the
       spec/contract/docs artifacts for the amendment.
 
+## Phase 9: Post-launch feedback, round 2 (2026-08-03)
+
+**Goal**: perceived-speed + layout feedback (contract P3–P5, L1, spec
+FR-018–020).
+
+- [X] T027 Portfolio loading skeleton: `PortfolioSkeleton` in
+      `frontend/src/components/wallet/PortfolioPanel.jsx` + shimmer styles in
+      `Portfolio.css` (aria-hidden bones, visually-hidden loading status,
+      reduced-motion safe).
+- [X] T028 Persist portfolio snapshots to device storage in
+      `frontend/src/hooks/usePortfolio.js` (`fw_portfolio_snapshots_v1`,
+      BigInt-safe encode/decode, bounded, best-effort) so reloads hydrate the
+      latest known data; disclose data age via the panel's "Updated … ago"
+      line.
+- [X] T029 Freeze the account selection: `.my-account-sticky` wrapper
+      (carousel + tab strip) pinning below the runtime-measured site header
+      in `MyAccountView.jsx/.css`; switch `.wallet-page` `overflow: hidden` →
+      `clip` and `.App` `overflow-x: hidden` → `clip` so ancestors don't
+      swallow the stick.
+- [X] T030 Tests: skeleton assertions (PortfolioPanel), storage
+      persist/hydrate round trip (usePortfolio), sticky-block composition
+      (MyAccountView); spec/contract/docs amendments.
+
 ## Dependencies
 
 ```text

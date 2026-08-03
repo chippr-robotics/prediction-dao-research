@@ -6,6 +6,7 @@ import InfoTip from '../ui/InfoTip'
 import AssetLogo from './AssetLogo'
 import AssetDetailSheet from './AssetDetailSheet'
 import { formatAssetAmount } from '../../lib/portfolio/aggregate'
+import { formatRelativeTime } from '../../lib/account/format'
 import SensitiveValue from '../common/SensitiveValue'
 import { useCollectiblesValuation } from '../../hooks/useCollectibles'
 import { computeCollectiblesValuation } from '../../lib/collectibles/valuation'
@@ -192,6 +193,38 @@ export default function PortfolioPanel({ portfolio = null }) {
   return <SelfLoadingPortfolioPanel />
 }
 
+/** Loading bones: real header/section/row geometry, shimmer placeholders. */
+function PortfolioSkeleton() {
+  return (
+    <div className="portfolio-skeleton" aria-hidden="true">
+      <header className="portfolio-header">
+        <p className="portfolio-total-label">Total portfolio balance</p>
+        <span className="portfolio-skeleton-bar portfolio-skeleton-total" />
+      </header>
+      {[0, 1, 2].map((section) => (
+        <section className="portfolio-category" key={section}>
+          <span className="portfolio-skeleton-bar portfolio-skeleton-heading" />
+          <ul className="portfolio-rows">
+            {[0, 1, 2].map((row) => (
+              <li className="portfolio-row portfolio-skeleton-row" key={row}>
+                <span className="portfolio-skeleton-avatar" />
+                <span className="portfolio-skeleton-lines">
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-wide" />
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                </span>
+                <span className="portfolio-skeleton-lines portfolio-skeleton-lines-end">
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                  <span className="portfolio-skeleton-bar portfolio-skeleton-line-narrow" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 function SelfLoadingPortfolioPanel() {
   // Spec 063 (US1): the portfolio shows the account the member is acting as (a vault or recovered
   // account), not always the connected wallet. Personal mode passes its own address → unchanged.
@@ -244,11 +277,16 @@ function PortfolioBody({ portfolio }) {
   }
 
   if (portfolio.status === 'loading') {
+    // Cold load (no session snapshot yet): show the BONES of the portfolio —
+    // header + category sections with shimmering placeholder rows — so the
+    // member sees the page shape immediately instead of a bare loading line.
+    // Placeholders are aria-hidden; the status text carries the semantics.
     return (
-      <div className="portfolio-root">
-        <p className="portfolio-state" role="status">
+      <div className="portfolio-root" aria-busy="true">
+        <p className="portfolio-visually-hidden" role="status">
           Loading portfolio…
         </p>
+        <PortfolioSkeleton />
       </div>
     )
   }
@@ -270,6 +308,14 @@ function PortfolioBody({ portfolio }) {
         >
           {portfolio.isLoading ? 'Refreshing…' : 'Refresh'}
         </button>
+        {/* Data age, honestly disclosed: hydrated snapshots (session cache or
+            the device store after a reload) show real figures with their real
+            timestamp while the background refresh brings them current. */}
+        {portfolio.lastUpdated != null && (
+          <p className="portfolio-updated" role="status">
+            Updated {formatRelativeTime(portfolio.lastUpdated)}
+          </p>
+        )}
       </header>
 
       {portfolio.categories.map((group) => (

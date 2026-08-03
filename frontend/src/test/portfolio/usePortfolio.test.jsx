@@ -290,4 +290,30 @@ describe('usePortfolio (aggregated, on-chain priced)', () => {
     expect(latest.totalUsd).toBeCloseTo(1)
     expect(latest.lastUpdated).toBe(firstUpdated)
   })
+
+  it('persists snapshots to device storage and hydrates them after a reload (spec 074 follow-up)', async () => {
+    // A successful read writes the snapshot store (BigInt-safe round trip).
+    fixtures.nativeBalances.set(137, 4n * 10n ** 18n)
+    fixtures.prices.set('MATIC', { usd: 0.5, source: 'chainlink', chainId: 137 })
+    const first = await renderPortfolio()
+    await waitFor(() => expect(latest.status).toBe('ready'))
+    expect(latest.totalUsd).toBeCloseTo(2)
+    const stored = JSON.parse(localStorage.getItem('fw_portfolio_snapshots_v1'))
+    const keys = Object.keys(stored)
+    expect(keys.some((k) => k.startsWith(ADDRESS.toLowerCase()))).toBe(true)
+    first.unmount()
+
+    // Simulate a fresh page: a DIFFERENT account whose key exists only in
+    // device storage (never seen by this module's in-memory cache). Transplant
+    // the stored snapshot onto the other address's key, then mount with the
+    // network hanging — the stored figures hydrate instantly.
+    const OTHER = '0x00000000000000000000000000000000000000A1'
+    const myKey = keys.find((k) => k.startsWith(ADDRESS.toLowerCase()))
+    stored[myKey.replace(ADDRESS.toLowerCase(), OTHER.toLowerCase())] = stored[myKey]
+    localStorage.setItem('fw_portfolio_snapshots_v1', JSON.stringify(stored))
+    fixtures.nativeBalances.set(137, () => new Promise(() => {}))
+    await renderPortfolio({ wallet: makeWallet({ address: OTHER }) })
+    expect(latest.status).toBe('ready')
+    expect(latest.totalUsd).toBeCloseTo(2)
+  })
 })
