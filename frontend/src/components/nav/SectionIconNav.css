@@ -18,7 +18,25 @@
   overflow-x: auto;
 }
 
+/* The active-tab pill. Absolutely positioned and driven by JS-measured
+   left/top/width/height (see SectionIconNav.jsx), so it can glide from one
+   icon to another instead of snapping. Sits behind the item content
+   (z-index 0 vs. items' z-index 1) so the icon glyph stays legible on top. */
+.section-icon-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 10px;
+  background: var(--brand-primary, var(--color-primary, #36B37E));
+  box-shadow: 0 4px 10px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.35);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.25s ease, height 0.25s ease;
+  pointer-events: none;
+}
+
 .section-icon-nav-item {
+  position: relative;
+  z-index: 1;
   flex: 1 1 0;
   min-width: 56px;
   display: flex;
@@ -31,10 +49,10 @@
   background: transparent;
   color: var(--text-muted, var(--color-text-secondary, #8A959E));
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.2s ease, background 0.15s ease;
 }
 
-.section-icon-nav-item:hover {
+.section-icon-nav-item:not(.active):hover {
   background: var(--bg-primary, var(--color-surface-hover, rgba(0, 0, 0, 0.04)));
 }
 
@@ -54,6 +72,17 @@
   width: 40px;
   height: 30px;
   color: inherit;
+  transition: color 0.2s ease;
+}
+
+.section-icon-nav-item.active .section-icon-nav-icon {
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-icon-nav-indicator {
+    transition: none;
+  }
 }
 
 .section-icon-nav-label {
