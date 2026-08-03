@@ -1,6 +1,6 @@
 # Contract: Workspace Layout
 
-**Feature**: 074-monorepo-workspaces | **Phase 1 design artifact**
+**Feature**: 075-monorepo-workspaces | **Phase 1 design artifact**
 
 The declared shape of the workspace. Names are the **real** `name` fields measured from each
 manifest — no renames occur in this feature (research R11).

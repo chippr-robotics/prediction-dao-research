@@ -1,7 +1,7 @@
 name: Security Testing & Analysis
 
 on:
-  # pull_request/push triggers deliberately REMOVED (spec 074, FR-009).
+  # pull_request/push triggers deliberately REMOVED (spec 075, FR-009).
   # ci-manager.yml invokes this workflow via workflow_call; declaring event triggers here
   # as well made it run TWICE per commit, which is why ci-manager's change detection only
   # ever ADDED work instead of reducing it.
@@ -169,7 +169,7 @@ jobs:
         run: |
           slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
-      # Constitution IV + spec 074 FR-007: the scan must actually gate. `|| true` above is retained
+      # Constitution IV + spec 075 FR-007: the scan must actually gate. `|| true` above is retained
       # deliberately — slither exits non-zero on ANY finding, including informational ones — so the
       # blocking decision is made here, on IMPACT, instead of being discarded entirely.
       - name: Enforce Slither severity gate

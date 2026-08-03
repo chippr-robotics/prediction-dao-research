@@ -136,7 +136,7 @@ jobs:
           # let a finding fail the job — matches security-testing.yml behavior.
           slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
-      # Constitution IV + spec 074 FR-007: the scan must actually gate. `|| true` above is retained
+      # Constitution IV + spec 075 FR-007: the scan must actually gate. `|| true` above is retained
       # deliberately — slither exits non-zero on ANY finding, including informational ones — so the
       # blocking decision is made here, on IMPACT, instead of being discarded entirely.
       - name: Enforce Slither severity gate
@@ -394,7 +394,7 @@ jobs:
         continue-on-error: false
 
       # Constitution IV: must fail the pipeline on error. Do NOT reintroduce `continue-on-error`
-      # (spec 074, FR-007/FR-008). `set -o pipefail` is load-bearing — the command pipes into
+      # (spec 075, FR-007/FR-008). `set -o pipefail` is load-bearing — the command pipes into
       # `tee`, so without it the step's status is tee's (always 0).
       - name: Run Cypress E2E tests (full suite)
         working-directory: frontend

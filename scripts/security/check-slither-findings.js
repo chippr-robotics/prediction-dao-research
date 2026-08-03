@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Slither severity gate (spec 074, FR-007/FR-008; constitution IV).
+ * Slither severity gate (spec 075, FR-007/FR-008; constitution IV).
  *
- * Until spec 074 the Slither step ended in `|| true` and its report was only ever uploaded as an
+ * Until spec 075 the Slither step ended in `|| true` and its report was only ever uploaded as an
  * artifact — so the constitution's "security scans MUST fail the pipeline on critical
  * vulnerabilities" was entirely unenforced. Slither could report anything and the job stayed green.
  *

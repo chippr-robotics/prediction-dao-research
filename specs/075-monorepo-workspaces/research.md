@@ -1,6 +1,6 @@
 # Phase 0 Research: Monorepo Workspaces, Packages, and a Declared Build-Target Graph
 
-**Feature**: 074-monorepo-workspaces | **Date**: 2026-08-02
+**Feature**: 075-monorepo-workspaces | **Date**: 2026-08-02
 
 All findings below were produced by a 12-agent review of the working tree (six domain surveys,
 three independent feasibility cases, one synthesis, two adversarial verification passes) and then

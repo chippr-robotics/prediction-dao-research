@@ -4,7 +4,7 @@ const hre = require("hardhat");
 /**
  * Spec 074, FR-002 / SC-002 — the EVM target must be DECLARED BY THIS REPOSITORY.
  *
- * Before spec 074 only the 0.8.23 compiler entry pinned `evmVersion`. The 0.8.24 entry — 116 of
+ * Before spec 075 only the 0.8.23 compiler entry pinned `evmVersion`. The 0.8.24 entry — 116 of
  * the repo's 120 contracts — and all 38 per-file overrides declared nothing, so their EVM target
  * came from Hardhat's own internal default
  * (config-resolution.js: `compiler.settings?.evmVersion ?? "paris"` for solc >= 0.8.20)
@@ -21,7 +21,7 @@ const hre = require("hardhat");
  * config, into which Hardhat has already substituted its default — so an assertion against it
  * passes whether or not the repo declared anything. Measured at adoption: userConfig reported
  * evmVersion on 0 of 38 overrides while the resolved config reported it on all 38. A test written
- * against `hre.config` is a gate that cannot fail, which is exactly what spec 074 exists to
+ * against `hre.config` is a gate that cannot fail, which is exactly what spec 075 exists to
  * eliminate. `hre.userConfig` is the raw module export and is the only surface that answers
  * "did WE declare this?".
  *

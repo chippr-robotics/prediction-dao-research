@@ -299,7 +299,7 @@ async function main() {
     process.exit(1);
   }
 
-  // A gate that compared nothing has not passed — it has abstained (spec 074, FR-004).
+  // A gate that compared nothing has not passed — it has abstained (spec 075, FR-004).
   //
   // This is the exact failure recorded in the header above: every contract fell through the
   // "no deployed impl to diff against" branch and the script printed a checkmark and exited 0,
@@ -312,7 +312,7 @@ async function main() {
       "\nStorage-layout check FAILED: 0 live implementations were diffed.\n" +
         "This gate exists to compare compiled layouts against deployed ones; comparing nothing is\n" +
         "not a pass. Check that deployments/*.json and .openzeppelin/*.json are present and readable\n" +
-        "(they are committed, irreproducible state — see specs/074-monorepo-workspaces/).\n" +
+        "(they are committed, irreproducible state — see specs/075-monorepo-workspaces/).\n" +
         "If this repo genuinely has no live upgradeable implementations, that is a deliberate change\n" +
         "and this guard must be updated explicitly.",
     );

@@ -11,7 +11,7 @@ on:
       - develop
   workflow_dispatch:
 
-# Supersede in-flight runs for the same ref (spec 074, FR-010). Without this, pushing a
+# Supersede in-flight runs for the same ref (spec 075, FR-010). Without this, pushing a
 # follow-up commit leaves the previous pipeline running to completion, which is where a large
 # share of this repo's runner time went.
 concurrency:

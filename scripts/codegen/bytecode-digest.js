@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Bytecode digest snapshot (spec 074, FR-005 / SC-001).
+ * Bytecode digest snapshot (spec 075, FR-005 / SC-001).
  *
  * Records a sha256 of `bytecode` + `deployedBytecode` for every compiled contract so a build-system
  * change can be PROVEN byte-neutral. Any change to compiler settings, dependency resolution, or the
@@ -77,7 +77,7 @@ if (cmpIdx !== -1) {
   if (changed.length || removed.length || added.length) {
     console.error(
       "\nFAIL: bytecode is NOT byte-identical to the baseline.\n" +
-        "Per spec 074 FR-005 this BLOCKS the change. Do not merge.\n" +
+        "Per spec 075 FR-005 this BLOCKS the change. Do not merge.\n" +
         "If the compiler target moved, treat it as an incident against the live implementations first."
     );
     process.exit(1);

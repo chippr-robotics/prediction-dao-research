@@ -1,6 +1,6 @@
 # Contract: Shared Packages
 
-**Feature**: 074-monorepo-workspaces | **Phase 1 design artifact**
+**Feature**: 075-monorepo-workspaces | **Phase 1 design artifact**
 
 Three shared packages. Two are new; one already exists and is merely consumed by name.
 

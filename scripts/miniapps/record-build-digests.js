@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Mini-app build digest baseline (spec 074, FR-019/FR-020/B2).
+ * Mini-app build digest baseline (spec 075, FR-019/FR-020/B2).
  *
  * WHY THIS EXISTS
  * tools/miniapp-build/hostScopePlugin.js resolves each shared dependency and `await import()`s it
@@ -17,7 +17,7 @@
  * the published CID: the live packages were built on a developer machine from an unrecorded commit
  * against unrecorded dependency versions, so a mismatch there could not distinguish "this change
  * broke it" from "HEAD never reproduced it". Answering that separate question needs an on-chain
- * read (scripts/miniapps/record-baseline.js, spec 074 T031).
+ * read (scripts/miniapps/record-baseline.js, spec 075 T031).
  *
  * Usage:
  *   node scripts/miniapps/record-build-digests.js --out <file>
@@ -71,7 +71,7 @@ if (cmpIdx !== -1) {
   if (diff.length) {
     console.error(
       `\nFAIL: ${diff.length} mini-app output file(s) changed.\n` +
-        "These bytes are keccak-committed on-chain in MiniAppRegistry. Per spec 074 FR-022 this\n" +
+        "These bytes are keccak-committed on-chain in MiniAppRegistry. Per spec 075 FR-022 this\n" +
         "BLOCKS the change until the difference is explained, and the affected package is\n" +
         "re-published and re-approved on-chain.",
     );

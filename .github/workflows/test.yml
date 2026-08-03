@@ -1,7 +1,7 @@
 name: Test Pipeline
 
 on:
-  # pull_request/push triggers deliberately REMOVED (spec 074, FR-009).
+  # pull_request/push triggers deliberately REMOVED (spec 075, FR-009).
   # ci-manager.yml invokes this workflow via workflow_call; declaring event triggers here
   # as well made it run TWICE per commit, which is why ci-manager's change detection only
   # ever ADDED work instead of reducing it.
@@ -354,7 +354,7 @@ jobs:
         run: npm ci
 
       # Constitution IV: this step MUST fail the pipeline on error. Do NOT reintroduce
-      # `continue-on-error` here (spec 074, FR-007/FR-008).
+      # `continue-on-error` here (spec 075, FR-007/FR-008).
       #
       # `set -o pipefail` is load-bearing: the command is piped into `tee`, so without it the
       # step's exit status is tee's (always 0) and cypress's failure is discarded exactly as
@@ -397,7 +397,7 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      # Belt-and-braces assertion on the machine-readable results (spec 074, FR-008).
+      # Belt-and-braces assertion on the machine-readable results (spec 075, FR-008).
       #
       # This replaces `grep -q "failing" cypress-output.txt`, which could never match: the run uses
       # `--reporter json`, so that file holds JSON, and mocha's JSON reporter emits `"failures": N`

@@ -1,8 +1,8 @@
 # Implementation Plan: Monorepo Workspaces, Packages, and a Declared Build-Target Graph
 
-**Branch**: `074-monorepo-workspaces` | **Date**: 2026-08-02 | **Spec**: [spec.md](./spec.md)
+**Branch**: `075-monorepo-workspaces` | **Date**: 2026-08-02 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/074-monorepo-workspaces/spec.md`
+**Input**: Feature specification from `/specs/075-monorepo-workspaces/spec.md`
 
 ## Summary
 
@@ -91,7 +91,7 @@ the constitution check itself:
 ### Documentation (this feature)
 
 ```text
-specs/074-monorepo-workspaces/
+specs/075-monorepo-workspaces/
 ├── plan.md              # This file
 ├── spec.md              # Feature specification
 ├── research.md          # Phase 0 output — R1..R12, incl. the Bazel evaluation

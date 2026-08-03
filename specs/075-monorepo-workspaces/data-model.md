@@ -1,6 +1,6 @@
 # Phase 1 Data Model: Workspace, Package, Target, Baseline
 
-**Feature**: 074-monorepo-workspaces | **Date**: 2026-08-02
+**Feature**: 075-monorepo-workspaces | **Date**: 2026-08-02
 
 This feature's "data" is build metadata, not runtime records. The entities below are the things
 that gain a declared identity, and the rules that must hold for each.

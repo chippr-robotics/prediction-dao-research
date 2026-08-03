@@ -1,6 +1,6 @@
 # Tasks: Monorepo Workspaces, Packages, and a Declared Build-Target Graph
 
-**Feature**: 074-monorepo-workspaces | **Branch**: `074-monorepo-workspaces`
+**Feature**: 075-monorepo-workspaces | **Branch**: `075-monorepo-workspaces`
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md),
 [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
 
@@ -17,9 +17,9 @@ this feature *is* gates.
 
 **No baseline, no merge.** These run on an unmodified tree and gate every later phase.
 
-- [ ] T001 Record the bytecode baseline on unmodified `main` per quickstart S0, writing sha256 of `bytecode`+`deployedBytecode` per artifact to `specs/074-monorepo-workspaces/baseline-bytecode.json`
-- [ ] T002 [P] Record the current pipeline job inventory (count per commit, duration, pass/fail) from run history to `specs/074-monorepo-workspaces/baseline-ci.md` — the comparison set for T077
-- [ ] T003 [P] Record per-job install size and wall-clock for `fairwins-relay-gateway` and `frontend` to `specs/074-monorepo-workspaces/baseline-installs.md` (gateway is ~299 packages today)
+- [ ] T001 Record the bytecode baseline on unmodified `main` per quickstart S0, writing sha256 of `bytecode`+`deployedBytecode` per artifact to `specs/075-monorepo-workspaces/baseline-bytecode.json`
+- [ ] T002 [P] Record the current pipeline job inventory (count per commit, duration, pass/fail) from run history to `specs/075-monorepo-workspaces/baseline-ci.md` — the comparison set for T077
+- [ ] T003 [P] Record per-job install size and wall-clock for `fairwins-relay-gateway` and `frontend` to `specs/075-monorepo-workspaces/baseline-installs.md` (gateway is ~299 packages today)
 - [ ] T004 Verify the baseline is reproducible: re-run T001 on a clean tree and confirm the digests match; a non-reproducible baseline invalidates every downstream gate
 
 **Checkpoint**: baselines committed. Nothing else may start until T001 and T004 pass.
@@ -101,7 +101,7 @@ bytes.**
 ### Baselines and fixtures FIRST (blocking)
 
 - [ ] T031 [US3] Write `scripts/miniapps/record-baseline.js` reading `manifestHash` + `cid` for both apps from `MiniAppRegistry` on Polygon 137 **and** Mordor 63 (FR-019)
-- [ ] T032 [US3] **GATE** — run it, rebuild on today's tree, and commit `specs/074-monorepo-workspaces/baseline-miniapps.json` recording per app per chain: `manifestHash`, `cid`, and **whether HEAD reproduces the published CID**. An unreachable chain records `unreachable` and **blocks** the gate — never a default (FR-019, B1)
+- [ ] T032 [US3] **GATE** — run it, rebuild on today's tree, and commit `specs/075-monorepo-workspaces/baseline-miniapps.json` recording per app per chain: `manifestHash`, `cid`, and **whether HEAD reproduces the published CID**. An unreachable chain records `unreachable` and **blocks** the gate — never a default (FR-019, B1)
 - [ ] T033 [US3] **GATE** — add a **new `ethers`-importing fixture** under `frontend/src/test/miniapps/fixtures/`. The existing fixture's own header states `ethers` is *intentionally not imported*, so it is structurally blind to the ~190-binding shim both real packages actually use (FR-021, B3)
 - [ ] T034 [US3] Confirm `node frontend/src/test/miniapps/fixtures/regenerate.mjs` produces an empty git diff **before** any workspace change
 

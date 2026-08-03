@@ -315,11 +315,11 @@ module.exports = {
             runs: 1,  // Optimize for deployment size over runtime gas
           },
           viaIR: true,
-          // PIN THE EVM TARGET (spec 074, FR-001). Do NOT remove, and do NOT add a compiler
+          // PIN THE EVM TARGET (spec 075, FR-001). Do NOT remove, and do NOT add a compiler
           // entry or an override without it — test/config/CompilerTargets.test.js fails the
           // suite if you do.
           //
-          // Until spec 074 this entry declared no evmVersion, so the EVM target of 116 of the
+          // Until spec 075 this entry declared no evmVersion, so the EVM target of 116 of the
           // repo's 120 contracts was inherited from Hardhat's own internal default
           // (config-resolution.js: `evmVersion ?? "paris"` for solc >= 0.8.20) while hardhat is
           // depended on as a caret range. A hardhat minor moving that default emits PUSH0
@@ -398,9 +398,9 @@ module.exports = {
         "@zk-kit/lean-imt.sol/InternalLeanIMT.sol",
         "@zk-kit/lean-imt.sol/LeanIMT.sol",
         "poseidon-solidity/PoseidonT3.sol",
-        // `evmVersion: "paris"` is REQUIRED here, not decorative (spec 074, FR-001). An override
+        // `evmVersion: "paris"` is REQUIRED here, not decorative (spec 075, FR-001). An override
         // that omits it inherits Hardhat's internal default exactly as a compiler entry does —
-        // verified: before spec 074 the user config declared evmVersion on 0 of these 38 entries
+        // verified: before spec 075 the user config declared evmVersion on 0 of these 38 entries
         // while the resolved config reported it on all 38, so the omission was invisible.
       ].map((f) => [
         f,

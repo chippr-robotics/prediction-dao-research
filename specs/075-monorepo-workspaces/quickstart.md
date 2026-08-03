@@ -1,9 +1,9 @@
 # Quickstart: Validating the Monorepo Workspace Conversion
 
-**Feature**: 074-monorepo-workspaces | **Phase 1 design artifact**
+**Feature**: 075-monorepo-workspaces | **Phase 1 design artifact**
 
 Runnable validation scenarios, one per phase. Each is the evidence that its phase is safe to merge.
-Run from the repository root on branch `074-monorepo-workspaces`.
+Run from the repository root on branch `075-monorepo-workspaces`.
 
 **Prerequisites**: Node ≥ 22 (measured: 24.9.0), npm ≥ 11 (measured: 11.6.0), a working
 `npm install`, and network access for solc on a cold cache.
@@ -104,7 +104,7 @@ gate.** *(FR-011)*
 Then confirm trigger hygiene:
 
 ```bash
-gh run list --branch 074-monorepo-workspaces --limit 20
+gh run list --branch 075-monorepo-workspaces --limit 20
 ```
 
 **Expected**: each workflow appears **once** per commit; a docs-only commit triggers only docs jobs;
@@ -121,7 +121,7 @@ pushing a second commit cancels the first run.
 ```bash
 # 1a. mini-app content hashes from the chain, BOTH cohorts
 node scripts/miniapps/record-baseline.js --chain 137 --chain 63 \
-  --out specs/074-monorepo-workspaces/baseline-miniapps.json
+  --out specs/075-monorepo-workspaces/baseline-miniapps.json
 # 1b. today's built bytes, same tree
 node frontend/src/test/miniapps/fixtures/regenerate.mjs
 git diff --exit-code frontend/src/test/miniapps/fixtures/   # expect clean BEFORE any change
