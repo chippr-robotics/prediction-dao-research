@@ -190,6 +190,16 @@ describe('MyAccountView — unified account experience (spec 074)', () => {
     expect(screen.getByRole('button', { name: /disconnect wallet/i })).toBeInTheDocument()
   })
 
+  it('freezes the account selection: carousel + view switcher share the sticky block (post-launch feedback)', () => {
+    const { container } = renderView()
+    const sticky = container.querySelector('.my-account-sticky')
+    expect(sticky).toBeTruthy()
+    expect(sticky.querySelector('[role="listbox"]')).toBeTruthy()
+    expect(sticky.querySelector('[role="tablist"]')).toBeTruthy()
+    // The view panel scrolls with the page — it must NOT be inside the frozen block.
+    expect(sticky.querySelector('[role="tabpanel"]')).toBeNull()
+  })
+
   it('passes nothing to useAccountStats in personal mode (A1)', () => {
     renderView()
     expect(useAccountStatsMock).toHaveBeenCalledWith(undefined)

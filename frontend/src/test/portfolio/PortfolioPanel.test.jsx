@@ -121,10 +121,16 @@ describe('PortfolioPanel states', () => {
     expect(screen.queryByText(/total portfolio balance/i)).not.toBeInTheDocument()
   })
 
-  it('shows a loading state', () => {
+  it('shows a skeleton of the portfolio bones while loading (spec 074 follow-up)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ status: 'loading' }))
-    renderPanel()
+    const { container } = renderPanel()
     expect(screen.getByRole('status')).toHaveTextContent(/loading portfolio/i)
+    // The bones: header label + shimmering section/row placeholders.
+    expect(screen.getByText(/total portfolio balance/i)).toBeInTheDocument()
+    const skeleton = container.querySelector('.portfolio-skeleton')
+    expect(skeleton).toBeTruthy()
+    expect(skeleton.getAttribute('aria-hidden')).toBe('true')
+    expect(skeleton.querySelectorAll('.portfolio-skeleton-row').length).toBeGreaterThanOrEqual(6)
   })
 
   it('shows the error state with a working retry', () => {

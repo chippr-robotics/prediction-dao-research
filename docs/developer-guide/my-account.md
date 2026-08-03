@@ -57,14 +57,26 @@ a direct link; unknown values fall back to Portfolio via
 - **Stats** — `SummaryTiles` + `PnlChart` + `ActivityBreakdowns` (the
   by-status / by-token / by-resolution groups are stats, not a log).
 
-**Portfolio freshness**: `usePortfolio` keeps a session-memory snapshot cache
-keyed by account + scan scope. A remount hydrates the last real snapshot
-immediately (original `lastUpdated` intact) while a fresh read runs in the
-background — the member never stares at "Loading portfolio…" for data the
-session already has. Snapshots never cross accounts or the testnet-visibility
-boundary, and nothing persists across reloads. MyAccountView mounts ONE
-portfolio instance for the card total and the Portfolio view together, and it
-starts warming as soon as My Account opens, whichever view is showing.
+**Portfolio freshness**: `usePortfolio` keeps a snapshot cache keyed by
+account + scan scope — session memory first, mirrored to device storage
+(`fw_portfolio_snapshots_v1`, BigInt-safe, bounded, figures only — never key
+material). A remount OR a page reload hydrates the last real snapshot
+immediately (original `lastUpdated` intact, disclosed as "Updated … ago" in
+the panel header) while a fresh read runs in the background; the 60s poll
+keeps it current. Snapshots never cross accounts or the testnet-visibility
+boundary. A genuinely cold load renders `PortfolioSkeleton` (the page's bones
+with shimmer placeholders, aria-hidden behind a visually-hidden loading
+status) rather than a bare loading line. MyAccountView mounts ONE portfolio
+instance for the card total and the Portfolio view together, and it starts
+warming as soon as My Account opens, whichever view is showing.
+
+**Frozen account selection**: the carousel and desktop tab strip live in
+`.my-account-sticky`, pinned below the site header while only the view
+content scrolls. The offset is measured at runtime from the header's live box
+(the header's height is not a constant). Two load-bearing details:
+`.wallet-page` clips with `overflow: clip` and `.App` with
+`overflow-x: clip` — switching either back to `hidden` creates a scroll
+container and silently kills the stick.
 
 The switcher renders exactly once per width: WalletPage feeds
 `SectionIconNav` (the mobile bottom bar) the `ACCOUNT_VIEWS` items while the

@@ -7,6 +7,35 @@
   gap: 16px;
 }
 
+/* Frozen account selection: the cards + view switcher pin below the (sticky)
+   site header while only the view content scrolls. The offset var is measured
+   at runtime from the header's live box (MyAccountView effect). Requires no
+   scroll-container ancestors — .wallet-page clips with `overflow: clip`, not
+   `hidden`, exactly so this can stick to the window scroll. */
+.my-account-sticky {
+  /* Matches .tab-content's padding (24px desktop / 16px ≤768px) so the bleed
+     below spans the host panel edge-to-edge. */
+  --my-account-bleed: 24px;
+  position: sticky;
+  top: var(--my-account-sticky-top, 0px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--color-surface, var(--bg-secondary, #ffffff));
+  /* Bleed over the host panel's padding so scrolling content disappears
+     cleanly under the frozen block instead of peeking out beside it. */
+  margin: calc(-1 * var(--my-account-bleed)) calc(-1 * var(--my-account-bleed)) 0;
+  padding: 16px var(--my-account-bleed) 8px;
+  border-bottom: 1px solid var(--border-color, #e3e7eb);
+}
+
+@media (max-width: 768px) {
+  .my-account-sticky {
+    --my-account-bleed: 16px;
+  }
+}
+
 .my-account-freshness {
   display: flex;
   align-items: center;

@@ -87,15 +87,30 @@ breakdowns moved to Stats, and the feed grew filter/search tools (F*).
 - **F3** A filter/search combination with no matches shows a "no matching
   activity" state distinct from the no-history empty state.
 
-## Portfolio freshness (P) — amended 2026-08-03
+## Portfolio freshness (P) — amended 2026-08-03 (round 2 same day)
 
 - **P1** A remount for an account+scope already read this session hydrates
   the last real snapshot immediately (status `ready`, original `lastUpdated`)
   while a background refresh runs.
 - **P2** Snapshots are keyed by account + scan scope: switching accounts or
   toggling testnet visibility can never render another key's data.
-- **P3** The cache is session-memory only (bounded, LRU-ish); a reload starts
-  cold.
+- **P3** (round 2) Snapshots also persist to device storage
+  (`fw_portfolio_snapshots_v1`, bounded, BigInt-safe, figures only — no keys
+  or secrets), so a page reload hydrates the latest known data too; storage
+  failures degrade silently to a cold load.
+- **P4** (round 2) A genuinely cold load renders the portfolio SKELETON
+  (`.portfolio-skeleton`, aria-hidden, with a visually-hidden
+  "Loading portfolio…" `role="status"`), not a bare text line.
+- **P5** (round 2) The panel header discloses data age ("Updated … ago" from
+  the snapshot's real `lastUpdated`) whenever figures are on screen.
+
+## Layout (L) — round 2
+
+- **L1** The carousel and the desktop view switcher live in one
+  `.my-account-sticky` block that pins below the site header
+  (`position: sticky`, runtime-measured offset); view panels are outside it,
+  so only the view content scrolls. `.wallet-page`/`.App` clip with
+  `overflow: clip` (never `hidden`) to keep the stick working.
 
 ## Accessibility (X)
 

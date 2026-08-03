@@ -270,6 +270,19 @@ they conflict:
   access, appearing only once real data is available (never a fabricated $0
   while loading).
 
+### Round 2 (same day)
+
+- **FR-018**: A cold portfolio load shows a **skeleton** of the portfolio
+  (header + category sections with placeholder rows) so the member sees the
+  page's bones immediately; placeholders are announced as loading, never as
+  data.
+- **FR-019**: Portfolio snapshots persist on the device (figures only —
+  never keys or secrets) so even a page reload shows the latest known data
+  immediately, updating in the background; the disclosed "Updated … ago"
+  timestamp always reflects when the figures were actually read.
+- **FR-020**: The account selection (cards + view switcher) stays frozen at
+  the top of My Account; scrolling moves only the view below it.
+
 ## Assumptions
 
 - ~~The Activity view is the default lower-half view~~ — superseded by
