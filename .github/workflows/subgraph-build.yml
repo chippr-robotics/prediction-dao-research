@@ -42,7 +42,7 @@ jobs:
           node-version: '22'
 
       - name: Install subgraph dependencies
-        run: npm install
+        run: npm ci
 
       - name: Verify generated ABI is present
         run: |

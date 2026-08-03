@@ -78,6 +78,7 @@
     "@openzeppelin/contracts": "5.4.0",
     "@openzeppelin/contracts-upgradeable": "5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
+    "@openzeppelin/upgrades-core": "^1.44.2",
     "@pinata/sdk": "^2.1.0",
     "@safe-global/safe-contracts": "1.4.1",
     "@safe-global/safe-singleton-factory": "^2.0.0",
@@ -108,5 +109,8 @@
     "@safe-global/safe-contracts": {
       "ethers": "$ethers"
     }
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }

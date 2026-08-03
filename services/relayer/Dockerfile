@@ -4,7 +4,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json ./
 # No lockfile is committed for this standalone service; install prod deps deterministically by version.
-RUN npm install --omit=dev --no-audit --no-fund
+RUN npm ci --omit=dev --no-audit --no-fund
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
