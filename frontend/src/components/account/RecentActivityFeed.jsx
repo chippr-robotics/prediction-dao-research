@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getNetwork } from '../../config/networks'
-import { formatUsd, formatRelativeTime } from '../../lib/account/format'
+import { formatUsd, formatRelativeTime, dayGroupLabel, weekGroupLabel } from '../../lib/account/format'
 import SensitiveValue from '../common/SensitiveValue'
 import NavIcon from '../nav/NavIcon'
 import EmptyState from './EmptyState'
@@ -29,6 +29,13 @@ const CLASS_FILTERS = [
   { key: 'earn', label: 'Earn' },
   { key: 'pool', label: 'Pools' },
   { key: 'membership', label: 'Membership' },
+]
+
+/** Group-by options for the activity list (spec 074 follow-up). 'day' is the default. */
+const GROUP_OPTIONS = [
+  { key: 'day', label: 'By day' },
+  { key: 'week', label: 'By week' },
+  { key: 'none', label: 'No grouping' },
 ]
 
 function explorerTxUrl(chainId, txHash) {
@@ -76,24 +83,33 @@ function entryMatchesQuery(e, meta, query) {
  *
  * Spec 074 follow-up: the class-filter chip row moved behind a Filter button
  * (dropdown), and a search field lives behind a Search icon — the feed leads
- * with the transactions themselves, and the tools appear on demand.
+ * with the transactions themselves, and the tools appear on demand. A Group
+ * button (dropdown, default "By day") interleaves subtle date-bucket headers
+ * ahead of the rows they cover.
  */
 function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBefore = null }) {
   const [classFilter, setClassFilter] = useState(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [groupBy, setGroupBy] = useState('day')
+  const [groupOpen, setGroupOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const filterRef = useRef(null)
+  const groupRef = useRef(null)
   const searchInputRef = useRef(null)
 
-  // Close the filter dropdown on outside click / Escape.
+  // Close the filter/group dropdowns on outside click / Escape.
   useEffect(() => {
-    if (!filterOpen) return undefined
+    if (!filterOpen && !groupOpen) return undefined
     const onDown = (event) => {
-      if (filterRef.current && !filterRef.current.contains(event.target)) setFilterOpen(false)
+      if (filterOpen && filterRef.current && !filterRef.current.contains(event.target)) setFilterOpen(false)
+      if (groupOpen && groupRef.current && !groupRef.current.contains(event.target)) setGroupOpen(false)
     }
     const onKey = (event) => {
-      if (event.key === 'Escape') setFilterOpen(false)
+      if (event.key === 'Escape') {
+        setFilterOpen(false)
+        setGroupOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -101,7 +117,7 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [filterOpen])
+  }, [filterOpen, groupOpen])
 
   // Opening search focuses the field so "icon → type" is one motion.
   useEffect(() => {
@@ -117,7 +133,27 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
   }, [entries, classFilter, query])
 
   const activeFilter = CLASS_FILTERS.find((f) => f.key === classFilter) || CLASS_FILTERS[0]
+  const activeGroup = GROUP_OPTIONS.find((g) => g.key === groupBy) || GROUP_OPTIONS[0]
   const isFiltering = classFilter != null || query.trim() !== ''
+
+  // Interleave date-group headers (default: by day) ahead of the rows they
+  // cover. Entries arrive newest-first, so same-bucket rows are always
+  // contiguous and a header only needs to print when the bucket changes.
+  const groupedRows = useMemo(() => {
+    if (groupBy === 'none') return rows.map((entry) => ({ type: 'entry', entry }))
+    const labelFor = groupBy === 'week' ? weekGroupLabel : dayGroupLabel
+    const items = []
+    let lastLabel = null
+    for (const entry of rows) {
+      const label = labelFor(entry.timestamp)
+      if (label !== lastLabel) {
+        items.push({ type: 'header', label })
+        lastLabel = label
+      }
+      items.push({ type: 'entry', entry })
+    }
+    return items
+  }, [rows, groupBy])
 
   return (
     <section className="account-feed" aria-label="Recent activity">
@@ -176,6 +212,44 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
               </ul>
             )}
           </div>
+          <div className="account-feed-filter-wrap" ref={groupRef}>
+            <button
+              type="button"
+              className={`account-feed-tool${groupBy !== 'day' ? ' active' : ''}`}
+              aria-label="Group activity"
+              aria-haspopup="menu"
+              aria-expanded={groupOpen}
+              onClick={() => setGroupOpen((o) => !o)}
+            >
+              <NavIcon name="layers" size={16} />
+              {groupBy !== 'day' && (
+                <span className="account-feed-tool-badge">{activeGroup.label}</span>
+              )}
+            </button>
+            {groupOpen && (
+              <ul className="account-feed-filter-menu" role="menu" aria-label="Group activity by">
+                {GROUP_OPTIONS.map((g) => (
+                  <li key={g.key} role="none">
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={groupBy === g.key}
+                      className={`account-feed-filter-option${groupBy === g.key ? ' active' : ''}`}
+                      onClick={() => {
+                        setGroupBy(g.key)
+                        setGroupOpen(false)
+                      }}
+                    >
+                      <span className="account-feed-filter-check" aria-hidden="true">
+                        {groupBy === g.key ? <NavIcon name="check" size={14} /> : null}
+                      </span>
+                      {g.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
 
@@ -214,7 +288,15 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
         )
       ) : (
         <ul className="account-feed-list">
-          {rows.map((e) => {
+          {groupedRows.map((item, idx) => {
+            if (item.type === 'header') {
+              return (
+                <li key={`group-${idx}`} className="account-feed-group-header" role="presentation">
+                  {item.label}
+                </li>
+              )
+            }
+            const e = item.entry
             const meta = KIND_META[e.kind] || { icon: '•', label: e.kind, tone: 'out' }
             const url = explorerTxUrl(e.chainId ?? chainId, e.txHash)
             const relative = e.timestamp != null ? formatRelativeTime(e.timestamp) : null

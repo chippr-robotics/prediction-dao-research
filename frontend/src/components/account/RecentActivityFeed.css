@@ -130,6 +130,23 @@
   flex-direction: column;
 }
 
+/* Date-group header (spec 074 follow-up, default "by day"): deliberately
+   understated — small, muted, uppercase — with extra breathing room above it
+   so a new bucket reads as a soft line break rather than a loud section. */
+.account-feed-group-header {
+  padding: 14px 2px 4px;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.account-feed-group-header:first-child {
+  padding-top: 0;
+}
+
 .account-feed-row {
   display: flex;
   align-items: center;
