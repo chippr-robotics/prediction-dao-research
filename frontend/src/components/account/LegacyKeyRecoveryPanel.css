@@ -20,13 +20,24 @@
 
 .lkr-stored__item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
   border-radius: 10px;
   background: var(--bg-primary, #f7f9fa);
+}
+
+.lkr-stored__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lkr-stored__avatar {
+  flex: none;
+  border-radius: 50%;
 }
 
 .lkr-stored__meta {
@@ -36,25 +47,84 @@
   min-width: 0;
 }
 
+.lkr-stored__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--brand-primary, #36b37e);
+  overflow-wrap: anywhere;
+}
+
 .lkr-stored__addr {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   color: var(--text-primary, #1f2933);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .lkr-stored__sub {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-muted, #8a959e);
 }
 
 .lkr-stored__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  flex-shrink: 0;
 }
 
-.lkr-stored__remove {
+.lkr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  background: transparent;
+  color: var(--text-secondary, #5a6772);
+  border-radius: 999px;
+  padding: 0.32rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: color 0.1s, background 0.1s, border-color 0.1s;
+}
+
+.lkr-action-btn:hover,
+.lkr-action-btn:focus-visible {
+  color: var(--brand-primary, #36b37e);
+  border-color: var(--brand-primary, #36b37e);
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 10%, transparent);
+  outline: none;
+}
+
+.lkr-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+/* Icon-only on narrow screens; label appears alongside once there's room. */
+.lkr-action-btn__label {
+  display: none;
+}
+
+@media (min-width: 420px) {
+  .lkr-action-btn__label {
+    display: inline;
+  }
+
+  .lkr-action-btn {
+    padding: 0.32rem 0.6rem;
+  }
+}
+
+.lkr-action-btn--danger {
   color: var(--danger-color, #dc2626);
+}
+
+.lkr-action-btn--danger:hover,
+.lkr-action-btn--danger:focus-visible {
+  color: var(--danger-color, #dc2626);
+  border-color: var(--danger-color, #dc2626);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 10%, transparent);
 }
 
 /* --- Secret entry --- */
