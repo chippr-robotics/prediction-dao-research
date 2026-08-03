@@ -99,23 +99,63 @@ provision_iam() {
          --display-name="FairWins alto bundler (VM)" \
          --description="Minimal: read two secrets, pull images, write logs/metrics. No project-level editor."
 
+  # A freshly created service account is not immediately visible to the IAM binding APIs; binding
+  # against it fails with "Service account ... does not exist" for a few seconds. Wait for it rather
+  # than making the operator re-run the step (this cost one run).
+  say "Waiting for ${BSA} to propagate"
+  for _ in $(seq 1 30); do
+    gcloud iam service-accounts describe "$BSA" --project "$PROJECT" >/dev/null 2>&1 && break
+    sleep 2
+  done
+
   say "Resource-scoped secret access (NOT project-wide)"
   for s in alto-executor-key-137 origin-lock-secret; do
-    gcloud secrets add-iam-policy-binding "$s" --project "$PROJECT" \
-      --member="serviceAccount:${BSA}" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+    for attempt in 1 2 3 4 5; do
+      if gcloud secrets add-iam-policy-binding "$s" --project "$PROJECT" \
+           --member="serviceAccount:${BSA}" --role=roles/secretmanager.secretAccessor --quiet >/dev/null 2>&1; then
+        break
+      fi
+      [ "$attempt" = 5 ] && { echo "FATAL: could not bind ${BSA} to secret ${s}" >&2; exit 1; }
+      sleep 5
+    done
   done
 
-  say "Project-level: image pull + telemetry only"
-  for r in roles/artifactregistry.reader roles/logging.logWriter roles/monitoring.metricWriter; do
-    gcloud projects add-iam-policy-binding "$PROJECT" \
-      --member="serviceAccount:${BSA}" --role="$r" --quiet >/dev/null
+  local GSA="fairwins-relay-engine@${PROJECT}.iam.gserviceaccount.com"
+
+  # Image pull is REPOSITORY-scoped, not project-scoped. Both images live in the same repo:
+  #   us-central1-docker.pkg.dev/<proj>/cloud-run-source-deploy/alto:v1.2.7
+  #   us-central1-docker.pkg.dev/<proj>/cloud-run-source-deploy/prediction-dao-research/fairwins-relay-gateway
+  # so one grant covers both VMs. On Cloud Run the *service agent* pulled images, so neither runtime
+  # SA needed this; on a VM the attached SA does the pull. Granting it project-wide would hand both
+  # SAs read over every repo in the project — and would destroy the property that makes
+  # fairwins-relay-engine@ worth keeping: it holds ZERO project-level roles today.
+  say "Artifact Registry read — scoped to the 'cloud-run-source-deploy' repo only"
+  for sa in "$BSA" "$GSA"; do
+    gcloud artifacts repositories add-iam-policy-binding cloud-run-source-deploy \
+      --location="$REGION" --project "$PROJECT" \
+      --member="serviceAccount:${sa}" --role=roles/artifactregistry.reader --quiet >/dev/null
   done
 
-  say "Gateway SA: verify it can still read what it needs (it holds no project-level roles by design)"
-  for r in roles/artifactregistry.reader roles/logging.logWriter roles/monitoring.metricWriter; do
-    gcloud projects add-iam-policy-binding "$PROJECT" \
-      --member="serviceAccount:fairwins-relay-engine@${PROJECT}.iam.gserviceaccount.com" \
-      --role="$r" --quiet >/dev/null
+  # roles/run.viewer, PROJECT-level, for the bundler SA only. single-alto-gate.sh must be able to
+  # read whether the Cloud Run bundler is disarmed, and it FAILS CLOSED when it cannot — so without
+  # this the VM's alto can never start. It must be project-level, not service-scoped: gcloud reports
+  # a genuine 404 and a permission denial identically ("or resource may not exist") to a caller
+  # without read access, and a service-scoped binding disappears with the service at decommission,
+  # which would leave the gate unable to tell "deleted" from "forbidden" exactly when it matters.
+  # read-only on Cloud Run: no data access, no deploy, no escalation path.
+  say "roles/run.viewer for the bundler SA (required by single-alto-gate.sh)"
+  gcloud projects add-iam-policy-binding "$PROJECT" \
+    --member="serviceAccount:${BSA}" --role=roles/run.viewer --quiet >/dev/null
+
+  # Telemetry roles have no resource-scoped equivalent — logWriter/metricWriter are inherently
+  # project-level. They grant write-only on logs and metrics: no read, no data access, no escalation
+  # path. This is the minimum a monitored VM can run with.
+  say "Telemetry (write-only, no resource-scoped equivalent exists)"
+  for sa in "$BSA" "$GSA"; do
+    for r in roles/logging.logWriter roles/monitoring.metricWriter; do
+      gcloud projects add-iam-policy-binding "$PROJECT" \
+        --member="serviceAccount:${sa}" --role="$r" --quiet >/dev/null
+    done
   done
 }
 

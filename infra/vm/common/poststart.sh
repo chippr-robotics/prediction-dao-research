@@ -37,7 +37,11 @@ case "$ROLE" in
       'curl -fsS -m 20 http://127.0.0.1:8788/status | grep -q "\"rpc\":\"up\""'
     # The engine is allowed to still be booting (~25s) and gasless intents self-submit until it is
     # up (never-stranded), so this is a WARNING, not a failure.
-    if ! curl -fsS -m 10 http://127.0.0.1:8080/health >/dev/null 2>&1; then
+    # Reached via docker exec, not a host curl: the engine joins the gateway's network namespace and
+    # its :8080 is never published to the host. /api/v1/health is the only unauthenticated route
+    # (/health, /v1/health and / all 401).
+    if ! docker exec fairwins-gateway-gateway \
+           wget -qO- --timeout=8 http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
       log "WARNING: engine not answering yet — intents will self-submit until it is up"
     fi
     ;;
