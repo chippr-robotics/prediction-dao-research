@@ -1,0 +1,20 @@
+{
+  "displayName": "FairWins: on-VM functional probe failing",
+  "documentation": {
+    "content": "The on-VM probe (infra/vm/common/probe.sh, every 60s) reported a failure. This catches what the uptime checks structurally cannot:\n\n* OZ relayer engine down — the gateway still serves /status, the paymaster and the proxies without it, so the uptime check stays GREEN while relaying is dead.\n* A chain's RPC unreachable.\n* Gas-wallet or paymaster-deposit runway below 48h — a numeric threshold no string matcher can express. If the relay gas wallet runs dry, gasless relaying stops platform-wide and members silently fall back to paying their own gas.\n* SECOND EXECUTOR RISK — the Cloud Run bundler was re-armed (a merge to main restores minScale:1 AND ingress:all via cloudbuild.yaml). Two altos on one executor key collide on nonces. Treat this as urgent.\n\nCheck: journalctl -u fairwins-probe@<role> -n 50",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "probe failures observed",
+    "conditionThreshold": {
+      "filter": "metric.type=\"logging.googleapis.com/user/fairwins_probe_failures\" AND resource.type=\"gce_instance\"",
+      "aggregations": [{ "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_SUM" }],
+      "comparison": "COMPARISON_GT",
+      "thresholdValue": 2,
+      "duration": "300s",
+      "trigger": { "count": 1 }
+    }
+  }],
+  "alertStrategy": { "autoClose": "1800s" }
+}

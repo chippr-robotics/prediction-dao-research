@@ -1,0 +1,20 @@
+{
+  "displayName": "FairWins: VM memory above 85%",
+  "documentation": {
+    "content": "An e2-small has 2 GiB. Container limits total 1024 MiB (bundler) / 768 MiB (gateway), leaving ~450 MiB for the OS, dockerd and host nginx. Sustained pressure means a container is leaking past its measured p99 (alto 0.261 GiB, gateway instance 0.31 GiB) or the VM is undersized.\n\nRequires the Ops Agent (installed by infra/vm/startup.sh) — agentless metrics do not include memory.\n\nAction: check `docker stats`; if genuinely undersized, move to e2-medium (~$33/mo vs ~$20).",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "memory utilization > 85% for 10 minutes",
+    "conditionThreshold": {
+      "filter": "metric.type=\"agent.googleapis.com/memory/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\"",
+      "aggregations": [{ "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_MEAN" }],
+      "comparison": "COMPARISON_GT",
+      "thresholdValue": 85,
+      "duration": "600s",
+      "trigger": { "count": 1 }
+    }
+  }],
+  "alertStrategy": { "autoClose": "1800s" }
+}

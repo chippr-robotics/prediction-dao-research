@@ -15,6 +15,7 @@ This directory contains step-by-step operational guides, integration procedures,
 
 ### Deploy
 - **[relayer-mordor-deploy.md](./relayer-mordor-deploy.md)** - First bring-up of the relayer stack on Mordor: GCP prerequisites, KMS keys, Cloud Run, origin lock, validation
+- **[vm-migration.md](./vm-migration.md)** - Cutover + rollback for moving the bundler and relay gateway off Cloud Run onto two GCE VMs: the single-executor invariant, the `cloudbuild.yaml` trap in both directions, functional verification, soak, decommission, and what the move gives up
 - **[zk-wager-pools-deploy.md](./zk-wager-pools-deploy.md)** - WagerPoolFactory (spec 034) append-only deploy, wiring matrix, subgraph publish
 - **[safe-proposal-hub-deploy.md](./safe-proposal-hub-deploy.md)** - SafeProposalHub (spec 043) events-only helper deploy
 
