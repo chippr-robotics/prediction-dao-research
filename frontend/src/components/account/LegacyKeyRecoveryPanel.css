@@ -18,14 +18,32 @@
   gap: 8px;
 }
 
+/* Card identity borrowed from the My Account carousel's account-card (AccountCardsCarousel.css):
+   the same per-kind left accent used for a "legacy" account there, plus a card-level shadow — so a
+   recovered account reads as the same "account" here as it does in the carousel/account switcher. */
 .lkr-stored__item {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--text-primary, #1f2933) 18%, transparent);
+  border-left: 4px solid var(--semantic-warning, #f5a623);
   border-radius: 10px;
   background: var(--bg-primary, #f7f9fa);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.lkr-stored__kind {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #5a6772);
 }
 
 .lkr-stored__row {

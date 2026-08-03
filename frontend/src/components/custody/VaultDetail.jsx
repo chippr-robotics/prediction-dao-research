@@ -27,7 +27,6 @@ export default function VaultDetail({
   if (vault.reachable === false) {
     return (
       <div className="custody-vault-detail" role="region" aria-label="Vault detail">
-        <h4>{vault.label || 'Vault'}</h4>
         <p className="custody-error" role="alert">
           Could not reach {chainLabel} to read this vault. Its details will appear when the network
           responds; nothing about the vault has changed.
@@ -44,7 +43,6 @@ export default function VaultDetail({
   if (vault.isSafe === false) {
     return (
       <div className="custody-vault-detail" role="region" aria-label="Vault detail">
-        <h4>{vault.label || 'Vault'}</h4>
         <p className="custody-error" role="alert">
           Could not read a Safe at <code>{vault.address}</code> on {chainLabel}.
         </p>
@@ -59,7 +57,6 @@ export default function VaultDetail({
 
   return (
     <div className="custody-vault-detail" role="region" aria-label="Vault detail">
-      <h4>{vault.label || 'Vault'}</h4>
       {!onVaultChain && (
         <div className="custody-warning" role="status">
           <p>
