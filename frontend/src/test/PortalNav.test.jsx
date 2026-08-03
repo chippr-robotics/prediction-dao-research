@@ -177,6 +177,20 @@ describe('PortalNav (collapsed icon rail)', () => {
     expect(screen.getByRole('tab', { name: 'Account' })).not.toHaveAttribute('title')
   })
 
+  it('an icon-less item opted into showIcon gets the initial-letter fallback even expanded', () => {
+    const { container } = render(
+      <PortalNav
+        items={[{ id: 'favorite-1', label: 'Token Mint', showIcon: true }]}
+        activeId="favorite-1"
+        onSelect={vi.fn()}
+        ariaLabel="Sections"
+      />
+    )
+    expect(container.querySelector('.portal-nav')).not.toHaveClass('portal-nav--collapsed')
+    expect(container.querySelectorAll('.portal-nav-item-icon')).toHaveLength(1)
+    expect(screen.getByText('T')).toBeInTheDocument()
+  })
+
   it('still selects when a collapsed item is clicked', () => {
     const onSelect = vi.fn()
     render(<PortalNav groups={ICON_GROUPS} activeId="overview" onSelect={onSelect} collapsed ariaLabel="Sections" />)

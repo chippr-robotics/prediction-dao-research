@@ -20,6 +20,11 @@
  * than dropped — the button keeps its accessible name, so screen readers and
  * `getByRole('tab', { name })` see the same rail collapsed or expanded. Group
  * headings become hairline rules (a 200px-wide word cannot survive a 64px rail).
+ *
+ * An item with no `icon` renders no icon tile when expanded (text only) unless it
+ * opts in with `showIcon: true`, in which case it gets the same initial-letter
+ * fallback the collapsed rail always shows — for entries whose glyph IS their
+ * name, like a favorited mini-app's Quick Access shortcut.
  */
 import { Fragment } from 'react'
 import NavIcon from '../nav/NavIcon'
@@ -52,8 +57,9 @@ export default function PortalNav({
     >
       {/* Collapsed, an icon-less item would be an unreadable blank row, so the
           rail falls back to its initial. Expanded, it keeps rendering exactly
-          what it did before: nothing at all. */}
-      {(item.icon || collapsed) && (
+          what it did before — nothing at all — unless the item opted into the
+          fallback via `showIcon`. */}
+      {(item.icon || item.showIcon || collapsed) && (
         <span className="portal-nav-item-icon" aria-hidden="true">
           {item.icon ? <NavIcon name={item.icon} /> : <span className="portal-nav-item-initial">{item.label?.[0]}</span>}
         </span>

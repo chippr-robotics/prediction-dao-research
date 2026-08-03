@@ -30,12 +30,18 @@
  * Search and the six operational-category filters (FR-008) are plain buttons and a plain search
  * input — keyboard operable by construction — with a polite live region announcing the result count
  * so a screen-reader user learns that a filter changed the list rather than having to go find out.
+ * The category chips sit behind a disclosure button inline with the search box rather than always
+ * on screen — the button's own label carries the active count, so collapsing them never hides
+ * *that* a filter is applied, only the chips used to change it. The visible list is then grouped
+ * under a heading per category (FR-007's category is otherwise readable only per-card), in the
+ * same on-chain enum order the chip row already uses, so browsing and filtering agree on one order.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
 import SubmitAppPanel from './SubmitAppPanel'
 import EmptyState from '../account/EmptyState'
+import NavIcon from '../nav/NavIcon'
 import { APP_CATEGORY_LABELS } from '../../abis/miniAppRegistry'
 import { networkName } from '../../lib/chains/estate'
 import {
@@ -44,6 +50,7 @@ import {
   appSlug,
   fetchCatalog,
 } from '../../lib/miniapps/registryClient'
+import { loadFavoriteApps, subscribeFavoriteApps, toggleFavoriteApp } from '../../lib/miniapps/favorites'
 
 /**
  * Where a developer goes to submit an app or a version update (FR-021).
@@ -94,7 +101,7 @@ function formatAge(ms) {
 /**
  * One catalog entry: name, vendor, version, category (FR-007) plus its launch affordance.
  *
- * Two independent things can withhold that affordance, and each says which one it was:
+ * Two independent things can withhold the launch affordance, and each says which one it was:
  *
  *   - `launchable` is about the LISTING's provenance, not the app's — false only when this card came
  *     from an unverified snapshot, in which case no launch link is rendered at all. A disabled button
@@ -104,20 +111,40 @@ function formatAge(ms) {
  *     lossy best effort there on purpose (two distinct on-chain listings must never collapse onto one
  *     address), so the app is genuinely unreachable by URL. Rendering `/apps/null` would be a link
  *     the catalog knows lands nowhere.
+ *
+ * The favorite star shares the second condition: a shortcut into the nav drawer's Quick Access
+ * group is a link like any other, so it needs the same working slug the Launch button does. It is
+ * withheld silently rather than shown disabled, for the same reason Launch is.
  */
-function AppCard({ app, launchable }) {
+function AppCard({ app, launchable, isFavorite, onToggleFavorite }) {
   const nameId = `miniapp-${app.id}-name`
   const descriptionId = `miniapp-${app.id}-description`
   // An on-chain enum may gain values ahead of this build's label map. Naming the raw ordinal is
   // honest; folding an unknown category into a familiar label would misfile the app.
   const categoryLabel = APP_CATEGORY_LABELS[app.category] ?? `Category ${app.category}`
   const slug = appSlug(app.name)
+  const canFavorite = launchable && Boolean(slug)
 
   return (
     <li className="miniapp-card">
-      <h4 className="miniapp-card-name" id={nameId}>
-        {app.name}
-      </h4>
+      <div className="miniapp-card-head">
+        <h5 className="miniapp-card-name" id={nameId}>
+          {app.name}
+        </h5>
+        {canFavorite && (
+          <button
+            type="button"
+            className={`miniapp-card-favorite${isFavorite ? ' is-active' : ''}`}
+            aria-pressed={isFavorite}
+            aria-label={
+              isFavorite ? `Remove ${app.name} from Quick Access` : `Add ${app.name} to Quick Access`
+            }
+            onClick={() => onToggleFavorite(app, slug)}
+          >
+            <NavIcon name="star" size={16} />
+          </button>
+        )}
+      </div>
       <p className="miniapp-card-category">{categoryLabel}</p>
       {app.description && (
         <p className="miniapp-card-description" id={descriptionId}>
@@ -175,9 +202,23 @@ function CatalogView() {
   const [reloadKey, setReloadKey] = useState(0)
   const [query, setQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState(() => new Set())
+  // The category chip row starts collapsed behind the Filter button — see the module header.
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set(loadFavoriteApps().map((fav) => fav.id)))
 
   const outcome = catalogRead.outcome
   const refreshing = catalogRead.key !== reloadKey
+
+  // Reflects changes made from either surface that touches favorites (this panel, or a removal from
+  // the nav drawer's Quick Access group) without threading state between them.
+  useEffect(
+    () => subscribeFavoriteApps(() => setFavoriteIds(new Set(loadFavoriteApps().map((fav) => fav.id)))),
+    [],
+  )
+
+  function handleToggleFavorite(app, slug) {
+    toggleFavoriteApp({ id: app.id, slug, name: app.name })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -249,6 +290,32 @@ function CatalogView() {
       )
     })
   }, [listing, query, selectedCategories])
+
+  /**
+   * `visible`, grouped under a heading per category (FR-007) in the chip row's own order.
+   *
+   * A category ordinal ahead of this build's label map (see `AppCard`'s fallback) still gets a
+   * group — under its raw ordinal — rather than being dropped: grouping must never quietly shrink
+   * the list `visible` already promised via the result count above it.
+   */
+  const groupedVisible = useMemo(() => {
+    const byCategory = new Map()
+    for (const app of visible) {
+      const bucket = byCategory.get(app.category)
+      if (bucket) bucket.push(app)
+      else byCategory.set(app.category, [app])
+    }
+    const groups = []
+    for (const category of CATEGORY_FILTERS) {
+      const apps = byCategory.get(category.value)
+      if (apps?.length) groups.push({ key: category.value, label: category.label, apps })
+      byCategory.delete(category.value)
+    }
+    for (const [value, apps] of byCategory) {
+      groups.push({ key: value, label: `Category ${value}`, apps })
+    }
+    return groups
+  }, [visible])
 
   function toggleCategory(value) {
     setSelectedCategories((current) => {
@@ -346,37 +413,60 @@ function CatalogView() {
 
       {showControls && (
         <div className="miniapp-catalog-controls">
-          <label className="miniapp-catalog-search">
-            <span className="sr-only">Search apps by name or description</span>
-            <input
-              type="search"
-              placeholder="Search apps…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          <div className="miniapp-catalog-searchrow">
+            <label className="miniapp-catalog-search">
+              <span className="sr-only">Search apps by name or description</span>
+              <input
+                type="search"
+                placeholder="Search apps…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
 
-          <div className="miniapp-catalog-filters" role="group" aria-label="Filter by operational category">
+            {/* The chip row itself is the state; this button only shows/hides it, so its own
+                pressed state is the disclosure — the active count stays on the label so closing
+                the panel never hides THAT a filter is applied, only the chips that set it. */}
             <button
               type="button"
-              className={`miniapp-catalog-filter${selectedCategories.size === 0 ? ' is-active' : ''}`}
-              aria-pressed={selectedCategories.size === 0}
-              onClick={() => setSelectedCategories(new Set())}
+              className={`miniapp-catalog-filter-toggle${selectedCategories.size > 0 ? ' is-active' : ''}`}
+              aria-expanded={filtersOpen}
+              aria-controls={filtersOpen ? 'miniapp-catalog-filters' : undefined}
+              onClick={() => setFiltersOpen((open) => !open)}
             >
-              All categories
+              <NavIcon name="sliders" size={16} />
+              Filter{selectedCategories.size > 0 ? ` (${selectedCategories.size})` : ''}
             </button>
-            {CATEGORY_FILTERS.map((category) => (
-              <button
-                key={category.value}
-                type="button"
-                className={`miniapp-catalog-filter${selectedCategories.has(category.value) ? ' is-active' : ''}`}
-                aria-pressed={selectedCategories.has(category.value)}
-                onClick={() => toggleCategory(category.value)}
-              >
-                {category.label}
-              </button>
-            ))}
           </div>
+
+          {filtersOpen && (
+            <div
+              className="miniapp-catalog-filters"
+              id="miniapp-catalog-filters"
+              role="group"
+              aria-label="Filter by operational category"
+            >
+              <button
+                type="button"
+                className={`miniapp-catalog-filter${selectedCategories.size === 0 ? ' is-active' : ''}`}
+                aria-pressed={selectedCategories.size === 0}
+                onClick={() => setSelectedCategories(new Set())}
+              >
+                All categories
+              </button>
+              {CATEGORY_FILTERS.map((category) => (
+                <button
+                  key={category.value}
+                  type="button"
+                  className={`miniapp-catalog-filter${selectedCategories.has(category.value) ? ' is-active' : ''}`}
+                  aria-pressed={selectedCategories.has(category.value)}
+                  onClick={() => toggleCategory(category.value)}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Polite live region: a filter or search term changes the grid silently for a screen-reader
               user, so the resulting count is announced rather than left to be discovered. */}
@@ -404,13 +494,28 @@ function CatalogView() {
         />
       )}
 
-      {visible.length > 0 && (
-        <ul className="miniapp-catalog-grid">
-          {visible.map((app) => (
-            <AppCard key={app.id} app={app} launchable={listing.verified} />
-          ))}
-        </ul>
-      )}
+      {groupedVisible.map((group) => (
+        <section
+          key={group.key}
+          className="miniapp-catalog-group"
+          aria-labelledby={`miniapp-catalog-group-${group.key}`}
+        >
+          <h4 className="miniapp-catalog-group-title" id={`miniapp-catalog-group-${group.key}`}>
+            {group.label}
+          </h4>
+          <ul className="miniapp-catalog-grid">
+            {group.apps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                launchable={listing.verified}
+                isFavorite={favoriteIds.has(app.id)}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
     </section>
   )
 }

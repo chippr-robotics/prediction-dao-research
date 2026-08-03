@@ -141,6 +141,17 @@
   flex-direction: column;
   gap: 0.6rem;
 }
+/* Search box and the Filter disclosure sit on one row (the request this satisfies: category
+   chips move behind a Filter button inline with search, rather than always on screen). */
+.miniapp-catalog-searchrow {
+  align-items: stretch;
+  display: flex;
+  gap: 0.5rem;
+}
+.miniapp-catalog-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .miniapp-catalog-search input {
   background: var(--surface-color, #fff);
   border: 1px solid var(--border-color, #e3e7eb);
@@ -153,6 +164,35 @@
 .miniapp-catalog-search input:focus-visible {
   outline: 2px solid var(--brand-primary, #36b37e);
   outline-offset: 1px;
+}
+
+.miniapp-catalog-filter-toggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  gap: 0.35rem;
+  padding: 0 0.85rem;
+  white-space: nowrap;
+}
+.miniapp-catalog-filter-toggle:hover {
+  border-color: var(--brand-primary, #36b37e);
+}
+.miniapp-catalog-filter-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+/* A category is selected: marked by weight + a tinted background, not colour alone — the label's
+   own "(N)" count is the third, text-based signal. */
+.miniapp-catalog-filter-toggle.is-active {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 14%, transparent);
+  border-color: var(--brand-primary, #36b37e);
+  font-weight: 600;
 }
 
 .miniapp-catalog-filters {
@@ -191,6 +231,22 @@
   margin: 0;
 }
 
+/* ---- Category groups ---------------------------------------------------- */
+
+.miniapp-catalog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.miniapp-catalog-group-title {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
 /* ---- Catalog grid ------------------------------------------------------ */
 
 .miniapp-catalog-grid {
@@ -211,11 +267,42 @@
   gap: 0.4rem;
   padding: 0.85rem 0.9rem;
 }
+.miniapp-card-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
 .miniapp-card-name {
   color: var(--text-primary, #1f2933);
   font-size: 0.98rem;
   line-height: 1.3;
   margin: 0;
+}
+/* Star toggle for Quick Access (nav drawer). Filled + brand colour when favorited — a shape
+   change, not just a colour change, so the state reads without relying on hue (WCAG 1.4.1). */
+.miniapp-card-favorite {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary, #5a6772);
+  cursor: pointer;
+  flex: 0 0 auto;
+  line-height: 0;
+  padding: 0.2rem;
+}
+.miniapp-card-favorite:hover {
+  color: var(--brand-primary, #36b37e);
+}
+.miniapp-card-favorite:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+.miniapp-card-favorite.is-active {
+  color: var(--brand-primary, #36b37e);
+}
+.miniapp-card-favorite.is-active .nav-icon {
+  fill: currentColor;
 }
 .miniapp-card-category {
   color: var(--text-secondary, #5a6772);
