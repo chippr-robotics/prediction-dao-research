@@ -1,0 +1,29 @@
+# Run this VM's compose stack. Templated by role: gateway | bundler.
+#   systemctl enable --now fairwins-stack@gateway.service
+[Unit]
+Description=FairWins %i container stack
+After=docker.service network-online.target fairwins-secrets@%i.service
+Requires=docker.service fairwins-secrets@%i.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/fairwins/%i
+EnvironmentFile=/etc/fairwins/role.env
+
+# SAFETY GATE (bundler only; exits 0 immediately for other roles). Must run BEFORE compose up.
+ExecStartPre=/opt/fairwins/common/gate.sh %i
+
+# Always pass -f explicitly. Without it, compose auto-merges docker-compose.override.yml from the
+# working directory — which is how an out-of-band edit could reintroduce PM_SIGNER_PRIVATE_KEY or a
+# second alto past every guard that only inspects the tracked file.
+ExecStartPre=/opt/fairwins/common/preflight.sh %i
+ExecStart=/usr/bin/docker compose -f /opt/fairwins/%i/docker-compose.yml up -d --remove-orphans
+# `up -d --wait` returns when containers are healthy, which does not prove the service is functional.
+# poststart.sh asserts the real surface (alto actually serving JSON-RPC, gateway reporting chains).
+ExecStartPost=/opt/fairwins/common/poststart.sh %i
+ExecStop=/usr/bin/docker compose -f /opt/fairwins/%i/docker-compose.yml down
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+{
+  "displayName": "FairWins: VM not reporting",
+  "documentation": {
+    "content": "A FairWins VM stopped reporting metrics — host failure, preemption, or the Ops Agent died.\n\nThis is the single-point-of-failure the migration off Cloud Run accepted: Cloud Run silently replaced instances 194x in 30 days; a single VM does not. Recovery is manual.\n\nCheck: gcloud compute instances list --filter='labels.app=fairwins'",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "no uptime metric for 5 minutes",
+    "conditionAbsent": {
+      "filter": "metric.type=\"compute.googleapis.com/instance/uptime\" AND resource.type=\"gce_instance\"",
+      "aggregations": [{ "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_RATE" }],
+      "duration": "300s",
+      "trigger": { "count": 1 }
+    }
+  }],
+  "alertStrategy": { "autoClose": "1800s" }
+}

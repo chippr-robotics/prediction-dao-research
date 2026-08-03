@@ -1,0 +1,9 @@
+[Unit]
+Description=FairWins functional probe (%i)
+After=fairwins-stack@%i.service
+Requires=fairwins-stack@%i.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/fairwins/role.env
+ExecStart=/opt/fairwins/common/probe.sh %i

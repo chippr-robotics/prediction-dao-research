@@ -1,0 +1,40 @@
+{
+  "displayName": "FairWins — VM CPU sustained high",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "A FairWins VM held >70% CPU utilisation for 15 minutes.\n\n### Why 70% matters more on e2-small than it looks\n`e2-small` presents 2 vCPU but has a **0.5 vCPU baseline** (25% utilisation). Anything sustained above 25% is being paid for out of the burst credit balance; when that balance empties the instance is throttled hard to baseline and everything gets slow at once. So 70% for 15 minutes is not \"a bit busy\" — it is *credit is draining and a throttle is coming*.\n\n### Measured baseline (30 days on Cloud Run, pre-migration)\n| service | p99 CPU | p99 mem | req/30d |\n|---|---|---|---|\n| alto bundler | 0.358 vCPU | 0.261 GiB | 2,855 |\n| relay gateway | 0.196 vCPU | 0.310 GiB | 10,522 |\n\n0.358 vCPU of 2 = ~18% utilisation, so this alert sits roughly 4x above the observed p99. If it fires, something has genuinely changed — it is not normal load creeping up.\n\n### Likely causes, in order\n1. alto stuck in a retry loop against a failing `ALTO_RPC_URL` (the 2026-07-12 signature).\n2. A UserOp flood / someone found the bundler with the origin lock fail-open.\n3. redis on the gateway VM growing unbounded — it is configured ephemeral (`--save \"\" --appendonly no`), so this would be genuine traffic, not persistence.\n\nThis is hypervisor-sourced and needs **no Ops Agent**."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "CPU utilisation > 70% for 15m",
+      "conditionThreshold": {
+        "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\" AND metric.label.\"instance_name\"=monitoring.regex.full_match(\"fairwins-(bundler|gateway)\")",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_MEAN",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "groupByFields": [
+              "metric.label.instance_name"
+            ]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0.70,
+        "duration": "900s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "604800s"
+  },
+  "severity": "WARNING",
+  "enabled": true,
+  "notificationChannels": [
+    "${CHANNEL}"
+  ]
+}

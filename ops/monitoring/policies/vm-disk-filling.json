@@ -1,0 +1,20 @@
+{
+  "displayName": "FairWins: VM disk above 85%",
+  "documentation": {
+    "content": "The 20 GB boot disk is filling. Most likely cause is container logs; the compose files cap json-file at 10m x 3 per container, so growth beyond that is images or the repo checkout.\n\nNote: these boot disks hold docker's resolved container environment at /var/lib/docker/containers/<id>/config.v2.json, which contains secret values. Do NOT snapshot or image them, and do not copy them off the host when debugging a disk-full condition.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "disk utilization > 85%",
+    "conditionThreshold": {
+      "filter": "metric.type=\"agent.googleapis.com/disk/percent_used\" AND resource.type=\"gce_instance\" AND metric.label.state=\"used\"",
+      "aggregations": [{ "alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_MEAN" }],
+      "comparison": "COMPARISON_GT",
+      "thresholdValue": 85,
+      "duration": "600s",
+      "trigger": { "count": 1 }
+    }
+  }],
+  "alertStrategy": { "autoClose": "1800s" }
+}

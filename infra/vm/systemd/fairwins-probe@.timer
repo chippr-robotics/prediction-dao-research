@@ -1,0 +1,13 @@
+# Runs the functional probe every 60s. Paired with fairwins-probe@<role>.service.
+# Enable as: systemctl enable --now fairwins-probe@gateway.timer
+[Unit]
+Description=FairWins functional probe timer
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=fairwins-probe@%i.service
+
+[Install]
+WantedBy=timers.target

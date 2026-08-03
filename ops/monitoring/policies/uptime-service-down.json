@@ -1,0 +1,25 @@
+{
+  "displayName": "FairWins: origin uptime check failing",
+  "documentation": {
+    "content": "A FairWins origin (bundler or gateway VM) is failing its functional uptime check.\n\nThe bundler check matches 0x5FF137D4 from eth_supportedEntryPoints; the gateway check matches \"rpc\":\"up\" from /status. Neither is a plain 200, so a failure means the service is functionally dead, not merely slow.\n\nImpact: gasless relaying degrades to self-submit (members pay their own gas). Passkey accountNative ops have NO fallback rail and will fail outright if the bundler is down.\n\nRunbook: docs/runbooks/vm-migration.md",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [{
+    "displayName": "uptime check failed for 5 minutes",
+    "conditionThreshold": {
+      "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\"",
+      "aggregations": [{
+        "alignmentPeriod": "300s",
+        "perSeriesAligner": "ALIGN_FRACTION_TRUE",
+        "crossSeriesReducer": "REDUCE_MEAN",
+        "groupByFields": ["resource.label.host"]
+      }],
+      "comparison": "COMPARISON_LT",
+      "thresholdValue": 0.4,
+      "duration": "300s",
+      "trigger": { "count": 1 }
+    }
+  }],
+  "alertStrategy": { "autoClose": "1800s" }
+}
