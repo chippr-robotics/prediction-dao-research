@@ -136,6 +136,12 @@ jobs:
           # let a finding fail the job — matches security-testing.yml behavior.
           slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
+      # Constitution IV + spec 074 FR-007: the scan must actually gate. `|| true` above is retained
+      # deliberately — slither exits non-zero on ANY finding, including informational ones — so the
+      # blocking decision is made here, on IMPACT, instead of being discarded entirely.
+      - name: Enforce Slither severity gate
+        run: node scripts/security/check-slither-findings.js slither-report.json
+
       - name: Upload Slither reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -387,10 +393,14 @@ jobs:
           echo "Contract deployment completed"
         continue-on-error: false
 
+      # Constitution IV: must fail the pipeline on error. Do NOT reintroduce `continue-on-error`
+      # (spec 074, FR-007/FR-008). `set -o pipefail` is load-bearing — the command pipes into
+      # `tee`, so without it the step's status is tee's (always 0).
       - name: Run Cypress E2E tests (full suite)
         working-directory: frontend
-        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
-        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
 
       - name: Summarize Cypress results
         if: always()
@@ -428,9 +438,19 @@ jobs:
         if: always()
         working-directory: frontend
         run: |
-          if grep -q "failing" cypress-output.txt 2>/dev/null; then
+          if [ ! -f cypress-results.json ]; then
+            echo "::error::cypress-results.json is missing — the E2E run did not complete. Failing rather than assuming success."
             exit 1
           fi
+          node -e "
+            const stats = (require('./cypress-results.json').stats) || {};
+            const failures = Number(stats.failures || 0);
+            console.log('passes=' + (stats.passes || 0) + ' failures=' + failures);
+            if (failures > 0) {
+              console.error('::error::' + failures + ' Cypress test(s) failed.');
+              process.exit(1);
+            }
+          "
 
       - name: Upload Cypress screenshots
         uses: actions/upload-artifact@v4
