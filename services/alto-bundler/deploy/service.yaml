@@ -23,8 +23,16 @@ spec:
     metadata:
       annotations:
         run.googleapis.com/container-dependencies: '{"nginx":["alto"]}'  # start alto before nginx
-        autoscaling.knative.dev/minScale: "1"      # keep one warm (executor nonce continuity)
-        autoscaling.knative.dev/maxScale: "2"
+        # minScale 1 keeps one instance warm so a member's first UserOp does not wait on alto's
+        # ~8-13s boot. It is NOT what preserves executor nonce continuity (the earlier comment here
+        # said so and was wrong): alto re-reads the executor nonce from chain on every boot, and the
+        # instance is in fact replaced ~194x/30d by min-instance churn and redeploys.
+        autoscaling.knative.dev/minScale: "1"
+        # PINNED TO 1 — SAFETY, NOT COST. ALTO_EXECUTOR_PRIVATE_KEYS and ALTO_UTILITY_PRIVATE_KEY
+        # both resolve to the SAME secret (alto-executor-key-137), so a second instance would run a
+        # second executor against the same EOA and collide on nonces. Do not raise this without
+        # giving each instance its own executor key.
+        autoscaling.knative.dev/maxScale: "1"
         run.googleapis.com/cpu-throttling: "false"     # bundler must keep processing between requests
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
@@ -46,10 +54,13 @@ spec:
                 secretKeyRef:
                   name: origin-lock-secret
                   key: latest
+          # Right-sized 2026-08-02. nginx only validates one header and proxies to localhost at a
+          # measured 13 req/day median; 1 full vCPU was ~10x the p99. Instance CPU total must be a
+          # supported Cloud Run value (1/2/4/6/8) -> 150m + 850m = exactly 1.
           resources:
             limits:
-              cpu: "1"
-              memory: 256Mi
+              cpu: "150m"
+              memory: 128Mi
           startupProbe:
             httpGet:
               path: /healthz
@@ -107,10 +118,14 @@ spec:
                 secretKeyRef:
                   name: alto-executor-key-137
                   key: latest
+          # Right-sized 2026-08-02: measured 30d p99 was 0.358 vCPU / 0.261 GiB across the whole
+          # instance, so 850m + 896Mi keeps ~2.4x CPU and ~3.4x memory headroom. cpu-throttling
+          # stays "false" — alto returns userOpHash immediately and broadcasts the bundle AFTER the
+          # response, so it must keep CPU between requests. Revert to "1" if p99 exceeds 0.8 vCPU.
           resources:
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: "850m"
+              memory: 896Mi
           # Required by Cloud Run because nginx `depends_on` alto (container-dependencies): the
           # dependency ordering gates nginx startup on alto's port being live. TCP probe on alto's
           # ALTO_PORT (3000); no HTTP health route exists on alto (GET / 404s).
