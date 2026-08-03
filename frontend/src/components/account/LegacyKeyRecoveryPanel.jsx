@@ -25,6 +25,7 @@ import { getNetwork } from '../../config/networks'
 import { captureLegacyRecovery } from '../../data/ledger/sources/legacyRecoverySource'
 import AddressInput from '../ui/AddressInput'
 import AddressBookButton from '../ui/AddressBookButton'
+import BlockiesAvatar from '../ui/BlockiesAvatar'
 import ActionSheet from './ActionSheet'
 import AccordionSection from './AccordionSection'
 import CrossChainRecoveryPanel from './CrossChainRecoveryPanel'
@@ -45,6 +46,30 @@ import './LegacyKeyRecoveryPanel.css'
 const shortAddr = (a) => (a ? `${a.substring(0, 6)}…${a.substring(a.length - 4)}` : '')
 const KIND_LABEL = { privateKey: 'private key', mnemonic: 'word list' }
 const kindNoun = (kind) => (kind === 'mnemonic' ? 'word list' : 'private key')
+
+function IconMove() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="lkr-icon">
+      <path d="M1 8a.75.75 0 0 1 .75-.75h9.69L8.22 4.03a.75.75 0 1 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 1 1-1.06-1.06l3.22-3.22H1.75A.75.75 0 0 1 1 8Z" />
+    </svg>
+  )
+}
+
+function IconChains() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="lkr-icon">
+      <path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z" />
+    </svg>
+  )
+}
+
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="lkr-icon">
+      <path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z" />
+    </svg>
+  )
+}
 
 const STEP_TITLES = {
   intro: 'Recover a legacy account',
@@ -383,44 +408,59 @@ function LegacyKeyRecoveryPanel({ deps = {}, defaultOpen = false }) {
 
         {stored.length > 0 && (
           <ul className="lkr-stored" aria-label="Recovered legacy keys stored on this device">
-            {stored.map((e) => (
-              <li key={e.address} className="lkr-stored__item">
-                <div className="lkr-stored__meta">
-                  <code className="lkr-stored__addr" title={e.address}>{shortAddr(e.address)}</code>
-                  <span className="lkr-stored__sub">
-                    {KIND_LABEL[e.kind] || 'key'}
-                    {e.importedAt ? ` · saved ${new Date(e.importedAt).toLocaleDateString()}` : ''}
-                  </span>
-                </div>
-                <div className="lkr-stored__actions">
-                  <button type="button" className="btn btn-small" onClick={() => startTransferStored(e)}>
-                    Move funds
-                  </button>
-                  {e.kind === 'mnemonic' && (
+            {stored.map((e) => {
+              const bookName = findByAddress(e.address, chainId)?.contact?.nickname
+              const displayName = bookName || 'Recovered account'
+              return (
+                <li key={e.address} className="lkr-stored__item">
+                  <div className="lkr-stored__row">
+                    <BlockiesAvatar address={e.address} size={40} className="lkr-stored__avatar" />
+                    <div className="lkr-stored__meta">
+                      <span className="lkr-stored__name">{displayName}</span>
+                      <code className="lkr-stored__addr" title={e.address}>{shortAddr(e.address)}</code>
+                      <span className="lkr-stored__sub">
+                        {KIND_LABEL[e.kind] || 'key'}
+                        {e.importedAt ? ` · saved ${new Date(e.importedAt).toLocaleDateString()}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="lkr-stored__actions">
                     <button
                       type="button"
-                      className="btn btn-small"
-                      onClick={() => setScanAddr(scanAddr === e.address ? null : e.address)}
-                      aria-expanded={scanAddr === e.address}
+                      className="lkr-action-btn"
+                      onClick={() => startTransferStored(e)}
                     >
-                      Other chains
+                      <IconMove />
+                      <span className="lkr-action-btn__label">Move funds</span>
                     </button>
+                    {e.kind === 'mnemonic' && (
+                      <button
+                        type="button"
+                        className="lkr-action-btn"
+                        onClick={() => setScanAddr(scanAddr === e.address ? null : e.address)}
+                        aria-expanded={scanAddr === e.address}
+                      >
+                        <IconChains />
+                        <span className="lkr-action-btn__label">Other chains</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="lkr-action-btn lkr-action-btn--danger"
+                      onClick={() => setPendingRemoval(e)}
+                      aria-haspopup="dialog"
+                      aria-label={`Remove stored key ${displayName}`}
+                    >
+                      <IconTrash />
+                      <span className="lkr-action-btn__label">Remove</span>
+                    </button>
+                  </div>
+                  {scanAddr === e.address && e.kind === 'mnemonic' && (
+                    <CrossChainRecoveryPanel entry={e} />
                   )}
-                  <button
-                    type="button"
-                    className="btn btn-small lkr-stored__remove"
-                    onClick={() => setPendingRemoval(e)}
-                    aria-haspopup="dialog"
-                    aria-label={`Remove stored key ${shortAddr(e.address)}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-                {scanAddr === e.address && e.kind === 'mnemonic' && (
-                  <CrossChainRecoveryPanel entry={e} />
-                )}
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
       </AccordionSection>
