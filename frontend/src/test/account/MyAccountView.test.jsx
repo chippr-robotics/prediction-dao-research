@@ -1,0 +1,187 @@
+/**
+ * MyAccountView (spec 074 US2/US3) — contracts U1–U4, U7, V1–V5, A1:
+ * default Activity view, ?view= deep links + fallback, view switching, the
+ * carousel on top, wallet utilities below, and the acting-account pass-through
+ * into useAccountStats.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+
+const useAccountStatsMock = vi.fn()
+let effectiveAccount
+
+vi.mock('../../hooks/useAccountStats', () => ({
+  useAccountStats: (...args) => useAccountStatsMock(...args),
+}))
+vi.mock('../../hooks/useEffectiveAccount', () => ({
+  useEffectiveAccount: () => effectiveAccount,
+}))
+vi.mock('../../hooks/useWalletManagement', () => ({
+  useWalletConnection: () => ({ disconnectWallet: vi.fn() }),
+}))
+vi.mock('../../hooks/useAccountSwitcher', () => {
+  const useAccountSwitcher = () => ({
+    accounts: [
+      { id: 'personal', kind: 'personal', address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed', label: 'Personal wallet' },
+      { id: 'vault:0x8cc5', kind: 'vault', address: '0x8cc5000000000000000000000000000000000000', chainId: 137, label: 'Team vault' },
+    ],
+    currentId: 'personal',
+    choose: vi.fn(),
+    unlockEntry: null,
+    setUnlockEntry: vi.fn(),
+    onUnlocked: vi.fn(),
+    hasChoices: true,
+  })
+  return {
+    useAccountSwitcher,
+    default: useAccountSwitcher,
+    ACCOUNT_KIND_TAG: { vault: 'Multisig', legacy: 'Recovered' },
+    shortAccountAddr: (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ''),
+  }
+})
+vi.mock('../../components/ui/BlockiesAvatar', () => ({ default: () => <div data-testid="avatar" /> }))
+vi.mock('../../components/account/LegacyUnlockDialog', () => ({ default: () => null }))
+vi.mock('../../components/wallet/PortfolioPanel', () => ({
+  default: () => <div data-testid="portfolio-panel" />,
+}))
+
+const baseStats = () => ({
+  summary: {
+    netPnlUsd: 100, winRate: 0.5, wins: 1, losses: 1,
+    totalWageredUsd: 200, activeWagers: 1, atStakeUsd: 10, walletBalanceUsd: 50,
+  },
+  series: { range: '30D', points: [], isEmpty: true, isLowData: true, endValueUsd: 0 },
+  setRange: vi.fn(),
+  breakdowns: {
+    byStatus: [{ status: 'active', count: 1, active: true }],
+    byToken: [{ tokenAddress: '0xusdc', symbol: 'USDC', count: 1, ownStakeUsd: 200 }],
+    byOracle: [{ resolutionType: 1, label: 'Polymarket', count: 1 }],
+  },
+  activity: [
+    {
+      entryId: 'oc:137:wt:0xabc-1-payout', chainId: 137, class: 'wager', kind: 'payout',
+      direction: 'in', status: 'settled', tokenSymbol: 'USDC', amount: 19, valueUsd: 19,
+      valuationStatus: 'valued', timestamp: Date.now() - 60_000, timestampProvenance: 'chain',
+      txHash: '0x' + 'ab'.repeat(32), refs: { wagerId: '1' },
+    },
+  ],
+  staleClasses: [],
+  prunedBefore: null,
+  isConnected: true, isSupportedNetwork: true, chainId: 137,
+  isLoading: false, isEmpty: false, error: null,
+  freshness: { summary: { lastUpdated: Date.now(), status: 'fresh' } },
+  refresh: vi.fn(),
+})
+
+const { default: MyAccountView } = await import('../../components/account/MyAccountView')
+
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="loc">{`${location.pathname}${location.search}`}</div>
+}
+
+function renderView(route = '/wallet?tab=account') {
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <MyAccountView />
+      <LocationProbe />
+    </MemoryRouter>,
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  useAccountStatsMock.mockImplementation(() => baseStats())
+  effectiveAccount = {
+    type: 'personal',
+    address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+    label: null,
+    isActingAccount: false,
+    connectedAddress: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+    chainId: null,
+  }
+})
+
+describe('MyAccountView — unified account experience (spec 074)', () => {
+  it('defaults to the Activity view with the carousel on top (U1, C1, V1)', () => {
+    renderView()
+    expect(screen.getByRole('listbox', { name: /select the active account/i })).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByText(/recent activity/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('portfolio-panel')).not.toBeInTheDocument()
+  })
+
+  it('deep-links to the Portfolio view (U2, V2)', () => {
+    renderView('/wallet?tab=account&view=portfolio')
+    expect(screen.getByRole('tabpanel', { name: 'Portfolio' })).toBeInTheDocument()
+    expect(screen.getByTestId('portfolio-panel')).toBeInTheDocument()
+  })
+
+  it('deep-links to the Stats view (U3, V3)', () => {
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByRole('tabpanel', { name: 'Stats' })).toBeInTheDocument()
+    // Summary tiles render (the wallet balance tile is stats-only chrome)
+    expect(screen.getByText(/wallet balance/i)).toBeInTheDocument()
+  })
+
+  it('falls back to Activity for an unknown view (U4)', () => {
+    renderView('/wallet?tab=account&view=nonsense')
+    expect(screen.getByRole('tabpanel', { name: 'Activity' })).toBeInTheDocument()
+  })
+
+  it('switches views from the tab strip and rewrites ?view= (U7, V5)', () => {
+    renderView()
+    const tablist = screen.getByRole('tablist', { name: /account views/i })
+    fireEvent.click(screen.getByRole('tab', { name: 'Portfolio' }))
+    expect(screen.getByTestId('portfolio-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('loc')).toHaveTextContent('view=portfolio')
+    // Back to the default view deletes the param
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }))
+    expect(screen.getByRole('tabpanel', { name: 'Activity' })).toBeInTheDocument()
+    expect(screen.getByTestId('loc')).not.toHaveTextContent('view=')
+    expect(tablist).toBeInTheDocument()
+  })
+
+  it('renders the wallet utilities below every view (V4)', () => {
+    renderView('/wallet?tab=account&view=stats')
+    expect(screen.getByRole('button', { name: /disconnect wallet/i })).toBeInTheDocument()
+  })
+
+  it('passes nothing to useAccountStats in personal mode (A1)', () => {
+    renderView()
+    expect(useAccountStatsMock).toHaveBeenCalledWith(undefined)
+  })
+
+  it('passes the acting address to useAccountStats when acting as another account (A1)', () => {
+    effectiveAccount = {
+      ...effectiveAccount,
+      type: 'vault',
+      address: '0x8cc5000000000000000000000000000000000000',
+      isActingAccount: true,
+    }
+    renderView()
+    expect(useAccountStatsMock).toHaveBeenCalledWith({
+      accountAddress: '0x8cc5000000000000000000000000000000000000',
+    })
+  })
+
+  it('keeps the honest unsupported-network state on Activity and Stats (V1, V3)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      isSupportedNetwork: false,
+    }))
+    renderView()
+    expect(screen.getByText(/network not supported/i)).toBeInTheDocument()
+  })
+
+  it('keeps the honest empty state with the create CTA (V1)', () => {
+    useAccountStatsMock.mockImplementation(() => ({
+      ...baseStats(),
+      isEmpty: true,
+    }))
+    renderView()
+    expect(screen.getByText(/no activity yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create a wager/i })).toBeInTheDocument()
+  })
+})

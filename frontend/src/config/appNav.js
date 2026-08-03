@@ -17,9 +17,39 @@
 export const HOME_ITEM = { id: 'home', label: 'Home', icon: 'home', to: '/app' }
 
 // Portfolio — pinned into Quick Access alongside Home (not a Finance section
-// item), so it keeps its 'portfolio' tab id / `/wallet?tab=portfolio` route but
-// is absent from the Finance group's bottom icon nav (see groupForTab).
+// item). It is now a VIEW inside the unified My Account experience rather than
+// its own `?tab=` (the account carousel + bottom view nav host it), so the item
+// keeps its 'portfolio' id but routes to `/wallet?tab=account&view=portfolio`
+// via pathForNavItem; the old `?tab=portfolio` deep link redirects there
+// (WalletPage TAB_REDIRECTS).
 export const PORTFOLIO_ITEM = { id: 'portfolio', label: 'Portfolio', icon: 'trending' }
+
+/*
+ * My Account views — the unified account experience (account card carousel on
+ * top, one of these views below, switched by a bottom nav on mobile and a tab
+ * strip on desktop). Lives on the Account tab as `?view=` so
+ * `/wallet?tab=account&view=portfolio` is a direct link and back/forward keep
+ * working (the PayTransferPanel idiom). Defined here — not in the panel — so
+ * WalletPage's bottom icon bar and MyAccountView can never disagree on the ids.
+ * `icon` is a NavIcon name.
+ */
+export const ACCOUNT_VIEWS = [
+  // Activity first — the default view: the ledger feed + breakdowns, mirroring
+  // the "recent transactions under your cards" shape of the reference design.
+  { id: 'activity', label: 'Activity', icon: 'clock' },
+  { id: 'portfolio', label: 'Portfolio', icon: 'trending' },
+  { id: 'stats', label: 'Stats', icon: 'reports' },
+]
+
+export const ACCOUNT_DEFAULT_VIEW = 'activity'
+
+/** Resolve a raw `?view=` param to a known account view (unknown/missing → default). */
+export function accountViewFromParam(param) {
+  return ACCOUNT_VIEWS.some((v) => v.id === param) ? param : ACCOUNT_DEFAULT_VIEW
+}
+
+/** The canonical location of the Portfolio view — the one place that URL is spelled out. */
+export const PORTFOLIO_PATH = '/wallet?tab=account&view=portfolio'
 
 /*
  * Wagers — a VIEW inside Finance ▸ Transfer, not a nav item of its own.
@@ -157,6 +187,7 @@ export const NAV_GROUPS = RAW_NAV_GROUPS
 export function pathForNavItem(id) {
   if (id === HOME_ITEM.id) return HOME_ITEM.to
   if (id === WAGERS_VIEW.id) return WAGERS_PATH
+  if (id === PORTFOLIO_ITEM.id) return PORTFOLIO_PATH
   return `/wallet?tab=${id}`
 }
 

@@ -97,10 +97,10 @@ describe('AppNavDrawer (global nav drawer)', () => {
     expect(portfolioIdx).toBeLessThan(financeIdx)
   })
 
-  it('routes Portfolio to its wallet tab', () => {
+  it('routes Portfolio to the unified My Account view (spec 074)', () => {
     renderDrawer()
     fireEvent.click(screen.getByRole('button', { name: 'Portfolio' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=portfolio')
+    expect(screen.getByTestId('loc')).toHaveTextContent('/wallet?tab=account&view=portfolio')
   })
 
   it('routes Home to the dashboard', () => {

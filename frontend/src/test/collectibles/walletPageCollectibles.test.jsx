@@ -21,6 +21,36 @@ vi.mock('../../components/collectibles/CollectiblesPanel', () => ({
 vi.mock('../../components/wallet/PortfolioPanel', () => ({
   default: () => <div data-testid="portfolio-panel" />,
 }))
+vi.mock('../../components/ui/BlockiesAvatar', () => ({
+  default: () => <div data-testid="blockies-avatar" />,
+}))
+// Spec 074 — the Account tab body is the unified view (card carousel +
+// Activity/Portfolio/Stats). Mock the switcher seam so the fallback-to-Account
+// cases stay free of the custody/legacy async loads behind it.
+vi.mock('../../hooks/useAccountSwitcher', () => {
+  const useAccountSwitcher = () => ({
+    accounts: [
+      {
+        id: 'personal',
+        kind: 'personal',
+        address: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
+        label: 'Personal wallet',
+      },
+    ],
+    currentId: 'personal',
+    choose: vi.fn(),
+    unlockEntry: null,
+    setUnlockEntry: vi.fn(),
+    onUnlocked: vi.fn(),
+    hasChoices: false,
+  })
+  return {
+    useAccountSwitcher,
+    default: useAccountSwitcher,
+    ACCOUNT_KIND_TAG: { vault: 'Multisig', legacy: 'Recovered' },
+    shortAccountAddr: (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ''),
+  }
+})
 vi.mock('../../hooks/useEncryption', () => ({
   useEncryption: () => ({ isInitialized: false, isInitializing: false, ensureInitialized: vi.fn() }),
 }))
@@ -126,11 +156,12 @@ describe('WalletPage — ?tab=collectibles deep link', () => {
     expect(container.querySelector('.profile-section')).toBeTruthy()
   })
 
-  it('filters Collectibles out of the Finance section bottom bar on unsupported networks', () => {
+  it('redirects the legacy ?tab=portfolio deep link into the unified My Account view (spec 074)', () => {
     useChainTokens.mockReturnValue({ capabilities: { collectibles: false } })
-    const { container } = renderPage('/wallet?tab=portfolio')
+    const { container, getByTestId } = renderPage('/wallet?tab=portfolio')
     expect(container.querySelector('.collectibles-section')).toBeNull()
-    // The rest of the Finance panels still render normally.
-    expect(container.querySelector('.portfolio-section')).toBeTruthy()
+    // The saved link lands on My Account with the Portfolio view active.
+    expect(container.querySelector('.profile-section')).toBeTruthy()
+    expect(getByTestId('portfolio-panel')).toBeTruthy()
   })
 })
