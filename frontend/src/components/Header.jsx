@@ -76,46 +76,33 @@ function Header({ hideWalletButton = false, appMode = false }) {
           )}
         </button>
 
-        {/* Desktop Navigation */}
-        <nav className="header-nav desktop-nav" aria-label="Main navigation">
-          {appMode ? (
-            <>
-              <button
-                onClick={() => navigate('/app')}
-                className={`nav-link nav-button ${location.pathname === '/app' || location.pathname === '/main' || location.pathname === '/fairwins' ? 'active' : ''}`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => navigate('/wallet')}
-                className={`nav-link nav-button ${location.pathname === '/wallet' ? 'active' : ''}`}
-              >
-                My Account
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => scrollToSection('features')} className="nav-link nav-button">
-                Features
-              </button>
-              <button onClick={() => scrollToSection('how-it-works')} className="nav-link nav-button">
-                How It Works
-              </button>
-              <button onClick={() => scrollToSection('custody')} className="nav-link nav-button">
-                Custody
-              </button>
-              <button onClick={() => scrollToSection('use-cases')} className="nav-link nav-button">
-                Use Cases
-              </button>
-              <button
-                onClick={() => navigate('/app')}
-                className="nav-link nav-button"
-              >
-                Launch App
-              </button>
-            </>
-          )}
-        </nav>
+        {/* Desktop Navigation — landing page only. In app mode, the left nav
+            drawer (opened via the logo button above) is the sole source of
+            navigation; a duplicate "Dashboard"/"My Account" pair here was
+            redundant and its active-state highlighting didn't track the
+            current view correctly. */}
+        {!appMode && (
+          <nav className="header-nav desktop-nav" aria-label="Main navigation">
+            <button onClick={() => scrollToSection('features')} className="nav-link nav-button">
+              Features
+            </button>
+            <button onClick={() => scrollToSection('how-it-works')} className="nav-link nav-button">
+              How It Works
+            </button>
+            <button onClick={() => scrollToSection('custody')} className="nav-link nav-button">
+              Custody
+            </button>
+            <button onClick={() => scrollToSection('use-cases')} className="nav-link nav-button">
+              Use Cases
+            </button>
+            <button
+              onClick={() => navigate('/app')}
+              className="nav-link nav-button"
+            >
+              Launch App
+            </button>
+          </nav>
+        )}
 
         {/* Wallet Connection Section */}
         <div className="header-actions">
