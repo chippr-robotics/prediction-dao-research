@@ -7,10 +7,15 @@
 # needs the origin-lock + webhook shared secrets injected at runtime (never baked in).
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY services/relay-gateway/package.json services/relay-gateway/package-lock.json* ./
-# Prefer the lockfile when present; fall back to a plain install for local builds.
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; \
-    else npm install --omit=dev --no-audit --no-fund; fi
+# Spec 075: this service is an npm WORKSPACE member, so its dependencies live in the single root
+# lockfile. Copy the root manifest+lock plus this workspace's manifest, then install only this
+# workspace. The previous `package-lock.json*` glob silently matched nothing once the child lock
+# was removed and fell through to a plain `npm install` — a non-reproducible image built from
+# whatever the registry served that day.
+COPY package.json package-lock.json ./
+COPY services/relay-gateway/package.json ./services/relay-gateway/
+RUN npm ci --omit=dev --no-audit --no-fund \
+      --workspace fairwins-relay-gateway --include-workspace-root=false
 
 FROM node:20-alpine AS runtime
 WORKDIR /app

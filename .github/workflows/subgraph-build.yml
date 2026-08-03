@@ -49,7 +49,8 @@ jobs:
           node-version: '22'
 
       - name: Install subgraph dependencies
-        run: npm ci
+        run: npm ci --workspace prediction-dao-research-subgraph --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Verify generated ABI is present
         run: |

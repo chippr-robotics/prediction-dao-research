@@ -161,10 +161,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       # IMPORTANT: Linting errors must fail the build to prevent code quality regressions.
       # Do not add 'continue-on-error: true' to this step as it would hide ESLint failures.
@@ -207,10 +208,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'services/relay-gateway/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install gateway dependencies
-        run: npm ci
+        run: npm ci --workspace fairwins-relay-gateway --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests
         run: npm test
@@ -232,10 +234,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests
         run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
@@ -320,10 +323,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Build frontend
         run: npm run build
@@ -373,10 +377,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       # Constitution IV: this step MUST fail the pipeline on error. Do NOT reintroduce
       # `continue-on-error` here (spec 075, FR-007/FR-008).

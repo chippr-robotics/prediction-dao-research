@@ -175,12 +175,46 @@ for (const u of UNITS) {
   for (const [pkg, where] of seen) problems.phantom.push({ unit: u.label, pkg, first: where });
 }
 
+// ── optional platform binaries must survive in the lockfile ─────────────────────────────────
+//
+// npm/cli#4828: an INCREMENTAL `npm install` can silently drop optionalDependencies from the
+// lockfile. This bit twice during the spec-075 workspace conversion — rollup's native binary
+// vanished and every Vite build died, including the mini-app release path whose output bytes are
+// keccak-committed on-chain. CI runs ubuntu-x64, so a lockfile missing the linux-x64 entry breaks
+// the build for everyone even though it may work on the machine that produced it.
+//
+// The recovery is always the same and is NOT `npm install` again:
+//     rm -rf node_modules package-lock.json && npm install
+const REQUIRED_OPTIONAL = ["@rollup/rollup-linux-x64-gnu"];
+const lockPath = path.join(ROOT, "package-lock.json");
+const missingOptional = [];
+if (fs.existsSync(lockPath)) {
+  const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+  const keys = Object.keys(lock.packages || {});
+  for (const name of REQUIRED_OPTIONAL) {
+    if (!keys.some((k) => k.endsWith(`node_modules/${name}`))) missingOptional.push(name);
+  }
+}
+
 // ── report ───────────────────────────────────────────────────────────────────────────────────
 if (process.argv.includes("--json")) {
   console.log(JSON.stringify(problems, null, 2));
 }
 
 let failed = false;
+
+if (missingOptional.length) {
+  failed = true;
+  console.error(`\n::error::${missingOptional.length} optional platform binary/ies missing from package-lock.json:`);
+  for (const n of missingOptional) console.error(`  · ${n}`);
+  console.error(
+    "\n  This is npm/cli#4828 — an incremental `npm install` dropped them. Every Vite build will\n" +
+      "  fail with \"Cannot find module @rollup/rollup-linux-x64-gnu\", including the mini-app release\n" +
+      "  path whose bytes are committed on-chain. Recover with a FULL re-resolve:\n" +
+      "      rm -rf node_modules package-lock.json && npm install\n" +
+      "  Re-running `npm install` alone does NOT fix it.",
+  );
+}
 
 if (problems.versionSkew.length) {
   failed = true;

@@ -47,7 +47,7 @@ import { fileURLToPath } from 'node:url'
 
 import { keccak256 } from 'ethers'
 
-import { MANIFEST_FILENAME, sha256Hex, verifyPackageDigests } from '../../../../../tools/miniapp-build/index.js'
+import { MANIFEST_FILENAME, sha256Hex, verifyPackageDigests } from '@fairwins/miniapp-build/index.js'
 
 const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url))
 const SOURCE_DIR = path.join(FIXTURES_DIR, 'source')
@@ -57,7 +57,14 @@ const BUILD_DIR = path.join(SOURCE_DIR, 'dist')
 const PACKAGE_DIR = path.join(FIXTURES_DIR, 'package')
 const TAMPERED_DIR = path.join(FIXTURES_DIR, 'tampered')
 const ONCHAIN_FILE = path.join(FIXTURES_DIR, 'onchain.json')
-const VITE_BIN = path.resolve(FIXTURES_DIR, '..', '..', '..', '..', 'node_modules', '.bin', 'vite')
+// Under npm workspaces every bin hoists to the repo-root node_modules/.bin and a child package
+// gets none — so check the root first, then the legacy frontend/ location for a non-workspace
+// checkout. This harness is what the spec-075 byte-reproducibility gate runs, so a stale path here
+// silently disables that gate.
+const VITE_BIN = [
+  path.resolve(FIXTURES_DIR, '..', '..', '..', '..', '..', 'node_modules', '.bin', 'vite'),
+  path.resolve(FIXTURES_DIR, '..', '..', '..', '..', 'node_modules', '.bin', 'vite'),
+].find((p) => fs.existsSync(p)) || path.resolve(FIXTURES_DIR, '..', '..', '..', '..', '..', 'node_modules', '.bin', 'vite')
 
 /**
  * The content identifier the fixture pretends to be pinned under.
@@ -94,7 +101,7 @@ function resetDir(dir) {
 // ---------------------------------------------------------------- build
 
 if (!fs.existsSync(VITE_BIN)) {
-  fail(`vite not found at ${VITE_BIN} — run \`npm install\` in frontend/ first`)
+  fail(`vite not found at ${VITE_BIN} — run \`npm install\` at the repo root first`)
 }
 
 console.log('[fixtures] building the fixture package with tools/miniapp-build …')

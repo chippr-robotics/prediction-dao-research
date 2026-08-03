@@ -1,18 +1,22 @@
 # FairWins ZK-Wager Pool gas relayer.
 # GAS INFRASTRUCTURE ONLY (see README). Minimal, non-root, no build step.
+# BUILD CONTEXT = REPO ROOT (spec 075 — this is a workspace member; its deps resolve from the
+# single root lockfile):
+#   docker build -f services/relayer/Dockerfile -t fairwins-pool-relayer .
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-# No lockfile is committed for this standalone service; install prod deps deterministically by version.
-RUN npm ci --omit=dev --no-audit --no-fund
+COPY package.json package-lock.json ./
+COPY services/relayer/package.json ./services/relayer/
+RUN npm ci --omit=dev --no-audit --no-fund \
+      --workspace fairwins-pool-relayer --include-workspace-root=false
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 # Drop privileges: the node image ships a non-root `node` user.
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
-COPY src ./src
+COPY services/relayer/package.json ./
+COPY services/relayer/src ./src
 USER node
 EXPOSE 8787
 # Liveness probe hits the no-secret health endpoint.

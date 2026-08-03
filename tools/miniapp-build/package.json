@@ -7,6 +7,8 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./index.js": "./index.js",
+    "./constants.js": "./constants.js",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

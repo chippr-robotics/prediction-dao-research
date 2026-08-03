@@ -47,7 +47,7 @@ Be respectful, inclusive, and collaborative. We're building something important 
 git clone https://github.com/YOUR_USERNAME/prediction-dao-research.git
 cd prediction-dao-research
 npm install
-cd frontend && npm install && cd ..
+# (spec 075) one root `npm install` covers frontend and every other workspace
 ```
 
 ### Making Changes

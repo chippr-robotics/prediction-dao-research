@@ -82,3 +82,49 @@ describe("Compiler configuration: EVM target is declared, not inherited", functi
     });
   });
 });
+
+/**
+ * Spec 075, FR-001/FR-005 — the SAME defect as an unpinned evmVersion, one layer down.
+ *
+ * Any npm package that contributes Solidity source to the compile is a build input. Declared with
+ * a caret range, the version that actually compiles is decided by WHEN someone last resolved the
+ * lockfile, not by this repository — so deployed bytecode silently depends on install time.
+ *
+ * This is not hypothetical. Regenerating the lockfile during the spec-075 workspace conversion
+ * floated `@chainlink/contracts` from 1.3.0 to 1.5.0 and changed the compiled bytecode of
+ * ChainlinkFunctionsOracleAdapter. The byte-diff gate caught it; nothing else would have.
+ * `@uma/core` was floating the same way (2.61.0 -> 2.62.2).
+ *
+ * Solidity-source dependencies must therefore be pinned EXACTLY, exactly as @openzeppelin/contracts
+ * and @safe-global/safe-contracts already were.
+ */
+describe("Solidity-source dependencies are pinned exactly (spec 075, FR-001)", function () {
+  // Every package whose .sol files are imported by contracts/. Keep in sync with the imports —
+  // a new `import "@vendor/..."` in a contract belongs here.
+  const SOLIDITY_SOURCE_PACKAGES = [
+    "@openzeppelin/contracts",
+    "@openzeppelin/contracts-upgradeable",
+    "@chainlink/contracts",
+    "@uma/core",
+    "@safe-global/safe-contracts",
+  ];
+
+  const EXACT = /^\d+\.\d+\.\d+/;
+
+  it("declares an exact version for every package that compiles into our bytecode", function () {
+    const pkg = require("../../package.json");
+    const declared = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+
+    const floating = SOLIDITY_SOURCE_PACKAGES.filter((name) => {
+      const range = declared[name];
+      return range !== undefined && !EXACT.test(range);
+    }).map((name) => `${name}@${declared[name]}`);
+
+    expect(
+      floating,
+      "These contribute Solidity source but declare a floating range, so the bytecode they produce " +
+        "depends on when the lockfile was last resolved rather than on this repo:\n  " +
+        floating.join("\n  "),
+    ).to.deep.equal([]);
+  });
+});

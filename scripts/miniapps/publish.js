@@ -51,7 +51,20 @@ const { keccak256 } = require('ethers')
 const REPO_ROOT = path.resolve(__dirname, '..', '..')
 const PACKAGES_DIR = path.join(REPO_ROOT, 'frontend', 'miniapps')
 const PRESET_DIR = path.join(REPO_ROOT, 'tools', 'miniapp-build')
-const VITE_BIN = path.join(REPO_ROOT, 'frontend', 'node_modules', '.bin', 'vite')
+/*
+ * Resolve vite from the workspace ROOT bin, not from frontend/.
+ *
+ * Under npm workspaces a child package gets NO node_modules/.bin at all — every executable hoists
+ * to the root. Verified on npm 11.6.0. The old hardcoded `frontend/node_modules/.bin/vite` broke
+ * the moment the workspace landed, and this is the RELEASE path for code whose bytes are
+ * keccak-committed on-chain, so it must not fail late.
+ *
+ * Both locations are checked so the script keeps working in a non-workspace checkout.
+ */
+const VITE_BIN = [
+  path.join(REPO_ROOT, 'node_modules', '.bin', 'vite'),
+  path.join(REPO_ROOT, 'frontend', 'node_modules', '.bin', 'vite'),
+].find((p) => fs.existsSync(p)) || path.join(REPO_ROOT, 'node_modules', '.bin', 'vite')
 
 /**
  * Where `--dev` stages packages.

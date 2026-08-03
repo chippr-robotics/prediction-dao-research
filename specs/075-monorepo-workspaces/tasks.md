@@ -108,29 +108,29 @@ bytes.**
 
 - [ ] T031 [US3] Write `scripts/miniapps/record-baseline.js` reading `manifestHash` + `cid` for both apps from `MiniAppRegistry` on Polygon 137 **and** Mordor 63 (FR-019)
 - [ ] T032 [US3] **GATE** — run it, rebuild on today's tree, and commit `specs/075-monorepo-workspaces/baseline-miniapps.json` recording per app per chain: `manifestHash`, `cid`, and **whether HEAD reproduces the published CID**. An unreachable chain records `unreachable` and **blocks** the gate — never a default (FR-019, B1)
-- [ ] T033 [US3] **GATE** — add a **new `ethers`-importing fixture** under `frontend/src/test/miniapps/fixtures/`. The existing fixture's own header states `ethers` is *intentionally not imported*, so it is structurally blind to the ~190-binding shim both real packages actually use (FR-021, B3)
-- [ ] T034 [US3] Confirm `node frontend/src/test/miniapps/fixtures/regenerate.mjs` produces an empty git diff **before** any workspace change
+- [X] T033 [US3] **GATE** — add a **new `ethers`-importing fixture** under `frontend/src/test/miniapps/fixtures/`. The existing fixture's own header states `ethers` is *intentionally not imported*, so it is structurally blind to the ~190-binding shim both real packages actually use (FR-021, B3)
+- [X] T034 [US3] Confirm `node frontend/src/test/miniapps/fixtures/regenerate.mjs` produces an empty git diff **before** any workspace change
 
 ### Prerequisite commit (separately revertible)
 
-- [ ] T035 [US3] Drop the 4 unused frontend deps — `@uniswap/v3-sdk`, `jsbi`, `@walletconnect/ethereum-provider`, `@walletconnect/modal` (verified zero import sites in `frontend/src`). `@uniswap/v3-sdk` is what drags `@openzeppelin/contracts@3.4.2-solc-0.7` into the frontend tree against root's exact 5.4.0 (research R5)
+- [X] T035 [US3] Drop the 4 unused frontend deps — `@uniswap/v3-sdk`, `jsbi`, `@walletconnect/ethereum-provider`, `@walletconnect/modal` (verified zero import sites in `frontend/src`). `@uniswap/v3-sdk` is what drags `@openzeppelin/contracts@3.4.2-solc-0.7` into the frontend tree against root's exact 5.4.0 (research R5)
 
 ### Workspace conversion
 
-- [ ] T036 [US3] Add `"private": true`, `"engines"`, and the `workspaces` array to root `package.json` per [contracts/workspace-layout.md](./contracts/workspace-layout.md) — including the nested glob `frontend/miniapps/*` (verified accepted by npm 11.6.0) (FR-012)
-- [ ] T037 [US3] Create `frontend/miniapps/token-mint/package.json` and `frontend/miniapps/clearpath/package.json` declaring `@fairwins/miniapp-build`/`vite`/`@vitejs/plugin-react` as devDeps and `react`/`ethers` as peerDeps, with a **real `version`** replacing the hardcoded `'1.0.0'` literal (FR-023)
+- [X] T036 [US3] Add `"private": true`, `"engines"`, and the `workspaces` array to root `package.json` per [contracts/workspace-layout.md](./contracts/workspace-layout.md) — including the nested glob `frontend/miniapps/*` (verified accepted by npm 11.6.0) (FR-012)
+- [X] T037 [US3] Create `frontend/miniapps/token-mint/package.json` and `frontend/miniapps/clearpath/package.json` declaring `@fairwins/miniapp-build`/`vite`/`@vitejs/plugin-react` as devDeps and `react`/`ethers` as peerDeps, with a **real `version`** replacing the hardcoded `'1.0.0'` literal (FR-023)
 - [X] T097 [US3] Add `scripts/deps/check-dependency-hygiene.js` + `npm run check:deps` + a CI job — a **standing** check for version skew (FR-015) and phantom imports (FR-003/SC-003). Both invariants were previously fixed by hand once with nothing preventing recurrence (**analyze finding G1**)
 - [X] T038 [US3] Align the `ethers` ranges across root/frontend/gateway/relayer. **Do NOT add a bare root `overrides.ethers`** — the lockfile carries ethers 5.8.0 ×9 and 4.0.49 ×2 for `@uma/core`, `@chainlink/contracts`, `@across-protocol/contracts`; an unscoped override forces an incompatible major onto all of them. Scope per-package if a pin is needed (FR-015, research R4)
-- [ ] T039 [US3] Delete `frontend/`, `services/relay-gateway/`, `subgraph/` lockfiles and regenerate one root `package-lock.json` (FR-013)
-- [ ] T040 [US3] **GATE** — before T039's subgraph deletion is final, run `graph codegen && graph build` under the merged tree. `subgraph/package-lock.json` is the only record of how graph-cli 0.80.0 + graph-ts 0.35.1 + matchstick-as 0.6.0 resolve, and graph-cli bundles its own AssemblyScript stack (research R12.4)
-- [ ] T041 [P] [US3] Switch all 6 relative imports of `tools/miniapp-build` to the package name `@fairwins/miniapp-build` (2 mini-app vite configs; `buildPreset.test.js:24`, `hostScope.test.js:45`, `fixtures/regenerate.mjs:50`, `fixtures/source/vite.config.js:21`)
-- [ ] T042 [US3] Fix `scripts/miniapps/publish.js:54` — `VITE_BIN` must resolve from the **root** bin dir. **Verified**: a workspace child gets no local `node_modules/.bin` at all (FR-018)
-- [ ] T043 [US3] Fix the same hardcoded pattern at `frontend/src/test/miniapps/fixtures/regenerate.mjs:60` — this is the harness T034/T046 depend on (FR-018)
-- [ ] T044 [P] [US3] Update root scripts invalidated by the change: `lock:sync`, `test:frontend`, `frontend` (FR-017)
-- [ ] T045 [US3] Update the ~27 `npm ci` sites across 9 workflows and every `cache-dependency-path` pointing at a deleted lockfile; service jobs use `npm ci --workspace <name> --include-workspace-root=false` so the gateway does not regress from ~299 to ~2,100 packages (FR-016)
-- [ ] T046 [P] [US3] Update the 4 remaining Dockerfiles (root, `services/relay-gateway/Dockerfile:12-13`, `services/relayer/Dockerfile:7`, `subgraph/matchstick.Dockerfile`) and `.dockerignore` so the root lockfile is present in every build context
-- [ ] T047 [P] [US3] Correct `cd frontend && npm install` in the 5 documents that carry it — `docs/developer-guide/{contributing,frontend,setup}.md`, `frontend/README.md:71`, `README.md:108` (FR-017)
-- [ ] T048 [P] [US3] Keep `services/relayer`'s build recipe and bring it under the workspace (FR-014).
+- [X] T039 [US3] Delete `frontend/`, `services/relay-gateway/`, `subgraph/` lockfiles and regenerate one root `package-lock.json` (FR-013)
+- [X] T040 [US3] **GATE** — before T039's subgraph deletion is final, run `graph codegen && graph build` under the merged tree. `subgraph/package-lock.json` is the only record of how graph-cli 0.80.0 + graph-ts 0.35.1 + matchstick-as 0.6.0 resolve, and graph-cli bundles its own AssemblyScript stack (research R12.4)
+- [X] T041 [P] [US3] Switch all 6 relative imports of `tools/miniapp-build` to the package name `@fairwins/miniapp-build` (2 mini-app vite configs; `buildPreset.test.js:24`, `hostScope.test.js:45`, `fixtures/regenerate.mjs:50`, `fixtures/source/vite.config.js:21`)
+- [X] T042 [US3] Fix `scripts/miniapps/publish.js:54` — `VITE_BIN` must resolve from the **root** bin dir. **Verified**: a workspace child gets no local `node_modules/.bin` at all (FR-018)
+- [X] T043 [US3] Fix the same hardcoded pattern at `frontend/src/test/miniapps/fixtures/regenerate.mjs:60` — this is the harness T034/T046 depend on (FR-018)
+- [X] T044 [P] [US3] Update root scripts invalidated by the change: `lock:sync`, `test:frontend`, `frontend` (FR-017)
+- [X] T045 [US3] Update the ~27 `npm ci` sites across 9 workflows and every `cache-dependency-path` pointing at a deleted lockfile; service jobs use `npm ci --workspace <name> --include-workspace-root=false` so the gateway does not regress from ~299 to ~2,100 packages (FR-016)
+- [X] T046 [P] [US3] Update the 4 remaining Dockerfiles (root, `services/relay-gateway/Dockerfile:12-13`, `services/relayer/Dockerfile:7`, `subgraph/matchstick.Dockerfile`) and `.dockerignore` so the root lockfile is present in every build context
+- [X] T047 [P] [US3] Correct `cd frontend && npm install` in the 5 documents that carry it — `docs/developer-guide/{contributing,frontend,setup}.md`, `frontend/README.md:71`, `README.md:108` (FR-017)
+- [X] T048 [P] [US3] Keep `services/relayer`'s build recipe and bring it under the workspace (FR-014).
       > **Resolved contradiction.** This previously offered "delete the Dockerfile OR give it a recipe", which conflicts
       > with the already-completed T014 (commit its lockfile; switch its Dockerfile to `npm ci`). T014 won: the unit now
       > has a lockfile and a reproducible install, so deleting the recipe would discard work and leave source with no
@@ -138,10 +138,13 @@ bytes.**
 
 ### The three blocking gates
 
-- [ ] T049 [US3] **GATE 1** — `artifacts/` bytecode byte-identical to `baseline-bytecode.json` (SC-001)
-- [ ] T050 [US3] **GATE 2** — fixture regenerate produces an empty git diff, **with the T033 `ethers` fixture in place** (FR-020)
-- [ ] T051 [US3] **GATE 3** — rebuild both real mini-app packages and confirm `entry.js`/`manifest.json` bytes are identical **before vs. after on the same tree**. Not "matches on chain" — no in-repo baseline exists and the live packages were built from an unrecorded commit (FR-020, B2). **Any difference blocks the merge**; if real, re-publish and re-approve on-chain (FR-022)
-- [ ] T052 [US3] Verify scoped install cost against `baseline-installs.md` (FR-016)
+- [X] T049 [US3] **GATE 1** — `artifacts/` bytecode byte-identical to `baseline-bytecode.json` (SC-001)
+- [X] T050 [US3] **GATE 2** — fixture regenerate produces an empty git diff, **with the T033 `ethers` fixture in place** (FR-020)
+- [X] T051 [US3] **GATE 3** — rebuild both real mini-app packages and confirm `entry.js`/`manifest.json` bytes are identical **before vs. after on the same tree**. Not "matches on chain" — no in-repo baseline exists and the live packages were built from an unrecorded commit (FR-020, B2). **Any difference blocks the merge**; if real, re-publish and re-approve on-chain (FR-022)
+- [X] T098 [US3] Pin `@chainlink/contracts` and `@uma/core` EXACTLY + guard it in `CompilerTargets.test.js` — regenerating the lockfile floated chainlink 1.3.0 -> 1.5.0 and **changed ChainlinkFunctionsOracleAdapter's bytecode**. Caught by the T049 gate (FR-001/FR-005)
+- [X] T099 [US3] Add a staleness guard to `record-build-digests.js` — it reported "unchanged" against a stale `dist/` after both mini-app builds FAILED, a false pass (FR-020)
+- [X] T100 [US3] Add an optional-platform-binary check to `check:deps` — npm/cli#4828 drops `@rollup/rollup-linux-x64-gnu` from the lockfile on incremental installs, breaking every Vite build incl. the on-chain release path
+- [X] T052 [US3] Verify scoped install cost against `baseline-installs.md` (FR-016)
 
 ### US7 — boundary enforcement (same PR)
 

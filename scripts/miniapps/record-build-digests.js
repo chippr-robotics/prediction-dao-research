@@ -49,7 +49,40 @@ function digests() {
 const args = process.argv.slice(2);
 const outIdx = args.indexOf("--out");
 const cmpIdx = args.indexOf("--compare");
+const maxAgeIdx = args.indexOf("--max-age-seconds");
 const now = digests();
+
+/**
+ * A stale dist is a FALSE PASS, and this gate has already produced one.
+ *
+ * During the spec-075 workspace conversion both mini-app builds failed (rollup's native binary was
+ * missing from a freshly-resolved lockfile) and this script still reported "output bytes
+ * unchanged" — because it hashed the dist/ left behind by the PREVIOUS successful build. A gate
+ * that passes when the build did not run is worse than no gate, because it is trusted.
+ *
+ * So when comparing, require the artifacts to be newer than the given age. Callers that just ran
+ * a build pass a small window; the default is off only for `--out`, where recording whatever is
+ * on disk is the intent.
+ */
+function assertFresh(maxAgeSeconds) {
+  const stale = [];
+  const cutoff = Number(process.env.SOURCE_DATE_EPOCH ? 0 : maxAgeSeconds);
+  for (const app of APPS) {
+    for (const f of FILES) {
+      const p = path.join(ROOT, "frontend", "miniapps", app, "dist", f);
+      const ageSec = (Date.now() - fs.statSync(p).mtimeMs) / 1000;
+      if (ageSec > cutoff) stale.push(`${app}/${f} (${Math.round(ageSec)}s old)`);
+    }
+  }
+  if (stale.length) {
+    console.error(
+      `\nFAIL: ${stale.length} built file(s) are older than ${maxAgeSeconds}s — the build did not just run.\n` +
+        "Refusing to compare a stale dist/: that reports success for a build that never happened.\n" +
+        stale.map((s) => `  · ${s}`).join("\n"),
+    );
+    process.exit(2);
+  }
+}
 
 const missing = Object.entries(now).filter(([, v]) => v === "MISSING");
 if (missing.length) {
@@ -65,6 +98,9 @@ if (outIdx !== -1) {
 }
 
 if (cmpIdx !== -1) {
+  // Default window: 10 minutes. Long enough for two real builds, short enough that yesterday's
+  // dist cannot masquerade as today's.
+  assertFresh(maxAgeIdx !== -1 ? Number(args[maxAgeIdx + 1]) : 600);
   const base = JSON.parse(fs.readFileSync(args[cmpIdx + 1], "utf8"));
   const diff = Object.keys(base).filter((k) => base[k] !== now[k]);
   Object.keys(base).forEach((k) => console.log(`${base[k] === now[k] ? "  match " : "  DIFFER"} ${k}`));
