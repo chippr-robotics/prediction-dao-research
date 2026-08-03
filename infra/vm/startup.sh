@@ -81,6 +81,14 @@ install -m0644 "$REPO_DIR/infra/vm/nginx/fairwins-${ROLE}.conf" /etc/nginx/sites
 ln -sf /etc/nginx/sites-available/fairwins.conf /etc/nginx/sites-enabled/fairwins.conf
 rm -f /etc/nginx/sites-enabled/default
 
+# The Origin CA private key is commonly pasted in by hand and lands 0644 by default. Enforce 0600
+# on every boot rather than relying on the operator remembering — a world-readable origin key lets
+# any local process impersonate this origin to Cloudflare.
+if [ -f /etc/ssl/fairwins/origin.key ]; then
+  chown root:root /etc/ssl/fairwins/origin.key
+  chmod 0600 /etc/ssl/fairwins/origin.key
+fi
+
 # nginx must not start before the Origin CA cert exists, or it fails and stays down.
 if [ ! -s /etc/ssl/fairwins/origin.pem ] || [ ! -s /etc/ssl/fairwins/origin.key ]; then
   echo "WARNING: Cloudflare Origin CA cert not installed at /etc/ssl/fairwins/origin.{pem,key}."
