@@ -40,7 +40,13 @@ vi.mock('../../lib/miniapps/registryClient', async (importOriginal) => {
 
 import { AppCategory, AppStatus, APP_CATEGORY_LABELS } from '../../abis/miniAppRegistry'
 import { REGISTRY_STATUS, UNREACHABLE_REASON, appSlug } from '../../lib/miniapps/registryClient'
+import { loadFavoriteApps, __resetFavoriteAppsForTests } from '../../lib/miniapps/favorites'
 import CatalogPanel from '../../components/miniapps/CatalogPanel'
+
+beforeEach(() => {
+  localStorage.clear()
+  __resetFavoriteAppsForTests()
+})
 
 const CHAIN = 137
 const REGISTRY = '0x5a168Cc9FeFaf40e7BC536C8C61669e6d547A0A2'
@@ -140,9 +146,24 @@ async function renderSettled() {
   return result
 }
 
-/** The apps currently on screen, by card heading — the member's-eye view of the catalog. */
+/**
+ * The apps currently on screen, by card heading — the member's-eye view of the catalog.
+ *
+ * Level 5: the catalog groups apps under a level-4 category heading (`h3 Apps > h4 category >
+ * h5 app name`), so the app names themselves sit one level deeper than they did before grouping.
+ */
 function listedApps() {
+  return screen.queryAllByRole('heading', { level: 5 }).map((node) => node.textContent)
+}
+
+/** The category group headings currently on screen, in render order. */
+function listedGroups() {
   return screen.queryAllByRole('heading', { level: 4 }).map((node) => node.textContent)
+}
+
+/** Opens the category filter chips, which sit behind the Filter disclosure inline with search. */
+async function openFilters(user) {
+  await user.click(screen.getByRole('button', { name: /^Filter/ }))
 }
 
 describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
@@ -189,7 +210,7 @@ describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
 
     await renderSettled()
 
-    const card = screen.getByRole('heading', { level: 4, name: 'Treasury Sweep' }).closest('li')
+    const card = screen.getByRole('heading', { level: 5, name: 'Treasury Sweep' }).closest('li')
     expect(within(card).getByText(APP_CATEGORY_LABELS[AppCategory.TREASURY_LIQUIDITY])).toBeInTheDocument()
     expect(within(card).getByText('v4')).toBeInTheDocument()
     expect(within(card).getByText('0x1234…5678')).toBeInTheDocument()
@@ -295,6 +316,7 @@ describe('CatalogPanel — search and category filters (FR-008)', () => {
 
     await renderSettled()
     expect(listedApps()).toHaveLength(6)
+    await openFilters(user)
 
     for (const category of Object.values(AppCategory)) {
       const label = APP_CATEGORY_LABELS[category]
@@ -321,6 +343,7 @@ describe('CatalogPanel — search and category filters (FR-008)', () => {
     )
     state.fetchCatalog = vi.fn(async () => okOutcome(perCategory))
     await renderSettled()
+    await openFilters(user)
 
     await user.click(screen.getByRole('button', { name: APP_CATEGORY_LABELS[AppCategory.RECONCILIATION] }))
     await user.click(screen.getByRole('button', { name: APP_CATEGORY_LABELS[AppCategory.REPORTING_AUDIT] }))
@@ -333,6 +356,130 @@ describe('CatalogPanel — search and category filters (FR-008)', () => {
     await user.click(screen.getByRole('button', { name: 'All categories' }))
     expect(listedApps()).toHaveLength(6)
     expect(screen.getByRole('button', { name: 'All categories' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('CatalogPanel — category chips sit behind a Filter disclosure', () => {
+  beforeEach(() => {
+    state.fetchCatalog = vi.fn(async () =>
+      okOutcome([
+        appRecord({ id: 1, name: 'Settle Desk', category: AppCategory.TRADE_SETTLEMENT }),
+        appRecord({ id: 2, name: 'Ledger Match', category: AppCategory.RECONCILIATION }),
+      ]),
+    )
+  })
+
+  it('hides the category chips until Filter is pressed', async () => {
+    await renderSettled()
+
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'All categories' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('aria-expanded', 'false')
+
+    const user = userEvent.setup()
+    await openFilters(user)
+
+    expect(screen.getByRole('button', { name: 'All categories' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('keeps the active-filter count on the toggle label even while the chips are collapsed', async () => {
+    const user = userEvent.setup()
+    await renderSettled()
+    await openFilters(user)
+
+    await user.click(screen.getByRole('button', { name: APP_CATEGORY_LABELS[AppCategory.RECONCILIATION] }))
+    await openFilters(user) // collapse
+
+    expect(screen.queryByRole('button', { name: 'All categories' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filter (1)' })).toBeInTheDocument()
+    // The narrowing itself survives collapsing the chip row — only the chips hide.
+    expect(listedApps()).toEqual(['Ledger Match'])
+  })
+})
+
+describe('CatalogPanel — apps grouped by category', () => {
+  it('renders a heading per category, in the on-chain enum order, over only the categories present', async () => {
+    state.fetchCatalog = vi.fn(async () =>
+      okOutcome([
+        appRecord({ id: 1, name: 'Ledger Match', category: AppCategory.RECONCILIATION }),
+        appRecord({ id: 2, name: 'Settle Desk', category: AppCategory.TRADE_SETTLEMENT }),
+        appRecord({ id: 3, name: 'Second Settle Desk', category: AppCategory.TRADE_SETTLEMENT }),
+      ]),
+    )
+    await renderSettled()
+
+    // Trade Settlement is ordinal 0, Reconciliation is ordinal 1 — the group order follows the
+    // enum, not discovery order, and only categories that actually have an app appear at all.
+    expect(listedGroups()).toEqual([
+      APP_CATEGORY_LABELS[AppCategory.TRADE_SETTLEMENT],
+      APP_CATEGORY_LABELS[AppCategory.RECONCILIATION],
+    ])
+
+    const tradeGroup = screen.getByRole('heading', {
+      level: 4,
+      name: APP_CATEGORY_LABELS[AppCategory.TRADE_SETTLEMENT],
+    }).closest('section')
+    expect(within(tradeGroup).getAllByRole('heading', { level: 5 }).map((n) => n.textContent)).toEqual([
+      'Settle Desk',
+      'Second Settle Desk',
+    ])
+  })
+
+  it('narrowing to one category leaves exactly one group heading', async () => {
+    const user = userEvent.setup()
+    state.fetchCatalog = vi.fn(async () =>
+      okOutcome([
+        appRecord({ id: 1, name: 'Settle Desk', category: AppCategory.TRADE_SETTLEMENT }),
+        appRecord({ id: 2, name: 'Ledger Match', category: AppCategory.RECONCILIATION }),
+      ]),
+    )
+    await renderSettled()
+
+    await user.type(screen.getByRole('searchbox', { name: /search apps/i }), 'ledger')
+
+    expect(listedGroups()).toEqual([APP_CATEGORY_LABELS[AppCategory.RECONCILIATION]])
+  })
+})
+
+describe('CatalogPanel — Quick Access favorites', () => {
+  it('offers no favorite star for a card that cannot be launched by URL', async () => {
+    state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Ünïcode Desk' })]))
+    await renderSettled()
+
+    expect(screen.queryByRole('button', { name: /Quick Access/ })).toBeNull()
+  })
+
+  it('offers no favorite star on an unverified stale snapshot', async () => {
+    state.fetchCatalog = vi.fn(async () =>
+      unreachableOutcome({ stale: staleSnapshot([appRecord({ id: 1, name: 'Settle Desk' })], 60_000) }),
+    )
+    await renderSettled()
+
+    expect(screen.queryByRole('button', { name: /Quick Access/ })).toBeNull()
+  })
+
+  it('adds a launchable app to Quick Access and persists it, then removes it on a second press', async () => {
+    const user = userEvent.setup()
+    state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 9, name: 'Settle Desk' })]))
+    await renderSettled()
+
+    const star = screen.getByRole('button', { name: 'Add Settle Desk to Quick Access' })
+    expect(star).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(star)
+
+    const active = screen.getByRole('button', { name: 'Remove Settle Desk from Quick Access' })
+    expect(active).toHaveAttribute('aria-pressed', 'true')
+    expect(loadFavoriteApps()).toEqual([{ id: 9, slug: appSlug('Settle Desk'), name: 'Settle Desk' }])
+
+    await user.click(active)
+
+    expect(screen.getByRole('button', { name: 'Add Settle Desk to Quick Access' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(loadFavoriteApps()).toEqual([])
   })
 })
 

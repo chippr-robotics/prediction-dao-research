@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import AppNavDrawer from '../components/nav/AppNavDrawer'
 import { NavDrawerProvider } from '../contexts/NavDrawerContext.jsx'
 import { useNavDrawer } from '../contexts/NavDrawerContext.js'
+import { addFavoriteApp, __resetFavoriteAppsForTests } from '../lib/miniapps/favorites'
 
 // useIsMobile() reads window.matchMedia('(max-width: 768px)'). setup.js mocks
 // matches: false for every query, i.e. desktop — which these tests rely on
@@ -54,6 +55,11 @@ function renderDrawer(route = '/app') {
 }
 
 describe('AppNavDrawer (global nav drawer)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    __resetFavoriteAppsForTests()
+  })
+
   it('lists Home plus the Finance / Tools / Apps sections', () => {
     const { container } = renderDrawer()
 
@@ -188,5 +194,50 @@ describe('AppNavDrawer (desktop icon gutter)', () => {
     const aside = document.getElementById('app-nav-drawer')
     expect(aside).toHaveAttribute('aria-hidden', 'true')
     expect(aside.className).not.toContain('collapsed')
+  })
+})
+
+// Favorited mini-apps (App Store Quick Access). A favorite is a device-scoped shortcut
+// (lib/miniapps/favorites.js) into `/apps/<slug>`, surfaced alongside Home/Portfolio.
+describe('AppNavDrawer (favorited mini-apps / Quick Access)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    __resetFavoriteAppsForTests()
+  })
+
+  it('lists a favorited app under Quick Access and routes it to its workspace', () => {
+    addFavoriteApp({ id: 12, slug: 'token-mint', name: 'Token Mint' })
+
+    const { container } = renderDrawer()
+
+    expect(screen.getByRole('button', { name: 'Token Mint' })).toBeInTheDocument()
+    const labels = Array.from(
+      container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
+    ).map((el) => el.textContent)
+    const quickAccessIdx = labels.indexOf('Quick Access')
+    const financeIdx = labels.indexOf('Finance')
+    const favoriteIdx = labels.indexOf('Token Mint')
+    expect(favoriteIdx).toBeGreaterThan(quickAccessIdx)
+    expect(favoriteIdx).toBeLessThan(financeIdx)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Token Mint' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/apps/token-mint')
+  })
+
+  it('lists only Home and Portfolio under Quick Access when nothing is favorited', () => {
+    const { container } = renderDrawer()
+    const labels = Array.from(
+      container.querySelectorAll('.portal-nav-group-label, .portal-nav-item-label')
+    ).map((el) => el.textContent)
+    const quickAccessIdx = labels.indexOf('Quick Access')
+    const financeIdx = labels.indexOf('Finance')
+    expect(labels.slice(quickAccessIdx + 1, financeIdx)).toEqual(['Home', 'Portfolio'])
+  })
+
+  it('highlights the favorited shortcut itself, not just the Apps entry, when it is the open app', () => {
+    addFavoriteApp({ id: 12, slug: 'token-mint', name: 'Token Mint' })
+    renderDrawer('/apps/token-mint')
+    expect(screen.getByRole('button', { name: 'Token Mint' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Apps' })).not.toHaveAttribute('aria-current')
   })
 })

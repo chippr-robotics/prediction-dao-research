@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useNavDrawer } from '../../contexts/NavDrawerContext.js'
 import { useIsMobile } from '../../hooks/useMediaQuery'
@@ -12,10 +12,12 @@ import {
   NAV_GROUPS,
   pathForNavItem,
   visibleNavGroups,
+  isNavItemEnabledForTenant,
 } from '../../config/appNav'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { collectiblesGatewayUrl } from '../../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../../lib/predict/predictClient'
+import { loadFavoriteApps, subscribeFavoriteApps } from '../../lib/miniapps/favorites'
 import './AppNavDrawer.css'
 
 // Deep-link alias parity with WalletPage (the Swap tab is now "Trade"; the
@@ -41,24 +43,32 @@ const TAB_ALIASES = { swap: 'trade', backup: 'security' }
  */
 const TAB_TO_MINIAPP = { tokens: 'apps', clearpath: 'apps' }
 
-// The drawer list = a top "Quick Access" group (Home, Portfolio) + the section groups. Built per
-// render because item visibility is chain-aware (spec 055: Collectibles hides entirely on networks
-// OpenSea doesn't serve or with no gateway configured).
+// The drawer list = a top "Quick Access" group (Home, Portfolio, favorited mini-apps) + the
+// section groups. Built per render because item visibility is chain-aware (spec 055: Collectibles
+// hides entirely on networks OpenSea doesn't serve or with no gateway configured).
 //
 // Wagers used to be spliced into the Apps group here, because it was an absolute `/wagers` route
 // rather than a `/wallet?tab=` section and so was not carried by NAV_GROUPS' tenant filter. That
 // splice is gone: Wagers is now a view inside Finance ▸ Transfer (spec 073), reached through the
 // Transfer entry NAV_GROUPS already carries, and gated by PayTransferPanel on the same `wagers`
 // tenant feature. One fewer place for the menu and the routes to disagree.
-function buildDrawerGroups(visibility) {
+function buildDrawerGroups(visibility, favoriteItems) {
   return [
-    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM] },
+    { label: 'Quick Access', items: [HOME_ITEM, PORTFOLIO_ITEM, ...favoriteItems] },
     ...visibleNavGroups(visibility, NAV_GROUPS),
   ]
 }
 
+// `favorites.js` entries -> drawer items. `showIcon` opts into PortalNav's initial-letter fallback
+// (the on-chain registry carries no app icon, so the first letter of its name stands in for one,
+// same as any other icon-less drawer entry would in the collapsed rail) so a favorited app is
+// recognisable at a glance in the EXPANDED menu too, not just the icon-only gutter.
+function favoriteToNavItem(favorite) {
+  return { id: `favorite-${favorite.id}`, label: favorite.name, to: `/apps/${favorite.slug}`, showIcon: true }
+}
+
 // Which drawer entry reflects the current route, so the open menu highlights it.
-function resolveActiveId(location) {
+function resolveActiveId(location, favoriteItems) {
   const { pathname, search } = location
   if (pathname === '/wallet') {
     const requested = new URLSearchParams(search).get('tab')
@@ -75,12 +85,15 @@ function resolveActiveId(location) {
     return WAGERS_VIEW.tab
   }
   // A mounted mini-app (`/apps/<slug>`, spec 073) IS the Apps section — the workspace is
-  // where a catalog launch lands. Highlighting the catalog entry keeps the menu pointing at
-  // where the member actually is, instead of showing nothing selected for the entire time an
-  // app is open. The trailing slash is part of the match so a future top-level route that
-  // merely starts with those letters cannot borrow the highlight.
+  // where a catalog launch lands. A favorited app highlights its OWN Quick Access shortcut
+  // instead, so the member sees exactly which shortcut brought them here; everything else
+  // falls back to the catalog entry, so nothing is left unselected for the entire time an app
+  // is open. The trailing slash is part of the match so a future top-level route that merely
+  // starts with those letters cannot borrow the highlight.
   if (pathname === '/apps' || pathname.startsWith('/apps/')) {
-    return 'apps'
+    const slug = pathname === '/apps' ? '' : pathname.slice('/apps/'.length)
+    const favoriteMatch = favoriteItems.find((item) => item.to === `/apps/${slug}`)
+    return favoriteMatch ? favoriteMatch.id : 'apps'
   }
   return null
 }
@@ -98,17 +111,31 @@ export default function AppNavDrawer() {
   const { isOpen, close, toggle } = useNavDrawer()
   const navigate = useNavigate()
   const location = useLocation()
-  const activeId = resolveActiveId(location)
   const { capabilities } = useChainTokens()
   const isMobile = useIsMobile()
   const drawerRef = useRef(null)
+
+  // Favorited mini-apps (App Store quick-access). Gated on the `apps` tenant feature so a build
+  // that has disabled the mini-app platform never surfaces a shortcut into it, even if a favorite
+  // was saved on this device before the tenant config changed.
+  const [favorites, setFavorites] = useState(() => loadFavoriteApps())
+  useEffect(() => subscribeFavoriteApps(() => setFavorites(loadFavoriteApps())), [])
+  const favoriteItems = useMemo(
+    () => (isNavItemEnabledForTenant('apps') ? favorites.map(favoriteToNavItem) : []),
+    [favorites],
+  )
+
+  const activeId = resolveActiveId(location, favoriteItems)
   const drawerGroups = useMemo(
     () =>
-      buildDrawerGroups({
-        collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '',
-        predict: Boolean(capabilities?.predict) && predictGatewayUrl() !== '',
-      }),
-    [capabilities],
+      buildDrawerGroups(
+        {
+          collectibles: Boolean(capabilities?.collectibles) && collectiblesGatewayUrl() !== '',
+          predict: Boolean(capabilities?.predict) && predictGatewayUrl() !== '',
+        },
+        favoriteItems,
+      ),
+    [capabilities, favoriteItems],
   )
 
   // Desktop never fully closes: `collapsed` is the icon gutter, `isOpen` is the
@@ -139,7 +166,8 @@ export default function AppNavDrawer() {
   }, [isOpen, isMobile, close])
 
   const handleSelect = (id) => {
-    navigate(pathForNavItem(id))
+    const favorite = favoriteItems.find((item) => item.id === id)
+    navigate(favorite ? favorite.to : pathForNavItem(id))
     close()
   }
 
