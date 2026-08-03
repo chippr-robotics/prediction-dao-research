@@ -28,7 +28,10 @@ REGION="${FW_REGION:-us-central1}"
 EMAIL="${FW_ALERT_EMAIL:-cody.w.burns@gmail.com}"
 BILLING="${FW_BILLING_ACCOUNT:-0166E9-FC2238-00E06F}"
 STEP="${1:-all}"
-say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
+# MUST write to stderr. channel() is consumed via command substitution, so a banner on stdout ends
+# up inside $chan and every policy is created with a malformed (i.e. absent) notification channel —
+# alerts that fire and page nobody, which looks identical to alerts that never fire.
+say() { printf '\n\033[1m==> %s\033[0m\n' "$*" >&2; }
 
 ip_of() { gcloud compute addresses describe "$1" --region "$REGION" --project "$PROJECT" --format='value(address)' 2>/dev/null; }
 
@@ -60,7 +63,7 @@ uptime_checks() {
   # --content-matcher-content; an earlier draft used it and every command aborted.
   gcloud monitoring uptime create fairwins-bundler-origin --project "$PROJECT" \
     --resource-type=uptime-url --resource-labels="host=${bip},project_id=${PROJECT}" \
-    --path="/__probe/health" --port=443 --protocol=https --no-validate-ssl \
+    --path="/__probe/health" --port=443 --protocol=https \
     --matcher-content="0x5FF137D4" --matcher-type=contains-string \
     --period=5 --timeout=30 \
     --regions=usa-oregon,usa-virginia,europe,asia-pacific 2>&1 | tail -2 || echo "  (exists?)"
@@ -68,7 +71,7 @@ uptime_checks() {
   say "Uptime check: gateway origin ${gip}"
   gcloud monitoring uptime create fairwins-gateway-origin --project "$PROJECT" \
     --resource-type=uptime-url --resource-labels="host=${gip},project_id=${PROJECT}" \
-    --path="/__probe/health" --port=443 --protocol=https --no-validate-ssl \
+    --path="/__probe/health" --port=443 --protocol=https \
     --matcher-content='"rpc":"up"' --matcher-type=contains-string \
     --period=5 --timeout=30 \
     --regions=usa-oregon,usa-virginia,europe,asia-pacific 2>&1 | tail -2 || echo "  (exists?)"
