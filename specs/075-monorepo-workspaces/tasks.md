@@ -162,17 +162,17 @@ bytes.**
 **Goal**: Collapse the EIP-712 duplication and machine-check it.
 **Independent test**: quickstart **S4**. **Plan phase**: 4. **Risk**: Medium — live signing paths.
 
-- [ ] T057 [US4] Create `packages/intent-types/` — pure ESM, **zero runtime deps**, extensioned imports and an explicit `exports` map so plain Node resolves it (research R6/P1)
-- [ ] T058 [US4] Move the intent struct table, the actions map, and `typeStringFor(action)` into it
-- [ ] T059 [US4] Move `RECEIVE_WITH_AUTHORIZATION_TYPES` (EIP-3009) from `frontend/src/lib/pools/gasless.js` **and** `services/relay-gateway/src/intent/intentTypes.js:192` into it — the fourth duplicated table and the money path. Omitting it leaves EIP-3009 duplicated *and asymmetric*, which is worse than today (FR-025)
-- [ ] T060 [US4] Reduce `frontend/src/lib/relay/intentTypes.js` (329 lines) to a re-export plus the `NETWORKS[chainId]?.stablecoin` adapter
-- [ ] T061 [US4] Reduce `services/relay-gateway/src/intent/intentTypes.js` (622 lines) to a re-export plus its ethers-based signing helpers
-- [ ] T062 [US4] **Commit boundary** — the extraction must be proven byte-neutral and commit separately from T063 so a bisect can distinguish *moved* from *added* (S5)
-- [ ] T063 [US4] Add the missing `InvalidateNonce` action to the shared table. Measured: frontend 29 actions / 27 tables vs gateway 28 / 26; `invalidateNonceWithSig` is live in `SignerIntentBase.sol:84`, `IWagerRegistryIntents.sol:80`, `WagerPoolFactory.sol:438`, so a relayed `invalidateNonce` is an unknown action at the gateway today (FR-028)
-- [ ] T064 [US4] Add `test/intent/TypehashParity.test.js` to the root hardhat suite: for every action, regenerate the type string and assert `keccak256(string)` equals the `*_TYPEHASH` literal read from the contract (FR-026)
-- [ ] T065 [US4] Add a **recorded fixed-vector** test for EIP-3009 `ReceiveWithAuthorization` — its authoritative typehash lives in the deployed USDC contract, and the only in-repo Solidity copy is `contracts/mocks/MockUSDCPermit.sol:16`, a **mock**. A contract-parity test would assert against a mock and prove nothing (FR-027)
+- [X] T057 [US4] Create `packages/intent-types/` — pure ESM, **zero runtime deps**, extensioned imports and an explicit `exports` map so plain Node resolves it (research R6/P1)
+- [X] T058 [US4] Move the intent struct table, the actions map, and `typeStringFor(action)` into it
+- [X] T059 [US4] Move `RECEIVE_WITH_AUTHORIZATION_TYPES` (EIP-3009) from `frontend/src/lib/pools/gasless.js` **and** `services/relay-gateway/src/intent/intentTypes.js:192` into it — the fourth duplicated table and the money path. Omitting it leaves EIP-3009 duplicated *and asymmetric*, which is worse than today (FR-025)
+- [X] T060 [US4] Reduce `frontend/src/lib/relay/intentTypes.js` (329 lines) to a re-export plus the `NETWORKS[chainId]?.stablecoin` adapter
+- [X] T061 [US4] Reduce `services/relay-gateway/src/intent/intentTypes.js` (622 lines) to a re-export plus its ethers-based signing helpers
+- [X] T062 [US4] **Commit boundary** — the extraction must be proven byte-neutral and commit separately from T063 so a bisect can distinguish *moved* from *added* (S5)
+- [X] T063 [US4] RESOLVED DIFFERENTLY — see below. Add the missing `InvalidateNonce` action to the shared table. Measured: frontend 29 actions / 27 tables vs gateway 28 / 26; `invalidateNonceWithSig` is live in `SignerIntentBase.sol:84`, `IWagerRegistryIntents.sol:80`, `WagerPoolFactory.sol:438`, so a relayed `invalidateNonce` is an unknown action at the gateway today (FR-028)
+- [X] T064 [US4] Add `test/intent/TypehashParity.test.js` to the root hardhat suite: for every action, regenerate the type string and assert `keccak256(string)` equals the `*_TYPEHASH` literal read from the contract (FR-026)
+- [X] T065 [US4] Add a **recorded fixed-vector** test for EIP-3009 `ReceiveWithAuthorization` — its authoritative typehash lives in the deployed USDC contract, and the only in-repo Solidity copy is `contracts/mocks/MockUSDCPermit.sol:16`, a **mock**. A contract-parity test would assert against a mock and prove nothing (FR-027)
 - [ ] T066 [P] [US4] Add an equivalent check for the spec-060 fee `serviceId`s and bps caps, independently restated in `BridgeRouter.sol:59`, `LiquidityRouter.sol:51`, `scripts/deploy/lib/feeServices.js`, `services/relay-gateway/src/fees/onchain.js`, `scripts/tenants/validate-tenant-manifest.js:32` (FR-029)
-- [ ] T067 [US4] Run quickstart S4, including a live sign/`ecrecover` round-trip per rail and confirmation that the never-stranded self-submit fallback still works with the gateway unreachable
+- [X] T067 [US4] Run quickstart S4, including a live sign/`ecrecover` round-trip per rail and confirmation that the never-stranded self-submit fallback still works with the gateway unreachable
 
 ---
 

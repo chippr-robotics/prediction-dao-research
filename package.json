@@ -60,7 +60,8 @@
     "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
-    "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath"
+    "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
+    "deps:reinstall": "bash scripts/deps/reinstall.sh"
   },
   "keywords": [
     "futarchy",
@@ -77,6 +78,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@chainlink/contracts": "1.3.0",
+    "@fairwins/intent-types": "*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.3",
     "@nomicfoundation/hardhat-ignition": "^0.15.16",
@@ -111,8 +113,7 @@
     "solidity-coverage": "^0.8.17",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
-    "typescript": "^5.9.3",
-    "@fairwins/intent-types": "*"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@semaphore-protocol/contracts": "^4.14.2"
