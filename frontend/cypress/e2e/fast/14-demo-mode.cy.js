@@ -36,7 +36,7 @@ describe('Demo Mode', () => {
     // Connect wallet.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
@@ -61,7 +61,7 @@ describe('Demo Mode', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')

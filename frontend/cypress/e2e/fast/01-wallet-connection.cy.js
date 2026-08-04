@@ -35,11 +35,11 @@ describe('Wallet Connection', () => {
 
     // The dropdown should show connector options. Look for MetaMask / Browser
     // Wallet option (the mock provider sets isMetaMask = true).
-    cy.get('.connector-option, [role="menuitem"]', { timeout: 5000 })
+    cy.get('.connect-modal__option, [role="menuitem"]', { timeout: 5000 })
       .should('have.length.greaterThan', 0)
 
     // Click the first available injected connector (MetaMask).
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
 
@@ -72,11 +72,11 @@ describe('Wallet Connection', () => {
       .click()
 
     // WalletConnect should always be listed (it uses QR / deep links).
-    cy.get('.connector-option, [role="menuitem"]', { timeout: 5000 })
+    cy.get('.connect-modal__option, [role="menuitem"]', { timeout: 5000 })
       .should('have.length.greaterThan', 0)
 
     // Verify a WalletConnect option exists — either by text or by the QR badge.
-    cy.get('.connector-option, [role="menuitem"]').then(($options) => {
+    cy.get('.connect-modal__option, [role="menuitem"]').then(($options) => {
       const hasWalletConnect = $options.toArray().some((el) => {
         const text = el.innerText || ''
         return (
@@ -101,7 +101,7 @@ describe('Wallet Connection', () => {
       .should('be.visible')
       .click()
 
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
 
@@ -127,7 +127,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
@@ -162,7 +162,7 @@ describe('Wallet Connection', () => {
 
     // Connect, then reload and verify we need to reconnect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]').click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
@@ -194,7 +194,7 @@ describe('Wallet Connection', () => {
     // Connect the wallet.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
@@ -245,7 +245,7 @@ describe('Wallet Connection', () => {
       .click()
 
     // Try to connect — it will be rejected.
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
 
@@ -270,7 +270,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
 
@@ -298,7 +298,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
 
@@ -335,7 +335,7 @@ describe('Wallet Connection', () => {
       .click()
 
     // Injected wallets should show "Not Detected" when no provider exists.
-    cy.get('.connector-option, [role="menuitem"]', { timeout: 5000 }).then(($options) => {
+    cy.get('.connect-modal__option, [role="menuitem"]', { timeout: 5000 }).then(($options) => {
       const texts = $options.toArray().map((el) => el.innerText)
       const anyUnavailable = texts.some(
         (t) => t.includes('Not Detected') || t.includes('not detected')
@@ -359,7 +359,7 @@ describe('Wallet Connection', () => {
     // Connect with account #0.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
       .first()
       .click()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })

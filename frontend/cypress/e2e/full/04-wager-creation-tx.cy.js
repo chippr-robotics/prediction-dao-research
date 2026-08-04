@@ -27,7 +27,7 @@ function connectWalletAndVisit(accountIndex = 0) {
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
     .first()
     .click()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })

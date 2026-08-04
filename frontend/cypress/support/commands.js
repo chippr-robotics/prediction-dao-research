@@ -21,6 +21,20 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const networkId = options.networkId || Cypress.env('NETWORK_ID') || 1337
   const rpcUrl = options.rpcUrl || Cypress.env('RPC_URL') || 'http://localhost:8545'
   const account = options.account || TEST_ACCOUNTS[0]
+  /*
+   * A real injected wallet reports NO accounts until the site has been authorised: `eth_accounts`
+   * returns [] and only `eth_requestAccounts` (the user pressing Connect) grants access.
+   *
+   * This mock used to return the account for BOTH, which made it look permanently pre-authorised.
+   * That was invisible while the mock itself was undiscoverable — but once it announces over
+   * EIP-6963 (issue #1016), wagmi finds it, sees a non-empty eth_accounts, and AUTO-CONNECTS on
+   * load. The app then renders the connected header, `.wallet-connect-button` never exists, and
+   * specs written to click Connect fail on a UI that skipped straight past them.
+   *
+   * So the default is now honestly disconnected. Pass `{ preAuthorized: true }` for a spec that
+   * wants a restored session.
+   */
+  let authorized = options.preAuthorized === true
 
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
@@ -39,8 +53,13 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         return new Promise((resolve, reject) => {
           switch (method) {
             case 'eth_requestAccounts':
-            case 'eth_accounts':
+              // The user pressing Connect. Grants access for the rest of this page load.
+              authorized = true
               resolve([account])
+              break
+            case 'eth_accounts':
+              // Silent probe on load — empty until authorised, exactly like a real wallet.
+              resolve(authorized ? [account] : [])
               break
             case 'eth_chainId':
               resolve(`0x${networkId.toString(16)}`)
@@ -119,6 +138,46 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         }
       }
     }
+
+    /*
+     * ANNOUNCE THE PROVIDER OVER EIP-6963 (issue #1016).
+     *
+     * Setting `window.ethereum` alone is no longer enough. This app uses wagmi 3
+     * (src/wagmi.js -> injected({ shimDisconnect: true })), which discovers wallets through
+     * EIP-6963 announcements via mipd — it never inspects window.ethereum to build the connector
+     * list. So the mock was invisible: ConnectModal rendered no available `.connector-option`,
+     * every wallet spec failed with "Expected to find element .connector-option:not(.unavailable)",
+     * and it had been that way since the wagmi migration — silently, because the E2E gate could
+     * not fail (fixed in #1015).
+     *
+     * The contract is exactly mipd's (node_modules/mipd/dist/esm/utils.js):
+     *   · dispatch `eip6963:announceProvider` with a FROZEN { info, provider } detail
+     *   · keep answering `eip6963:requestProvider`, because the app requests on mount — which is
+     *     after this hook runs, so a single fire-and-forget announcement would be missed
+     *
+     * Events go through `win`, not Cypress's own window: this is the application's realm.
+     */
+    const detail = Object.freeze({
+      info: Object.freeze({
+        // A stable uuid keeps the connector identity stable across re-announcements within a spec.
+        uuid: '00000000-0000-4000-8000-0000000f1a17',
+        name: 'MetaMask',
+        // rdns is what wagmi keys the connector on; io.metamask matches the mock's isMetaMask.
+        rdns: 'io.metamask',
+        // Inline SVG: EIP-6963 requires a data URI, and a remote icon would be a network
+        // dependency in a test.
+        icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
+      }),
+      provider: win.ethereum,
+    })
+
+    const announce = () => {
+      try {
+        win.dispatchEvent(new win.CustomEvent('eip6963:announceProvider', { detail }))
+      } catch { /* realm torn down mid-test; nothing to announce to */ }
+    }
+    win.addEventListener('eip6963:requestProvider', announce)
+    announce()
   })
 })
 
@@ -691,33 +750,44 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
      */
     if (autoDismissConnectModal) {
       /*
-       * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle
-       * (WalletContext explicitly waits for wallet detection), so an immediate DOM check races it
-       * and finds nothing. Poll for a bounded window instead, and tolerate it never appearing:
-       * a test that is already connected, or one that stubs the wallet differently, will never see
-       * the prompt and must not be delayed or failed by this.
+       * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle,
+       * and WalletContext waits for wallet detection before that. An immediate DOM check races it,
+       * and even a short poll can finish BEFORE the dialog appears, which is exactly what happened
+       * first time round: Escape fired at nothing and the modal opened a moment later.
+       *
+       * So: poll generously, dismiss, then confirm — and retry once, because "appeared, dismissed,
+       * appeared again" is indistinguishable from "appeared late" without looking twice.
+       * Tolerate it never appearing: a spec that is already connected never sees the prompt and
+       * must not be delayed or failed by this.
        */
-      cy.document({ log: false }).then(
-        (doc) =>
-          new Cypress.Promise((resolve) => {
-            const deadline = Date.now() + 6000
-            const poll = () => {
-              if (doc.querySelector('[data-testid="connect-modal-backdrop"]')) return resolve(true)
-              if (Date.now() > deadline) return resolve(false)
-              setTimeout(poll, 100)
-            }
-            poll()
-          }),
-      ).then((appeared) => {
-        if (!appeared) return
-        // Escape rather than clicking the backdrop: the backdrop is the element under test in some
-        // specs, and ConnectModal binds Escape to the same `close` handler.
-        // Best-effort: press Escape, then move on. Deliberately NOT asserted — if the dialog
-        // declines to close, the spec should fail on its own terms with its own message, not on
-        // an assertion inside a shared helper. A helper that can fail the suite is a second gate
-        // nobody signed up for.
-        cy.get('body', { log: false }).type('{esc}')
-      })
+      const waitForBackdrop = (doc, ms) =>
+        new Cypress.Promise((resolve) => {
+          const deadline = Date.now() + ms
+          const poll = () => {
+            if (doc.querySelector('[data-testid="connect-modal-backdrop"]')) return resolve(true)
+            if (Date.now() > deadline) return resolve(false)
+            setTimeout(poll, 100)
+          }
+          poll()
+        })
+
+      cy.document({ log: false }).then((doc) =>
+        waitForBackdrop(doc, 12000).then((appeared) => {
+          if (!appeared) return undefined
+          // Escape rather than clicking the backdrop: the backdrop is the element under test in
+          // some specs, and ConnectModal binds Escape on `document` to the same `close` handler
+          // (verified: a single Escape takes the backdrop count 1 -> 0).
+          cy.get('body', { log: false }).type('{esc}')
+          return cy.document({ log: false }).then((d2) =>
+            waitForBackdrop(d2, 1500).then((stillThere) => {
+              // Best-effort second attempt, then give up: a shared helper must never be the thing
+              // that fails a spec. If the dialog will not close, the spec should say so in its own
+              // words.
+              if (stillThere) cy.get('body', { log: false }).type('{esc}')
+            }),
+          )
+        }),
+      )
     }
     return win
   })

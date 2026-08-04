@@ -26,7 +26,7 @@ function connectAndVisit(accountIndex = 0) {
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
     .first()
     .click()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
@@ -105,7 +105,7 @@ function createAcceptAndResolve(config = {}) {
   // Step 2: Accept as opponent
   cy.switchAccount(1)
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
 
   cy.openMyWagers('participating')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -130,7 +130,7 @@ function createAcceptAndResolve(config = {}) {
   // Step 4: Resolve as creator
   cy.switchAccount(0)
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
 
   cy.openMyWagers('created')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
