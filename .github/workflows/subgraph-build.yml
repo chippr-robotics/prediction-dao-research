@@ -84,5 +84,13 @@ jobs:
       - name: Build Matchstick runner image
         run: docker build -f matchstick.Dockerfile -t fw-matchstick .
 
+      # spec 075: under npm workspaces the subgraph has NO local node_modules — @graphprotocol/graph-ts
+      # and matchstick-as hoist to the repo root. Matchstick resolves libs from `./node_modules`
+      # INSIDE the container, so the root tree is mounted there explicitly. A symlink would not
+      # work: its target sits outside the bind mount.
       - name: Matchstick unit tests (Docker)
-        run: docker run --rm -v "$PWD":/matchstick fw-matchstick
+        run: |
+          docker run --rm \
+            -v "$PWD":/matchstick \
+            -v "$PWD/../node_modules":/matchstick/node_modules:ro \
+            fw-matchstick
