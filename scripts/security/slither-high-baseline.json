@@ -12,10 +12,16 @@
     "Known shapes on sight: the 6 `uninitialized-state` hits in WagerRegistryCore are the UUPS",
     "storage-definition contract, whose state is set in initialize() by design; the solady",
     "LibString hits are assembly false positives in vendored code. The router `reentrancy-balance`",
-    "and `arbitrary-send-*` hits need a real look."
+    "and `arbitrary-send-*` hits need a real look.",
+    "NOTE: the first extraction used a regex ([a-z-]+) that could not match check names containing DIGITS, so [arbitrary-send-erc20] was silently dropped and the gate then failed on it as NEW. A pattern that cannot express the thing it filters is the same class of defect as a gate that cannot fail — re-extracted with [a-z0-9-]+."
   ],
   "generatedFrom": "CI run on PR #1015 (first run with the gate enabled)",
   "findings": [
+    {
+      "check": "arbitrary-send-erc20",
+      "file": "contracts/wagers/WagerRegistryCore.sol",
+      "line": 236
+    },
     {
       "check": "arbitrary-send-eth",
       "file": "contracts/account/CoinbaseSmartWallet.sol",
