@@ -25,7 +25,9 @@ function addAuthenticator() {
   })
 
   it('[CP-01] entry gate shows for passkey users exactly as for classic wallets', () => {
-    cy.visit('/fairwins')
+    // Opt out of the suite-wide acknowledgement seed (support/commands.js): this test's whole
+    // purpose is to observe the gate, so it must meet a browser that has never entered.
+    cy.visit('/fairwins', { acknowledgeEntryGate: false })
     cy.get('[data-testid="entry-gate"], .entry-gate', { timeout: 15000 }).should('exist')
   })
 

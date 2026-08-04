@@ -623,3 +623,102 @@ Cypress.Commands.add('createAndAcceptWager', (cfg = {}) => {
     })
   })
 })
+
+/* ------------------------------------------------------------------------- *
+ * Entry gate (spec 007 US4) — bypass by default (spec 075)
+ * ------------------------------------------------------------------------- *
+ *
+ * EntryGate is a full-screen compliance overlay that blocks the app until a visitor affirms
+ * eligibility. It renders on mount whenever localStorage has no acknowledgement, so it covers the
+ * UI in a fresh browser — which is every Cypress run.
+ *
+ * That is why the E2E suite went red the moment the gate was repaired to be able to fail (spec 075
+ * US2): `cy.click()` reported "covered by another element: <div class='entry-gate-overlay'>" on
+ * essentially every UI test. Reproduced locally at 11/11 failures in one spec. The tests were not
+ * wrong and the app was not broken — nothing had ever told Cypress how to get past the gate,
+ * and the muted gate meant nobody saw it.
+ *
+ * The acknowledgement MUST be seeded before the page loads: EntryGate reads it during the first
+ * render, so a post-visit localStorage write is too late. `cy.visit` is overwritten rather than
+ * adding a beforeEach to 20+ spec files, so a new spec is covered automatically.
+ *
+ * A spec that is genuinely TESTING the gate opts out per visit:
+ *     cy.visit('/fairwins', { acknowledgeEntryGate: false })
+ */
+const ENTRY_GATE_ACK_KEY = 'fairwins.entryGate.ack.v1'
+
+/** Shape mirrors utils/entryGateAck.js#writeAck; the app only requires a non-null record. */
+const entryGateAckRecord = () => ({
+  terms: 'cypress-e2e',
+  risk: 'cypress-e2e',
+  at: new Date(0).toISOString(),
+})
+
+Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
+  const { acknowledgeEntryGate = true, autoDismissConnectModal = true, onBeforeLoad, ...rest } = options
+  return originalFn(url, {
+    ...rest,
+    onBeforeLoad(win) {
+      if (acknowledgeEntryGate) {
+        try {
+          win.localStorage.setItem(ENTRY_GATE_ACK_KEY, JSON.stringify(entryGateAckRecord()))
+        } catch {
+          /* storage disabled in this browser context — the spec will see the gate, which is honest */
+        }
+      } else {
+        try {
+          win.localStorage.removeItem(ENTRY_GATE_ACK_KEY)
+        } catch { /* nothing to clear */ }
+      }
+      if (onBeforeLoad) onBeforeLoad(win)
+    },
+  }).then((win) => {
+    /*
+     * ...and dismiss the auto-opened connect modal.
+     *
+     * Acknowledging the gate is exactly what triggers AutoConnectPrompt: for a RETURNING,
+     * disconnected visitor the app helpfully opens the connect dialog for them
+     * (AutoConnectPrompt.jsx — "if (!isConnectModalOpen) openConnectModal()"). Correct product
+     * behaviour, and it replaced the entry gate as the thing covering every button: the failure
+     * message just changed from `.entry-gate-overlay` to `.connect-modal__backdrop`.
+     *
+     * These specs predate both surfaces and drive the connect flow themselves, so the harness
+     * closes the auto-opened dialog and leaves the app in the state the tests were written
+     * against. A spec that WANTS the prompt opts out with `autoDismissConnectModal: false`.
+     *
+     * Escape is used rather than clicking the backdrop: the backdrop is the element under test in
+     * some specs, and ConnectModal binds Escape to the same `close` handler.
+     */
+    if (autoDismissConnectModal) {
+      /*
+       * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle
+       * (WalletContext explicitly waits for wallet detection), so an immediate DOM check races it
+       * and finds nothing. Poll for a bounded window instead, and tolerate it never appearing:
+       * a test that is already connected, or one that stubs the wallet differently, will never see
+       * the prompt and must not be delayed or failed by this.
+       */
+      cy.document({ log: false }).then(
+        (doc) =>
+          new Cypress.Promise((resolve) => {
+            const deadline = Date.now() + 6000
+            const poll = () => {
+              if (doc.querySelector('[data-testid="connect-modal-backdrop"]')) return resolve(true)
+              if (Date.now() > deadline) return resolve(false)
+              setTimeout(poll, 100)
+            }
+            poll()
+          }),
+      ).then((appeared) => {
+        if (!appeared) return
+        // Escape rather than clicking the backdrop: the backdrop is the element under test in some
+        // specs, and ConnectModal binds Escape to the same `close` handler.
+        // Best-effort: press Escape, then move on. Deliberately NOT asserted — if the dialog
+        // declines to close, the spec should fail on its own terms with its own message, not on
+        // an assertion inside a shared helper. A helper that can fail the suite is a second gate
+        // nobody signed up for.
+        cy.get('body', { log: false }).type('{esc}')
+      })
+    }
+    return win
+  })
+})
