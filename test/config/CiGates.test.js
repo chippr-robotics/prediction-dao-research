@@ -118,3 +118,46 @@ describe("contracts/ remains a single compilation unit (spec 075, FR-048)", func
     }
   });
 });
+
+/**
+ * Spec 075 T090 / constitution "Archived code": `contracts-archive/` and `test-archive/` are
+ * reference only and MUST NOT be imported by, or deployed from, active code.
+ *
+ * That rule was prose. This makes it mechanical — prose rules in this repo have a track record of
+ * being believed rather than checked.
+ */
+describe("archived code is never referenced by active code (spec 075)", function () {
+  const ARCHIVES = ["contracts-archive", "test-archive"];
+  // Prose may legitimately discuss the archives; only executable trees are scanned.
+  const SCAN = ["contracts", "test", "scripts", "frontend/src", "services", "subgraph/src", "packages"];
+  const CODE = /\.(js|jsx|mjs|cjs|ts|tsx|sol)$/;
+
+  it("has no import or require reaching into an archive directory", function () {
+    const offenders = [];
+    const walk = (dir) => {
+      const abs = path.join(ROOT, dir);
+      if (!fs.existsSync(abs)) return;
+      for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+        const rel = path.join(dir, e.name);
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        if (e.isDirectory()) { walk(rel); continue; }
+        if (!CODE.test(e.name)) continue;
+        const src = fs.readFileSync(path.join(ROOT, rel), "utf8");
+        for (const line of src.split("\n")) {
+          const t = line.trim();
+          if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) continue;
+          if (!/\b(import|require|from)\b/.test(t)) continue;
+          for (const a of ARCHIVES) {
+            if (t.includes(`${a}/`)) offenders.push(`${rel}: ${t.slice(0, 100)}`);
+          }
+        }
+      }
+    };
+    SCAN.forEach(walk);
+    expect(
+      offenders,
+      "Archived code is reference-only and must never be imported or deployed from " +
+        `(constitution, "Archived code"):\n  ${offenders.join("\n  ")}`,
+    ).to.deep.equal([]);
+  });
+});

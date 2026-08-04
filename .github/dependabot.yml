@@ -1,0 +1,47 @@
+# Dependency updates (spec 075, T092).
+#
+# Only possible now that there is ONE lockfile — previously four independent lockfiles plus two
+# unlocked units meant Dependabot could not see the tree as a whole. There is currently no
+# vulnerability gate anywhere in CI while `npm audit` reports findings on every install, so this is
+# the first automated pressure on that.
+#
+# NOTE the interaction with spec 075's exact-pinning rule: @openzeppelin/contracts,
+# @openzeppelin/contracts-upgradeable, @chainlink/contracts, @uma/core and
+# @safe-global/safe-contracts contribute SOLIDITY SOURCE, so a bump changes compiled bytecode.
+# Those PRs must be treated as contract changes: run the byte-diff gate
+# (scripts/codegen/bytecode-digest.js) and expect a NEW baseline to be recorded deliberately, not
+# incidentally. They are grouped separately so they are never mixed into a routine tooling bump.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Bumping any of these changes deployed bytecode. Isolated so the diff is unmistakable.
+      solidity-sources:
+        patterns:
+          - "@openzeppelin/contracts"
+          - "@openzeppelin/contracts-upgradeable"
+          - "@chainlink/contracts"
+          - "@uma/core"
+          - "@safe-global/safe-contracts"
+      dev-tooling:
+        dependency-type: development
+        exclude-patterns:
+          - "@openzeppelin/*"
+          - "@chainlink/*"
+          - "@uma/*"
+          - "@safe-global/*"
+    ignore:
+      # Pinned deliberately: hardhat's internal evmVersion default is a build input (spec 075
+      # FR-001), so a major bump must be adopted with the byte-diff gate, not auto-merged.
+      - dependency-name: hardhat
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
