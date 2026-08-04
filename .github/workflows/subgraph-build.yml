@@ -10,14 +10,14 @@ on:
       - develop
     paths:
       - 'subgraph/**'
-      - 'frontend/src/abis/WagerRegistry.json'
+      - 'packages/abi/**'
   push:
     branches:
       - main
       - develop
     paths:
       - 'subgraph/**'
-      - 'frontend/src/abis/WagerRegistry.json'
+      - 'packages/abi/**'
   workflow_dispatch:
 
 # Supersede in-flight runs for the same ref (spec 075, FR-010). Without this, pushing a
@@ -52,12 +52,23 @@ jobs:
         run: npm ci --workspace prediction-dao-research-subgraph --include-workspace-root=false
         working-directory: .  # root install; the child has no lockfile (spec 075)
 
-      - name: Verify generated ABI is present
+      # spec 075: the subgraph reads GENERATED ABIs from @fairwins/abi, not hand-written files
+      # under frontend/src/abis (which no longer exist). Checks every ABI subgraph.yaml declares,
+      # rather than one representative file — the previous guard checked only WagerRegistry.json
+      # and would have missed any other ABI going absent.
+      - name: Verify the generated ABIs the manifest declares are present
+        working-directory: .
         run: |
-          if [ ! -f "../frontend/src/abis/WagerRegistry.json" ]; then
-            echo "::error::frontend/src/abis/WagerRegistry.json missing — run npm run sync:frontend-contracts:<net>"
-            exit 1
-          fi
+          missing=0
+          for f in $(grep -oE '\.\./node_modules/@fairwins/abi/json/[A-Za-z]+\.json' subgraph/subgraph.yaml | sort -u); do
+            name="$(basename "$f")"
+            if [ ! -f "packages/abi/json/$name" ]; then
+              echo "::error::packages/abi/json/$name is missing — run \`npm run codegen:abis\`"
+              missing=1
+            fi
+          done
+          [ "$missing" = "0" ] || exit 1
+          echo "All ABIs referenced by subgraph.yaml are present in packages/abi/json/."
 
       - name: Codegen
         run: npm run codegen
