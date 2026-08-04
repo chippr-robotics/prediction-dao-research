@@ -61,7 +61,9 @@
     "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
     "check:deps": "node scripts/deps/check-dependency-hygiene.js",
     "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
-    "deps:reinstall": "bash scripts/deps/reinstall.sh"
+    "deps:reinstall": "bash scripts/deps/reinstall.sh",
+    "codegen:abis": "node scripts/codegen/emit-abis.js",
+    "check:abis": "node scripts/codegen/emit-abis.js --check"
   },
   "keywords": [
     "futarchy",

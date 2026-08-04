@@ -79,6 +79,12 @@ jobs:
       - name: Check upgradeable storage layout
         run: npm run check:storage-layout
 
+      # Gate (spec 075, FR-032): the committed ABIs must match the compiled contracts. The proxies
+      # are upgraded IN PLACE at stable addresses, so a stale ABI desynchronises the app and the
+      # subgraph from the chain with no address change to notice. Must fail loudly (constitution IV).
+      - name: Check generated ABIs are current
+        run: npm run check:abis
+
       - name: Run tests
         run: npm test 2>&1 | tee test-output.txt
 

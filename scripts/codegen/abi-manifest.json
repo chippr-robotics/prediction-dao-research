@@ -1,0 +1,104 @@
+{
+  "$comment": [
+    "Which contract ABIs are CONSUMED outside contracts/, and how (spec 075, FR-030/FR-031).",
+    "Committed on purpose: the set of ABIs we publish is a decision, not a directory listing.",
+    "`facets` lists artifacts merged into one ABI, in precedence order. WagerRegistry MUST merge",
+    "its two facets \u2014 the proxy delegatecalls unknown selectors to WagerRegistryIntents, so a",
+    "single-facet ABI silently omits every gasless entry point, event and error (measured: 35",
+    "members, incl. 9 errors the frontend could not decode)."
+  ],
+  "contracts": [
+    {
+      "name": "WagerRegistry",
+      "facets": [
+        "contracts/wagers/WagerRegistry.sol:WagerRegistry",
+        "contracts/wagers/WagerRegistryIntents.sol:WagerRegistryIntents"
+      ],
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "MembershipManager",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "MembershipVoucher",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "TokenFactory",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "ChainlinkDataFeedOracleAdapter",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "ChainlinkFunctionsOracleAdapter",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "UMAOptimisticOracleV3Adapter",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "WagerPool",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "WagerPoolFactory",
+      "consumers": [
+        "frontend",
+        "subgraph"
+      ]
+    },
+    {
+      "name": "TokenInstance",
+      "verifyAgainst": "contracts/tokens/templates/OpenERC20V2.sol:OpenERC20V2",
+      "events": [
+        "Transfer",
+        "Paused",
+        "Unpaused",
+        "Frozen",
+        "RoleGranted",
+        "RoleRevoked"
+      ],
+      "consumers": [
+        "subgraph"
+      ],
+      "$comment": [
+        "SYNTHETIC template ABI: there is no TokenInstance contract. The subgraph indexes tokens the",
+        "factory CLONES, generically, so this is the subset of events it handles. Declared as a subset",
+        "with a reference contract rather than hand-maintained, so the generator fails if any listed",
+        "event disappears from OpenERC20V2 or changes shape.",
+        "CAVEAT (pre-existing, unchanged here): `Transfer` is the ERC20 shape (non-indexed value).",
+        "The ERC721 templates index tokenId instead, so ERC-721 transfers decode with the wrong data",
+        "layout under this template. Out of scope for spec 075 \u2014 changing it changes what the subgraph",
+        "indexes; recorded so it is not mistaken for something this generator introduced."
+      ]
+    }
+  ]
+}

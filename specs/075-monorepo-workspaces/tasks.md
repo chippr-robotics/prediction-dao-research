@@ -182,13 +182,13 @@ bytes.**
 constitution Principle V violation.
 **Independent test**: quickstart **S5**. **Plan phase**: 5. **Risk**: Medium; **highest effort**.
 
-- [ ] T068 [US5] Write `scripts/codegen/emit-abis.js` reading `artifacts/build-info/`, driven by a small committed manifest naming which contracts are consumed (FR-030)
-- [ ] T069 [US5] Ensure `WagerRegistry` emits the **merged two-facet ABI** — the proxy delegatecalls unknown selectors to `WagerRegistryIntents`, so a single-facet ABI is wrong for every `…WithSig` entry point (FR-031)
-- [ ] T070 [US5] Generate `packages/abi/{src,json}` and **commit the output** (FR-035, decided in the plan's post-design constitution re-check: not committing would break a fresh clone's frontend build, which today needs no Solidity toolchain)
+- [X] T068 [US5] Write `scripts/codegen/emit-abis.js` reading `artifacts/build-info/`, driven by a small committed manifest naming which contracts are consumed (FR-030)
+- [X] T069 [US5] Ensure `WagerRegistry` emits the **merged two-facet ABI** — the proxy delegatecalls unknown selectors to `WagerRegistryIntents`, so a single-facet ABI is wrong for every `…WithSig` entry point (FR-031)
+- [X] T070 [US5] Generate `packages/abi/{src,json}` and **commit the output** (FR-035, decided in the plan's post-design constitution re-check: not committing would break a fresh clone's frontend build, which today needs no Solidity toolchain)
 - [ ] T071 [US5] Migrate `frontend/src/abis/*` consumers to `@fairwins/abi` **one contract at a time**, adjudicating every generated-vs-committed difference individually and recording the resolution — some hand edits are fixes, some are rot (FR-033)
-- [ ] T072 [US5] Repoint `subgraph.yaml`'s 8 `file: ../frontend/src/abis/*.json` entries at the package, and retire `subgraph/abis/` — `WagerPool.json` is already drifted (81 vs 88 entries, missing `IntentNonceUsed`/`DOMAIN_SEPARATOR`/`invalidateNonceWithSig`, retaining two removed errors) (FR-034)
-- [ ] T073 [US5] Add `emit-abis.js --check` as a **blocking** CI target (FR-032)
-- [ ] T074 [US5] Retire `sync-frontend-contracts.js`'s `emitAbiJson` path only. **Leave its address sync alone** — it regex-rewrites `frontend/src/config/contracts.js` in place and untangling that is blocked on `virtual:tenant`
+- [X] T072 [US5] Repoint `subgraph.yaml`'s 8 `file: ../frontend/src/abis/*.json` entries at the package, and retire `subgraph/abis/` — `WagerPool.json` is already drifted (81 vs 88 entries, missing `IntentNonceUsed`/`DOMAIN_SEPARATOR`/`invalidateNonceWithSig`, retaining two removed errors) (FR-034)
+- [X] T073 [US5] Add `emit-abis.js --check` as a **blocking** CI target (FR-032)
+- [X] T074 [US5] Retire `sync-frontend-contracts.js`'s `emitAbiJson` path only. **Leave its address sync alone** — it regex-rewrites `frontend/src/config/contracts.js` in place and untangling that is blocked on `virtual:tenant`
 - [ ] T075 [US5] Run quickstart S5, including proving the gate fails on a deliberately stale ABI (SC-014) and a live Polygon read confirming event decoding is unchanged
 
 ---
