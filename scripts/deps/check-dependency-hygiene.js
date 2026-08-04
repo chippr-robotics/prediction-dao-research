@@ -23,13 +23,30 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..", "..");
 
 /** Manifests in the repo, and which source trees each one owns. */
+/*
+ * `rootFallback` — may a ROOT declaration satisfy this unit's import?
+ *
+ * Only for code that actually runs inside the root project's module resolution: scripts/ and test/
+ * are executed by the root (often through the hardhat runtime), so the root manifest is their
+ * manifest.
+ *
+ * It is FALSE for every other unit, and that distinction is load-bearing. A bundled workspace
+ * resolves through its own manifest — Vite will not use a root declaration — and a service is
+ * installed scoped (`npm ci --workspace x --include-workspace-root=false`), so a root declaration
+ * is simply absent at build time.
+ *
+ * This was originally true everywhere, and it produced a FALSE NEGATIVE: frontend/src imported
+ * `@fairwins/intent-types` while only the ROOT declared it. check:deps passed, and the frontend
+ * build then failed in CI with "Rollup failed to resolve import". A gate that reports clean while
+ * the build breaks is exactly the failure mode spec 075 exists to remove.
+ */
 const UNITS = [
-  { manifest: "package.json", label: "root", sources: ["scripts", "test"] },
-  { manifest: "frontend/package.json", label: "frontend", sources: ["frontend/src"] },
-  { manifest: "services/relay-gateway/package.json", label: "relay-gateway", sources: ["services/relay-gateway/src"] },
-  { manifest: "services/relayer/package.json", label: "relayer", sources: ["services/relayer/src"] },
-  { manifest: "subgraph/package.json", label: "subgraph", sources: ["subgraph/src"] },
-  { manifest: "tools/miniapp-build/package.json", label: "miniapp-build", sources: ["tools/miniapp-build"] },
+  { manifest: "package.json", label: "root", sources: ["scripts", "test"], rootFallback: true },
+  { manifest: "frontend/package.json", label: "frontend", sources: ["frontend/src"], rootFallback: false },
+  { manifest: "services/relay-gateway/package.json", label: "relay-gateway", sources: ["services/relay-gateway/src"], rootFallback: false },
+  { manifest: "services/relayer/package.json", label: "relayer", sources: ["services/relayer/src"], rootFallback: false },
+  { manifest: "subgraph/package.json", label: "subgraph", sources: ["subgraph/src"], rootFallback: false },
+  { manifest: "tools/miniapp-build/package.json", label: "miniapp-build", sources: ["tools/miniapp-build"], rootFallback: false },
 ];
 
 /**
@@ -157,7 +174,7 @@ for (const u of UNITS) {
   if (!fs.existsSync(path.join(ROOT, u.manifest))) continue;
   const own = declared(readJson(u.manifest));
   // The root manifest is a legitimate fallback for scripts/ and test/, which run in the root project.
-  const rootDeclared = u.label === "root" ? {} : declared(readJson("package.json"));
+  const rootDeclared = u.rootFallback ? declared(readJson("package.json")) : {};
   const files = u.sources.flatMap((s) => walk(s));
   const seen = new Map();
   for (const f of files) {

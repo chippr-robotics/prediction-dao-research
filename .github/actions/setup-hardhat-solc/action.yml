@@ -23,11 +23,19 @@ runs:
   steps:
     # Persist the seeded compiler across runs and jobs. On a cache hit the seed
     # step below is fully offline (no network at all).
+    # actions/cache keys may not contain commas, and `solc-versions` is comma-separated. Derive a
+    # key-safe form rather than interpolating the raw list (spec 075: this exact mistake turned the
+    # whole Smart Contract Tests job red with "cannot contain commas").
+    - name: Derive a cache-key-safe version list
+      id: solckey
+      shell: bash
+      run: echo "slug=$(echo '${{ inputs.solc-versions }}' | tr ',' '-' | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+
     - name: Restore Hardhat solc compiler cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/hardhat-nodejs/compilers-v2
-        key: hardhat-solc-${{ runner.os }}-${{ inputs.solc-versions }}
+        key: hardhat-solc-${{ runner.os }}-${{ steps.solckey.outputs.slug }}
         restore-keys: |
           hardhat-solc-${{ runner.os }}-
 
