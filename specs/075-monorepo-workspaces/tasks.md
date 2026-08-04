@@ -148,10 +148,10 @@ bytes.**
 
 ### US7 — boundary enforcement (same PR)
 
-- [ ] T053 [P] [US7] Add `eslint-plugin-boundaries` to `frontend/eslint.config.js` with element types `host` / `package` / `preset`, forbidding both directions (FR-044)
-- [ ] T054 [US7] **Narrow `frontend/eslint.config.js:13`'s `ignores: ['cypress/**', 'src/test/**']`** so `src/test/**` is covered — **3 of the 4** real boundary escapes live there, so a lint added without this covers *less* than the vitest guard it reinforces (FR-045)
-- [ ] T055 [US7] Extend `frontend/src/test/miniapps/packageBoundary.test.js` to reject imports **by package name**, not only relative paths. Workspaces symlink every member into root `node_modules` under its name (verified), making `import '@fairwins/miniapp-token-mint'` newly resolvable from `frontend/src` (FR-046)
-- [ ] T056 [US7] Run quickstart S3 Step 8: all three violation directions rejected (SC-017)
+- [X] T053 ~~Add `eslint-plugin-boundaries`~~ **NOT ADOPTED** — `packageBoundary.test.js` walks the tree as text and now covers every direction, so the plugin adds a dependency and a duplicate implementation for no extra enforcement (see plan.md Complexity Tracking)
+- [X] T054 ~~Narrow the eslint `ignores`~~ **PREMISE WAS WRONG** — line 13's `ignores` only excludes those paths from the FIRST config block; a dedicated `src/test/**` block already lints them. Verified empirically: 474 test files linted, and an injected unused var is caught
+- [X] T055 [US7] Extend `frontend/src/test/miniapps/packageBoundary.test.js` to reject imports **by package name**, not only relative paths. Workspaces symlink every member into root `node_modules` under its name (verified), making `import '@fairwins/miniapp-token-mint'` newly resolvable from `frontend/src` (FR-046)
+- [X] T056 [US7] Run quickstart S3 Step 8: all three violation directions rejected (SC-017)
 
 **Checkpoint**: one lockfile, 9 members, boundaries enforced, zero committed bytes changed.
 

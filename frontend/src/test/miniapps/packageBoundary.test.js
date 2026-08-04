@@ -108,3 +108,62 @@ describe('a package does not import from the host', () => {
     expect(offenders).toEqual([])
   })
 })
+
+
+/**
+ * BY-NAME imports — the direction npm workspaces newly created (spec 075, FR-046).
+ *
+ * Converting the mini-apps into workspace members means npm symlinks each one into the ROOT
+ * node_modules under its package name (verified: `@fairwins/miniapp-token-mint ->
+ * ../../frontend/miniapps/token-mint`). So `import '@fairwins/miniapp-token-mint'` is now
+ * resolvable from anywhere in the tree, including frontend/src.
+ *
+ * The checks above only look at relative paths and the literal substring `frontend/src/`, so they
+ * are structurally blind to this. Nothing enforced it before workspaces because nothing could
+ * resolve it before workspaces.
+ */
+const PACKAGE_NAMES = ['@fairwins/miniapp-token-mint', '@fairwins/miniapp-clearpath']
+const HOST_PACKAGE_NAME = 'frontend'
+
+describe('the boundary holds for by-name imports too', () => {
+  it('no host file imports a mini-app package by its package name', () => {
+    const offenders = []
+    for (const file of walk(SRC)) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]
+        if (PACKAGE_NAMES.includes(pkg)) offenders.push(`${relative(FRONTEND, file)} → ${spec}`)
+      }
+    }
+    // A package is untrusted third-party code frozen at an immutable CID. The host importing one
+    // by name would bundle a copy of it — a different module instance from the one the loader
+    // verifies and executes.
+    expect(offenders).toEqual([])
+  })
+
+  it('no package imports the host by its package name', () => {
+    const offenders = []
+    for (const file of walk(PACKAGES)) {
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]
+        if (pkg === HOST_PACKAGE_NAME) offenders.push(`${relative(FRONTEND, file)} → ${spec}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('no package imports another package by name', () => {
+    const offenders = []
+    for (const file of walk(PACKAGES)) {
+      const owner = relative(PACKAGES, file).split(/[\\/]/)[0]
+      for (const spec of specifiers(readFileSync(file, 'utf8'))) {
+        const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]
+        if (PACKAGE_NAMES.includes(pkg) && !pkg.endsWith(owner)) {
+          offenders.push(`${relative(FRONTEND, file)} → ${spec}`)
+        }
+      }
+    }
+    // Packages are curated and versioned independently; one bundling another would freeze a copy
+    // of code the registry believes it is serving separately.
+    expect(offenders).toEqual([])
+  })
+})
