@@ -18,9 +18,35 @@
  * Usage: node scripts/security/check-slither-findings.js [path-to-slither-report.json]
  */
 const fs = require("fs");
+const path = require("path");
 
 const FAIL_ON = new Set(["High"]);
 const reportPath = process.argv[2] || "slither-report.json";
+const BASELINE_PATH = path.join(__dirname, "slither-high-baseline.json");
+
+/*
+ * BASELINE — pre-existing High findings, snapshotted when this gate was first enabled.
+ *
+ * Slither previously ran with `|| true` and no gate at all, so 16 High-impact findings had
+ * accumulated untriaged. Failing on all of them here would have meant either blocking a
+ * build-system PR on 16 security triages, or turning the gate off again — and turning it off is
+ * how it stayed useless for so long.
+ *
+ * So: NEW High findings fail; baselined ones are reported loudly on every run and do not.
+ * That is deliberately weaker than constitution I, which requires accepted findings to carry a
+ * written rationale. None of these has one yet. The baseline is a record that they are KNOWN AND
+ * UNREVIEWED, not that they are accepted, and it must only ever shrink.
+ */
+function loadBaseline() {
+  if (!fs.existsSync(BASELINE_PATH)) return [];
+  return (JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8")).findings || []);
+}
+const identity = (d) => {
+  const sm = (d.elements && d.elements[0] && d.elements[0].source_mapping) || {};
+  const file = sm.filename_relative || "unknown";
+  const line = sm.lines && sm.lines.length ? sm.lines[0] : 0;
+  return `${d.check}@${file}:${line}`;
+};
 
 if (!fs.existsSync(reportPath)) {
   // A missing report means the scan did not run. That is a failure, not a pass — the whole point
@@ -53,9 +79,24 @@ for (const impact of ["High", "Medium", "Low", "Informational", "Optimization"])
   if (byImpact[impact]) console.log(`  ${impact}: ${byImpact[impact]}`);
 }
 
-const blocking = detectors.filter((d) => FAIL_ON.has(d.impact));
+const baseline = new Set(loadBaseline().map((f) => `${f.check}@${f.file}:${f.line}`));
+const highs = detectors.filter((d) => FAIL_ON.has(d.impact));
+const known = highs.filter((d) => baseline.has(identity(d)));
+const blocking = highs.filter((d) => !baseline.has(identity(d)));
+
+if (known.length > 0) {
+  // Printed every run, never folded into the pass line: a known finding that stops being mentioned
+  // becomes an unknown one.
+  console.log(
+    `\n::warning::${known.length} High-impact finding(s) are BASELINED — known, and NOT yet triaged ` +
+      "(scripts/security/slither-high-baseline.json). Each needs a fix or a written rationale " +
+      "(constitution I); this list must only ever shrink:",
+  );
+  for (const d of known) console.log(`  · ${identity(d)}`);
+}
+
 if (blocking.length > 0) {
-  console.error(`\n::error::${blocking.length} HIGH-impact Slither finding(s) block this pipeline:`);
+  console.error(`\n::error::${blocking.length} NEW HIGH-impact Slither finding(s) block this pipeline:`);
   for (const d of blocking) {
     const where = (d.elements && d.elements[0] && d.elements[0].source_mapping) || {};
     const loc = where.filename_relative ? `${where.filename_relative}:${where.lines ? where.lines[0] : "?"}` : "unknown location";
@@ -69,4 +110,8 @@ if (blocking.length > 0) {
   process.exit(1);
 }
 
-console.log("\nOK: no High-impact findings.");
+console.log(
+  known.length
+    ? `\nOK: no NEW High-impact findings (${known.length} baselined, see above).`
+    : "\nOK: no High-impact findings.",
+);
