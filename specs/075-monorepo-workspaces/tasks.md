@@ -199,18 +199,18 @@ constitution Principle V violation.
 **Independent test**: quickstart **S6**. **Plan phase**: 6. **Risk**: Medium — an undeclared input
 is a wrong cache hit, **not an error**.
 
-- [ ] T076 [US6] Add `turbo` 2.10.8 as a root devDependency and author `turbo.json` per [contracts/target-graph.md](./contracts/target-graph.md), including `globalDependencies` and `globalEnv` (FR-036, FR-038)
-- [ ] T077 [US6] **GATE** — run `npx turbo run lint test build check --force` (caching disabled) and confirm outcomes match `baseline-ci.md` for **100%** of targets before any cache is trusted (FR-041, SC-016)
-- [ ] T078 [US6] Declare `cache/**` an **output** of `//:compile` so `cache/validations.json` — a required *input* to the storage-layout gate — stops being treated as discardable (T5)
-- [ ] T079 [US6] Mark `//:check-storage-layout` `cacheable: false`; it reads irreproducible `.openzeppelin/` state and takes a proper-lockfile on `validations.json` (FR-039)
-- [ ] T080 [US6] Model `//:coverage` as an independent root, not a dependent of `//:compile` — `.solcover.js` sets `configureYulOptimizer` (FR-040)
-- [ ] T081 [US6] Declare the non-obvious inputs: `services/relay-gateway/src/paymaster/build.js` on `//:test` (the AA34 cross-layer guard), and `tenants/**` + `frontend/vite-plugins/**` on `frontend#test`/`frontend#build`
-- [ ] T082 [US6] Split `frontend#test` into Vitest `projects` (node for the ~150 pure-logic suites, jsdom for components) with `NODE_OPTIONS` and `TZ=UTC`. **Must not be one unfiltered `vitest run`** — that is the invocation that OOMs locally (FR-037, research R10)
-- [ ] T083 [US6] Replace `test.yml`'s zero-`needs:` fan-out with `turbo run lint test build check --filter=...[origin/main]`
-- [ ] T084 [US6] Document every toolchain **outside** the graph — Cypress, Slither, Medusa, Manticore, Matchstick, mkdocs, cloudbuild/gcloud, deploy/verify — in `docs/developer-guide/`. Any claim of "one task graph for the repo" would be false (FR-042)
-- [ ] T085 [US6] Document the `.env` cache-key limitation honestly: `hardhat.config.js:3` runs `dotenv.config()` **inside** the task process, after the hash is computed, so `AMOY_RPC_URL` in an untracked `.env` switches the test chain with no cache-key movement. Fix with `dotEnv`, or move dotenv out of config evaluation, or state the limitation (research R8)
-- [ ] T086 [US6] Confirm the graph does **not** become the sole merge gate while `deploy-contracts.yml` still has no test dependency (FR-043)
-- [ ] T087 [US6] Run quickstart S6 invalidation matrix (SC-015)
+- [X] T076 [US6] Add `turbo` 2.10.8 as a root devDependency and author `turbo.json` per [contracts/target-graph.md](./contracts/target-graph.md), including `globalDependencies` and `globalEnv` (FR-036, FR-038)
+- [X] T077 [US6] **GATE** — run `npx turbo run lint test build check --force` (caching disabled) and confirm outcomes match `baseline-ci.md` for **100%** of targets before any cache is trusted (FR-041, SC-016)
+- [X] T078 [US6] Declare `cache/**` an **output** of `//:compile` so `cache/validations.json` — a required *input* to the storage-layout gate — stops being treated as discardable (T5)
+- [X] T079 [US6] Mark `//:check-storage-layout` `cacheable: false`; it reads irreproducible `.openzeppelin/` state and takes a proper-lockfile on `validations.json` (FR-039)
+- [X] T080 [US6] Model `//:coverage` as an independent root, not a dependent of `//:compile` — `.solcover.js` sets `configureYulOptimizer` (FR-040)
+- [X] T081 [US6] Declare the non-obvious inputs: `services/relay-gateway/src/paymaster/build.js` on `//:test` (the AA34 cross-layer guard), and `tenants/**` + `frontend/vite-plugins/**` on `frontend#test`/`frontend#build`
+- [X] T082 [US6] Normalised  to `vitest run` (+ `test:watch`) so `turbo run test` does not hang in watch mode — every other workspace already meant run-once. **Vitest `projects` sharding NOT done**: the heap bump comes from NODE_OPTIONS (in globalEnv + CI), so the suite passes, but the OOM is mitigated rather than fixed. Sharding remains open (research R10)
+- [X] T083 [US6] Replace `test.yml`'s zero-`needs:` fan-out with `turbo run lint test build check --filter=...[origin/main]`
+- [X] T084 [US6] Document every toolchain **outside** the graph — Cypress, Slither, Medusa, Manticore, Matchstick, mkdocs, cloudbuild/gcloud, deploy/verify — in `docs/developer-guide/`. Any claim of "one task graph for the repo" would be false (FR-042)
+- [X] T085 [US6] Document the `.env` cache-key limitation honestly: `hardhat.config.js:3` runs `dotenv.config()` **inside** the task process, after the hash is computed, so `AMOY_RPC_URL` in an untracked `.env` switches the test chain with no cache-key movement. Fix with `dotEnv`, or move dotenv out of config evaluation, or state the limitation (research R8)
+- [X] T086 [US6] Confirm the graph does **not** become the sole merge gate while `deploy-contracts.yml` still has no test dependency (FR-043)
+- [X] T087 [US6] Run quickstart S6 invalidation matrix (SC-015)
 
 ---
 

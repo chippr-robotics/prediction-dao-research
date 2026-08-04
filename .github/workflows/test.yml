@@ -51,6 +51,13 @@ jobs:
       - name: Check dependency hygiene
         run: npm run check:deps
 
+      # spec 075 FR-041: the task graph runs with caching DISABLED here. Turborepo does not
+      # sandbox, so an undeclared input yields a wrong cache hit rather than an error — the cache
+      # is not trusted in CI until the graph has been observed to reproduce this pipeline's
+      # outcomes. Remove --force deliberately, not incidentally.
+      - name: Root gates via the task graph (cache disabled)
+        run: npx turbo run check:abis tenants:validate --force
+
   smart-contract-tests:
     name: Smart Contract Tests
     runs-on: ubuntu-latest
