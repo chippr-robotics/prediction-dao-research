@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { getNetwork } from '../../config/networks'
 import { formatUsd, formatRelativeTime, dayGroupLabel, weekGroupLabel } from '../../lib/account/format'
 import SensitiveValue from '../common/SensitiveValue'
@@ -139,20 +139,33 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
   // Interleave date-group headers (default: by day) ahead of the rows they
   // cover. Entries arrive newest-first, so same-bucket rows are always
   // contiguous and a header only needs to print when the bucket changes.
+  /*
+   * Grouped as [{ label, entries }] rather than a flat [header|entry] stream, so each day/week
+   * bucket renders as its OWN <ul> preceded by a heading.
+   *
+   * The previous flat shape put group headers inside the <ul> as `<li role="presentation">`. That
+   * strips the element's implicit `listitem` role, which leaves the <ul> directly containing a
+   * non-list-item — an axe `list` violation (surfaced by axe-core 4.12; 4.11 missed it), and a
+   * real WCAG problem rather than a lint nit.
+   *
+   * Making the header a plain <li> would fix axe but break the contract these tests document:
+   * "group headers are presentational, not list rows". Lifting headers OUT of the list satisfies
+   * both — `getAllByRole('listitem')` still returns activity rows only.
+   */
   const groupedRows = useMemo(() => {
-    if (groupBy === 'none') return rows.map((entry) => ({ type: 'entry', entry }))
+    if (groupBy === 'none') return [{ label: null, entries: rows }]
     const labelFor = groupBy === 'week' ? weekGroupLabel : dayGroupLabel
-    const items = []
-    let lastLabel = null
+    const groups = []
+    let current = null
     for (const entry of rows) {
       const label = labelFor(entry.timestamp)
-      if (label !== lastLabel) {
-        items.push({ type: 'header', label })
-        lastLabel = label
+      if (current == null || current.label !== label) {
+        current = { label, entries: [] }
+        groups.push(current)
       }
-      items.push({ type: 'entry', entry })
+      current.entries.push(entry)
     }
-    return items
+    return groups
   }, [rows, groupBy])
 
   return (
@@ -287,16 +300,16 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
           />
         )
       ) : (
-        <ul className="account-feed-list">
-          {groupedRows.map((item, idx) => {
-            if (item.type === 'header') {
-              return (
-                <li key={`group-${idx}`} className="account-feed-group-header" role="presentation">
-                  {item.label}
-                </li>
-              )
-            }
-            const e = item.entry
+        <div className="account-feed-list">
+          {groupedRows.map((group, gi) => (
+          <Fragment key={group.label ?? `group-${gi}`}>
+          {group.label != null && (
+            // <h4>: the section is already titled by an <h3>, so a group heading sits one level
+            // below it. Styling is unchanged — the CSS class carries it.
+            <h4 className="account-feed-group-header">{group.label}</h4>
+          )}
+          <ul className="account-feed-group-items">
+          {group.entries.map((e) => {
             const meta = KIND_META[e.kind] || { icon: '•', label: e.kind, tone: 'out' }
             const url = explorerTxUrl(e.chainId ?? chainId, e.txHash)
             const relative = e.timestamp != null ? formatRelativeTime(e.timestamp) : null
@@ -340,7 +353,10 @@ function RecentActivityFeed({ entries = [], chainId, staleClasses = [], prunedBe
               </li>
             )
           })}
-        </ul>
+          </ul>
+          </Fragment>
+          ))}
+        </div>
       )}
       {prunedBefore != null && (
         <p className="account-feed-pruned">
