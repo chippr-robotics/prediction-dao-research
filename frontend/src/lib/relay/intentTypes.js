@@ -14,185 +14,20 @@
  * payment-class intents are unavailable on that chain (FR-020, e.g. Mordor/ETC USC).
  */
 import { NETWORKS } from '../../config/networks'
-import { RECEIVE_WITH_AUTHORIZATION_TYPES } from '../pools/gasless'
+import { INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES, typeStringFor } from '@fairwins/intent-types'
 import { PaymentUnsupportedOnChain } from './errors'
 
-// Re-exported so relay callers need only this module for both signature legs (shape reused verbatim
-// from the spec-034 prototype in lib/pools/gasless.js — the token-side EIP-3009 struct is unchanged).
-export { RECEIVE_WITH_AUTHORIZATION_TYPES }
-
-/** Common trailing fields shared by every intent struct (schema: "Common trailing fields"). */
-const TRAILING = [
-  { name: 'nonce', type: 'bytes32' },
-  { name: 'validAfter', type: 'uint256' },
-  { name: 'validBefore', type: 'uint256' },
-]
-
-/** `{ wagerId, actor }` shape shared by most no-stake wager intents. */
-const WAGER_ACTOR = [
-  { name: 'wagerId', type: 'uint256' },
-  { name: 'actor', type: 'address' },
-]
-
-/**
- * EIP-712 struct field lists, keyed by primary type. Pass as
- * `{ [primaryType]: INTENT_TYPES[primaryType] }` to `signer.signTypedData` (no nested custom types).
+/*
+ * Struct definitions now live in @fairwins/intent-types (spec 075, FR-024/FR-025) — one source,
+ * consumed by this app AND by services/relay-gateway, and checked against the verifying contracts
+ * by test/intent/TypehashParity.test.js.
+ *
+ * They used to be duplicated here and in the gateway, kept in step by hand. That held for 26 of 27
+ * structs; `InvalidateNonce` was missing from the gateway entirely.
+ *
+ * Re-exported so relay callers still need only this module for both signature legs.
  */
-export const INTENT_TYPES = {
-  CreateWagerIntent: [
-    { name: 'creator', type: 'address' },
-    { name: 'opponent', type: 'address' },
-    { name: 'arbitrator', type: 'address' },
-    { name: 'token', type: 'address' },
-    { name: 'creatorStake', type: 'uint128' },
-    { name: 'opponentStake', type: 'uint128' },
-    { name: 'acceptDeadline', type: 'uint64' },
-    { name: 'resolveDeadline', type: 'uint64' },
-    { name: 'resolutionType', type: 'uint8' },
-    { name: 'conditionId', type: 'bytes32' },
-    { name: 'creatorIsYes', type: 'bool' },
-    { name: 'metadataHash', type: 'bytes32' },
-    { name: 'metadataUri', type: 'string' },
-    { name: 'termsVersionHash', type: 'bytes32' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  AcceptWagerIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'taker', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  ClaimPayoutIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'claimant', type: 'address' },
-    ...TRAILING,
-  ],
-  ClaimRefundIntent: [...WAGER_ACTOR, ...TRAILING],
-  DeclareDrawIntent: [...WAGER_ACTOR, ...TRAILING],
-  RevokeDrawIntent: [...WAGER_ACTOR, ...TRAILING],
-  CancelOpenIntent: [...WAGER_ACTOR, ...TRAILING],
-  DeclineIntent: [...WAGER_ACTOR, ...TRAILING],
-  DeclareWinnerIntent: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'winner', type: 'address' },
-    { name: 'actor', type: 'address' },
-    ...TRAILING,
-  ],
-  PurchaseTierIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'tier', type: 'uint8' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  UpgradeTierIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'tier', type: 'uint8' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  ExtendMembershipIntent: [
-    { name: 'role', type: 'bytes32' },
-    { name: 'member', type: 'address' },
-    { name: 'paymentNonce', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  RedeemVoucherIntent: [
-    { name: 'voucherId', type: 'uint256' },
-    { name: 'acceptedTermsHash', type: 'bytes32' },
-    { name: 'redeemer', type: 'address' },
-    ...TRAILING,
-  ],
-  // Gasless cancel of an unsubmitted intent (invalidateNonceWithSig, FR-006) — no validAfter: the
-  // cancel should be executable immediately, bounded only by validBefore.
-  InvalidateNonce: [
-    { name: 'signer', type: 'address' },
-    { name: 'nonce', type: 'bytes32' },
-    { name: 'validBefore', type: 'uint256' },
-  ],
-
-  // ---- Tier-2 group pools (spec 035/036) ----
-  // Byte-identical to the on-chain typehashes: the six actor twins verify against the CLONE's domain,
-  // CreatePool against the FACTORY's. `pool`/`entries` ride in intent.params (calldata), NOT the struct.
-  ApproveOutcome: [
-    { name: 'member', type: 'address' },
-    { name: 'proposalId', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  ClaimShare: [
-    { name: 'winner', type: 'address' },
-    { name: 'index', type: 'uint256' },
-    { name: 'recipient', type: 'address' },
-    ...TRAILING,
-  ],
-  ProposeOutcome: [
-    { name: 'creator', type: 'address' },
-    { name: 'proposalId', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  CloseJoining: [
-    { name: 'creator', type: 'address' },
-    ...TRAILING,
-  ],
-  Cancel: [
-    { name: 'creator', type: 'address' },
-    ...TRAILING,
-  ],
-  Refund: [
-    { name: 'member', type: 'address' },
-    ...TRAILING,
-  ],
-  CreatePool: [
-    { name: 'creator', type: 'address' },
-    { name: 'token', type: 'address' },
-    { name: 'buyIn', type: 'uint256' },
-    { name: 'maxMembers', type: 'uint32' },
-    { name: 'thresholdBips', type: 'uint16' },
-    { name: 'acceptDeadline', type: 'uint64' },
-    { name: 'resolveDeadline', type: 'uint64' },
-    ...TRAILING,
-  ],
-
-  // ---- Callsign registry (spec 054) — signer-attributed, no payment leg (free with Gold membership).
-  //      Byte-identical to CallsignRegistry.sol typehashes + services/relay-gateway/src/intent/intentTypes.js.
-  CommitCallsignIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'commitment', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  RegisterCallsignIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'callsign', type: 'string' },
-    { name: 'salt', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  ChangeCallsignIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'newCallsign', type: 'string' },
-    { name: 'salt', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  ReleaseCallsignIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'callsignHash', type: 'bytes32' },
-    ...TRAILING,
-  ],
-  RequestRepointIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'callsignHash', type: 'bytes32' },
-    { name: 'newOwner', type: 'address' },
-    ...TRAILING,
-  ],
-  CancelRepointIntent: [
-    { name: 'owner', type: 'address' },
-    { name: 'callsignHash', type: 'bytes32' },
-    ...TRAILING,
-  ],
-}
+export { INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES, typeStringFor }
 
 /**
  * Gateway `action` → typed-data + routing metadata:

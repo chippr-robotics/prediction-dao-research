@@ -1,0 +1,16 @@
+{
+  "name": "@fairwins/intent-types",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The single definition of every FairWins EIP-712 intent struct (spec 075). Zero runtime dependencies; resolvable by plain Node and by Vite.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["src"],
+  "scripts": {
+    "test": "vitest run"
+  }
+}

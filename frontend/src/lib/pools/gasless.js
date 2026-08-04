@@ -12,16 +12,14 @@
  */
 import { ethers } from 'ethers'
 
-export const RECEIVE_WITH_AUTHORIZATION_TYPES = {
-  ReceiveWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
-  ],
-}
+// Single source: @fairwins/intent-types (spec 075, FR-025). This table was previously duplicated
+// here AND in services/relay-gateway/src/intent/intentTypes.js, kept in step by hand. It is the
+// money path — EIP-3009 `joinWithAuthorization` and stake pulls — so a silent divergence would
+// produce signatures that do not verify against real USDC.
+import { RECEIVE_WITH_AUTHORIZATION_TYPES } from '@fairwins/intent-types'
+
+// Re-exported for existing callers that import it from here.
+export { RECEIVE_WITH_AUTHORIZATION_TYPES }
 
 /**
  * Produce a signed EIP-3009 authorization that lets a relayer pull `value` from the member into the pool.

@@ -9,7 +9,8 @@
     "services/relay-gateway",
     "services/relayer",
     "subgraph",
-    "tools/miniapp-build"
+    "tools/miniapp-build",
+    "packages/*"
   ],
   "main": "index.js",
   "scripts": {
@@ -110,7 +111,8 @@
     "solidity-coverage": "^0.8.17",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@fairwins/intent-types": "*"
   },
   "dependencies": {
     "@semaphore-protocol/contracts": "^4.14.2"
