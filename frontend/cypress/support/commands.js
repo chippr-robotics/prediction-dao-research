@@ -319,26 +319,65 @@ Cypress.Commands.add('openCreateWagerModal', (type = 'oneVsOne') => {
 /**
  * Fill the wager creation form with the given configuration.
  */
+/*
+ * Lead with the ids FriendMarketsModal actually renders (#fm-description, #fm-opponent,
+ * #fm-stake), the way cy.attemptCreateWager already does.
+ *
+ * The `[data-testid="wager-*"]` selectors these led with have never existed in the app, and for
+ * DESCRIPTION every fallback missed too: the field is an `<input type="text">`, so
+ * `textarea[name="description"]` and the bare `textarea` matched nothing and five CRE tests
+ * failed on it. Opponent and stake only worked by falling through to their THIRD alternative,
+ * which is why the same defect stayed invisible in those two.
+ */
 Cypress.Commands.add('fillWagerForm', (config = {}) => {
   if (config.opponent) {
-    cy.get('[data-testid="wager-opponent"], input[name="opponent"], input[placeholder*="0x"]')
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]')
       .first()
       .clear()
       .type(config.opponent)
   }
 
   if (config.description) {
-    cy.get('[data-testid="wager-description"], textarea[name="description"], textarea')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]')
       .first()
       .clear()
       .type(config.description)
   }
 
   if (config.stake) {
-    cy.get('[data-testid="wager-stake"], input[name="stake"], input[type="number"]')
-      .first()
-      .clear()
-      .type(config.stake.toString())
+    cy.enterAmountViaKeypad('fm-stake', config.stake)
+  }
+})
+
+/**
+ * Enter an amount into an AmountKeypad.
+ *
+ * The stake field is NOT a text input — `AmountKeypad` renders `role="group"` with one button
+ * per digit and no `<input>` anywhere, so `.type()` could never drive it and every selector that
+ * assumed one (`#fm-stake`, `input[type="number"]`) matched nothing. The `id` passed to the
+ * component is a BASE id: it renders `#<base>-hero` for the display and `#<base>-key-<digit>`,
+ * `-key-decimal`, `-key-back` for the pad.
+ *
+ * @param {string} baseId  the id given to AmountKeypad, e.g. 'fm-stake'
+ * @param {string|number} amount  digits and at most one '.'
+ */
+Cypress.Commands.add('enterAmountViaKeypad', (baseId, amount) => {
+  const text = String(amount)
+  if (!/^\d*\.?\d*$/.test(text)) {
+    throw new Error(`enterAmountViaKeypad: "${text}" is not a plain decimal amount`)
+  }
+
+  cy.get(`#${baseId}-hero`, { timeout: 10000 }).should('exist')
+
+  // Clear whatever is there. The pad has no "clear", only backspace, and the display is capped
+  // well under 20 digits — pressing back past empty is a no-op, so this is safe to over-press.
+  cy.get(`#${baseId}-key-back`).then(($back) => {
+    for (let i = 0; i < 20; i += 1) cy.wrap($back).click({ force: true })
+  })
+
+  for (const ch of text) {
+    const keyId = ch === '.' ? `${baseId}-key-decimal` : `${baseId}-key-${ch}`
+    cy.get(`#${keyId}`).click({ force: true })
   }
 })
 
@@ -574,7 +613,7 @@ Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
   cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
   cy.wait(300)
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+  cy.enterAmountViaKeypad('fm-stake', o.stake)
   cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
     if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
   })
@@ -607,7 +646,7 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    cy.enterAmountViaKeypad('fm-stake', o.stake)
     if (o.resolutionType !== undefined) {
       cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
     }
@@ -666,7 +705,7 @@ Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
     cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    cy.enterAmountViaKeypad('fm-stake', o.stake)
     const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`

@@ -12,7 +12,13 @@
 describe('Wager Creation Form Validation', () => {
   beforeEach(() => {
     cy.mockWeb3Provider()
-    cy.visit('/fairwins')
+    /*
+     * Wager creation lives at Finance > Transfer > Wagers since spec 073 moved it
+     * (WAGERS_VIEW/WAGERS_PATH in config/appNav.js, rendered by PayTransferPanel);
+     * `/fairwins` no longer hosts the "Friends Decide" card, so openCreateWagerModal
+     * had nothing to click. Same relocation already fixed for 13-dashboard in bc294ec8.
+     */
+    cy.visit('/wagers')
     cy.connectWallet()
   })
 
