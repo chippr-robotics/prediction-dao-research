@@ -479,18 +479,26 @@ jobs:
           #
           # The authoritative pass/fail is cypress's EXIT CODE, which is non-zero iff tests failed
           # and which `set -o pipefail` on the run step now preserves. What that exit code cannot
-          # tell us is whether the run died before executing anything, so that is what this checks:
-          # Cypress prints "(Run Finished)" only after a complete run.
-          if ! grep -q "(Run Finished)" cypress-output.txt; then
-            echo "::error::Cypress never reached '(Run Finished)' — the run died before completing. Failing rather than assuming success."
+          # tell us is whether the run died before executing anything, so that is what this checks.
+          #
+          # EVERY MATCH BELOW RUNS ON THE DE-COLOURED COPY. Cypress writes
+          # `(<esc>[4m<esc>[1mRun Finished<esc>[22m<esc>[24m)`, so the literal "(Run Finished)"
+          # does not occur in the raw file, and the totals row's ✖ is wrapped in codes too.
+          # Grepping the raw output for either is the same mistake as the original gate grepping
+          # "failing" against a reporter that only ever emits "failures" — a check that cannot fire.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
             exit 1
           fi
+
           # Cross-check the reported totals. Belt and braces: the run step already failed the job
-          # on a non-zero exit, but a summary line claiming failures must never coexist with a
+          # on a non-zero exit, but a summary row claiming failures must never coexist with a
           # green step.
-          if grep -qE "^\s+.\s+[0-9]+ of [0-9]+ failed" cypress-output.txt; then
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-plain.txt; then
             echo "::error::Cypress reported failing specs."
-            grep -E "^\s+.\s+[0-9]+ of [0-9]+ failed" cypress-output.txt
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-plain.txt
             exit 1
           fi
 
