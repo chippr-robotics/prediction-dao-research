@@ -46,6 +46,32 @@ const stripComments = (raw) =>
 // block a merge. Anything NOT matching these is treated as a quality gate (constitution IV).
 const AUXILIARY = /upload|summar|artifact|comment|report|codecov|badge|notify|screenshot|video|cache/i;
 
+/*
+ * A step that INVOKES a build/test/lint tool is a gate no matter what it is called, and this
+ * overrides AUXILIARY. Name-matching alone exempted three real gates by pure coincidence:
+ *
+ *   "Run tests with gas reporting"                   -> matched `report`  (the CONTRACT TEST SUITE)
+ *   "Generate coverage report"                       -> matched `report`  (x4, three workflows)
+ *   "Root gates via the task graph (cache disabled)" -> matched `cache`   (check:abis + tenants:validate)
+ *
+ * Verified by mutation before the fix: adding `continue-on-error: true` to the contract test
+ * suite in security-testing.yml left this file 10 passing / 0 failing. A guard whose job is to
+ * stop gates being disabled could not see the most important gate in the repo being disabled.
+ *
+ * The tool name is anchored to command position — at line start or after `;`, `&&`, `|`, `(` —
+ * because an unanchored /slither|medusa/ matched those words inside echoed markdown prose in
+ * security-testing.yml's genuinely-auxiliary "Generate summary" step.
+ */
+const GATE_COMMAND =
+  /(?:^|[;&|(]\s*)\s*(?:npm\s+(?:run\s+)?(?:test|lint|build|compile)|npx\s+(?:turbo|hardhat|vitest|cypress|eslint|graph)|yarn\s+(?:test|lint|build)|forge\s+test|slither|medusa)\b/m;
+
+/** True when the step is auxiliary BY NAME and does not actually invoke a gate tool. */
+const isAuxiliary = (step) => {
+  const name = step.name || "";
+  if (!AUXILIARY.test(name)) return false;
+  return !GATE_COMMAND.test(String(step.run || ""));
+};
+
 describe("CI gates cannot be silently disabled (spec 075)", function () {
   it("no merge-gating JOB carries continue-on-error", function () {
     // A job-level flag neutralises EVERY step in the job at once — a wider hole than the
@@ -82,8 +108,30 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
       "Same report-generation step in the scheduled deep-analysis workflow.",
   };
 
+  /*
+   * continue-on-error exemptions. Same contract as EXIT_CODE_EXEMPT: a reason, and the staleness
+   * check below deletes the excuse if the step disappears.
+   *
+   * These three re-run an ALREADY-GATED suite purely to produce a coverage artifact, so their
+   * failure must not double-block a merge. Each reason names the sibling step that carries the
+   * real pass/fail signal — if that sibling ever gains continue-on-error itself, the guard above
+   * catches it, so this exemption cannot be used to launder a test suite into being advisory.
+   */
+  const CONTINUE_ON_ERROR_EXEMPT = {
+    "frontend-testing.yml::unit-tests::Generate coverage report":
+      "Coverage artifact only; re-runs the suite already gated by `Run unit tests` in the same job.",
+    "test.yml::frontend-tests::Generate coverage report":
+      "Coverage artifact only; re-runs the suite already gated by `Run tests` in the same job.",
+    "security-testing.yml::coverage-report::Generate coverage report":
+      "Coverage artifact only; the contract suite's pass/fail comes from `Run tests with gas " +
+      "reporting` in the hardhat-tests job, which is gating.",
+  };
+
   it("keeps every exit-code exemption justified and still present", function () {
-    for (const [key, reason] of Object.entries(EXIT_CODE_EXEMPT)) {
+    for (const [key, reason] of Object.entries({
+      ...EXIT_CODE_EXEMPT,
+      ...CONTINUE_ON_ERROR_EXEMPT,
+    })) {
       const [file, jobId, stepName] = key.split("::");
       const wf = readWorkflow(file);
       const job = (wf.jobs || {})[jobId];
@@ -147,7 +195,7 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
           const run = String(step.run || "");
           if (!run.includes("| tee")) continue;
           const name = step.name || "(unnamed)";
-          if (AUXILIARY.test(name)) continue;
+          if (isAuxiliary(step)) continue;
           if (step["continue-on-error"] === true) continue;
           if (!/pipefail/.test(run) && !/PIPESTATUS/.test(run) && step.shell !== "bash") {
             offenders.push(`${file} :: ${jobId} :: ${name}`);
@@ -171,7 +219,8 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
         for (const step of job.steps || []) {
           if (step["continue-on-error"] !== true) continue;
           const name = step.name || step.uses || step.run || "(unnamed)";
-          if (AUXILIARY.test(name)) continue;
+          if (isAuxiliary(step)) continue;
+          if (CONTINUE_ON_ERROR_EXEMPT[`${file}::${jobId}::${name}`]) continue;
           offenders.push(`${file} :: ${jobId} :: ${name}`);
         }
       }
