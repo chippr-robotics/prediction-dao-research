@@ -275,26 +275,6 @@ Cypress.Commands.add('navigateAndVerify', (path, urlPattern) => {
 })
 
 /**
- * Enable demo mode via localStorage and reload.
- */
-Cypress.Commands.add('enableDemoMode', () => {
-  cy.window().then((win) => {
-    win.localStorage.setItem('useMockWagers', 'true')
-  })
-  cy.reload()
-})
-
-/**
- * Disable demo mode (switch to live) via localStorage and reload.
- */
-Cypress.Commands.add('disableDemoMode', () => {
-  cy.window().then((win) => {
-    win.localStorage.setItem('useMockWagers', 'false')
-  })
-  cy.reload()
-})
-
-/**
  * Open the wager creation modal for a specific type.
  * Group wagers are no longer supported — the v2 contract is 1v1 only. The
  * 1v1 flow is split into participant-resolved ("Friends Decide") and
