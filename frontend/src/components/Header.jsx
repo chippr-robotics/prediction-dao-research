@@ -5,14 +5,18 @@ import ThemeToggle from './ui/ThemeToggle'
 import NotificationBell from './notifications/NotificationBell'
 import NetworkCrawler from './fairwins/NetworkCrawler'
 import { useNavDrawer } from '../contexts/NavDrawerContext.js'
+import { useIsMobile } from '../hooks/useMediaQuery'
+import { resolveLandingPath } from '../utils/landingViewPreference'
 import './Header.css'
 
 function Header({ hideWalletButton = false, appMode = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { open: openNavDrawer, isOpen: navDrawerOpen, available: navDrawerAvailable } = useNavDrawer()
+  const isMobile = useIsMobile()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const launchApp = () => navigate(resolveLandingPath(isMobile))
 
   // In app mode the clover logo is the site menu button — it opens the global
   // navigation drawer ("us"). On the landing pages (no drawer provider) it keeps
@@ -96,7 +100,7 @@ function Header({ hideWalletButton = false, appMode = false }) {
               Use Cases
             </button>
             <button
-              onClick={() => navigate('/app')}
+              onClick={launchApp}
               className="nav-link nav-button"
             >
               Launch App
@@ -157,7 +161,7 @@ function Header({ hideWalletButton = false, appMode = false }) {
           </button>
           <button
             onClick={() => {
-              navigate('/app')
+              launchApp()
               closeMenu()
             }}
             className="mobile-nav-link"

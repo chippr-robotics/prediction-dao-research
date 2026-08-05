@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import {
   HOME_MODES,
   getDefaultHomeMode,
@@ -7,28 +8,42 @@ import {
   getDefaultCurrencyKind,
   setDefaultCurrencyKind,
 } from '../../utils/homePreference'
+import {
+  LANDING_VIEWS,
+  getLandingViewPreference,
+  setLandingViewPreference,
+  resolveLandingView,
+} from '../../utils/landingViewPreference'
 import './HomePreferencesPanel.css'
 
 /**
- * HomePreferencesPanel (spec 058 US4) — choose which mode the home surface
- * opens in (Pay / Request / Wager) and which currency the amount hero starts
- * on. Device-scoped, no wallet required (the choice must apply on first paint
- * at /app, before any connect). Currency options are rendered with the ACTIVE
- * network's real symbols but stored as a network-agnostic kind, so the
- * setting follows the user honestly across networks.
+ * HomePreferencesPanel (spec 058 US4 + landing-view preference) — choose
+ * which screen the app opens on (Home vs Portfolio), which mode the Home
+ * surface itself opens in (Pay / Request / Wager), and which currency the
+ * amount hero starts on. Device-scoped, no wallet required (the choice must
+ * apply on first paint, before any connect). Currency options are rendered
+ * with the ACTIVE network's real symbols but stored as a network-agnostic
+ * kind, so the setting follows the user honestly across networks.
  */
 
 const MODE_LABELS = { pay: 'Pay', request: 'Request', wager: 'Wager' }
+const LANDING_VIEW_LABELS = { auto: 'Auto', home: 'Home', portfolio: 'Portfolio' }
 
 function HomePreferencesPanel() {
   // Setters persist synchronously; a local bump re-reads storage so the
   // checked states are always current.
   const [, forceRender] = useState(0)
   const tokens = useChainTokens()
+  const isMobile = useIsMobile()
 
+  const landingView = getLandingViewPreference()
   const mode = getDefaultHomeMode()
   const kind = getDefaultCurrencyKind()
 
+  const pickLandingView = (next) => {
+    setLandingViewPreference(next)
+    forceRender((n) => n + 1)
+  }
   const pickMode = (next) => {
     setDefaultHomeMode(next)
     forceRender((n) => n + 1)
@@ -47,8 +62,31 @@ function HomePreferencesPanel() {
     <div className="home-preferences-panel">
       <h3 className="home-preferences-panel-title">Home screen</h3>
       <p className="home-preferences-panel-hint">
-        Choose what the app opens on and which currency the amount starts in.
+        Choose which screen the app opens on, what the Home screen starts on, and which currency
+        the amount starts in.
       </p>
+
+      <fieldset className="home-preferences-group">
+        <legend className="home-preferences-legend">Opens on</legend>
+        <div className="home-preferences-options" role="radiogroup" aria-label="Opens on">
+          {LANDING_VIEWS.map((v) => (
+            <label key={v} className={`home-preferences-option ${landingView === v ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="landing-default-view"
+                value={v}
+                checked={landingView === v}
+                onChange={() => pickLandingView(v)}
+              />
+              <span>{LANDING_VIEW_LABELS[v]}</span>
+            </label>
+          ))}
+        </div>
+        <p className="home-preferences-note">
+          Auto follows this device&apos;s screen size — Home on a phone, Portfolio on a larger
+          display (currently {LANDING_VIEW_LABELS[resolveLandingView(isMobile)]} on this device).
+        </p>
+      </fieldset>
 
       <fieldset className="home-preferences-group">
         <legend className="home-preferences-legend">Default view</legend>

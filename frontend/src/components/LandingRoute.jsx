@@ -4,7 +4,10 @@
  * First-time visitors get the marketing page. Anyone this browser has already
  * attached an account for goes straight to the app, where the unlock prompt
  * meets them — "Launch App" is a step with no decision in it for a returning
- * member, and nothing in FairWins works until an account is connected.
+ * member, and nothing in FairWins works until an account is connected. Which
+ * screen they land on (Home or Portfolio) follows landingViewPreference —
+ * device-based by default (mobile → Home, larger screens → Portfolio) but
+ * overridable from Preferences.
  *
  * Escape hatches, both honoured for the rest of the tab session: "Leave" on the
  * entry gate, and /?stay=1.
@@ -13,12 +16,15 @@
 import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useWallet } from '../hooks/useWalletManagement'
+import { useIsMobile } from '../hooks/useMediaQuery'
 import LandingPage from './LandingPage'
 import { hasAcknowledged } from '../utils/entryGateAck'
 import { hasWalletHistory, keepOnLanding, shouldStayOnLanding } from '../utils/appEntry'
+import { resolveLandingPath } from '../utils/landingViewPreference'
 
 export default function LandingRoute() {
   const { isConnected, connectionStatus } = useWallet()
+  const isMobile = useIsMobile()
   const { search } = useLocation()
   const askedToStay = new URLSearchParams(search).get('stay') === '1'
 
@@ -34,7 +40,7 @@ export default function LandingRoute() {
 
   // Never forward past the eligibility gate: a visitor who has not entered yet
   // has to see it, and "Leave" must land somewhere that stays put.
-  if (!stay && returning && hasAcknowledged()) return <Navigate to="/app" replace />
+  if (!stay && returning && hasAcknowledged()) return <Navigate to={resolveLandingPath(isMobile)} replace />
 
   return <LandingPage />
 }
