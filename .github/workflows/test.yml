@@ -523,5 +523,5 @@ jobs:
         if: always()
         with:
           name: cypress-fast-results
-          path: frontend/cypress-results.json
+          path: frontend/cypress-output.txt
           retention-days: 30

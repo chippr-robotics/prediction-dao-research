@@ -76,21 +76,29 @@ describe('Wager Creation Form Validation', () => {
       stake: 0
     })
 
-    // Form should prevent submission with zero stake
+    /*
+     * Assert the ACTUAL validation message (FriendMarketsModal.jsx:737), not /stake|amount|minimum/i
+     * — that pattern matched the permanent "Stake Amount" field label, so it held whether or not
+     * validation ran. The old branch was doubly unfalsifiable: its `else` asserted
+     * `expect(isDisabled).to.be.true` inside the branch reached only when isDisabled was true.
+     * The submit button's disabled state is `submitting || !isConnected || !isCorrectNetwork`
+     * (FriendMarketsModal.jsx:1896) and never depends on the stake, so submitting is the only way
+     * to reach the validation path. (#1019)
+     */
     cy.get('[role="dialog"], .modal')
       .find('button[type="submit"], button')
       .filter(':contains("Create")')
-      .then(($btn) => {
-        // Button should be disabled or show validation error
-        const isDisabled = $btn.is(':disabled') || $btn.attr('aria-disabled') === 'true'
-        if (!isDisabled) {
-          cy.wrap($btn).click({ force: true })
-          // Should show error after submission attempt
-          cy.get('[role="dialog"], .modal').invoke('text').should('match', /stake|amount|minimum/i)
-        } else {
-          expect(isDisabled).to.be.true
-        }
-      })
+      .first()
+      .click({ force: true })
+
+    /*
+     * `exist`, not `be.visible`. The error IS rendered — Cypress reports the element as present but
+     * "overflowed by other elements" inside the fixed-position modal, i.e. it is below the fold of
+     * a form the app does not scroll to the first error. That is a real UX observation (#1019) and
+     * a DIFFERENT claim from the one this test is named for; asserting visibility here would couple
+     * "does validation fire" to "does the modal scroll", and fail for the wrong reason.
+     */
+    cy.contains('.fm-error', 'Valid stake amount is required', { timeout: 5000 }).should('exist')
   })
 
   it('[CRE-22] Create wager exceeding max stake (1000) shows validation error', () => {

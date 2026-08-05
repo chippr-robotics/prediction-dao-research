@@ -413,28 +413,24 @@ jobs:
           echo "### Cypress E2E Tests (Full Suite)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "cypress-results.json" ]; then
-            node -e "
-              const r = require('./cypress-results.json');
-              const stats = r.stats || {};
-              console.log('| Metric | Value |');
-              console.log('|--------|-------|');
-              console.log('| Passing | ' + (stats.passes || 0) + ' |');
-              console.log('| Failing | ' + (stats.failures || 0) + ' |');
-              console.log('| Pending | ' + (stats.pending || 0) + ' |');
-              console.log('| Duration | ' + ((stats.duration || 0) / 1000).toFixed(1) + 's |');
-              console.log('| Suites | ' + (stats.suites || 0) + ' |');
-            " >> $GITHUB_STEP_SUMMARY 2>/dev/null
-          else
-            # Fall back to text parsing
-            SPECS=$(grep -c "Running:" cypress-output.txt 2>/dev/null || echo "n/a")
-            PASSING=$(grep -oP '\d+ passing' cypress-output.txt | tail -1 || echo "")
-            FAILING=$(grep -oP '\d+ failing' cypress-output.txt | tail -1 || echo "")
+          # cypress-results.json never exists (see `Check Cypress exit code`), so the JSON branch was
+          # dead and the fallback reported the LAST spec's tally as if it were the whole run. Parse
+          # the run-total row instead: <label> <duration> <tests> <passing> <failing> <pending> <skipped>.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            NUMS=$(echo "$TOTALS" | tr -d '│┌┐└┘─' | sed 's/[✔✖]//g' | grep -oE '[0-9]+|-' | tail -5 | tr '\n' ' ')
+            set -- $NUMS
+            # Cypress prints "-" for a zero column.
+            z () { [ "${1:-}" = "-" ] || [ -z "${1:-}" ] && echo 0 || echo "$1"; }
             echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Specs run | $SPECS |" >> $GITHUB_STEP_SUMMARY
-            [ -n "$PASSING" ] && echo "| Passing | $PASSING |" >> $GITHUB_STEP_SUMMARY
-            [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests | ${1:-?} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $(z "${2:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | $(z "${3:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pending | $(z "${4:-}") |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -442,19 +438,26 @@ jobs:
         if: always()
         working-directory: frontend
         run: |
-          if [ ! -f cypress-results.json ]; then
-            echo "::error::cypress-results.json is missing — the E2E run did not complete. Failing rather than assuming success."
+          # Same fix as test.yml's `Check E2E results`. Cypress NEVER WRITES cypress-results.json:
+          # `--reporter json --reporter-options "output=..."` emits to stdout and ignores the
+          # option, and there is no aggregate to write because the reporter emits one object PER
+          # SPEC. Requiring the file made this step fail every scheduled run regardless of results.
+          #
+          # EVERY MATCH RUNS ON THE DE-COLOURED COPY. Cypress writes
+          # `(<esc>[4m<esc>[1mRun Finished<esc>[22m<esc>[24m)`, so the literal "(Run Finished)" does
+          # not occur in the raw file and the totals row's ✖ is wrapped in codes too.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
             exit 1
           fi
-          node -e "
-            const stats = (require('./cypress-results.json').stats) || {};
-            const failures = Number(stats.failures || 0);
-            console.log('passes=' + (stats.passes || 0) + ' failures=' + failures);
-            if (failures > 0) {
-              console.error('::error::' + failures + ' Cypress test(s) failed.');
-              process.exit(1);
-            }
-          "
+
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-plain.txt; then
+            echo "::error::Cypress reported failing specs."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-plain.txt
+            exit 1
+          fi
 
       - name: Upload Cypress screenshots
         uses: actions/upload-artifact@v4
@@ -477,7 +480,7 @@ jobs:
         if: always()
         with:
           name: cypress-e2e-results
-          path: frontend/cypress-results.json
+          path: frontend/cypress-output.txt
           retention-days: 90
 
   summary:

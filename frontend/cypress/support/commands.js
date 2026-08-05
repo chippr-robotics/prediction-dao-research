@@ -344,7 +344,13 @@ Cypress.Commands.add('fillWagerForm', (config = {}) => {
       .type(config.description)
   }
 
-  if (config.stake) {
+  /*
+   * `!= null` rather than a truthiness check: `stake: 0` is FALSY, so the old guard silently
+   * skipped the keypad and left the field on WAGER_DEFAULTS.STAKE_AMOUNT ('10'). CRE-21, the test
+   * named "zero stake shows validation error", therefore submitted a stake of ten and had never
+   * once entered a zero. The keypad itself handles '0' correctly. (#1019)
+   */
+  if (config.stake != null) {
     cy.enterAmountViaKeypad('fm-stake', config.stake)
   }
 })
