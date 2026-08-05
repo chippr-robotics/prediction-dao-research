@@ -198,7 +198,20 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
  * Wait for wallet connection UI to appear.
  */
 Cypress.Commands.add('waitForWalletConnection', () => {
-  cy.get('[data-testid="wallet-address"], .wallet-address, .connected-wallet', { timeout: 10000 })
+  /*
+   * Wait for the CONNECTED INDICATOR, not for the address text.
+   *
+   * This helper waited on `[data-testid="wallet-address"], .wallet-address, .connected-wallet`.
+   * The first of those has never existed in the app (`git log -S` finds no commit that added it),
+   * and the address text itself only renders INSIDE the account dropdown — WalletButton.jsx puts
+   * `.account-address-value` behind `{isOpen && ...}`. So the helper waited ten seconds for
+   * something that appears only after a click it never makes, and every spec that connects a
+   * wallet failed on it. That single helper accounted for 28 of the suite's failures.
+   *
+   * `.wallet-account-button` IS the connected state: WalletButton renders it in place of the
+   * connect button as soon as an account is present.
+   */
+  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 })
 
