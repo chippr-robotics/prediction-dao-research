@@ -47,7 +47,122 @@ const stripComments = (raw) =>
 const AUXILIARY = /upload|summar|artifact|comment|report|codecov|badge|notify|screenshot|video|cache/i;
 
 describe("CI gates cannot be silently disabled (spec 075)", function () {
-  it("no quality gate carries continue-on-error", function () {
+  it("no merge-gating JOB carries continue-on-error", function () {
+    // A job-level flag neutralises EVERY step in the job at once — a wider hole than the
+    // per-step flag, and the original version of this test never looked at it. Verified by
+    // mutation: job-level continue-on-error on smart-contract-tests left the suite fully green.
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        if (job["continue-on-error"] === true) offenders.push(`${file} :: ${jobId} (JOB-level)`);
+      }
+    }
+    expect(
+      offenders,
+      "continue-on-error on a merge-gating JOB disables every check inside it:\n  " + offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  /*
+   * Steps allowed to discard their own exit code, keyed by `file::job::step`.
+   *
+   * An explicit allowlist, not a name regex: the previous version exempted anything whose NAME
+   * matched /report|summar|.../, so renaming a gating step to "Run tests and report" disabled it.
+   * Every entry needs a reason, and an entry whose step no longer exists fails the suite below —
+   * so a stale exemption cannot quietly outlive the thing it excused.
+   */
+  const EXIT_CODE_EXEMPT = {
+    "security-testing.yml::slither-analysis::Run Slither analysis":
+      "Report GENERATION only. Slither exits non-zero on ANY finding including informational ones, " +
+      "so failing here would redden CI on notes. The blocking decision is the next step, " +
+      "`Enforce Slither severity gate`, which fails on High impact — asserted separately below.",
+    "torture-test.yml::slither-analysis::Run Slither analysis":
+      "Same report-generation step in the scheduled deep-analysis workflow.",
+  };
+
+  it("keeps every exit-code exemption justified and still present", function () {
+    for (const [key, reason] of Object.entries(EXIT_CODE_EXEMPT)) {
+      const [file, jobId, stepName] = key.split("::");
+      const wf = readWorkflow(file);
+      const job = (wf.jobs || {})[jobId];
+      expect(job, `${key}: job no longer exists — drop the exemption`).to.exist;
+      const step = (job.steps || []).find((st) => (st.name || "") === stepName);
+      expect(step, `${key}: step no longer exists — drop the exemption`).to.exist;
+      expect(reason.length, `${key} needs a real reason`).to.be.greaterThan(40);
+    }
+  });
+
+  it("no gating step swallows its own exit code with `|| true`", function () {
+    // `|| true` is the literal mechanism that kept the Slither gate dead. The original test only
+    // read step NAMES and never looked at what the step actually ran.
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        for (const step of job.steps || []) {
+          const run = String(step.run || "");
+          if (!run) continue;
+          const name = step.name || step.uses || "(unnamed)";
+          if (EXIT_CODE_EXEMPT[`${file}::${jobId}::${name}`]) continue;
+          for (const line of run.split("\n")) {
+            const t = line.trim();
+            if (t.startsWith("#")) continue;
+            if (!/(\|\|\s*true|;\s*true)\s*$/.test(t) && !/^exit 0$/.test(t)) continue;
+            /*
+             * Judged by BEHAVIOUR, not by step name. The previous version exempted any step whose
+             * NAME matched /report|summar|.../, so renaming a gating step to "Run tests and report"
+             * disabled the check entirely. A line that only appends to the job summary may swallow
+             * its own error — losing a markdown row is not losing a gate. A line that runs a check
+             * may not.
+             */
+            if (/\$GITHUB_STEP_SUMMARY/.test(t)) continue;
+            offenders.push(`${file} :: ${jobId} :: ${name} -> ${t.slice(0, 70)}`);
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      "These gating steps discard their own failure:\n  " + offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  it("every tee'd gating step sets pipefail", function () {
+    /*
+     * `cmd | tee log` under `bash -e` exits with TEE's status — always 0 — so the gate's failure is
+     * discarded exactly as continue-on-error discarded it. This repo had the correct reasoning
+     * written in a comment for the Cypress step and never applied it to the six siblings: the
+     * CONTRACT TEST SUITE, frontend unit tests (in two workflows), lint and coverage were all
+     * throwing away their exit codes. Demonstrated: `bash -e -c 'false | tee f'` exits 0.
+     */
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        for (const step of job.steps || []) {
+          const run = String(step.run || "");
+          if (!run.includes("| tee")) continue;
+          const name = step.name || "(unnamed)";
+          if (AUXILIARY.test(name)) continue;
+          if (step["continue-on-error"] === true) continue;
+          if (!/pipefail/.test(run) && !/PIPESTATUS/.test(run) && step.shell !== "bash") {
+            offenders.push(`${file} :: ${jobId} :: ${name}`);
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      "These gating steps pipe into tee without pipefail, so their exit code is discarded:\n  " +
+        offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  it("no quality gate step carries continue-on-error", function () {
     const offenders = [];
     for (const file of workflowFiles()) {
       const wf = readWorkflow(file);

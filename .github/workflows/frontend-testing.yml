@@ -52,7 +52,11 @@ jobs:
         working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run unit tests
-        run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           TZ: UTC
