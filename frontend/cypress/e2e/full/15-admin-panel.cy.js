@@ -16,7 +16,7 @@ function connectThenVisitAdmin(account) {
   cy.mockWeb3Provider({ account })
   cy.visit('/fairwins')
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
   cy.visit('/admin')
 }

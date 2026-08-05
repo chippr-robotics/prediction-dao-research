@@ -1,10 +1,18 @@
 name: CI Manager - Smart Test Selection
 
 on:
+  # EVERY pull request, whatever it targets.
+  #
+  # This was `branches: [main, develop]`, so a PR into any other branch ran NOTHING here — and
+  # this is the workflow that dispatches test.yml and security-testing.yml, i.e. all of them.
+  # Stacked PRs are the normal shape of work in this repo (a feature branch collecting fixes
+  # before one merge to main), and every one of those forks was merging on the strength of
+  # Release Drafter alone. #1018 merged that way: mergeStateStatus CLEAN, zero tests run.
+  #
+  # The base branch is not what decides whether code should be tested. Path filters already keep
+  # the cost proportional — that is this workflow's entire job — so running it everywhere is
+  # cheap. `push` stays scoped: the pull_request event is the gate.
   pull_request:
-    branches:
-      - main
-      - develop
   push:
     branches:
       - main

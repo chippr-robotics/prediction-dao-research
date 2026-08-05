@@ -95,7 +95,11 @@ jobs:
         run: npx turbo run check:abis tenants:validate --force
 
       - name: Run tests
-        run: npm test 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
 
       - name: Summarize test results
         if: always()
@@ -185,7 +189,11 @@ jobs:
       # IMPORTANT: Linting errors must fail the build to prevent code quality regressions.
       # Do not add 'continue-on-error: true' to this step as it would hide ESLint failures.
       - name: Run linter
-        run: npm run lint 2>&1 | tee lint-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-output.txt
 
       - name: Summarize lint results
         if: always()
@@ -256,7 +264,11 @@ jobs:
         working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run tests
-        run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
         env:
           # Parity with frontend-testing.yml, which runs the IDENTICAL suite (spec 075, T027).
           # Without the heap bump the full suite OOMs; TZ is pinned because several suites
@@ -287,7 +299,11 @@ jobs:
       # actual test failures. We allow this to fail gracefully while still uploading
       # whatever coverage data was generated.
       - name: Generate coverage report
-        run: npm run test:coverage -- --run 2>&1 | tee coverage-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm run test:coverage -- --run 2>&1 | tee coverage-output.txt
         continue-on-error: true
 
       - name: Summarize coverage
@@ -415,30 +431,31 @@ jobs:
           echo "### Cypress Fast E2E" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "cypress-results.json" ]; then
-            node -e "
-              const r = require('./cypress-results.json');
-              const stats = r.stats || {};
-              console.log('| Metric | Value |');
-              console.log('|--------|-------|');
-              console.log('| Passing | ' + (stats.passes || 0) + ' |');
-              console.log('| Failing | ' + (stats.failures || 0) + ' |');
-              console.log('| Pending | ' + (stats.pending || 0) + ' |');
-              console.log('| Duration | ' + ((stats.duration || 0) / 1000).toFixed(1) + 's |');
-              console.log('| Specs | ' + (stats.suites || 0) + ' |');
-            " >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          # Parse the RUN-TOTAL row of Cypress's own summary table. The previous version preferred
+          # cypress-results.json, which Cypress never writes (see `Check E2E results`), and its
+          # fallback grepped the first `N passing` line — i.e. spec #1's tally reported as if it
+          # were the whole run.
+          #
+          # The totals row is the last line matching "All specs passed!" or "N of M failed", with
+          # columns: <label> <duration> <tests> <passing> <failing> <pending> <skipped>.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+          TOTALS=$(grep -E "(All specs passed!|[0-9]+ of [0-9]+ failed)" cypress-plain.txt | tail -1)
+          if [ -n "$TOTALS" ]; then
+            # Strip box-drawing characters, then take the trailing numeric columns.
+            NUMS=$(echo "$TOTALS" | tr -d '│┌┐└┘─' | sed 's/[✔✖]//g' | grep -oE '[0-9]+|-' | tail -5 | tr '\n' ' ')
+            set -- $NUMS
+            # Cypress prints "-" for a zero column, so normalise it rather than rendering "-".
+            z () { [ "${1:-}" = "-" ] || [ -z "${1:-}" ] && echo 0 || echo "$1"; }
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Tests | ${1:-?} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $(z "${2:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failing | $(z "${3:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pending | $(z "${4:-}") |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`$(echo "$TOTALS" | tr -d '│' | xargs)\`" >> $GITHUB_STEP_SUMMARY
           else
-            # Fall back to parsing text output
-            PASSING=$(grep -oP 'passing \(\d+' cypress-output.txt | head -1 || echo "")
-            FAILING=$(grep -oP '\d+ failing' cypress-output.txt | head -1 || echo "")
-            if [ -n "$PASSING" ] || [ -n "$FAILING" ]; then
-              echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-              [ -n "$PASSING" ] && echo "| Result | $PASSING |" >> $GITHUB_STEP_SUMMARY
-              [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "⚠️ Could not parse Cypress results" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "⚠️ Cypress produced no run-total row — see the job log." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -453,19 +470,37 @@ jobs:
       - name: Check E2E results
         if: always()
         run: |
-          if [ ! -f cypress-results.json ]; then
-            echo "::error::cypress-results.json is missing — the E2E run did not complete. Failing rather than assuming success."
+          # This gate used to require cypress-results.json. Cypress NEVER WRITES THAT FILE:
+          # `--reporter json --reporter-options "output=..."` emits the JSON to stdout and the
+          # option is ignored (verified directly — a passing single-spec run exits 0 and leaves no
+          # file). So spec 075 swapped an always-green gate for an always-RED one: this step could
+          # not pass even with every test green, which is the same defect wearing the other face.
+          # There is also no aggregate to write — the json reporter emits one object PER SPEC.
+          #
+          # The authoritative pass/fail is cypress's EXIT CODE, which is non-zero iff tests failed
+          # and which `set -o pipefail` on the run step now preserves. What that exit code cannot
+          # tell us is whether the run died before executing anything, so that is what this checks.
+          #
+          # EVERY MATCH BELOW RUNS ON THE DE-COLOURED COPY. Cypress writes
+          # `(<esc>[4m<esc>[1mRun Finished<esc>[22m<esc>[24m)`, so the literal "(Run Finished)"
+          # does not occur in the raw file, and the totals row's ✖ is wrapped in codes too.
+          # Grepping the raw output for either is the same mistake as the original gate grepping
+          # "failing" against a reporter that only ever emits "failures" — a check that cannot fire.
+          sed -e 's/\x1b\[[0-9;]*m//g' cypress-output.txt > cypress-plain.txt
+
+          if ! grep -qE "Run Finished" cypress-plain.txt; then
+            echo "::error::Cypress never reached 'Run Finished' — the run died before completing. Failing rather than assuming success."
             exit 1
           fi
-          node -e "
-            const stats = (require('./cypress-results.json').stats) || {};
-            const failures = Number(stats.failures || 0);
-            console.log('passes=' + (stats.passes || 0) + ' failures=' + failures + ' pending=' + (stats.pending || 0));
-            if (failures > 0) {
-              console.error('::error::' + failures + ' Cypress test(s) failed.');
-              process.exit(1);
-            }
-          "
+
+          # Cross-check the reported totals. Belt and braces: the run step already failed the job
+          # on a non-zero exit, but a summary row claiming failures must never coexist with a
+          # green step.
+          if grep -qE "[0-9]+ of [0-9]+ failed" cypress-plain.txt; then
+            echo "::error::Cypress reported failing specs."
+            grep -E "[0-9]+ of [0-9]+ failed" cypress-plain.txt
+            exit 1
+          fi
 
       - name: Upload Cypress screenshots
         uses: actions/upload-artifact@v4

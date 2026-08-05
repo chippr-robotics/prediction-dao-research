@@ -28,9 +28,7 @@ function connectAndOpenMembershipModal(accountIndex = 0) {
   // Connect wallet via the header connect button
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 
@@ -410,9 +408,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     // Connect wallet
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // Open membership modal
     cy.get('body').then(($body) => {
@@ -460,9 +456,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     // Connect wallet
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
 

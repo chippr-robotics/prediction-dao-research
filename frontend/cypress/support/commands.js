@@ -21,6 +21,20 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const networkId = options.networkId || Cypress.env('NETWORK_ID') || 1337
   const rpcUrl = options.rpcUrl || Cypress.env('RPC_URL') || 'http://localhost:8545'
   const account = options.account || TEST_ACCOUNTS[0]
+  /*
+   * A real injected wallet reports NO accounts until the site has been authorised: `eth_accounts`
+   * returns [] and only `eth_requestAccounts` (the user pressing Connect) grants access.
+   *
+   * This mock used to return the account for BOTH, which made it look permanently pre-authorised.
+   * That was invisible while the mock itself was undiscoverable — but once it announces over
+   * EIP-6963 (issue #1016), wagmi finds it, sees a non-empty eth_accounts, and AUTO-CONNECTS on
+   * load. The app then renders the connected header, `.wallet-connect-button` never exists, and
+   * specs written to click Connect fail on a UI that skipped straight past them.
+   *
+   * So the default is now honestly disconnected. Pass `{ preAuthorized: true }` for a spec that
+   * wants a restored session.
+   */
+  let authorized = options.preAuthorized === true
 
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
@@ -39,8 +53,13 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         return new Promise((resolve, reject) => {
           switch (method) {
             case 'eth_requestAccounts':
-            case 'eth_accounts':
+              // The user pressing Connect. Grants access for the rest of this page load.
+              authorized = true
               resolve([account])
+              break
+            case 'eth_accounts':
+              // Silent probe on load — empty until authorised, exactly like a real wallet.
+              resolve(authorized ? [account] : [])
               break
             case 'eth_chainId':
               resolve(`0x${networkId.toString(16)}`)
@@ -119,6 +138,46 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         }
       }
     }
+
+    /*
+     * ANNOUNCE THE PROVIDER OVER EIP-6963 (issue #1016).
+     *
+     * Setting `window.ethereum` alone is no longer enough. This app uses wagmi 3
+     * (src/wagmi.js -> injected({ shimDisconnect: true })), which discovers wallets through
+     * EIP-6963 announcements via mipd — it never inspects window.ethereum to build the connector
+     * list. So the mock was invisible: ConnectModal rendered no available `.connector-option`,
+     * every wallet spec failed with "Expected to find element .connector-option:not(.unavailable)",
+     * and it had been that way since the wagmi migration — silently, because the E2E gate could
+     * not fail (fixed in #1015).
+     *
+     * The contract is exactly mipd's (node_modules/mipd/dist/esm/utils.js):
+     *   · dispatch `eip6963:announceProvider` with a FROZEN { info, provider } detail
+     *   · keep answering `eip6963:requestProvider`, because the app requests on mount — which is
+     *     after this hook runs, so a single fire-and-forget announcement would be missed
+     *
+     * Events go through `win`, not Cypress's own window: this is the application's realm.
+     */
+    const detail = Object.freeze({
+      info: Object.freeze({
+        // A stable uuid keeps the connector identity stable across re-announcements within a spec.
+        uuid: '00000000-0000-4000-8000-0000000f1a17',
+        name: 'MetaMask',
+        // rdns is what wagmi keys the connector on; io.metamask matches the mock's isMetaMask.
+        rdns: 'io.metamask',
+        // Inline SVG: EIP-6963 requires a data URI, and a remote icon would be a network
+        // dependency in a test.
+        icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
+      }),
+      provider: win.ethereum,
+    })
+
+    const announce = () => {
+      try {
+        win.dispatchEvent(new win.CustomEvent('eip6963:announceProvider', { detail }))
+      } catch { /* realm torn down mid-test; nothing to announce to */ }
+    }
+    win.addEventListener('eip6963:requestProvider', announce)
+    announce()
   })
 })
 
@@ -139,7 +198,20 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
  * Wait for wallet connection UI to appear.
  */
 Cypress.Commands.add('waitForWalletConnection', () => {
-  cy.get('[data-testid="wallet-address"], .wallet-address, .connected-wallet', { timeout: 10000 })
+  /*
+   * Wait for the CONNECTED INDICATOR, not for the address text.
+   *
+   * This helper waited on `[data-testid="wallet-address"], .wallet-address, .connected-wallet`.
+   * The first of those has never existed in the app (`git log -S` finds no commit that added it),
+   * and the address text itself only renders INSIDE the account dropdown — WalletButton.jsx puts
+   * `.account-address-value` behind `{isOpen && ...}`. So the helper waited ten seconds for
+   * something that appears only after a click it never makes, and every spec that connects a
+   * wallet failed on it. That single helper accounted for 28 of the suite's failures.
+   *
+   * `.wallet-account-button` IS the connected state: WalletButton renders it in place of the
+   * connect button as soon as an account is present.
+   */
+  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 })
 
@@ -157,6 +229,17 @@ Cypress.Commands.add('connectWallet', () => {
     .should('be.visible')
     .should('not.be.disabled')
     .click({ force: true })
+
+  /*
+   * Clicking "Connect Wallet" only OPENS ConnectModal — it does not connect anything.
+   * Something has to choose a connector from the dialog, and this helper never did, so
+   * `waitForWalletConnection` below sat waiting on a connection nobody had initiated.
+   * Every one of the 14 `cy.connectWallet()` call sites failed on it.
+   *
+   * The specs that connect successfully are precisely the ones that drive the dialog
+   * themselves via `cy.selectInjectedConnector()`; this makes the helper do the same.
+   */
+  cy.selectInjectedConnector()
 
   cy.waitForWalletConnection()
 })
@@ -236,26 +319,65 @@ Cypress.Commands.add('openCreateWagerModal', (type = 'oneVsOne') => {
 /**
  * Fill the wager creation form with the given configuration.
  */
+/*
+ * Lead with the ids FriendMarketsModal actually renders (#fm-description, #fm-opponent,
+ * #fm-stake), the way cy.attemptCreateWager already does.
+ *
+ * The `[data-testid="wager-*"]` selectors these led with have never existed in the app, and for
+ * DESCRIPTION every fallback missed too: the field is an `<input type="text">`, so
+ * `textarea[name="description"]` and the bare `textarea` matched nothing and five CRE tests
+ * failed on it. Opponent and stake only worked by falling through to their THIRD alternative,
+ * which is why the same defect stayed invisible in those two.
+ */
 Cypress.Commands.add('fillWagerForm', (config = {}) => {
   if (config.opponent) {
-    cy.get('[data-testid="wager-opponent"], input[name="opponent"], input[placeholder*="0x"]')
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]')
       .first()
       .clear()
       .type(config.opponent)
   }
 
   if (config.description) {
-    cy.get('[data-testid="wager-description"], textarea[name="description"], textarea')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]')
       .first()
       .clear()
       .type(config.description)
   }
 
   if (config.stake) {
-    cy.get('[data-testid="wager-stake"], input[name="stake"], input[type="number"]')
-      .first()
-      .clear()
-      .type(config.stake.toString())
+    cy.enterAmountViaKeypad('fm-stake', config.stake)
+  }
+})
+
+/**
+ * Enter an amount into an AmountKeypad.
+ *
+ * The stake field is NOT a text input — `AmountKeypad` renders `role="group"` with one button
+ * per digit and no `<input>` anywhere, so `.type()` could never drive it and every selector that
+ * assumed one (`#fm-stake`, `input[type="number"]`) matched nothing. The `id` passed to the
+ * component is a BASE id: it renders `#<base>-hero` for the display and `#<base>-key-<digit>`,
+ * `-key-decimal`, `-key-back` for the pad.
+ *
+ * @param {string} baseId  the id given to AmountKeypad, e.g. 'fm-stake'
+ * @param {string|number} amount  digits and at most one '.'
+ */
+Cypress.Commands.add('enterAmountViaKeypad', (baseId, amount) => {
+  const text = String(amount)
+  if (!/^\d*\.?\d*$/.test(text)) {
+    throw new Error(`enterAmountViaKeypad: "${text}" is not a plain decimal amount`)
+  }
+
+  cy.get(`#${baseId}-hero`, { timeout: 10000 }).should('exist')
+
+  // Clear whatever is there. The pad has no "clear", only backspace, and the display is capped
+  // well under 20 digits — pressing back past empty is a no-op, so this is safe to over-press.
+  cy.get(`#${baseId}-key-back`).then(($back) => {
+    for (let i = 0; i < 20; i += 1) cy.wrap($back).click({ force: true })
+  })
+
+  for (const ch of text) {
+    const keyId = ch === '.' ? `${baseId}-key-decimal` : `${baseId}-key-${ch}`
+    cy.get(`#${keyId}`).click({ force: true })
   }
 })
 
@@ -470,7 +592,13 @@ Cypress.Commands.add('connectAs', (account) => {
   cy.visit('/fairwins')
   cy.get('body', { timeout: 10000 }).should('be.visible')
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  /*
+   * `.connector-option` survives ONLY in WalletButton.css — the JSX was renamed to
+   * `.connect-modal__option` and the stylesheet was never cleaned up, so this selector
+   * has matched nothing since the rename. Route through the one helper that knows the
+   * real class instead of keeping a second, drifting copy of it.
+   */
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 })
 
@@ -485,7 +613,7 @@ Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
   cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
   cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
   cy.wait(300)
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+  cy.enterAmountViaKeypad('fm-stake', o.stake)
   cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
     if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
   })
@@ -518,7 +646,7 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    cy.enterAmountViaKeypad('fm-stake', o.stake)
     if (o.resolutionType !== undefined) {
       cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
     }
@@ -577,7 +705,7 @@ Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
     cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
     cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
     cy.wait(300)
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    cy.enterAmountViaKeypad('fm-stake', o.stake)
     const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
     const p2 = (n) => String(n).padStart(2, '0')
     const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
@@ -691,34 +819,70 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
      */
     if (autoDismissConnectModal) {
       /*
-       * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle
-       * (WalletContext explicitly waits for wallet detection), so an immediate DOM check races it
-       * and finds nothing. Poll for a bounded window instead, and tolerate it never appearing:
-       * a test that is already connected, or one that stubs the wallet differently, will never see
-       * the prompt and must not be delayed or failed by this.
+       * The prompt opens ASYNCHRONOUSLY — AutoConnectPrompt waits for `connectionStatus` to settle,
+       * and WalletContext waits for wallet detection before that. An immediate DOM check races it,
+       * and even a short poll can finish BEFORE the dialog appears, which is exactly what happened
+       * first time round: Escape fired at nothing and the modal opened a moment later.
+       *
+       * So: poll generously, dismiss, then confirm — and retry once, because "appeared, dismissed,
+       * appeared again" is indistinguishable from "appeared late" without looking twice.
+       * Tolerate it never appearing: a spec that is already connected never sees the prompt and
+       * must not be delayed or failed by this.
        */
-      cy.document({ log: false }).then(
-        (doc) =>
-          new Cypress.Promise((resolve) => {
-            const deadline = Date.now() + 6000
-            const poll = () => {
-              if (doc.querySelector('[data-testid="connect-modal-backdrop"]')) return resolve(true)
-              if (Date.now() > deadline) return resolve(false)
-              setTimeout(poll, 100)
-            }
-            poll()
-          }),
-      ).then((appeared) => {
-        if (!appeared) return
-        // Escape rather than clicking the backdrop: the backdrop is the element under test in some
-        // specs, and ConnectModal binds Escape to the same `close` handler.
-        // Best-effort: press Escape, then move on. Deliberately NOT asserted — if the dialog
-        // declines to close, the spec should fail on its own terms with its own message, not on
-        // an assertion inside a shared helper. A helper that can fail the suite is a second gate
-        // nobody signed up for.
-        cy.get('body', { log: false }).type('{esc}')
-      })
+      const waitForBackdrop = (doc, ms) =>
+        new Cypress.Promise((resolve) => {
+          const deadline = Date.now() + ms
+          const poll = () => {
+            if (doc.querySelector('[data-testid="connect-modal-backdrop"]')) return resolve(true)
+            if (Date.now() > deadline) return resolve(false)
+            setTimeout(poll, 100)
+          }
+          poll()
+        })
+
+      cy.document({ log: false }).then((doc) =>
+        waitForBackdrop(doc, 12000).then((appeared) => {
+          if (!appeared) return undefined
+          // Escape rather than clicking the backdrop: the backdrop is the element under test in
+          // some specs, and ConnectModal binds Escape on `document` to the same `close` handler
+          // (verified: a single Escape takes the backdrop count 1 -> 0).
+          cy.get('body', { log: false }).type('{esc}')
+          return cy.document({ log: false }).then((d2) =>
+            waitForBackdrop(d2, 1500).then((stillThere) => {
+              // Best-effort second attempt, then give up: a shared helper must never be the thing
+              // that fails a spec. If the dialog will not close, the spec should say so in its own
+              // words.
+              if (stillThere) cy.get('body', { log: false }).type('{esc}')
+            }),
+          )
+        }),
+      )
     }
     return win
   })
+})
+
+
+/**
+ * Select the mocked INJECTED wallet in the connect dialog (issue #1016).
+ *
+ * Specs used to do `.connect-modal__option:not(.unavailable)').first().click()` with a comment
+ * saying "the first available injected connector (MetaMask)". That stopped being true: the dialog
+ * now lists Passkey first (marked Recommended), then WalletConnect, then the injected wallet. So
+ * `.first()` clicked Passkey — which needs a real platform authenticator, silently never connects,
+ * and every "after connection..." assertion then failed on a UI that had not connected.
+ *
+ * Selecting by NAME instead of by position means a future reordering of the dialog cannot quietly
+ * change which wallet the suite tests.
+ *
+ * Note the dialog can legitimately list the injected wallet twice — once from the EIP-6963
+ * announcement and once from wagmi's generic injected connector — so this takes the first match
+ * rather than asserting there is exactly one.
+ */
+Cypress.Commands.add('selectInjectedConnector', () => {
+  cy.contains('.connect-modal__option:not(.unavailable)', /metamask|browser wallet|injected/i, {
+    timeout: 10000,
+  })
+    .first()
+    .click()
 })

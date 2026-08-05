@@ -34,7 +34,11 @@ jobs:
       - name: Run tests with gas reporting
         env:
           REPORT_GAS: true
-        run: npm test 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
 
       - name: Summarize test results
         if: always()

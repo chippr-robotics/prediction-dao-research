@@ -46,8 +46,171 @@ const stripComments = (raw) =>
 // block a merge. Anything NOT matching these is treated as a quality gate (constitution IV).
 const AUXILIARY = /upload|summar|artifact|comment|report|codecov|badge|notify|screenshot|video|cache/i;
 
+/*
+ * A step that INVOKES a build/test/lint tool is a gate no matter what it is called, and this
+ * overrides AUXILIARY. Name-matching alone exempted three real gates by pure coincidence:
+ *
+ *   "Run tests with gas reporting"                   -> matched `report`  (the CONTRACT TEST SUITE)
+ *   "Generate coverage report"                       -> matched `report`  (x4, three workflows)
+ *   "Root gates via the task graph (cache disabled)" -> matched `cache`   (check:abis + tenants:validate)
+ *
+ * Verified by mutation before the fix: adding `continue-on-error: true` to the contract test
+ * suite in security-testing.yml left this file 10 passing / 0 failing. A guard whose job is to
+ * stop gates being disabled could not see the most important gate in the repo being disabled.
+ *
+ * The tool name is anchored to command position — at line start or after `;`, `&&`, `|`, `(` —
+ * because an unanchored /slither|medusa/ matched those words inside echoed markdown prose in
+ * security-testing.yml's genuinely-auxiliary "Generate summary" step.
+ */
+const GATE_COMMAND =
+  /(?:^|[;&|(]\s*)\s*(?:npm\s+(?:run\s+)?(?:test|lint|build|compile)|npx\s+(?:turbo|hardhat|vitest|cypress|eslint|graph)|yarn\s+(?:test|lint|build)|forge\s+test|slither|medusa)\b/m;
+
+/** True when the step is auxiliary BY NAME and does not actually invoke a gate tool. */
+const isAuxiliary = (step) => {
+  const name = step.name || "";
+  if (!AUXILIARY.test(name)) return false;
+  return !GATE_COMMAND.test(String(step.run || ""));
+};
+
 describe("CI gates cannot be silently disabled (spec 075)", function () {
-  it("no quality gate carries continue-on-error", function () {
+  it("no merge-gating JOB carries continue-on-error", function () {
+    // A job-level flag neutralises EVERY step in the job at once — a wider hole than the
+    // per-step flag, and the original version of this test never looked at it. Verified by
+    // mutation: job-level continue-on-error on smart-contract-tests left the suite fully green.
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        if (job["continue-on-error"] === true) offenders.push(`${file} :: ${jobId} (JOB-level)`);
+      }
+    }
+    expect(
+      offenders,
+      "continue-on-error on a merge-gating JOB disables every check inside it:\n  " + offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  /*
+   * Steps allowed to discard their own exit code, keyed by `file::job::step`.
+   *
+   * An explicit allowlist, not a name regex: the previous version exempted anything whose NAME
+   * matched /report|summar|.../, so renaming a gating step to "Run tests and report" disabled it.
+   * Every entry needs a reason, and an entry whose step no longer exists fails the suite below —
+   * so a stale exemption cannot quietly outlive the thing it excused.
+   */
+  const EXIT_CODE_EXEMPT = {
+    "security-testing.yml::slither-analysis::Run Slither analysis":
+      "Report GENERATION only. Slither exits non-zero on ANY finding including informational ones, " +
+      "so failing here would redden CI on notes. The blocking decision is the next step, " +
+      "`Enforce Slither severity gate`, which fails on High impact — asserted separately below.",
+    "torture-test.yml::slither-analysis::Run Slither analysis":
+      "Same report-generation step in the scheduled deep-analysis workflow.",
+  };
+
+  /*
+   * continue-on-error exemptions. Same contract as EXIT_CODE_EXEMPT: a reason, and the staleness
+   * check below deletes the excuse if the step disappears.
+   *
+   * These three re-run an ALREADY-GATED suite purely to produce a coverage artifact, so their
+   * failure must not double-block a merge. Each reason names the sibling step that carries the
+   * real pass/fail signal — if that sibling ever gains continue-on-error itself, the guard above
+   * catches it, so this exemption cannot be used to launder a test suite into being advisory.
+   */
+  const CONTINUE_ON_ERROR_EXEMPT = {
+    "frontend-testing.yml::unit-tests::Generate coverage report":
+      "Coverage artifact only; re-runs the suite already gated by `Run unit tests` in the same job.",
+    "test.yml::frontend-tests::Generate coverage report":
+      "Coverage artifact only; re-runs the suite already gated by `Run tests` in the same job.",
+    "security-testing.yml::coverage-report::Generate coverage report":
+      "Coverage artifact only; the contract suite's pass/fail comes from `Run tests with gas " +
+      "reporting` in the hardhat-tests job, which is gating.",
+  };
+
+  it("keeps every exit-code exemption justified and still present", function () {
+    for (const [key, reason] of Object.entries({
+      ...EXIT_CODE_EXEMPT,
+      ...CONTINUE_ON_ERROR_EXEMPT,
+    })) {
+      const [file, jobId, stepName] = key.split("::");
+      const wf = readWorkflow(file);
+      const job = (wf.jobs || {})[jobId];
+      expect(job, `${key}: job no longer exists — drop the exemption`).to.exist;
+      const step = (job.steps || []).find((st) => (st.name || "") === stepName);
+      expect(step, `${key}: step no longer exists — drop the exemption`).to.exist;
+      expect(reason.length, `${key} needs a real reason`).to.be.greaterThan(40);
+    }
+  });
+
+  it("no gating step swallows its own exit code with `|| true`", function () {
+    // `|| true` is the literal mechanism that kept the Slither gate dead. The original test only
+    // read step NAMES and never looked at what the step actually ran.
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        for (const step of job.steps || []) {
+          const run = String(step.run || "");
+          if (!run) continue;
+          const name = step.name || step.uses || "(unnamed)";
+          if (EXIT_CODE_EXEMPT[`${file}::${jobId}::${name}`]) continue;
+          for (const line of run.split("\n")) {
+            const t = line.trim();
+            if (t.startsWith("#")) continue;
+            if (!/(\|\|\s*true|;\s*true)\s*$/.test(t) && !/^exit 0$/.test(t)) continue;
+            /*
+             * Judged by BEHAVIOUR, not by step name. The previous version exempted any step whose
+             * NAME matched /report|summar|.../, so renaming a gating step to "Run tests and report"
+             * disabled the check entirely. A line that only appends to the job summary may swallow
+             * its own error — losing a markdown row is not losing a gate. A line that runs a check
+             * may not.
+             */
+            if (/\$GITHUB_STEP_SUMMARY/.test(t)) continue;
+            offenders.push(`${file} :: ${jobId} :: ${name} -> ${t.slice(0, 70)}`);
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      "These gating steps discard their own failure:\n  " + offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  it("every tee'd gating step sets pipefail", function () {
+    /*
+     * `cmd | tee log` under `bash -e` exits with TEE's status — always 0 — so the gate's failure is
+     * discarded exactly as continue-on-error discarded it. This repo had the correct reasoning
+     * written in a comment for the Cypress step and never applied it to the six siblings: the
+     * CONTRACT TEST SUITE, frontend unit tests (in two workflows), lint and coverage were all
+     * throwing away their exit codes. Demonstrated: `bash -e -c 'false | tee f'` exits 0.
+     */
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      if (!isMergeGating(wf)) continue;
+      for (const [jobId, job] of Object.entries(wf.jobs || {})) {
+        for (const step of job.steps || []) {
+          const run = String(step.run || "");
+          if (!run.includes("| tee")) continue;
+          const name = step.name || "(unnamed)";
+          if (isAuxiliary(step)) continue;
+          if (step["continue-on-error"] === true) continue;
+          if (!/pipefail/.test(run) && !/PIPESTATUS/.test(run) && step.shell !== "bash") {
+            offenders.push(`${file} :: ${jobId} :: ${name}`);
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      "These gating steps pipe into tee without pipefail, so their exit code is discarded:\n  " +
+        offenders.join("\n  "),
+    ).to.deep.equal([]);
+  });
+
+  it("no quality gate step carries continue-on-error", function () {
     const offenders = [];
     for (const file of workflowFiles()) {
       const wf = readWorkflow(file);
@@ -56,7 +219,8 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
         for (const step of job.steps || []) {
           if (step["continue-on-error"] !== true) continue;
           const name = step.name || step.uses || step.run || "(unnamed)";
-          if (AUXILIARY.test(name)) continue;
+          if (isAuxiliary(step)) continue;
+          if (CONTINUE_ON_ERROR_EXEMPT[`${file}::${jobId}::${name}`]) continue;
           offenders.push(`${file} :: ${jobId} :: ${name}`);
         }
       }
@@ -90,6 +254,29 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
         `${file} runs Slither but never enforces a severity gate — findings would be reported and ignored`,
       ).to.equal(true);
     }
+  });
+
+  it("the dispatcher runs on every pull request, whatever it targets", function () {
+    /*
+     * ci-manager dispatches test.yml and security-testing.yml — it IS the gate. Restricting it to
+     * `branches: [main, develop]` meant a PR into any other base ran nothing but Release Drafter,
+     * and stacked PRs (a feature branch collecting fixes before one merge to main) are the normal
+     * shape of work here. #1018 merged that way: GitHub reported mergeStateStatus CLEAN, and not
+     * one test had run. A base-branch filter is not a decision about whether code needs testing.
+     */
+    const wf = readWorkflow("ci-manager.yml");
+    const triggers = wf.on ?? wf[true] ?? {};
+    expect(triggers, "ci-manager must keep a pull_request trigger").to.have.property(
+      "pull_request",
+    );
+    const pr = triggers.pull_request;
+    // `pull_request:` with no body parses to null — that is the unrestricted form we want.
+    const branches = pr && typeof pr === "object" ? pr.branches : undefined;
+    expect(
+      branches,
+      "ci-manager.pull_request must NOT filter by base branch: a PR into a feature branch would " +
+        `run zero jobs and merge on Release Drafter alone (found branches=${JSON.stringify(branches)})`,
+    ).to.equal(undefined);
   });
 });
 
