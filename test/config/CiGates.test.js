@@ -255,6 +255,29 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
       ).to.equal(true);
     }
   });
+
+  it("the dispatcher runs on every pull request, whatever it targets", function () {
+    /*
+     * ci-manager dispatches test.yml and security-testing.yml — it IS the gate. Restricting it to
+     * `branches: [main, develop]` meant a PR into any other base ran nothing but Release Drafter,
+     * and stacked PRs (a feature branch collecting fixes before one merge to main) are the normal
+     * shape of work here. #1018 merged that way: GitHub reported mergeStateStatus CLEAN, and not
+     * one test had run. A base-branch filter is not a decision about whether code needs testing.
+     */
+    const wf = readWorkflow("ci-manager.yml");
+    const triggers = wf.on ?? wf[true] ?? {};
+    expect(triggers, "ci-manager must keep a pull_request trigger").to.have.property(
+      "pull_request",
+    );
+    const pr = triggers.pull_request;
+    // `pull_request:` with no body parses to null — that is the unrestricted form we want.
+    const branches = pr && typeof pr === "object" ? pr.branches : undefined;
+    expect(
+      branches,
+      "ci-manager.pull_request must NOT filter by base branch: a PR into a feature branch would " +
+        `run zero jobs and merge on Release Drafter alone (found branches=${JSON.stringify(branches)})`,
+    ).to.equal(undefined);
+  });
 });
 
 describe("contracts/ remains a single compilation unit (spec 075, FR-048)", function () {
