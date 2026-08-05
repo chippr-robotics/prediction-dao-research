@@ -230,6 +230,17 @@ Cypress.Commands.add('connectWallet', () => {
     .should('not.be.disabled')
     .click({ force: true })
 
+  /*
+   * Clicking "Connect Wallet" only OPENS ConnectModal — it does not connect anything.
+   * Something has to choose a connector from the dialog, and this helper never did, so
+   * `waitForWalletConnection` below sat waiting on a connection nobody had initiated.
+   * Every one of the 14 `cy.connectWallet()` call sites failed on it.
+   *
+   * The specs that connect successfully are precisely the ones that drive the dialog
+   * themselves via `cy.selectInjectedConnector()`; this makes the helper do the same.
+   */
+  cy.selectInjectedConnector()
+
   cy.waitForWalletConnection()
 })
 
@@ -542,7 +553,13 @@ Cypress.Commands.add('connectAs', (account) => {
   cy.visit('/fairwins')
   cy.get('body', { timeout: 10000 }).should('be.visible')
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  /*
+   * `.connector-option` survives ONLY in WalletButton.css — the JSX was renamed to
+   * `.connect-modal__option` and the stylesheet was never cleaned up, so this selector
+   * has matched nothing since the rename. Route through the one helper that knows the
+   * real class instead of keeping a second, drifting copy of it.
+   */
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 })
 
