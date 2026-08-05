@@ -22,7 +22,17 @@ describe('Dashboard', () => {
    */
   function connectAndVisitDashboard() {
     cy.mockWeb3Provider({ account: TEST_ACCOUNT })
-    cy.visit('/fairwins')
+    /*
+     * The wager dashboard is no longer the app's landing view. Spec 073 moved it to
+     * Finance > Transfer > Wagers (appNav.js WAGERS_VIEW/WAGERS_PATH, rendered by
+     * PayTransferPanel), with `/wagers` kept as a redirect — see the FR-030 amendment in
+     * specs/073-miniapp-platform/spec.md and the note in CLAUDE.md.
+     *
+     * This spec kept visiting `/fairwins` and asserting the quick-action grid was there, so every
+     * test failed with ".quick-action-card never found" against a page that had simply stopped
+     * hosting it. The surface still exists and is still worth testing — only its address changed.
+     */
+    cy.visit('/wagers')
     cy.get('body', { timeout: 10000 }).should('be.visible')
 
     // Connect via UI.
