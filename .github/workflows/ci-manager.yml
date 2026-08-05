@@ -33,6 +33,12 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       security: ${{ steps.filter.outputs.security }}
       core: ${{ steps.filter.outputs.core }}
+      services: ${{ steps.filter.outputs.services }}
+      packages: ${{ steps.filter.outputs.packages }}
+      tenants: ${{ steps.filter.outputs.tenants }}
+      tooling: ${{ steps.filter.outputs.tooling }}
+      subgraph: ${{ steps.filter.outputs.subgraph }}
+      ops: ${{ steps.filter.outputs.ops }}
       any_code_changed: ${{ steps.check.outputs.any_code_changed }}
     
     steps:
@@ -49,7 +55,9 @@ jobs:
             contracts:
               - 'contracts/**'
               - 'hardhat.config.js'
-              - 'scripts/deploy*.js'
+              # `scripts/deploy*.js` did NOT match scripts/deploy/lib/upgradeable.js (the in-place
+              # upgrade path) or scripts/deploy/check-storage-layout.js (the gate itself).
+              - 'scripts/deploy/**'
               - 'test/*.test.js'
               - 'test/integration/**'
               - 'medusa.json'
@@ -73,6 +81,29 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'turbo.json'
+            # Directories below matched NO filter at all before spec 075. A PR touching only one of
+            # them ran zero jobs and merged green — and now that these checks are REQUIRED, they
+            # would report `skipped`, which SATISFIES a required check. Requiring checks made that
+            # hole quieter, not smaller.
+            services:
+              - 'services/**'
+            packages:
+              - 'packages/**'
+              - 'tools/**'
+            tenants:
+              - 'tenants/**'
+            tooling:
+              - 'scripts/**'
+              - 'test/**'
+            subgraph:
+              - 'subgraph/**'
+            ops:
+              - 'deployments/**'
+              - 'infra/**'
+              - 'ops/**'
+              - '.openzeppelin/**'
 
       - name: Check if any code changed
         id: check
@@ -165,7 +196,20 @@ jobs:
   smart-contract-tests:
     name: Smart Contract Tests
     needs: detect-changes
-    if: needs.detect-changes.outputs.contracts == 'true' || needs.detect-changes.outputs.core == 'true'
+    # test.yml is the workhorse: it owns Dependency Hygiene, Relay Gateway Tests, Tenant Manifest
+    # Validation, Frontend Lint/Unit/Build and Cypress Fast E2E — i.e. most of the REQUIRED checks.
+    # Gating it on contracts||core meant a services-, packages-, tenants-, scripts- or
+    # subgraph-only PR skipped every one of them.
+    if: |
+      needs.detect-changes.outputs.contracts == 'true' ||
+      needs.detect-changes.outputs.core == 'true' ||
+      needs.detect-changes.outputs.frontend == 'true' ||
+      needs.detect-changes.outputs.services == 'true' ||
+      needs.detect-changes.outputs.packages == 'true' ||
+      needs.detect-changes.outputs.tenants == 'true' ||
+      needs.detect-changes.outputs.tooling == 'true' ||
+      needs.detect-changes.outputs.subgraph == 'true' ||
+      needs.detect-changes.outputs.ops == 'true'
     uses: ./.github/workflows/test.yml
 
   frontend-tests:

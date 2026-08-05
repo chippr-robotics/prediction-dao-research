@@ -161,3 +161,62 @@ describe("archived code is never referenced by active code (spec 075)", function
     ).to.deep.equal([]);
   });
 });
+
+/**
+ * Spec 075: every top-level directory containing executable code must be matched by at least one
+ * ci-manager path filter.
+ *
+ * Before this, `services/**`, `packages/**`, `tenants/**`, `tools/**`, `subgraph/**`,
+ * `deployments/**` and most of `scripts/**` matched NO filter, so a PR touching only one of them
+ * ran zero jobs. With required status checks now in force that is worse, not better: the jobs
+ * report `skipped`, and a skipped check SATISFIES a required check — so such a PR merges with a
+ * green tick and no tests run.
+ *
+ * The list was never the defect; the mechanism was. This fails when a new top-level code directory
+ * appears with nothing matching it.
+ */
+describe("every code directory is covered by a ci-manager path filter (spec 075)", function () {
+  const IGNORED = new Set([
+    "node_modules", "artifacts", "cache", "coverage", "dist", "build",
+    "docs", "specs", "blockscout", "contracts-archive", "test-archive", ".github", ".specify",
+    ".claude", ".openzeppelin", ".git",
+  ]);
+  const CODE = /\.(js|jsx|mjs|cjs|ts|tsx|sol|sh|py)$/;
+
+  const hasCode = (dir) => {
+    const stack = [dir];
+    while (stack.length) {
+      const d = stack.pop();
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) stack.push(p);
+        else if (CODE.test(e.name)) return true;
+      }
+    }
+    return false;
+  };
+
+  it("matches every top-level directory that contains executable code", function () {
+    const wf = yaml.load(fs.readFileSync(path.join(WF_DIR, "ci-manager.yml"), "utf8"));
+    const step = wf.jobs["detect-changes"].steps.find((s) => (s.uses || "").includes("paths-filter"));
+    expect(step, "ci-manager no longer uses dorny/paths-filter — this guard needs updating").to.exist;
+    const filters = yaml.load(step.with.filters);
+    const globs = Object.values(filters).flat().map(String);
+
+    const uncovered = [];
+    for (const e of fs.readdirSync(ROOT, { withFileTypes: true })) {
+      if (!e.isDirectory() || IGNORED.has(e.name) || e.name.startsWith(".")) continue;
+      if (!hasCode(path.join(ROOT, e.name))) continue;
+      // A directory is covered if some glob is rooted at it.
+      if (!globs.some((g) => g.replace(/^!/, "").startsWith(`${e.name}/`))) uncovered.push(e.name);
+    }
+
+    expect(
+      uncovered,
+      "These top-level directories contain executable code but match no ci-manager filter, so a PR " +
+        "touching only them runs no jobs — and with required checks in force, `skipped` counts as " +
+        `success:\n  ${uncovered.join("\n  ")}`,
+    ).to.deep.equal([]);
+  });
+});
