@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import Footer from './Footer'
 import { tenantBrand, tenantLinks, isFeatureEnabled } from '../config/tenant'
+import { useIsMobile } from '../hooks/useMediaQuery'
+import { resolveLandingPath } from '../utils/landingViewPreference'
 import './LandingPage.css'
 
 // Hero social icons by manifest social key (spec 072 — links come from the
@@ -32,12 +34,13 @@ const SOCIAL_ICONS = {
 
 function LandingPage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [visibleSections, setVisibleSections] = useState(new Set())
   const brand = tenantBrand()
   const { support, social } = tenantLinks()
 
   const handleGetStarted = () => {
-    navigate('/app')
+    navigate(resolveLandingPath(isMobile))
   }
 
   // Intersection observer for scroll-triggered animations
