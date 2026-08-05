@@ -39,9 +39,7 @@ describe('Wallet Connection', () => {
       .should('have.length.greaterThan', 0)
 
     // Click the first available injected connector (MetaMask).
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // After connection, the WalletButton should switch to showing the account.
     // The wallet-account-button (Blockies avatar) replaces the connect button.
@@ -101,9 +99,7 @@ describe('Wallet Connection', () => {
       .should('be.visible')
       .click()
 
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
@@ -127,9 +123,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
 
@@ -162,9 +156,7 @@ describe('Wallet Connection', () => {
 
     // Connect, then reload and verify we need to reconnect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]').click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
 
@@ -194,9 +186,7 @@ describe('Wallet Connection', () => {
     // Connect the wallet.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
       .click()
@@ -245,9 +235,7 @@ describe('Wallet Connection', () => {
       .click()
 
     // Try to connect — it will be rejected.
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // The connect button should remain visible (connection failed).
     // The pending state should eventually clear.
@@ -270,9 +258,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // If the app detects a wrong network, a network error banner should appear.
     // The banner is rendered in AppContent when networkError is truthy.
@@ -298,9 +284,7 @@ describe('Wallet Connection', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // Look for the "Switch Network" button. If the banner isn't visible (app
     // might not detect the mismatch with the mock), this test passes gracefully.
@@ -359,9 +343,7 @@ describe('Wallet Connection', () => {
     // Connect with account #0.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
       .should('be.visible')
 

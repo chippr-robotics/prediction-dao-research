@@ -25,9 +25,7 @@ function connectAndVisit(accountIndex = 0) {
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 }
@@ -119,9 +117,7 @@ describe('Wager Acceptance', () => {
     // Step 3: Open My Wagers — opponent should see the pending wager
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -171,9 +167,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -222,9 +216,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -265,9 +257,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -337,9 +327,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -375,9 +363,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -447,9 +433,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -523,9 +507,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     // If frozen, acceptance should show an error about frozen account
     cy.openMyWagers('participating')
@@ -587,9 +569,7 @@ describe('Wager Acceptance', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 

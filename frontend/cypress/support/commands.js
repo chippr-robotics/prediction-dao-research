@@ -792,3 +792,28 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
     return win
   })
 })
+
+
+/**
+ * Select the mocked INJECTED wallet in the connect dialog (issue #1016).
+ *
+ * Specs used to do `.connect-modal__option:not(.unavailable)').first().click()` with a comment
+ * saying "the first available injected connector (MetaMask)". That stopped being true: the dialog
+ * now lists Passkey first (marked Recommended), then WalletConnect, then the injected wallet. So
+ * `.first()` clicked Passkey — which needs a real platform authenticator, silently never connects,
+ * and every "after connection..." assertion then failed on a UI that had not connected.
+ *
+ * Selecting by NAME instead of by position means a future reordering of the dialog cannot quietly
+ * change which wallet the suite tests.
+ *
+ * Note the dialog can legitimately list the injected wallet twice — once from the EIP-6963
+ * announcement and once from wagmi's generic injected connector — so this takes the first match
+ * rather than asserting there is exactly one.
+ */
+Cypress.Commands.add('selectInjectedConnector', () => {
+  cy.contains('.connect-modal__option:not(.unavailable)', /metamask|browser wallet|injected/i, {
+    timeout: 10000,
+  })
+    .first()
+    .click()
+})

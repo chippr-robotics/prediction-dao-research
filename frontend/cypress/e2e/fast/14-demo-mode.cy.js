@@ -36,9 +36,7 @@ describe('Demo Mode', () => {
     // Connect wallet.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
 
     // By default (no env override), demoMode is false — no demo badge.
@@ -61,9 +59,7 @@ describe('Demo Mode', () => {
     // Connect.
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
     cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
 
     // Navigate to My Account (WalletPage) where the network toggle lives.

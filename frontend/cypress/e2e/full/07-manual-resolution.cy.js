@@ -26,9 +26,7 @@ function connectAndVisit(accountIndex = 0) {
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 }
@@ -205,7 +203,7 @@ describe('Manual Resolution', () => {
     // Step 2: Accept as opponent
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     // Step 3: Advance time past end date (1 day default + buffer)
@@ -214,7 +212,7 @@ describe('Manual Resolution', () => {
     // Step 4: Switch back to creator and resolve
     cy.switchAccount(0)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
 
     openResolutionForFirstWager()
 
@@ -240,7 +238,7 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -278,7 +276,7 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -286,7 +284,7 @@ describe('Manual Resolution', () => {
     // Switch to creator to resolve
     cy.switchAccount(0)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
 
     openResolutionForFirstWager()
 
@@ -311,7 +309,7 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -349,7 +347,7 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -357,7 +355,7 @@ describe('Manual Resolution', () => {
     // Switch to arbitrator
     cy.switchAccount(2)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
 
     // Arbitrator may see the wager in their participating list
     cy.openMyWagers('participating')
@@ -413,13 +411,13 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     // Do NOT advance time — wager is still active (before end date)
     cy.switchAccount(0)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('created')
 
@@ -459,7 +457,7 @@ describe('Manual Resolution', () => {
 
     cy.switchAccount(1)
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 }).first().click()
+    cy.selectInjectedConnector()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -605,9 +603,7 @@ describe('Manual Resolution', () => {
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connect-modal__option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('created')
 
