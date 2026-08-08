@@ -512,7 +512,10 @@ jobs:
 
       - name: Upload Cypress videos
         uses: actions/upload-artifact@v4
-        if: always()
+        # failure() not always(): a video of a PASSING run is never watched, and these are the
+        # largest artifacts in the pipeline. Uploading them on every push is what pushed the
+        # artifact API into rate-limiting.
+        if: failure()
         with:
           name: cypress-fast-videos
           path: frontend/cypress/videos
