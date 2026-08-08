@@ -56,7 +56,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload gas report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gas-report
@@ -97,7 +97,7 @@ jobs:
           exit $rc
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
@@ -147,7 +147,7 @@ jobs:
         run: node scripts/security/check-slither-findings.js slither-report.json
 
       - name: Upload Slither reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: slither-reports
@@ -260,7 +260,7 @@ jobs:
           find . -type d -name "mcore_*" -exec cp -r {} manticore-results/ \; || true
 
       - name: Upload Manticore results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: manticore-results
@@ -348,7 +348,7 @@ jobs:
           find . -name "medusa-output" -exec cp -r {} medusa-results/ \; || true
 
       - name: Upload Medusa results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: medusa-results
@@ -460,7 +460,7 @@ jobs:
           fi
 
       - name: Upload Cypress screenshots
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: cypress-screenshots
@@ -468,7 +468,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Cypress videos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cypress-videos
@@ -476,7 +476,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Cypress JSON results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cypress-e2e-results

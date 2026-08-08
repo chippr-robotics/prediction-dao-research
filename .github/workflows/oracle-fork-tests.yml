@@ -91,7 +91,7 @@ jobs:
         run: npm run test:fork
 
       - name: Upload Hardhat compiler cache (for debugging fork failures)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: hardhat-cache-${{ github.run_id }}
