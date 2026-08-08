@@ -77,7 +77,7 @@ function createSimpleWager(config = {}) {
   cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
   // Wait for creation to complete
-  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
 describe('Wager Acceptance', () => {

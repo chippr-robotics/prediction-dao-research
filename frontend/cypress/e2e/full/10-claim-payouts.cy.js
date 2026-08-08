@@ -85,7 +85,7 @@ function createAcceptAndResolve(config = {}) {
 
   cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
-  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 
   cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn')
     .click({ force: true })

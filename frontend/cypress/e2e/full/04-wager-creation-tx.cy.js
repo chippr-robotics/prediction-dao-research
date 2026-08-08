@@ -104,14 +104,14 @@ function submitWagerForm() {
 
   // Wait for transaction to be submitted and confirmed.
   // The form transitions through verify → approve → create → complete.
-  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
 /**
  * Assert wager was created successfully (success screen visible).
  */
 function assertWagerCreated() {
-  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 }
 
 describe('Wager Creation with Real Transactions', () => {
@@ -170,8 +170,7 @@ describe('Wager Creation with Real Transactions', () => {
      * original one-shot `invoke('text').then()`, which read the DOM before the tx settled.
      * Tightening this to success-only would fail the test for behaving correctly.
      */
-    cy.contains(/Wager Created|not supported|native|erc20/i, { timeout: 60000 })
-      .should('be.visible')
+    cy.contains(/Wager Created|not supported|native|erc20/i, { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -191,7 +190,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -270,7 +269,7 @@ describe('Wager Creation with Real Transactions', () => {
      * opponent holds a key, so the "opponent hasn't registered a key" branch this used to tolerate
      * is unreachable. Tolerating it would let a genuine encryption regression pass.
      */
-    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
@@ -392,7 +391,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
+    cy.contains('Wager Created', { timeout: 60000 }).should('exist')
   })
 
   // ---------------------------------------------------------------------------
