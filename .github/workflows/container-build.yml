@@ -1,0 +1,94 @@
+name: Container Images Build
+
+# Spec 075 fallout. The workspace conversion broke BOTH shipped images and CI reported green,
+# because no workflow has ever built either one:
+#
+#   · the SPA image ran `npm ci` inside frontend/ after this repo dropped to a single root
+#     lockfile — `npm ci` cannot install without a lockfile, so the image failed outright;
+#   · the relay-gateway image BUILT SUCCESSFULLY and then died at boot on
+#     ERR_MODULE_NOT_FOUND, because `npm ci` writes a workspace symlink whether or not its
+#     target directory exists, and packages/intent-types was never copied in.
+#
+# CI missed both because its jobs run `npm ci --workspace <name>` against a FULL CHECKOUT, where
+# packages/ is present. The Docker build context is a different, narrower world, and it was the
+# only world nothing tested. This workflow tests that world.
+#
+# No `branches:` filter — a PR into a feature branch needs this as much as one into main, and
+# scoping by base branch is the defect fixed in #1033. `paths:` is the scoping tool.
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'services/**/Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'frontend/package.json'
+      - 'services/relay-gateway/package.json'
+      - 'packages/**'
+      - 'tools/miniapp-build/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'services/**/Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'packages/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  spa-image:
+    name: SPA image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # `--target build` stops before nginx: the build stage is where the workspace install and
+      # the Vite build happen, which is the whole risk surface. Building the runtime stage too
+      # would only copy an already-produced dist/.
+      - name: Build the frontend image build stage
+        run: docker build -f Dockerfile --target build -t fairwins-spa:ci .
+
+      # A build that exits 0 having produced nothing is the failure mode this repo keeps hitting,
+      # so assert the artefact rather than the exit code.
+      - name: Assert the bundle actually exists
+        run: |
+          set -o pipefail
+          docker run --rm --entrypoint sh fairwins-spa:ci -c '
+            test -s dist/index.html || { echo "::error::dist/index.html missing or empty"; exit 1; }
+            n=$(ls dist/assets 2>/dev/null | wc -l)
+            [ "$n" -gt 0 ] || { echo "::error::dist/assets is empty"; exit 1; }
+            echo "bundle OK: $n asset(s)"
+          '
+
+  gateway-image:
+    name: Relay gateway image builds and boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the relay-gateway image
+        run: docker build -f services/relay-gateway/Dockerfile -t fairwins-relay-gateway:ci .
+
+      # Building is NOT enough — this image built green for the entire life of the workspace
+      # branch and exited instantly at runtime. Resolve the workspace package the way node will.
+      - name: Assert the workspace package resolves at runtime
+        run: |
+          set -o pipefail
+          docker run --rm --entrypoint node fairwins-relay-gateway:ci \
+            -e "import('@fairwins/intent-types').then(m => {
+                  const n = Object.keys(m.INTENT_TYPES || {}).length;
+                  if (!n) { console.error('resolved but empty'); process.exit(1); }
+                  console.log('intent-types resolved, structs:', n);
+                }).catch(e => { console.error(e.message); process.exit(1); })"
