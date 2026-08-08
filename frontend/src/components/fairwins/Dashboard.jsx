@@ -472,11 +472,6 @@ function Dashboard() {
   // working when rendered outside WagerActivityProvider (legacy tests).
   const activity = useWagerActivityOptional()
   const actionNeededCount = activity?.actionNeededCount ?? 0
-  // Demo mode is dev-only — set VITE_USE_MOCK_WAGERS=true in your .env to
-  // bypass the wallet gate and view the dashboard with sample data. Production
-  // never sets this so the badge and welcome bypass stay off.
-  const demoMode = import.meta.env?.VITE_USE_MOCK_WAGERS === 'true'
-
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [showOpenChallenge, setShowOpenChallenge] = useState(false)
@@ -638,7 +633,7 @@ function Dashboard() {
   }, [navigate])
 
   // Not connected state — show welcome/onboarding view
-  if (!isConnected && !demoMode) {
+  if (!isConnected) {
     return (
       <div className="dashboard-container">
         <WelcomeView onConnect={() => connectWallet()} />
@@ -653,7 +648,6 @@ function Dashboard() {
         <div className="header-content">
           <div className="header-title-row">
             <h1>Quick Actions</h1>
-            {demoMode && <span className="demo-mode-badge">Demo Mode</span>}
           </div>
         </div>
       </header>

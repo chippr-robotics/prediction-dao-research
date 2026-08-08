@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useChainId, useSwitchChain } from 'wagmi'
+import { useSwitchChain } from 'wagmi'
 import { getSelectableNetworks } from '../../config/networks'
 import { getNetworkFeatures } from '../../config/networkCapabilities'
 import { BITCOIN_NETWORKS } from '../../config/bitcoinNetworks'
 import { useRpcEndpoints } from '../../hooks/useRpcEndpoints'
+import { useWalletChainId } from '../../hooks/useWalletChainId'
 import NetworkEndpointForm from './NetworkEndpointForm'
 import './NetworkPanel.css'
 
@@ -113,7 +114,10 @@ function BitcoinNetworkCard({ net }) {
  *      app resolves through those settings (lib/network/rpcEndpoints).
  */
 function NetworkPanel() {
-  const chainId = useChainId()
+  // The wallet's own chain (issue #1030). With `useChainId()` this list badged a network the
+  // member was NOT on as "Connected" — and, worse, hid that network's "Switch" button, which is
+  // the one control that would have got them there.
+  const chainId = useWalletChainId()
   const { switchChain, isPending, variables, error } = useSwitchChain()
   const networks = getSelectableNetworks()
   const pendingChainId = isPending ? variables?.chainId : null

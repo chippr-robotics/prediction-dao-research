@@ -2,9 +2,9 @@
 // 13-dashboard.cy.js
 // Fast-tier E2E tests for dashboard rendering (DSH-01..DSH-13)
 //
-// These tests use mockWeb3Provider() and demo mode (VITE_USE_MOCK_WAGERS env
-// bypass or localStorage useMockWagers) to verify the dashboard UI renders
-// correctly without a Hardhat node.
+// These tests use mockWeb3Provider() and connect through the UI to verify the dashboard
+// renders without a Hardhat node. They never used demo mode: the localStorage toggle this
+// header used to cite was read by nothing, and the env bypass was build-time only.
 // =============================================================================
 
 const TEST_ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from 'wagmi'
 import ConnectModal from '../components/wallet/ConnectModal'
 import { ethers } from 'ethers'
 import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID, cohortChainIds } from '../config/networks'
+import { useWalletChainId } from '../hooks/useWalletChainId'
 import { makeReadProvider } from '../utils/rpcProvider'
 import {
   getUserRoles,
@@ -18,7 +19,12 @@ export function WalletProvider({ children }) {
   const { address, isConnected, connector: activeConnector, status: accountStatus } = useAccount()
   const { connect, connectAsync, connectors } = useConnect()
   const { disconnect } = useDisconnect()
-  const chainId = useChainId()
+  // The WALLET's chain, never the one wagmi's config settled on (issue #1030). Identical to the
+  // old `useChainId()` for every configured chain and for every passkey session; it differs only
+  // when the wallet sits on a chain the app does not configure — the case this context has to be
+  // able to SEE in order to correct it (auto-switch below) instead of silently reading and
+  // displaying a different network.
+  const chainId = useWalletChainId()
   const { switchChain } = useSwitchChain()
   const { data: walletClient } = useWalletClient()
 
@@ -71,6 +77,11 @@ export function WalletProvider({ children }) {
     if (activeConnector.id === 'walletConnect') return 'walletconnect'
     return 'injected'
   }, [isConnected, activeConnector])
+  // Reads follow the wallet's own chain. On an unsupported one `getNetwork` falls back to the
+  // home network by design — which is now a DISCLOSED fallback rather than a silent misdirection,
+  // because the auto-switch below is simultaneously asking the member to move there. Deliberately
+  // not nulled: a null provider would leave `balances.native` at its '0' initial value, and a
+  // fabricated zero balance is worse than the home chain's real one.
   const readProvider = useMemo(() => {
     const net = getNetwork(chainId)
     const rpcProvider = net?.rpcUrl ? makeReadProvider(net.rpcUrl, chainId) : null
@@ -269,15 +280,35 @@ export function WalletProvider({ children }) {
 
   // Auto-switch to Polygon (PRIMARY_CHAIN_ID) when the wallet connects on an
   // unsupported chain. If the switch fails, show a network error instead.
+  //
+  // This is unchanged in intent — it just finally RUNS. `chainId` used to come from wagmi's
+  // config state, which can only ever hold a configured chain, and every configured chain is
+  // also a NETWORKS key, so `isSupportedChainId(chainId)` was unconditionally true and both the
+  // switch and the banner were dead code (issue #1030).
+  //
+  // The passkey rail is untouched by this: its connector reports only ids drawn from
+  // `config.chains`, so it takes the `isSupportedChainId` early return exactly as before and
+  // never reaches the switch.
+  //
+  // `autoSwitchedFrom` makes the attempt at-most-once per chain the wallet lands on. Without it
+  // this effect is one unstable `switchChain` identity away from prompting the member in a loop,
+  // and under StrictMode's double-invoked effects it would raise two wallet prompts for one
+  // arrival. Cleared as soon as the wallet is on a supported chain, so a member who wanders back
+  // onto an unsupported one is offered the switch again.
+  const autoSwitchedFrom = useRef(null)
   useEffect(() => {
     if (!isConnected) {
+      autoSwitchedFrom.current = null
       setNetworkError(null)
       return
     }
     if (isSupportedChainId(chainId)) {
+      autoSwitchedFrom.current = null
       setNetworkError(null)
       return
     }
+    if (autoSwitchedFrom.current === chainId) return
+    autoSwitchedFrom.current = chainId
     // Wallet is on an unsupported chain — try switching automatically
     switchChain(
       { chainId: PRIMARY_CHAIN_ID },

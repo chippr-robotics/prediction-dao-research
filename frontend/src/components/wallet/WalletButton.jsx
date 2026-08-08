@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAccount, useChainId } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useDex } from '../../hooks/useDex'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
@@ -52,12 +52,14 @@ function WalletButton({ className = '' }) {
   const { accounts, currentId, choose, unlockEntry, setUnlockEntry, onUnlocked, hasChoices } = useAccountSwitcher()
   const [acctMenuOpen, setAcctMenuOpen] = useState(false)
   const { openConnectModal, disconnectWallet } = useWallet()
-  const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { copied: addressCopied, copy: copyAddress } = useClipboard()
   const { balances, loading: balanceLoading } = useDex()
-  const { network } = useNetworkMode()
+  // Both from the same source (issue #1030) — the chip used to pair `useChainId()`'s
+  // config-resolved id with `useNetworkMode()`'s network, so on an unconfigured chain the
+  // `Chain ${chainId}` fallback would have named the wrong chain too.
+  const { network, chainId } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,

@@ -13,6 +13,9 @@ on:
   # the cost proportional — that is this workflow's entire job — so running it everywhere is
   # cheap. `push` stays scoped: the pull_request event is the gate.
   pull_request:
+    # `ready_for_review` matters: the default types are opened/synchronize/reopened, so with the
+    # draft guard below a PR marked ready would otherwise never get a pipeline at all.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
@@ -35,6 +38,12 @@ jobs:
   detect-changes:
     name: Detect Changed Components
     runs-on: ubuntu-latest
+    # DRAFT PRs DO NOT RUN CI. GitHub runs workflows on drafts unless a job says otherwise, so
+    # every push to a work-in-progress branch was running the full pipeline — 11 artifact uploads
+    # per run — and the artifact API began rate-limiting. Every other job `needs` this one, so
+    # skipping here skips the pipeline. `github.event.pull_request` is null on push, and
+    # `null != true` is true, so pushes to main/develop are unaffected.
+    if: github.event.pull_request.draft != true
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -251,12 +260,7 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-ci
-          path: frontend/dist/
-          retention-days: 7
+      # No dist/ upload: nothing downloads it, and the gate is `npm run build` exiting 0.
 
   docs-build:
     name: Documentation Build
@@ -287,12 +291,10 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs-site
-          path: ./site
-          retention-days: 7
+      # No site upload: this job exists to prove `mkdocs build` succeeds. The published
+      # docs come from deploy-docs.yml, which rebuilds from source and uses
+      # upload-pages-artifact — it never reads this one. At 9.4 MB it was the single
+      # largest per-push artifact after the Cypress videos.
 
   security-analysis:
     name: Security Analysis
