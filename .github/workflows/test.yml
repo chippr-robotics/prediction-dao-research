@@ -86,6 +86,19 @@ jobs:
       - name: Check generated ABIs are current
         run: npm run check:abis
 
+      # Gate (spec 075, FR-005). plan.md describes this feature as "gated on a byte-for-byte
+      # bytecode diff that BLOCKS the change on any difference" — but the script was referenced
+      # nowhere except a comment in dependabot.yml, so it blocked nothing and was a tool someone
+      # had to remember to run. This is the step that makes the sentence true.
+      #
+      # It is the only automated defence against the incident that motivated the pin: a floating
+      # @chainlink/contracts (1.3.0 -> 1.5.0) silently changed ChainlinkFunctionsOracleAdapter's
+      # deployed bytecode with every other gate green, because CompilerTargets only checks the
+      # SHAPE of a version range, not the bytes that come out. Runs directly after Compile so the
+      # artifacts it hashes are this run's.
+      - name: Bytecode is byte-identical to the recorded baseline
+        run: node scripts/codegen/bytecode-digest.js --compare specs/075-monorepo-workspaces/baseline-bytecode.json
+
       # spec 075 FR-041: exercise the task graph with caching DISABLED. Turborepo does not sandbox,
       # so an undeclared input yields a wrong cache hit rather than an error; the cache is not
       # trusted in CI until the graph has been observed to reproduce this pipeline's outcomes.
@@ -166,6 +179,53 @@ jobs:
           # what exhausted it and failed every job on upload. Coverage numbers land in
           # the step summary above; the HTML is only read same-day, if ever.
           retention-days: 7
+
+  # Gate (spec 075, FR-019/FR-020/B2). Mini-app output bytes are keccak-committed on-chain in
+  # MiniAppRegistry, and the chain of custody is:
+  #   npm hoisting -> module resolution -> host shim text -> entry.js -> manifest hash -> on-chain
+  # A change to installation layout can therefore invalidate an immutable, curated, on-chain record
+  # with no error raised anywhere. This gate existed as a script but appeared in NO workflow — it
+  # was a manual checklist item, for the one guarantee in this repo that cannot be re-checked after
+  # the fact.
+  miniapp-bytes:
+    name: Mini-app Output Bytes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `--since` stamped BEFORE the build, and `&&` so a failed build can never reach the
+      # compare. Both matter: the compare used to accept any dist/ younger than 10 minutes, so a
+      # build that FAILED left the previous successful output in place and the gate printed
+      # "output bytes unchanged" — the exact false pass its own source comment describes, which
+      # happened once already when rollup's native binary went missing during this conversion.
+      - name: Build mini-apps and compare output bytes
+        run: |
+          set -euo pipefail
+          STAMP=$(($(date +%s) * 1000))
+          # Explicit `&&`, and explicit `-e`. The comment above claims the compare cannot be
+          # reached by a failed build, so the code must say that rather than lean on the runner's
+          # default `bash -e {0}` — a `shell:` override, or someone copying this block elsewhere,
+          # would silently turn the claim false. Relying on implicit shell behaviour for a gate's
+          # blocking property is how the tee'd steps in this repo lost their exit codes.
+          #
+          # KEEP THIS COMPOUND LAST. `set -e` deliberately does NOT fire on a failing left-hand
+          # side of `&&`, so the build's failure reaches the step only as the compound's own exit
+          # status. Verified: with a trailing command after it, a failed build yields step exit 0.
+          npm run build:miniapps && node scripts/miniapps/record-build-digests.js \
+            --compare specs/075-monorepo-workspaces/baseline-miniapp-builds.json \
+            --since "$STAMP"
 
   frontend-lint:
     name: Frontend Lint

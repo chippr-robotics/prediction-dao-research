@@ -50,6 +50,7 @@ const args = process.argv.slice(2);
 const outIdx = args.indexOf("--out");
 const cmpIdx = args.indexOf("--compare");
 const maxAgeIdx = args.indexOf("--max-age-seconds");
+const sinceIdx = args.indexOf("--since");
 const now = digests();
 
 /**
@@ -64,24 +65,59 @@ const now = digests();
  * a build pass a small window; the default is off only for `--out`, where recording whatever is
  * on disk is the intent.
  */
-function assertFresh(maxAgeSeconds) {
+/**
+ * `--since <epoch-ms>` is the CORRECT form and what CI uses: the caller stamps the time before it
+ * starts the build, so "fresh" means "written by THIS run". Absolute age cannot express that. A
+ * build that FAILED, followed by a compare inside the age window, hashed the previous successful
+ * dist/ and printed OK — the very incident the comment above describes, still reachable for ten
+ * minutes, which is exactly the iterate-and-rerun cadence.
+ *
+ * Age remains as a fallback for a human running the sweep by hand.
+ */
+function assertFresh({ maxAgeSeconds, sinceMs }) {
   const stale = [];
-  const cutoff = Number(process.env.SOURCE_DATE_EPOCH ? 0 : maxAgeSeconds);
+  // SOURCE_DATE_EPOCH means "reproducible build, timestamps are pinned" — freshness is then
+  // unknowable and the check must be SKIPPED. It previously set the cutoff to 0, which marked
+  // every file stale the instant it was written: the escape hatch was a permanent hard failure,
+  // and a gate that always fails is a gate someone deletes.
+  if (process.env.SOURCE_DATE_EPOCH) return;
+
   for (const app of APPS) {
     for (const f of FILES) {
       const p = path.join(ROOT, "frontend", "miniapps", app, "dist", f);
-      const ageSec = (Date.now() - fs.statSync(p).mtimeMs) / 1000;
-      if (ageSec > cutoff) stale.push(`${app}/${f} (${Math.round(ageSec)}s old)`);
+      const mtimeMs = fs.statSync(p).mtimeMs;
+      if (sinceMs != null) {
+        if (mtimeMs < sinceMs) {
+          stale.push(`${app}/${f} (written ${Math.round((sinceMs - mtimeMs) / 1000)}s BEFORE this run)`);
+        }
+        continue;
+      }
+      const ageSec = (Date.now() - mtimeMs) / 1000;
+      if (ageSec > maxAgeSeconds) stale.push(`${app}/${f} (${Math.round(ageSec)}s old)`);
     }
   }
   if (stale.length) {
     console.error(
-      `\nFAIL: ${stale.length} built file(s) are older than ${maxAgeSeconds}s — the build did not just run.\n` +
+      `\nFAIL: ${stale.length} built file(s) predate this verification run — the build did not just run.\n` +
         "Refusing to compare a stale dist/: that reports success for a build that never happened.\n" +
         stale.map((s) => `  · ${s}`).join("\n"),
     );
     process.exit(2);
   }
+}
+
+/**
+ * Fail CLOSED on an unusable value. `Number(undefined)` and `Number("abc")` are both NaN, and
+ * `age > NaN` is always false — so `--max-age-seconds` with a missing or non-numeric argument
+ * silently disabled the freshness check entirely and a three-hour-old dist/ reported OK.
+ */
+function numericArg(flag, raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(`FAIL: ${flag} needs a non-negative number (got ${JSON.stringify(raw)}).`);
+    process.exit(2);
+  }
+  return n;
 }
 
 const missing = Object.entries(now).filter(([, v]) => v === "MISSING");
@@ -99,8 +135,11 @@ if (outIdx !== -1) {
 
 if (cmpIdx !== -1) {
   // Default window: 10 minutes. Long enough for two real builds, short enough that yesterday's
-  // dist cannot masquerade as today's.
-  assertFresh(maxAgeIdx !== -1 ? Number(args[maxAgeIdx + 1]) : 600);
+  // dist cannot masquerade as today's. `--since` supersedes it and is what CI passes.
+  assertFresh({
+    sinceMs: sinceIdx !== -1 ? numericArg("--since", args[sinceIdx + 1]) : null,
+    maxAgeSeconds: maxAgeIdx !== -1 ? numericArg("--max-age-seconds", args[maxAgeIdx + 1]) : 600,
+  });
   const base = JSON.parse(fs.readFileSync(args[cmpIdx + 1], "utf8"));
   const diff = Object.keys(base).filter((k) => base[k] !== now[k]);
   Object.keys(base).forEach((k) => console.log(`${base[k] === now[k] ? "  match " : "  DIFFER"} ${k}`));
