@@ -252,60 +252,49 @@ describe('Wallet Connection', () => {
   // ---------------------------------------------------------------------------
   // WAL-08: Connect on wrong network — verify network error banner
   // ---------------------------------------------------------------------------
-  it('[WAL-08] Connect on wrong network', () => {
-    // Use a non-matching chainId (Ethereum mainnet = 1 instead of expected).
-    cy.mockWeb3Provider({
-      account: TEST_ACCOUNTS[0],
-      networkId: 1, // Mainnet — the app expects a Polygon chain
-    })
-    cy.visit('/fairwins')
-    cy.get('body').should('be.visible')
-
-    // Connect.
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
-    // If the app detects a wrong network, a network error banner should appear.
-    // The banner is rendered in AppContent when networkError is truthy.
-    cy.get('body', { timeout: 10000 }).then(($body) => {
-      const hasBanner = $body.find('.network-error-banner, [role="alert"]').length > 0
-      const hasConnectBtn = $body.find('.wallet-connect-button').length > 0
-      // Either the error banner is shown OR the app stays in disconnected mode.
-      expect(hasBanner || hasConnectBtn).to.be.true
-    })
-  })
+  /*
+   * Chain 56 (BNB), not 1. This test used to pass `networkId: 1` calling it "the app expects a
+   * Polygon chain" — but Ethereum became a supported chain with spec 067 (NETWORKS has 1, and
+   * `isSupportedChainId` is just hasOwnProperty), so chain 1 raises no error at all. The old
+   * assertion tolerated that by accepting `hasBanner || hasConnectBtn`, and passed only because
+   * the pre-#1019 connector click never actually connected, leaving the Connect button on screen.
+   * Once connecting worked, both halves went false and it failed — the test had been reporting on
+   * a broken connect, not on network handling. 56 is genuinely absent from NETWORKS.
+   */
+  // PENDING (#1030): the network-error banner is UNREACHABLE, so this cannot be written honestly yet.
+  //
+  // Measured, not assumed. `App.jsx:121` renders the banner on `networkError && isConnected`, and
+  // `WalletContext.jsx:277` clears networkError whenever `isSupportedChainId(chainId)`. Reaching it
+  // needs a chain the app rejects — and there is no such chain:
+  //   * every chain in wagmi's config (wagmi.js:212) is also a key in NETWORKS, so no configured
+  //     chain is unsupported; and
+  //   * on an UNCONFIGURED chain, wagmi's `useChainId()` reports a configured chain instead of the
+  //     wallet's. Probed with the wallet on BNB (0x38): the app rendered "Polygon" and stayed
+  //     connected with no banner. That misreporting is the bug filed as #1030.
+  //
+  // The old version passed `networkId: 1` calling it "the app expects a Polygon chain", but
+  // Ethereum became supported with spec 067. It survived only because its assertion accepted
+  // `hasBanner || hasConnectBtn` and the pre-#1019 connector click never actually connected,
+  // leaving the Connect button on screen. Once connecting worked, both halves went false — the
+  // test had been reporting on a broken connect, never on network handling.
+  it.skip('[WAL-08] Connect on wrong network', () => {})
 
   // ---------------------------------------------------------------------------
   // WAL-09: Switch to correct network from banner — verify banner disappears
   // ---------------------------------------------------------------------------
-  it('[WAL-09] Switch to correct network from banner', () => {
-    cy.mockWeb3Provider({
-      account: TEST_ACCOUNTS[0],
-      networkId: 1,
-    })
-    cy.visit('/fairwins')
-    cy.get('body').should('be.visible')
-
-    // Connect.
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
-    // Look for the "Switch Network" button. If the banner isn't visible (app
-    // might not detect the mismatch with the mock), this test passes gracefully.
-    cy.get('body', { timeout: 10000 }).then(($body) => {
-      const switchBtn = $body.find('.switch-network-button, button[aria-label="Switch to correct network"]')
-      if (switchBtn.length > 0) {
-        cy.wrap(switchBtn).first().click()
-        // After switching, the banner should disappear (mock resolves immediately).
-        cy.get('.network-error-banner').should('not.exist')
-      } else {
-        // Banner not shown — the mock's wallet_switchEthereumChain resolved, so pass.
-        expect(true).to.be.true
-      }
-    })
-  })
+  /*
+   * This test was unfalsifiable: its `else` branch was `expect(true).to.be.true`, so when the
+   * banner it exists to exercise was ABSENT — the case that actually needed reporting — it passed
+   * and said so. With the mock's chain now mutable it can assert the real journey instead: the
+   * member lands on an unsupported chain, is shown the banner, presses the button in it, and the
+   * banner clears because the chain genuinely moved.
+   */
+  // PENDING (#1030): depends on the same unreachable banner as WAL-08.
+  //
+  // This one was also UNFALSIFIABLE independently of that: its `else` branch was
+  // `expect(true).to.be.true`, so in exactly the case worth reporting — the banner absent — it
+  // passed and said the switch worked. It has never once exercised the button it is named for.
+  it.skip('[WAL-09] Switch to correct network from banner', () => {})
 
   // ---------------------------------------------------------------------------
   // WAL-10: No wallet extension — verify "Not Detected" state

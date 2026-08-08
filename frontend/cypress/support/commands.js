@@ -38,6 +38,19 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
 
   let activeAccount = initialAccount
 
+  /*
+   * The chain is MUTABLE, because a real wallet's chain is. `wallet_switchEthereumChain` used to
+   * resolve(null) without moving `networkId`, so the app's auto-switch (WalletContext: unsupported
+   * chain -> switchChain(PRIMARY_CHAIN_ID), banner only `onError`) reported success while every
+   * subsequent eth_chainId still returned the old chain. Nothing could ever reach either real
+   * outcome — recovered, or told to switch — so the wrong-network specs asserted neither.
+   *
+   * `rejectChainSwitch: true` models the other honest wallet behaviour: the member declines, or the
+   * wallet has no such chain. That is the ONLY path that raises the network error banner.
+   */
+  let activeChainId = Number(networkId)
+  const rejectChainSwitch = options.rejectChainSwitch === true
+
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
     // interactive elements in tests.
@@ -64,16 +77,25 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               resolve(authorized ? [activeAccount] : [])
               break
             case 'eth_chainId':
-              resolve(`0x${networkId.toString(16)}`)
+              resolve(`0x${activeChainId.toString(16)}`)
               break
             case 'wallet_switchEthereumChain':
+              if (rejectChainSwitch) {
+                // EIP-1193 user-rejection. 4902 (unrecognised chain) is the other realistic
+                // refusal; both leave the wallet on its original chain, which is the point.
+                const err = new Error('User rejected the request.')
+                err.code = 4001
+                reject(err)
+                break
+              }
+              win.ethereum.__cySetChain(Number(params?.[0]?.chainId ?? activeChainId))
               resolve(null)
               break
             case 'wallet_addEthereumChain':
               resolve(null)
               break
             case 'net_version':
-              resolve(networkId.toString())
+              resolve(activeChainId.toString())
               break
             case 'eth_getBalance':
               resolve('0x56bc75e2d63100000') // 100 ETH
@@ -140,6 +162,20 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         authorized = true
         const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.accountsChanged) || []
         cbs.forEach((cb) => cb([next]))
+      },
+
+      /*
+       * Move the chain the way a real wallet does: mutate the LIVE provider and emit
+       * `chainChanged` with the hex id, so wagmi's watcher reconciles instead of the app
+       * re-reading a chain that silently never moved.
+       */
+      __cySetChain: (next) => {
+        activeChainId = Number(next)
+        const hex = `0x${activeChainId.toString(16)}`
+        win.ethereum.chainId = hex
+        win.ethereum.networkVersion = activeChainId.toString()
+        const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.chainChanged) || []
+        cbs.forEach((cb) => cb(hex))
       },
 
       on: (event, callback) => {
