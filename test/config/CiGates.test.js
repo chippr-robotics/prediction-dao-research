@@ -291,7 +291,14 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
      * `paths:` is the right way to scope a workflow. The base branch is not: it encodes an
      * assumption that code merging somewhere other than main deserves less checking, and stacked
      * PRs are the normal shape of work in this repo.
+     *
+     * BOTH filter keys are checked. GitHub accepts `branches` and `branches-ignore` (mutually
+     * exclusive per event), and `branches-ignore: ['075-*']` skips stacked PRs exactly as
+     * `branches: [main]` does. Checking only the first would leave this test's NAME — no base
+     * branch filtering — broader than what it asserts, which is the same over-claiming shape the
+     * rest of this file exists to catch. Reported by review on #1033.
      */
+    const BASE_FILTER_KEYS = ["branches", "branches-ignore"];
     const offenders = [];
     for (const file of workflowFiles()) {
       const wf = readWorkflow(file);
@@ -299,12 +306,15 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
       if (!triggers || typeof triggers !== "object") continue;
       const pr = triggers.pull_request;
       if (pr == null || typeof pr !== "object") continue; // absent, or the unrestricted `pull_request:` form
-      if (pr.branches) offenders.push(`${file} (branches=${JSON.stringify(pr.branches)})`);
+      for (const key of BASE_FILTER_KEYS) {
+        if (pr[key]) offenders.push(`${file} (${key}=${JSON.stringify(pr[key])})`);
+      }
     }
     expect(
       offenders,
       "These workflows skip PRs that target a feature branch, so stacked work is gated more " +
-        `weakly than a direct PR to main. Scope with \`paths:\`, not \`branches:\`:\n  ${offenders.join("\n  ")}`,
+        "weakly than a direct PR to main. Scope with `paths:`, not `branches:`/`branches-ignore:`:" +
+        `\n  ${offenders.join("\n  ")}`,
     ).to.deep.equal([]);
   });
 });
