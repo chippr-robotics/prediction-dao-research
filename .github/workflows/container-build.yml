@@ -82,13 +82,41 @@ jobs:
         run: docker build -f services/relay-gateway/Dockerfile -t fairwins-relay-gateway:ci .
 
       # Building is NOT enough — this image built green for the entire life of the workspace
-      # branch and exited instantly at runtime. Resolve the workspace package the way node will.
-      - name: Assert the workspace package resolves at runtime
+      # branch and exited instantly at runtime.
+      #
+      # An import probe is not enough EITHER. Checking only that @fairwins/intent-types resolves
+      # would leave this job's name ("builds and boots") broader than what it asserts, and would
+      # ship green through any other boot regression: loadConfig() throwing, a missing
+      # deployments/ record failing the FR-025 startup check, or any runtime ESM error outside
+      # that one import. Reported in review on #1034. So: start the real entrypoint and require
+      # the server to actually answer.
+      - name: Boot the container and require /healthz to answer
         run: |
           set -o pipefail
-          docker run --rm --entrypoint node fairwins-relay-gateway:ci \
-            -e "import('@fairwins/intent-types').then(m => {
-                  const n = Object.keys(m.INTENT_TYPES || {}).length;
-                  if (!n) { console.error('resolved but empty'); process.exit(1); }
-                  console.log('intent-types resolved, structs:', n);
-                }).catch(e => { console.error(e.message); process.exit(1); })"
+          docker run -d --name gw -p 8788:8788 fairwins-relay-gateway:ci
+
+          for i in $(seq 1 30); do
+            if ! docker ps --filter name=gw --filter status=running -q | grep -q .; then
+              echo "::error::the container exited during startup"
+              docker logs gw
+              exit 1
+            fi
+            if curl -fsS --max-time 2 http://127.0.0.1:8788/healthz >/dev/null 2>&1; then
+              echo "healthz answered after ${i}s"
+              docker logs gw
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::container stayed up but /healthz never answered within 30s"
+          docker logs gw
+          exit 1
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs gw || true
+
+      - name: Stop the container
+        if: always()
+        run: docker rm -f gw || true
