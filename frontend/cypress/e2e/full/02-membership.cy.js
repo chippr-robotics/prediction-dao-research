@@ -80,6 +80,7 @@ describe('Membership Purchase / Upgrade / Extend', () => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
     // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureWagerCapacity([0, 1])
     cy.ensureEncryptionKeys([0, 1])
   })
 

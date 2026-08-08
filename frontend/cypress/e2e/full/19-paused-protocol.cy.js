@@ -37,6 +37,7 @@ function attemptCreate() {
 
 describe('Paused Protocol', () => {
   before(() => {
+    cy.ensureWagerCapacity([0, 1])
     cy.ensureEncryptionKeys([0, 1])
     // Ensure the creator can create when unpaused: funded + approved + member.
     cy.fundAccount(ADMIN)

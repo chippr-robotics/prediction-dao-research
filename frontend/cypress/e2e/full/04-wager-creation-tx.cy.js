@@ -119,6 +119,7 @@ describe('Wager Creation with Real Transactions', () => {
     // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
     // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
     // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureWagerCapacity([0, 1])
     cy.ensureEncryptionKeys([0, 1])
   })
 
@@ -356,7 +357,13 @@ describe('Wager Creation with Real Transactions', () => {
       cy.get('#fm-description, input[type="text"]').first().clear().type('CRE-11: Offer 5x odds')
 
       cy.get('input[placeholder*="0x"]').first().clear().type(TEST_ACCOUNTS[1])
-      cy.wait(500)
+
+  // Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+  // formData.opponentResolved (FriendMarketsModal.jsx:699-702), which AddressInput sets from an
+  // async callback; submitting first fails validation with "Opponent address is required" and the
+  // modal simply never reaches the success screen. AddressInput renders
+  // role="img" aria-label="Valid address" once resolution lands.
+  cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
 
       cy.enterAmountViaKeypad('fm-stake', '10')
 

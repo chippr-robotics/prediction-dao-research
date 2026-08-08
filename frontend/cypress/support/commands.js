@@ -686,6 +686,28 @@ Cypress.Commands.add('hasRegisteredKey', (address) => {
  *
  * @param {number[]} indexes indices into TEST_ACCOUNTS
  */
+/**
+ * Give the test accounts enough membership headroom to create wagers.
+ *
+ * seed-local grants tier 1 (Bronze), whose `monthlyMarketCreation` cap is small. The full tier
+ * shares ONE long-lived local chain across specs, so those creations accumulate: after roughly
+ * five wagers the cap is spent and every later create is refused by MembershipManager — silently,
+ * from the spec's point of view, because the UI simply never reaches the success screen.
+ *
+ * That is a fixture problem, not a product one, and it presents exactly like a broken selector:
+ * a whole spec "cannot create wagers" while the one before it could.
+ *
+ * @param {number[]} indexes indices into TEST_ACCOUNTS
+ * @param {number} tier membership tier (4 = highest headroom)
+ */
+Cypress.Commands.add('ensureWagerCapacity', (indexes = [0, 1], tier = 4) => {
+  indexes.forEach((i) => {
+    const address = TEST_ACCOUNTS[i]
+    if (!address) throw new Error(`ensureWagerCapacity: invalid index ${i}`)
+    cy.grantMembershipFor(address, { tier, durationDays: 365 })
+  })
+})
+
 Cypress.Commands.add('ensureEncryptionKeys', (indexes = [0, 1]) => {
   const needed = []
 
