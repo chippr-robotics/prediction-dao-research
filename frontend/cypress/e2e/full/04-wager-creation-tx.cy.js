@@ -82,10 +82,16 @@ function openAndFillWagerForm(config = {}) {
 
   // Set arbitrator
   if (config.arbitrator) {
-    cy.get('[role="dialog"]').within(() => {
-      cy.get('input[placeholder*="0x"]').last().clear().type(config.arbitrator)
-    })
-    cy.wait(500)
+    /*
+     * `#fm-arbitrator` (FriendMarketsModal.jsx:1586), not `input[placeholder*="0x"]).last()`.
+     * The arbitrator input only renders once ResolutionType.ThirdParty is selected, so before that
+     * `.last()` is the OPPONENT field — the helper would overwrite the opponent with the
+     * arbitrator address and leave the arbitrator empty, which then fails validation
+     * ("Arbitrator address is required for third-party resolution", :720).
+     * Waits for resolution rather than a fixed 500ms, same as the opponent field.
+     */
+    cy.get('#fm-arbitrator', { timeout: 10000 }).clear().type(config.arbitrator)
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('have.length.greaterThan', 1)
   }
 
   // Set odds multiplier (offer)
@@ -295,7 +301,10 @@ describe('Wager Creation with Real Transactions', () => {
     // Verify the derived acceptance deadline is displayed (deterministic, not
     // editable) via the glanceable "Accept by" timeline tile.
     cy.get('[role="dialog"]').within(() => {
-      cy.contains('Accept by').should('be.visible')
+      // `exist`, not `be.visible`: the deadline tiles sit below the fold of the scrollable modal.
+      // The claim is that the acceptance deadline is RENDERED; whether the modal scrolls to it is a
+      // separate UX question (#1019). Same class as the success heading.
+      cy.contains('Accept by').should('exist')
       cy.get('.fm-stat-tile.is-accept .fm-stat-time').should('exist')
       cy.get('.fm-stat-tile.is-accept .fm-stat-time').invoke('text').should('not.be.empty').and('not.equal', '—')
     })
