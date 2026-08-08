@@ -595,11 +595,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Artifact | Retention |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| gas-report | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| coverage-report | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| slither-reports | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| manticore-results | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| medusa-results | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| cypress-e2e-results | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| cypress-videos | 90 days |" >> $GITHUB_STEP_SUMMARY
-          echo "| cypress-screenshots (on failure) | 90 days |" >> $GITHUB_STEP_SUMMARY
+          # Keep these in step with the retention-days on the upload steps above —
+          # a summary that advertises a retention the pipeline does not honour is a
+          # report stating something untrue, which is the whole defect class spec 075
+          # exists to close.
+          echo "| gas-report | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| coverage-report | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| slither-reports | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| manticore-results | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| medusa-results | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-e2e-results | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-videos (failing specs only) | 30 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-screenshots (on failure) | 30 days |" >> $GITHUB_STEP_SUMMARY
