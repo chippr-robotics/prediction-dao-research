@@ -212,10 +212,18 @@ jobs:
       # happened once already when rollup's native binary went missing during this conversion.
       - name: Build mini-apps and compare output bytes
         run: |
-          set -o pipefail
+          set -euo pipefail
           STAMP=$(($(date +%s) * 1000))
-          npm run build:miniapps
-          node scripts/miniapps/record-build-digests.js \
+          # Explicit `&&`, and explicit `-e`. The comment above claims the compare cannot be
+          # reached by a failed build, so the code must say that rather than lean on the runner's
+          # default `bash -e {0}` — a `shell:` override, or someone copying this block elsewhere,
+          # would silently turn the claim false. Relying on implicit shell behaviour for a gate's
+          # blocking property is how the tee'd steps in this repo lost their exit codes.
+          #
+          # KEEP THIS COMPOUND LAST. `set -e` deliberately does NOT fire on a failing left-hand
+          # side of `&&`, so the build's failure reaches the step only as the compound's own exit
+          # status. Verified: with a trailing command after it, a failed build yields step exit 0.
+          npm run build:miniapps && node scripts/miniapps/record-build-digests.js \
             --compare specs/075-monorepo-workspaces/baseline-miniapp-builds.json \
             --since "$STAMP"
 
