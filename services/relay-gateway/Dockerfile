@@ -14,6 +14,11 @@ WORKDIR /app
 # whatever the registry served that day.
 COPY package.json package-lock.json ./
 COPY services/relay-gateway/package.json ./services/relay-gateway/
+# The linked workspace package's manifest must be present too. This service depends on
+# @fairwins/intent-types (spec 075, FR-024), and `npm ci` writes the workspace symlink whether
+# or not its target exists — so omitting it produced a DANGLING link, a build that succeeded,
+# and a container that died at boot on ERR_MODULE_NOT_FOUND. The install cannot tell you.
+COPY packages/intent-types/package.json ./packages/intent-types/
 RUN npm ci --omit=dev --no-audit --no-fund \
       --workspace fairwins-relay-gateway --include-workspace-root=false
 
@@ -23,6 +28,12 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY services/relay-gateway/package.json ./
 COPY services/relay-gateway/src ./src
+# The symlink copied with node_modules resolves to /app/packages/intent-types, so the RUNTIME
+# stage needs the real files as well — carrying the link alone is what made this image start
+# and immediately exit. src/intent/intentTypes.js imports it at module load, reached from
+# src/server.js at boot, so every gateway surface (035/036 intents, the 050 paymaster endpoint,
+# the 057 Polymarket proxy, 060 fee reads, 061 Bitcoin) fails together.
+COPY packages/intent-types ./packages/intent-types
 # Version-pinned target set (FR-025): the deployments records are baked into the image so the
 # startup consistency check validates against the exact addresses this build was shipped with.
 COPY deployments ./deployments

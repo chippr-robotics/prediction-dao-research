@@ -1,0 +1,128 @@
+name: Container Images Build
+
+# Spec 075 fallout. The workspace conversion broke BOTH shipped images and CI reported green,
+# because no workflow has ever built either one:
+#
+#   · the SPA image ran `npm ci` inside frontend/ after this repo dropped to a single root
+#     lockfile — `npm ci` cannot install without a lockfile, so the image failed outright;
+#   · the relay-gateway image BUILT SUCCESSFULLY and then died at boot on
+#     ERR_MODULE_NOT_FOUND, because `npm ci` writes a workspace symlink whether or not its
+#     target directory exists, and packages/intent-types was never copied in.
+#
+# CI missed both because its jobs run `npm ci --workspace <name>` against a FULL CHECKOUT, where
+# packages/ is present. The Docker build context is a different, narrower world, and it was the
+# only world nothing tested. This workflow tests that world.
+#
+# No `branches:` filter — a PR into a feature branch needs this as much as one into main, and
+# scoping by base branch is the defect fixed in #1033. `paths:` is the scoping tool.
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'services/**/Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'frontend/package.json'
+      - 'services/relay-gateway/package.json'
+      - 'packages/**'
+      - 'tools/miniapp-build/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'services/**/Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'packages/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  spa-image:
+    name: SPA image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # `--target build` stops before nginx: the build stage is where the workspace install and
+      # the Vite build happen, which is the whole risk surface. Building the runtime stage too
+      # would only copy an already-produced dist/.
+      - name: Build the frontend image build stage
+        run: docker build -f Dockerfile --target build -t fairwins-spa:ci .
+
+      # A build that exits 0 having produced nothing is the failure mode this repo keeps hitting,
+      # so assert the artefact rather than the exit code.
+      - name: Assert the bundle actually exists
+        run: |
+          set -o pipefail
+          docker run --rm --entrypoint sh fairwins-spa:ci -c '
+            test -s dist/index.html || { echo "::error::dist/index.html missing or empty"; exit 1; }
+            n=$(ls dist/assets 2>/dev/null | wc -l)
+            [ "$n" -gt 0 ] || { echo "::error::dist/assets is empty"; exit 1; }
+            echo "bundle OK: $n asset(s)"
+          '
+
+  gateway-image:
+    name: Relay gateway image builds and boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the relay-gateway image
+        run: docker build -f services/relay-gateway/Dockerfile -t fairwins-relay-gateway:ci .
+
+      # Building is NOT enough — this image built green for the entire life of the workspace
+      # branch and exited instantly at runtime.
+      #
+      # An import probe is not enough EITHER. Checking only that @fairwins/intent-types resolves
+      # would leave this job's name ("builds and boots") broader than what it asserts, and would
+      # ship green through any other boot regression: loadConfig() throwing, a missing
+      # deployments/ record failing the FR-025 startup check, or any runtime ESM error outside
+      # that one import. Reported in review on #1034. So: start the real entrypoint and require
+      # the server to actually answer.
+      #
+      # Written WITHOUT `exit 0` and without `|| true`, because CiGates rejects both — correctly:
+      # a bare `exit 0` is exactly how a step forces success, and the guard cannot distinguish my
+      # "early return on success" from that. Restructuring costs nothing and keeps the guard
+      # strict; an exemption would have spent the guard's credibility on my own convenience.
+      - name: Boot the container and require /healthz to answer
+        run: |
+          set -euo pipefail
+          docker run -d --name gw -p 8788:8788 fairwins-relay-gateway:ci
+
+          healthy=0
+          for i in $(seq 1 30); do
+            if ! docker ps --filter name=gw --filter status=running -q | grep -q .; then
+              echo "::error::the container exited during startup"
+              break
+            fi
+            if curl -fsS --max-time 2 http://127.0.0.1:8788/healthz >/dev/null 2>&1; then
+              healthy=1
+              echo "healthz answered after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$healthy" != 1 ]; then
+            echo "::error::the gateway never served /healthz — see the container logs below"
+          fi
+          docker logs gw
+          # Last command, so its status IS the step's. No `exit`, nothing to swallow.
+          test "$healthy" = 1
+
+      # `xargs -r` runs nothing when there is no match, so this exits 0 on its own rather than
+      # needing `|| true` — including when the boot step failed before the container existed.
+      - name: Stop the container
+        if: always()
+        run: docker ps -aq --filter "name=^gw$" | xargs -r docker rm -f
