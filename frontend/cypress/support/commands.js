@@ -687,19 +687,41 @@ Cypress.Commands.add('hasRegisteredKey', (address) => {
  * @param {number[]} indexes indices into TEST_ACCOUNTS
  */
 Cypress.Commands.add('ensureEncryptionKeys', (indexes = [0, 1]) => {
-  indexes.forEach((i) => {
+  const needed = []
+
+  cy.wrap(indexes, { log: false }).each((i) => {
     const address = TEST_ACCOUNTS[i]
     if (!address) throw new Error(`ensureEncryptionKeys: invalid index ${i}`)
-    // Long timeout: the callback drives a whole connect + register + on-chain poll, and `.then()`
-    // otherwise inherits the 10s default and aborts mid-registration.
-    cy.task('chainTx', { action: 'hasKey', args: { address } }).then({ timeout: 180000 }, (r) => {
-      if (r && r.registered) return
-      cy.mockWeb3Provider({ account: address })
-      cy.visit('/wallet')
-      cy.get('body', { timeout: 10000 }).should('be.visible')
-      cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-      cy.selectInjectedConnector()
-      cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
+    return cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => {
+      if (!(r && r.registered)) needed.push(address)
+    })
+  })
+
+  // Long timeout: the callback drives connect + register + an on-chain poll per account, and
+  // `.then()` otherwise inherits the 10s default and aborts mid-registration.
+  cy.wrap(null, { log: false }).then({ timeout: 240000 }, () => {
+    if (!needed.length) return
+
+    /*
+     * Mock ONCE, then switch with __cySetAccount for the rest.
+     *
+     * Calling cy.mockWeb3Provider() per account would register a fresh `window:before:load`
+     * handler each time — handlers accumulate, the last one wins, and it carries its own
+     * `authorized` flag. That is exactly the defect that made cy.switchAccount report a stale
+     * account against a disconnected provider; there is no reason to reintroduce it here.
+     */
+    cy.mockWeb3Provider({ account: needed[0] })
+    cy.visit('/wallet?tab=security')
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+    cy.selectInjectedConnector()
+    cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
+
+    needed.forEach((address, pos) => {
+      if (pos > 0) {
+        cy.window({ log: false }).then((win) => win.ethereum.__cySetAccount(address))
+        cy.assertActiveAccount(address)
+      }
       cy.registerEncryptionKeyViaUI(address)
     })
   })

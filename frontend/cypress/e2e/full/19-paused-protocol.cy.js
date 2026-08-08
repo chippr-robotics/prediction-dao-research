@@ -32,11 +32,12 @@ function attemptCreate() {
   // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
   // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
   // nothing while the spec read as though it controlled encryption. (#1028)
-  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 }
 
 describe('Paused Protocol', () => {
   before(() => {
+    cy.ensureEncryptionKeys([0, 1])
     // Ensure the creator can create when unpaused: funded + approved + member.
     cy.fundAccount(ADMIN)
     cy.task('chainTx', { action: 'approve', args: { index: 0 } })

@@ -100,10 +100,7 @@ function openAndFillWagerForm(config = {}) {
  * Submit the wager creation form and wait for TX completion.
  */
 function submitWagerForm() {
-  cy.get('[role="dialog"], .modal')
-    .find('button[type="submit"], button')
-    .filter(':contains("Create")')
-    .click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
   // Wait for transaction to be submitted and confirmed.
   // The form transitions through verify → approve → create → complete.
@@ -139,6 +136,13 @@ function assertWagerCreated() {
 }
 
 describe('Wager Creation with Real Transactions', () => {
+  before(() => {
+    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
+    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
+    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureEncryptionKeys([0, 1])
+  })
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
@@ -398,7 +402,7 @@ describe('Wager Creation with Real Transactions', () => {
       cy.get('input[placeholder*="0x"]').first().clear().type(TEST_ACCOUNTS[1])
       cy.wait(500)
 
-      cy.get('#fm-stake, input[type="number"]').first().clear().type('10')
+      cy.enterAmountViaKeypad('fm-stake', '10')
 
       // Set odds to 5x (500)
       cy.get('.fm-odds-presets button').then(($buttons) => {

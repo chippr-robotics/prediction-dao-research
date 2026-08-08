@@ -69,10 +69,7 @@ function createSimpleWager(config = {}) {
   // nothing while the spec read as though it controlled encryption. (#1028)
 
   // Submit
-  cy.get('[role="dialog"], .modal')
-    .find('button[type="submit"], button')
-    .filter(':contains("Create")')
-    .click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
   // Wait for creation to complete
   cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
@@ -82,6 +79,13 @@ function createSimpleWager(config = {}) {
 }
 
 describe('Wager Acceptance', () => {
+  before(() => {
+    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
+    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
+    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureEncryptionKeys([0, 1])
+  })
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
