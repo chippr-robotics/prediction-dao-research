@@ -65,7 +65,29 @@
         "src/**",
         "test/**",
         "vite.config.js",
+        "vite-plugins/**"
+      ]
+    },
+    "frontend#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vite.config.js",
         "vite-plugins/**",
+        "$TURBO_ROOT$/tenants/**",
+        "$TURBO_ROOT$/packages/*/src/**"
+      ]
+    },
+    "fairwins-relay-gateway#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
         "$TURBO_ROOT$/tenants/**",
         "$TURBO_ROOT$/packages/*/src/**"
       ]
