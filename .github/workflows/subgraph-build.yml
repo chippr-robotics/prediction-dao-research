@@ -4,10 +4,11 @@ name: Subgraph Build and Tests
 # as a failing gate. No continue-on-error on these steps (constitution IV).
 
 on:
+  # No `branches:` filter. A base-branch filter is not a decision about whether code needs
+  # testing: a PR into a feature branch would skip this gate entirely, and stacked PRs (a
+  # feature branch collecting fixes before one merge to main) are the normal shape of work
+  # here. The `paths:` filter below is what scopes this workflow; the base branch is not.
   pull_request:
-    branches:
-      - main
-      - develop
     paths:
       - 'subgraph/**'
       - 'packages/abi/**'

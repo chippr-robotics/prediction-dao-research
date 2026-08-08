@@ -278,6 +278,35 @@ describe("CI gates cannot be silently disabled (spec 075)", function () {
         `run zero jobs and merge on Release Drafter alone (found branches=${JSON.stringify(branches)})`,
     ).to.equal(undefined);
   });
+
+  it("NO workflow filters its pull_request trigger by base branch", function () {
+    /*
+     * The test above pinned ci-manager alone, which closed one instance and left the class open:
+     * frontend-testing.yml and subgraph-build.yml kept `branches: [main, develop]`, so a PR into a
+     * feature branch was reviewed against strictly less than a PR into main. That is not
+     * hypothetical — the AEAD tamper flake (#1032) failed on the 075 branch in the FULL frontend
+     * suite, and the PR fixing it could not run the workflow that caught it, because that PR
+     * targeted 075 rather than main.
+     *
+     * `paths:` is the right way to scope a workflow. The base branch is not: it encodes an
+     * assumption that code merging somewhere other than main deserves less checking, and stacked
+     * PRs are the normal shape of work in this repo.
+     */
+    const offenders = [];
+    for (const file of workflowFiles()) {
+      const wf = readWorkflow(file);
+      const triggers = wf.on ?? wf[true] ?? {};
+      if (!triggers || typeof triggers !== "object") continue;
+      const pr = triggers.pull_request;
+      if (pr == null || typeof pr !== "object") continue; // absent, or the unrestricted `pull_request:` form
+      if (pr.branches) offenders.push(`${file} (branches=${JSON.stringify(pr.branches)})`);
+    }
+    expect(
+      offenders,
+      "These workflows skip PRs that target a feature branch, so stacked work is gated more " +
+        `weakly than a direct PR to main. Scope with \`paths:\`, not \`branches:\`:\n  ${offenders.join("\n  ")}`,
+    ).to.deep.equal([]);
+  });
 });
 
 describe("contracts/ remains a single compilation unit (spec 075, FR-048)", function () {
