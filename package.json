@@ -91,7 +91,7 @@
     "@nomicfoundation/ignition-core": "^0.15.15",
     "@openzeppelin/contracts": "5.4.0",
     "@openzeppelin/contracts-upgradeable": "5.4.0",
-    "@openzeppelin/hardhat-upgrades": "^3.9.0",
+    "@openzeppelin/hardhat-upgrades": "^4.1.0",
     "@openzeppelin/upgrades-core": "^1.44.2",
     "@pinata/sdk": "^2.1.0",
     "@safe-global/safe-contracts": "1.4.1",
