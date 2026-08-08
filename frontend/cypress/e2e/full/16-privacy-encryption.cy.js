@@ -31,7 +31,7 @@ const DESC = 'E2E private encrypted wager details'
 function connect(account) {
   cy.clearLocalStorage()
   cy.mockWeb3Provider({ account })
-  cy.visit('/fairwins')
+  cy.visitWagers()
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
   cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')

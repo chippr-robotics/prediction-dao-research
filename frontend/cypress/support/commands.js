@@ -20,7 +20,7 @@ const TEST_ACCOUNTS = [
 Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const networkId = options.networkId || Cypress.env('NETWORK_ID') || 1337
   const rpcUrl = options.rpcUrl || Cypress.env('RPC_URL') || 'http://localhost:8545'
-  const account = options.account || TEST_ACCOUNTS[0]
+  const initialAccount = options.account || TEST_ACCOUNTS[0]
   /*
    * A real injected wallet reports NO accounts until the site has been authorised: `eth_accounts`
    * returns [] and only `eth_requestAccounts` (the user pressing Connect) grants access.
@@ -36,6 +36,8 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
    */
   let authorized = options.preAuthorized === true
 
+  let activeAccount = initialAccount
+
   cy.on('window:before:load', (win) => {
     // Suppress the dev banner so its fixed-position overlay doesn't cover
     // interactive elements in tests.
@@ -45,7 +47,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
 
     win.ethereum = {
       isMetaMask: true,
-      selectedAddress: account,
+      selectedAddress: activeAccount,
       networkVersion: networkId.toString(),
       chainId: `0x${networkId.toString(16)}`,
 
@@ -55,11 +57,11 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
             case 'eth_requestAccounts':
               // The user pressing Connect. Grants access for the rest of this page load.
               authorized = true
-              resolve([account])
+              resolve([activeAccount])
               break
             case 'eth_accounts':
               // Silent probe on load — empty until authorised, exactly like a real wallet.
-              resolve(authorized ? [account] : [])
+              resolve(authorized ? [activeAccount] : [])
               break
             case 'eth_chainId':
               resolve(`0x${networkId.toString(16)}`)
@@ -83,7 +85,7 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               // so any account-distinct deterministic value yields per-account keys
               // (a same-for-all value would let a non-participant decrypt). Expand
               // the 40-hex-char account to a 65-byte (130-hex) value.
-              resolve('0x' + account.slice(2).toLowerCase().repeat(4).slice(0, 130))
+              resolve('0x' + activeAccount.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
               fetch(rpcUrl, {
@@ -117,8 +119,28 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
         })
       },
 
-      enable: () => Promise.resolve([account]),
+      enable: () => Promise.resolve([activeAccount]),
       send: (method, params) => win.ethereum.request({ method, params }),
+
+      /*
+       * Switch the connected account the way a real wallet does — mutate the LIVE provider and
+       * emit `accountsChanged`. Used by cy.switchAccount.
+       *
+       * The old cy.switchAccount called cy.mockWeb3Provider() again and reloaded. That registered a
+       * SECOND `window:before:load` handler; both ran on reload, the later one won, and it carried
+       * a fresh `authorized = false`. Probed result: the provider reported `eth_accounts: []` while
+       * the UI still displayed account 0 — the app showed a stale account while the provider said
+       * disconnected, and every post-switch assertion in 05-wager-acceptance was reading the wrong
+       * account. Reloading is also not what a switch does: a real member switches in MetaMask and
+       * the live page follows.
+       */
+      __cySetAccount: (next) => {
+        activeAccount = next
+        win.ethereum.selectedAddress = next
+        authorized = true
+        const cbs = (win.ethereum._callbacks && win.ethereum._callbacks.accountsChanged) || []
+        cbs.forEach((cb) => cb([next]))
+      },
 
       on: (event, callback) => {
         win.ethereum._callbacks = win.ethereum._callbacks || {}
@@ -189,9 +211,34 @@ Cypress.Commands.add('switchAccount', (accountIndex) => {
   const account = TEST_ACCOUNTS[accountIndex]
   if (!account) throw new Error(`Invalid account index: ${accountIndex}`)
 
-  cy.mockWeb3Provider({ account })
-  cy.reload()
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.window().then((win) => {
+    if (!win.ethereum || typeof win.ethereum.__cySetAccount !== 'function') {
+      throw new Error('switchAccount: cy.mockWeb3Provider() must run before the visit')
+    }
+    win.ethereum.__cySetAccount(account)
+  })
+
+  // The app must FOLLOW the switch. Account switching is a core feature, so prove it landed
+  // rather than assuming the event was honoured.
+  cy.assertActiveAccount(account)
+})
+
+/**
+ * Assert which account the app currently believes is connected.
+ *
+ * The address renders only INSIDE the opened account dropdown (WalletButton.jsx puts
+ * `.account-address-value` behind `{isOpen && ...}`), so this opens it, checks, and closes it
+ * again — leaving the UI as it found it.
+ */
+Cypress.Commands.add('assertActiveAccount', (address) => {
+  const short = `${address.slice(0, 6)}`
+  cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible').click()
+  cy.get('.account-address-value', { timeout: 10000 })
+    .invoke('text')
+    .should((t) => {
+      expect(t.toLowerCase(), `connected account should be ${address}`).to.include(short.toLowerCase())
+    })
+  cy.get('.wallet-account-button').click()
 })
 
 /**
@@ -256,6 +303,57 @@ Cypress.Commands.add('verifyNetwork', (expectedChainId = 1337) => {
     const numericChainId = parseInt(chainId, 16)
     expect(numericChainId).to.equal(expectedChainId)
   })
+})
+
+/*
+ * WAGERS_PATH, inlined from src/config/appNav.js:74.
+ *
+ * Deliberately NOT imported: appNav.js -> config/tenant.js imports the Vite virtual module
+ * `virtual:tenant`, and the Cypress preprocessor has no plugin that can resolve it — importing it
+ * fails the whole spec bundle. src/test/ guards the real value; this is a copy under test.
+ */
+const WAGERS_PATH = '/wallet?tab=paytransfer&view=wagers'
+
+/*
+ * Resolution-type labels, from FriendMarketsModal.jsx RESOLUTION_TYPE_LABELS. Keyed by the numeric
+ * ResolutionType so specs can keep passing the enum value they always passed.
+ */
+const RESOLUTION_TYPE_LABELS = {
+  0: 'Either of Us (equal stakes)',
+  1: 'Me (Creator)',
+  2: 'Them (Opponent)',
+  3: 'A Friend (Arbitrator)',
+  4: 'An Oracle (Polymarket)',
+}
+
+/**
+ * Choose who can resolve the wager.
+ *
+ * The control is a `PillSelect` — `role="radiogroup"` of `role="radio"` BUTTONS — not a `<select>`,
+ * so `.select()` could never drive it. Specs targeted `#fm-resolution-type, .fm-select`; neither
+ * string appears in any `.jsx` in the app. Click the pill by its visible label instead.
+ *
+ * @param {number|string} type ResolutionType enum value, or the label itself
+ */
+Cypress.Commands.add('selectResolutionType', (type) => {
+  const label = RESOLUTION_TYPE_LABELS[type] || type
+  cy.contains('[role="radiogroup"] [role="radio"]', label, { timeout: 10000 })
+    .click({ force: true })
+    .should('have.attr', 'aria-checked', 'true')
+})
+
+/**
+ * Visit the wager surface.
+ *
+ * Spec 073 moved wager creation off `/fairwins` (which still exists and renders HomeScreen) to
+ * Finance > Transfer > Wagers. Every quick-action card — Friends Decide, Oracle Settles, Make an
+ * Offer, My Wagers — is rendered by Dashboard, and Dashboard is mounted ONLY by PayTransferPanel
+ * under `?view=wagers`. Specs that kept visiting /fairwins were asking a page that had stopped
+ * hosting those controls to produce them.
+ */
+Cypress.Commands.add('visitWagers', () => {
+  cy.visit(WAGERS_PATH)
+  cy.get('body', { timeout: 10000 }).should('be.visible')
 })
 
 /**
@@ -419,6 +517,7 @@ Cypress.Commands.add('assertToast', (type, message) => {
 Cypress.Commands.add('advanceTime', (seconds) => {
   const rpcUrl = Cypress.env('RPC_URL') || 'http://localhost:8545'
 
+  // 1. The CHAIN clock — what the contracts see.
   cy.request({
     method: 'POST',
     url: rpcUrl,
@@ -439,6 +538,38 @@ Cypress.Commands.add('advanceTime', (seconds) => {
       method: 'evm_mine',
       params: []
     }
+  })
+
+  /*
+   * 2. The BROWSER clock — what the UI sees.
+   *
+   * evm_increaseTime moves the chain only. Every expiry decision in the app is browser-time
+   * (`computedStatus` flips to EXPIRED on `Date.now() > acceptDeadline`, and the countdown tiles
+   * tick off the same source), so a spec that advanced the chain past a deadline and then asserted
+   * the UI said "Expired" was waiting on a clock nothing had moved. That is why the deadline tests
+   * could not pass.
+   *
+   * Shift Date by the same offset inside the app realm. A cumulative offset rather than a frozen
+   * clock, so intervals keep firing and the UI re-renders on its own — cy.clock() would stop them.
+   */
+  cy.window().then((win) => {
+    if (!win.__cyTimeShim) {
+      const RealDate = win.Date
+      const realNow = RealDate.now.bind(RealDate)
+      win.__cyTimeOffsetMs = 0
+
+      function ShiftedDate(...args) {
+        if (args.length === 0) return new RealDate(realNow() + win.__cyTimeOffsetMs)
+        return new RealDate(...args)
+      }
+      ShiftedDate.prototype = RealDate.prototype
+      ShiftedDate.now = () => realNow() + win.__cyTimeOffsetMs
+      ShiftedDate.parse = RealDate.parse
+      ShiftedDate.UTC = RealDate.UTC
+      win.Date = ShiftedDate
+      win.__cyTimeShim = true
+    }
+    win.__cyTimeOffsetMs += seconds * 1000
   })
 })
 

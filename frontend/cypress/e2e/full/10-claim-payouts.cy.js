@@ -21,8 +21,7 @@ const TEST_ACCOUNTS = [
  */
 function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
@@ -62,10 +61,7 @@ function createAcceptAndResolve(config = {}) {
 
   cy.wait(500)
 
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-    .first()
-    .clear()
-    .type(opts.stake.toString())
+  cy.enterAmountViaKeypad('fm-stake', opts.stake.toString())
 
   if (opts.stakeToken) {
     cy.get('#fm-stake-token, [role="dialog"] .fm-token-select')
@@ -74,18 +70,13 @@ function createAcceptAndResolve(config = {}) {
   }
 
   if (opts.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(opts.resolutionType.toString())
+    cy.selectResolutionType(opts.resolutionType.toString())
   }
 
-  // Disable encryption
-  cy.get('[role="dialog"]').then(($modal) => {
-    const encToggle = $modal.find('input[type="checkbox"]')
-    if (encToggle.length > 0 && encToggle.is(':checked')) {
-      cy.wrap(encToggle.first()).uncheck({ force: true })
-    }
-  })
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 
   cy.get('[role="dialog"], .modal')
     .find('button[type="submit"], button')
@@ -102,8 +93,6 @@ function createAcceptAndResolve(config = {}) {
 
   // Step 2: Accept as opponent
   cy.switchAccount(1)
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
 
   cy.openMyWagers('participating')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -127,8 +116,6 @@ function createAcceptAndResolve(config = {}) {
 
   // Step 4: Resolve as creator
   cy.switchAccount(0)
-  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-  cy.selectInjectedConnector()
 
   cy.openMyWagers('created')
   cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {

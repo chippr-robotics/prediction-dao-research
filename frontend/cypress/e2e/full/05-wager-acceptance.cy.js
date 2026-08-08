@@ -20,8 +20,7 @@ const TEST_ACCOUNTS = [
  */
 function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
@@ -58,25 +57,16 @@ function createSimpleWager(config = {}) {
 
   cy.wait(500)
 
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-    .first()
-    .clear()
-    .type(opts.stake.toString())
+  cy.enterAmountViaKeypad('fm-stake', opts.stake.toString())
 
   if (opts.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(opts.resolutionType.toString())
+    cy.selectResolutionType(opts.resolutionType.toString())
   }
 
-  if (!opts.encrypted) {
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
-  }
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 
   // Submit
   cy.get('[role="dialog"], .modal')
@@ -165,10 +155,6 @@ describe('Wager Acceptance', () => {
 
     cy.switchAccount(1)
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -214,10 +200,6 @@ describe('Wager Acceptance', () => {
 
     cy.switchAccount(1)
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
@@ -254,10 +236,6 @@ describe('Wager Acceptance', () => {
       .click({ force: true })
 
     cy.switchAccount(1)
-
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -325,10 +303,6 @@ describe('Wager Acceptance', () => {
     // Switch to bystander (account #4) — NOT the invited opponent
     cy.switchAccount(4)
 
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
     cy.openMyWagers('participating')
 
     // The bystander should either:
@@ -360,10 +334,6 @@ describe('Wager Acceptance', () => {
     cy.advanceTime(13 * 60 * 60) // 13 hours
 
     cy.switchAccount(1)
-
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
 
     cy.openMyWagers('participating')
 
@@ -417,53 +387,11 @@ describe('Wager Acceptance', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // ACC-10: Accept with insufficient balance
-  // ---------------------------------------------------------------------------
-  it('[ACC-10] Accept with insufficient balance shows error', () => {
-    connectAndVisit(0)
-    createSimpleWager({
-      description: 'ACC-10: Insufficient balance test',
-      stake: 999, // High stake to trigger insufficient balance
-    })
-
-    cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn')
-      .click({ force: true })
-
-    cy.switchAccount(1)
-
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
-
-    cy.openMyWagers('participating')
-
-    cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const viewBtn = $panel.find('.mm-action-accept, button:contains("View Offer")')
-      if (viewBtn.length > 0) {
-        cy.wrap(viewBtn.first()).click({ force: true })
-
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 5000 }).should('be.visible')
-
-        // Try to accept
-        cy.contains('button', /accept offer/i).click()
-        cy.contains('button', /i understand|confirm|accept/i).click()
-
-        // Should show balance error
-        cy.get('.ma-modal, [role="dialog"]', { timeout: 30000 }).invoke('text').then((text) => {
-          const lower = text.toLowerCase()
-          const hasBalanceError = lower.includes('insufficient') ||
-                                lower.includes('balance') ||
-                                lower.includes('not enough') ||
-                                lower.includes('error') ||
-                                lower.includes('failed')
-          expect(hasBalanceError).to.be.true
-        })
-      } else {
-        expect(true).to.be.true
-      }
-    })
-  })
-
+  // ACC-10 ("Accept with insufficient balance") REMOVED.
+  // Its premise was false: seed-local funds every test account with 1,000,000 USDC, so a
+  // stake of 999 is not an insufficient balance and the error it asserted could never appear.
+  // Testing the real path needs an account deliberately under-funded on chain, which is a
+  // different fixture than this spec provides. (#1028)
   // ---------------------------------------------------------------------------
   // ACC-11: View encrypted wager without correct wallet
   // ---------------------------------------------------------------------------
@@ -504,10 +432,6 @@ describe('Wager Acceptance', () => {
 
     // Switch to opponent and try to accept — the contract should revert
     cy.switchAccount(1)
-
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
-      .click()
-    cy.selectInjectedConnector()
 
     // If frozen, acceptance should show an error about frozen account
     cy.openMyWagers('participating')
@@ -564,8 +488,7 @@ describe('Wager Acceptance', () => {
       }
     })
 
-    cy.visit('/fairwins')
-    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.visitWagers()
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()

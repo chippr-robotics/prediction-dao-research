@@ -22,8 +22,7 @@ const TEST_ACCOUNTS = [
  */
 function connectWalletAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
@@ -60,10 +59,7 @@ function openAndFillWagerForm(config = {}) {
 
   // Set stake amount
   if (config.stake) {
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-      .first()
-      .clear()
-      .type(config.stake.toString())
+    cy.enterAmountViaKeypad('fm-stake', config.stake.toString())
   }
 
   // Set stake token
@@ -75,9 +71,7 @@ function openAndFillWagerForm(config = {}) {
 
   // Set resolution type
   if (config.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(config.resolutionType.toString())
+    cy.selectResolutionType(config.resolutionType.toString())
   }
 
   // Set arbitrator
@@ -96,15 +90,10 @@ function openAndFillWagerForm(config = {}) {
       .trigger('input')
   }
 
-  // Toggle encryption
-  if (config.encrypted === false) {
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
-  }
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 }
 
 /**
@@ -360,10 +349,7 @@ describe('Wager Creation with Real Transactions', () => {
       .clear()
       .type(TEST_ACCOUNTS[1])
 
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-      .first()
-      .clear()
-      .type('5')
+    cy.enterAmountViaKeypad('fm-stake', '5')
 
     // Set a custom end date (7 days from now)
     const futureDate = new Date()
@@ -374,13 +360,7 @@ describe('Wager Creation with Real Transactions', () => {
       .clear()
       .type(formattedDate)
 
-    // Disable encryption for simplicity
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
+    // Encryption is ON by default and no longer optional (see note above).
 
     submitWagerForm()
     assertWagerCreated()
@@ -429,13 +409,6 @@ describe('Wager Creation with Real Transactions', () => {
       })
     })
 
-    // Disable encryption
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
 
     // Verify odds summary shows correct values
     cy.get('[role="dialog"]').within(() => {
@@ -471,9 +444,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (polyOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(polyOption.val())
+        cy.selectResolutionType(polyOption.val())
 
         // The Polymarket browser should appear
         cy.get('[role="dialog"]').invoke('text').then((text) => {
@@ -502,9 +473,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (clOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(clOption.val())
+        cy.selectResolutionType(clOption.val())
 
         // Oracle condition picker should appear
         cy.get('[role="dialog"]').invoke('text').then((text) => {
@@ -533,9 +502,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (cfOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(cfOption.val())
+        cy.selectResolutionType(cfOption.val())
 
         cy.get('[role="dialog"]').invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -562,9 +529,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (umaOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(umaOption.val())
+        cy.selectResolutionType(umaOption.val())
 
         cy.get('[role="dialog"]').invoke('text').then((text) => {
           const lower = text.toLowerCase()
@@ -591,9 +556,7 @@ describe('Wager Creation with Real Transactions', () => {
       })
 
       if (polyOption.length > 0) {
-        cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-          .first()
-          .select(polyOption.val())
+        cy.selectResolutionType(polyOption.val())
 
         // The PolymarketBrowser component should render inside the form
         cy.get('[role="dialog"]').then(($modal) => {
