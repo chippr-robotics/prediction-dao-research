@@ -254,20 +254,30 @@ describe('BridgeTab — routes (T124, FR-041/FR-045)', () => {
     render(<BridgeTab {...node} />)
     await screen.findByRole('table', { name: 'Curated bridge routes' })
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Disable' })[0])
+    /*
+     * ── A canConfig-GATED CONTROL IS AWAITED, NEVER READ WITH A PLAIN `getBy*` ──────────────────
+     * This tab makes TWO independent async reads: the router's own state (the route list, which
+     * renders the table awaited above) and `readRouterAuthority` (BridgeTab.jsx:404), which sets
+     * `gates.config` — and every control below lives inside `{canConfig && …}`. Awaiting only the
+     * first and then reaching for a gated control with a non-retrying query passes locally and
+     * fails on a loaded CI runner, where the authority read lands a render later.
+     *
+     * Same defect as #1029 in the sibling AdminSupplyTab, which was fixed there and not here.
+     */
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Disable' }))[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /disabled/.test(c[1]))).toBe(true))
 
-    fireEvent.change(screen.getByLabelText(/Per-transaction maximum for USDC to Polygon/i), {
+    fireEvent.change(await screen.findByLabelText(/Per-transaction maximum for USDC to Polygon/i), {
       target: { value: '1000' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set limit' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set limit' }))[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /Per-transaction maximum updated/.test(c[1]))).toBe(true))
 
     // Removal ASKS FIRST, and the question names what it costs — removal is not the harder version
     // of Disable, it is the one that deletes the entry and blinds the Operations panel's lateness
     // detection for transfers still moving on the route.
     const confirm = stubConfirm(true)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove' }))[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /removed/.test(c[1]))).toBe(true))
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(confirm.mock.calls[0][0]).toMatch(/Disable/)
@@ -280,7 +290,7 @@ describe('BridgeTab — routes (T124, FR-041/FR-045)', () => {
     await screen.findByRole('table', { name: 'Curated bridge routes' })
 
     const confirm = stubConfirm(false)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove' }))[0])
     expect(confirm).toHaveBeenCalled()
     expect(runTx).not.toHaveBeenCalled()
   })
@@ -325,7 +335,9 @@ describe('BridgeTab — routes (T124, FR-041/FR-045)', () => {
     expect(within(coverage).getByText('0 of 1 enabled')).toBeInTheDocument()
     expect(within(coverage).getAllByText('none — not offered to members').length).toBeGreaterThan(0)
 
-    fireEvent.click(within(coverage).getAllByRole('button', { name: 'Enable all (1 tx)' })[0])
+    // The bulk column is canConfig-gated too (BridgeTab.jsx:814/828), so awaiting the coverage
+    // table is not the same as awaiting this button.
+    fireEvent.click((await within(coverage).findAllByRole('button', { name: 'Enable all (1 tx)' }))[0])
     await waitFor(() => expect(runTx).toHaveBeenCalled())
   })
 })
@@ -356,8 +368,16 @@ describe('BridgeTab — the pause is always visible, and honest about who can pu
   it('renders the card with a reason, not nothing, when the account holds neither role', async () => {
     render(<BridgeTab {...props().node} />)
     expect(await screen.findByText('Emergency pause')).toBeInTheDocument()
+    /*
+     * The NOTICE is awaited before the absence below is asserted. "Emergency pause" is a static
+     * heading, so it arrives long before the authority read resolves — and until it does, the
+     * button is absent for the ordinary reason that nothing has been decided yet. Asserting the
+     * absence at that moment would pass without ever observing the refusal this test is named
+     * for. The notice only renders on a definite no, so it is the point at which the absence
+     * means something.
+     */
+    const notice = await screen.findByText(/the killswitch exists and is exercisable/i)
     expect(screen.queryByRole('button', { name: /^Pause new bridges/i })).not.toBeInTheDocument()
-    const notice = screen.getByText(/the killswitch exists and is exercisable/i)
     expect(notice).toBeInTheDocument()
     expect(notice.parentElement.textContent).toMatch(/does not carry here/i)
     expect(notice.parentElement.textContent).toMatch(/Role Manager grants/i)
@@ -411,9 +431,11 @@ describe('BridgeTab — fee is read-only (T132, FR-048/FR-051)', () => {
     m.feeThrows = new Error('FeeRouter unreachable')
     render(<BridgeTab {...props({ isAdmin: true, isLiquidityAdmin: true }).node} />)
     expect(await screen.findByText(/could not be read — members cannot start a fee-bearing bridge/i)).toBeInTheDocument()
-    // The pause and the route controls are untouched by an unreadable fee.
-    expect(screen.getByRole('button', { name: 'Pause new bridges' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Save route' })).toBeEnabled()
+    // The pause and the route controls are untouched by an unreadable fee. Awaited, not assumed:
+    // the fee quote is a THIRD independent read, and its arrival says nothing about the authority
+    // read that decides whether either of these buttons is rendered at all.
+    expect(await screen.findByRole('button', { name: 'Pause new bridges' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Save route' })).toBeEnabled()
   })
 })
 
