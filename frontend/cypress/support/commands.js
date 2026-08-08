@@ -464,6 +464,25 @@ Cypress.Commands.add('enterAmountViaKeypad', (baseId, amount) => {
     const keyId = ch === '.' ? `${baseId}-key-decimal` : `${baseId}-key-${ch}`
     cy.get(`#${keyId}`).click({ force: true })
   }
+
+  /*
+   * WAIT FOR THE COMMAND'S OWN EFFECT TO LAND.
+   *
+   * Each key click dispatches a React state update; clicking submit immediately after the last one
+   * can submit while formData.stakeAmount is still stale, which fails validation with "Valid stake
+   * amount is required" and never reaches the success screen. The hero (`#<base>-hero`) is the
+   * rendered value, so asserting it is a deterministic settle rather than a sleep.
+   *
+   * This is what an instrumented diagnostic was accidentally supplying: it read #fm-stake-hero
+   * before submitting, and that read — not the extra time — was doing the work.
+   */
+  cy.get(`#${baseId}-hero`, { timeout: 10000 })
+    .invoke('text')
+    .should((shown) => {
+      const digits = shown.replace(/[^0-9.]/g, '')
+      const want = text === '' ? '0' : text
+      expect(digits, `keypad ${baseId} should show ${want}`).to.contain(want)
+    })
 })
 
 /**
@@ -736,9 +755,13 @@ Cypress.Commands.add('ensureEncryptionKeys', (indexes = [0, 1]) => {
     cy.mockWeb3Provider({ account: needed[0] })
     cy.visit('/wallet?tab=security')
     cy.get('body', { timeout: 10000 }).should('be.visible')
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.selectInjectedConnector()
-    cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
+    /*
+     * cy.connectWallet() rather than a hand-rolled open+select: it already opens ConnectModal,
+     * CHOOSES a connector, and waits for .wallet-account-button. Duplicating that here is how the
+     * two drifted — this copy opened the dialog by class while connectWallet finds the button by
+     * text, and it broke on the fresh-chain path where registration actually has to happen.
+     */
+    cy.connectWallet()
 
     needed.forEach((address, pos) => {
       if (pos > 0) {
