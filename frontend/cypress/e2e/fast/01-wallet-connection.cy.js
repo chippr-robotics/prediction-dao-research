@@ -261,23 +261,62 @@ describe('Wallet Connection', () => {
    * Once connecting worked, both halves went false and it failed — the test had been reporting on
    * a broken connect, not on network handling. 56 is genuinely absent from NETWORKS.
    */
-  // PENDING (#1030): the network-error banner is UNREACHABLE, so this cannot be written honestly yet.
-  //
-  // Measured, not assumed. `App.jsx:121` renders the banner on `networkError && isConnected`, and
-  // `WalletContext.jsx:277` clears networkError whenever `isSupportedChainId(chainId)`. Reaching it
-  // needs a chain the app rejects — and there is no such chain:
-  //   * every chain in wagmi's config (wagmi.js:212) is also a key in NETWORKS, so no configured
-  //     chain is unsupported; and
-  //   * on an UNCONFIGURED chain, wagmi's `useChainId()` reports a configured chain instead of the
-  //     wallet's. Probed with the wallet on BNB (0x38): the app rendered "Polygon" and stayed
-  //     connected with no banner. That misreporting is the bug filed as #1030.
-  //
-  // The old version passed `networkId: 1` calling it "the app expects a Polygon chain", but
-  // Ethereum became supported with spec 067. It survived only because its assertion accepted
-  // `hasBanner || hasConnectBtn` and the pre-#1019 connector click never actually connected,
-  // leaving the Connect button on screen. Once connecting worked, both halves went false — the
-  // test had been reporting on a broken connect, never on network handling.
-  it.skip('[WAL-08] Connect on wrong network', () => {})
+  /*
+   * FIXED (#1030). The banner used to be unreachable: `WalletContext` read the chain from wagmi's
+   * `useChainId()`, which reports `config.state.chainId` — and wagmi refuses to write an
+   * UNCONFIGURED chain there ("If chain is not configured, then don't switch over to it",
+   * createConfig.js). Since every configured chain is also a NETWORKS key, `isSupportedChainId`
+   * was unconditionally true, so both the auto-switch and the banner were dead code and the app
+   * displayed "Polygon" to a member sitting on BNB. It now reads the CONNECTION's chainId
+   * (`useWalletChainId`), which carries the wallet's real chain.
+   */
+  it('[WAL-08] Connect on wrong network', () => {
+    // Chain 56 (BNB) is genuinely absent from NETWORKS. `rejectChainSwitch` models the member
+    // declining the app's automatic switch — the only path that reaches the banner.
+    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0], networkId: 56, rejectChainSwitch: true })
+    cy.visit('/fairwins')
+    cy.get('body').should('be.visible')
+
+    // Count what the app actually ASKS the wallet to do. Without this the test could pass on a
+    // banner rendered for some unrelated reason; with it, the auto-switch has to genuinely fire.
+    cy.window().then((win) => {
+      win.__switchChainRequests = 0
+      const request = win.ethereum.request.bind(win.ethereum)
+      win.ethereum.request = (args) => {
+        if (args?.method === 'wallet_switchEthereumChain') win.__switchChainRequests += 1
+        return request(args)
+      }
+    })
+
+    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
+      .should('be.visible')
+      .click()
+    cy.selectInjectedConnector()
+    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 15000 })
+      .should('be.visible')
+
+    // The app must try to move the member onto a chain it supports...
+    cy.window({ timeout: 10000 }).should((win) => {
+      expect(win.__switchChainRequests, 'wallet_switchEthereumChain requests').to.be.greaterThan(0)
+    })
+
+    // ...and when the wallet refuses, say so, with a way out.
+    cy.get('.network-error-banner', { timeout: 10000 })
+      .should('be.visible')
+      .and('contain.text', 'Polygon')
+    cy.get('.network-error-banner .switch-network-button').should('be.visible')
+
+    // The wallet really is still on BNB, so the banner is reporting the present, not a stale state.
+    cy.window().its('ethereum.chainId').should('eq', '0x38')
+
+    // And the app must NOT name a network the member is not on — the actual #1030 defect. Both
+    // halves are required: "not Polygon" alone would pass on an empty chip. The banner is fixed to
+    // the top of the viewport and covers the header, hence the forced click.
+    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]').click({ force: true })
+    cy.get('.network-info', { timeout: 10000 })
+      .should('not.contain.text', 'Polygon')
+      .and('contain.text', '56')
+  })
 
   // ---------------------------------------------------------------------------
   // WAL-09: Switch to correct network from banner — verify banner disappears
@@ -289,12 +328,51 @@ describe('Wallet Connection', () => {
    * member lands on an unsupported chain, is shown the banner, presses the button in it, and the
    * banner clears because the chain genuinely moved.
    */
-  // PENDING (#1030): depends on the same unreachable banner as WAL-08.
-  //
-  // This one was also UNFALSIFIABLE independently of that: its `else` branch was
-  // `expect(true).to.be.true`, so in exactly the case worth reporting — the banner absent — it
-  // passed and said the switch worked. It has never once exercised the button it is named for.
-  it.skip('[WAL-09] Switch to correct network from banner', () => {})
+  it('[WAL-09] Switch to correct network from banner', () => {
+    cy.mockWeb3Provider({ account: TEST_ACCOUNTS[0], networkId: 56, rejectChainSwitch: true })
+    cy.visit('/fairwins')
+    cy.get('body').should('be.visible')
+
+    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
+      .should('be.visible')
+      .click()
+    cy.selectInjectedConnector()
+
+    cy.get('.network-error-banner', { timeout: 15000 }).should('be.visible')
+
+    // Instrument AFTER the automatic attempt, so the count below is the button's doing alone.
+    cy.window().then((win) => {
+      win.__switchChainRequests = 0
+      const request = win.ethereum.request.bind(win.ethereum)
+      win.ethereum.request = (args) => {
+        if (args?.method === 'wallet_switchEthereumChain') win.__switchChainRequests += 1
+        return request(args)
+      }
+    })
+
+    // Pressing the button asks the WALLET. It does not merely hide the banner.
+    cy.get('.network-error-banner .switch-network-button').click()
+    cy.window({ timeout: 10000 }).should((win) => {
+      expect(
+        win.__switchChainRequests,
+        'wallet_switchEthereumChain requests raised by the banner button',
+      ).to.be.greaterThan(0)
+    })
+
+    // This wallet keeps refusing, so the banner MUST stay. Clearing it here would be the same lie
+    // the old version told with `expect(true).to.be.true`.
+    cy.get('.network-error-banner').should('be.visible')
+
+    // The member switches in their wallet instead. The page has to follow.
+    cy.window().then((win) => win.ethereum.__cySetChain(137))
+
+    cy.get('.network-error-banner').should('not.exist')
+    cy.window().its('ethereum.chainId').should('eq', '0x89')
+    cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
+      .should('be.visible')
+      .click()
+    cy.get('.network-info', { timeout: 10000 }).should('contain.text', 'Polygon')
+  })
 
   // ---------------------------------------------------------------------------
   // WAL-10: No wallet extension — verify "Not Detected" state

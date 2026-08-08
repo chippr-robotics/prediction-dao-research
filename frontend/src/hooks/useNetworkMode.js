@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
-import { useChainId, useSwitchChain } from 'wagmi'
-import { getNetwork, TESTNET_MAINNET_PAIR, getCurrentChainId } from '../config/networks'
+import { useSwitchChain } from 'wagmi'
+import { NETWORKS, TESTNET_MAINNET_PAIR, getCurrentChainId } from '../config/networks'
+import { useWalletChainId } from './useWalletChainId'
 
 /**
  * Testnet ↔ Mainnet toggle. The default network is Polygon Mainnet; the user
@@ -18,9 +19,16 @@ import { getNetwork, TESTNET_MAINNET_PAIR, getCurrentChainId } from '../config/n
  *  - error: last switch error
  */
 export function useNetworkMode() {
-  const wagmiChainId = useChainId()
-  const chainId = wagmiChainId || getCurrentChainId()
-  const network = getNetwork(chainId)
+  // The wallet's own chain (issue #1030), not the one wagmi's config settled on. Same value as
+  // before for every configured chain; different only when the wallet is somewhere this build
+  // does not know about, which is precisely when saying "Polygon" would be a lie.
+  const walletChainId = useWalletChainId()
+  const chainId = walletChainId || getCurrentChainId()
+  // STRICT lookup, not `getNetwork()`: its fallback to the home network is what let an
+  // unconfigured chain render as "Polygon". `undefined` here means "this build has no entry for
+  // the chain you are on" — every consumer already reads it as `network?.name`, and the one
+  // display site falls through to `Chain <id>`.
+  const network = NETWORKS[chainId]
   const { switchChain, isPending: isSwitching, error } = useSwitchChain()
 
   const mode = useMemo(() => {
