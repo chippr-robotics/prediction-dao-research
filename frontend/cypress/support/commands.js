@@ -673,17 +673,72 @@ Cypress.Commands.add('hasRegisteredKey', (address) => {
 })
 
 /**
+ * Ensure the given test accounts have an encryption key registered on the local KeyRegistry.
+ *
+ * THIS IS A PRECONDITION FOR CREATING ANY WAGER. Encryption is mandatory — the opt-out checkbox
+ * was removed sprints ago — and FriendMarketsModal refuses to create a wager whose opponent has
+ * no key: "Your opponent has not registered their encryption key yet." A fresh local chain has no
+ * keys, so every full-tier create silently stalled on that notice with ZERO validation errors and
+ * an enabled submit button, which is why it looked like a click problem rather than a fixture gap.
+ *
+ * Idempotent: checks KeyRegistry first and only drives the UI for accounts that need it. Keys are
+ * derived from the mock's deterministic per-account signature, so they stay stable across specs.
+ *
+ * @param {number[]} indexes indices into TEST_ACCOUNTS
+ */
+Cypress.Commands.add('ensureEncryptionKeys', (indexes = [0, 1]) => {
+  indexes.forEach((i) => {
+    const address = TEST_ACCOUNTS[i]
+    if (!address) throw new Error(`ensureEncryptionKeys: invalid index ${i}`)
+    // Long timeout: the callback drives a whole connect + register + on-chain poll, and `.then()`
+    // otherwise inherits the 10s default and aborts mid-registration.
+    cy.task('chainTx', { action: 'hasKey', args: { address } }).then({ timeout: 180000 }, (r) => {
+      if (r && r.registered) return
+      cy.mockWeb3Provider({ account: address })
+      cy.visit('/wallet')
+      cy.get('body', { timeout: 10000 }).should('be.visible')
+      cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+      cy.selectInjectedConnector()
+      cy.get('.wallet-account-button', { timeout: 10000 }).should('be.visible')
+      cy.registerEncryptionKeyViaUI(address)
+    })
+  })
+})
+
+/**
  * Register the connected account's encryption key via the WalletPage Security tab.
  * Idempotent — if already registered, it just confirms. Polls KeyRegistry until
  * the key is on-chain. The connected account must already be connected (the mock
  * provides per-account signatures so the registered key is account-specific).
  */
 Cypress.Commands.add('registerEncryptionKeyViaUI', (address) => {
-  cy.visit('/wallet')
-  cy.contains('button', /security/i, { timeout: 10000 }).click()
+  /*
+   * Deep-link by TAB ID, not by clicking a button labelled "Security". Spec 062 renamed that
+   * section to "Recovery" while deliberately keeping the tab id `security` (and a `backup` alias),
+   * so `cy.contains('button', /security/i)` has matched nothing since that rename. The id is the
+   * stable contract; the label is not.
+   */
+  cy.visit('/wallet?tab=security')
+  cy.get('body', { timeout: 10000 }).should('be.visible')
+  /*
+   * OPEN THE ACCORDION FIRST. The button lives inside
+   * `<AccordionSection id="encryption-key" title="Encryption key">` (WalletPage.jsx), which renders
+   * COLLAPSED, so the button exists in the DOM but is not visible and a bare .click() fails
+   * ("covered by another element", then "expected to be visible"). Same trap as f855b30f.
+   *
+   * Deliberately NOT {force: true}: forcing would also sail past a button that is genuinely
+   * unreachable, and this repo has already been bitten by force hiding a real defect.
+   */
+  cy.get('#encryption-key-header', { timeout: 10000 }).then(($h) => {
+    if ($h.attr('aria-expanded') !== 'true') cy.wrap($h).click()
+  })
+
   cy.get('body', { timeout: 10000 }).then(($b) => {
     if (/register encryption key/i.test($b.text())) {
-      cy.contains('button', /register encryption key/i).click()
+      cy.contains('button', /register encryption key/i)
+        .scrollIntoView()
+        .should('be.visible')
+        .click()
     }
   })
   const poll = (n) => cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => {
@@ -957,7 +1012,14 @@ Cypress.Commands.overwrite('visit', (originalFn, url, options = {}) => {
           poll()
         })
 
-      cy.document({ log: false }).then((doc) =>
+      /*
+       * `timeout` is load-bearing: waitForBackdrop polls for up to 12s, but `.then()` inherits the
+       * 10s default command timeout, so on any visit where the connect modal does NOT auto-open the
+       * callback outlived its own timeout and failed with "returned a promise that never resolved".
+       * That made every visit-without-a-modal fail — which is most of them once a spec is already
+       * connected.
+       */
+      cy.document({ log: false }).then({ timeout: 30000 }, (doc) =>
         waitForBackdrop(doc, 12000).then((appeared) => {
           if (!appeared) return undefined
           // Escape rather than clicking the backdrop: the backdrop is the element under test in
