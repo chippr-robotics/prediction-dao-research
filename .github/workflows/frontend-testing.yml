@@ -1,10 +1,11 @@
 name: Frontend Testing and Accessibility Audits
 
 on:
+  # No `branches:` filter — see subgraph-build.yml. This workflow runs the FULL frontend suite,
+  # which is a superset of ci-manager's; restricting it to main/develop meant a PR into a feature
+  # branch was reviewed against the smaller set. That is how the addressBookCrypto AEAD flake
+  # (#1032) reached 075: the PR fixing it could not run the workflow that caught it.
   pull_request:
-    branches:
-      - main
-      - develop
     paths:
       - 'frontend/**'
   push:
