@@ -260,12 +260,7 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-ci
-          path: frontend/dist/
-          retention-days: 7
+      # No dist/ upload: nothing downloads it, and the gate is `npm run build` exiting 0.
 
   docs-build:
     name: Documentation Build
@@ -296,12 +291,10 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs-site
-          path: ./site
-          retention-days: 7
+      # No site upload: this job exists to prove `mkdocs build` succeeds. The published
+      # docs come from deploy-docs.yml, which rebuilds from source and uses
+      # upload-pages-artifact — it never reads this one. At 9.4 MB it was the single
+      # largest per-push artifact after the Cypress videos.
 
   security-analysis:
     name: Security Analysis

@@ -161,7 +161,11 @@ jobs:
         with:
           name: contracts-coverage-report
           path: coverage/
-          retention-days: 30
+          # 7, not 30. The repo is private, so artifacts draw on the account storage
+          # quota (public repos get it free) — 30-day retention at this push rate is
+          # what exhausted it and failed every job on upload. Coverage numbers land in
+          # the step summary above; the HTML is only read same-day, if ever.
+          retention-days: 7
 
   frontend-lint:
     name: Frontend Lint
@@ -335,7 +339,7 @@ jobs:
         with:
           name: frontend-test-coverage
           path: frontend/coverage/
-          retention-days: 30
+          retention-days: 7
 
   frontend-build:
     name: Frontend Build
@@ -384,12 +388,9 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-test
-          path: frontend/dist/
-          retention-days: 7
+      # No dist/ upload. Nothing downloads it — the gate is `npm run build` exiting 0,
+      # and the step summary above already reports bundle sizes and file count. Uploading
+      # 2.5 MB of unread bytes on every push is pure quota burn on a private repo.
 
   cypress-fast-e2e:
     name: Cypress Fast E2E
@@ -508,7 +509,7 @@ jobs:
         with:
           name: cypress-fast-screenshots
           path: frontend/cypress/screenshots
-          retention-days: 30
+          retention-days: 7
 
       - name: Upload Cypress videos
         uses: actions/upload-artifact@v4
@@ -527,4 +528,4 @@ jobs:
         with:
           name: cypress-fast-results
           path: frontend/cypress-output.txt
-          retention-days: 30
+          retention-days: 7

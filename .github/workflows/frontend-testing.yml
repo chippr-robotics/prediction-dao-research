@@ -108,13 +108,10 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: frontend-coverage
-          path: frontend/coverage/
-          retention-days: 30
+      # No coverage upload here. test.yml's `frontend-test-coverage` uploads the SAME
+      # path (frontend/coverage/) on the same push — two 7.4 MB copies of one report.
+      # The percentages land in the step summary above either way, so this job keeps
+      # the summary and test.yml keeps the artifact.
 
   lighthouse-audit:
     name: Lighthouse Accessibility Audit
@@ -199,7 +196,7 @@ jobs:
         with:
           name: lighthouse-results
           path: frontend/.lighthouseci/
-          retention-days: 30
+          retention-days: 7
 
   axe-audit:
     name: axe Accessibility Audit

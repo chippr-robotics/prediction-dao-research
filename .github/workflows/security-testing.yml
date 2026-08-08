@@ -67,7 +67,7 @@ jobs:
         with:
           name: security-gas-report
           path: gas-report.txt
-          retention-days: 30
+          retention-days: 7
 
   coverage-report:
     name: Coverage Analysis
@@ -124,7 +124,7 @@ jobs:
         with:
           name: security-coverage-report
           path: coverage/
-          retention-days: 30
+          retention-days: 7
 
   slither-analysis:
     name: Slither Static Analysis
@@ -187,7 +187,7 @@ jobs:
           path: |
             slither-report.json
             slither-report.md
-          retention-days: 30
+          retention-days: 7
 
   summary:
     name: Generate Test Summary
