@@ -105,7 +105,7 @@ Full picture: [Architecture guide](docs/developer-guide/architecture.md).
 ## Quick start
 
 ```bash
-npm install
+npm install              # ONE install covers every workspace (spec 075)
 npm run compile          # contracts
 npm test                 # contract suite
 npm run test:frontend    # frontend (Vitest)

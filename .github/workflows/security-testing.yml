@@ -1,14 +1,10 @@
 name: Security Testing & Analysis
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-  push:
-    branches:
-      - main
-      - develop
+  # pull_request/push triggers deliberately REMOVED (spec 075, FR-009).
+  # ci-manager.yml invokes this workflow via workflow_call; declaring event triggers here
+  # as well made it run TWICE per commit, which is why ci-manager's change detection only
+  # ever ADDED work instead of reducing it.
   schedule:
     # Run weekly on Monday at 00:00 UTC
     - cron: '0 0 * * 1'
@@ -46,7 +42,11 @@ jobs:
       - name: Run tests with gas reporting
         env:
           REPORT_GAS: true
-        run: npm test 2>&1 | tee test-output.txt
+        # `set -o pipefail` is REQUIRED: piping into `tee` otherwise makes the step's exit
+        # status tee's (always 0), silently discarding this gate's failures (spec 075).
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
 
       - name: Summarize test results
         if: always()
@@ -67,7 +67,7 @@ jobs:
         with:
           name: security-gas-report
           path: gas-report.txt
-          retention-days: 30
+          retention-days: 7
 
   coverage-report:
     name: Coverage Analysis
@@ -124,7 +124,7 @@ jobs:
         with:
           name: security-coverage-report
           path: coverage/
-          retention-days: 30
+          retention-days: 7
 
   slither-analysis:
     name: Slither Static Analysis
@@ -173,6 +173,12 @@ jobs:
         run: |
           slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
+      # Constitution IV + spec 075 FR-007: the scan must actually gate. `|| true` above is retained
+      # deliberately — slither exits non-zero on ANY finding, including informational ones — so the
+      # blocking decision is made here, on IMPACT, instead of being discarded entirely.
+      - name: Enforce Slither severity gate
+        run: node scripts/security/check-slither-findings.js slither-report.json
+
       - name: Upload Slither reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -181,7 +187,7 @@ jobs:
           path: |
             slither-report.json
             slither-report.md
-          retention-days: 30
+          retention-days: 7
 
   summary:
     name: Generate Test Summary

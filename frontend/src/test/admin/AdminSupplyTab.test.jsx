@@ -205,7 +205,15 @@ describe('SupplyTab — the pause is narrow and says so (T128, research R3)', ()
     expect(
       await screen.findByText(/PAUSED — no new Uniswap supplies\. Existing positions are untouched and still withdrawable\./),
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Resume new Uniswap supplies' })).toBeInTheDocument()
+    // ── A ROLE-GATED CONTROL IS AWAITED, NEVER READ WITH A PLAIN `getBy*` ────────────────────────
+    // The tab makes TWO independent async reads: the router's own state (pause flag, pool list) and
+    // `readRouterAuthority`, which decides whether an operator's controls are rendered at all.
+    // Awaiting only the first — the PAUSED banner here, the "Curated pools" table below — and then
+    // reaching for a gated control with a non-retrying query passed 28/28 locally and failed on a
+    // loaded CI runner, where the authority read lands a render later: the test reported "unable to
+    // find Set caps" when what actually happened is that it had not arrived yet. Every query for a
+    // control behind `canPause`/`canConfig` therefore retries.
+    expect(await screen.findByRole('button', { name: 'Resume new Uniswap supplies' })).toBeInTheDocument()
   })
 
   it('dispatches the pause with Uniswap-only wording', async () => {
@@ -223,7 +231,7 @@ describe('SupplyTab — a retired pool is retired, not gone (T129, FR-024)', () 
     expect(within(table).getByText(/RETIRED — closed to new deposits, still withdrawable/)).toBeInTheDocument()
     // Both trading pools are present: retiring one does not remove it from the list.
     expect(within(table).getAllByText(/Trading pool \(Uniswap V3\)/).length).toBe(2)
-    expect(screen.getByRole('button', { name: 'Reopen' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Reopen' })).toBeInTheDocument()
   })
 
   it('shows a position count for it, sourced from the router’s own deposits', async () => {
@@ -297,11 +305,11 @@ describe('SupplyTab — a retired pool is retired, not gone (T129, FR-024)', () 
     const { node, runTx } = props({ isLiquidityAdmin: true })
     render(<SupplyTab {...node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Retire' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Retire' }))[0])
     await waitFor(() =>
       expect(runTx.mock.calls.some((c) => /existing positions untouched/.test(c[1]))).toBe(true),
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Reopen' }))
     await waitFor(() => expect(runTx.mock.calls.some((c) => /reopened/.test(c[1]))).toBe(true))
   })
 })
@@ -314,10 +322,10 @@ describe('SupplyTab — per-leg caps (T130, FR-045)', () => {
     // 10,000 USDC on leg 0, uncapped on leg 1 — not one scalar for both.
     expect(within(table).getByText(/10000\.0 USDC/)).toBeInTheDocument()
 
-    fireEvent.change(screen.getAllByLabelText(/Per-transaction cap for USDC in pool/i)[0], {
+    fireEvent.change((await screen.findAllByLabelText(/Per-transaction cap for USDC in pool/i))[0], {
       target: { value: '500' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set caps' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set caps' }))[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /caps updated/.test(c[1]))).toBe(true))
   })
 
@@ -333,10 +341,10 @@ describe('SupplyTab — per-leg caps (T130, FR-045)', () => {
     await screen.findByRole('table', { name: 'Curated pools' })
 
     // Type ONLY the WETH leg. The pool is capped at 10,000 USDC on leg 0 and uncapped on leg 1.
-    fireEvent.change(screen.getAllByLabelText(/Per-transaction cap for WETH in pool/i)[0], {
+    fireEvent.change((await screen.findAllByLabelText(/Per-transaction cap for WETH in pool/i))[0], {
       target: { value: '2' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set caps' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set caps' }))[0])
     await waitFor(() => expect(runTx).toHaveBeenCalled())
 
     // Inspect what the transaction thunk actually asks the contract for.
@@ -357,7 +365,7 @@ describe('SupplyTab — per-leg caps (T130, FR-045)', () => {
     render(<SupplyTab {...node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set caps' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set caps' }))[0])
     expect(screen.getByRole('alert')).toHaveTextContent(/Type a new ceiling first/i)
     expect(screen.getByRole('alert')).toHaveTextContent(/enter 0 explicitly/i)
     expect(runTx).not.toHaveBeenCalled()
@@ -368,10 +376,10 @@ describe('SupplyTab — per-leg caps (T130, FR-045)', () => {
     render(<SupplyTab {...node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
 
-    fireEvent.change(screen.getAllByLabelText(/Per-transaction cap for USDC in pool/i)[0], {
+    fireEvent.change((await screen.findAllByLabelText(/Per-transaction cap for USDC in pool/i))[0], {
       target: { value: '0' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set caps' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set caps' }))[0])
     await waitFor(() => expect(runTx.mock.calls.some((c) => /caps updated/.test(c[1]))).toBe(true))
   })
 
@@ -389,10 +397,10 @@ describe('SupplyTab — per-leg caps (T130, FR-045)', () => {
     const { node, runTx } = props({ isLiquidityAdmin: true })
     render(<SupplyTab {...node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
-    fireEvent.change(screen.getAllByLabelText(/Per-transaction cap for USDC in pool/i)[0], {
+    fireEvent.change((await screen.findAllByLabelText(/Per-transaction cap for USDC in pool/i))[0], {
       target: { value: 'lots' },
     })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Set caps' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Set caps' }))[0])
     expect(screen.getByRole('alert')).toHaveTextContent(/Enter an amount in USDC/i)
     expect(runTx).not.toHaveBeenCalled()
   })
@@ -456,8 +464,10 @@ describe('SupplyTab — fee is read-only (T132, FR-048)', () => {
     m.feeThrows = new Error('FeeRouter unreachable')
     render(<SupplyTab {...props({ isAdmin: true }).node} />)
     expect(await screen.findByText(/could not be read — members cannot start a fee-bearing supply/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pause new Uniswap supplies' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Save pool listing' })).toBeEnabled()
+    // The fee quote is a THIRD independent read; arriving first says nothing about the authority
+    // read that gates these two buttons, so both are awaited rather than assumed present.
+    expect(await screen.findByRole('button', { name: 'Pause new Uniswap supplies' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Save pool listing' })).toBeEnabled()
   })
 })
 
@@ -473,6 +483,11 @@ describe('SupplyTab — least privilege and history', () => {
   it('an operator with none of the three can act on nothing', async () => {
     render(<SupplyTab {...props().node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
+    // Awaited because these are ABSENCE assertions: before the authority read lands, every control
+    // below is absent for the ordinary reason that nothing has been decided yet, and the test would
+    // pass without ever observing the refusal it exists to check. The "not yours to pull" copy only
+    // renders on a definite no, so it is the point at which the absences below mean something.
+    await screen.findByText(/the pause is not yours to pull/i)
     expect(screen.queryByRole('button', { name: /Pause/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Retire/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Set caps/i })).not.toBeInTheDocument()
@@ -497,6 +512,10 @@ describe('SupplyTab — least privilege and history', () => {
   it('is axe-clean fully loaded', async () => {
     const { container } = render(<SupplyTab {...props({ isAdmin: true }).node} />)
     await screen.findByRole('table', { name: 'Curated pools' })
+    // "Fully loaded" has to include the operator controls — the per-row cap inputs and the listing
+    // form are the labelled widgets most likely to carry a violation, and awaiting only the table
+    // would have scanned a tree they had not been added to yet.
+    await screen.findAllByRole('button', { name: 'Set caps' })
     expect(await axe(container)).toHaveNoViolations()
   })
 })

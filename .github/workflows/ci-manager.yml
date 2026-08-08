@@ -1,15 +1,33 @@
 name: CI Manager - Smart Test Selection
 
 on:
+  # EVERY pull request, whatever it targets.
+  #
+  # This was `branches: [main, develop]`, so a PR into any other branch ran NOTHING here — and
+  # this is the workflow that dispatches test.yml and security-testing.yml, i.e. all of them.
+  # Stacked PRs are the normal shape of work in this repo (a feature branch collecting fixes
+  # before one merge to main), and every one of those forks was merging on the strength of
+  # Release Drafter alone. #1018 merged that way: mergeStateStatus CLEAN, zero tests run.
+  #
+  # The base branch is not what decides whether code should be tested. Path filters already keep
+  # the cost proportional — that is this workflow's entire job — so running it everywhere is
+  # cheap. `push` stays scoped: the pull_request event is the gate.
   pull_request:
-    branches:
-      - main
-      - develop
+    # `ready_for_review` matters: the default types are opened/synchronize/reopened, so with the
+    # draft guard below a PR marked ready would otherwise never get a pipeline at all.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
       - develop
   workflow_dispatch:
+
+# Supersede in-flight runs for the same ref (spec 075, FR-010). Without this, pushing a
+# follow-up commit leaves the previous pipeline running to completion, which is where a large
+# share of this repo's runner time went.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -20,12 +38,24 @@ jobs:
   detect-changes:
     name: Detect Changed Components
     runs-on: ubuntu-latest
+    # DRAFT PRs DO NOT RUN CI. GitHub runs workflows on drafts unless a job says otherwise, so
+    # every push to a work-in-progress branch was running the full pipeline — 11 artifact uploads
+    # per run — and the artifact API began rate-limiting. Every other job `needs` this one, so
+    # skipping here skips the pipeline. `github.event.pull_request` is null on push, and
+    # `null != true` is true, so pushes to main/develop are unaffected.
+    if: github.event.pull_request.draft != true
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
       frontend: ${{ steps.filter.outputs.frontend }}
       docs: ${{ steps.filter.outputs.docs }}
       security: ${{ steps.filter.outputs.security }}
       core: ${{ steps.filter.outputs.core }}
+      services: ${{ steps.filter.outputs.services }}
+      packages: ${{ steps.filter.outputs.packages }}
+      tenants: ${{ steps.filter.outputs.tenants }}
+      tooling: ${{ steps.filter.outputs.tooling }}
+      subgraph: ${{ steps.filter.outputs.subgraph }}
+      ops: ${{ steps.filter.outputs.ops }}
       any_code_changed: ${{ steps.check.outputs.any_code_changed }}
     
     steps:
@@ -42,7 +72,9 @@ jobs:
             contracts:
               - 'contracts/**'
               - 'hardhat.config.js'
-              - 'scripts/deploy*.js'
+              # `scripts/deploy*.js` did NOT match scripts/deploy/lib/upgradeable.js (the in-place
+              # upgrade path) or scripts/deploy/check-storage-layout.js (the gate itself).
+              - 'scripts/deploy/**'
               - 'test/*.test.js'
               - 'test/integration/**'
               - 'medusa.json'
@@ -66,6 +98,29 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'turbo.json'
+            # Directories below matched NO filter at all before spec 075. A PR touching only one of
+            # them ran zero jobs and merged green — and now that these checks are REQUIRED, they
+            # would report `skipped`, which SATISFIES a required check. Requiring checks made that
+            # hole quieter, not smaller.
+            services:
+              - 'services/**'
+            packages:
+              - 'packages/**'
+              - 'tools/**'
+            tenants:
+              - 'tenants/**'
+            tooling:
+              - 'scripts/**'
+              - 'test/**'
+            subgraph:
+              - 'subgraph/**'
+            ops:
+              - 'deployments/**'
+              - 'infra/**'
+              - 'ops/**'
+              - '.openzeppelin/**'
 
       - name: Check if any code changed
         id: check
@@ -158,7 +213,20 @@ jobs:
   smart-contract-tests:
     name: Smart Contract Tests
     needs: detect-changes
-    if: needs.detect-changes.outputs.contracts == 'true' || needs.detect-changes.outputs.core == 'true'
+    # test.yml is the workhorse: it owns Dependency Hygiene, Relay Gateway Tests, Tenant Manifest
+    # Validation, Frontend Lint/Unit/Build and Cypress Fast E2E — i.e. most of the REQUIRED checks.
+    # Gating it on contracts||core meant a services-, packages-, tenants-, scripts- or
+    # subgraph-only PR skipped every one of them.
+    if: |
+      needs.detect-changes.outputs.contracts == 'true' ||
+      needs.detect-changes.outputs.core == 'true' ||
+      needs.detect-changes.outputs.frontend == 'true' ||
+      needs.detect-changes.outputs.services == 'true' ||
+      needs.detect-changes.outputs.packages == 'true' ||
+      needs.detect-changes.outputs.tenants == 'true' ||
+      needs.detect-changes.outputs.tooling == 'true' ||
+      needs.detect-changes.outputs.subgraph == 'true' ||
+      needs.detect-changes.outputs.ops == 'true'
     uses: ./.github/workflows/test.yml
 
   frontend-tests:
@@ -180,10 +248,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'  # single root lockfile (spec 075)
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --workspace frontend --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
       - name: Run linter
         run: npm run lint
@@ -191,12 +260,7 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-ci
-          path: frontend/dist/
-          retention-days: 7
+      # No dist/ upload: nothing downloads it, and the gate is `npm run build` exiting 0.
 
   docs-build:
     name: Documentation Build
@@ -227,12 +291,10 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs-site
-          path: ./site
-          retention-days: 7
+      # No site upload: this job exists to prove `mkdocs build` succeeds. The published
+      # docs come from deploy-docs.yml, which rebuilds from source and uses
+      # upload-pages-artifact — it never reads this one. At 9.4 MB it was the single
+      # largest per-push artifact after the Cypress videos.
 
   security-analysis:
     name: Security Analysis

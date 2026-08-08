@@ -18,7 +18,7 @@
 
 import react from '@vitejs/plugin-react'
 
-import { createMiniAppConfig } from '../../../../../../tools/miniapp-build/index.js'
+import { createMiniAppConfig } from '@fairwins/miniapp-build/index.js'
 
 export default createMiniAppConfig({
   appId: 'fixture-app',

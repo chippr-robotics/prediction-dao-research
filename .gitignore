@@ -176,3 +176,10 @@ site/
 # Stray Playwright screenshots saved to repo root
 /dashboard-loaded.png
 /open-challenge-modal-taker.png
+
+# Blockscout solc standard-json inputs emitted by scripts/deploy/lib/helpers.js (spec 074)
+blockscout/
+.dependencygraph/
+
+# Turborepo local task cache (spec 075)
+.turbo/

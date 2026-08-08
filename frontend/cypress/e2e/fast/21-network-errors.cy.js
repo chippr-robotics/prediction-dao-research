@@ -10,7 +10,9 @@
 describe('Network & Transaction Errors', () => {
   beforeEach(() => {
     cy.mockWeb3Provider()
-    cy.visit('/fairwins')
+    // Spec 073 moved the wager surface to Finance > Transfer > Wagers; `/fairwins` no longer
+    // hosts the create-wager cards, so openCreateWagerModal had nothing to click (bc294ec8).
+    cy.visit('/wagers')
   })
 
   it('[NET-01] Transaction confirmation shows step-by-step progress', () => {

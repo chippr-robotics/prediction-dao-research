@@ -126,26 +126,7 @@
   gap: 1rem;
 }
 
-.demo-mode-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.35rem 0.75rem;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  border-radius: 20px;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  animation: pulse-demo 2s infinite;
-  -webkit-background-clip: unset;
-  -webkit-text-fill-color: white;
-  background-clip: unset;
-}
 
-@keyframes pulse-demo {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
 
 .dashboard-subtitle {
   font-size: 0.95rem;

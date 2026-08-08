@@ -20,7 +20,7 @@ dataSources:
         - WagerTransfer
       abis:
         - name: WagerRegistry
-          file: ../frontend/src/abis/WagerRegistry.json
+          file: ../node_modules/@fairwins/abi/json/WagerRegistry.json
       eventHandlers:
         - event: WagerCreated(indexed uint256,indexed address,indexed
             address,address,uint128,uint128,uint8,bytes32,string)
@@ -62,7 +62,7 @@ dataSources:
         - Voucher
       abis:
         - name: MembershipVoucher
-          file: ../frontend/src/abis/MembershipVoucher.json
+          file: ../node_modules/@fairwins/abi/json/MembershipVoucher.json
       eventHandlers:
         - event: VoucherMinted(indexed uint256,indexed address,indexed
             bytes32,uint8,uint32,uint128)
@@ -85,7 +85,7 @@ dataSources:
         - Voucher
       abis:
         - name: MembershipManager
-          file: ../frontend/src/abis/MembershipManager.json
+          file: ../node_modules/@fairwins/abi/json/MembershipManager.json
       eventHandlers:
         - event: MembershipRedeemed(indexed address,indexed bytes32,uint8,indexed
             uint256,uint64)
@@ -107,7 +107,7 @@ dataSources:
         - OracleMarketLink
       abis:
         - name: ChainlinkDataFeedOracleAdapter
-          file: ../frontend/src/abis/ChainlinkDataFeedOracleAdapter.json
+          file: ../node_modules/@fairwins/abi/json/ChainlinkDataFeedOracleAdapter.json
       eventHandlers:
         - event: ConditionRegistered(indexed bytes32,string,uint256)
           handler: handleDataFeedConditionRegistered
@@ -132,7 +132,7 @@ dataSources:
         - OracleMarketLink
       abis:
         - name: ChainlinkFunctionsOracleAdapter
-          file: ../frontend/src/abis/ChainlinkFunctionsOracleAdapter.json
+          file: ../node_modules/@fairwins/abi/json/ChainlinkFunctionsOracleAdapter.json
       eventHandlers:
         - event: ConditionRegistered(indexed bytes32,string,uint256)
           handler: handleFunctionsConditionRegistered
@@ -157,7 +157,7 @@ dataSources:
         - OracleMarketLink
       abis:
         - name: UMAOptimisticOracleV3Adapter
-          file: ../frontend/src/abis/UMAOptimisticOracleV3Adapter.json
+          file: ../node_modules/@fairwins/abi/json/UMAOptimisticOracleV3Adapter.json
       eventHandlers:
         - event: ConditionRegistered(indexed bytes32,string,uint256)
           handler: handleUmaConditionRegistered
@@ -181,7 +181,7 @@ dataSources:
         - Token
       abis:
         - name: TokenFactory
-          file: ../frontend/src/abis/TokenFactory.json
+          file: ../node_modules/@fairwins/abi/json/TokenFactory.json
       eventHandlers:
         - event: TokenCreated(indexed uint256,indexed uint8,indexed
             address,address,string,string)
@@ -203,7 +203,7 @@ dataSources:
         - PoolAllowedToken
       abis:
         - name: WagerPoolFactory
-          file: ./abis/WagerPoolFactory.json
+          file: ../node_modules/@fairwins/abi/json/WagerPoolFactory.json
       eventHandlers:
         - event: PoolCreated(indexed uint256,indexed address,indexed
             address,uint32[4],address,uint256,uint32,uint16,uint64,uint64)
@@ -226,7 +226,7 @@ templates:
         - TokenActivity
       abis:
         - name: TokenInstance
-          file: ../frontend/src/abis/TokenInstance.json
+          file: ../node_modules/@fairwins/abi/json/TokenInstance.json
       eventHandlers:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
@@ -260,7 +260,7 @@ templates:
         - PoolRefund
       abis:
         - name: WagerPool
-          file: ./abis/WagerPool.json
+          file: ../node_modules/@fairwins/abi/json/WagerPool.json
       eventHandlers:
         - event: Joined(indexed address)
           handler: handleJoined

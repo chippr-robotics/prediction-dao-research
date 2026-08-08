@@ -81,7 +81,8 @@ ConnectModal, they never render connector choices of their own.
 ```bash
 npm run frontend           # dev server, from the repo root
 # or
-cd frontend && npm install && npm run dev
+npm install          # root install covers every workspace (spec 075)
+npm run frontend     # == npm run dev --workspace frontend
 ```
 
 ## Contract configuration

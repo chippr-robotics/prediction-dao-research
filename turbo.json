@@ -1,0 +1,151 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "//": "Task graph for spec 075 (US6). Targets wrap npm scripts that already exist. Turborepo does NOT sandbox: an undeclared input yields a WRONG CACHE HIT, not an error \u2014 every `inputs` list is a safety claim. KNOWN LIMITATION: hardhat.config.js runs dotenv inside the task process, after the cache key is computed, so AMOY_RPC_URL in an untracked .env moves no key and silently switches the test chain. Cypress, Slither, Medusa, Manticore, Matchstick, mkdocs, cloudbuild and every deploy path are OUTSIDE this graph. See docs/developer-guide/monorepo.md.",
+  "globalDependencies": [
+    "package-lock.json",
+    "hardhat.config.js",
+    ".solcover.js",
+    "coverage-threshold-policy.json"
+  ],
+  "globalEnv": [
+    "AMOY_RPC_URL",
+    "AMOY_FORK_BLOCK",
+    "MAINNET_RPC_URL",
+    "OPTIMISM_RPC_URL",
+    "BASE_RPC_URL",
+    "ARBITRUM_RPC_URL",
+    "POLYGON_RPC_URL",
+    "FORCE_SOLCJS",
+    "REPORT_GAS",
+    "COVERAGE",
+    "TZ",
+    "NODE_OPTIONS",
+    "VITE_TENANT_ID",
+    "VITE_NETWORK_ID"
+  ],
+  "tasks": {
+    "//#compile": {
+      "inputs": [
+        "contracts/**/*.sol",
+        "hardhat.config.js"
+      ],
+      "outputs": [
+        "artifacts/**",
+        "cache/**"
+      ]
+    },
+    "//#test": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "test/**",
+        "contracts/**/*.sol",
+        "scripts/deploy/lib/**",
+        "scripts/coverage/lib/**",
+        "scripts/operations/seed-local.js",
+        "packages/intent-types/src/**",
+        "services/relay-gateway/src/paymaster/build.js"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "eslint.config.js"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vite.config.js",
+        "vite-plugins/**",
+        "../../tenants/**",
+        "../../packages/*/src/**"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "src/**",
+        "public/**",
+        "index.html",
+        "vite.config.js",
+        "vite-plugins/**",
+        "../../tenants/**"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "codegen": {
+      "dependsOn": [
+        "//#check:abis"
+      ],
+      "inputs": [
+        "subgraph.yaml",
+        "schema.graphql",
+        "../packages/abi/json/**"
+      ],
+      "outputs": [
+        "generated/**"
+      ]
+    },
+    "//#check:storage-layout": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "artifacts/build-info/**",
+        ".openzeppelin/**",
+        "deployments/**",
+        "cache/validations.json"
+      ],
+      "cache": false
+    },
+    "//#check:abis": {
+      "dependsOn": [
+        "//#compile"
+      ],
+      "inputs": [
+        "artifacts/build-info/**",
+        "scripts/codegen/**",
+        "packages/abi/**"
+      ]
+    },
+    "//#check:deps": {
+      "inputs": [
+        "package.json",
+        "package-lock.json",
+        "*/package.json",
+        "*/*/package.json",
+        "frontend/src/**",
+        "services/*/src/**"
+      ]
+    },
+    "//#tenants:validate": {
+      "inputs": [
+        "tenants/**",
+        "scripts/tenants/**"
+      ]
+    },
+    "//#test:coverage": {
+      "inputs": [
+        "contracts/**/*.sol",
+        "test/**",
+        ".solcover.js"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    }
+  }
+}

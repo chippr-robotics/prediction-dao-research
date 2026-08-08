@@ -4,21 +4,29 @@ name: Subgraph Build and Tests
 # as a failing gate. No continue-on-error on these steps (constitution IV).
 
 on:
+  # No `branches:` filter. A base-branch filter is not a decision about whether code needs
+  # testing: a PR into a feature branch would skip this gate entirely, and stacked PRs (a
+  # feature branch collecting fixes before one merge to main) are the normal shape of work
+  # here. The `paths:` filter below is what scopes this workflow; the base branch is not.
   pull_request:
-    branches:
-      - main
-      - develop
     paths:
       - 'subgraph/**'
-      - 'frontend/src/abis/WagerRegistry.json'
+      - 'packages/abi/**'
   push:
     branches:
       - main
       - develop
     paths:
       - 'subgraph/**'
-      - 'frontend/src/abis/WagerRegistry.json'
+      - 'packages/abi/**'
   workflow_dispatch:
+
+# Supersede in-flight runs for the same ref (spec 075, FR-010). Without this, pushing a
+# follow-up commit leaves the previous pipeline running to completion, which is where a large
+# share of this repo's runner time went.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -42,14 +50,26 @@ jobs:
           node-version: '22'
 
       - name: Install subgraph dependencies
-        run: npm install
+        run: npm ci --workspace prediction-dao-research-subgraph --include-workspace-root=false
+        working-directory: .  # root install; the child has no lockfile (spec 075)
 
-      - name: Verify generated ABI is present
+      # spec 075: the subgraph reads GENERATED ABIs from @fairwins/abi, not hand-written files
+      # under frontend/src/abis (which no longer exist). Checks every ABI subgraph.yaml declares,
+      # rather than one representative file — the previous guard checked only WagerRegistry.json
+      # and would have missed any other ABI going absent.
+      - name: Verify the generated ABIs the manifest declares are present
+        working-directory: .
         run: |
-          if [ ! -f "../frontend/src/abis/WagerRegistry.json" ]; then
-            echo "::error::frontend/src/abis/WagerRegistry.json missing — run npm run sync:frontend-contracts:<net>"
-            exit 1
-          fi
+          missing=0
+          for f in $(grep -oE '\.\./node_modules/@fairwins/abi/json/[A-Za-z]+\.json' subgraph/subgraph.yaml | sort -u); do
+            name="$(basename "$f")"
+            if [ ! -f "packages/abi/json/$name" ]; then
+              echo "::error::packages/abi/json/$name is missing — run \`npm run codegen:abis\`"
+              missing=1
+            fi
+          done
+          [ "$missing" = "0" ] || exit 1
+          echo "All ABIs referenced by subgraph.yaml are present in packages/abi/json/."
 
       - name: Codegen
         run: npm run codegen
@@ -65,5 +85,13 @@ jobs:
       - name: Build Matchstick runner image
         run: docker build -f matchstick.Dockerfile -t fw-matchstick .
 
+      # spec 075: under npm workspaces the subgraph has NO local node_modules — @graphprotocol/graph-ts
+      # and matchstick-as hoist to the repo root. Matchstick resolves libs from `./node_modules`
+      # INSIDE the container, so the root tree is mounted there explicitly. A symlink would not
+      # work: its target sits outside the bind mount.
       - name: Matchstick unit tests (Docker)
-        run: docker run --rm -v "$PWD":/matchstick fw-matchstick
+        run: |
+          docker run --rm \
+            -v "$PWD":/matchstick \
+            -v "$PWD/../node_modules":/matchstick/node_modules:ro \
+            fw-matchstick

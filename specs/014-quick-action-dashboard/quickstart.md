@@ -42,7 +42,7 @@ Enter on the first tile opens the create dialog (A7/B1/B3/C5).
 npm run frontend   # starts the Vite dev server
 ```
 
-Then connect a wallet (or run with `VITE_USE_MOCK_WAGERS=true` for demo mode) and
+Then connect a wallet (demo mode was removed; the dashboard requires a connection) and
 open the dashboard. Verify against the contract:
 
 - **Grouping (C3/C4, SC-001)**: two labeled clusters — "Start a wager" over the

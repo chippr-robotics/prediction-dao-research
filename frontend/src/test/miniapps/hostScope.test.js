@@ -42,7 +42,7 @@ import {
   SHARED_MODULE_SPECIFIERS,
   STORE_KEY_PATTERN as BUILD_STORE_KEY_PATTERN,
   VERSION_PATTERN as BUILD_VERSION_PATTERN,
-} from '../../../../tools/miniapp-build/constants.js'
+} from '@fairwins/miniapp-build/constants.js'
 
 describe('host scope installation', () => {
   it('publishes the scope under the registered symbol the build preset writes into', () => {

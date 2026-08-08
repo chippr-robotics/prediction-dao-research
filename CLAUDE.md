@@ -350,8 +350,29 @@ artifacts live under `specs/<feature>/`.
   discloses the reload instead of implying an instant switch. See
   `docs/developer-guide/network-endpoints.md` + `specs/069-network-endpoints-user-panel/`.
 
+- **The repo is an npm WORKSPACE (spec 075): one root lockfile, 8 members, `contracts/` deliberately
+  NOT a member** (it is one compilation unit and cannot be split). Two skills carry the operational
+  detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
+  and **`monorepo-verify`** (the gate suite and what each gate proves). Three rules are absolute,
+  each because it already went wrong here: (1) **Never recover an install with `npm install`** —
+  npm/cli#4828 silently drops `@rollup/rollup-linux-x64-gnu` from node_modules AND the lockfile on
+  an incremental install, breaking every Vite build including the on-chain mini-app release path,
+  and re-running `npm install` cannot fix it (the lock is already wrong, so npm reports "up to
+  date"). Use `npm run deps:reinstall`. (2) **Every dependency contributing Solidity source is
+  pinned EXACTLY** — a caret range makes deployed bytecode a function of when the lockfile was last
+  resolved; `@chainlink/contracts` floating 1.3.0→1.5.0 changed `ChainlinkFunctionsOracleAdapter`'s
+  bytecode and only the byte-diff gate caught it. (3) **A shared package under `packages/` MUST be
+  resolvable by plain Node** (extensioned imports + explicit `exports`) — `frontend/src` has ~2,966
+  extensionless imports while the gateway is Node ESM, which is *why* the EIP-712 structs stayed
+  duplicated. Those structs + their action metadata now have ONE source, `@fairwins/intent-types`,
+  checked against the verifying contracts by `test/intent/TypehashParity.test.js` and
+  `services/relay-gateway/test/actionCoverage.test.js`. Any change touching dependencies, hoisting,
+  or the build preset MUST pass the byte gates (`scripts/codegen/bytecode-digest.js`,
+  `scripts/miniapps/record-build-digests.js`) — mini-app output bytes are keccak-committed
+  on-chain. See `specs/075-monorepo-workspaces/`.
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/074-unified-my-account/plan.md
+at specs/075-monorepo-workspaces/plan.md
 <!-- SPECKIT END -->

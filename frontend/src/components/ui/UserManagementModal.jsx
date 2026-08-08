@@ -152,7 +152,7 @@ function UserManagementModal({ onScanMarket }) {
 
             <div className="section">
               <h3>Network</h3>
-              <div className="demo-mode-section">
+              <div className="network-toggle-section">
                 <div className="status-display">
                   <span className={`status-badge ${isMainnet ? 'live' : 'demo'}`}>
                     {isMainnet ? 'Mainnet' : 'Testnet'}
@@ -161,14 +161,14 @@ function UserManagementModal({ onScanMarket }) {
                 </div>
                 <button
                   onClick={handleToggleNetwork}
-                  className="toggle-demo-btn"
+                  className="toggle-network-btn"
                   disabled={isSwitchingNetwork}
                 >
                   {isSwitchingNetwork
                     ? 'Switching…'
                     : `Switch to ${isMainnet ? 'Testnet' : 'Mainnet'}`}
                 </button>
-                <p className="demo-mode-description">
+                <p className="network-toggle-description">
                   {isMainnet
                     ? <><span aria-hidden="true">🌐</span> Mainnet: Connected to Polygon. Transactions use real funds and gas.</>
                     : <><span aria-hidden="true">🧪</span> Testnet: Connected to Polygon Amoy. Use a faucet for test MATIC.</>}

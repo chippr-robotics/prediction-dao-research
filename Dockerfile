@@ -2,19 +2,33 @@
 # Stage 1: Build the React application
 FROM node:22-alpine AS build
 
+# Build from the REPO ROOT, not frontend/ (spec 075). There is one root lockfile now, so
+# `COPY frontend/package*.json` matched only package.json and `npm ci` failed outright with
+# "can only install with an existing package-lock.json". Restoring a child lockfile is not the
+# fix either: frontend/package.json declares @fairwins/intent-types and @fairwins/miniapp-build,
+# which are `private: true` workspace packages that can never resolve from the registry.
+WORKDIR /app
+
+# Manifests first, so a source-only change does not invalidate the install layer.
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
+COPY packages/intent-types/package.json ./packages/intent-types/
+COPY tools/miniapp-build/package.json ./tools/miniapp-build/
+
+RUN npm ci --workspace frontend --include-workspace-root=false
+
+# The linked workspace SOURCES. `npm ci` writes a workspace link whether or not the target
+# directory exists — a missing one yields a DANGLING symlink and an install that looks clean,
+# which is exactly how the relay-gateway image built successfully and then crashed on boot.
+COPY packages/intent-types/ ./packages/intent-types/
+COPY tools/miniapp-build/ ./tools/miniapp-build/
+
+# Source + tenant manifests (spec 072 — the tenant-branding plugin resolves tenants/ as a
+# sibling of the frontend tree; the build fails loudly if the directory is missing).
+COPY frontend/ ./frontend/
+COPY tenants/ ./tenants/
+
 WORKDIR /app/frontend
-
-# Copy package files
-COPY frontend/package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code + tenant manifests (spec 072 — the tenant-branding plugin
-# resolves tenants/ as a sibling of the frontend tree; the build fails loudly
-# if the directory is missing)
-COPY frontend/ .
-COPY tenants/ ../tenants/
 
 # Build arguments for environment variables (baked into JS bundle at build time)
 # Note: VITE_PINATA_JWT is NOT included here - it's handled at runtime via nginx proxy

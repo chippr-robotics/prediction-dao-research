@@ -75,12 +75,12 @@ const MORDOR_CONTRACTS = {
 const HARDHAT_CONTRACTS = {
   deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   treasury: '',
-  wagerRegistry: '0x31F2B0a0d14a8814af2430154ee39E551b66BA8A',
-  membershipManager: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
-  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
-  sanctionsGuard: '',
-  polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
-  paymentToken: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+  wagerRegistry: '0x9A676e781A523b5d0C0e43731313A708CB607508',
+  membershipManager: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
+  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
+  sanctionsGuard: '0xA29BCB4a6355Ec3e2e62B280Bf0cA76C7927A207',
+  polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
+  paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
   // spec 049 — multisig policy engine (synced from deployments/hardhat-chain1337-v2.json)
   safePolicyGuard: '0xBE509C8E6c4F132e2Af49761A318FfA362e9CE38',
@@ -98,6 +98,9 @@ const HARDHAT_CONTRACTS = {
   // per-network empty state (FR-051) — never invented availability.
   bridgeRouter: '',
   liquidityRouter: '',
+  membershipVoucher: '0x4a1d81F8c3cd56b44d09a2abB42EeB7Ed83cfBf4',
+  voucherBatchMinter: '0xD238Dd92FdEF481DdFF65B396099EE9FB368684F',
+  tokenFactory: '0x4A679253410272dd5232B3Ff7cF5dbB88f295319',
 }
 
 // Polygon Amoy testnet deployment (v2 — P2P betting architecture)

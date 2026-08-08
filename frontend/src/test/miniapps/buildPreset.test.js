@@ -21,7 +21,7 @@ import {
   HOST_PERMISSIONS as PRESET_PERMISSIONS,
   CONTRACT_NAME_PATTERN as PRESET_CONTRACT_PATTERN,
   MAX_DECLARED_CONTRACTS as PRESET_MAX_CONTRACTS,
-} from '../../../../tools/miniapp-build/index.js'
+} from '@fairwins/miniapp-build/index.js'
 import {
   SUPPORTED_HOST_API,
   HOST_PERMISSIONS,

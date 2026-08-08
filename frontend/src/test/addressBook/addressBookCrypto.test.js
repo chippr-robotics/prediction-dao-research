@@ -45,7 +45,16 @@ describe('addressBookCrypto', () => {
 
   it('rejects a tampered envelope (AEAD)', async () => {
     const envelope = JSON.parse(await exportAddressBook(sampleBook(), signerA))
-    envelope.ciphertext = envelope.ciphertext.slice(0, -2) + '00'
+    /*
+     * The replacement is CONDITIONAL, matching backupCrypto.test.js:34 and claimCode.test.js:126.
+     * It used to append a constant '00', which is a no-op whenever the ciphertext already ends in
+     * '00' — nothing was tampered, the import legitimately succeeded, and the test failed with
+     * "promise resolved instead of rejecting". Measured rate over 200k random ciphertexts: 0.022%,
+     * about 1 run in 4,500 — rare enough to look like a mystery flake in a crypto test and read as
+     * "AEAD did not detect tampering", which is alarming and was never true.
+     */
+    const tail = envelope.ciphertext.slice(-2)
+    envelope.ciphertext = envelope.ciphertext.slice(0, -2) + (tail === '00' ? 'ff' : '00')
     await expect(importAddressBook(JSON.stringify(envelope), signerA)).rejects.toThrow()
   })
 })

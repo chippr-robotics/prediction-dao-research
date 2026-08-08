@@ -298,6 +298,27 @@ async function main() {
     console.error("\nStorage-layout / upgrade-safety check FAILED.");
     process.exit(1);
   }
+
+  // A gate that compared nothing has not passed — it has abstained (spec 075, FR-004).
+  //
+  // This is the exact failure recorded in the header above: every contract fell through the
+  // "no deployed impl to diff against" branch and the script printed a checkmark and exited 0,
+  // while a deliberately corrupted __gap sailed through. The comparison was fixed then; the
+  // ZERO-COMPARISON case was not, so a future change that empties `deployments/` or
+  // `.openzeppelin/` — a bad path join, a renamed record, a build system that relocates them —
+  // silently restores the same green-but-blind gate. Refuse to report success instead.
+  if (compared === 0) {
+    console.error(
+      "\nStorage-layout check FAILED: 0 live implementations were diffed.\n" +
+        "This gate exists to compare compiled layouts against deployed ones; comparing nothing is\n" +
+        "not a pass. Check that deployments/*.json and .openzeppelin/*.json are present and readable\n" +
+        "(they are committed, irreproducible state — see specs/075-monorepo-workspaces/).\n" +
+        "If this repo genuinely has no live upgradeable implementations, that is a deliberate change\n" +
+        "and this guard must be updated explicitly.",
+    );
+    process.exit(1);
+  }
+
   console.log(
     `\nAll upgradeable contracts passed. ${compared} live implementation(s) diffed for append-only compatibility` +
       (unverified.length ? `; ${unverified.length} declared unverifiable (above).` : "."),

@@ -263,14 +263,6 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Quick Actions')).toBeInTheDocument()
     })
 
-    it('should not show the demo mode badge by default', () => {
-      // The demo badge only renders when VITE_USE_MOCK_WAGERS=true (a dev-only
-      // env var). In production tests the toggle is gone, so the badge should
-      // be absent.
-      renderWithProviders(<Dashboard />)
-      expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
-    })
-
     it('should not show redundant connected wallet subtitle', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByText(/Connected:/)).not.toBeInTheDocument()

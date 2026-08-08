@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'contracts/**'
-      - 'scripts/deploy-deterministic.js'
+      - 'scripts/deploy/archive/deploy-deterministic.js'
       - 'hardhat.config.js'
       - '.github/workflows/deploy-contracts.yml'
 
@@ -40,7 +40,7 @@ jobs:
         run: npm ci
 
       - name: Compile contracts
-        run: npm run compile
+        uses: ./.github/actions/setup-hardhat-solc  # seeds + caches BOTH pinned solc versions (spec 075, T026)
 
       - name: Deploy contracts (Deterministic)
         env:
@@ -58,9 +58,14 @@ jobs:
           echo "Factory Address: 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7"
           echo ""
 
-          npx hardhat run scripts/deploy-deterministic.js --network amoy | tee deployment.log
+          # A pipeline reports the LAST command's status, so `hardhat run ... | tee` exits with
+          # TEE's status — always 0. `$?` below was therefore always 0 and a deploy that reverted,
+          # ran out of gas, or could not reach the RPC was reported as a SUCCESSFUL deployment.
+          # Testing the pipeline as the `if` condition keeps errexit from aborting the step before
+          # the diagnostic prints, while pipefail makes the condition reflect hardhat's own status.
+          set -o pipefail
 
-          if [ $? -eq 0 ]; then
+          if npx hardhat run scripts/deploy/archive/deploy-deterministic.js --network amoy | tee deployment.log; then
             echo "✅ Deployment completed successfully!"
           else
             echo "❌ Deployment failed!"

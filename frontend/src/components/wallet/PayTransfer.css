@@ -504,9 +504,10 @@
    tab panel it is also a second top-level heading on the document. The heading goes; the header ROW
    stays, because it also carries the Demo Mode badge — hiding the whole row would take a live
    status indicator with it. */
-.pt-wagers .dashboard-header h1 {
-  display: none;
-}
-.pt-wagers .dashboard-header:not(:has(.demo-mode-badge)) {
+/* The header is hidden here unconditionally. This was
+   `.dashboard-header:not(:has(.demo-mode-badge))`, which only held while a demo badge could
+   exist; with demo mode removed the guard is always true, so it is written plainly rather than
+   left as a condition that reads as if it still discriminates. */
+.pt-wagers .dashboard-header {
   display: none;
 }

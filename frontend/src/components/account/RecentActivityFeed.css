@@ -130,6 +130,16 @@
   flex-direction: column;
 }
 
+/* Each day/week bucket is its own <ul> under an <h4> (see the component: headers must not be
+   direct children of a list). Inherits the flat column look the single list had. */
+.account-feed-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Date-group header (spec 074 follow-up, default "by day"): deliberately
    understated — small, muted, uppercase — with extra breathing room above it
    so a new bucket reads as a soft line break rather than a loud section. */

@@ -429,7 +429,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 
 ## 14. Demo Mode
 
-**Preconditions:** App configured with `VITE_USE_MOCK_WAGERS=true` (or demo mode toggle available).
+**Preconditions:** Wallet connected to a live network. (Demo mode was removed — the platform runs against real networks, so there is no mock-wager path to configure.)
 
 ### Happy Path
 

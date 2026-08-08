@@ -1,0 +1,24 @@
+{
+  "name": "@fairwins/miniapp-clearpath",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ClearPath — external-DAO governance mini-app package (spec 073).",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@fairwins/miniapp-build": "*",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.2.4",
+    "vitest": "^4.0.18",
+    "vitest-axe": "^0.1.0"
+  },
+  "peerDependencies": {
+    "ethers": "^6.17.0",
+    "react": "^19.2.0"
+  }
+}

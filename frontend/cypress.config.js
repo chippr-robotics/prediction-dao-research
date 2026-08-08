@@ -1,6 +1,6 @@
 import { defineConfig } from 'cypress'
 import { ethers } from 'ethers'
-import { readFileSync } from 'fs'
+import { readFileSync, unlinkSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
@@ -74,6 +74,13 @@ export default defineConfig({
     viewportWidth: 1280,
     viewportHeight: 720,
     video: true,
+    /*
+     * Cypress 13+ defaults videoCompression to false, i.e. raw video: the fast suite
+     * produced ~45 MB per run, which on a private repo (artifacts bill against the
+     * account storage quota) was 84% of all CI artifact storage and eventually failed
+     * every job on upload. 32 is Cypress's own pre-13 default CRF.
+     */
+    videoCompression: 32,
     screenshotOnRunFailure: true,
     defaultCommandTimeout: 10000,
     requestTimeout: 10000,
@@ -235,6 +242,27 @@ export default defineConfig({
           return Number(next) - 1
         },
       })
+
+      /*
+       * Keep video only for specs that actually failed. A video of a passing spec is
+       * never watched, and the artifact upload only runs `if: failure()` anyway — so on
+       * a mixed run this drops every passing spec's recording before it is ever bundled.
+       * Deleting here rather than in the workflow means the bytes never leave the runner.
+       */
+      on('after:spec', (spec, results) => {
+        if (!results?.video) return
+        const failed = (results.tests ?? []).some((test) =>
+          (test.attempts ?? []).some((attempt) => attempt.state === 'failed')
+        )
+        if (failed) return
+        try {
+          unlinkSync(results.video)
+        } catch {
+          // Already gone (or never written) — nothing to reclaim, and this must not
+          // fail the run: video cleanup is housekeeping, not a gate.
+        }
+      })
+
       return config
     },
   },

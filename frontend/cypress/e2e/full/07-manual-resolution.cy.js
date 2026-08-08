@@ -21,14 +21,11 @@ const TEST_ACCOUNTS = [
  */
 function connectAndVisit(accountIndex = 0) {
   cy.mockWeb3Provider({ account: TEST_ACCOUNTS[accountIndex] })
-  cy.visit('/fairwins')
-  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.visitWagers()
 
   cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
     .click()
-  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-    .first()
-    .click()
+  cy.selectInjectedConnector()
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 })
     .should('be.visible')
 }
@@ -58,17 +55,17 @@ function createWager(config = {}) {
     .clear()
     .type(opts.opponent)
 
-  cy.wait(500)
+  // Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+  // formData.opponentResolved (FriendMarketsModal.jsx:699-702), which AddressInput sets from an
+  // async callback; submitting first fails validation with "Opponent address is required" and the
+  // modal simply never reaches the success screen. AddressInput renders
+  // role="img" aria-label="Valid address" once resolution lands.
+  cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
 
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-    .first()
-    .clear()
-    .type(opts.stake.toString())
+  cy.enterAmountViaKeypad('fm-stake', opts.stake.toString())
 
   if (opts.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select')
-      .first()
-      .select(opts.resolutionType.toString())
+    cy.selectResolutionType(opts.resolutionType.toString())
   }
 
   if (opts.arbitrator) {
@@ -78,23 +75,14 @@ function createWager(config = {}) {
     cy.wait(500)
   }
 
-  // Disable encryption
-  cy.get('[role="dialog"]').then(($modal) => {
-    const encToggle = $modal.find('input[type="checkbox"]')
-    if (encToggle.length > 0 && encToggle.is(':checked')) {
-      cy.wrap(encToggle.first()).uncheck({ force: true })
-    }
-  })
+  // Encryption is ON by default and is no longer optional — the opt-out checkbox was removed
+  // from FriendMarketsModal several sprints ago (grep `checkbox` there returns nothing). The
+  // block that used to uncheck it was a no-op guarded by `if (length > 0)`, so it silently did
+  // nothing while the spec read as though it controlled encryption. (#1028)
 
-  cy.get('[role="dialog"], .modal')
-    .find('button[type="submit"], button')
-    .filter(':contains("Create")')
-    .click({ force: true })
+  cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    expect(lower.includes('created') || lower.includes('success') || lower.includes('share')).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('exist')
 
   cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn')
     .click({ force: true })
@@ -186,6 +174,14 @@ function resolveWithOutcome(outcome = 'Pass') {
 }
 
 describe('Manual Resolution', () => {
+  before(() => {
+    // Encryption is MANDATORY: FriendMarketsModal refuses to create a wager whose opponent has
+    // no key in KeyRegistry, silently and with no validation error. A fresh chain has none.
+    // Keys persist on chain, so this is once per spec — later runs hit the hasKey fast path.
+    cy.ensureWagerCapacity([0, 1])
+    cy.ensureEncryptionKeys([0, 1])
+  })
+
   beforeEach(() => {
     cy.clearLocalStorage()
     cy.clearCookies()
@@ -204,8 +200,6 @@ describe('Manual Resolution', () => {
 
     // Step 2: Accept as opponent
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     // Step 3: Advance time past end date (1 day default + buffer)
@@ -213,8 +207,6 @@ describe('Manual Resolution', () => {
 
     // Step 4: Switch back to creator and resolve
     cy.switchAccount(0)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
     openResolutionForFirstWager()
 
@@ -239,8 +231,6 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -277,16 +267,12 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
 
     // Switch to creator to resolve
     cy.switchAccount(0)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
     openResolutionForFirstWager()
 
@@ -310,8 +296,6 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -348,16 +332,12 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
 
     // Switch to arbitrator
     cy.switchAccount(2)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
     // Arbitrator may see the wager in their participating list
     cy.openMyWagers('participating')
@@ -412,14 +392,10 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     // Do NOT advance time — wager is still active (before end date)
     cy.switchAccount(0)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
 
     cy.openMyWagers('created')
 
@@ -458,8 +434,6 @@ describe('Manual Resolution', () => {
     })
 
     cy.switchAccount(1)
-    cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
     acceptPendingWager()
 
     cy.advanceTime(25 * 60 * 60)
@@ -600,14 +574,11 @@ describe('Manual Resolution', () => {
   // ---------------------------------------------------------------------------
   it('[RES-13] Bystander cannot resolve any wager', () => {
     cy.mockWeb3Provider({ account: TEST_ACCOUNTS[4] }) // Bystander
-    cy.visit('/fairwins')
-    cy.get('body', { timeout: 10000 }).should('be.visible')
+    cy.visitWagers()
 
     cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
       .click()
-    cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
-      .first()
-      .click()
+    cy.selectInjectedConnector()
 
     cy.openMyWagers('created')
 

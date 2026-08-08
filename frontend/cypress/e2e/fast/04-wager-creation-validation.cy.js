@@ -12,7 +12,13 @@
 describe('Wager Creation Form Validation', () => {
   beforeEach(() => {
     cy.mockWeb3Provider()
-    cy.visit('/fairwins')
+    /*
+     * Wager creation lives at Finance > Transfer > Wagers since spec 073 moved it
+     * (WAGERS_VIEW/WAGERS_PATH in config/appNav.js, rendered by PayTransferPanel);
+     * `/fairwins` no longer hosts the "Friends Decide" card, so openCreateWagerModal
+     * had nothing to click. Same relocation already fixed for 13-dashboard in bc294ec8.
+     */
+    cy.visit('/wagers')
     cy.connectWallet()
   })
 
@@ -70,21 +76,29 @@ describe('Wager Creation Form Validation', () => {
       stake: 0
     })
 
-    // Form should prevent submission with zero stake
+    /*
+     * Assert the ACTUAL validation message (FriendMarketsModal.jsx:737), not /stake|amount|minimum/i
+     * — that pattern matched the permanent "Stake Amount" field label, so it held whether or not
+     * validation ran. The old branch was doubly unfalsifiable: its `else` asserted
+     * `expect(isDisabled).to.be.true` inside the branch reached only when isDisabled was true.
+     * The submit button's disabled state is `submitting || !isConnected || !isCorrectNetwork`
+     * (FriendMarketsModal.jsx:1896) and never depends on the stake, so submitting is the only way
+     * to reach the validation path. (#1019)
+     */
     cy.get('[role="dialog"], .modal')
       .find('button[type="submit"], button')
       .filter(':contains("Create")')
-      .then(($btn) => {
-        // Button should be disabled or show validation error
-        const isDisabled = $btn.is(':disabled') || $btn.attr('aria-disabled') === 'true'
-        if (!isDisabled) {
-          cy.wrap($btn).click({ force: true })
-          // Should show error after submission attempt
-          cy.get('[role="dialog"], .modal').invoke('text').should('match', /stake|amount|minimum/i)
-        } else {
-          expect(isDisabled).to.be.true
-        }
-      })
+      .first()
+      .click({ force: true })
+
+    /*
+     * `exist`, not `be.visible`. The error IS rendered — Cypress reports the element as present but
+     * "overflowed by other elements" inside the fixed-position modal, i.e. it is below the fold of
+     * a form the app does not scroll to the first error. That is a real UX observation (#1019) and
+     * a DIFFERENT claim from the one this test is named for; asserting visibility here would couple
+     * "does validation fire" to "does the modal scroll", and fail for the wrong reason.
+     */
+    cy.contains('.fm-error', 'Valid stake amount is required', { timeout: 5000 }).should('exist')
   })
 
   it('[CRE-22] Create wager exceeding max stake (1000) shows validation error', () => {
@@ -117,19 +131,15 @@ describe('Wager Creation Form Validation', () => {
     cy.openCreateWagerModal('oneVsOne')
 
     // Select Third Party resolution type
-    cy.get('[role="dialog"], .modal').within(() => {
-      cy.get('select, [role="listbox"]').then(($selects) => {
-        // Find the resolution type dropdown
-        const resolutionSelect = $selects.filter((_, el) => {
-          const text = Cypress.$(el).text().toLowerCase()
-          return text.includes('third') || text.includes('party') || text.includes('resolution')
-        })
-
-        if (resolutionSelect.length > 0) {
-          cy.wrap(resolutionSelect.first()).select('Third Party')
-        }
-      })
-    })
+    /*
+     * cy.selectResolutionType, not a hand-rolled <select> search. The resolution control is a
+     * PillSelect (role="radiogroup" of role="radio" buttons); the ONLY <select> in the modal is
+     * #fm-stake-token. So the old text filter matched nothing, `if (length > 0)` SILENTLY SKIPPED
+     * the selection, and CRE-24 submitted with the DEFAULT resolution type — then passed anyway,
+     * because its error matcher includes /required/, which ordinary field validation produces.
+     * A test named for third-party arbitration that never selected third-party arbitration.
+     */
+    cy.selectResolutionType(3)
 
     cy.fillWagerForm({
       opponent: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
