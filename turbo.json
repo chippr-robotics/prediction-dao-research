@@ -66,8 +66,8 @@
         "test/**",
         "vite.config.js",
         "vite-plugins/**",
-        "../../tenants/**",
-        "../../packages/*/src/**"
+        "$TURBO_ROOT$/tenants/**",
+        "$TURBO_ROOT$/packages/*/src/**"
       ]
     },
     "build": {
@@ -80,10 +80,35 @@
         "index.html",
         "vite.config.js",
         "vite-plugins/**",
-        "../../tenants/**"
+        "$TURBO_ROOT$/tenants/**"
       ],
       "outputs": [
         "dist/**"
+      ]
+    },
+    "@fairwins/miniapp-build#build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "*.js",
+        "package.json",
+        "$TURBO_ROOT$/tenants/**"
+      ],
+      "outputs": []
+    },
+    "prediction-dao-research-subgraph#build": {
+      "dependsOn": [
+        "codegen"
+      ],
+      "inputs": [
+        "src/**",
+        "subgraph.yaml",
+        "schema.graphql",
+        "$TURBO_ROOT$/packages/abi/json/**"
+      ],
+      "outputs": [
+        "build/**"
       ]
     },
     "codegen": {
