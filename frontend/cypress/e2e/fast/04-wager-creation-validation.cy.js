@@ -131,19 +131,15 @@ describe('Wager Creation Form Validation', () => {
     cy.openCreateWagerModal('oneVsOne')
 
     // Select Third Party resolution type
-    cy.get('[role="dialog"], .modal').within(() => {
-      cy.get('select, [role="listbox"]').then(($selects) => {
-        // Find the resolution type dropdown
-        const resolutionSelect = $selects.filter((_, el) => {
-          const text = Cypress.$(el).text().toLowerCase()
-          return text.includes('third') || text.includes('party') || text.includes('resolution')
-        })
-
-        if (resolutionSelect.length > 0) {
-          cy.wrap(resolutionSelect.first()).select('Third Party')
-        }
-      })
-    })
+    /*
+     * cy.selectResolutionType, not a hand-rolled <select> search. The resolution control is a
+     * PillSelect (role="radiogroup" of role="radio" buttons); the ONLY <select> in the modal is
+     * #fm-stake-token. So the old text filter matched nothing, `if (length > 0)` SILENTLY SKIPPED
+     * the selection, and CRE-24 submitted with the DEFAULT resolution type — then passed anyway,
+     * because its error matcher includes /required/, which ordinary field validation produces.
+     * A test named for third-party arbitration that never selected third-party arbitration.
+     */
+    cy.selectResolutionType(3)
 
     cy.fillWagerForm({
       opponent: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',

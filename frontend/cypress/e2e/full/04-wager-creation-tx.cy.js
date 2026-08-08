@@ -53,8 +53,14 @@ function openAndFillWagerForm(config = {}) {
       .first()
       .clear()
       .type(config.opponent)
-    // Wait for address resolution
-    cy.wait(500)
+    /*
+     * Wait for the address to RESOLVE, not a fixed 500ms. validateForm requires
+     * formData.opponentResolved; submitting first fails validation and the modal never reaches the
+     * success screen, so the failure surfaces 60s later as a timeout on the success copy and points
+     * at the transaction instead of at the form. The same fix was already applied to CRE-11 lower in
+     * THIS file — one copy got it, the helper serving CRE-01..CRE-09 did not.
+     */
+    cy.get('[aria-label="Valid address"]', { timeout: 15000 }).should('exist')
   }
 
   // Set stake amount
