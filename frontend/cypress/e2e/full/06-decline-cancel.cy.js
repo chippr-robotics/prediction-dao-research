@@ -57,10 +57,7 @@ function createWagerForTest(description, opponent = TEST_ACCOUNTS[1]) {
   cy.get('.fm-btn-primary', { timeout: 10000 }).should('not.be.disabled').click()
 
   // Wait for creation
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    expect(lower.includes('created') || lower.includes('success') || lower.includes('share')).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
 
   // Close modal
   cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn')

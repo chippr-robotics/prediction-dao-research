@@ -104,35 +104,14 @@ function submitWagerForm() {
 
   // Wait for transaction to be submitted and confirmed.
   // The form transitions through verify → approve → create → complete.
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    // Success is indicated by the success screen with share options
-    const isComplete = lower.includes('created') ||
-                      lower.includes('success') ||
-                      lower.includes('share') ||
-                      lower.includes('qr') ||
-                      lower.includes('invite')
-    // Or an error we need to assert on
-    const isError = lower.includes('error') ||
-                   lower.includes('failed') ||
-                   lower.includes('rejected')
-    expect(isComplete || isError).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
 }
 
 /**
  * Assert wager was created successfully (success screen visible).
  */
 function assertWagerCreated() {
-  cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-    const lower = text.toLowerCase()
-    const isSuccess = lower.includes('created') ||
-                     lower.includes('success') ||
-                     lower.includes('share') ||
-                     lower.includes('qr code') ||
-                     lower.includes('invite link')
-    expect(isSuccess).to.be.true
-  })
+  cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
 }
 
 describe('Wager Creation with Real Transactions', () => {
@@ -186,15 +165,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     // Native token may not be supported in v2 (ERC20-only).
     // Assert either success or a clear error explaining the limitation.
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('not supported') ||
-                          lower.includes('native') ||
-                          lower.includes('erc20')
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
   })
 
   // ---------------------------------------------------------------------------
@@ -214,14 +185,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('share') ||
-                          lower.includes('balance') // may fail if no WMATIC balance
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
   })
 
   // ---------------------------------------------------------------------------
@@ -297,15 +261,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     // Encrypted wager may fail if opponent hasn't registered key.
     // Either success or a clear error about encryption key is valid.
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('encryption key') ||
-                          lower.includes('register') ||
-                          lower.includes('unencrypted')
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
   })
 
   // ---------------------------------------------------------------------------
@@ -421,14 +377,7 @@ describe('Wager Creation with Real Transactions', () => {
 
     submitWagerForm()
 
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('share') ||
-                          lower.includes('error')
-      expect(validOutcome).to.be.true
-    })
+    cy.contains('Wager Created', { timeout: 60000 }).should('be.visible')
   })
 
   // ---------------------------------------------------------------------------
