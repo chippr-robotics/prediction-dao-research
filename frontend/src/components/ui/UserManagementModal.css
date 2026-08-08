@@ -314,7 +314,7 @@
   background: var(--danger-color-hover, #b91c1c);
 }
 
-/* Demo Mode Section */
+/* Network toggle (Testnet/Mainnet) */
 /* Renamed from .demo-mode-* : this block styles the live Testnet/Mainnet switcher, not demo
    mode. The old names were a leftover, and once demo mode was removed they would have read as
    dead code to the next person cleaning up — deleting them breaks network switching. */

@@ -205,7 +205,8 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
 
 /**
  * Switch to a different Hardhat test account by index (0-4).
- * Re-initializes the mock provider and reloads the page.
+ * Mutates the LIVE provider and emits `accountsChanged`, exactly as a wallet does — it does NOT
+ * reload the page or re-initialise the mock. Asserts the app followed the switch.
  */
 Cypress.Commands.add('switchAccount', (accountIndex) => {
   const account = TEST_ACCOUNTS[accountIndex]
