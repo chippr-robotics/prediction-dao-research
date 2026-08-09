@@ -46,7 +46,10 @@ the PR would produce (FR-012).
 **Negative check** — the gate must not be bypassable:
 
 ```bash
-grep -n "continue-on-error" .github/workflows/version-gate.yml   # must return nothing
+# Match the YAML KEY, not the word: both new workflows carry comments that mention
+# `continue-on-error` in order to forbid it, and a bare word-grep flags those as violations.
+grep -nE '^\s*continue-on-error\s*:' .github/workflows/version-gate.yml   # must return nothing
+grep -nE '^\s*continue-on-error\s*:' .github/workflows/branch-policy.yml  # must return nothing
 ```
 
 ---
