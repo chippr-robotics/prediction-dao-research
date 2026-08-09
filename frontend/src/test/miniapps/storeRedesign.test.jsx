@@ -30,7 +30,7 @@ vi.mock('../../lib/miniapps/registryClient', async (importOriginal) => {
 import { AppCategory, AppStatus } from '../../abis/miniAppRegistry'
 import { REGISTRY_STATUS, UNREACHABLE_REASON, appSlug } from '../../lib/miniapps/registryClient'
 import { __resetFavoriteAppsForTests } from '../../lib/miniapps/favorites'
-import { artworkFor, GenericAppArt } from '../../components/miniapps/appArtwork'
+import { artworkFor } from '../../components/miniapps/appArtwork'
 import CatalogPanel from '../../components/miniapps/CatalogPanel'
 
 beforeEach(() => {
@@ -110,9 +110,13 @@ const BADGE = 'On-chain verified market'
 
 describe('artworkFor — total, curated, generic (FR-001)', () => {
   it('returns curated art for the shipped apps and the generic for everything else', () => {
-    expect(artworkFor('token-mint').Art).not.toBe(GenericAppArt)
-    expect(artworkFor('clearpath').Art).not.toBe(GenericAppArt)
-    expect(artworkFor('never-heard-of-it').Art).toBe(GenericAppArt)
+    // The generic's identity is observable through the function itself: any two unknown slugs
+    // share it, and neither curated entry does.
+    const generic = artworkFor('never-heard-of-it').Art
+    expect(artworkFor('also-unknown').Art).toBe(generic)
+    expect(artworkFor('token-mint').Art).not.toBe(generic)
+    expect(artworkFor('clearpath').Art).not.toBe(generic)
+    expect(artworkFor('token-mint').Art).not.toBe(artworkFor('clearpath').Art)
   })
 
   it('is total over degenerate inputs — null, undefined, empty, garbage', () => {
@@ -121,7 +125,7 @@ describe('artworkFor — total, curated, generic (FR-001)', () => {
       expect(typeof Art).toBe('function')
     }
     // `__proto__`/inherited keys must not leak an Object.prototype member out of the map.
-    expect(artworkFor('toString').Art).toBe(GenericAppArt)
+    expect(artworkFor('toString').Art).toBe(artworkFor('never-heard-of-it').Art)
   })
 })
 

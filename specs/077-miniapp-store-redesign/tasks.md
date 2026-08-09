@@ -111,9 +111,9 @@ restructured trust copy. **Independent test**: quickstart §2 steps 1, 4–6.
 
 ## Phase 5: Polish & Cross-Cutting
 
-- [ ] T018 [P] Update `docs/developer-guide/miniapps.md`: host-side artwork map (why art never
+- [X] T018 [P] Update `docs/developer-guide/miniapps.md`: host-side artwork map (why art never
       comes from packages/chain), store sub-view seam, badge honesty rule.
-- [ ] T019 Final verification sweep (monorepo-verify): `npm run check:deps`, stamped byte-gate
+- [X] T019 Final verification sweep (monorepo-verify): `npm run check:deps`, stamped byte-gate
       compare green against the NEW baseline, `check-miniapp-versions` pairing green, scoped
       frontend suites + lint + host build green; confirm the redesign commits (Phases 3–5)
       moved NO baseline digest.
