@@ -31,18 +31,23 @@ cd prediction-dao-research
 
 ### 2. Install Dependencies
 
-Install root project dependencies:
+One install, from the repo root, covers every workspace (spec 075 — one lockfile, 8 members):
 
 ```bash
 npm install
 ```
 
-Install frontend dependencies:
+**Do not run `npm install` inside `frontend/` (or any other workspace).** An incremental install in
+a child silently drops optional platform binaries — notably `@rollup/rollup-linux-x64-gnu` — from
+BOTH `node_modules` and `package-lock.json` (npm/cli#4828). Every Vite build then dies with
+`Cannot find module @rollup/rollup-linux-x64-gnu`, including the mini-app release path whose output
+bytes are committed on-chain. Re-running `npm install` does not fix it: the lockfile is already
+wrong, so npm reports "up to date".
+
+If it happens, recover with a full re-resolve:
 
 ```bash
-cd frontend
-npm install
-cd ..
+npm run deps:reinstall
 ```
 
 ### 3. Verify Installation

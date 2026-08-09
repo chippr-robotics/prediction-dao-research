@@ -69,11 +69,24 @@ computed the hash. `globalEnv` only covers variables exported in the caller's sh
 
 **Confirmed empirically**: editing `AMOY_RPC_URL` in `.env` left the `//#test` hash unchanged —
 and that variable switches the default test chain from a clean 1337 to an Amoy fork. So
-`//#test` cache hits are **not sound** in a tree with a `.env` that sets a build-relevant variable.
+`//#test` cache hits were **not sound** in a tree with a `.env` that sets a build-relevant variable.
 
-Until dotenv is moved out of config evaluation (or a `dotEnv` declaration is added), run
-`npx turbo run test --force` when a `.env` value matters. This is stated rather than hidden because
-an undeclared input in Turborepo produces a **wrong cache hit, not an error**.
+**FIXED (#1036/#1074).** `.env*` and `frontend/.env*` are now `globalDependencies`, so the dotenv
+FILES are hashed by content and an edited `AMOY_RPC_URL` invalidates `//#test` instead of silently
+switching the test chain behind a cache hit. `--force` is no longer required for this.
+
+Two things worth keeping straight, because they are what made the original defect confusing:
+
+- `globalEnv` and a dotenv file are **different channels**. `globalEnv` hashes what is already
+  exported into Turborepo's own process; it was never wrong, it simply does not observe a value
+  that `dotenv.config()` or Vite's `loadEnv()` reads *inside* the task. Both entries are kept.
+- Turborepo hashes a `globalDependencies` path **even when the file is gitignored**, and an
+  **absent** file is not an error — just a different hash. That is why this works locally without
+  affecting CI, which has no `.env`.
+
+The trade-off is deliberate: any `.env` edit now busts the whole cache rather than one task. That
+is a false **miss**, which is the safe direction — an undeclared input in Turborepo produces a
+**wrong cache hit, not an error**.
 
 ### Outside the graph entirely
 

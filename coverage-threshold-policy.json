@@ -52,7 +52,6 @@
   ],
   "excluded": [
     { "pathGlob": "contracts/account/lib/**", "reason": "vendored FreshCryptoLib / solady / webauthn-sol / account-abstraction" },
-    { "pathGlob": "contracts/pools/SemaphoreDeploy.sol", "reason": "vendored Semaphore self-deploy closure" },
     { "pathGlob": "contracts/test/**", "reason": "test-only fuzz/mocks harnesses" },
     { "pathGlob": "contracts/mocks/**", "reason": "test-only mocks" },
     { "pathGlob": "contracts/**/interfaces/**", "reason": "no executable logic" }
