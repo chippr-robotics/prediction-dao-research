@@ -1,5 +1,9 @@
 const { expect } = require("chai");
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
+
+const REPO_ROOT = path.join(__dirname, "..", "..");
 
 /**
  * Spec 074, FR-002 / SC-002 — the EVM target must be DECLARED BY THIS REPOSITORY.
@@ -99,8 +103,10 @@ describe("Compiler configuration: EVM target is declared, not inherited", functi
  * and @safe-global/safe-contracts already were.
  */
 describe("Solidity-source dependencies are pinned exactly (spec 075, FR-001)", function () {
-  // Every package whose .sol files are imported by contracts/. Keep in sync with the imports —
-  // a new `import "@vendor/..."` in a contract belongs here.
+  // The packages whose .sol files contracts/ is EXPECTED to import. This list is documentation of
+  // an intended build surface — it is no longer the input to the check. `solidityImportPackages()`
+  // below reads the imports themselves, and the first test asserts the two agree in BOTH
+  // directions, so neither a new vendor import nor a stale entry here can pass unnoticed.
   const SOLIDITY_SOURCE_PACKAGES = [
     "@openzeppelin/contracts",
     "@openzeppelin/contracts-upgradeable",
@@ -109,16 +115,80 @@ describe("Solidity-source dependencies are pinned exactly (spec 075, FR-001)", f
     "@safe-global/safe-contracts",
   ];
 
-  const EXACT = /^\d+\.\d+\.\d+/;
+  /**
+   * ANCHORED, and that matters (issue #1039).
+   *
+   * The original was `/^\d+\.\d+\.\d+/` — unanchored, so it matched a PREFIX. `"1.3.0 - 1.5.0"`
+   * (a hyphen range spanning three minors) and `"1.3.0 || ^2.0.0"` (an explicit alternative major)
+   * both passed a test whose entire purpose is to reject exactly those. Measured on a mutated copy
+   * of package.json: both forms → 5 passing.
+   *
+   * This is the full semver grammar for a SINGLE version — major.minor.patch with optional
+   * prerelease and build metadata — anchored at both ends, so anything npm would treat as a range
+   * (`^`, `~`, `x`, `>=`, `-`, `||`, `*`, `latest`, `npm:`, `file:`, `git+…`) is rejected.
+   *
+   * The `semver` package would express this more legibly, but it is NOT declared in the root
+   * manifest (verified: absent from dependencies and devDependencies — it is only present as a
+   * hoisted transitive of other packages). Importing it here would make `npm run check:deps`
+   * report a phantom dependency for the root unit, i.e. fixing one gate by breaking another.
+   * A regex with no dependency is the right trade at this size.
+   */
+  const EXACT_VERSION =
+    /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
-  it("declares an exact version for every package that compiles into our bytecode", function () {
-    const pkg = require("../../package.json");
+  it("the documented package list matches what contracts/ actually imports", function () {
+    const imported = solidityImportPackages();
+    const documented = new Set(SOLIDITY_SOURCE_PACKAGES);
+
+    const undocumented = [...imported.keys()].filter((p) => !documented.has(p));
+    const stale = SOLIDITY_SOURCE_PACKAGES.filter((p) => !imported.has(p));
+
+    expect(
+      undocumented,
+      "contracts/ imports Solidity source from package(s) missing from SOLIDITY_SOURCE_PACKAGES, so " +
+        "nothing checks how their version is pinned:\n  " +
+        undocumented.map((p) => `${p}  (e.g. ${imported.get(p)})`).join("\n  "),
+    ).to.deep.equal([]);
+
+    expect(
+      stale,
+      "SOLIDITY_SOURCE_PACKAGES names package(s) no contract imports any more. Delete them — a stale " +
+        `entry makes the gate look broader than it is:\n  ${stale.join("\n  ")}`,
+    ).to.deep.equal([]);
+  });
+
+  it("declares an exact version at the ROOT for every package that compiles into our bytecode", function () {
+    // Read from disk rather than `require`, so a mutated copy can be diffed against this same test.
+    const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"));
     const declared = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+    const imported = solidityImportPackages();
 
-    const floating = SOLIDITY_SOURCE_PACKAGES.filter((name) => {
-      const range = declared[name];
-      return range !== undefined && !EXACT.test(range);
-    }).map((name) => `${name}@${declared[name]}`);
+    /*
+     * UNDECLARED IS A FAILURE, NOT A PASS (issue #1039).
+     *
+     * The original filter was `range !== undefined && !EXACT.test(range)` — it skipped any package
+     * the root manifest did not declare at all. So it caught "declared loosely" and missed "not
+     * declared", which is the strictly worse condition and the one a workspace conversion actually
+     * produces: move a Solidity-source dependency into a member's manifest, or let it arrive
+     * transitively, and the version compiling into deployed bytecode becomes an install-time
+     * artifact with this gate still green. Measured: deleting `@chainlink/contracts` from a mutated
+     * package.json → 5 passing.
+     *
+     * The ROOT manifest specifically: contracts/ compiles in the root project, so a declaration in
+     * a workspace member's manifest does not pin what solc reads. (`npm run check:deps` separately
+     * fails if two manifests declare disagreeing ranges for the same package.)
+     */
+    const undeclared = [...imported.keys()].filter((name) => declared[name] === undefined);
+    const floating = [...imported.keys()]
+      .filter((name) => declared[name] !== undefined && !EXACT_VERSION.test(String(declared[name]).trim()))
+      .map((name) => `${name}@${declared[name]}`);
+
+    expect(
+      undeclared,
+      "These contribute Solidity source to the compile but the ROOT manifest does not declare them " +
+        "at all, so the version that produces our bytecode is whatever the install happens to hoist:\n  " +
+        undeclared.join("\n  "),
+    ).to.deep.equal([]);
 
     expect(
       floating,
@@ -128,3 +198,102 @@ describe("Solidity-source dependencies are pinned exactly (spec 075, FR-001)", f
     ).to.deep.equal([]);
   });
 });
+
+/**
+ * Spec 075 / issue #1039 — a per-file compiler override must describe source that is actually
+ * COMPILED.
+ *
+ * Eight of the 38 overrides named source that had not been in the compilation for months: the
+ * Semaphore V4 self-deploy closure, dropped from the pools design by spec 034 along with
+ * `contracts/pools/SemaphoreDeploy.sol` itself. Hardhat silently ignores an override that matches
+ * no source file, so they cost nothing at build time and read, to anyone auditing the config, as
+ * live decisions about how deployed bytecode is produced. Two of the three packages involved
+ * (`@zk-kit/lean-imt.sol`, `poseidon-solidity`) were not even root dependencies.
+ *
+ * File existence alone would NOT have caught them — the packages are still installed transitively,
+ * so the .sol files are on disk. The property that distinguishes live from dead is whether the
+ * override's package is one contracts/ imports.
+ */
+describe("Compiler overrides target source that is actually compiled (issue #1039)", function () {
+  it("every per-file override names a real file in the compile graph", function () {
+    const overrides = Object.keys(hre.userConfig.solidity.overrides || {});
+    expect(overrides, "expected at least one per-file override").to.have.length.greaterThan(0);
+
+    const imported = solidityImportPackages();
+    const dead = [];
+
+    for (const key of overrides) {
+      if (key.startsWith("contracts/")) {
+        // First-party: the file must exist. `contracts/pools/SemaphoreDeploy.sol` did not.
+        if (!fs.existsSync(path.join(REPO_ROOT, key))) {
+          dead.push(`${key}  — no such file in contracts/`);
+        }
+        continue;
+      }
+      // Third-party: the package must be one contracts/ imports, AND the file must exist.
+      const pkg = key.startsWith("@") ? key.split("/").slice(0, 2).join("/") : key.split("/")[0];
+      if (!imported.has(pkg)) {
+        dead.push(`${key}  — nothing under contracts/ imports ${pkg}, so this file is never compiled`);
+        continue;
+      }
+      if (!resolveDependencyFile(key)) {
+        dead.push(`${key}  — package ${pkg} is imported but this file does not exist in it`);
+      }
+    }
+
+    expect(
+      dead,
+      "Dead compiler override(s). Hardhat ignores an override that matches no source file, so these " +
+        "are invisible at build time while reading as live compiler decisions. DELETE them rather " +
+        "than allowlisting them:\n  " +
+        dead.join("\n  "),
+    ).to.deep.equal([]);
+  });
+});
+
+/**
+ * Every external package imported by a .sol file under `contracts/`, mapped to one importing file
+ * (for the failure message). Relative imports are skipped; `contracts-archive/` is not scanned
+ * because it is reference-only and never compiled.
+ */
+function solidityImportPackages() {
+  const found = new Map();
+  const IMPORT_RE = /^\s*import\s+[^;]*?["']([^"']+)["']/gm;
+
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        walk(abs);
+      } else if (entry.name.endsWith(".sol")) {
+        const src = fs.readFileSync(abs, "utf8");
+        for (const m of src.matchAll(IMPORT_RE)) {
+          const spec = m[1];
+          if (spec.startsWith(".") || spec.startsWith("/")) continue;
+          const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+          if (!found.has(pkg)) found.set(pkg, path.relative(REPO_ROOT, abs));
+        }
+      }
+    }
+  };
+
+  walk(path.join(REPO_ROOT, "contracts"));
+  return found;
+}
+
+/** A dependency-relative .sol path (`@scope/pkg/a/b.sol`) → absolute path, or null if absent. */
+function resolveDependencyFile(spec) {
+  const direct = path.join(REPO_ROOT, "node_modules", spec);
+  if (fs.existsSync(direct)) return direct;
+  // Fall back to Node resolution for a nested/hoisted-elsewhere install.
+  const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+  const rest = spec.slice(pkg.length + 1);
+  try {
+    const base = path.dirname(require.resolve(`${pkg}/package.json`, { paths: [REPO_ROOT] }));
+    const full = path.join(base, rest);
+    return fs.existsSync(full) ? full : null;
+  } catch {
+    return null;
+  }
+}
