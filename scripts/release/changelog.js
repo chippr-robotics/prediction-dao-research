@@ -97,9 +97,14 @@ function entry({ version, previous, commits, artifacts, promotedFrom: from }) {
     git(["log", "-1", "--format=%cs", version], { soft: true }) ||
     git(["log", "-1", "--format=%cs"], { soft: true });
   const lines = [`## ${version} — ${date}`, ""];
-  // FR-036: always stated. A hotfix says "none (hotfix)" rather than dropping the line, because a
-  // missing line reads as an oversight and this one is load-bearing during an incident.
-  lines.push(`Promoted from: ${from || "none (hotfix)"}`);
+  // FR-036: always stated — a missing line reads as an oversight, and this one is load-bearing
+  // during an incident.
+  //
+  // The absent case is NOT labelled "hotfix". It was, and that was wrong: a release can lack a
+  // candidate because it was a hotfix, OR because it was cut before the `staging` branch existed —
+  // which is true of every release so far. Naming a cause the script cannot actually determine is
+  // the same dishonesty this spec exists to remove. It states the observable fact instead.
+  lines.push(`Promoted from: ${from || "none — released directly from main"}`);
   lines.push(
     previous
       ? `Previous release: ${previous} · Range: \`${previous}..${version}\` (${commits.length} commits)`

@@ -36,11 +36,23 @@ In branch protection for **both** `main` and `staging`, mark as required:
 **A gate that is not required is not a gate.** The workflow files exist and will run and fail
 correctly, but GitHub will happily let a red check merge until it is marked required.
 
-### 3. Allow the release workflow to push to `main`
+### 3. Nothing to do — the release record arrives as a pull request
 
-`release.yml` pushes a tag and a `chore(release): …` commit. Grant the GitHub Actions identity
-push access to `main` in branch protection ("Allow specified actors to bypass required pull
-requests"), or the release will tag successfully and then fail on the CHANGELOG commit.
+`release.yml` pushes the TAG directly (tags are not covered by the branch ruleset) and then opens a
+**pull request** for the generated `CHANGELOG.md` and manifest version bumps.
+
+It used to push that commit straight to `main`, and once branch protection arrived that failed on
+every release:
+
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+- Changes must be made through a pull request.
+- 2 of 2 required status checks are expected.
+```
+
+A ruleset bypass for the bot was the alternative. Opening a PR was chosen instead, so the protection
+on the branch that deploys to members stays intact with no exception. **The cost is a small
+`chore(release): vX.Y.Z` PR after each release — review and merge it; there is nothing to edit.**
 
 ### 4. Provision the two staging services (FR-023, FR-026c, T035)
 
@@ -86,7 +98,8 @@ Every merge into `staging` tags a candidate (`vX.Y.Z-rc.N`) and deploys both sta
 3. **Merge with a merge commit. Not a squash.** The workflow prints this as a notice on every
    promotion PR. Squashing collapses every PR title into one subject, and the release version is
    computed from those subjects — a release containing a `feat` would ship as a patch.
-4. `release.yml` tags, publishes the record, updates `CHANGELOG.md`, and syncs manifest versions.
+4. `release.yml` tags, publishes the GitHub Release, then opens a `chore(release): vX.Y.Z` pull
+   request carrying the generated `CHANGELOG.md` entry and manifest version bumps. Merge it.
 
 ### Hotfixes
 
@@ -162,16 +175,21 @@ by hand, **from a full clone** (see the clone-depth warning above — a shallow 
 missing most of the release):
 
 ```bash
-git fetch --unshallow
-node scripts/release/changelog.js --version v1.0.0 --previous ""
-node scripts/release/sync-manifest-versions.js --version v1.0.0
+git fetch --unshallow                      # MANDATORY — see the clone-depth warning above
+node scripts/release/changelog.js --version vX.Y.Z --previous vX.Y.W
+node scripts/release/sync-manifest-versions.js --version vX.Y.Z
 ```
 
-Then open an ordinary pull request with the result. This is the one case where a generated file is
-committed outside the release job, and it is still generated — never hand-written (FR-037).
+For several missed releases, run `changelog.js` once per tag **oldest first** (each call prepends,
+so the newest ends on top), then sync the manifests once to the newest tag.
 
-**Known outstanding:** v1.0.0's entry was never written, because the release job failed at this step
-on a stale hardcoded manifest list. It needs the backfill above.
+Then open a pull request with the result. Use a **`release/*` branch** if you can — the version gate
+exempts that branch outright. On any other branch the gate still passes provided the PR also updates
+`CHANGELOG.md` and every manifest version equals the newest tag, which is exactly what a release
+record looks like; an arbitrary version number still fails.
+
+This is the one case where a generated file is committed outside the release job, and it is still
+generated — never hand-written (FR-037).
 
 ### A promotion is blocked by config drift
 

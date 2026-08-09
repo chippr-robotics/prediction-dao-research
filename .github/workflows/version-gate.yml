@@ -70,8 +70,34 @@ jobs:
       # Mini-app manifests are EXEMPT: those version independently (FR-007) and a contributor is
       # expected to bump them by hand in the same PR that changes the package.
       - name: Reject hand-edited version numbers
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
+
+          # A RELEASE RECORD is the one legitimate way version fields change. release.yml generates
+          # the changelog + manifest bumps and opens a PR for them (it cannot push to main — the
+          # ruleset requires pull requests), so without this the release process would be blocked by
+          # its own gate on every single release.
+          #
+          # Recognised two ways, and both are checked rather than trusted:
+          #   · the branch release.yml creates, `release/*`; or
+          #   · a PR that also updates CHANGELOG.md and sets every version to the NEWEST TAG —
+          #     which is what a sanctioned manual backfill looks like (see the runbook).
+          #
+          # The second condition is deliberately narrow: matching the newest tag means the PR is
+          # recording a release that already happened, not inventing a version. A contributor
+          # picking an arbitrary number still fails.
+          LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+          EXPECTED="${LATEST_TAG#v}"
+          exempt=no
+          case "$HEAD_REF" in
+            release/*) exempt=yes ;;
+          esac
+          if [ "$exempt" = no ] && [ -n "$EXPECTED" ] && grep -qx 'CHANGELOG.md' changed-files.txt; then
+            exempt=maybe
+          fi
+
           offenders=""
           while read -r f; do
             case "$f" in
@@ -79,11 +105,26 @@ jobs:
               */package.json|package.json) ;;
               *) continue ;;
             esac
-            if git diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" -- "$f" \
-                 | grep -qE '^[+-]\s*"version":'; then
-              offenders="$offenders $f"
+            diff="$(git diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" -- "$f")"
+            printf '%s' "$diff" | grep -qE '^[+-]\s*"version":' || continue
+
+            # Under the backfill exemption, a manifest set to the newest tag is a release record.
+            # Anything else in the same PR is still a hand-edit and still fails.
+            if [ "$exempt" = maybe ]; then
+              newv="$(printf '%s' "$diff" | grep -E '^\+\s*"version":' | head -1 | sed -E 's/.*"version"\s*:\s*"([^"]+)".*/\1/')"
+              if [ "$newv" = "$EXPECTED" ]; then
+                echo "::notice::$f -> $newv matches the newest tag ($LATEST_TAG); treated as a release record"
+                continue
+              fi
             fi
+            offenders="$offenders $f"
           done < changed-files.txt
+
+          if [ "$exempt" = yes ]; then
+            echo "::notice::Release-record branch ($HEAD_REF) — version edits are generated, not hand-written."
+            offenders=""
+          fi
+
           if [ -n "$offenders" ]; then
             echo "::error::Hand-edited version number(s) in:$offenders"
             echo "::error::Versions are computed at release time by scripts/release/version.js and"

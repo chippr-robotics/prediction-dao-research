@@ -1,6 +1,6 @@
 {
   "name": "@fairwins/intent-types",
-  "version": "1.0.0",
+  "version": "1.2.3",
   "private": true,
   "type": "module",
   "description": "The single definition of every FairWins EIP-712 intent struct and domain (spec 075). Zero runtime dependencies; resolvable by plain Node and by Vite.",
@@ -9,7 +9,9 @@
     ".": "./src/index.js",
     "./package.json": "./package.json"
   },
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "//gates": [
     "This package declares no test script ON PURPOSE (as does @fairwins/abi). It used to declare",
     "'vitest run', which exited 1 with 'No test files found' — vitest was never a dependency here",
