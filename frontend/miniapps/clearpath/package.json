@@ -5,8 +5,7 @@
   "type": "module",
   "description": "ClearPath — external-DAO governance mini-app package (spec 073).",
   "scripts": {
-    "build": "vite build",
-    "test": "vitest run"
+    "build": "vite build"
   },
   "devDependencies": {
     "@fairwins/miniapp-build": "*",
