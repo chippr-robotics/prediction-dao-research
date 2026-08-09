@@ -109,7 +109,17 @@ bytes.**
 - [ ] T031 [US3] Write `scripts/miniapps/record-baseline.js` reading `manifestHash` + `cid` for both apps from `MiniAppRegistry` on Polygon 137 **and** Mordor 63 (FR-019)
 - [ ] T032 [US3] **GATE** — run it, rebuild on today's tree, and commit `specs/075-monorepo-workspaces/baseline-miniapps.json` recording per app per chain: `manifestHash`, `cid`, and **whether HEAD reproduces the published CID**. An unreachable chain records `unreachable` and **blocks** the gate — never a default (FR-019, B1)
 - [X] T033 [US3] **GATE** — add a **new `ethers`-importing fixture** under `frontend/src/test/miniapps/fixtures/`. The existing fixture's own header states `ethers` is *intentionally not imported*, so it is structurally blind to the ~190-binding shim both real packages actually use (FR-021, B3)
+      > **Was checked without being done; done now.** The box was ticked while the only fixture still declared
+      > `sharedDeps: ["@fairwins/miniapp-sdk","react","react/jsx-runtime"]` — no ethers — and its own header
+      > still said ethers was deliberately absent. Delivered as a SECOND fixture (`fixtures/source-ethers/` ->
+      > `fixtures/package-ethers/` + `onchain-ethers.json`) rather than by editing the first, so the original's
+      > committed bytes and its tampered twin are untouched. Its shared-dep set is identical to Token Mint's
+      > and ClearPath's, and its committed `entry.js` carries **192** ethers binding names. Covered by four new
+      > assertions in `packageFixture.test.jsx` (digest parity, the shared-dep set, the baked-in binding list,
+      > and a real loader+render on the host's ethers).
 - [X] T034 [US3] Confirm `node frontend/src/test/miniapps/fixtures/regenerate.mjs` produces an empty git diff **before** any workspace change
+      > Re-verified on the post-conversion tree: regeneration leaves `package/`, `tampered/` and `onchain.json`
+      > byte-identical, and the new ethers fixture reproduces its own bytes on a second consecutive run.
 
 ### Prerequisite commit (separately revertible)
 
@@ -119,6 +129,15 @@ bytes.**
 
 - [X] T036 [US3] Add `"private": true`, `"engines"`, and the `workspaces` array to root `package.json` per [contracts/workspace-layout.md](./contracts/workspace-layout.md) — including the nested glob `frontend/miniapps/*` (verified accepted by npm 11.6.0) (FR-012)
 - [X] T037 [US3] Create `frontend/miniapps/token-mint/package.json` and `frontend/miniapps/clearpath/package.json` declaring `@fairwins/miniapp-build`/`vite`/`@vitejs/plugin-react` as devDeps and `react`/`ethers` as peerDeps, with a **real `version`** replacing the hardcoded `'1.0.0'` literal (FR-023)
+      > **Half-done when checked; finished now.** The `package.json` files landed, but both `vite.config.js`
+      > files kept `version: '1.0.0'` as a literal — so `manifest.version` (inside the keccak-committed manifest
+      > bytes) and `package.json#version` (what npm/workspace tooling reads) were two independent numbers that
+      > agreed only by coincidence: bumping the workspace version would change no published byte, and bumping
+      > the literal would move the on-chain commitment with nothing in `package.json` to show for it. Both
+      > configs now read `version` from their own `package.json` at config-evaluation time. **Byte-neutral
+      > today, proven**: `build:miniapps` + `record-build-digests.js --compare` reports "OK: mini-app output
+      > bytes unchanged" both before and after. Separately verified the read is live, not decorative — bumping
+      > `token-mint/package.json` to `9.9.9` emitted `manifest.json … v9.9.9` (reverted).
 - [X] T097 [US3] Add `scripts/deps/check-dependency-hygiene.js` + `npm run check:deps` + a CI job — a **standing** check for version skew (FR-015) and phantom imports (FR-003/SC-003). Both invariants were previously fixed by hand once with nothing preventing recurrence (**analyze finding G1**)
 - [X] T038 [US3] Align the `ethers` ranges across root/frontend/gateway/relayer. **Do NOT add a bare root `overrides.ethers`** — the lockfile carries ethers 5.8.0 ×9 and 4.0.49 ×2 for `@uma/core`, `@chainlink/contracts`, `@across-protocol/contracts`; an unscoped override forces an incompatible major onto all of them. Scope per-package if a pin is needed (FR-015, research R4)
 - [X] T039 [US3] Delete `frontend/`, `services/relay-gateway/`, `subgraph/` lockfiles and regenerate one root `package-lock.json` (FR-013)
@@ -129,7 +148,20 @@ bytes.**
 - [X] T044 [P] [US3] Update root scripts invalidated by the change: `lock:sync`, `test:frontend`, `frontend` (FR-017)
 - [X] T045 [US3] Update the ~27 `npm ci` sites across 9 workflows and every `cache-dependency-path` pointing at a deleted lockfile; service jobs use `npm ci --workspace <name> --include-workspace-root=false` so the gateway does not regress from ~299 to ~2,100 packages (FR-016)
 - [X] T046 [P] [US3] Update the 4 remaining Dockerfiles (root, `services/relay-gateway/Dockerfile:12-13`, `services/relayer/Dockerfile:7`, `subgraph/matchstick.Dockerfile`) and `.dockerignore` so the root lockfile is present in every build context
-- [X] T047 [P] [US3] Correct `cd frontend && npm install` in the 5 documents that carry it — `docs/developer-guide/{contributing,frontend,setup}.md`, `frontend/README.md:71`, `README.md:108` (FR-017)
+- [ ] T047 [P] [US3] Correct `cd frontend && npm install` in the 5 documents that carry it — `docs/developer-guide/{contributing,frontend,setup}.md`, `frontend/README.md:71`, `README.md:108` (FR-017)
+      > **Un-checked: 3 of 5 done, 2 still wrong.** Corrected: `README.md:108`, `docs/developer-guide/frontend.md:84`,
+      > `docs/developer-guide/contributing.md:49` (each now says one root install covers every workspace).
+      > **Still carrying the old instruction:**
+      > - `docs/developer-guide/setup.md:40-46` — a whole "Install frontend dependencies" block that is still
+      >   `cd frontend` / `npm install` / `cd ..`, immediately after the root install at :37. Under workspaces
+      >   this is not merely redundant, it is the npm/cli#4828 incremental-install trap: it silently drops
+      >   `@rollup/rollup-linux-x64-gnu` from `node_modules` **and the lockfile**, breaking every Vite build
+      >   including the on-chain mini-app release path — the exact failure T100 exists to detect after the fact.
+      > - `frontend/README.md:71` — the named line, still a bare `npm install` under "Installation" in the
+      >   frontend package's own README, where a reader is by construction inside `frontend/`.
+      >
+      > Both should point at the root install (`npm install` at the repo root, or `npm run deps:reinstall` to
+      > recover a broken tree — never a child `npm install`).
 - [X] T048 [P] [US3] Keep `services/relayer`'s build recipe and bring it under the workspace (FR-014).
       > **Resolved contradiction.** This previously offered "delete the Dockerfile OR give it a recipe", which conflicts
       > with the already-completed T014 (commit its lockfile; switch its Dockerfile to `npm ci`). T014 won: the unit now
@@ -140,6 +172,18 @@ bytes.**
 
 - [X] T049 [US3] **GATE 1** — `artifacts/` bytecode byte-identical to `baseline-bytecode.json` (SC-001)
 - [X] T050 [US3] **GATE 2** — fixture regenerate produces an empty git diff, **with the T033 `ethers` fixture in place** (FR-020)
+      > **Previously checked against a precondition that did not hold** — T033's fixture did not exist when this
+      > box was ticked, so the gate ran over a fixture with no ethers shim at all. Now genuinely run with it in
+      > place: regeneration leaves every committed artifact byte-identical.
+      >
+      > **What this can and cannot claim.** The ethers fixture postdates the workspace conversion, so it cannot
+      > retroactively prove the conversion left *its* bytes alone — that is unprovable without reinstalling the
+      > pre-conversion tree, and it is not what makes the gate worth having. The conversion question is in fact
+      > already answered, and by stronger evidence: `baseline-miniapp-builds.json` was recorded in `2f553117`,
+      > **before** the conversion in `438d7215`, has never been re-recorded, and today's build still matches it
+      > byte for byte — over the two REAL packages, both of which carry the 192-name ethers shim. What T033 adds
+      > is *continuous* enforcement: that baseline gate only runs when someone runs it, whereas the fixture
+      > digests are re-checked on every frontend test run, against bytes a reviewer can read.
 - [X] T051 [US3] **GATE 3** — rebuild both real mini-app packages and confirm `entry.js`/`manifest.json` bytes are identical **before vs. after on the same tree**. Not "matches on chain" — no in-repo baseline exists and the live packages were built from an unrecorded commit (FR-020, B2). **Any difference blocks the merge**; if real, re-publish and re-approve on-chain (FR-022)
 - [X] T098 [US3] Pin `@chainlink/contracts` and `@uma/core` EXACTLY + guard it in `CompilerTargets.test.js` — regenerating the lockfile floated chainlink 1.3.0 -> 1.5.0 and **changed ChainlinkFunctionsOracleAdapter's bytecode**. Caught by the T049 gate (FR-001/FR-005)
 - [X] T099 [US3] Add a staleness guard to `record-build-digests.js` — it reported "unchanged" against a stale `dist/` after both mini-app builds FAILED, a false pass (FR-020)

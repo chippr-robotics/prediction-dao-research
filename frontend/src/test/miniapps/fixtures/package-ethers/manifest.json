@@ -1,0 +1,25 @@
+{
+  "schema": "fairwins-miniapp-manifest/1",
+  "id": "fixture-ethers",
+  "name": "Ethers Fixture Mini-App",
+  "version": "1.0.0",
+  "entry": "entry.js",
+  "styles": [],
+  "hostApi": 2,
+  "sharedDeps": [
+    "@fairwins/miniapp-sdk",
+    "ethers",
+    "react",
+    "react/jsx-runtime"
+  ],
+  "permissions": [
+    "toast"
+  ],
+  "storeKeys": [],
+  "contracts": [],
+  "files": {
+    "entry.js": {
+      "sha256": "4c02733ee89d12df9ad49512d3a0deb2051435e1faf651ab7beb6562d8d1fa4f"
+    }
+  }
+}
