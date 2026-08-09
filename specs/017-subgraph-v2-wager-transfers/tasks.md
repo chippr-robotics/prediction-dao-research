@@ -66,7 +66,7 @@ Off-chain indexer + web app. Subgraph work under `subgraph/`; frontend under `fr
 
 - [X] T012 [US1] Implement `handleWagerCreated` in `subgraph/src/mappings/wagerRegistry.ts`: create/load `Wager`, set all v2 fields and stakes from event params, `createdAt = event.block.timestamp`, `status = open` (stakes stored here per research R3 for later refund derivation).
 - [X] T013 [US1] Implement status-updating handlers in `subgraph/src/mappings/wagerRegistry.ts`: `handleWagerAccepted` (→active), `handleWagerResolved` (→resolved, set winner + resolvedAt), `handleWagerRefunded`/`handleWagerDrawn`/`handleWagerCancelled` (terminal status), and optional `handleWagerDeclined`/`handleDrawProposed`/`handleDrawRevoked` (status only, no transfer).
-- [X] T014 [US1] Run `cd subgraph && npm run build && npm test`; confirm build compiles and the US1 Matchstick tests pass.
+- [X] T014 [US1] Run `cd subgraph && npm run build && npm run test:matchstick` (renamed from `npm test` in #1036); confirm build compiles and the US1 Matchstick tests pass.
 - [ ] T015 [US1] Deploy to one network (e.g. Amoy) per `quickstart.md` step 2 and run the `wagers` probe query (quickstart step 3); confirm live v2 wagers return with non-genesis `startBlock` (SC-001, SC-005).
 
 **Checkpoint**: The subgraph returns live v2 wagers with correct lifecycle status — independently demonstrable.
@@ -91,7 +91,7 @@ Off-chain indexer + web app. Subgraph work under `subgraph/`; frontend under `fr
 - [X] T018 [US2] Add a `createTransfer(...)` helper in `subgraph/src/mappings/wagerRegistry.ts` that builds an immutable `WagerTransfer` with `id = event.transaction.hash.concatI32(event.logIndex.toI32())`, sets wager/party/direction/token/amount/from/to/txHash/blockNumber/timestamp, and `from`/`to` per research R4 (escrow = `event.address`).
 - [X] T019 [US2] Extend `handleWagerCreated` (creator deposit, amount = `creatorStake`) and `handleWagerAccepted` (opponent deposit, amount = stored `opponentStake`) to emit deposit transfers via the helper.
 - [X] T020 [US2] Extend `handlePayoutClaimed` (payout to winner, amount = event `amount`), `handleWagerRefunded`/`handleWagerDrawn` (refund per party from stored stakes), and `handleWagerCancelled` (creator refund from stored stake) to emit transfers (per `data-model.md` production-rules table).
-- [X] T021 [US2] Run `cd subgraph && npm run build && npm test`; confirm US2 Matchstick tests (incl. edge cases) pass. Redeploy and run **both** probes (quickstart step 3): `wagerTransfers(where:{party})` — verify rows + resolvable `txHash`, time-ordered (SC-002, SC-003, FR-010); and `wager(id){ transfers { … } }` — verify the per-wager `@derivedFrom` transfers resolve (FR-011).
+- [X] T021 [US2] Run `cd subgraph && npm run build && npm run test:matchstick` (renamed from `npm test` in #1036); confirm US2 Matchstick tests (incl. edge cases) pass. Redeploy and run **both** probes (quickstart step 3): `wagerTransfers(where:{party})` — verify rows + resolvable `txHash`, time-ordered (SC-002, SC-003, FR-010); and `wager(id){ transfers { … } }` — verify the per-wager `@derivedFrom` transfers resolve (FR-011).
 
 **Checkpoint**: Both US1 and US2 are independently demonstrable from the deployed subgraph.
 
