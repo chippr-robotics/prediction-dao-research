@@ -1,11 +1,13 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  "//": "Task graph for spec 075 (US6). Targets wrap npm scripts that already exist. Turborepo does NOT sandbox: an undeclared input yields a WRONG CACHE HIT, not an error \u2014 every `inputs` list is a safety claim. KNOWN LIMITATION: hardhat.config.js runs dotenv inside the task process, after the cache key is computed, so AMOY_RPC_URL in an untracked .env moves no key and silently switches the test chain. Cypress, Slither, Medusa, Manticore, Matchstick, mkdocs, cloudbuild and every deploy path are OUTSIDE this graph. See docs/developer-guide/monorepo.md.",
+  "//": "Task graph for spec 075 (US6). Targets wrap npm scripts that already exist. Turborepo does NOT sandbox: an undeclared input yields a WRONG CACHE HIT, not an error \u2014 every `inputs` list is a safety claim. DOTENV: turbo never loads .env files, and `globalEnv` only hashes what is already exported into TURBO'S OWN process \u2014 a var that dotenv (hardhat.config.js) or vite `loadEnv` reads INSIDE the task lands after the key is computed, so through that channel it moves nothing. The dotenv FILES are therefore hashed as globalDependencies below; that is what makes an edited AMOY_RPC_URL invalidate `//#test` instead of silently switching the test chain behind a cache hit. Cypress, Slither, Medusa, Manticore, Matchstick (`npm run test:matchstick --workspace subgraph`, Docker-only on this host \u2014 see subgraph/matchstick.Dockerfile), mkdocs, cloudbuild and every deploy path are OUTSIDE this graph. MINI-APPS: the packages under frontend/miniapps/* deliberately have no `test` script \u2014 vitest run in a package dir picks up that package's PUBLISH preset, whose hostScopePlugin rewrites react/jsx-runtime into the host shim and kills every suite at import. Their 22 spec files run under the host config as part of `frontend#test`, which is why `miniapps/*/src/**` is one of its inputs \u2014 remove that input and a mini-app source edit stops moving the key of the only task that tests it. See docs/developer-guide/monorepo.md.",
   "globalDependencies": [
     "package-lock.json",
     "hardhat.config.js",
     ".solcover.js",
-    "coverage-threshold-policy.json"
+    "coverage-threshold-policy.json",
+    ".env*",
+    "frontend/.env*"
   ],
   "globalEnv": [
     "AMOY_RPC_URL",
@@ -75,6 +77,7 @@
       "inputs": [
         "src/**",
         "test/**",
+        "miniapps/*/src/**",
         "vite.config.js",
         "vite-plugins/**",
         "$TURBO_ROOT$/tenants/**",
@@ -193,6 +196,15 @@
       "outputs": [
         "coverage/**"
       ]
+    },
+    "check": {
+      "dependsOn": [
+        "//#check:abis",
+        "//#check:deps",
+        "//#tenants:validate",
+        "//#check:storage-layout"
+      ],
+      "cache": false
     }
   }
 }
