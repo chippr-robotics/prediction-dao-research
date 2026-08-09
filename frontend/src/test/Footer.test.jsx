@@ -47,6 +47,20 @@ describe('Footer', () => {
     expect(screen.getByText('Polymarket')).toBeInTheDocument()
   })
 
+  it('drawer variant: copyright only, no legal/policy links (issue #1025)', () => {
+    const { container } = render(<Footer variant="drawer" />)
+    const footer = container.querySelector('footer')
+    expect(footer).toBeTruthy()
+    expect(footer).toHaveClass('app-footer--drawer')
+
+    for (const { label } of LEGAL_LINKS) {
+      expect(within(footer).queryByRole('link', { name: new RegExp(label, 'i') })).not.toBeInTheDocument()
+    }
+
+    const year = new Date().getFullYear()
+    expect(footer.textContent).toContain(String(year))
+  })
+
   it('is wired into the in-app layout as the condensed variant (FR-005)', () => {
     expect(appSource).toContain('<Footer variant="condensed" />')
   })

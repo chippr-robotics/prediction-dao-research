@@ -45,7 +45,18 @@ import {
 import { collectiblesGatewayUrl } from '../lib/collectibles/gatewayClient'
 import { predictGatewayUrl } from '../lib/predict/predictClient'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
+import NavIcon from '../components/nav/NavIcon'
+import { LEGAL_LINKS } from '../constants/legalLinks'
 import './WalletPage.css'
+
+// Icon per Settings → App → Legal & Policies row (issue #1025). Keyed by href
+// since that's the stable identity LEGAL_LINKS already uses as its list key.
+const LEGAL_LINK_ICONS = {
+  '/terms': 'reports',
+  '/risk': 'alert',
+  '/privacy': 'lock',
+}
+const LEGAL_LINK_ICON_DEFAULT = 'ban' // Account Moderation (deep-links into /terms)
 
 // My Account section panels, keyed by tab id. The section MENU now lives in the
 // global nav drawer + account button (see config/appNav.js) — this page just
@@ -676,6 +687,26 @@ function WalletPage() {
                           {pwaChecking ? 'Checking…' : 'Check for updates'}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Issue #1025 — moved from the side nav drawer's footer into
+                        Settings → App, after Install App / Software Update. */}
+                    <div className="section" id="legal-policies">
+                      <h3>Legal &amp; Policies</h3>
+                      <p className="section-description">
+                        Terms, risk disclosures, and other policies governing your use of FairWins.
+                      </p>
+                      <nav className="app-legal-links" aria-label="Legal and policy documents">
+                        {LEGAL_LINKS.map((link) => (
+                          <a key={link.href} href={link.href} className="app-legal-link-row">
+                            <span className="app-legal-link-icon" aria-hidden="true">
+                              <NavIcon name={LEGAL_LINK_ICONS[link.href] || LEGAL_LINK_ICON_DEFAULT} size={18} />
+                            </span>
+                            <span className="app-legal-link-label">{link.label}</span>
+                            <span className="app-legal-link-chevron" aria-hidden="true">›</span>
+                          </a>
+                        ))}
+                      </nav>
                     </div>
                   </div>
                 )}

@@ -105,7 +105,8 @@ function resolveActiveId(location, favoriteItems) {
  * under it — see the `.app-shell` padding in this file's CSS) that expands in
  * place to the full labelled panel; it never fully hides on desktop, so a
  * section is always one click away. Selecting an entry routes to the section
- * and returns to the gutter; the in-app legal footer only fits once expanded.
+ * and returns to the gutter; the copyright footer only fits once expanded (the
+ * legal/policy links that used to sit here moved to Settings → App, issue #1025).
  */
 export default function AppNavDrawer() {
   const { isOpen, close, toggle } = useNavDrawer()
