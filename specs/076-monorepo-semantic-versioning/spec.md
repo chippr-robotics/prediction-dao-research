@@ -14,7 +14,7 @@ Nothing in this repository currently answers the question *"what is running in p
 
 - **No release has ever been cut.** The repository has **zero git tags**. Release Drafter has been drafting `v$RESOLVED_VERSION` notes since it was added, but no draft has ever been published, so the draft's version number has never been anchored to a real release.
 - **Workspace versions are decorative and already inconsistent.** The eight workspace members carry `0.0.0`, `0.1.0`, and `1.0.0` with no rule about which changes when; the root says `1.0.0`. None of these numbers has ever been incremented by a merge.
-- **Deployed surfaces are anonymous.** The production Cloud Run service is deployed at an image tagged with a commit SHA. Nothing the SPA or the relay gateway exposes states which build it is, so reproducing a member's bug report starts by guessing which commit they were served.
+- **Deployed surfaces are anonymous.** The production service runs an image tagged with a commit SHA, but neither the SPA nor the relay gateway reports which build it is serving. Reproducing a member's bug report therefore starts by guessing which commit they were served.
 - **There is no pre-production environment.** `main` merges deploy straight to the live service; the only place a release candidate can be exercised is production.
 - **The branch model is convention, not enforcement.** `staging` does not yet exist on the remote, several workflows still name a long-gone `develop` branch, and nothing prevents a feature branch from merging directly into `main`.
 
