@@ -62,12 +62,16 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
-    minify: 'esbuild',
+    // Vite 8: the bundled minifier (the pre-8 'esbuild' value now needs esbuild installed
+    // separately), and rolldown only supports the function form of manualChunks.
+    minify: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          web3: ['ethers', 'wagmi', 'viem']
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react|react-dom|react-router-dom)\//.test(id)) return 'vendor'
+          if (/node_modules\/(ethers|wagmi|viem)\//.test(id)) return 'web3'
+          return undefined
         }
       }
     }

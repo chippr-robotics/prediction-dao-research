@@ -282,9 +282,14 @@ for (const u of UNITS) {
 // keccak-committed on-chain. CI runs ubuntu-x64, so a lockfile missing the linux-x64 entry breaks
 // the build for everyone even though it may work on the machine that produced it.
 //
+// Vite 8 (spec 077) replaced rollup with rolldown, whose linux-x64 binding is the binary the
+// build actually needs now — and it is declared `optional` AND `peer`, the exact shape npm is
+// known to skip even when locked (see CLAUDE.md on `npm ci`). Rollup itself left the dependency
+// tree entirely with that bump, so guarding the old name would pass vacuously.
+//
 // The recovery is always the same and is NOT `npm install` again:
 //     rm -rf node_modules package-lock.json && npm install
-const REQUIRED_OPTIONAL = ["@rollup/rollup-linux-x64-gnu"];
+const REQUIRED_OPTIONAL = ["@rolldown/binding-linux-x64-gnu"];
 const lockPath = path.join(ROOT, "package-lock.json");
 const missingOptional = [];
 if (fs.existsSync(lockPath)) {
@@ -332,8 +337,9 @@ if (missingOptional.length) {
   for (const n of missingOptional) console.error(`  · ${n}`);
   console.error(
     "\n  This is npm/cli#4828 — an incremental `npm install` dropped them. Every Vite build will\n" +
-      "  fail with \"Cannot find module @rollup/rollup-linux-x64-gnu\", including the mini-app release\n" +
-      "  path whose bytes are committed on-chain. Recover with a FULL re-resolve:\n" +
+      "  fail with a missing-native-binding error (rolldown cannot load without its platform\n" +
+      "  binding), including the mini-app release path whose bytes are committed on-chain.\n" +
+      "  Recover with a FULL re-resolve:\n" +
       "      rm -rf node_modules package-lock.json && npm install\n" +
       "  Re-running `npm install` alone does NOT fix it.",
   );
