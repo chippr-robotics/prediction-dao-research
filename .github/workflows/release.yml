@@ -1,0 +1,182 @@
+name: Release
+
+# Publishes a release from `main` (spec 076, FR-004/FR-021/FR-033/FR-037).
+#
+# The version is NOT computed here. `scripts/release/version.js` is the single authority for that
+# (FR-015) — this workflow asks it, and hands the answer to Release Drafter as an explicit `version:`
+# input. `.github/release-drafter.yml` deliberately has no `version-resolver:` block: two systems
+# that must agree about what a classification means will eventually disagree, and one cannot.
+#
+# Three behaviours are deliberate and each is asserted below rather than assumed:
+#   · An EMPTY commit range publishes NOTHING (FR-021). It does not re-tag the current version.
+#   · A tag that already exists is a hard failure (FR-004). Tags are immutable; a workflow that
+#     force-updates one destroys the only durable record of what shipped.
+#   · The whole job is skipped for the CHANGELOG commit it makes itself, or it would loop.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  # Never two releases at once — they would race for the same tag.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    # The CHANGELOG commit this job pushes must not trigger it again.
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history AND tags: the version is computed from the commit range since the last
+          # tag, so a shallow clone would silently produce a wrong answer rather than an error.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # A squashed promotion collapses every PR title in the release into one subject, so the
+      # version would be computed from a single classification instead of all of them (research R6).
+      # This does not block — the merge has already happened — but it says loudly that the release
+      # about to be cut may understate what shipped.
+      - name: Warn if a promotion arrived squashed
+        run: |
+          set -euo pipefail
+          PARENTS=$(git rev-list --parents -n 1 HEAD | wc -w)
+          SUBJECT=$(git log -1 --format=%s)
+          if [ "$PARENTS" -lt 3 ] && printf '%s' "$SUBJECT" | grep -qiE '^(merge )?(pull request )?.*staging'; then
+            echo "::warning::This looks like a SQUASHED promotion from staging."
+            echo "::warning::Promotions must use a merge commit (spec 076, research R6) or the release"
+            echo "::warning::version is computed from one collapsed subject instead of every PR in it."
+          fi
+
+      - name: Compute the next version
+        id: version
+        run: |
+          set -euo pipefail
+          node scripts/release/version.js --explain | tee version-explain.txt
+          node scripts/release/version.js --json > version.json
+          VERSION=$(node -p "require('./version.json').version || ''")
+          REASON=$(node -p "require('./version.json').reason")
+          PREVIOUS=$(node -p "require('./version.json').previous || ''")
+          {
+            echo "version=$VERSION"
+            echo "reason=$REASON"
+            echo "previous=$PREVIOUS"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release version"
+            echo ""
+            echo '```'
+            cat version-explain.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # FR-021. A promotion that introduces no new commits must not mint a version — a release
+      # record describing nothing is worse than no record.
+      - name: Stop when there is nothing to release
+        id: gate
+        run: |
+          if [ -z "${{ steps.version.outputs.version }}" ]; then
+            echo "::notice::No release: ${{ steps.version.outputs.reason }}"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # FR-004. Published tags are immutable. If this fires, something already released this
+      # version and the right response is to investigate, never to force the tag.
+      - name: Refuse to move or reuse an existing tag
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::tag $TAG already exists. Published tags are immutable (spec 076 FR-004)."
+            echo "::error::This means a release already claimed this version. Do not force-update it."
+            exit 1
+          fi
+
+      - name: Create and push the tag
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Build the artifact table
+        if: steps.gate.outputs.proceed == 'true'
+        id: artifacts
+        run: |
+          set -euo pipefail
+          # Every artifact category is listed, INCLUDING the ones that did not move (FR-035):
+          # a missing row is indistinguishable from an unexamined one.
+          node scripts/release/artifacts.js \
+            --previous "${{ steps.version.outputs.previous }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --out artifacts.md
+          cat artifacts.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Release Drafter writes the NOTES. The version is supplied, never resolved here (FR-015).
+      - name: Publish the release
+        if: steps.gate.outputs.proceed == 'true'
+        id: drafter
+        uses: release-drafter/release-drafter@v6
+        with:
+          version: ${{ steps.version.outputs.version }}
+          tag: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          publish: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append the artifact table to the release body
+        if: steps.gate.outputs.proceed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Read the table from disk rather than threading it through a step output: the table is
+            // multi-line markdown and round-tripping it through shell quoting is where this kind of
+            // step usually breaks.
+            const fs = require('fs')
+            const table = fs.readFileSync('artifacts.md', 'utf8')
+            const release_id = Number('${{ steps.drafter.outputs.id }}')
+            const { data } = await github.rest.repos.getRelease({ ...context.repo, release_id })
+            await github.rest.repos.updateRelease({
+              ...context.repo,
+              release_id,
+              body: `${data.body || ''}\n\n${table}`,
+            })
+
+      # FR-037: the changelog is produced by the release process, never hand-written.
+      - name: Update CHANGELOG.md
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          node scripts/release/changelog.js \
+            --version "${{ steps.version.outputs.version }}" \
+            --previous "${{ steps.version.outputs.previous }}" \
+            --artifacts artifacts.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          # Sync the repository version into every non-mini-app manifest (FR-007a). Mini-apps are
+          # versioned independently and are deliberately untouched here (FR-007).
+          node scripts/release/sync-manifest-versions.js --version "${{ steps.version.outputs.version }}"
+          git add package.json frontend/package.json services/*/package.json subgraph/package.json packages/*/package.json tools/miniapp-build/package.json
+          git commit -m "chore(release): ${{ steps.version.outputs.version }} [skip release]"
+          git push origin HEAD:main

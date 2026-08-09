@@ -68,18 +68,18 @@ from; each release leaves a durable record.
 release record and the commit. Change a line, redeploy, confirm the identity moves with it.
 (quickstart S4)
 
-- [ ] T012 [P] [US1] Add `ARG`/`ENV` for `VITE_APP_VERSION` and `VITE_GIT_SHA` to `Dockerfile`, following the existing build-arg block
-- [ ] T013 [P] [US1] Pass `--build-arg VITE_APP_VERSION` and `VITE_GIT_SHA=$COMMIT_SHA` from `cloudbuild.yaml`, resolving the version from the tag at the built commit
-- [ ] T014 [US1] Create `frontend/src/config/version.js` exposing `appVersion()` and `gitSha()`, returning `unreleased+<short-sha>` when the build has no matching release (FR-031) — never the nearest tag
-- [ ] T015 [US1] Write `frontend/src/test/config/version.test.js` covering the released case, the **unreleased case**, and a missing-build-arg case (must degrade to unreleased, never to a fabricated number)
-- [ ] T016 [US1] Render the version line in `frontend/src/components/ui/FairWinsUserModal.jsx`, labelling an unreleased build as such rather than showing a bare string
-- [ ] T017 [US1] Write a render + axe test for the version line following the repo's existing component-test pattern (constitution V, WCAG 2.1 AA)
-- [ ] T018 [P] [US1] Read `APP_VERSION`/`GIT_SHA` in `services/relay-gateway/src/config/index.js` and emit them on `/healthz` and `/status` in `services/relay-gateway/src/server.js`, in the **public** half of the payload — not behind the `X-Origin-Auth` branch that gates `gasWalletRunwayHrs` (research R5)
-- [ ] T019 [US1] Write a gateway test asserting the version is readable with no `X-Origin-Auth` header AND that `gasWalletRunwayHrs` remains gated — the second half guards against widening the disclosure while adding to it
-- [ ] T020 [US1] Create `.github/workflows/release.yml`: on push to `main`, compute the version, exit without tagging when the commit range is empty (FR-021), create the annotated tag, publish the release, and prepend the generated entry to `CHANGELOG.md`
-- [ ] T021 [US1] Remove `version-resolver:` from `.github/release-drafter.yml` and pass an explicit `version:` input from `release.yml`, so notes and versioning cannot disagree (FR-015, research R2)
-- [ ] T022 [US1] Assert tag immutability in `release.yml` — refuse to move or reuse an existing tag (FR-004), failing loudly rather than force-updating
-- [ ] T023 [P] [US1] Write `docs/developer-guide/versioning-and-releases.md` covering the scheme, the classification grammar, and what "breaking" means in this repository
+- [X] T012 [P] [US1] Add `ARG`/`ENV` for `VITE_APP_VERSION` and `VITE_GIT_SHA` to `Dockerfile`, following the existing build-arg block
+- [X] T013 [P] [US1] Pass `--build-arg VITE_APP_VERSION` and `VITE_GIT_SHA=$COMMIT_SHA` from `cloudbuild.yaml`, resolving the version from the tag at the built commit
+- [X] T014 [US1] Create `frontend/src/config/version.js` exposing `appVersion()` and `gitSha()`, returning `unreleased+<short-sha>` when the build has no matching release (FR-031) — never the nearest tag
+- [X] T015 [US1] Write `frontend/src/test/config/version.test.js` covering the released case, the **unreleased case**, and a missing-build-arg case (must degrade to unreleased, never to a fabricated number)
+- [X] T016 [US1] Render the version line in `frontend/src/components/ui/FairWinsUserModal.jsx`, labelling an unreleased build as such rather than showing a bare string
+- [X] T017 [US1] Write a render + axe test for the version line following the repo's existing component-test pattern (constitution V, WCAG 2.1 AA)
+- [X] T018 [P] [US1] Read `APP_VERSION`/`GIT_SHA` in `services/relay-gateway/src/config/index.js` and emit them on `/healthz` and `/status` in `services/relay-gateway/src/server.js`, in the **public** half of the payload — not behind the `X-Origin-Auth` branch that gates `gasWalletRunwayHrs` (research R5)
+- [X] T019 [US1] Write a gateway test asserting the version is readable with no `X-Origin-Auth` header AND that `gasWalletRunwayHrs` remains gated — the second half guards against widening the disclosure while adding to it
+- [X] T020 [US1] Create `.github/workflows/release.yml`: on push to `main`, compute the version, exit without tagging when the commit range is empty (FR-021), create the annotated tag, publish the release, and prepend the generated entry to `CHANGELOG.md`
+- [X] T021 [US1] Remove `version-resolver:` from `.github/release-drafter.yml` and pass an explicit `version:` input from `release.yml`, so notes and versioning cannot disagree (FR-015, research R2)
+- [X] T022 [US1] Assert tag immutability in `release.yml` — refuse to move or reuse an existing tag (FR-004), failing loudly rather than force-updating
+- [X] T023 [P] [US1] Write `docs/developer-guide/versioning-and-releases.md` covering the scheme, the classification grammar, and what "breaking" means in this repository
 
 **Checkpoint**: US1 is independently shippable. Production can be asked what it is running.
 
@@ -94,13 +94,13 @@ produce is visible before merge; no version is ever hand-edited.
 actionable message; add it, confirm the gate passes and reports the predicted version. (quickstart
 S2, S3)
 
-- [ ] T024 [US3] Create `.github/workflows/version-gate.yml` running on `pull_request` (`opened`, `synchronize`, `reopened`, `edited` — `edited` matters because the title is the input), invoking `classify.js` against the PR title and changed-file list
-- [ ] T025 [US3] Make the gate's failure message name the accepted types and the exact edit that fixes it (FR-011), quoting the offending title back
-- [ ] T026 [US3] Surface the predicted next version in the check's job summary so the author sees the consequence of their classification before merging (FR-012)
-- [ ] T027 [US3] Confirm no `continue-on-error` on any step of `version-gate.yml` and add a comment explaining that this gate may never become advisory (constitution IV, quickstart S2 negative check)
-- [ ] T028 [US3] Add a hand-edited-version check to the gate: fail when a PR diff changes a `version` field in any workspace `package.json` other than a mini-app's (FR-008, `contracts/version-scheme.md` §7)
-- [ ] T029 [P] [US3] Create `.github/workflows/branch-policy.yml` failing a `pull_request` into `main` whose head is neither `staging` nor `hotfix/*` (FR-018)
-- [ ] T030 [US3] Add hotfix drift detection: after a release, detect commits present on `main` but absent from `staging` and report through an issue rather than a log line (FR-019)
+- [X] T024 [US3] Create `.github/workflows/version-gate.yml` running on `pull_request` (`opened`, `synchronize`, `reopened`, `edited` — `edited` matters because the title is the input), invoking `classify.js` against the PR title and changed-file list
+- [X] T025 [US3] Make the gate's failure message name the accepted types and the exact edit that fixes it (FR-011), quoting the offending title back
+- [X] T026 [US3] Surface the predicted next version in the check's job summary so the author sees the consequence of their classification before merging (FR-012)
+- [X] T027 [US3] Confirm no `continue-on-error` on any step of `version-gate.yml` and add a comment explaining that this gate may never become advisory (constitution IV, quickstart S2 negative check)
+- [X] T028 [US3] Add a hand-edited-version check to the gate: fail when a PR diff changes a `version` field in any workspace `package.json` other than a mini-app's (FR-008, `contracts/version-scheme.md` §7)
+- [X] T029 [P] [US3] Create `.github/workflows/branch-policy.yml` failing a `pull_request` into `main` whose head is neither `staging` nor `hotfix/*` (FR-018)
+- [X] T030 [US3] Add hotfix drift detection: after a release, detect commits present on `main` but absent from `staging` and report through an issue rather than a log line (FR-019)
 - [ ] T031 [US3] Register `version-gate` and `branch-policy` as required status checks in branch protection for `main` and `staging` — a gate that is not required is not a gate
 
 **Checkpoint**: Classifications are trustworthy. Candidate numbering in Phase 5 now has valid input.
@@ -117,15 +117,15 @@ cohort — and promotion publishes that same candidate as a production release.
 release. (quickstart S5, S8)
 
 - [ ] T032 [US2] Create the `staging` branch from `main` and protect it to the same standard (FR-016, FR-017) — it does not exist on the remote today
-- [ ] T033 [US2] Create `cloudbuild.staging.yaml` building **two** SPA images from one commit, identical except `VITE_NETWORK_ID` (`137` and `80002`) and the enumerated differences in `contracts/environments.md`
-- [ ] T034 [US2] Create `.github/workflows/staging-deploy.yml`: on push to `staging`, compute the `-rc.N`, tag it, trigger the staging build, and deploy both services
+- [X] T033 [US2] Create `cloudbuild.staging.yaml` building **two** SPA images from one commit, identical except `VITE_NETWORK_ID` (`137` and `80002`) and the enumerated differences in `contracts/environments.md`
+- [X] T034 [US2] Create `.github/workflows/staging-deploy.yml`: on push to `staging`, compute the `-rc.N`, tag it, trigger the staging build, and deploy both services
 - [ ] T035 [US2] Provision the two Cloud Run services, their DNS names, and their **own** secrets — separate gas wallet, paymaster deposit, origin-lock secret, and RPC credentials, with no admin or deployer key present (FR-026c, FR-027, `contracts/environments.md`)
-- [ ] T036 [US2] Add a persistent non-production marker to the app when a staging flag is set, plus `noindex` (FR-025)
-- [ ] T037 [US2] Add the mainnet-staging disclosure: state that on-chain actions there are **real**, not a simulation (FR-026d, constitution III) — this is the compensating control for the full-mirror decision and must not be softened to a generic "test environment" banner
-- [ ] T038 [US2] Add the promotion configuration-drift check: fail a `staging` → `main` PR when staging and production build configurations differ anywhere outside the enumerated list (FR-027a, quickstart S6)
+- [X] T036 [US2] Add a persistent non-production marker to the app when a staging flag is set, plus `noindex` (FR-025)
+- [X] T037 [US2] Add the mainnet-staging disclosure: state that on-chain actions there are **real**, not a simulation (FR-026d, constitution III) — this is the compensating control for the full-mirror decision and must not be softened to a generic "test environment" banner
+- [X] T038 [US2] Add the promotion configuration-drift check: fail a `staging` → `main` PR when staging and production build configurations differ anywhere outside the enumerated list (FR-027a, quickstart S6)
 - [ ] T039 [US2] Configure the promotion merge as a **merge commit**, not a squash, and document why in `release.yml` — squashing collapses the per-PR classifications the version is computed from (research R6)
-- [ ] T040 [P] [US2] Replace `develop` with `staging` in the push triggers of `.github/workflows/ci-manager.yml`, `frontend-testing.yml` and `subgraph-build.yml`; add `staging` to `container-build.yml` (FR-022) — `develop` does not exist
-- [ ] T041 [US2] Assert the cohort boundary held: add a check that `frontend/src/config/networks.js` is unmodified by this feature (quickstart S5) — the strongest available form of "the production build is unaffected" (FR-026b)
+- [X] T040 [P] [US2] Replace `develop` with `staging` in the push triggers of `.github/workflows/ci-manager.yml`, `frontend-testing.yml` and `subgraph-build.yml`; add `staging` to `container-build.yml` (FR-022) — `develop` does not exist
+- [X] T041 [US2] Assert the cohort boundary held: add a check that `frontend/src/config/networks.js` is unmodified by this feature (quickstart S5) — the strongest available form of "the production build is unaffected" (FR-026b)
 - [ ] T042 [P] [US2] Write `docs/runbooks/release-and-promotion.md` covering promotion, hotfix, back-merge, and what to do when a promotion is blocked by drift
 
 **Checkpoint**: Nothing reaches production without first running on staging.
@@ -141,18 +141,18 @@ ambiguous.
 package update; confirm the record names the new implementation and the new content address.
 (quickstart S8, S9)
 
-- [ ] T043 [US4] Implement `scripts/release/artifacts.js` producing the artifact table in `contracts/release-record.md`, reading contract implementations from `deployments/` and mini-app CIDs from the on-chain registry — **read, never inferred from the build** (research R8)
-- [ ] T044 [US4] Emit an explicit "unchanged" row for every category that did not move (FR-035) — a missing row is indistinguishable from an unexamined one
-- [ ] T045 [P] [US4] Write `scripts/release/__tests__/artifacts.test.js` covering a moved category, an unchanged category, and an unreachable registry (must report unreadable, never a fabricated absence — constitution III)
-- [ ] T046 [US4] Wire `artifacts.js` into `release.yml` so the table is part of the published record and the `CHANGELOG.md` entry
-- [ ] T047 [US4] Add the mini-app version-pairing check: fail when an app's baseline digest changed without its `package.json` version changing, **and** when its version changed without its bytes changing (FR-007b, quickstart S9) — both directions, because either disagreement makes the record's CID pairing untrue
+- [X] T043 [US4] Implement `scripts/release/artifacts.js` producing the artifact table in `contracts/release-record.md`, reading contract implementations from `deployments/` and mini-app CIDs from the on-chain registry — **read, never inferred from the build** (research R8)
+- [X] T044 [US4] Emit an explicit "unchanged" row for every category that did not move (FR-035) — a missing row is indistinguishable from an unexamined one
+- [X] T045 [P] [US4] Write `scripts/release/__tests__/artifacts.test.js` covering a moved category, an unchanged category, and an unreachable registry (must report unreadable, never a fabricated absence — constitution III)
+- [X] T046 [US4] Wire `artifacts.js` into `release.yml` so the table is part of the published record and the `CHANGELOG.md` entry
+- [X] T047 [US4] Add the mini-app version-pairing check: fail when an app's baseline digest changed without its `package.json` version changing, **and** when its version changed without its bytes changing (FR-007b, quickstart S9) — both directions, because either disagreement makes the record's CID pairing untrue
 - [ ] T048 [US4] Record `promotedFrom` on each release, printing `none (hotfix)` rather than omitting the line for a hotfix release (FR-036)
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T049 Sync the repository release version into every non-mini-app workspace manifest as part of `release.yml`, so `frontend`'s `0.0.0` and the services' `0.1.0` stop being decorative (FR-007a)
+- [X] T049 Sync the repository release version into every non-mini-app workspace manifest as part of `release.yml`, so `frontend`'s `0.0.0` and the services' `0.1.0` stop being decorative (FR-007a)
 - [ ] T050 [P] Run every quickstart scenario S1–S10 and record the outcomes in the feature directory
 - [ ] T051 [P] Add a versioning-and-releases guardrail entry to `CLAUDE.md` covering the three rules most likely to be violated: never hand-edit a version, never add a second version authority, and promotion is a merge commit
 - [ ] T052 Confirm byte neutrality — `bytecode-digest.js --compare` and the mini-app digest gate must both report unchanged, since this feature must not move a single byte of deployed bytecode or published package output (quickstart S10)

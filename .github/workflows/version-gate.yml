@@ -1,0 +1,137 @@
+name: Version Gate
+
+# Required, merge-blocking check (spec 076, FR-009..FR-014).
+#
+# Every pull request must declare what kind of change it makes, in a form a machine can read. This
+# workflow is the enforcement.
+#
+# CONSTITUTION IV: this gate MUST NOT be advisory. There is deliberately no `continue-on-error` on
+# any step below, and none may be added — a version gate that passes on error is not a gate. See
+# .github/CI_ERROR_HANDLING_POLICY.md.
+#
+# Why the PR TITLE and not labels: a required check has to run on `opened`, and labels are applied
+# asynchronously by the autolabeler — the check would race the thing it consumes. The title is also
+# what becomes the squash commit subject, which is what lets the release be computed from git alone.
+
+on:
+  pull_request:
+    # `edited` is essential: the title IS the input, so retitling must re-run the check. Without it
+    # an author fixes the title and the failed check never clears.
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  classify:
+    name: Change classification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Collect the changed-file list
+        id: files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA...$HEAD_SHA" > changed-files.txt
+          echo "count=$(wc -l < changed-files.txt)" >> "$GITHUB_OUTPUT"
+
+      # FR-009/FR-011/FR-014. classify.js prints the accepted values and the exact fix on failure.
+      - name: Classify the pull request
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PR_BODY" > pr-body.txt
+          node scripts/release/classify.js \
+            --title "$PR_TITLE" \
+            --body-from pr-body.txt \
+            --files-from changed-files.txt
+
+      # FR-008. Versions are computed at release time; a hand-written one will disagree with the
+      # computed one, so it is rejected rather than silently overwritten later.
+      #
+      # Mini-app manifests are EXEMPT: those version independently (FR-007) and a contributor is
+      # expected to bump them by hand in the same PR that changes the package.
+      - name: Reject hand-edited version numbers
+        run: |
+          set -euo pipefail
+          offenders=""
+          while read -r f; do
+            case "$f" in
+              frontend/miniapps/*/package.json) continue ;;    # independently versioned, FR-007
+              */package.json|package.json) ;;
+              *) continue ;;
+            esac
+            if git diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" -- "$f" \
+                 | grep -qE '^[+-]\s*"version":'; then
+              offenders="$offenders $f"
+            fi
+          done < changed-files.txt
+          if [ -n "$offenders" ]; then
+            echo "::error::Hand-edited version number(s) in:$offenders"
+            echo "::error::Versions are computed at release time by scripts/release/version.js and"
+            echo "::error::written by the release workflow (spec 076, FR-008). Revert the version"
+            echo "::error::field; the release will set it."
+            echo "::error::Mini-app packages under frontend/miniapps/ are the one exception — they"
+            echo "::error::version independently and you SHOULD bump those by hand."
+            exit 1
+          fi
+
+      # FR-012. The author sees the consequence of their classification before merging.
+      - name: Report the version this would produce
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          CLASS=$(node scripts/release/classify.js --title "$PR_TITLE")
+          BUMP=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).bump)" "$CLASS")
+          CURRENT=$(node scripts/release/version.js --current)
+          {
+            echo "### Version gate"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Classification | \`$(node -e "const c=JSON.parse(process.argv[1]);process.stdout.write(c.type+(c.breaking?'!':'')+(c.scope?'('+c.scope+')':''))" "$CLASS")\` |"
+            echo "| Bump | **$BUMP** |"
+            echo "| Current release | \`$CURRENT\` |"
+            echo ""
+            echo "The release version is the MOST SIGNIFICANT classification across everything merged"
+            echo "since the last release — this PR contributes a \`$BUMP\`, it does not decide the total."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  miniapp-version-pairing:
+    name: Mini-app version pairing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # FR-007b. A mini-app's package version and its published bytes must move together, or the
+      # release record's version↔CID pairing is untrue. Checked in BOTH directions.
+      - name: Versions and published bytes must move together
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/release/check-miniapp-versions.js --base "$BASE_SHA" --head "$HEAD_SHA"

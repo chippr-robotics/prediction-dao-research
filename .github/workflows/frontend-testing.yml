@@ -11,7 +11,8 @@ on:
   push:
     branches:
       - main
-      - develop
+      # spec 076 FR-022: `develop` never existed on the remote; `staging` is the real one.
+      - staging
     paths:
       - 'frontend/**'
   workflow_dispatch:
@@ -243,7 +244,7 @@ jobs:
     name: Deployment Readiness Check
     runs-on: ubuntu-latest
     needs: [unit-tests, lighthouse-audit, axe-audit]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
     
     steps:
       - name: Check all tests passed

@@ -1,0 +1,172 @@
+name: Branch Policy
+
+# Required, merge-blocking check (spec 076, FR-016/FR-018/FR-019).
+#
+# `main` is the production branch: everything on it deploys to members. The only two legitimate ways
+# for a change to arrive there are a PROMOTION from `staging` (the normal path, where the change has
+# already been exercised on a release candidate) and a declared HOTFIX.
+#
+# Without this check the branch model is convention, which is what it was: nothing prevented a
+# feature branch merging straight into `main` and skipping staging entirely.
+#
+# No `continue-on-error` anywhere below, and none may be added (constitution IV).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  schedule:
+    # Hotfix drift (FR-019) is a state, not an event — a hotfix can sit on main unmerged for days,
+    # so it is checked on a timer as well as at promotion.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  source-branch:
+    name: PRs into main come from staging or a hotfix
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the head branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          case "$HEAD_REF" in
+            staging)
+              echo "Promotion from staging — the normal path."
+              echo "::notice::MERGE THIS WITH A MERGE COMMIT, NOT A SQUASH (spec 076, FR-020/research R6)."
+              echo "::notice::Everywhere else in this repo, squash. Here, do not: the release version is"
+              echo "::notice::computed from the change classification carried on each commit subject, and"
+              echo "::notice::squashing a promotion collapses every PR title in the release into one line."
+              echo "::notice::The release would then see a single 'chore' where a 'feat' had shipped." ;;
+            hotfix/*)
+              echo "::notice::Declared hotfix ($HEAD_REF). It MUST be back-merged into staging after"
+              echo "::notice::release, or the next promotion will silently revert it (FR-019)." ;;
+            *)
+              echo "::error::A pull request into main must come from 'staging' or 'hotfix/*'."
+              # (see below for the merge-strategy note that applies once this passes)
+              echo "::error::This one comes from '$HEAD_REF'."
+              echo "::error::"
+              echo "::error::Changes reach production by promotion, so that they have first run on"
+              echo "::error::staging (spec 076, FR-018). Retarget this PR at 'staging'; it will reach"
+              echo "::error::main with the next promotion."
+              echo "::error::"
+              echo "::error::If this genuinely cannot wait, rename the branch to 'hotfix/<something>'"
+              echo "::error::and be ready to back-merge it into staging."
+              exit 1 ;;
+          esac
+
+  promotion-config:
+    name: staging must mirror production
+    # Only a promotion needs this: a hotfix bypasses staging by definition, so comparing the two
+    # would be asking a question that has no meaning for it.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'staging'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # FR-024/FR-027a: an UNLISTED difference means staging exercised a different configuration,
+      # so its green result says nothing about production.
+      # FR-026b: networks.js must be untouched — staging reaches both cohorts by being two
+      # services, never by loosening the build-time cohort rule.
+      - name: Differences must be enumerated, and the cohort boundary untouched
+        run: |
+          node scripts/release/check-promotion-config.js \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}"
+
+  hotfix-drift:
+    name: main must not hold a release staging lacks
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect commits on main that staging does not have
+        id: drift
+        run: |
+          set -euo pipefail
+          if ! git rev-parse -q --verify origin/staging >/dev/null; then
+            echo "::warning::origin/staging does not exist yet — drift detection is inactive (FR-017)."
+            echo "drifted=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git log --oneline origin/staging..origin/main > drift.txt || true
+          if [ -s drift.txt ]; then
+            echo "drifted=yes" >> "$GITHUB_OUTPUT"
+            cat drift.txt
+          else
+            echo "drifted=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Reported as an issue rather than a log line: a hotfix silently absent from staging is
+      # reverted by the next promotion, and nobody reads a green workflow's logs.
+      - name: Open or update a drift issue
+        if: steps.drift.outputs.drifted == 'yes'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs')
+            const commits = fs.readFileSync('drift.txt', 'utf8').trim()
+            const title = 'main contains commits absent from staging'
+            const body = [
+              'Commits on `main` that `staging` does not have:',
+              '',
+              '```',
+              commits,
+              '```',
+              '',
+              'A hotfix that does not return to `staging` is reverted by the next promotion',
+              '(spec 076, FR-019). Back-merge `main` into `staging` to clear this.',
+              '',
+              'This issue closes itself when the drift is gone.',
+              '',
+              '---',
+              '_Generated by [Claude Code](https://claude.ai/code)_',
+            ].join('\n')
+
+            const existing = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'release-drift',
+            })
+            const found = existing.data.find((i) => i.title === title)
+            if (found) {
+              await github.rest.issues.update({ ...context.repo, issue_number: found.number, body })
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['release-drift'] })
+            }
+
+      - name: Close the drift issue once clear
+        if: steps.drift.outputs.drifted == 'no'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const existing = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'release-drift',
+            })
+            for (const issue of existing.data) {
+              if (issue.title !== 'main contains commits absent from staging') continue
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: 'Drift cleared — `staging` now contains everything on `main`.\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_',
+              })
+              await github.rest.issues.update({
+                ...context.repo, issue_number: issue.number, state: 'closed', state_reason: 'completed',
+              })
+            }

@@ -160,8 +160,33 @@ function nextCandidate(opts = {}) {
   return { ...next, candidate: `${fmt(next.release)}-rc.${iteration}`, iteration };
 }
 
+/**
+ * The release candidate this release was promoted from (FR-036).
+ *
+ * Returns the highest `v<version>-rc.N` tag that is an ANCESTOR of the release commit. Ancestry is
+ * the point: an rc tag on an abandoned staging line is not what shipped, and naming it would make
+ * the record wrong in exactly the way the record exists to prevent.
+ *
+ * Returns null for a hotfix — one that bypassed staging has no candidate, and the release record
+ * prints "none (hotfix)" rather than omitting the line.
+ */
+function promotedFrom(version, ref = "HEAD") {
+  const base = String(version || "").trim();
+  if (!RELEASE_TAG_RE.test(base)) return null;
+  const out = git(["tag", "--list", `${base}-rc.*`, "--merged", ref], { allowFail: true });
+  if (!out) return null;
+  const found = out
+    .split("\n")
+    .map((t) => RC_TAG_RE.exec(t.trim()))
+    .filter(Boolean)
+    .map((m) => ({ tag: m[0], iteration: +m[4] }))
+    .sort((a, b) => a.iteration - b.iteration);
+  return found.length ? found[found.length - 1].tag : null;
+}
+
 module.exports = {
   FIRST_VERSION,
+  promotedFrom,
   fmt,
   compare,
   releaseTags,
@@ -180,6 +205,13 @@ if (require.main === module) {
   if (has("--current")) {
     const cur = currentRelease();
     console.log(cur ? cur.tag : "none");
+    process.exit(0);
+  }
+
+  // FR-036: which candidate did this release come from?
+  const pfIndex = argv.indexOf("--promoted-from");
+  if (pfIndex !== -1) {
+    console.log(promotedFrom(argv[pfIndex + 1]) || "none (hotfix)");
     process.exit(0);
   }
 

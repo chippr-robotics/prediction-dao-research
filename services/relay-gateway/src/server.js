@@ -268,6 +268,28 @@ export function createApp(config, deps = {}) {
     const header = req.get('x-origin-auth')
     return !!header && timingSafeEqual(header, config.originAuthSecret)
   }
+  /**
+   * Build identity (spec 076, FR-030/FR-031).
+   *
+   * Deliberately OUTSIDE the `disclose` gate below: an operator matching a member's bug report to a
+   * running build needs this exactly when they cannot reach the trusted edge, and a version string
+   * is not a secret (gasWalletRunwayHrs is, which is why THAT stays gated).
+   *
+   * When the deploy did not supply a version, this reports `unreleased+<sha>` — never the nearest
+   * tag. Reporting a release the process is not running would make the release record untrustworthy
+   * (constitution III).
+   */
+  const buildIdentity = () => {
+    const { version, gitSha } = config.build || {}
+    const short = gitSha ? String(gitSha).slice(0, 7) : null
+    const released = typeof version === 'string' && /^v\d+\.\d+\.\d+(-rc\.\d+)?$/.test(version)
+    return {
+      version: released ? version : short ? `unreleased+${short}` : 'unreleased',
+      gitSha: short,
+      released,
+    }
+  }
+
   const healthHandler = async (req, res) => {
     if (!healthCache.chains || Date.now() - healthCache.at >= config.healthCacheMs) {
       try {
@@ -299,7 +321,7 @@ export function createApp(config, deps = {}) {
         beneficiary: config.opensea.referralAddress ?? null,
       },
     }
-    res.json({ status: 'ok', chains, killSwitch: killSwitch.isActive(), fees })
+    res.json({ status: 'ok', build: buildIdentity(), chains, killSwitch: killSwitch.isActive(), fees })
   }
   app.get('/healthz', healthHandler)
   app.get('/status', healthHandler)

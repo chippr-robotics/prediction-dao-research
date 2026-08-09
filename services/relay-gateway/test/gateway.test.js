@@ -590,6 +590,59 @@ describe('GET /healthz + /status (cached, gated telemetry)', () => {
     await request(app).get('/status')
     expect(blockCalls).toBe(1) // three hits, one fan-out within the cache window
   })
+
+  // Build identity (spec 076, FR-030/FR-031).
+  it('reports the build version to PUBLIC callers while runway telemetry stays gated', async () => {
+    const config = testConfig({
+      APP_VERSION: 'v1.4.0',
+      GIT_SHA: 'b7c48f1a958f8fbfb5d0bb54ed762db7ea6a2011',
+      GAS_WALLET_137: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+    })
+    const { app } = build({ config, providers: mockProviders(config) })
+
+    // The version must be readable with NO X-Origin-Auth: an operator diagnosing a bug report
+    // often cannot reach the trusted edge, and that is exactly when they need it.
+    const pub = await request(app).get('/status')
+    expect(pub.body.build).toEqual({
+      version: 'v1.4.0',
+      gitSha: 'b7c48f1',
+      released: true,
+    })
+
+    // The other half of this test is the part that matters on review: adding a public field must
+    // not have widened the disclosure that was deliberately gated.
+    expect(pub.body.chains['137'].gasWalletRunwayHrs).toBeUndefined()
+    const auth = await request(app).get('/status').set('X-Origin-Auth', ORIGIN_SECRET)
+    expect(auth.body.chains['137'].gasWalletRunwayHrs).toBeGreaterThan(0)
+  })
+
+  it('reports an unreleased build honestly rather than naming a release (FR-031)', async () => {
+    const config = testConfig({ GIT_SHA: 'b7c48f1a958f8fbfb5d0bb54ed762db7ea6a2011' })
+    const { app } = build({ config, providers: mockProviders(config) })
+    const res = await request(app).get('/healthz')
+    expect(res.body.build).toEqual({
+      version: 'unreleased+b7c48f1',
+      gitSha: 'b7c48f1',
+      released: false,
+    })
+  })
+
+  it('never presents a malformed version as a release', async () => {
+    for (const bad of ['main', '1.4.0', 'v1.4', 'latest']) {
+      const config = testConfig({ APP_VERSION: bad, GIT_SHA: 'b7c48f1aaaa' })
+      const { app } = build({ config, providers: mockProviders(config) })
+      const res = await request(app).get('/status')
+      expect(res.body.build.released, `"${bad}" must not read as released`).toBe(false)
+      expect(res.body.build.version).toBe('unreleased+b7c48f1')
+    }
+  })
+
+  it('says unreleased with no sha at all rather than inventing one', async () => {
+    const config = testConfig()
+    const { app } = build({ config, providers: mockProviders(config) })
+    const res = await request(app).get('/status')
+    expect(res.body.build).toEqual({ version: 'unreleased', gitSha: null, released: false })
+  })
 })
 
 describe('audit trail (FR-021): no key material or signatures in events', () => {
