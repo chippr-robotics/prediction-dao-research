@@ -70,6 +70,38 @@ describe('WagerTable (spec 018) — the single My Wagers list view', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  describe('keyboard activation of the row', () => {
+    it('opens the detail view on Enter and on Space', async () => {
+      const user = userEvent.setup()
+      const onSelect = vi.fn()
+      render(<WagerTable {...baseProps} onSelect={onSelect} markets={[wager()]} />)
+      const row = screen.getByText('Lakers ML vs Mike').closest('tr')
+
+      row.focus()
+      await user.keyboard('{Enter}')
+      expect(onSelect).toHaveBeenCalledTimes(1)
+
+      await user.keyboard(' ')
+      expect(onSelect).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not open the detail view when a row action is keyed', async () => {
+      const user = userEvent.setup()
+      const onClaim = vi.fn()
+      const onSelect = vi.fn()
+      const won = wager({ id: '7', status: 'resolved', computedStatus: 'resolved', winner: ME, paid: false })
+      render(<WagerTable {...baseProps} onSelect={onSelect} onClaim={onClaim} showOutcome markets={[won]} />)
+
+      const row = screen.getByText('Lakers ML vs Mike').closest('tr')
+      within(row).getByRole('button', { name: /^claim$/i }).focus()
+      // Space is how a button is pressed; the keydown bubbles to the row, which
+      // must not treat it as "open this wager".
+      await user.keyboard(' ')
+      expect(onClaim).toHaveBeenCalledTimes(1)
+      expect(onSelect).not.toHaveBeenCalled()
+    })
+  })
+
   it('does not offer a Claim action to the losing side', () => {
     const lost = wager({ id: '43', status: 'resolved', computedStatus: 'resolved', winner: OTHER, paid: false })
     render(<WagerTable {...baseProps} onClaim={vi.fn()} showOutcome markets={[lost]} />)

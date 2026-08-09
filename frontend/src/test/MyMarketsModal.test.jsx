@@ -738,6 +738,58 @@ describe('MyMarketsModal', () => {
       await user.click(screen.getByRole('button', { name: /^show$/i }))
       expect(screen.getByText('Lakers win outright')).toBeInTheDocument()
     })
+
+    // Feed navigation swaps the selected wager while the detail view stays
+    // mounted. Every piece of that view's state is per-wager, so it must not
+    // survive the swap: concealed terms here, and the withdraw/refund receipts.
+    it('does not carry concealed terms from one wager onto the next', async () => {
+      const encrypted = (id, terms) => ({
+        id, description: `Encrypted Wager ${id}`, creator: me,
+        participants: [me], status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+        isEncrypted: true, decryptedMetadata: { terms },
+      })
+      useLazyMarketDecryption.mockReturnValue({
+        markets: [encrypted('44', 'Terms of forty four'), encrypted('45', 'Terms of forty five')],
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      })
+
+      const user = userEvent.setup()
+      let view
+      await act(async () => {
+        view = renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} initialSelectedMarketId="44" />
+        )
+      })
+
+      // Conceal wager 44's terms.
+      expect(await screen.findByText('Terms of forty four')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /^hide$/i }))
+      expect(screen.queryByText('Terms of forty four')).not.toBeInTheDocument()
+
+      // Navigate straight to wager 45 — its terms start visible.
+      await act(async () => {
+        view.rerender(
+          <BrowserRouter>
+            <ThemeContext.Provider value={defaultThemeContext}>
+              <WalletContext.Provider value={defaultWalletContext}>
+                <FriendMarketsContext.Provider value={defaultFriendMarketsContext}>
+                  <UIContext.Provider value={defaultUIContext}>
+                    <MyMarketsModal isOpen onClose={mockOnClose} initialSelectedMarketId="45" />
+                  </UIContext.Provider>
+                </FriendMarketsContext.Provider>
+              </WalletContext.Provider>
+            </ThemeContext.Provider>
+          </BrowserRouter>
+        )
+      })
+
+      expect(await screen.findByText('Terms of forty five')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^hide$/i })).toBeInTheDocument()
+    })
   })
 
   describe('Draw resolution (US3)', () => {

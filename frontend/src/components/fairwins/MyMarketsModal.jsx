@@ -1095,6 +1095,12 @@ function MyMarketsModal({
                 <div role="tabpanel" className="mm-panel">
                   {selectedMarket ? (
                     <MarketDetailView
+                      /* Remount when the wager changes. Feed navigation can swap
+                         selectedMarketId while this view is mounted, and every
+                         piece of its state is per-wager — concealed terms, and
+                         the withdraw/refund receipts and errors. Without the key
+                         those carry over onto a different wager. */
+                      key={selectedMarket.id}
                       market={selectedMarket}
                       onBack={handleBackToList}
                       formatDate={formatDate}
@@ -1163,6 +1169,12 @@ function MyMarketsModal({
                 <div role="tabpanel" className="mm-panel">
                   {selectedMarket ? (
                     <MarketDetailView
+                      /* Remount when the wager changes. Feed navigation can swap
+                         selectedMarketId while this view is mounted, and every
+                         piece of its state is per-wager — concealed terms, and
+                         the withdraw/refund receipts and errors. Without the key
+                         those carry over onto a different wager. */
+                      key={selectedMarket.id}
                       market={selectedMarket}
                       onBack={handleBackToList}
                       formatDate={formatDate}
@@ -1229,6 +1241,12 @@ function MyMarketsModal({
                 <div role="tabpanel" className="mm-panel">
                   {selectedMarket ? (
                     <MarketDetailView
+                      /* Remount when the wager changes. Feed navigation can swap
+                         selectedMarketId while this view is mounted, and every
+                         piece of its state is per-wager — concealed terms, and
+                         the withdraw/refund receipts and errors. Without the key
+                         those carry over onto a different wager. */
+                      key={selectedMarket.id}
                       market={selectedMarket}
                       onBack={handleBackToList}
                       formatDate={formatDate}
@@ -1280,6 +1298,12 @@ function MyMarketsModal({
                 <div role="tabpanel" className="mm-panel">
                   {selectedMarket ? (
                     <MarketDetailView
+                      /* Remount when the wager changes. Feed navigation can swap
+                         selectedMarketId while this view is mounted, and every
+                         piece of its state is per-wager — concealed terms, and
+                         the withdraw/refund receipts and errors. Without the key
+                         those carry over onto a different wager. */
+                      key={selectedMarket.id}
                       market={selectedMarket}
                       onBack={handleBackToList}
                       formatDate={formatDate}

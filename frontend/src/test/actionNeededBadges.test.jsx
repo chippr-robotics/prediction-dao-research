@@ -300,6 +300,56 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       expect(tags[0]).toHaveTextContent(/claim/i)
     })
 
+    // `showResolveCountdown` only means the resolve control was *offered* — it
+    // renders nothing for a wallet with no resolution authority, and a countdown
+    // before the window opens. Neither is a Resolve button, so neither may
+    // suppress the tag: that is precisely how a row ends up looking inert.
+    it('keeps the "resolve" tag when the resolve control renders no button', async () => {
+      // wagerOne: ME is a lone participant, not the creator and not
+      // participants[1], so ResolveButtonWithCountdown renders nothing at all.
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '1': 'resolve' }
+      })
+
+      await act(async () => {
+        render(modalUi([wagerOne()]))
+      })
+
+      const row = screen.getByText('Wager One').closest('tr')
+      expect(within(row).queryByRole('button', { name: /^resolve$/i })).not.toBeInTheDocument()
+      const tags = document.querySelectorAll('.wc-action-needed')
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toHaveTextContent(/resolve/i)
+    })
+
+    it('drops the "resolve" tag once the row shows a real Resolve button', async () => {
+      const resolvable = {
+        id: '9',
+        description: 'Resolvable Wager',
+        creator: ME,
+        participants: [ME, OTHER],
+        resolutionType: 0,
+        status: 'active',
+        marketType: 'friend',
+        // Past trading end (ms) → the resolve window is open right now.
+        tradingEndTime: Date.now() - 60 * 60 * 1000,
+      }
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '9': 'resolve' }
+      })
+
+      await act(async () => {
+        render(modalUi([resolvable]))
+      })
+      await act(async () => {
+        screen.getByRole('tab', { name: /created/i }).click()
+      })
+
+      const row = screen.getByText('Resolvable Wager').closest('tr')
+      expect(within(row).getByRole('button', { name: /^resolve$/i })).toBeInTheDocument()
+      expect(document.querySelectorAll('.wc-action-needed')).toHaveLength(0)
+    })
+
     it('drops the tag for a wager whose Accept control is in the row', async () => {
       // A pending offer addressed to the member renders "View Offer", so the
       // "accept" tag would just duplicate it.

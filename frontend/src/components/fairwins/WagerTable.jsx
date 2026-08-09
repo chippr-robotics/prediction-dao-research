@@ -4,6 +4,7 @@ import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { buildWagerVm } from './wagerVm'
 import Badge from '../ui/Badge'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
+import { resolveControlState } from './resolveWindow'
 import OpponentName from './OpponentName'
 import SensitiveValue from '../common/SensitiveValue'
 
@@ -38,11 +39,16 @@ const CONTROLS_SATISFYING = {
 /**
  * True when the row still needs its action-needed tag: something is pending on
  * this wager and no control in the row already says so.
+ *
+ * @param {boolean} resolveButtonShown - whether ResolveButtonWithCountdown is
+ *   rendering an actual Resolve *button* for this row. A countdown or an empty
+ *   render does not count: suppressing the tag behind a control that was never
+ *   drawn is what leaves a row looking inert.
  */
-function needsActionTag(vm, resolveControlShown) {
+function needsActionTag(vm, resolveButtonShown) {
   if (!vm.actionNeeded) return false
   const shown = new Set(vm.actions.map(a => a.key))
-  if (resolveControlShown) shown.add('resolve')
+  if (resolveButtonShown) shown.add('resolve')
   return !(CONTROLS_SATISFYING[vm.actionNeeded] ?? []).some(k => shown.has(k))
 }
 
@@ -124,12 +130,18 @@ export default function WagerTable({
 
   const rows = markets.map(m => {
     const vm = buildWagerVm(m, ctx)
-    const resolveControlShown = showResolveCountdown && !vm.isExpired
+    // Ask the resolve control itself whether it is drawing a button. It re-checks
+    // on its own 1s tick, so a row whose window opens between parent renders can
+    // briefly show both the tag and the button — a duplicate that clears on the
+    // next render, which is the safe direction to be wrong in.
+    const resolveButtonShown =
+      showResolveCountdown && !vm.isExpired &&
+      resolveControlState(m, account).state === 'button'
     return {
       market: m,
       vm,
       decrypt: decryptControlFor(vm, onDecrypt),
-      showActionTag: needsActionTag(vm, resolveControlShown),
+      showActionTag: needsActionTag(vm, resolveButtonShown),
     }
   })
   const hasActionsColumn =
@@ -139,6 +151,18 @@ export default function WagerTable({
   const openRow = (market) => {
     onView?.(market)
     onSelect(market)
+  }
+
+  // The row is exposed as role="button", so it activates on Enter AND Space like
+  // a real button. Keystrokes on a control *inside* the row are ignored: they
+  // bubble to here, and Space is how you press the row's own action buttons —
+  // without this guard, claiming would also navigate into the detail view.
+  const onRowKeyDown = (e, market) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      openRow(market)
+    }
   }
 
   return (
@@ -161,7 +185,7 @@ export default function WagerTable({
               role="button"
               tabIndex={0}
               onClick={() => openRow(market)}
-              onKeyDown={(e) => { if (e.key === 'Enter') openRow(market) }}
+              onKeyDown={(e) => onRowKeyDown(e, market)}
             >
               <td className="mm-table-market">
                 <span className="mm-table-market-title">

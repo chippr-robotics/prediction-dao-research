@@ -370,13 +370,32 @@ describe('Dashboard', () => {
    * reload so FriendMarketsContext picks them up from cache. The on-chain
    * fetch fails (no Hardhat) and the catch path preserves localStorage,
    * matching the wallet-disconnected-from-node scenario in production caches.
+   *
+   * The cache is CHAIN-SCOPED: FriendMarketsContext reads `friendMarkets:<chainId>`
+   * and only falls back to the bare `friendMarkets` key when no chain is set —
+   * which never happens once wagmi has a chain. Seeding the bare key alone (as
+   * this helper used to) was therefore never readable, and the only tests that
+   * depended on it either assert an EMPTY list (DSH-14, which passes either way)
+   * or are skipped. Seed both the connected chain and wagmi's default first
+   * chain, because the provider re-reads the cache when the chain settles after
+   * reconnect.
    */
+  const WAGMI_DEFAULT_CHAIN_ID = 137 // polygon is first in `chains` (frontend/src/wagmi.js)
+
   function seedFriendMarketsAndOpen(markets) {
-    // Narrow viewport → compact card grid (spec 019); these checks expand cards.
+    // Phone viewport: My Wagers renders the same table here as on desktop.
     cy.viewport(390, 844)
     connectAndVisitDashboard()
     cy.window().then((win) => {
-      win.localStorage.setItem('friendMarkets', JSON.stringify(markets))
+      const payload = JSON.stringify(markets)
+      const mockChainId = Number(Cypress.env('NETWORK_ID') || 1337)
+      for (const key of [
+        'friendMarkets',
+        `friendMarkets:${mockChainId}`,
+        `friendMarkets:${WAGMI_DEFAULT_CHAIN_ID}`,
+      ]) {
+        win.localStorage.setItem(key, payload)
+      }
     })
     cy.reload()
     cy.get('body', { timeout: 10000 }).should('be.visible')
@@ -491,12 +510,13 @@ describe('Dashboard', () => {
     cy.viewport(390, 844)
     seedFriendMarketsAndOpen([resolvableWagerAsCreator('res-17')])
 
-    cy.contains('button, [role="tab"]', /created/i).click({ force: true })
+    cy.get('[role="tab"]').contains(/created/i).click({ force: true })
 
     // The table renders on a phone — no card grid, no orientation dependency.
-    cy.get('.mm-table', { timeout: 10000 }).should('exist')
     cy.contains('.mm-table-row', 'DSH-17 Resolvable Wager', { timeout: 10000 })
       .should('be.visible')
+    cy.get('.mm-table').should('exist')
+    cy.contains('.mm-table-row', 'DSH-17 Resolvable Wager')
       .within(() => {
         // The resolution flow is one tap from the row.
         cy.contains('button', /^Resolve$/).should('be.visible').click()
