@@ -109,6 +109,30 @@ just removes the reminder.
 
 ## When something goes wrong
 
+### Reproducing a release problem locally — check your clone depth FIRST
+
+```bash
+git rev-parse --is-shallow-repository   # must print false
+git rev-list --count HEAD               # compare against the count CI reports
+```
+
+**A shallow clone will make release bugs invisible and, worse, produce wrong output that looks
+right.** This has already cost real time twice:
+
+- The v1.0.0 investigation. The pipeline was reading a ~5.6 MB commit log in CI and blowing Node's
+  1 MiB `execFileSync` default. Locally the same command produced 430 KB and worked perfectly,
+  because the clone held 193 of 2508 commits. The measurement was right and the conclusion was
+  wrong.
+- Anything that generates a changelog. `changelog.js` walks the whole range, so running it against
+  a shallow clone silently emits an entry missing most of the release.
+
+`actions/checkout` in `release.yml` uses `fetch-depth: 0` for exactly this reason. Match it locally
+before drawing conclusions:
+
+```bash
+git fetch --unshallow    # or: git clone (without --depth) into a scratch directory
+```
+
 ### The release published nothing
 
 Expected in two cases: an empty commit range, or no commit in the range carried a classification.
@@ -126,6 +150,28 @@ prints every commit, how it classified, and which one set the bump. Commits show
 version. **Investigate before doing anything** — do not delete or move the tag. Published tags are
 the only durable record of what shipped (FR-004). The usual cause is a re-run of a completed
 release; if so, nothing is wrong and no action is needed.
+
+### The release tagged and published, but the CHANGELOG commit failed
+
+The tag and the GitHub Release are already correct and immutable — do not re-run the release to
+"fix" the changelog. Re-running hits the tag-immutability guard (FR-004) and fails, which is the
+intended behavior.
+
+What is missing is only the in-repo `CHANGELOG.md` entry and the manifest version sync. Backfill it
+by hand, **from a full clone** (see the clone-depth warning above — a shallow one writes an entry
+missing most of the release):
+
+```bash
+git fetch --unshallow
+node scripts/release/changelog.js --version v1.0.0 --previous ""
+node scripts/release/sync-manifest-versions.js --version v1.0.0
+```
+
+Then open an ordinary pull request with the result. This is the one case where a generated file is
+committed outside the release job, and it is still generated — never hand-written (FR-037).
+
+**Known outstanding:** v1.0.0's entry was never written, because the release job failed at this step
+on a stale hardcoded manifest list. It needs the backfill above.
 
 ### A promotion is blocked by config drift
 

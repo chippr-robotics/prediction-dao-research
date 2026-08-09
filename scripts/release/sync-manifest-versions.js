@@ -21,20 +21,50 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..", "..");
 
-/** Manifests that track the repository release version (FR-007a). */
-const TRACKED = [
-  "package.json",
-  "frontend/package.json",
-  "services/relay-gateway/package.json",
-  "services/relayer/package.json",
-  "subgraph/package.json",
-  "tools/miniapp-build/package.json",
-  "packages/abi/package.json",
-  "packages/intent-types/package.json",
-];
-
 /** Independently versioned — never written by this script (FR-007). */
 const EXCLUDED_PREFIX = "frontend/miniapps/";
+
+/**
+ * THE TRACKED LIST IS DERIVED, NOT TYPED.
+ *
+ * It used to be a hardcoded array, and it broke the first real release: `services/relayer` was
+ * deleted from the workspace while spec 076 was in flight, and this script — correctly refusing to
+ * sync a subset — failed the release step after the tag and the GitHub Release had already been
+ * published.
+ *
+ * `scripts/deps/check-dependency-hygiene.js` learned exactly this lesson under issue #1039 and says
+ * so in its own comment: a hardcoded member list is an invariant held by human discipline, and
+ * adding or removing a workspace member is routine while remembering to update a second list is
+ * not. So the members come from the same source npm itself uses — the root manifest's `workspaces`
+ * globs — which means this cannot fall behind the workspace by construction.
+ *
+ * Mini-apps are excluded because they version INDEPENDENTLY (FR-007): overwriting one here would
+ * break the version-to-CID pairing that FR-007b exists to protect.
+ */
+function expandWorkspaceGlob(glob) {
+  if (!glob.includes("*")) return [glob];
+  const base = glob.slice(0, glob.indexOf("/*"));
+  const abs = path.join(ROOT, base);
+  if (!fs.existsSync(abs)) return [];
+  return fs
+    .readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+    .map((e) => `${base}/${e.name}`)
+    .sort();
+}
+
+function trackedManifests() {
+  const root = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const members = (root.workspaces || [])
+    .flatMap(expandWorkspaceGlob)
+    .filter((dir) => !dir.startsWith(EXCLUDED_PREFIX))
+    .map((dir) => `${dir}/package.json`)
+    .filter((rel) => fs.existsSync(path.join(ROOT, rel)));
+  // The root manifest tracks the release too, and is not a workspace member of itself.
+  return ["package.json", ...members.sort()];
+}
+
+const TRACKED = trackedManifests();
 
 function normalize(version) {
   const v = String(version || "").trim();
@@ -67,12 +97,20 @@ function sync(version, { check = false } = {}) {
     }
   }
 
-  // A tracked manifest that has vanished is a real problem — the workspace list changed and this
-  // script was not updated. Say so rather than silently syncing a subset.
+  // Unreachable now that TRACKED is derived and filtered by existsSync, but kept as a belt: if this
+  // ever fires again it means the derivation regressed, and syncing a subset silently would leave
+  // manifests disagreeing about which release they belong to.
   if (missing.length) {
+    throw new Error(`tracked manifests vanished between derivation and read: ${missing.join(", ")}`);
+  }
+
+  // A derived list that comes back empty is a coverage hole wearing a green light — rename a
+  // directory and this would report "already at vX.Y.Z" having written nothing. Same failure shape
+  // check-dependency-hygiene.js guards against with its empty-glob check.
+  if (TRACKED.length <= 1) {
     throw new Error(
-      `tracked manifests are missing: ${missing.join(", ")}. ` +
-        `Update TRACKED in scripts/release/sync-manifest-versions.js to match the workspace.`,
+      `only ${TRACKED.length} manifest(s) derived from the workspace globs — expected the root plus ` +
+        `every non-mini-app member. Check "workspaces" in the root package.json.`,
     );
   }
   return changed;
