@@ -31,8 +31,10 @@ dependency and no new release tool** — see research R2.
 
 **Storage**: git tags and files in the repository. No database.
 
-**Testing**: Vitest for the new `scripts/release/*` units and the frontend version line; existing
-`test/` Hardhat suite untouched; workflow behavior validated per `quickstart.md`
+**Testing**: `node --test` (Node 22 built-in) for the new `scripts/release/*` units — `scripts/` is
+not a workspace member, so Vitest there would mean new config and a new dev dependency for three
+files; Vitest for the frontend version line, in the existing frontend suite; existing `test/` Hardhat
+suite untouched; workflow behavior validated per `quickstart.md`
 
 **Target Platform**: GitHub Actions runners (`ubuntu-latest`); Cloud Run `us-central1`
 
