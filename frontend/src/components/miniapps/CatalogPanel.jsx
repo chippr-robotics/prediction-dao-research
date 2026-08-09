@@ -40,6 +40,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
 import SubmitAppPanel from './SubmitAppPanel'
+import { artworkFor } from './appArtwork'
 import EmptyState from '../account/EmptyState'
 import NavIcon from '../nav/NavIcon'
 import { APP_CATEGORY_LABELS } from '../../abis/miniAppRegistry'
@@ -70,6 +71,66 @@ const SUBMIT_ROUTE = '/wallet?tab=apps&view=submit'
 const CATEGORY_FILTERS = Object.entries(APP_CATEGORY_LABELS)
   .map(([ordinal, label]) => ({ value: Number(ordinal), label }))
   .sort((a, b) => a.value - b.value)
+
+/**
+ * Decorative glyphs for the store chrome (spec 077). All are `aria-hidden`: each sits beside
+ * text that already says the same thing, so the art adds flavour, never meaning.
+ */
+function RocketGlyph() {
+  return (
+    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 13.5c-1.8-.6-3-1.8-3.5-3.5C7.6 5.6 10.4 3.2 15 3c-.2 4.6-2.6 7.4-7 8.5Z" />
+        <circle cx="11.6" cy="6.4" r="1.2" />
+        <path d="M6.5 10 4 11.5 6 12M10 13.5 8.5 16l-.5-2M5.5 14.5 4 16" />
+      </g>
+    </svg>
+  )
+}
+
+function VerifiedBadgeGlyph() {
+  return (
+    <svg className="miniapp-glyph miniapp-glyph-badge" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      {/* rosette: scalloped seal with a check — the concept art's rainbow badge, themed */}
+      <path
+        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
+        fill="currentColor"
+        opacity="0.18"
+      />
+      <path
+        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M6.8 10.2l2.1 2.1 4.3-4.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ScrollCheckGlyph() {
+  return (
+    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 3h9a1.5 1.5 0 0 1 1.5 1.5V15A2.5 2.5 0 0 1 14 17.5H7A2.5 2.5 0 0 1 4.5 15V4.5" />
+        <path d="M6 3a1.5 1.5 0 0 0-1.5 1.5V6H7V4.5A1.5 1.5 0 0 0 6 3Z" />
+        <path d="M8 10.6l2 2 3.4-3.8" />
+      </g>
+    </svg>
+  )
+}
+
+function HashShieldGlyph() {
+  return (
+    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 2.5 16 5v4.5c0 3.7-2.4 6.5-6 8-3.6-1.5-6-4.3-6-8V5l6-2.5Z" />
+        <path d="M8.2 7.5 7 12.5M13 7.5l-1.2 5M7 9h6M6.8 11h6" />
+      </g>
+    </svg>
+  )
+}
 
 /** Vendor addresses are shown short; the full value stays available as a tooltip/copy target. */
 function shortAddress(address) {
@@ -124,65 +185,78 @@ function AppCard({ app, launchable, isFavorite, onToggleFavorite }) {
   const categoryLabel = APP_CATEGORY_LABELS[app.category] ?? `Category ${app.category}`
   const slug = appSlug(app.name)
   const canFavorite = launchable && Boolean(slug)
+  // Curated host-side art; a slug the host doesn't know — or a name with no slug at all — gets
+  // the deliberate generic illustration (spec 077 FR-001, never a broken or borrowed image).
+  const { Art } = artworkFor(slug)
 
   return (
     <li className="miniapp-card">
-      <div className="miniapp-card-head">
-        <h5 className="miniapp-card-name" id={nameId}>
-          {app.name}
-        </h5>
-        {canFavorite && (
-          <button
-            type="button"
-            className={`miniapp-card-favorite${isFavorite ? ' is-active' : ''}`}
-            aria-pressed={isFavorite}
-            aria-label={
-              isFavorite ? `Remove ${app.name} from Quick Access` : `Add ${app.name} to Quick Access`
-            }
-            onClick={() => onToggleFavorite(app, slug)}
+      {/* Decorative illustration panel — the name below is the accessible identity. */}
+      <div className="miniapp-card-art" aria-hidden="true">
+        <Art />
+      </div>
+      <div className="miniapp-card-body">
+        <div className="miniapp-card-head">
+          <h5 className="miniapp-card-name" id={nameId}>
+            {app.name}
+          </h5>
+          {canFavorite && (
+            <button
+              type="button"
+              className={`miniapp-card-favorite${isFavorite ? ' is-active' : ''}`}
+              aria-pressed={isFavorite}
+              aria-label={
+                isFavorite ? `Remove ${app.name} from Quick Access` : `Add ${app.name} to Quick Access`
+              }
+              onClick={() => onToggleFavorite(app, slug)}
+            >
+              <NavIcon name="star" size={16} />
+            </button>
+          )}
+        </div>
+        <p className="miniapp-card-category">{categoryLabel}</p>
+        {app.description && (
+          <p className="miniapp-card-description" id={descriptionId}>
+            {app.description}
+          </p>
+        )}
+        {/* The technical data box: vendor + version contained and visually separate from the
+            description (spec 077 FR-005). Same DL semantics as before the redesign. */}
+        <dl className="miniapp-card-meta">
+          <div>
+            <dt>Vendor</dt>
+            <dd>
+              <code title={app.vendor || undefined}>{shortAddress(app.vendor)}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Version</dt>
+            <dd>v{app.approved.version}</dd>
+          </div>
+        </dl>
+        {launchable && slug ? (
+          <Link
+            className="miniapp-card-launch"
+            to={`/apps/${slug}`}
+            // The visible word stays inside the accessible name (WCAG 2.5.3), and the app name makes
+            // each of these links distinguishable in a screen reader's link list. The rocket is
+            // flavour (FR-006) and stays out of the name.
+            aria-label={`Launch ${app.name}`}
+            aria-describedby={app.description ? descriptionId : undefined}
           >
-            <NavIcon name="star" size={16} />
-          </button>
+            <RocketGlyph />
+            Launch
+          </Link>
+        ) : (
+          <p className="miniapp-card-refusal" role="note">
+            {/* Provenance first: when we cannot verify the listing at all, that is the reason that
+                matters, whatever else is also true of the record. */}
+            {!launchable
+              ? 'Launch unavailable — this listing could not be verified.'
+              : 'Launch unavailable — this app’s registered name can’t be used as a web address, so the host has no way to open it. Its vendor needs to re-register it under a usable name.'}
+          </p>
         )}
       </div>
-      <p className="miniapp-card-category">{categoryLabel}</p>
-      {app.description && (
-        <p className="miniapp-card-description" id={descriptionId}>
-          {app.description}
-        </p>
-      )}
-      <dl className="miniapp-card-meta">
-        <div>
-          <dt>Vendor</dt>
-          <dd>
-            <code title={app.vendor || undefined}>{shortAddress(app.vendor)}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>v{app.approved.version}</dd>
-        </div>
-      </dl>
-      {launchable && slug ? (
-        <Link
-          className="miniapp-card-launch"
-          to={`/apps/${slug}`}
-          // The visible word stays inside the accessible name (WCAG 2.5.3), and the app name makes
-          // each of these links distinguishable in a screen reader's link list.
-          aria-label={`Launch ${app.name}`}
-          aria-describedby={app.description ? descriptionId : undefined}
-        >
-          Launch
-        </Link>
-      ) : (
-        <p className="miniapp-card-refusal" role="note">
-          {/* Provenance first: when we cannot verify the listing at all, that is the reason that
-              matters, whatever else is also true of the record. */}
-          {!launchable
-            ? 'Launch unavailable — this listing could not be verified.'
-            : 'Launch unavailable — this app’s registered name can’t be used as a web address, so the host has no way to open it. Its vendor needs to re-register it under a usable name.'}
-        </p>
-      )}
     </li>
   )
 }
@@ -334,13 +408,38 @@ function CatalogView() {
   return (
     <section className="miniapp-catalog" aria-label="Apps">
       <div className="miniapp-catalog-header">
-        <div>
-          <h3>Apps</h3>
-          <p className="miniapp-catalog-subtitle">
-            Every app listed here has been reviewed and approved on-chain. Before any of an app’s code
-            runs, the host re-reads its registry record and checks the package against the hash
-            recorded there.
-          </p>
+        <div className="miniapp-store-hero">
+          <div className="miniapp-store-title">
+            <h3>Apps</h3>
+            {/* The trust badge is a factual claim about THIS listing, so it renders only when the
+                listing is actually verified (spec 077 FR-002) — never over a stale snapshot, an
+                outage, or a registry gap. */}
+            {listing?.verified && (
+              <p className="miniapp-store-badge">
+                <VerifiedBadgeGlyph />
+                On-chain verified market
+              </p>
+            )}
+          </div>
+          {/* The spec-073 trust story, restructured into two scannable blocks (FR-003). Same
+              factual claims as the old paragraph; the glyphs are decoration, not meaning. */}
+          <ul className="miniapp-store-trust">
+            <li>
+              <ScrollCheckGlyph />
+              <span>
+                <strong>Reviewed on-chain.</strong> Every app listed here has been reviewed and
+                approved on-chain.
+              </span>
+            </li>
+            <li>
+              <HashShieldGlyph />
+              <span>
+                <strong>Hash-checked before launch.</strong> Before any of an app’s code runs, the
+                host re-reads its registry record and checks the package against the hash recorded
+                there.
+              </span>
+            </li>
+          </ul>
         </div>
         {/* No registry means nothing to refresh and nowhere to submit — offering either would be an
             affordance that leads nowhere. */}
