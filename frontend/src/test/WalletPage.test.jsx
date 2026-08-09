@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import WalletPage from '../pages/WalletPage'
 import { WalletContext, UIContext } from '../contexts'
+import { LEGAL_LINKS } from '../constants/legalLinks'
 
 // Spec 011 — Account tab entry point for the address QR modal
 // (contracts/address-qr-ui-contract.md, W1–W2). Wallet state is mocked at the
@@ -246,5 +247,34 @@ describe('WalletPage — section routing', () => {
     const { container } = renderPage(connectedWalletContext, '/wallet?tab=membership')
     expect(container.querySelector('.wallet-portal-current')).toBeFalsy()
     expect(container.querySelector('.wallet-portal-topbar')).toBeFalsy()
+  })
+})
+
+// Issue #1025 — Terms & Conditions / Risk Disclosure / Privacy Policy / Account
+// Moderation moved out of the side nav drawer into Settings → App, after
+// Install App / Software Update.
+describe('WalletPage — Preferences → App → Legal & Policies (issue #1025)', () => {
+  const PREFERENCES_ROUTE = '/wallet?tab=preferences'
+
+  it('lists all four legal/policy links, each pointing at its existing in-app route', () => {
+    renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    expect(screen.getByRole('heading', { name: /legal & policies/i })).toBeInTheDocument()
+
+    for (const { label, href } of LEGAL_LINKS) {
+      expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toHaveAttribute('href', href)
+    }
+  })
+
+  it('positions Legal & Policies after Install App and Software Update', () => {
+    const { container } = renderPage(connectedWalletContext, PREFERENCES_ROUTE)
+    const headings = Array.from(container.querySelectorAll('.preferences-group-heading, h3')).map(
+      (el) => el.textContent
+    )
+    const installIdx = headings.indexOf('Install App')
+    const updateIdx = headings.indexOf('Software Update')
+    const legalIdx = headings.indexOf('Legal & Policies')
+    expect(installIdx).toBeGreaterThanOrEqual(0)
+    expect(updateIdx).toBeGreaterThan(installIdx)
+    expect(legalIdx).toBeGreaterThan(updateIdx)
   })
 })

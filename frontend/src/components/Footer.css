@@ -51,10 +51,10 @@
 }
 
 /*
- * Drawer variant — the same condensed legal footer, restyled to be contained at
- * the bottom of the wallet section drawer (WalletPage.css). It stacks vertically,
- * drops the wide centered layout, and uses margin-top:auto so it is pinned to the
- * bottom of the flex-column drawer regardless of how tall the section list is.
+ * Drawer variant — copyright only (the legal/policy links moved to Settings → App,
+ * issue #1025), restyled to be contained at the bottom of the side nav drawer
+ * (AppNavDrawer.css). Uses margin-top:auto so it is pinned to the bottom of the
+ * flex-column drawer regardless of how tall the section list is.
  */
 .app-footer--drawer {
   flex-direction: column;
@@ -64,9 +64,4 @@
   margin: auto 0 0;
   padding: 1rem 12px;
   font-size: 0.8125rem;
-}
-
-.app-footer--drawer .app-footer-links {
-  flex-direction: column;
-  gap: 0.5rem;
 }
