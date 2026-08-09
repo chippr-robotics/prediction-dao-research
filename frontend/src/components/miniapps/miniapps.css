@@ -120,100 +120,11 @@
 .miniapp-store-badge .miniapp-glyph-badge {
   color: var(--brand-primary, #36b37e);
 }
-/* The trust story as two scannable blocks instead of one dense paragraph. */
-.miniapp-store-trust {
-  display: grid;
-  gap: 0.45rem;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.miniapp-store-trust li {
-  align-items: flex-start;
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 10px;
-  color: var(--text-secondary, #5a6772);
-  display: flex;
-  font-size: 0.82rem;
-  gap: 0.5rem;
-  line-height: 1.45;
-  padding: 0.55rem 0.7rem;
-}
-.miniapp-store-trust li strong {
-  color: var(--text-primary, #1f2933);
-}
-.miniapp-store-trust .miniapp-glyph {
-  color: var(--brand-primary, #36b37e);
-  height: 20px;
-  margin-top: 0.1rem;
-  width: 20px;
-}
-
 /* Decorative glyph base: sized to sit beside a line of text, never focusable, never announced. */
 .miniapp-glyph {
   flex: 0 0 auto;
   height: 18px;
   width: 18px;
-}
-
-/* ---- Store bar: Market / My Apps / Search (spec 077, US2) -------------- */
-
-/* A floating dock, sticky at the viewport bottom while the catalog scrolls — the concept art's
-   bottom navigation, scoped to the Apps section. It sits last in the DOM, so its visual position
-   and its tab order agree. `bottom` keeps a thumb-height gap plus the device safe area. */
-.miniapp-store-bar {
-  align-self: center;
-  background: var(--surface-color, #fff);
-  border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 999px;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-  padding: 0.3rem;
-  position: sticky;
-  z-index: 2;
-}
-.miniapp-store-bar-link {
-  align-items: center;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--text-secondary, #5a6772);
-  display: inline-flex;
-  font-size: 0.82rem;
-  font-weight: 600;
-  gap: 0.35rem;
-  padding: 0.4rem 0.9rem;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.miniapp-store-bar-link:hover {
-  color: var(--text-primary, #1f2933);
-}
-.miniapp-store-bar-link:focus-visible {
-  outline: 2px solid var(--brand-primary, #36b37e);
-  outline-offset: 2px;
-}
-/* Active section: tinted pill + border + weight — and `aria-current` in the markup — so the
-   state never rides on colour alone. */
-.miniapp-store-bar-link.is-active {
-  background: color-mix(in srgb, var(--brand-primary, #36b37e) 14%, transparent);
-  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
-  color: var(--text-primary, #1f2933);
-}
-
-@media (max-width: 480px) {
-  .miniapp-store-bar {
-    justify-content: space-around;
-    width: 100%;
-  }
-  .miniapp-store-bar-link {
-    flex: 1 1 0;
-    justify-content: center;
-  }
 }
 
 /* ---- State blocks ------------------------------------------------------ */
@@ -391,165 +302,373 @@
   width: 4px;
 }
 
-/* ---- Catalog grid ------------------------------------------------------ */
+/* ---- Catalog list (iteration 2: store rows) ---------------------------- */
 
 .miniapp-catalog-grid {
-  display: grid;
-  gap: 0.6rem;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  display: flex;
+  flex-direction: column;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.miniapp-card {
-  background: var(--surface-color, #fff);
-  border: 1px solid var(--border-color, #e3e7eb);
+/* A store row: leading art tile, text block, and a stretched tap target (see AppRow's note on
+   why the button overlays rather than wraps). Rows read as one tappable surface — hover/focus
+   feedback lands on the whole row via the overlay's states. */
+.miniapp-row {
+  align-items: center;
   border-radius: 14px;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  gap: 0.85rem;
+  padding: 0.6rem 0.6rem;
+  position: relative;
 }
-.miniapp-card:hover {
-  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, var(--border-color, #e3e7eb));
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--text-primary, #1f2933) 10%, transparent);
+.miniapp-row:hover {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 7%, transparent);
 }
-/* The illustration panel: a soft brand-tinted stage for the curated art. Decorative throughout —
-   it is aria-hidden in the markup and carries no text. */
-.miniapp-card-art {
+.miniapp-row-art {
   align-items: center;
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--brand-primary, #36b37e) 16%, transparent),
     color-mix(in srgb, var(--brand-primary, #36b37e) 4%, transparent)
   );
-  border-bottom: 1px solid var(--border-color, #e3e7eb);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 14px;
   display: flex;
+  flex: 0 0 auto;
+  height: 56px;
   justify-content: center;
-  padding: 0.8rem;
+  width: 56px;
 }
-.miniapp-art {
-  height: 72px;
-  width: 72px;
+.miniapp-row-art .miniapp-art {
+  height: 40px;
+  width: 40px;
 }
-.miniapp-card-body {
+.miniapp-row-body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.8rem 0.9rem 0.9rem;
+  gap: 0.15rem;
+  min-width: 0;
 }
-.miniapp-card-head {
-  align-items: flex-start;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: space-between;
-}
-.miniapp-card-name {
+.miniapp-row-name {
   color: var(--text-primary, #1f2933);
-  font-size: 0.98rem;
-  line-height: 1.3;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
   margin: 0;
 }
-/* Star toggle for Quick Access (nav drawer). Filled + brand colour when favorited — a shape
-   change, not just a colour change, so the state reads without relying on hue (WCAG 1.4.1). */
-.miniapp-card-favorite {
+.miniapp-row-meta {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.8rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.miniapp-row-meta code {
+  font-size: 0.78rem;
+}
+.miniapp-row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.1rem 0 0;
+}
+.miniapp-row-chip {
+  align-items: center;
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 999px;
+  color: var(--text-secondary, #5a6772);
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 0.25rem;
+  padding: 0.1rem 0.5rem;
+}
+.miniapp-row-chip.is-favorite {
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-row-chip.is-favorite .nav-icon {
+  color: var(--brand-primary, #36b37e);
+  fill: currentColor;
+}
+/* The stretched tap target: every pixel of the row opens the sheet, and the row's focus ring is
+   the button's, drawn around the whole row. */
+.miniapp-row-tap {
   background: transparent;
   border: none;
-  border-radius: 6px;
-  color: var(--text-secondary, #5a6772);
+  border-radius: 14px;
   cursor: pointer;
-  flex: 0 0 auto;
-  line-height: 0;
-  padding: 0.2rem;
+  inset: 0;
+  padding: 0;
+  position: absolute;
 }
-.miniapp-card-favorite:hover {
-  color: var(--brand-primary, #36b37e);
+.miniapp-row-tap:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: -2px;
 }
-.miniapp-card-favorite:focus-visible {
+
+/* ---- Store bar: fixed bottom navigation (spec 077 iteration 2) --------- */
+
+/* A proper bottom nav, app-store style: fixed to the viewport bottom, full-width on small
+   screens with icon-over-label entries, floating as a centered dock on wide ones. It sits last
+   in the DOM (tab order = "after the content", the native idiom for bottom navs) and the
+   catalog carries a spacer (`.miniapp-catalog-with-bar`) so it never occludes the last row. */
+.miniapp-store-bar {
+  background: var(--surface-color, #fff);
+  border-top: 1px solid var(--border-color, #e3e7eb);
+  bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  left: 0;
+  padding: 0.3rem 0.5rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
+  position: fixed;
+  right: 0;
+  z-index: 30;
+}
+.miniapp-store-bar-link {
+  align-items: center;
+  border-radius: 12px;
+  color: var(--text-secondary, #5a6772);
+  display: inline-flex;
+  flex-direction: column;
+  font-size: 0.72rem;
+  font-weight: 600;
+  gap: 0.1rem;
+  padding: 0.2rem 0.75rem 0.3rem;
+  text-decoration: none;
+}
+.miniapp-store-bar-link:hover {
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-store-bar-link:focus-visible {
   outline: 2px solid var(--brand-primary, #36b37e);
   outline-offset: 2px;
 }
-.miniapp-card-favorite.is-active {
+.miniapp-store-bar-icon {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  justify-content: center;
+  line-height: 0;
+  padding: 0.2rem 0.85rem;
+}
+/* Active entry: tinted pill behind the icon plus full-contrast text — with `aria-current` in
+   the markup, so the state never rides on colour alone. */
+.miniapp-store-bar-link.is-active {
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-store-bar-link.is-active .miniapp-store-bar-icon {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 18%, transparent);
   color: var(--brand-primary, #36b37e);
 }
-.miniapp-card-favorite.is-active .nav-icon {
-  fill: currentColor;
-}
-.miniapp-card-category {
-  color: var(--text-secondary, #5a6772);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  margin: 0;
-  text-transform: uppercase;
-}
-.miniapp-card-description {
-  color: var(--text-secondary, #5a6772);
-  font-size: 0.85rem;
-  line-height: 1.4;
-  margin: 0;
-}
-/* The technical-data box (FR-005): vendor + version contained and visibly apart from the prose. */
-.miniapp-card-meta {
-  background: var(--bg-primary, #f7f9fa);
-  border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 10px;
-  color: var(--text-secondary, #5a6772);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 0.78rem;
-  gap: 0.25rem 1rem;
-  margin: 0.25rem 0 0;
-  padding: 0.45rem 0.65rem;
-}
-.miniapp-card-meta > div {
-  align-items: baseline;
-  display: flex;
-  gap: 0.3rem;
-}
-.miniapp-card-meta dt {
-  font-weight: 600;
-}
-.miniapp-card-meta dd {
-  margin: 0;
-}
-.miniapp-card-meta code {
-  font-size: 0.78rem;
+
+/* Room for the fixed bar: applied to the section exactly when the bar renders. */
+.miniapp-catalog-with-bar {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
 }
 
-.miniapp-card-launch {
+@media (min-width: 720px) {
+  /* Wide viewports: the same nav floats as a centered dock instead of spanning the window. */
+  .miniapp-store-bar {
+    border: 1px solid var(--border-color, #e3e7eb);
+    border-radius: 999px;
+    bottom: 0.75rem;
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
+    gap: 0.25rem;
+    left: 50%;
+    padding: 0.3rem 0.5rem;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- App details sheet (spec 077 iteration 2, FR-017) ------------------ */
+
+.miniapp-sheet-backdrop {
+  align-items: flex-end;
+  background: color-mix(in srgb, var(--text-primary, #1f2933) 45%, transparent);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 40;
+}
+.miniapp-sheet {
+  background: var(--surface-color, #fff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 85vh;
+  max-width: 480px;
+  overflow-y: auto;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .miniapp-sheet {
+    animation: miniapp-sheet-rise 0.18s ease-out;
+  }
+  @keyframes miniapp-sheet-rise {
+    from {
+      transform: translateY(1.5rem);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+.miniapp-sheet-head {
   align-items: center;
+  display: flex;
+  gap: 0.85rem;
+}
+.miniapp-sheet-art {
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary, #36b37e) 16%, transparent),
+    color-mix(in srgb, var(--brand-primary, #36b37e) 4%, transparent)
+  );
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 16px;
+  display: flex;
+  flex: 0 0 auto;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+.miniapp-sheet-art .miniapp-art {
+  height: 46px;
+  width: 46px;
+}
+.miniapp-sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.miniapp-sheet-title h4 {
+  color: var(--text-primary, #1f2933);
+  font-size: 1.15rem;
+  margin: 0;
+}
+.miniapp-sheet-category {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  margin: 0.1rem 0 0;
+  text-transform: uppercase;
+}
+.miniapp-sheet-close {
   align-self: flex-start;
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 999px;
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+  flex: 0 0 auto;
+  line-height: 0;
+  padding: 0.4rem;
+}
+.miniapp-sheet-close:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+.miniapp-sheet-description {
+  color: var(--text-secondary, #5a6772);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+/* The technical-data box, sheet edition: same containment idea as the old card box. */
+.miniapp-sheet-meta {
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 12px;
+  color: var(--text-secondary, #5a6772);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+}
+.miniapp-sheet-meta > div {
+  align-items: baseline;
+  display: flex;
+  gap: 0.4rem;
+}
+.miniapp-sheet-meta dt {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+.miniapp-sheet-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.miniapp-sheet-meta code {
+  font-size: 0.75rem;
+}
+.miniapp-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.miniapp-sheet-open {
+  align-items: center;
   background: var(--primary-button, var(--brand-primary, #36b37e));
   border: 1px solid transparent;
   border-radius: 999px;
   color: var(--primary-button-text, #fff);
   display: inline-flex;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   gap: 0.4rem;
-  margin-top: auto;
-  padding: 0.4rem 1.1rem;
+  padding: 0.5rem 1.3rem;
   text-decoration: none;
 }
-.miniapp-card-launch .miniapp-glyph {
-  height: 16px;
-  width: 16px;
-}
-.miniapp-card-launch:hover {
+.miniapp-sheet-open:hover {
   background: var(--primary-button-hover, #2f9e6e);
 }
-.miniapp-card-launch:focus-visible {
+.miniapp-sheet-open:focus-visible {
   outline: 2px solid var(--brand-primary, #36b37e);
   outline-offset: 2px;
 }
-
-/* No launch affordance at all when the listing is unverified — this replaces it, and says why. */
-.miniapp-card-refusal {
+.miniapp-sheet-favorite {
+  background: transparent;
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 999px;
+  color: var(--text-primary, #1f2933);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+}
+.miniapp-sheet-favorite:hover {
+  border-color: var(--brand-primary, #36b37e);
+}
+.miniapp-sheet-favorite:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+/* Pressed (in My Apps): tint + border + the label itself flips — never colour alone. */
+.miniapp-sheet-favorite.is-active {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 12%, transparent);
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+}
+/* Replaces the actions when the launch is refused on principle — same copy rules as the cards
+   had (provenance first), relocated with the actions. */
+.miniapp-sheet-refusal {
   color: var(--text-secondary, #5a6772);
-  font-size: 0.8rem;
-  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  margin: 0;
 }
 
 /* ---------------------------------------------------------------------------------------------

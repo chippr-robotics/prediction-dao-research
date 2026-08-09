@@ -134,3 +134,33 @@ restructured trust copy. **Independent test**: quickstart §2 steps 1, 4–6.
 MVP = Phase 3 (US1) — the redesigned market alone satisfies the issue's core pain points.
 Phases commit separately: toolchain bump (one commit), US1, US2, polish — each leaving the
 tree green.
+
+## Phase 6: User Story 4 — App-store experience (iteration 2, post-merge feedback)
+
+**Goal**: Play-Store-like list rows + app details bottom sheet, fixed bottom nav, icon
+refresh, no explainer prose. **Independent test**: spec Iteration 2 acceptance scenarios.
+
+- [X] T020 [US4] Create `frontend/src/components/miniapps/AppSheet.jsx`: bottom-sheet dialog
+      (`role="dialog"`, `aria-modal`, labelled by app name) showing artwork, name, category,
+      description, vendor (full value), version; actions Open (launch link, rocket, only when
+      verified + slug) and Add to / Remove from My Apps (aria-pressed, same canFavorite rule);
+      launch-refusal copy for unverified/no-slug; Escape + backdrop + close-button dismissal;
+      focus into the sheet on open and back to the invoking row on close.
+- [X] T021 [US4] Rework `frontend/src/components/miniapps/CatalogPanel.jsx`: remove the trust
+      blocks (badge stays, gated on verified); Refresh becomes an icon-only button whose
+      accessible name still announces Refresh/Refreshing; `AppCard` becomes a tappable list
+      row (leading art, bold name, category • vendor line, version chip, non-interactive
+      favorited indicator) that opens the AppSheet; favorite star and launch link leave the
+      row.
+- [X] T022 [US4] Restyle `frontend/src/components/miniapps/StoreBar.jsx` +
+      `frontend/src/components/miniapps/miniapps.css` as a fixed full-width bottom navigation
+      (icon over label, active tint, safe-area padding) with a content spacer so no row is
+      occluded; add row-list and sheet styles; drop the dead trust-block styles.
+- [X] T023 [US4] Update the affected suites (`CatalogPanel.test.jsx`, `storeRedesign.test.jsx`,
+      `storeNavigation.test.jsx`) to the row+sheet interaction model and add sheet-focused
+      coverage: open/close (button, backdrop, Escape), focus restoration, Open link href,
+      favorite toggle from the sheet, refusal copy inside the sheet on stale/no-slug, axe
+      passes with the sheet open.
+- [ ] T024 [US4] Verify (lint, scoped suites, host build, byte gate untouched), update
+      `docs/developer-guide/miniapps.md`'s store-surface section, commit, push, and open the
+      iteration-2 PR.

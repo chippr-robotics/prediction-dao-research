@@ -78,7 +78,14 @@ The catalog's visual layer. Three rules keep it from becoming a trust surface:
   change. All of it is decorative (`aria-hidden`); the card's text is the identity.
 - **The "On-chain verified market" badge is a factual claim**, so it renders only over a
   verified listing — never the stale snapshot, the outage, or the registry gap. If you touch the
-  header, keep that gate; `storeRedesign.test.jsx` pins it across every state.
+  header, keep that gate; `storeRedesign.test.jsx` pins it across every state. The badge is the
+  ONLY trust copy on the surface (iteration 2): the explanation prose was removed deliberately —
+  do not reintroduce it; this guide and the runbooks are where the depth lives.
+- **Rows promise nothing the sheet walks back.** Catalog entries are tappable store rows; the
+  launch affordance, the My Apps toggle, and both launch-refusal explanations live in the
+  app-details sheet (`AppSheet.jsx`), gated on the SAME `verified`/slug pair the cards used.
+  `appSheet.test.jsx` pins the dialog mechanics (labelling, Escape/backdrop/close, focus
+  restoration to the invoking row).
 - **Store navigation is presentation state, not navigation.** Market / My Apps / Search ride the
   Apps tab's existing `?view=` seam (`storeViews.js` resolves it, totally — unknown values are
   the market; `view=submit` keeps its exclusive surface). Every sub-view is a lens over the ONE
