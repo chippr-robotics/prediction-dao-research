@@ -100,7 +100,7 @@ gate while a commit can still deploy without its tests having run.
 ## Traps
 
 **Never recover an install with `npm install`.** npm/cli#4828 silently drops
-`@rollup/rollup-linux-x64-gnu` from *both* `node_modules` and `package-lock.json` on an incremental
+the build's native binding — currently `@rolldown/binding-linux-x64-gnu` — from *both* `node_modules` and `package-lock.json` on an incremental
 install; every Vite build then dies, including the mini-app release path whose bytes are
 keccak-committed on-chain. It happened four times during this conversion. Re-running `npm install`
 cannot fix it — the lockfile is already wrong, so npm reports "up to date". Use

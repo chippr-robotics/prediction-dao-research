@@ -38,9 +38,9 @@ npm install
 ```
 
 **Do not run `npm install` inside `frontend/` (or any other workspace).** An incremental install in
-a child silently drops optional platform binaries — notably `@rollup/rollup-linux-x64-gnu` — from
+a child silently drops optional platform binaries — currently `@rolldown/binding-linux-x64-gnu` — from
 BOTH `node_modules` and `package-lock.json` (npm/cli#4828). Every Vite build then dies with
-`Cannot find module @rollup/rollup-linux-x64-gnu`, including the mini-app release path whose output
+a missing-native-binding error, including the mini-app release path whose output
 bytes are committed on-chain. Re-running `npm install` does not fix it: the lockfile is already
 wrong, so npm reports "up to date".
 
@@ -49,6 +49,10 @@ If it happens, recover with a full re-resolve:
 ```bash
 npm run deps:reinstall
 ```
+
+The binary's name tracks the build toolchain (it was rollup's until Vite 8 moved to rolldown). The
+authoritative list is `REQUIRED_OPTIONAL` in `scripts/deps/check-dependency-hygiene.js` — `npm run
+check:deps` fails when one is missing, so you do not have to know the name to catch it.
 
 ### 3. Verify Installation
 
