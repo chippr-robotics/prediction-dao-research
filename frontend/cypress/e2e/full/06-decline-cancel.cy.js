@@ -137,7 +137,7 @@ describe('Decline and Cancel Wagers', () => {
     cy.openMyWagers('created')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         // Click on the first wager to view details
         cy.wrap(rows.first()).click()
@@ -214,7 +214,7 @@ describe('Decline and Cancel Wagers', () => {
     cy.openMyWagers('participating')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-      const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+      const rows = $panel.find('.mm-table-row')
       if (rows.length > 0) {
         cy.wrap(rows.first()).click()
 
@@ -254,7 +254,7 @@ describe('Decline and Cancel Wagers', () => {
       const activeBadge = $panel.find('.status-active, :contains("Active")')
       if (activeBadge.length > 0) {
         // Click on the active wager
-        const rows = $panel.find('.wc-card .wc-header, .mm-table-row, tr[role="button"]')
+        const rows = $panel.find('.mm-table-row')
         if (rows.length > 0) {
           cy.wrap(rows.first()).click()
 

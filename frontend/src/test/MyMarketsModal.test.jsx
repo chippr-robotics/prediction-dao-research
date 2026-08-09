@@ -144,11 +144,12 @@ describe('MyMarketsModal', () => {
     )
   }
 
-  // Spec 019: the view is chosen by viewport. Default the matchMedia mock to
-  // "narrow" (no min-width match) → grid; setWideViewport() forces the table.
-  const setWideViewport = (wide) => {
+  // My Wagers renders the table at every viewport; matchMedia no longer picks a
+  // view. Force it "narrow" so the tests exercise the phone case — the one that
+  // used to hide the resolution flow behind an expandable card.
+  const setNarrowViewport = () => {
     window.matchMedia = vi.fn().mockImplementation((query) => ({
-      matches: wide && /min-width/.test(query),
+      matches: /max-width/.test(query),
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -163,8 +164,7 @@ describe('MyMarketsModal', () => {
     vi.clearAllMocks()
     // Reset session-scoped UI prefs so test order can't leak them.
     try { sessionStorage.clear() } catch { /* no-op */ }
-    // Default to narrow viewport (grid) for every test unless it opts into wide.
-    setWideViewport(false)
+    setNarrowViewport()
     // Mock window.ethereum to avoid provider creation errors
     global.window.ethereum = undefined
     useWallet.mockReturnValue({
@@ -705,6 +705,91 @@ describe('MyMarketsModal', () => {
       expect(await screen.findByText(/terms unavailable/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
     })
+
+    // spec 018 FR-002. This lived on the expandable card; with one table view the
+    // decrypted terms and their conceal control live in the detail view.
+    it('lets the user hide and re-show decrypted private terms in the detail view', async () => {
+      const market = {
+        id: '43', description: 'Encrypted Wager Forty Three', creator: me,
+        participants: [me], status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+        isEncrypted: true, decryptedMetadata: { terms: 'Lakers win outright' },
+      }
+      useLazyMarketDecryption.mockReturnValue({
+        markets: [market],
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      })
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(<MyMarketsModal isOpen={true} onClose={mockOnClose} />)
+      })
+      await user.click(screen.getByRole('tab', { name: /created/i }))
+      await user.click(await screen.findByText('Encrypted Wager Forty Three'))
+
+      // Decrypted terms are visible…
+      expect(await screen.findByText('Lakers win outright')).toBeInTheDocument()
+      // …conceal them…
+      await user.click(screen.getByRole('button', { name: /^hide$/i }))
+      expect(screen.queryByText('Lakers win outright')).not.toBeInTheDocument()
+      // …and show them again (no re-decryption).
+      await user.click(screen.getByRole('button', { name: /^show$/i }))
+      expect(screen.getByText('Lakers win outright')).toBeInTheDocument()
+    })
+
+    // Feed navigation swaps the selected wager while the detail view stays
+    // mounted. Every piece of that view's state is per-wager, so it must not
+    // survive the swap: concealed terms here, and the withdraw/refund receipts.
+    it('does not carry concealed terms from one wager onto the next', async () => {
+      const encrypted = (id, terms) => ({
+        id, description: `Encrypted Wager ${id}`, creator: me,
+        participants: [me], status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+        isEncrypted: true, decryptedMetadata: { terms },
+      })
+      useLazyMarketDecryption.mockReturnValue({
+        markets: [encrypted('44', 'Terms of forty four'), encrypted('45', 'Terms of forty five')],
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      })
+
+      const user = userEvent.setup()
+      let view
+      await act(async () => {
+        view = renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} initialSelectedMarketId="44" />
+        )
+      })
+
+      // Conceal wager 44's terms.
+      expect(await screen.findByText('Terms of forty four')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /^hide$/i }))
+      expect(screen.queryByText('Terms of forty four')).not.toBeInTheDocument()
+
+      // Navigate straight to wager 45 — its terms start visible.
+      await act(async () => {
+        view.rerender(
+          <BrowserRouter>
+            <ThemeContext.Provider value={defaultThemeContext}>
+              <WalletContext.Provider value={defaultWalletContext}>
+                <FriendMarketsContext.Provider value={defaultFriendMarketsContext}>
+                  <UIContext.Provider value={defaultUIContext}>
+                    <MyMarketsModal isOpen onClose={mockOnClose} initialSelectedMarketId="45" />
+                  </UIContext.Provider>
+                </FriendMarketsContext.Provider>
+              </WalletContext.Provider>
+            </ThemeContext.Provider>
+          </BrowserRouter>
+        )
+      })
+
+      expect(await screen.findByText('Terms of forty five')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^hide$/i })).toBeInTheDocument()
+    })
   })
 
   describe('Draw resolution (US3)', () => {
@@ -754,9 +839,8 @@ describe('MyMarketsModal', () => {
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
 
-      // Expand the card to reveal its Resolve action.
-      await user.click(await screen.findByText('Either Bet'))
-
+      // The Resolve control sits in the row itself — no expand, no rotate.
+      await screen.findByText('Either Bet')
       const resolveBtn = await screen.findByRole('button', { name: /^resolve$/i })
       await user.click(resolveBtn)
 
@@ -861,12 +945,11 @@ describe('MyMarketsModal', () => {
       await openHistory(user)
 
       await waitFor(() => expect(screen.getByText('Won Wager')).toBeInTheDocument())
-      // Expand the card to reveal its Claim action.
-      await user.click(screen.getByText('Won Wager'))
+      // The Claim button is in the row — reachable without opening anything.
       expect(await screen.findByRole('button', { name: /^claim$/i })).toBeInTheDocument()
     })
 
-    it('claims in place instead of opening the detail card (regression: claim opened the card)', async () => {
+    it('claims in place instead of opening the detail view (regression: claim opened the detail)', async () => {
       const user = userEvent.setup()
       await act(async () => {
         renderWithProviders(
@@ -875,8 +958,7 @@ describe('MyMarketsModal', () => {
       })
       await openHistory(user)
 
-      // Expand the card, then claim from within it.
-      await user.click(await screen.findByText('Won Wager'))
+      await screen.findByText('Won Wager')
       const claimBtn = await screen.findByRole('button', { name: /^claim$/i })
       await act(async () => {
         await user.click(claimBtn)
@@ -890,8 +972,6 @@ describe('MyMarketsModal', () => {
 
     it('shows the Claim Winnings button in the detail view opened from the table row', async () => {
       const user = userEvent.setup()
-      // Wide viewport → table view renders automatically (spec 019).
-      setWideViewport(true)
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvedWon()]} />
@@ -967,32 +1047,16 @@ describe('MyMarketsModal', () => {
     })
   })
 
-  describe('Automatic view by viewport (spec 019)', () => {
+  describe('Single table view at every viewport', () => {
     const me = '0x1234567890123456789012345678901234567890'
+    const other = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
     const aWager = {
-      id: 'v1', description: 'Toggle Wager', creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+      id: 'v1', description: 'Toggle Wager', creator: other,
       participants: [me], status: 'active', marketType: 'friend',
       tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
     }
 
-    it('renders the compact card grid on a narrow viewport (no table, no toggles)', async () => {
-      setWideViewport(false)
-      await act(async () => {
-        renderWithProviders(
-          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[aWager]} />
-        )
-      })
-      await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
-      expect(screen.queryByRole('table')).not.toBeInTheDocument()
-      // No manual view/density/refresh controls remain.
-      expect(screen.queryByRole('button', { name: /^grid$/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^table$/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /compact|comfortable/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
-    })
-
-    it('renders the table on a wide viewport', async () => {
-      setWideViewport(true)
+    it('renders the table on a narrow viewport, with no view/density/refresh toggles', async () => {
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[aWager]} />
@@ -1000,6 +1064,56 @@ describe('MyMarketsModal', () => {
       })
       await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
       expect(screen.getByRole('table')).toBeInTheDocument()
+      // Nothing to choose: no grid/table switch, no density control, no refresh.
+      expect(screen.queryByRole('button', { name: /^grid$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^table$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /compact|comfortable/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument()
+    })
+
+    it('renders the table on a wide viewport too', async () => {
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: /min-width/.test(query),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[aWager]} />
+        )
+      })
+      await waitFor(() => expect(screen.getByText('Toggle Wager')).toBeInTheDocument())
+      expect(screen.getByRole('table')).toBeInTheDocument()
+    })
+
+    // The bug this replaced the card grid for: on a phone the resolution flow
+    // was only reachable by expanding a card, and the card never exposed it —
+    // members had to rotate to landscape to get the table.
+    it('reaches the resolution flow from a row on a narrow viewport (no rotation)', async () => {
+      const user = userEvent.setup()
+      const resolvable = {
+        id: 'v2', description: 'Phone Resolve', creator: me, opponent: other,
+        participants: [me, other], resolutionType: 0, status: 'active',
+        marketType: 'friend',
+        tradingEndTime: Date.now() - 60 * 60 * 1000,
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvable]} />
+        )
+      })
+
+      await user.click(screen.getByRole('tab', { name: /created/i }))
+      await screen.findByText('Phone Resolve')
+
+      const resolveBtn = await screen.findByRole('button', { name: /^resolve$/i })
+      await user.click(resolveBtn)
+      expect(await screen.findByText(/Draw — both parties refunded/i)).toBeInTheDocument()
     })
 
     it('auto-refreshes the list on an interval while open (FR-003/004)', async () => {

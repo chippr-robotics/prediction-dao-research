@@ -325,10 +325,10 @@ artifacts live under `specs/<feature>/`.
   invariant is that nothing unverified ever runs, not that everything declared is downloaded.
   **Converted apps: Token Mint and ClearPath ONLY** (live on Polygon 137 and Mordor 63; ids are
   per-registry and differ per chain — resolve by `idByName`/slug, never by id across cohorts).
-  **Wagers is deliberately NOT a mini-app and must not be converted** — 69% of its file closure
-  (22 of 32 files) is shared with the host-retained `HomeScreen`/Trade surfaces, because
-  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerCard`/
-  `WagerList`/`wagerVm` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
+  **Wagers is deliberately NOT a mini-app and must not be converted** — most of its file closure
+  is shared with the host-retained `HomeScreen`/Trade surfaces, because
+  `HomeScreen` is itself a wager surface, so a package would mean two copies of `WagerTable`/
+  `wagerVm`/`wagerCardHelpers` drifting apart. It lives at **Finance ▸ Transfer ▸ Wagers**
   (`WAGERS_VIEW`/`WAGERS_PATH` in `config/appNav.js`, rendered by `PayTransferPanel`); `/wagers`
   redirects there. See the FR-030 amendment in `specs/073-miniapp-platform/spec.md`.
   See `docs/developer-guide/miniapps.md` + `docs/runbooks/miniapp-registry-operations.md` +

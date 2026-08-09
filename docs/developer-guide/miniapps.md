@@ -861,11 +861,12 @@ Also worth knowing:
 It was planned as the third conversion and was cut during implementation (the FR-030 amendment in
 `spec.md`; tasks T030–T033).
 
-Scoping measured **69% of the `/wagers` file closure — 22 of 32 files — as shared** with the
-host-retained home and trade surfaces: `WagerCard`, `WagerList`, `WagerTable`, `wagerVm`, and the
-create/accept/resolve flows, because `HomeScreen`, which `App.jsx` renders at `/`, is itself a wager
-surface. A package may not import from `frontend/src/` and is frozen at an immutable CID, so
-converting would mean the host and the package each carrying their own copy of those 22 files: two
+Scoping measured **69% of the `/wagers` file closure — 22 of 32 files at the time — as shared** with
+the host-retained home and trade surfaces: the wager list (`WagerTable`), `wagerVm`,
+`wagerCardHelpers`, and the create/accept/resolve flows, because `HomeScreen`, which `App.jsx`
+renders at `/`, is itself a wager surface. A package may not import from `frontend/src/` and is
+frozen at an immutable CID, so converting would mean the host and the package each carrying their
+own copy of those files: two
 edits and a re-publish for every wager fix, with guaranteed drift. That is a worse outcome for
 members than not converting.
 
