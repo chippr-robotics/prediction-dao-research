@@ -63,7 +63,11 @@
     "build:miniapps": "npm run build --workspace @fairwins/miniapp-token-mint && npm run build --workspace @fairwins/miniapp-clearpath",
     "deps:reinstall": "bash scripts/deps/reinstall.sh",
     "codegen:abis": "node scripts/codegen/emit-abis.js",
-    "check:abis": "node scripts/codegen/emit-abis.js --check"
+    "check:abis": "node scripts/codegen/emit-abis.js --check",
+    "release:version": "node scripts/release/version.js",
+    "release:classify": "node scripts/release/classify.js",
+    "release:artifacts": "node scripts/release/artifacts.js",
+    "test:release": "node --test \"scripts/release/__tests__/*.test.js\""
   },
   "keywords": [
     "futarchy",
