@@ -14,7 +14,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 
-const { TRACKED, EXCLUDED_PREFIX, normalize, sync } = require("../sync-manifest-versions");
+const { TRACKED, EXCLUDED_PREFIX, expandWorkspaceGlob, normalize, sync } = require("../sync-manifest-versions");
 
 const ROOT = path.join(__dirname, "..", "..", "..");
 
@@ -66,4 +66,49 @@ test("rejects anything that is not a release version", () => {
   }
   assert.equal(normalize("v1.2.3"), "1.2.3");
   assert.equal(normalize("1.2.3"), "1.2.3");
+});
+
+// ---- workspace glob shapes (review on #1080) --------------------------------------------------
+//
+// The expansion understands a literal path or a single trailing "/*". Anything else must THROW
+// rather than produce a truncated or mis-resolved base: a silently dropped manifest leaves that
+// package permanently disagreeing about which release it belongs to, which is the failure this
+// whole file was rewritten to prevent.
+
+test("expands a literal workspace path unchanged", () => {
+  assert.deepEqual(expandWorkspaceGlob("services/relay-gateway"), ["services/relay-gateway"]);
+});
+
+test("expands a single trailing /* to its immediate children", () => {
+  const got = expandWorkspaceGlob("packages/*");
+  assert.ok(got.length > 0, "packages/* should expand");
+  for (const dir of got) {
+    assert.ok(dir.startsWith("packages/"), `${dir} should be under packages/`);
+    assert.ok(!dir.includes("*"), `${dir} should not retain a wildcard`);
+  }
+});
+
+test("REFUSES unsupported patterns instead of guessing", () => {
+  for (const bad of [
+    "packages/**", // would silently return immediate children only
+    "services/*/api", // would silently drop the "/api" suffix
+    "*", // would yield paths with a leading slash
+    "**", //
+    "pack*ges/*", // wildcard outside the trailing position
+  ]) {
+    assert.throws(
+      () => expandWorkspaceGlob(bad),
+      /unsupported workspace pattern/,
+      `"${bad}" must be rejected`,
+    );
+  }
+});
+
+test("this repository's own globs are all supported shapes", () => {
+  // If someone adds an unsupported pattern to the root manifest, this fails here rather than
+  // during a release.
+  const root = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  for (const glob of root.workspaces || []) {
+    assert.doesNotThrow(() => expandWorkspaceGlob(glob), `"${glob}" should expand`);
+  }
 });

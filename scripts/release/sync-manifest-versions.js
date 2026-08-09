@@ -25,6 +25,44 @@ const ROOT = path.join(__dirname, "..", "..");
 const EXCLUDED_PREFIX = "frontend/miniapps/";
 
 /**
+ * The ONLY wildcard shape this understands: a single trailing `/*` on a literal base.
+ *
+ * npm accepts more than that, and the difference is not academic. Silently mishandling a pattern
+ * would drop a manifest out of the release sync, leaving it permanently disagreeing about which
+ * release it belongs to — the exact bug this file was just rewritten to prevent, arriving through
+ * a different door. Concretely, before this guard:
+ *
+ *   a doubled trailing wildcard -> base "packages", immediate children only:
+ *                                 DEEPER MEMBERS SILENTLY MISSED
+ *   a wildcard in the MIDDLE    -> base "services", the trailing segment dropped: WRONG PATHS
+ *   a bare wildcard             -> indexOf is -1, base "": PATHS WITH A LEADING SLASH
+ *
+ * So an unsupported pattern throws. Refusing to guess is the whole point (reported by review on
+ * #1080).
+ */
+const SUPPORTED_GLOB = /^[^*]+\/\*$/;
+
+function expandWorkspaceGlob(glob) {
+  if (!glob.includes("*")) return [glob]; // a literal workspace path
+  if (!SUPPORTED_GLOB.test(glob)) {
+    throw new Error(
+      `unsupported workspace pattern "${glob}" in the root package.json. ` +
+        `scripts/release/sync-manifest-versions.js understands a literal path or a single trailing ` +
+        `"/*", and refuses to guess at anything else rather than silently syncing the wrong set of ` +
+        `manifests. Teach expandWorkspaceGlob the new shape, with a test.`,
+    );
+  }
+  const base = glob.slice(0, -2); // drop the trailing "/*"
+  const abs = path.join(ROOT, base);
+  if (!fs.existsSync(abs)) return [];
+  return fs
+    .readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+    .map((e) => `${base}/${e.name}`)
+    .sort();
+}
+
+/**
  * THE TRACKED LIST IS DERIVED, NOT TYPED.
  *
  * It used to be a hardcoded array, and it broke the first real release: `services/relayer` was
@@ -41,18 +79,6 @@ const EXCLUDED_PREFIX = "frontend/miniapps/";
  * Mini-apps are excluded because they version INDEPENDENTLY (FR-007): overwriting one here would
  * break the version-to-CID pairing that FR-007b exists to protect.
  */
-function expandWorkspaceGlob(glob) {
-  if (!glob.includes("*")) return [glob];
-  const base = glob.slice(0, glob.indexOf("/*"));
-  const abs = path.join(ROOT, base);
-  if (!fs.existsSync(abs)) return [];
-  return fs
-    .readdirSync(abs, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !e.name.startsWith("."))
-    .map((e) => `${base}/${e.name}`)
-    .sort();
-}
-
 function trackedManifests() {
   const root = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   const members = (root.workspaces || [])
@@ -116,7 +142,7 @@ function sync(version, { check = false } = {}) {
   return changed;
 }
 
-module.exports = { TRACKED, EXCLUDED_PREFIX, normalize, sync };
+module.exports = { TRACKED, EXCLUDED_PREFIX, SUPPORTED_GLOB, expandWorkspaceGlob, normalize, sync };
 
 // ---- CLI ---------------------------------------------------------------------------------------
 if (require.main === module) {
