@@ -87,10 +87,25 @@ cancel open / decline / declare winner (no-stake) · membership purchase / upgra
 
 `frontend/src/lib/relay/` is the one client every flow uses:
 
-- `intentTypes.js` — the EIP-712 struct definitions (MUST stay byte-identical to the contract
-  typehashes) + per-contract domain builders + the FR-020 stablecoin-domain pre-sign check
-  (`domainVersion` in `config/networks.js`: native USDC `'2'`, bridged `'1'`, Mordor USC `null` ⇒
-  payment intents unavailable, self-submit only).
+- `intentTypes.js` — re-exports the EIP-712 struct definitions and binds the per-contract domain
+  builders, plus the FR-020 stablecoin-domain pre-sign check (`domainVersion` in
+  `config/networks.js`: native USDC `'2'`, bridged `'1'`, Mordor USC `null` ⇒ payment intents
+  unavailable, self-submit only).
+
+  **The structs and the FairWins domains are NOT defined here.** Both live once, in
+  `packages/intent-types` (`@fairwins/intent-types`), imported by this app and by the relay gateway,
+  and both halves of the EIP-712 digest are gated against the Solidity by
+  `test/intent/TypehashParity.test.js`:
+
+  - `INTENT_TYPES` / `OPEN_ACCEPT_TYPES` vs each contract's `*_TYPEHASH` literal, **in both
+    directions** — a struct present in the package but not the contracts fails, and so does one the
+    contracts verify but the package no longer defines.
+  - `CONTRACT_DOMAINS` (+ `DOMAIN_SOURCES`, `domainFor`) vs each contract's own
+    `__EIP712_init(name, version)` arguments. A correct struct signed under a wrong domain is just
+    as dead as a wrong struct — the domain separator is half the digest — so it is gated the same
+    way, not by convention.
+
+  Do not retype a struct or a `{ name, version }` pair anywhere else; add it to the package.
 - `intentClient.js` — `signIntent` / `relayIntent` / `pollStatus` / `probeHealth` / `makeRelayer`.
   `VITE_RELAYER_URL` unset ⇒ `makeRelayer` returns null ⇒ everything self-submits.
 - `useIntentAction.js` — the **never-stranded enforcement point**: relayer unset, unhealthy, 429,
