@@ -37,6 +37,7 @@ import AdminPanel from './components/AdminPanel'
 
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
+import StagingBanner from './components/ui/StagingBanner'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import PwaInstallPrompt from './components/pwa/PwaInstallPrompt'
@@ -99,6 +100,10 @@ function AppContent() {
 
   return (
     <>
+      {/* Non-production marker (spec 076, FR-025/FR-026d). Renders nothing in production;
+          on the mainnet staging service it is also the real-funds disclosure. */}
+      <StagingBanner />
+
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
 

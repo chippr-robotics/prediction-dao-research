@@ -242,7 +242,15 @@ for (const [name, byRange] of Object.entries(ranges)) {
 }
 
 // ── FR-003: every imported bare specifier is declared by its owning unit ─────────────────────
-const nodeBuiltins = new Set(require("module").builtinModules.flatMap((m) => [m, `node:${m}`]));
+// `module.builtinModules` deliberately OMITS the modules that are only importable with the `node:`
+// prefix, so deriving the set from it alone under-reports and those modules get flagged as phantom
+// dependencies. `node:test` is the one this repo uses (scripts/release/__tests__, spec 076); the
+// others are listed so the next one to be adopted does not trip the same false positive.
+const PREFIX_ONLY_BUILTINS = ["node:test", "node:test/reporters", "node:sea", "node:sqlite"];
+const nodeBuiltins = new Set([
+  ...require("module").builtinModules.flatMap((m) => [m, `node:${m}`]),
+  ...PREFIX_ONLY_BUILTINS,
+]);
 for (const u of UNITS) {
   if (!fs.existsSync(path.join(ROOT, u.manifest))) continue;
   const own = declared(readJson(u.manifest));

@@ -42,27 +42,21 @@ categories:
       - 'maintenance'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
-version-resolver:
-  major:
-    labels:
-      - 'major'
-      - 'breaking'
-  minor:
-    labels:
-      - 'minor'
-      - 'feature'
-      - 'enhancement'
-  patch:
-    labels:
-      - 'patch'
-      - 'fix'
-      - 'bugfix'
-      - 'bug'
-      - 'documentation'
-      - 'docs'
-      - 'chore'
-      - 'dependencies'
-  default: patch
+# NO `version-resolver:` BLOCK — deliberately removed (spec 076, FR-015).
+#
+# Release Drafter writes the NOTES here. It does not decide the VERSION. That is computed by
+# scripts/release/version.js from the change classification carried on each merged pull request,
+# and handed to this action as an explicit `version:` input by .github/workflows/release.yml.
+#
+# Why: FR-015 requires the notes configuration and the merge gate to agree about what each
+# classification means. Two systems that must agree will eventually disagree — this block resolved
+# versions from LABELS while the gate resolves them from PR TITLES, so a PR labelled `enhancement`
+# with a `fix:` title would have produced two different answers. One authority cannot disagree with
+# itself.
+#
+# If you are here to add a version rule, add it to
+# specs/076-monorepo-semantic-versioning/contracts/version-scheme.md and
+# scripts/release/classify.js instead.
 template: |
   ## What's Changed
 

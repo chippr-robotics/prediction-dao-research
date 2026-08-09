@@ -548,5 +548,12 @@ export function loadConfig(env = process.env, opts = {}) {
     // /healthz + /status cache window: caps upstream RPC fan-out from the origin-lock-exempt health
     // route so it can't be looped to amplify load onto the operator's public RPCs.
     healthCacheMs: int(env, 'HEALTH_CACHE_MS', 5000),
+    // Build identity (spec 076, FR-030). Set by the deploy pipeline; absent on any build that is
+    // not a published release, in which case the health surface reports `unreleased+<sha>` rather
+    // than the nearest tag (FR-031). Public, non-secret — see the health handler in server.js.
+    build: {
+      version: opt(env, 'APP_VERSION', null),
+      gitSha: opt(env, 'GIT_SHA', null),
+    },
   }
 }

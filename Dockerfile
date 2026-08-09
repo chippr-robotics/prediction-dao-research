@@ -55,6 +55,12 @@ ARG VITE_BUNDLER_URLS_POLYGON
 # Sponsored-paymaster endpoint (spec 050): the relay-gateway's /v1/paymaster. Set => passkey UserOps
 # are gasless (FairWins sponsors gas); unset => the account self-funds and the UI discloses honestly.
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
+# Release identity (spec 076, FR-029/FR-032). Baked in at build so the running app can name the
+# release it came from. VITE_APP_VERSION is the tag at the built commit, or empty when the commit
+# is not a published release — in which case the app reports `unreleased+<sha>` rather than the
+# nearest tag (FR-031). Never hardcode either value; both come from the build.
+ARG VITE_APP_VERSION
+ARG VITE_GIT_SHA
 
 # Set environment variables from build args
 ENV VITE_COMMIT_SHA=${VITE_COMMIT_SHA}
@@ -69,6 +75,8 @@ ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
 ENV VITE_SPONSOR_PAYMASTER_POLYGON=${VITE_SPONSOR_PAYMASTER_POLYGON}
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+ENV VITE_GIT_SHA=${VITE_GIT_SHA}
 
 # Build the application
 RUN npm run build

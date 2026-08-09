@@ -31,6 +31,9 @@ on:
   push:
     branches:
       - main
+      # spec 076 FR-022/FR-023: staging builds the same images production will, so a container
+      # regression must surface on the integration branch rather than at promotion.
+      - staging
     paths:
       - 'Dockerfile'
       - '.dockerignore'

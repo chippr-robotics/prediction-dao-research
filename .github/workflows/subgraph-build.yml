@@ -15,7 +15,8 @@ on:
   push:
     branches:
       - main
-      - develop
+      # spec 076 FR-022: `develop` is defunct; `staging` is the integration branch.
+      - staging
     paths:
       - 'subgraph/**'
       - 'packages/abi/**'
