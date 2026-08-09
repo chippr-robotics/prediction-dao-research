@@ -1,6 +1,6 @@
-# Mini-app package fixture (spec 073, task T014)
+# Mini-app package fixtures (spec 073 T014, spec 075 T033)
 
-A **real mini-app package, built by the real build tool, committed as bytes.**
+**Real mini-app packages, built by the real build tool, committed as bytes.**
 
 Every other test in `src/test/miniapps/` synthesizes its package inline: hand-written
 entry text, a hand-built manifest object, a hash taken over whatever the test itself
@@ -21,11 +21,14 @@ real loader over real build output.
 | `package/` | the **committed build output**: `manifest.json`, `entry.js`, `style.css` — verbatim `vite build` output, i.e. exactly what `scripts/miniapps/publish.js` would pin |
 | `onchain.json` | the **approved tuple a vendor would submit**: `cid` + `keccak256(manifest.json bytes)`, computed on the build side |
 | `tampered/` | a **self-consistent impostor package**: `entry.js` with one extra statement, and a `manifest.json` that honestly describes it |
+| `source-ethers/` | the **second fixture's** sources — the same shape, plus an `ethers` import |
+| `package-ethers/` | its committed build output: `manifest.json`, `entry.js` (no stylesheet — that app ships none) |
+| `onchain-ethers.json` | its approved tuple |
 | `index.js` | the test seam — reads the bytes, serves them through a `fetchImpl` in the loader's own URL shape |
 | `regenerate.mjs` | rebuilds everything above |
 
-`source/dist/` is intermediate build output and is already ignored by `frontend/.gitignore`
-(bare `dist`), so only the curated copy in `package/` is ever committed.
+`source*/dist/` is intermediate build output and is already ignored by `frontend/.gitignore`
+(bare `dist`), so only the curated copies in `package/` and `package-ethers/` are ever committed.
 
 ## Regenerating
 
@@ -33,17 +36,18 @@ real loader over real build output.
 node frontend/src/test/miniapps/fixtures/regenerate.mjs
 ```
 
-The script builds `source/` with the preset, runs the preset's own
-`verifyPackageDigests()` before copying anything, then writes `package/`, `onchain.json`
-and `tampered/`. It records no timestamps, paths or hostnames and overrides no preset
-defaults, so **re-running it on an unchanged tree must leave `git diff` empty**.
+The script builds `source/` and `source-ethers/` with the preset, runs the preset's own
+`verifyPackageDigests()` before copying anything, then writes `package/`, `onchain.json`,
+`tampered/`, `package-ethers/` and `onchain-ethers.json`. It records no timestamps, paths
+or hostnames and overrides no preset defaults, so **re-running it on an unchanged tree
+must leave `git diff` empty**.
 
 A diff after regeneration is a signal, not a chore: it means the build tool changed what
-it emits. Read the diff, confirm the tests still pass against the new bytes, and commit
-both together.
+it emits — **or that a shared dependency now resolves to something else**. Read the diff,
+confirm the tests still pass against the new bytes, and commit both together.
 
-Note that the tests read `package/`, never `source/` — editing the sources without
-regenerating changes nothing.
+Note that the tests read `package/` and `package-ethers/`, never `source*/` — editing the
+sources without regenerating changes nothing.
 
 ## Why the tampered package is built this way
 
@@ -69,5 +73,34 @@ default-exports a mountable component, imports `react` and (through JSX)
 which only works if the shim resolved to the **host's** React — and ships its own
 stylesheet so the package emits the `style.css` the host injects scoped.
 
-`ethers` is intentionally not imported: it would add a ~190-binding shim to committed
-bytes for no additional coverage.
+`ethers` is intentionally not imported *by that app*, so its committed bytes stay small
+enough to read.
+
+## Why there is a second fixture (spec 075, T033)
+
+Leaving `ethers` out was right for spec 073 and wrong for spec 075, because the hazard
+spec 075 exists to bound runs through `ethers` specifically:
+
+```
+npm hoisting -> module resolution -> hostScopePlugin#discoverExports ->
+shim text -> entry.js -> its sha256 in manifest.json ->
+keccak256(manifest bytes) -> the on-chain MiniAppRegistry commitment
+```
+
+`hostScopePlugin.js` enumerates a shared module's bindings by importing the very file Vite
+resolved, so the emitted shim is a literal transcript of what the installer put on disk.
+ethers contributes **192 names** to that transcript — by far the largest — and **both real
+packages carry it**. A fixture set without it could not notice a resolution change that
+rewrote thousands of bytes in every published package, which is exactly what adopting
+workspaces, changing hoisting, or bumping a dependency can do with no error raised
+anywhere.
+
+So `source-ethers/` imports `ethers` and its committed `entry.js` carries the whole list.
+Its shared-dependency set (`@fairwins/miniapp-sdk`, `ethers`, `react`, `react/jsx-runtime`)
+is deliberately **identical to Token Mint's and ClearPath's**, so the fixture and the real
+packages exercise the same shim surface. It ships no stylesheet, which is not an omission
+either: `styles: []` is a package shape the host must handle and the first fixture cannot
+produce.
+
+It has no tampered twin. The refusal paths are already proven once, and proving them twice
+would only double the committed bytes.

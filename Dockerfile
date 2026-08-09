@@ -34,6 +34,10 @@ WORKDIR /app/frontend
 # Note: VITE_PINATA_JWT is NOT included here - it's handled at runtime via nginx proxy
 # Tenant selection (spec 072): one image = one tenant. Unset => the default
 # (fairwins) tenant, byte-identical to the pre-072 build.
+# Build stamp for the nav drawer's version label (src/config/buildInfo.js). Passed as a build ARG
+# rather than derived: .dockerignore excludes .git, so the image build cannot run `git rev-parse`.
+# Unset resolves to 'dev', which the drawer displays honestly instead of hiding the label.
+ARG VITE_COMMIT_SHA
 ARG VITE_TENANT_ID
 ARG VITE_WALLETCONNECT_PROJECT_ID
 ARG VITE_APP_URL
@@ -51,8 +55,15 @@ ARG VITE_BUNDLER_URLS_POLYGON
 # Sponsored-paymaster endpoint (spec 050): the relay-gateway's /v1/paymaster. Set => passkey UserOps
 # are gasless (FairWins sponsors gas); unset => the account self-funds and the UI discloses honestly.
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
+# Release identity (spec 076, FR-029/FR-032). Baked in at build so the running app can name the
+# release it came from. VITE_APP_VERSION is the tag at the built commit, or empty when the commit
+# is not a published release — in which case the app reports `unreleased+<sha>` rather than the
+# nearest tag (FR-031). Never hardcode either value; both come from the build.
+ARG VITE_APP_VERSION
+ARG VITE_GIT_SHA
 
 # Set environment variables from build args
+ENV VITE_COMMIT_SHA=${VITE_COMMIT_SHA}
 ENV VITE_TENANT_ID=${VITE_TENANT_ID}
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
 ENV VITE_APP_URL=${VITE_APP_URL}
@@ -64,6 +75,8 @@ ENV VITE_WAGER_SOURCE=${VITE_WAGER_SOURCE}
 ENV VITE_RELAYER_URL=${VITE_RELAYER_URL}
 ENV VITE_BUNDLER_URLS_POLYGON=${VITE_BUNDLER_URLS_POLYGON}
 ENV VITE_SPONSOR_PAYMASTER_POLYGON=${VITE_SPONSOR_PAYMASTER_POLYGON}
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+ENV VITE_GIT_SHA=${VITE_GIT_SHA}
 
 # Build the application
 RUN npm run build

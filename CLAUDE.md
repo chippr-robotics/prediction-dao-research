@@ -78,9 +78,17 @@ artifacts live under `specs/<feature>/`.
   `WagerRegistryCore` — the single storage-layout definition; never declare registry state
   anywhere else — and `check:storage-layout` validates the pair. In tests use
   `test/helpers/proxy.js#deployWagerRegistry` (deploys + wires both facets, returns a merged-ABI
-  contract). The EIP-712 intent structs exist in THREE places that must stay byte-identical:
-  the contract typehashes, `frontend/src/lib/relay/intentTypes.js`, and
-  `services/relay-gateway/src/intent/intentTypes.js`. The relayer (spec 036:
+  contract). The EIP-712 intent structs have **ONE source since spec 075** —
+  `@fairwins/intent-types` — and `frontend/src/lib/relay/intentTypes.js` and
+  `services/relay-gateway/src/intent/intentTypes.js` are re-exports, not copies. Never
+  reintroduce a local table: `test/intent/TypehashParity.test.js` checks the package against
+  typehashes parsed out of the **contracts** (both directions — a struct the Solidity verifies
+  but the package lacks fails too), and `services/relay-gateway/test/actionCoverage.test.js`
+  checks the gateway's action table against it. The **domains** (`name`/`version`) are the one
+  piece still hand-synced across `intentTypes.js` in both trees plus
+  `frontend/src/utils/claimCode/deriveFromCode.js`, with nothing tying them to the contract that
+  verifies the signature — a correct type table under a wrong domain still produces an invalid
+  signature (issue #1038). The relayer (spec 036:
   `services/relay-gateway` policy gateway + `services/oz-relayer` engine config) is optional
   infrastructure — every gasless flow keeps a self-submit fallback (never-stranded rule).
   See `docs/developer-guide/gasless-intents.md` + `docs/runbooks/relayer-operations.md`.
@@ -358,7 +366,15 @@ artifacts live under `specs/<feature>/`.
   npm/cli#4828 silently drops `@rollup/rollup-linux-x64-gnu` from node_modules AND the lockfile on
   an incremental install, breaking every Vite build including the on-chain mini-app release path,
   and re-running `npm install` cannot fix it (the lock is already wrong, so npm reports "up to
-  date"). Use `npm run deps:reinstall`. (2) **Every dependency contributing Solidity source is
+  date"). Use `npm run deps:reinstall`. **`npm ci` does not fix it either** — measured: it exits 0
+  reporting "added 2955 packages" from a lockfile that *does* contain the entry, and still leaves
+  the binary uninstalled, because that entry is `optional` AND `peer` and npm skips optional peer
+  deps even when locked. If a `deps:reinstall` is interrupted (no lockfile, half-built
+  node_modules), restore the lockfile with `git checkout -- package-lock.json` and then install the
+  binary alone: `npm install --no-save @rollup/rollup-linux-x64-gnu@<version from the lockfile>` —
+  ~18s, and verified to leave `package-lock.json` byte-identical. **Dependabot triggers this
+  routinely**: 3 of 5 lockfile-touching Dependabot PRs in one week dropped the binary, and
+  `check:deps` is what catches it. (2) **Every dependency contributing Solidity source is
   pinned EXACTLY** — a caret range makes deployed bytecode a function of when the lockfile was last
   resolved; `@chainlink/contracts` floating 1.3.0→1.5.0 changed `ChainlinkFunctionsOracleAdapter`'s
   bytecode and only the byte-diff gate caught it. (3) **A shared package under `packages/` MUST be
@@ -369,10 +385,39 @@ artifacts live under `specs/<feature>/`.
   `services/relay-gateway/test/actionCoverage.test.js`. Any change touching dependencies, hoisting,
   or the build preset MUST pass the byte gates (`scripts/codegen/bytecode-digest.js`,
   `scripts/miniapps/record-build-digests.js`) — mini-app output bytes are keccak-committed
-  on-chain. See `specs/075-monorepo-workspaces/`.
+  on-chain. **Both byte gates now RUN in CI** (`test.yml`: the bytecode diff in
+  `smart-contract-tests`, the mini-app bytes in their own `miniapp-bytes` job); until then they
+  were scripts nobody was required to run, and the mini-app one reported "output bytes unchanged"
+  after a *failed* build. A gate firing here is not a chore — getting it green means deliberately
+  re-recording a baseline, i.e. accepting that deployed bytecode or a published package changed.
+  See `specs/075-monorepo-workspaces/`.
 
 <!-- SPECKIT START -->
+- **Versioning and releases (spec 076): one authority, one promotion path, honest identity.**
+  `scripts/release/` is the ONLY thing that may compute a version — `.github/release-drafter.yml`
+  deliberately has no `version-resolver:` block, because two systems that must agree about what a
+  classification means will eventually disagree. Never add a second one. Three rules are absolute:
+  (1) **Never hand-edit a version number.** Every non-mini-app manifest tracks the repository release
+  and is written by `release.yml`; the version gate rejects a hand-edited one (FR-008). Mini-apps
+  under `frontend/miniapps/` are the ONE exception — they version independently (FR-007) and a
+  contributor bumps them by hand in the same PR that changes the package, because a version and its
+  on-chain CID that disagree make the release record untrue (FR-007b, checked both directions).
+  (2) **Promotion is `staging` → `main` with a MERGE COMMIT**, against this repo's squash-everywhere
+  convention. The version is computed from the classification carried on each commit subject, so
+  squashing a promotion collapses every PR title into one and a release containing a `feat` ships as
+  a patch. (3) **No surface may report a version it is not running** — a build with no published
+  release says `unreleased+<sha>`, never the nearest tag (FR-031, constitution III). Staging is
+  **two Cloud Run services** from one commit (mainnet + testnet cohort) because `buildIsTestnet()`
+  folds `VITE_NETWORK_ID` at build time and one image resolves exactly one cohort; reaching both
+  cohorts by loosening that rule is forbidden (FR-026b), and `check-promotion-config.js` fails a
+  promotion that modifies `frontend/src/config/networks.js`. The mainnet staging service touches
+  **real funds** and must keep saying so. PR titles are Conventional Commits; what counts as
+  *breaking* here is written down (EIP-712 struct/domain, contract storage layout or external
+  interface, mini-app host object, removed member-facing capability) in
+  `specs/076-monorepo-semantic-versioning/contracts/version-scheme.md`. See
+  `docs/developer-guide/versioning-and-releases.md` + `docs/runbooks/release-and-promotion.md`.
+
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/075-monorepo-workspaces/plan.md
+at specs/076-monorepo-semantic-versioning/plan.md
 <!-- SPECKIT END -->

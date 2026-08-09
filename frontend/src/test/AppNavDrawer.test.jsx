@@ -33,9 +33,10 @@ function OpenOnMount() {
 
 // App navigation redesign — the global left drawer ("us"). It lists Home plus
 // the Finance/Tools/Apps sections, routes each entry, highlights the active one
-// from the URL, and carries the in-app legal footer. Personal-account entries
+// from the URL, and carries a copyright-only footer. Personal-account entries
 // (Account/Membership/Preferences) intentionally live on the account button, not
-// here.
+// here. The legal/policy links that used to live in this footer moved to
+// Settings → App (issue #1025).
 
 function LocationProbe() {
   const location = useLocation()
@@ -127,13 +128,15 @@ describe('AppNavDrawer (global nav drawer)', () => {
     expect(screen.getByRole('button', { name: 'Trade' })).not.toHaveAttribute('aria-current')
   })
 
-  it('contains the in-app legal footer', () => {
+  it('contains a copyright-only footer, with no legal/policy links (issue #1025)', () => {
     const { container } = renderDrawer()
     const footer = container.querySelector('.app-footer--drawer')
     expect(footer).toBeTruthy()
-    expect(
-      within(footer).getByRole('link', { name: /Terms & Conditions/i })
-    ).toHaveAttribute('href', '/terms')
+    expect(within(footer).getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument()
+    expect(within(footer).queryByRole('link', { name: /Terms & Conditions/i })).not.toBeInTheDocument()
+    expect(within(footer).queryByRole('link', { name: /Risk Disclosure/i })).not.toBeInTheDocument()
+    expect(within(footer).queryByRole('link', { name: /Privacy Policy/i })).not.toBeInTheDocument()
+    expect(within(footer).queryByRole('link', { name: /Account Moderation/i })).not.toBeInTheDocument()
   })
 })
 

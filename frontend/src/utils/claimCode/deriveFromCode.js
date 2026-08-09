@@ -12,20 +12,24 @@
  * other.
  */
 import { keccak256, toUtf8Bytes, getBytes, SigningKey, computeAddress, Wallet } from 'ethers'
+import { CONTRACT_DOMAINS, OPEN_ACCEPT_TYPES, domainFor } from '@fairwins/intent-types'
 import { normalizeCode } from './wordlist.js'
 
 const CLAIM_DOMAIN = 'FairWins/claim/v1'
 const TERMS_DOMAIN = 'FairWins/terms/v1'
 
-// EIP-712 — MUST match the registry's OPEN_ACCEPT_TYPEHASH and EIP712 domain exactly.
-const EIP712_DOMAIN_NAME = 'FairWins WagerRegistry'
-const EIP712_DOMAIN_VERSION = '1'
-const OPEN_ACCEPT_TYPES = {
-  OpenAccept: [
-    { name: 'wagerId', type: 'uint256' },
-    { name: 'taker', type: 'address' }
-  ]
-}
+/*
+ * EIP-712 — MUST match the registry's OPEN_ACCEPT_TYPEHASH and EIP712 domain exactly. Both now come
+ * from @fairwins/intent-types instead of being retyped here: the struct is checked against
+ * WagerRegistryCore's OPEN_ACCEPT_TYPEHASH and the domain against WagerRegistry's own
+ * `__EIP712_init(...)` by test/intent/TypehashParity.test.js. The values are unchanged — this
+ * signature is the claim-code proof leg of acceptOpenWager and an altered domain would silently
+ * stop every open-challenge accept from verifying.
+ *
+ * Re-exported below (unchanged names) because the open-challenge tests and callers import them here.
+ */
+const EIP712_DOMAIN_NAME = CONTRACT_DOMAINS.wagerRegistry.name
+const EIP712_DOMAIN_VERSION = CONTRACT_DOMAINS.wagerRegistry.version
 
 /**
  * Derive the claim keypair and symmetric key from a four-word code.
@@ -61,12 +65,7 @@ export function deriveFromCode(code) {
 export async function signOpenAccept(code, { wagerId, taker, chainId, verifyingContract }) {
   const { claimPrivateKey } = deriveFromCode(code)
   const wallet = new Wallet(claimPrivateKey)
-  const domain = {
-    name: EIP712_DOMAIN_NAME,
-    version: EIP712_DOMAIN_VERSION,
-    chainId,
-    verifyingContract
-  }
+  const domain = domainFor('wagerRegistry', chainId, verifyingContract)
   return wallet.signTypedData(domain, OPEN_ACCEPT_TYPES, { wagerId, taker })
 }
 

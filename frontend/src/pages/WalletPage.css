@@ -1375,3 +1375,51 @@
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+
+/* Legal & Policies section (Preferences tab → App group, issue #1025) */
+.app-legal-links {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.app-legal-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.app-legal-link-row + .app-legal-link-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.app-legal-link-row:hover,
+.app-legal-link-row:focus-visible {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+}
+
+.app-legal-link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.app-legal-link-label {
+  flex: 1;
+  font-size: 0.92rem;
+}
+
+.app-legal-link-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+}

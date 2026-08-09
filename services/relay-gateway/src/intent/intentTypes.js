@@ -29,32 +29,22 @@ import { ethers } from 'ethers'
  * The package is authored Node-resolvable (extensioned imports + an explicit `exports` map)
  * precisely so this service can import it; the frontend's copy never could be imported here.
  */
-import { INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES } from '@fairwins/intent-types'
-
-export { INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES }
-import { GatewayError } from '../errors.js'
+import { CONTRACT_DOMAINS, INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES } from '@fairwins/intent-types'
 
 // ---------------------------------------------------------------------------
 // EIP-712 domains (per verifying contract; chainId + verifyingContract added at runtime)
 // ---------------------------------------------------------------------------
-
-export const CONTRACT_DOMAINS = {
-  wagerRegistry: { name: 'FairWins WagerRegistry', version: '1' },
-  membershipManager: { name: 'FairWins MembershipManager', version: '1' },
-  // Tier-2 group pools (spec 035/036). The FACTORY verifies createPoolWithSig against its own domain;
-  // the CLONE verifies the six actor twins against a per-clone domain (verifyingContract = the clone),
-  // so pool signer-attributed actions target the factory but recover under `wagerPool` with the pool
-  // address as verifyingContract (the domain/target split — see ACTIONS + verify.js).
-  wagerPool: { name: 'FairWins WagerPool', version: '1' },
-  wagerPoolFactory: { name: 'FairWins WagerPoolFactory', version: '1' },
-  // Callsign registry (spec 054) — its own domain; register/change/requestRepoint execute only while
-  // the signer holds Gold+ (revert otherwise), so the gateway SHOULD pre-screen tier before relaying.
-  callsignRegistry: { name: 'FairWins CallsignRegistry', version: '1' },
-}
-
-// ---------------------------------------------------------------------------
-// EIP-712 struct definitions (verbatim from intent-eip712-schemas.md)
-// ---------------------------------------------------------------------------
+//
+// CONTRACT_DOMAINS was a local literal here until spec 075's follow-up: the same five name/version
+// pairs also lived in the frontend and in the claim-code signer, with nothing tying any copy to the
+// Solidity. The domain separator is half of the EIP-712 digest, so a drifted domain is exactly as
+// fatal as a drifted struct — a signature that verifies nowhere — and it had no gate at all.
+// It now comes from the package and is asserted against each contract's own `__EIP712_init(...)`
+// arguments by test/intent/TypehashParity.test.js.
+//
+// Re-exported so verify.js and the tests keep importing domains from this module.
+export { CONTRACT_DOMAINS, INTENT_TYPES, RECEIVE_WITH_AUTHORIZATION_TYPES }
+import { GatewayError } from '../errors.js'
 
 
 // ---------------------------------------------------------------------------

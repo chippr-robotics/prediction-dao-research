@@ -1,13 +1,20 @@
 /**
- * Test access to the committed mini-app package fixture (spec 073, task T014).
+ * Test access to the committed mini-app package fixtures (spec 073 T014, spec 075 T033).
  *
- * The bytes under `package/` and `tampered/` are build output, not test data:
- * `regenerate.mjs` produces them with the real `tools/miniapp-build/` preset,
- * and `onchain.json` records the approved tuple a vendor would submit for them.
- * This module is only the seam that hands those bytes to a test — it computes
- * nothing, so a test asserting "the host's hash of these bytes equals the hash
- * the build recorded" is comparing two independent implementations rather than
- * one implementation against itself.
+ * The bytes under `package/`, `tampered/` and `package-ethers/` are build
+ * output, not test data: `regenerate.mjs` produces them with the real
+ * `tools/miniapp-build/` preset, and `onchain.json` / `onchain-ethers.json`
+ * record the approved tuple a vendor would submit for them. This module is only
+ * the seam that hands those bytes to a test — it computes nothing, so a test
+ * asserting "the host's hash of these bytes equals the hash the build recorded"
+ * is comparing two independent implementations rather than one implementation
+ * against itself.
+ *
+ * TWO PACKAGES. `package/` is the original React-only fixture. `package-ethers/`
+ * is the same preset applied to an app that also imports `ethers`, so its
+ * committed `entry.js` carries the ~190-name host-scope shim that both REAL
+ * packages carry and the first fixture deliberately does not. See
+ * `regenerate.mjs` for why the distinction is load-bearing for spec 075.
  *
  * Everything is read from disk on demand. Reading through `fs` is what lets a
  * test drive the REAL loader (which only knows how to fetch) over REAL committed
@@ -23,6 +30,7 @@ import { AppStatus } from '../../../abis/miniAppRegistry'
 const FIXTURES_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PACKAGE_DIR = path.join(FIXTURES_DIR, 'package')
 const TAMPERED_DIR = path.join(FIXTURES_DIR, 'tampered')
+const ETHERS_PACKAGE_DIR = path.join(FIXTURES_DIR, 'package-ethers')
 
 /** The approved tuple `regenerate.mjs` recorded — the vendor's on-chain submission. */
 export const ONCHAIN = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'onchain.json'), 'utf8'))
@@ -31,6 +39,16 @@ export const FIXTURE_APP_ID = ONCHAIN.appId
 export const FIXTURE_VERSION = ONCHAIN.version
 export const FIXTURE_CID = ONCHAIN.approved.cid
 export const FIXTURE_MANIFEST_HASH = ONCHAIN.approved.manifestHash
+
+/** The same, for the ethers fixture. */
+export const ETHERS_ONCHAIN = JSON.parse(
+  fs.readFileSync(path.join(FIXTURES_DIR, 'onchain-ethers.json'), 'utf8'),
+)
+
+export const ETHERS_FIXTURE_APP_ID = ETHERS_ONCHAIN.appId
+export const ETHERS_FIXTURE_VERSION = ETHERS_ONCHAIN.version
+export const ETHERS_FIXTURE_CID = ETHERS_ONCHAIN.approved.cid
+export const ETHERS_FIXTURE_MANIFEST_HASH = ETHERS_ONCHAIN.approved.manifestHash
 
 export const MANIFEST_PATH = 'manifest.json'
 export const ENTRY_PATH = 'entry.js'
@@ -58,6 +76,26 @@ export function fixtureBytes(relative) {
 /** Bytes of one file from the tampered package (`manifest.json` / `entry.js` only). */
 export function tamperedBytes(relative) {
   return readBytes(TAMPERED_DIR, relative)
+}
+
+/** Bytes of one file from the ethers package (`manifest.json` / `entry.js`; it ships no stylesheet). */
+export function ethersFixtureBytes(relative) {
+  return readBytes(ETHERS_PACKAGE_DIR, relative)
+}
+
+/**
+ * What a gateway serving the ethers package would hold.
+ *
+ * No stylesheet entry, and that is the package itself talking rather than an
+ * omission here: `source-ethers/` imports no CSS, so its manifest declares
+ * `styles: []` — a shape the loader must handle and the first fixture cannot
+ * produce.
+ */
+export function ethersPackageFiles() {
+  return {
+    [MANIFEST_PATH]: ethersFixtureBytes(MANIFEST_PATH),
+    [ENTRY_PATH]: ethersFixtureBytes(ENTRY_PATH),
+  }
 }
 
 /** What a gateway serving the approved package would hold. */
@@ -132,6 +170,20 @@ export function fixtureRecord(overrides = {}) {
     status: AppStatus.APPROVED,
     launchable: true,
     approved: { cid: FIXTURE_CID, manifestHash: FIXTURE_MANIFEST_HASH, version: 1n },
+    proposed: { cid: '', manifestHash: `0x${'0'.repeat(64)}`, version: 0n },
+    ...overrides,
+  }
+}
+
+/** The registry record the launch path would receive for the ethers package. */
+export function ethersFixtureRecord(overrides = {}) {
+  return {
+    id: 2n,
+    appId: ETHERS_FIXTURE_APP_ID,
+    name: 'Ethers Fixture Mini-App',
+    status: AppStatus.APPROVED,
+    launchable: true,
+    approved: { cid: ETHERS_FIXTURE_CID, manifestHash: ETHERS_FIXTURE_MANIFEST_HASH, version: 1n },
     proposed: { cid: '', manifestHash: `0x${'0'.repeat(64)}`, version: 0n },
     ...overrides,
   }

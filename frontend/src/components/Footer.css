@@ -51,10 +51,10 @@
 }
 
 /*
- * Drawer variant — the same condensed legal footer, restyled to be contained at
- * the bottom of the wallet section drawer (WalletPage.css). It stacks vertically,
- * drops the wide centered layout, and uses margin-top:auto so it is pinned to the
- * bottom of the flex-column drawer regardless of how tall the section list is.
+ * Drawer variant — copyright only (the legal/policy links moved to Settings → App,
+ * issue #1025), restyled to be contained at the bottom of the side nav drawer
+ * (AppNavDrawer.css). Uses margin-top:auto so it is pinned to the bottom of the
+ * flex-column drawer regardless of how tall the section list is.
  */
 .app-footer--drawer {
   flex-direction: column;
@@ -66,7 +66,25 @@
   font-size: 0.8125rem;
 }
 
-.app-footer--drawer .app-footer-links {
-  flex-direction: column;
-  gap: 0.5rem;
+/*
+ * The build stamp. Subtle by design — it is diagnostic, not navigation, so it must not compete
+ * with the copyright above it (the legal links moved to Settings > App in #1025/#1071, so in the
+ * drawer this sits directly under the copyright). Muted, smaller, and monospace so a commit SHA is
+ * legible and unambiguous — l/1/I and O/0 matter when someone reads it back over a call.
+ *
+ * NOT `user-select: none`: the whole point is that it can be copied into a bug report.
+ */
+.app-footer-build {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--text-tertiary, var(--text-muted, #8b8b8b));
+  opacity: 0.75;
 }
+
+.app-footer--drawer .app-footer-build {
+  margin-top: 0.125rem;
+}
+

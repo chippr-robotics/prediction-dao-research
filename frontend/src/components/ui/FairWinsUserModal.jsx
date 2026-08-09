@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import TradePanel from '../fairwins/TradePanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
+import { buildIdentity } from '../../config/version'
 import './FairWinsUserModal.css'
 
 /**
@@ -509,7 +510,36 @@ function FairWinsUserModal() {
             </section>
           </div>
         )}
+
+        {/*
+          Build identity (spec 076, FR-029). Shown on every tab, not tucked behind one, because its
+          whole purpose is to be readable when someone is asked "what version are you on?".
+          An unreleased build says so — it never displays the nearest release (FR-031).
+        */}
+        <BuildIdentityLine />
       </div>
+    </div>
+  )
+}
+
+function BuildIdentityLine() {
+  const { label, sha, released, candidate } = buildIdentity()
+  const description = released
+    ? candidate
+      ? 'Release candidate — pre-production build'
+      : 'Released build'
+    : 'Unreleased build — not a published release'
+
+  return (
+    <div className="fwum-build-identity" data-testid="build-identity">
+      <span className="fwum-build-label">Version</span>
+      <span className="fwum-build-value" title={`${description} (commit ${sha})`}>
+        {label}
+      </span>
+      {!released && (
+        <span className="fwum-build-note">not a published release</span>
+      )}
+      <span className="sr-only">{description}</span>
     </div>
   )
 }
