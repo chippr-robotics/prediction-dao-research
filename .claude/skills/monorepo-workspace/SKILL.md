@@ -19,9 +19,9 @@ One root lockfile, 8 workspace members. Everything below was learned by it going
 | `frontend/miniapps/token-mint` | `@fairwins/miniapp-token-mint` |
 | `frontend/miniapps/clearpath` | `@fairwins/miniapp-clearpath` |
 | `services/relay-gateway` | `fairwins-relay-gateway` |
-| `services/relayer` | `fairwins-pool-relayer` |
 | `subgraph` | `prediction-dao-research-subgraph` |
 | `tools/miniapp-build` | `@fairwins/miniapp-build` |
+| `packages/abi` | `@fairwins/abi` |
 | `packages/intent-types` | `@fairwins/intent-types` |
 
 `contracts/` is deliberately NOT a member — it is not an npm package, it is the root project's
