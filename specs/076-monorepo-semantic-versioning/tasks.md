@@ -123,10 +123,10 @@ release. (quickstart S5, S8)
 - [X] T036 [US2] Add a persistent non-production marker to the app when a staging flag is set, plus `noindex` (FR-025)
 - [X] T037 [US2] Add the mainnet-staging disclosure: state that on-chain actions there are **real**, not a simulation (FR-026d, constitution III) — this is the compensating control for the full-mirror decision and must not be softened to a generic "test environment" banner
 - [X] T038 [US2] Add the promotion configuration-drift check: fail a `staging` → `main` PR when staging and production build configurations differ anywhere outside the enumerated list (FR-027a, quickstart S6)
-- [ ] T039 [US2] Configure the promotion merge as a **merge commit**, not a squash, and document why in `release.yml` — squashing collapses the per-PR classifications the version is computed from (research R6)
+- [X] T039 [US2] Configure the promotion merge as a **merge commit**, not a squash, and document why in `release.yml` — squashing collapses the per-PR classifications the version is computed from (research R6)
 - [X] T040 [P] [US2] Replace `develop` with `staging` in the push triggers of `.github/workflows/ci-manager.yml`, `frontend-testing.yml` and `subgraph-build.yml`; add `staging` to `container-build.yml` (FR-022) — `develop` does not exist
 - [X] T041 [US2] Assert the cohort boundary held: add a check that `frontend/src/config/networks.js` is unmodified by this feature (quickstart S5) — the strongest available form of "the production build is unaffected" (FR-026b)
-- [ ] T042 [P] [US2] Write `docs/runbooks/release-and-promotion.md` covering promotion, hotfix, back-merge, and what to do when a promotion is blocked by drift
+- [X] T042 [P] [US2] Write `docs/runbooks/release-and-promotion.md` covering promotion, hotfix, back-merge, and what to do when a promotion is blocked by drift
 
 **Checkpoint**: Nothing reaches production without first running on staging.
 
@@ -146,16 +146,38 @@ package update; confirm the record names the new implementation and the new cont
 - [X] T045 [P] [US4] Write `scripts/release/__tests__/artifacts.test.js` covering a moved category, an unchanged category, and an unreachable registry (must report unreadable, never a fabricated absence — constitution III)
 - [X] T046 [US4] Wire `artifacts.js` into `release.yml` so the table is part of the published record and the `CHANGELOG.md` entry
 - [X] T047 [US4] Add the mini-app version-pairing check: fail when an app's baseline digest changed without its `package.json` version changing, **and** when its version changed without its bytes changing (FR-007b, quickstart S9) — both directions, because either disagreement makes the record's CID pairing untrue
-- [ ] T048 [US4] Record `promotedFrom` on each release, printing `none (hotfix)` rather than omitting the line for a hotfix release (FR-036)
+- [X] T048 [US4] Record `promotedFrom` on each release, printing `none (hotfix)` rather than omitting the line for a hotfix release (FR-036)
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
 - [X] T049 Sync the repository release version into every non-mini-app workspace manifest as part of `release.yml`, so `frontend`'s `0.0.0` and the services' `0.1.0` stop being decorative (FR-007a)
-- [ ] T050 [P] Run every quickstart scenario S1–S10 and record the outcomes in the feature directory
-- [ ] T051 [P] Add a versioning-and-releases guardrail entry to `CLAUDE.md` covering the three rules most likely to be violated: never hand-edit a version, never add a second version authority, and promotion is a merge commit
-- [ ] T052 Confirm byte neutrality — `bytecode-digest.js --compare` and the mini-app digest gate must both report unchanged, since this feature must not move a single byte of deployed bytecode or published package output (quickstart S10)
+- [X] T050 [P] Run every quickstart scenario S1–S10 and record the outcomes in the feature directory
+- [X] T051 [P] Add a versioning-and-releases guardrail entry to `CLAUDE.md` covering the three rules most likely to be violated: never hand-edit a version, never add a second version authority, and promotion is a merge commit
+- [X] T052 Confirm byte neutrality — `bytecode-digest.js --compare` and the mini-app digest gate must both report unchanged, since this feature must not move a single byte of deployed bytecode or published package output (quickstart S10)
+
+---
+
+## Not done — operational, cannot be made by a pull request
+
+**T031, T032, T035** are open deliberately. Each requires repository-admin or cloud-provisioning
+rights, and each is written up with its exact steps in
+`docs/runbooks/release-and-promotion.md` § "One-time setup".
+
+| Task | Why it cannot be a code change | Consequence until done |
+| --- | --- | --- |
+| T031 — register required status checks | Branch-protection settings live in GitHub, not the repo | `version-gate` and `branch-policy` run and report correctly but do **not block a merge**. A workflow file is not a required check. |
+| T032 — create and protect `staging` | Needs a protected branch, and protection is an admin setting | The branch model stays convention. `branch-policy`'s drift job logs a warning and no-ops rather than failing daily about a branch that does not exist. |
+| T035 — provision the two Cloud Run services | Needs GCP project access, DNS, and separately funded accounts | `staging-deploy.yml` would tag a candidate and then fail at `gcloud builds submit`. |
+
+**T032 was deliberately not done unilaterally even though pushing a branch is possible.** Creating
+`staging` arms `staging-deploy.yml` on every push to it, which would tag release candidates and then
+fail trying to deploy to services that do not exist — a red pipeline on an unprotected branch,
+which is worse than an honest gap. Create it together with T035.
+
+Validation for what *was* done is recorded in [validation.md](./validation.md), including which
+quickstart scenarios are deferred and which setup step each is blocked on.
 
 ---
 
