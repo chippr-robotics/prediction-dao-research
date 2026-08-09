@@ -398,31 +398,7 @@ artifacts live under `specs/<feature>/`.
   See `specs/075-monorepo-workspaces/`.
 
 <!-- SPECKIT START -->
-- **Versioning and releases (spec 076): one authority, one promotion path, honest identity.**
-  `scripts/release/` is the ONLY thing that may compute a version — `.github/release-drafter.yml`
-  deliberately has no `version-resolver:` block, because two systems that must agree about what a
-  classification means will eventually disagree. Never add a second one. Three rules are absolute:
-  (1) **Never hand-edit a version number.** Every non-mini-app manifest tracks the repository release
-  and is written by `release.yml`; the version gate rejects a hand-edited one (FR-008). Mini-apps
-  under `frontend/miniapps/` are the ONE exception — they version independently (FR-007) and a
-  contributor bumps them by hand in the same PR that changes the package, because a version and its
-  on-chain CID that disagree make the release record untrue (FR-007b, checked both directions).
-  (2) **Promotion is `staging` → `main` with a MERGE COMMIT**, against this repo's squash-everywhere
-  convention. The version is computed from the classification carried on each commit subject, so
-  squashing a promotion collapses every PR title into one and a release containing a `feat` ships as
-  a patch. (3) **No surface may report a version it is not running** — a build with no published
-  release says `unreleased+<sha>`, never the nearest tag (FR-031, constitution III). Staging is
-  **two Cloud Run services** from one commit (mainnet + testnet cohort) because `buildIsTestnet()`
-  folds `VITE_NETWORK_ID` at build time and one image resolves exactly one cohort; reaching both
-  cohorts by loosening that rule is forbidden (FR-026b), and `check-promotion-config.js` fails a
-  promotion that modifies `frontend/src/config/networks.js`. The mainnet staging service touches
-  **real funds** and must keep saying so. PR titles are Conventional Commits; what counts as
-  *breaking* here is written down (EIP-712 struct/domain, contract storage layout or external
-  interface, mini-app host object, removed member-facing capability) in
-  `specs/076-monorepo-semantic-versioning/contracts/version-scheme.md`. See
-  `docs/developer-guide/versioning-and-releases.md` + `docs/runbooks/release-and-promotion.md`.
-
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/077-miniapp-store-redesign/plan.md
+at specs/079-hardhat-3-migration/plan.md
 <!-- SPECKIT END -->
