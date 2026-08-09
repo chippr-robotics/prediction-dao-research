@@ -397,10 +397,11 @@ export default function BridgeTab({
   //     → this effect re-runs → fetchState() again → …
   //
   // Not a bounded over-fetch: a loop with a period of one RPC round-trip, running for as long as
-  // the tab is open. Measured here: `paused()` 51 times in 250ms, 201 in 1s — and worse than the
-  // SupplyTab case, because `fetchOps` depends on the whole `state` object (:388) and is dragged
-  // along each lap, so `queryFilter` was hit 1909 times in a single second, each carrying per-row
-  // getBlock, receipt reads and gateway status calls.
+  // the tab is open. Measured HERE, over one second against a mock costing a macrotask (the count
+  // scales with round-trip latency, so treat it as an order of magnitude, not a constant):
+  // `paused()` 141 -> 1, `queryFilter` 1312 -> 1. Worse than the SupplyTab case because `fetchOps`
+  // depends on the whole `state` object (:388) and is dragged along each lap, each pass carrying
+  // per-row getBlock, receipt reads and gateway status calls.
   //
   // The quote SHOULD re-run when the router repoints its FeeRouter, so the dependency stays; only
   // the coupling back into `fetchState` is severed.
