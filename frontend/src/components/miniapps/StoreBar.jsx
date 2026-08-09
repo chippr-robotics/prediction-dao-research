@@ -33,7 +33,11 @@ export default function StoreBar({ active }) {
             to={entry.to}
             aria-current={isActive ? 'page' : undefined}
           >
-            <NavIcon name={entry.icon} size={18} />
+            {/* Icon over label (iteration 2): the pill behind the active icon is the material
+                idiom, and the text label below keeps the state readable without hue. */}
+            <span className="miniapp-store-bar-icon">
+              <NavIcon name={entry.icon} size={20} />
+            </span>
             {entry.label}
           </Link>
         )

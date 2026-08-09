@@ -257,3 +257,51 @@ IPFS and on-chain re-approval before the new bytes are treated as live.
   previous approved packages.
 - The registry ABI/host object are untouched: no new on-chain fields (e.g. icon URLs) are
   introduced.
+
+## Iteration 2 — App-store experience (post-merge feedback, 2026-08-09)
+
+Member feedback on the shipped surface: it reads as a demo, not a store. Reference supplied: a
+Google Play "Top charts" screenshot — dense tappable rows, bold titles, chips, a fixed bottom
+navigation, details behind a tap. This iteration supersedes parts of US1/US2 above:
+
+### User Story 4 - Store rows and an app details sheet (Priority: P1)
+
+As a store member, I want the catalog to read like a real app store — a compact list of
+tappable rows (icon, bold title, metadata line, chips) — and tapping an app to open a bottom
+sheet with its details and the actions (open it, add it to / remove it from My Apps), so
+browsing and acting feel native instead of like a document.
+
+**Acceptance Scenarios**:
+
+1. **Given** a verified catalog, **When** the member views the market, **Then** apps render as
+   list rows — leading icon, bold name, category/vendor metadata line, version chip, and an
+   "in My Apps" indicator when favorited — with no always-visible explanation prose.
+2. **Given** a row, **When** the member taps it, **Then** a bottom sheet opens with the app's
+   artwork, name, description, vendor (full value available), version, category, and actions:
+   **Open** (launch) and **Add to / Remove from My Apps**; the sheet is dismissible by close
+   button, backdrop tap, and Escape, and focus returns to the row on close.
+3. **Given** an unverified (stale) listing or an app with no usable slug, **When** its sheet is
+   open, **Then** the launch-refusal explanation appears there and no Open action is offered —
+   the honest-state rules are unchanged, only relocated.
+4. **Given** the store header, **When** the member looks at it, **Then** the trust explanation
+   paragraphs are gone (the verified badge remains, and deep detail lives in the docs), and
+   Refresh is an icon-only control that keeps its accessible name and focus behavior.
+5. **Given** a small viewport, **When** the member browses any store view, **Then** Market /
+   My Apps / Search sit in a fixed, full-width bottom navigation (icon over label, active
+   tint, safe-area padding) that never occludes the last row.
+
+### Amended requirements
+
+- **FR-003 (superseded)**: the restructured trust blocks are REMOVED from the store surface;
+  the factual verification story lives in the developer docs. The verified badge (FR-002) and
+  every honest-state disclosure (FR-010) are unchanged.
+- **FR-006 (amended)**: the launch call-to-action moves into the app sheet as **Open** (rocket
+  retained), accessible name "Open {app}"; rows themselves carry no launch link.
+- **FR-007 (amended)**: the store navigation is a fixed bottom navigation bar, not a floating
+  dock.
+- **FR-017 (new)**: each catalog entry is a single tappable row control opening an app-details
+  bottom sheet (`role="dialog"`, labelled by the app name, Escape/backdrop/close dismissal,
+  focus restored to the invoking row). Favorite toggling moves from the row into the sheet;
+  rows show a non-interactive favorited indicator.
+- **FR-018 (new)**: the Refresh control is icon-only with an accessible name that continues to
+  announce Refresh/Refreshing states without losing keyboard focus.

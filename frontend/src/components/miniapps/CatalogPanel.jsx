@@ -39,9 +39,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
+import AppSheet from './AppSheet'
 import SubmitAppPanel from './SubmitAppPanel'
 import StoreBar from './StoreBar'
 import { STORE_VIEWS, resolveStoreView } from './storeViews'
+import { RefreshGlyph, VerifiedBadgeGlyph } from './appArt'
 import { artworkFor } from './appArtwork'
 import EmptyState from '../account/EmptyState'
 import NavIcon from '../nav/NavIcon'
@@ -74,66 +76,6 @@ const CATEGORY_FILTERS = Object.entries(APP_CATEGORY_LABELS)
   .map(([ordinal, label]) => ({ value: Number(ordinal), label }))
   .sort((a, b) => a.value - b.value)
 
-/**
- * Decorative glyphs for the store chrome (spec 077). All are `aria-hidden`: each sits beside
- * text that already says the same thing, so the art adds flavour, never meaning.
- */
-function RocketGlyph() {
-  return (
-    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 13.5c-1.8-.6-3-1.8-3.5-3.5C7.6 5.6 10.4 3.2 15 3c-.2 4.6-2.6 7.4-7 8.5Z" />
-        <circle cx="11.6" cy="6.4" r="1.2" />
-        <path d="M6.5 10 4 11.5 6 12M10 13.5 8.5 16l-.5-2M5.5 14.5 4 16" />
-      </g>
-    </svg>
-  )
-}
-
-function VerifiedBadgeGlyph() {
-  return (
-    <svg className="miniapp-glyph miniapp-glyph-badge" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      {/* rosette: scalloped seal with a check — the concept art's rainbow badge, themed */}
-      <path
-        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
-        fill="currentColor"
-        opacity="0.18"
-      />
-      <path
-        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <path d="M6.8 10.2l2.1 2.1 4.3-4.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ScrollCheckGlyph() {
-  return (
-    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 3h9a1.5 1.5 0 0 1 1.5 1.5V15A2.5 2.5 0 0 1 14 17.5H7A2.5 2.5 0 0 1 4.5 15V4.5" />
-        <path d="M6 3a1.5 1.5 0 0 0-1.5 1.5V6H7V4.5A1.5 1.5 0 0 0 6 3Z" />
-        <path d="M8 10.6l2 2 3.4-3.8" />
-      </g>
-    </svg>
-  )
-}
-
-function HashShieldGlyph() {
-  return (
-    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 2.5 16 5v4.5c0 3.7-2.4 6.5-6 8-3.6-1.5-6-4.3-6-8V5l6-2.5Z" />
-        <path d="M8.2 7.5 7 12.5M13 7.5l-1.2 5M7 9h6M6.8 11h6" />
-      </g>
-    </svg>
-  )
-}
-
 /** Vendor addresses are shown short; the full value stays available as a tooltip/copy target. */
 function shortAddress(address) {
   return typeof address === 'string' && address.length > 12
@@ -162,103 +104,52 @@ function formatAge(ms) {
 }
 
 /**
- * One catalog entry: name, vendor, version, category (FR-007) plus its launch affordance.
+ * One catalog entry as a store row (spec 077 iteration 2, FR-017): leading art, bold name, a
+ * category-and-vendor metadata line, a version chip, and — when favorited — a non-interactive
+ * "My Apps" indicator. The whole row is tappable and opens the app's details sheet; the launch
+ * link, the favorite toggle, and the refusal explanations all live THERE now, so the row makes
+ * no promise the sheet has to walk back.
  *
- * Two independent things can withhold the launch affordance, and each says which one it was:
- *
- *   - `launchable` is about the LISTING's provenance, not the app's — false only when this card came
- *     from an unverified snapshot, in which case no launch link is rendered at all. A disabled button
- *     would be worse: it invites the member to keep clicking something refused on principle rather
- *     than temporarily busy.
- *   - `appSlug(name)` is null when the registered name cannot become a URL slug. The client refuses a
- *     lossy best effort there on purpose (two distinct on-chain listings must never collapse onto one
- *     address), so the app is genuinely unreachable by URL. Rendering `/apps/null` would be a link
- *     the catalog knows lands nowhere.
- *
- * The favorite star shares the second condition: a shortcut into the nav drawer's Quick Access
- * group is a link like any other, so it needs the same working slug the Launch button does. It is
- * withheld silently rather than shown disabled, for the same reason Launch is.
+ * Structure note: the tap target is a "stretched" button laid over the row rather than a button
+ * wrapping the content — a heading (h5, which the grouping semantics and screen-reader listings
+ * rely on) is not valid phrasing content inside a <button>. The overlay keeps the row's own
+ * semantics intact while making every pixel tappable, and its accessible name pairs the app's
+ * name with what tapping does.
  */
-function AppCard({ app, launchable, isFavorite, onToggleFavorite }) {
-  const nameId = `miniapp-${app.id}-name`
-  const descriptionId = `miniapp-${app.id}-description`
-  // An on-chain enum may gain values ahead of this build's label map. Naming the raw ordinal is
-  // honest; folding an unknown category into a familiar label would misfile the app.
+function AppRow({ app, isFavorite, onOpen }) {
   const categoryLabel = APP_CATEGORY_LABELS[app.category] ?? `Category ${app.category}`
   const slug = appSlug(app.name)
-  const canFavorite = launchable && Boolean(slug)
   // Curated host-side art; a slug the host doesn't know — or a name with no slug at all — gets
   // the deliberate generic illustration (spec 077 FR-001, never a broken or borrowed image).
   const { Art } = artworkFor(slug)
 
   return (
-    <li className="miniapp-card">
-      {/* Decorative illustration panel — the name below is the accessible identity. */}
-      <div className="miniapp-card-art" aria-hidden="true">
+    <li className="miniapp-row">
+      <div className="miniapp-row-art" aria-hidden="true">
         <Art />
       </div>
-      <div className="miniapp-card-body">
-        <div className="miniapp-card-head">
-          <h5 className="miniapp-card-name" id={nameId}>
-            {app.name}
-          </h5>
-          {canFavorite && (
-            <button
-              type="button"
-              className={`miniapp-card-favorite${isFavorite ? ' is-active' : ''}`}
-              aria-pressed={isFavorite}
-              aria-label={
-                isFavorite ? `Remove ${app.name} from Quick Access` : `Add ${app.name} to Quick Access`
-              }
-              onClick={() => onToggleFavorite(app, slug)}
-            >
-              <NavIcon name="star" size={16} />
-            </button>
+      <div className="miniapp-row-body">
+        <h5 className="miniapp-row-name">{app.name}</h5>
+        <p className="miniapp-row-meta">
+          {categoryLabel} • <code title={app.vendor || undefined}>{shortAddress(app.vendor)}</code>
+        </p>
+        <p className="miniapp-row-chips">
+          <span className="miniapp-row-chip">v{app.approved.version}</span>
+          {isFavorite && (
+            <span className="miniapp-row-chip is-favorite">
+              <NavIcon name="star" size={12} />
+              My Apps
+            </span>
           )}
-        </div>
-        <p className="miniapp-card-category">{categoryLabel}</p>
-        {app.description && (
-          <p className="miniapp-card-description" id={descriptionId}>
-            {app.description}
-          </p>
-        )}
-        {/* The technical data box: vendor + version contained and visually separate from the
-            description (spec 077 FR-005). Same DL semantics as before the redesign. */}
-        <dl className="miniapp-card-meta">
-          <div>
-            <dt>Vendor</dt>
-            <dd>
-              <code title={app.vendor || undefined}>{shortAddress(app.vendor)}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Version</dt>
-            <dd>v{app.approved.version}</dd>
-          </div>
-        </dl>
-        {launchable && slug ? (
-          <Link
-            className="miniapp-card-launch"
-            to={`/apps/${slug}`}
-            // The visible word stays inside the accessible name (WCAG 2.5.3), and the app name makes
-            // each of these links distinguishable in a screen reader's link list. The rocket is
-            // flavour (FR-006) and stays out of the name.
-            aria-label={`Launch ${app.name}`}
-            aria-describedby={app.description ? descriptionId : undefined}
-          >
-            <RocketGlyph />
-            Launch
-          </Link>
-        ) : (
-          <p className="miniapp-card-refusal" role="note">
-            {/* Provenance first: when we cannot verify the listing at all, that is the reason that
-                matters, whatever else is also true of the record. */}
-            {!launchable
-              ? 'Launch unavailable — this listing could not be verified.'
-              : 'Launch unavailable — this app’s registered name can’t be used as a web address, so the host has no way to open it. Its vendor needs to re-register it under a usable name.'}
-          </p>
-        )}
+        </p>
       </div>
+      <button
+        type="button"
+        className="miniapp-row-tap"
+        onClick={(event) => onOpen(app, event.currentTarget)}
+      >
+        <span className="sr-only">{app.name} details</span>
+      </button>
     </li>
   )
 }
@@ -380,7 +271,7 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
   /**
    * `visible`, grouped under a heading per category (FR-007) in the chip row's own order.
    *
-   * A category ordinal ahead of this build's label map (see `AppCard`'s fallback) still gets a
+   * A category ordinal ahead of this build's label map (see `AppRow`'s fallback) still gets a
    * group — under its raw ordinal — rather than being dropped: grouping must never quietly shrink
    * the list `visible` already promised via the result count above it.
    */
@@ -428,8 +319,33 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
     if (view === STORE_VIEWS.SEARCH) searchInputRef.current?.focus()
   }, [view, showControls])
 
+  /**
+   * The open app-details sheet (iteration 2, FR-017), by app id — id rather than the record so a
+   * Refresh that drops the app from the listing closes the sheet instead of showing a ghost.
+   * `sheetReturnFocus` is the row button that opened it; focus goes back there on close, so a
+   * keyboard member lands exactly where they left the list.
+   */
+  const [sheetAppId, setSheetAppId] = useState(null)
+  const sheetReturnFocus = useRef(null)
+  const sheetApp = sheetAppId !== null ? (listing?.apps.find((app) => app.id === sheetAppId) ?? null) : null
+
+  function handleOpenSheet(app, trigger) {
+    sheetReturnFocus.current = trigger
+    setSheetAppId(app.id)
+  }
+
+  function handleCloseSheet() {
+    setSheetAppId(null)
+    sheetReturnFocus.current?.focus()
+    sheetReturnFocus.current = null
+  }
+
+  // The fixed bottom navigation needs breathing room under the list so it never occludes the
+  // last row; the spacer class applies exactly when the bar renders.
+  const showStoreBar = outcome && outcome.status !== REGISTRY_STATUS.NOT_DEPLOYED
+
   return (
-    <section className="miniapp-catalog" aria-label="Apps">
+    <section className={`miniapp-catalog${showStoreBar ? ' miniapp-catalog-with-bar' : ''}`} aria-label="Apps">
       <div className="miniapp-catalog-header">
         <div className="miniapp-store-hero">
           <div className="miniapp-store-title">
@@ -444,25 +360,8 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
               </p>
             )}
           </div>
-          {/* The spec-073 trust story, restructured into two scannable blocks (FR-003). Same
-              factual claims as the old paragraph; the glyphs are decoration, not meaning. */}
-          <ul className="miniapp-store-trust">
-            <li>
-              <ScrollCheckGlyph />
-              <span>
-                <strong>Reviewed on-chain.</strong> Every app listed here has been reviewed and
-                approved on-chain.
-              </span>
-            </li>
-            <li>
-              <HashShieldGlyph />
-              <span>
-                <strong>Hash-checked before launch.</strong> Before any of an app’s code runs, the
-                host re-reads its registry record and checks the package against the hash recorded
-                there.
-              </span>
-            </li>
-          </ul>
+          {/* No explanation prose here (iteration 2, FR-003 superseded): the badge is the trust
+              signal, and the verification story lives in the developer docs. */}
         </div>
         {/* No registry means nothing to refresh and nowhere to submit — offering either would be an
             affordance that leads nowhere. */}
@@ -483,10 +382,13 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
                 if (refreshing) return
                 setReloadKey((key) => key + 1)
               }}
+              // Icon-only (iteration 2, FR-018): the aria-label carries the same state change the
+              // visible text used to, so the still-focused control keeps announcing the outcome.
+              aria-label={refreshing ? 'Refreshing…' : 'Refresh'}
               aria-disabled={refreshing || undefined}
               aria-busy={refreshing || undefined}
             >
-              {refreshing ? 'Refreshing…' : 'Refresh'}
+              <RefreshGlyph />
             </button>
             <Link className="miniapp-catalog-submit" to={SUBMIT_ROUTE}>
               Submit an app
@@ -638,22 +540,35 @@ function CatalogView({ view = STORE_VIEWS.MARKET }) {
           </h4>
           <ul className="miniapp-catalog-grid">
             {group.apps.map((app) => (
-              <AppCard
+              <AppRow
                 key={app.id}
                 app={app}
-                launchable={listing.verified}
                 isFavorite={favoriteIds.has(app.id)}
-                onToggleFavorite={handleToggleFavorite}
+                onOpen={handleOpenSheet}
               />
             ))}
           </ul>
         </section>
       ))}
 
-      {/* The store's own section navigation (spec 077, US2): persistent — sticky at the viewport
-          bottom while the catalog scrolls — and withheld only when there is no store at all (no
-          registry on this build), where all three entries would lead nowhere. */}
-      {outcome && outcome.status !== REGISTRY_STATUS.NOT_DEPLOYED && <StoreBar active={view} />}
+      {/* The app-details sheet (iteration 2, FR-017). `listing` is non-null whenever a row
+          existed to open it; `verified` carries the listing's provenance into the sheet's
+          action rules unchanged. */}
+      {sheetApp && listing && (
+        <AppSheet
+          app={sheetApp}
+          slug={appSlug(sheetApp.name)}
+          verified={listing.verified}
+          isFavorite={favoriteIds.has(sheetApp.id)}
+          onToggleFavorite={handleToggleFavorite}
+          onClose={handleCloseSheet}
+        />
+      )}
+
+      {/* The store's own section navigation (spec 077, US2 as amended): a fixed bottom
+          navigation bar, withheld only when there is no store at all (no registry on this
+          build), where all three entries would lead nowhere. */}
+      {showStoreBar && <StoreBar active={view} />}
     </section>
   )
 }

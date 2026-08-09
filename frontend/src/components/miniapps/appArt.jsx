@@ -96,4 +96,56 @@ function GenericAppArt() {
   )
 }
 
+/* ---- Chrome glyphs (spec 077) ------------------------------------------------------------- */
+/*
+ * Decorative glyphs for the store chrome. All `aria-hidden`: each sits beside (or inside a
+ * control that carries) text or an aria-label saying the same thing, so the art adds flavour,
+ * never meaning. They live here rather than in CatalogPanel so components-only files stay
+ * components-only (react-refresh) and the sheet can share them.
+ */
+
+export function RocketGlyph() {
+  return (
+    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 13.5c-1.8-.6-3-1.8-3.5-3.5C7.6 5.6 10.4 3.2 15 3c-.2 4.6-2.6 7.4-7 8.5Z" />
+        <circle cx="11.6" cy="6.4" r="1.2" />
+        <path d="M6.5 10 4 11.5 6 12M10 13.5 8.5 16l-.5-2M5.5 14.5 4 16" />
+      </g>
+    </svg>
+  )
+}
+
+export function RefreshGlyph() {
+  return (
+    <svg className="miniapp-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6" />
+        <path d="M16.5 2.8v3.4h-3.4" />
+      </g>
+    </svg>
+  )
+}
+
+export function VerifiedBadgeGlyph() {
+  return (
+    <svg className="miniapp-glyph miniapp-glyph-badge" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      {/* rosette: scalloped seal with a check — the concept art's rainbow badge, themed */}
+      <path
+        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
+        fill="currentColor"
+        opacity="0.18"
+      />
+      <path
+        d="M10 1.6l1.9 1.2 2.2-.3 1 2 2 1-.3 2.2L18 10l-1.2 1.9.3 2.2-2 1-1 2-2.2-.3L10 18.4l-1.9-1.2-2.2.3-1-2-2-1 .3-2.2L2 10l1.2-1.9-.3-2.2 2-1 1-2 2.2.3L10 1.6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M6.8 10.2l2.1 2.1 4.3-4.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export { TokenMintArt, ClearPathArt, GenericAppArt }

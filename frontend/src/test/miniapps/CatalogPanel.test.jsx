@@ -166,6 +166,12 @@ async function openFilters(user) {
   await user.click(screen.getByRole('button', { name: /^Filter/ }))
 }
 
+/** Taps an app's row (the stretched details button) and returns the opened sheet dialog. */
+async function openSheet(user, name) {
+  await user.click(screen.getByRole('button', { name: `${name} details` }))
+  return screen.getByRole('dialog', { name })
+}
+
 describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
   beforeEach(() => {
     state.fetchCatalog = null
@@ -195,7 +201,8 @@ describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
     expect(screen.getByText('Showing all 2 apps.')).toBeInTheDocument()
   })
 
-  it('shows name, vendor, version and category on each card, and links launch at /apps/<slug>', async () => {
+  it('shows name, category, vendor and version on each row, and opens the details sheet on tap', async () => {
+    const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () =>
       okOutcome([
         appRecord({
@@ -210,17 +217,28 @@ describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
 
     await renderSettled()
 
-    const card = screen.getByRole('heading', { level: 5, name: 'Treasury Sweep' }).closest('li')
-    expect(within(card).getByText(APP_CATEGORY_LABELS[AppCategory.TREASURY_LIQUIDITY])).toBeInTheDocument()
-    expect(within(card).getByText('v4')).toBeInTheDocument()
-    expect(within(card).getByText('0x1234…5678')).toBeInTheDocument()
-    expect(within(card).getByText('Sweeps idle balances into the operating account.')).toBeInTheDocument()
+    // The row: bold name heading, category • vendor metadata line, version chip. The description
+    // and the launch affordance are NOT here — they moved to the sheet.
+    const row = screen.getByRole('heading', { level: 5, name: 'Treasury Sweep' }).closest('li')
+    expect(within(row).getByText(new RegExp(APP_CATEGORY_LABELS[AppCategory.TREASURY_LIQUIDITY]))).toBeInTheDocument()
+    expect(within(row).getByText('v4')).toBeInTheDocument()
+    expect(within(row).getByText('0x1234…5678')).toBeInTheDocument()
+    expect(within(row).queryByText('Sweeps idle balances into the operating account.')).toBeNull()
+    expect(within(row).queryByRole('link')).toBeNull()
 
-    const launch = within(card).getByRole('link', { name: 'Launch Treasury Sweep' })
-    expect(launch).toHaveAttribute('href', `/apps/${appSlug('Treasury Sweep')}`)
+    // The sheet: full detail plus the Open action, linked at the same /apps/<slug> the launch
+    // route resolves.
+    const sheet = await openSheet(user, 'Treasury Sweep')
+    expect(within(sheet).getByText('Sweeps idle balances into the operating account.')).toBeInTheDocument()
+    expect(within(sheet).getByText(VENDOR)).toBeInTheDocument()
+    expect(within(sheet).getByText('v4')).toBeInTheDocument()
+    expect(within(sheet).getByRole('link', { name: 'Open Treasury Sweep' })).toHaveAttribute(
+      'href',
+      `/apps/${appSlug('Treasury Sweep')}`,
+    )
   })
 
-  it('renders no launch link for a name that has no slug, and says why', async () => {
+  it('offers no Open action for a name that has no slug, and says why in the sheet', async () => {
     // `appSlug` refuses a lossy best effort — a name it cannot fold into a valid slug returns null
     // rather than a mangled one, because two distinct on-chain listings must never share an address.
     // The catalog's job is to say that plainly instead of linking to `/apps/null`.
@@ -232,14 +250,21 @@ describe('CatalogPanel — listing (spec 073 FR-003/FR-007)', () => {
       ]),
     )
 
+    const user = userEvent.setup()
     await renderSettled()
 
     // The listing is still shown — it IS approved and it IS launchable; only its address is missing.
     expect(listedApps()).toEqual(['Ünïcode Desk', 'Settle Desk'])
-    expect(screen.queryByRole('link', { name: 'Launch Ünïcode Desk' })).toBeNull()
-    expect(screen.getByText(/registered name can’t be used as a web address/i)).toBeInTheDocument()
+
+    // Its sheet explains the refusal and offers no Open action…
+    const refused = await openSheet(user, 'Ünïcode Desk')
+    expect(within(refused).getByText(/registered name can’t be used as a web address/i)).toBeInTheDocument()
+    expect(within(refused).queryByRole('link', { name: /^Open / })).toBeNull()
+    await user.click(within(refused).getByRole('button', { name: /^Close/ }))
+
     // …and it does not contaminate its neighbour.
-    expect(screen.getByRole('link', { name: 'Launch Settle Desk' })).toHaveAttribute(
+    const ok = await openSheet(user, 'Settle Desk')
+    expect(within(ok).getByRole('link', { name: 'Open Settle Desk' })).toHaveAttribute(
       'href',
       `/apps/${appSlug('Settle Desk')}`,
     )
@@ -442,43 +467,49 @@ describe('CatalogPanel — apps grouped by category', () => {
   })
 })
 
-describe('CatalogPanel — Quick Access favorites', () => {
-  it('offers no favorite star for a card that cannot be launched by URL', async () => {
+describe('CatalogPanel — My Apps (Quick Access favorites, toggled from the sheet)', () => {
+  it('offers no My Apps toggle in the sheet of an app that cannot be launched by URL', async () => {
+    const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Ünïcode Desk' })]))
     await renderSettled()
 
-    expect(screen.queryByRole('button', { name: /Quick Access/ })).toBeNull()
+    const sheet = await openSheet(user, 'Ünïcode Desk')
+    expect(within(sheet).queryByRole('button', { name: /My Apps/ })).toBeNull()
   })
 
-  it('offers no favorite star on an unverified stale snapshot', async () => {
+  it('offers no My Apps toggle on an unverified stale snapshot', async () => {
+    const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () =>
       unreachableOutcome({ stale: staleSnapshot([appRecord({ id: 1, name: 'Settle Desk' })], 60_000) }),
     )
     await renderSettled()
 
-    expect(screen.queryByRole('button', { name: /Quick Access/ })).toBeNull()
+    const sheet = await openSheet(user, 'Settle Desk')
+    expect(within(sheet).queryByRole('button', { name: /My Apps/ })).toBeNull()
   })
 
-  it('adds a launchable app to Quick Access and persists it, then removes it on a second press', async () => {
+  it('adds a launchable app to My Apps from its sheet, persists it, and removes it on a second press', async () => {
     const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 9, name: 'Settle Desk' })]))
     await renderSettled()
 
-    const star = screen.getByRole('button', { name: 'Add Settle Desk to Quick Access' })
-    expect(star).toHaveAttribute('aria-pressed', 'false')
+    const sheet = await openSheet(user, 'Settle Desk')
+    const toggle = within(sheet).getByRole('button', { name: 'Add Settle Desk to My Apps' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
 
-    await user.click(star)
+    await user.click(toggle)
 
-    const active = screen.getByRole('button', { name: 'Remove Settle Desk from Quick Access' })
+    const active = within(sheet).getByRole('button', { name: 'Remove Settle Desk from My Apps' })
     expect(active).toHaveAttribute('aria-pressed', 'true')
     expect(loadFavoriteApps()).toEqual([{ id: 9, slug: appSlug('Settle Desk'), name: 'Settle Desk' }])
 
-    await user.click(active)
+    // The row picks up the state as a non-interactive indicator chip.
+    await user.click(within(sheet).getByRole('button', { name: /^Close/ }))
+    const row = screen.getByRole('heading', { level: 5, name: 'Settle Desk' }).closest('li')
+    expect(within(row).getByText('My Apps')).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: 'Add Settle Desk to Quick Access' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
+    const reopened = await openSheet(user, 'Settle Desk')
+    await user.click(within(reopened).getByRole('button', { name: 'Remove Settle Desk from My Apps' }))
     expect(loadFavoriteApps()).toEqual([])
   })
 })
@@ -538,7 +569,7 @@ describe('CatalogPanel — honest degradation (spec.md edge cases)', () => {
     expect(screen.queryByText('No apps are approved yet')).toBeNull()
     expect(screen.queryByText('Apps aren’t available here.')).toBeNull()
     expect(listedApps()).toEqual([])
-    expect(screen.queryByRole('link', { name: /^Launch / })).toBeNull()
+    expect(screen.queryByRole('link', { name: /^Open / })).toBeNull()
   })
 
   it('registry unreachable with no route: names the missing connection rather than blaming the registry', async () => {
@@ -580,10 +611,14 @@ describe('CatalogPanel — honest degradation (spec.md edge cases)', () => {
     expect(screen.getByText(/it is not current, and nothing in it can be launched/i)).toBeInTheDocument()
 
     // The snapshot IS shown — that is what makes this state different from the bare outage — but
-    // every launch affordance is gone and each card says why.
+    // every launch affordance is gone, and an opened sheet says why instead of offering Open.
     expect(listedApps()).toEqual(['Settle Desk', 'Ledger Match'])
-    expect(screen.queryByRole('link', { name: /^Launch / })).toBeNull()
-    expect(screen.getAllByText('Launch unavailable — this listing could not be verified.')).toHaveLength(2)
+    expect(screen.queryByRole('link', { name: /^Open / })).toBeNull()
+
+    const user = userEvent.setup()
+    const sheet = await openSheet(user, 'Settle Desk')
+    expect(within(sheet).getByText('Launch unavailable — this listing could not be verified.')).toBeInTheDocument()
+    expect(within(sheet).queryByRole('link', { name: /^Open / })).toBeNull()
   })
 
   it('a throwing registry client is an outage, not an empty catalog', async () => {

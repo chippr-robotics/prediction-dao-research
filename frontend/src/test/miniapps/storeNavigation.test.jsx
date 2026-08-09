@@ -180,13 +180,15 @@ describe('sub-view routing is total (contract §1)', () => {
 })
 
 describe('My Apps (spec 077 FR-008)', () => {
-  it('lists only favorited apps, with the same card treatment and working launch links', async () => {
+  it('lists only favorited apps, with the same row treatment and a working Open action', async () => {
+    const user = userEvent.setup()
     favorite(TWO_APPS[1]) // Ledger Match
     state.fetchCatalog = vi.fn(async () => okOutcome(TWO_APPS))
     await renderAt('/wallet?tab=apps&view=mine')
 
     expect(listedApps()).toEqual(['Ledger Match'])
-    expect(screen.getByRole('link', { name: 'Launch Ledger Match' })).toHaveAttribute(
+    await user.click(screen.getByRole('button', { name: 'Ledger Match details' }))
+    expect(screen.getByRole('link', { name: 'Open Ledger Match' })).toHaveAttribute(
       'href',
       `/apps/${appSlug('Ledger Match')}`,
     )
@@ -204,17 +206,22 @@ describe('My Apps (spec 077 FR-008)', () => {
     expect(screen.queryByRole('searchbox')).toBeNull()
   })
 
-  it('unfavoriting from the card updates the view live', async () => {
+  it('unfavoriting from the app sheet updates the view live', async () => {
     const user = userEvent.setup()
     favorite(TWO_APPS[0])
     state.fetchCatalog = vi.fn(async () => okOutcome(TWO_APPS))
     await renderAt('/wallet?tab=apps&view=mine')
 
     expect(listedApps()).toEqual(['Settle Desk'])
-    await user.click(screen.getByRole('button', { name: 'Remove Settle Desk from Quick Access' }))
+    await user.click(screen.getByRole('button', { name: 'Settle Desk details' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Settle Desk from My Apps' }))
 
+    // The rows update live: the app leaves the My Apps projection and the honest empty state
+    // takes over. The sheet itself stays open (it reads the full listing, so the member can
+    // change their mind and re-add without hunting the app down again).
     expect(listedApps()).toEqual([])
     expect(screen.getByText('Nothing in My Apps yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Settle Desk to My Apps' })).toBeInTheDocument()
   })
 })
 

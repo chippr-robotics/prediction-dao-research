@@ -12,11 +12,16 @@
  *   2. **Artwork is total and decorative.** Curated slugs get their own illustration, everything
  *      else gets the deliberate generic — never a broken image — and all of it is aria-hidden so
  *      the card's text remains the identity a screen reader hears.
- *   3. **Flavour never enters the accessible name.** The rocket in Launch and the glyphs in the
- *      trust blocks are decoration; names and copy read exactly as before.
+ *   3. **Flavour never enters the accessible name.** The rocket in the sheet's Open action and
+ *      the chrome glyphs are decoration; names and copy carry the meaning.
+ *
+ * Iteration 2 (post-merge feedback): the explanation prose is GONE from the surface (FR-003
+ * superseded — the badge is the trust signal, depth lives in the docs), cards became store
+ * rows, and the launch affordance moved into the app sheet as Open.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 
@@ -180,20 +185,30 @@ describe('the trust badge renders over a verified listing and nothing else (FR-0
   })
 })
 
-describe('the trust story reads as prioritized blocks (FR-003)', () => {
-  it('keeps both factual claims, split under their own lead-ins', async () => {
+describe('the explanation prose is gone (iteration 2, FR-003 superseded)', () => {
+  it('renders neither of the old trust paragraphs anywhere on the surface', async () => {
     state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Settle Desk' })]))
     await renderSettled()
 
-    expect(screen.getByText('Reviewed on-chain.')).toBeInTheDocument()
-    expect(screen.getByText(/reviewed and approved on-chain/i)).toBeInTheDocument()
-    expect(screen.getByText('Hash-checked before launch.')).toBeInTheDocument()
-    expect(screen.getByText(/checks the package against the hash recorded there/i)).toBeInTheDocument()
+    expect(screen.queryByText(/reviewed and approved on-chain/i)).toBeNull()
+    expect(screen.queryByText(/checks the package against the hash recorded there/i)).toBeNull()
+    // The badge — the compact trust signal — is what remains.
+    expect(screen.getByText(BADGE)).toBeInTheDocument()
+  })
+
+  it('Refresh is icon-only but keeps its accessible name (FR-018)', async () => {
+    state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Settle Desk' })]))
+    await renderSettled()
+
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    // No visible text — the glyph plus the aria-label carry the control.
+    expect(refresh.textContent).toBe('')
+    expect(refresh.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 })
 
 describe('card artwork (FR-001) and flavour staying out of accessible names (FR-006)', () => {
-  it('gives every card an aria-hidden illustration panel; unknown apps get the generic art', async () => {
+  it('gives every row an aria-hidden illustration tile; unknown apps get the generic art', async () => {
     state.fetchCatalog = vi.fn(async () =>
       okOutcome([
         appRecord({ id: 1, name: 'Token Mint' }), // slug: token-mint → curated
@@ -203,8 +218,8 @@ describe('card artwork (FR-001) and flavour staying out of accessible names (FR-
     await renderSettled()
 
     for (const name of ['Token Mint', 'Settle Desk']) {
-      const card = screen.getByRole('heading', { level: 5, name }).closest('li')
-      const art = card.querySelector('.miniapp-card-art')
+      const row = screen.getByRole('heading', { level: 5, name }).closest('li')
+      const art = row.querySelector('.miniapp-row-art')
       expect(art).not.toBeNull()
       expect(art).toHaveAttribute('aria-hidden', 'true')
       expect(art.querySelector('svg.miniapp-art')).not.toBeNull()
@@ -213,21 +228,27 @@ describe('card artwork (FR-001) and flavour staying out of accessible names (FR-
     expect(appSlug('Token Mint')).toBe('token-mint')
   })
 
-  it('a name with no slug still gets art (the generic), alongside its launch refusal', async () => {
+  it('a name with no slug still gets art (the generic) on its row, with the refusal in its sheet', async () => {
+    const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Ünïcode Desk' })]))
     await renderSettled()
 
-    const card = screen.getByRole('heading', { level: 5, name: 'Ünïcode Desk' }).closest('li')
-    expect(card.querySelector('.miniapp-card-art svg')).not.toBeNull()
-    expect(within(card).getByText(/registered name can’t be used as a web address/i)).toBeInTheDocument()
+    const row = screen.getByRole('heading', { level: 5, name: 'Ünïcode Desk' }).closest('li')
+    expect(row.querySelector('.miniapp-row-art svg')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Ünïcode Desk details' }))
+    const sheet = screen.getByRole('dialog', { name: 'Ünïcode Desk' })
+    expect(within(sheet).getByText(/registered name can’t be used as a web address/i)).toBeInTheDocument()
   })
 
-  it('the rocket is decoration: the launch link keeps its exact accessible name', async () => {
+  it('the rocket is decoration: the sheet\'s Open link keeps its exact accessible name', async () => {
+    const user = userEvent.setup()
     state.fetchCatalog = vi.fn(async () => okOutcome([appRecord({ id: 1, name: 'Settle Desk' })]))
     await renderSettled()
 
-    const launch = screen.getByRole('link', { name: 'Launch Settle Desk' })
-    const glyph = launch.querySelector('svg')
+    await user.click(screen.getByRole('button', { name: 'Settle Desk details' }))
+    const open = screen.getByRole('link', { name: 'Open Settle Desk' })
+    const glyph = open.querySelector('svg')
     expect(glyph).not.toBeNull()
     expect(glyph).toHaveAttribute('aria-hidden', 'true')
   })
