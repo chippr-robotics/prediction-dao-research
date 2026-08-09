@@ -35,7 +35,31 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # BOOTSTRAP. This rule cannot apply before the branch model it enforces exists: `staging` is
+      # created as a one-time operational step (spec 076 T032), and until then "come from staging"
+      # would block every pull request in the repository — including the one that creates staging.
+      #
+      # It warns rather than passing silently, so the inactive state is visible rather than looking
+      # like a rule that is being satisfied.
+      - name: Skip while the branch model is not yet in place
+        id: bootstrap
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify origin/staging >/dev/null; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::origin/staging does not exist, so the promotion rule is INACTIVE."
+            echo "::warning::Create and protect it (docs/runbooks/release-and-promotion.md § One-time"
+            echo "::warning::setup, task T032). Until then any branch may merge into main."
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check the head branch
+        if: steps.bootstrap.outputs.active == 'true'
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
