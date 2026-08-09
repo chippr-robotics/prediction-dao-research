@@ -33,11 +33,25 @@ const RC_TAG_RE = /^v(\d+)\.(\d+)\.(\d+)-rc\.(\d+)$/;
 
 function git(args, { allowFail = false } = {}) {
   try {
-    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    return execFileSync("git", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      // Node's default is 1 MiB. The full-history log with bodies is ~430 KB today and grows with
+      // every commit; crossing the default makes execFileSync throw ENOBUFS, which — before the
+      // guard in subjectsSince below — was swallowed into "no commits". Sized so it cannot be the
+      // cause again.
+      maxBuffer: 256 * 1024 * 1024,
+    }).trim();
   } catch (err) {
     if (allowFail) return "";
     throw err;
   }
+}
+
+/** Cheap, bounded, and immune to buffer limits — used to cross-check the parsed log. */
+function commitCount(range) {
+  const out = git(["rev-list", "--count", range]);
+  return Number.parseInt(out, 10);
 }
 
 function fmt(v) {
@@ -71,7 +85,29 @@ function currentRelease() {
 /** Commit subjects in (from, HEAD]. With no `from`, the whole history. */
 function subjectsSince(fromTag) {
   const range = fromTag ? `${fromTag}..HEAD` : "HEAD";
-  const out = git(["log", "--format=%s%x00%b%x1e", range], { allowFail: true });
+
+  // NO `allowFail` HERE — deliberately. It used to be `{ allowFail: true }`, and that turned any
+  // git failure into `""` -> zero commits -> "empty-range" -> "no release". The first live run of
+  // this workflow did exactly that: it reported `commits: 0` on a 192-commit history, exited
+  // successfully, and published nothing. A release pipeline that silently does nothing is worse
+  // than one that fails, because nobody investigates a green run.
+  //
+  // This is the same rule the rest of spec 076 is built on: unknown is not the same as clear.
+  const out = git(["log", "--format=%s%x00%b%x1e", range]);
+
+  // Cross-check against a command that cannot plausibly fail the same way. If git can count
+  // commits in this range but we parsed none out of the log, something is wrong with the READ,
+  // not with the repository — and reporting "nothing to release" would be a lie.
+  const expected = commitCount(range);
+  const parsed = out ? out.split("\x1e").map((r) => r.trim()).filter(Boolean).length : 0;
+  if (expected > 0 && parsed === 0) {
+    throw new Error(
+      `git rev-list counts ${expected} commit(s) in "${range}" but the formatted log parsed 0. ` +
+        `Refusing to report "nothing to release" — that would silently skip a real release. ` +
+        `Log length was ${out.length} bytes.`,
+    );
+  }
+
   if (!out) return [];
   return out
     .split("\x1e")
