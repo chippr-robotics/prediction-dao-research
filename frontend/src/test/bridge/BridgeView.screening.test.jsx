@@ -240,11 +240,25 @@ describe('BridgeView — screening the acting wallet (T116/T120, FR-032)', () =>
 
     await user.click(confirmButton())
 
-    await waitFor(() => expect(screenOne).toHaveBeenCalled())
-    const [, chainId, options] = screenOne.mock.calls[0]
-    expect(chainId).toBe(137)
+    /*
+     * Asserts that a FORCED screen happened, not that the first call after the click was the
+     * forced one. Those are different claims, and the second is not what this test is named for.
+     *
+     * It waited for any call and then read `mock.calls[0]`, so an unforced re-screen landing first
+     * — a re-render on the quote path, which is ordinary under load — made it fail with
+     * `expected { provider: {…} } to match object { force: true }` while the behaviour under test
+     * was correct. It failed that way on two unrelated PRs (#1060, #1067) and passes 3/3 locally,
+     * i.e. it was a CI-load artifact, not a regression.
+     *
+     * Waiting for the forced call specifically also removes the ordering assumption entirely:
+     * whichever order they arrive in, the requirement is that submission re-screens.
+     */
+    await waitFor(() => {
+      expect(screenOne.mock.calls.some(([, , options]) => options?.force === true)).toBe(true)
+    })
     // Forced: a cached 'clear' from the quote is exactly what must not be reused here.
-    expect(options).toMatchObject({ force: true })
+    const forced = screenOne.mock.calls.find(([, , options]) => options?.force === true)
+    expect(forced[1]).toBe(137)
   })
 
   it('treats an unscreenable wallet as an unknown, never as a flagged one', async () => {
