@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { SHOW_ALL_ORACLE_MODELS } from '../constants/wagerDefaults'
 import { LEGAL_LINKS } from '../constants/legalLinks'
 import { tenantBrand, tenantLinks } from '../config/tenant'
+import { buildLabel } from '../config/buildInfo'
 import './Footer.css'
 
 /**
@@ -41,6 +42,13 @@ export default function Footer({ variant = 'full' }) {
           </nav>
         )}
         <p className="app-footer-copyright">{copyright}</p>
+        {/*
+          * Which build this is. Deliberately selectable (not `user-select: none`) — the whole
+          * point is that someone reporting a problem can copy it into the report. `title` carries
+          * the long form for a hover, and the element is NOT aria-hidden: a support conversation
+          * over a screen reader needs this as much as a sighted one.
+          */}
+        <p className="app-footer-build" title={`Build ${buildLabel()}`}>{buildLabel()}</p>
       </footer>
     )
   }

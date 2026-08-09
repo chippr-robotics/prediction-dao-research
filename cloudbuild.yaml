@@ -9,6 +9,9 @@ steps:
       # instance. A per-tenant instance is the same pipeline with its own
       # VITE_TENANT_ID + tenant URLs and its own Cloud Run service — see
       # docs/runbooks/tenant-operations.md.
+      # Stamps the nav drawer's build label so a bug report pins an exact commit (buildInfo.js).
+      - '--build-arg'
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
       - '--build-arg'
       - 'VITE_TENANT_ID=fairwins'
       - '--build-arg'
