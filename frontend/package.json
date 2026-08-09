@@ -27,7 +27,7 @@
   "dependencies": {
     "@fairwins/intent-types": "*",
     "@noble/ciphers": "^1.0.0",
-    "@noble/curves": "^1.6.0",
+    "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.5.0",
     "@noble/post-quantum": "^0.2.0",
     "@polymarket/clob-client": "^5.8.1",
