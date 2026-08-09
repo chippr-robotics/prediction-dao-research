@@ -211,13 +211,42 @@ describe('a package does not import from the host', () => {
  * A package that somehow has no package.json is skipped here, but it is still walked by the
  * path-based checks above, so it cannot escape the boundary entirely.
  */
-const PACKAGE_NAMES = existsSync(PACKAGES)
-  ? readdirSync(PACKAGES)
-      .filter((d) => !SKIP_DIRS.has(d) && existsSync(join(PACKAGES, d, 'package.json')))
-      .map((d) => JSON.parse(readFileSync(join(PACKAGES, d, 'package.json'), 'utf8')).name)
-      .filter(Boolean)
+const PACKAGE_DIRS = existsSync(PACKAGES)
+  ? readdirSync(PACKAGES).filter(
+      (d) => !SKIP_DIRS.has(d) && existsSync(join(PACKAGES, d, 'package.json')),
+    )
   : []
+const PACKAGE_MANIFESTS = PACKAGE_DIRS.map((dir) => ({
+  dir,
+  name: JSON.parse(readFileSync(join(PACKAGES, dir, 'package.json'), 'utf8')).name,
+})).filter((p) => p.name)
+const PACKAGE_NAMES = PACKAGE_MANIFESTS.map((p) => p.name)
 const HOST_PACKAGE_NAME = 'frontend'
+
+/*
+ * Deriving the names off disk means the by-name checks are only as trustworthy as the mapping
+ * between a package's directory and its declared name. If those ever disagreed, every check below
+ * would still run — and would quietly reason about the wrong package, which is worse than not
+ * running at all.
+ *
+ * Raised in review on #1060 on the belief that the two names WERE swapped in this tree. They are
+ * not (verified: clearpath/package.json declares @fairwins/miniapp-clearpath, token-mint declares
+ * @fairwins/miniapp-token-mint) — but "the gate is silently reasoning about the wrong package" is
+ * exactly the failure mode worth refusing to have, so it is now asserted rather than assumed.
+ */
+describe('the derived package list is trustworthy', () => {
+  it('declares a name matching its directory for every mini-app package', () => {
+    const mismatched = PACKAGE_MANIFESTS.filter((p) => p.name !== `@fairwins/miniapp-${p.dir}`).map(
+      (p) => `frontend/miniapps/${p.dir} declares "${p.name}"`,
+    )
+    expect(mismatched).toEqual([])
+  })
+
+  it('found the packages at all', () => {
+    // A zero-length list would make every by-name check below vacuously pass.
+    expect(PACKAGE_NAMES.length).toBeGreaterThan(0)
+  })
+})
 
 describe('the boundary holds for by-name imports too', () => {
   it('no host file imports a mini-app package by its package name', () => {
