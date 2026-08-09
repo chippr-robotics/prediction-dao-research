@@ -72,6 +72,10 @@ jobs:
       - name: Reject hand-edited version numbers
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          # Needed to tell a branch OUR workflow created from one a contributor merely named that
+          # way — see the fork note below.
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -81,19 +85,28 @@ jobs:
           # its own gate on every single release.
           #
           # Recognised two ways, and both are checked rather than trusted:
-          #   · the branch release.yml creates, `release/*`; or
+          #   · the branch release.yml creates, `release/*`, FROM THIS REPOSITORY; or
           #   · a PR that also updates CHANGELOG.md and sets every version to the NEWEST TAG —
           #     which is what a sanctioned manual backfill looks like (see the runbook).
           #
           # The second condition is deliberately narrow: matching the newest tag means the PR is
           # recording a release that already happened, not inventing a version. A contributor
           # picking an arbitrary number still fails.
+          #
+          # THE SAME-REPO REQUIREMENT IS LOAD-BEARING. Branch name alone is not evidence of
+          # provenance: anyone can open a fork PR from a branch called `release/whatever` and would
+          # have inherited an unconditional exemption from FR-008. Pushing a `release/*` branch to
+          # THIS repository already requires write access, which is the bar that makes the name
+          # mean something. A fork can still take the backfill path — that one is verified by
+          # CONTENT, so it needs no trust. Reported by review on #1088.
           LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
           EXPECTED="${LATEST_TAG#v}"
           exempt=no
-          case "$HEAD_REF" in
-            release/*) exempt=yes ;;
-          esac
+          if [ "$HEAD_REPO" = "$THIS_REPO" ]; then
+            case "$HEAD_REF" in
+              release/*) exempt=yes ;;
+            esac
+          fi
           if [ "$exempt" = no ] && [ -n "$EXPECTED" ] && grep -qx 'CHANGELOG.md' changed-files.txt; then
             exempt=maybe
           fi

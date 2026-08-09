@@ -26,7 +26,10 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: read
+  # `write`, not `read`: the final step OPENS a pull request for the generated release record
+  # (github.rest.pulls.create). With `read` the token 403s at runtime and the release job fails at
+  # its last step — the precise failure this PR exists to remove. Reported by review on #1088.
+  pull-requests: write
 
 jobs:
   release:
@@ -198,6 +201,18 @@ jobs:
           git checkout -b "$BRANCH"
           git add -A
           git commit -m "chore(release): ${VERSION} [skip release]"
+
+          # `--force-with-lease` compares against refs/remotes/origin/$BRANCH, so that ref has to
+          # exist for the lease to mean anything. `fetch-depth: 0` above does fetch every branch
+          # today — but relying on that couples this push to a checkout implementation detail, and
+          # anyone shrinking fetch-depth for speed would silently turn the lease into a no-op
+          # ("stale info" rejection) exactly on the re-run path it exists to protect.
+          #
+          # So fetch it explicitly when it exists. `ls-remote` is a question, not a swallowed
+          # failure: a genuine transport error still fails the step under `set -e`.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+          fi
           git push origin "$BRANCH" --force-with-lease
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
