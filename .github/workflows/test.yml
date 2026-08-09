@@ -169,7 +169,7 @@ jobs:
         run: node scripts/coverage/check-thresholds.js --summary coverage/coverage-summary.json --policy coverage-threshold-policy.json --scope gated
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: contracts-coverage-report
@@ -394,7 +394,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-test-coverage
@@ -564,7 +564,7 @@ jobs:
           fi
 
       - name: Upload Cypress screenshots
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: cypress-fast-screenshots
@@ -572,7 +572,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Cypress videos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         # failure() not always(): a video of a PASSING run is never watched, and these are the
         # largest artifacts in the pipeline. Uploading them on every push is what pushed the
         # artifact API into rate-limiting.
@@ -583,7 +583,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Cypress JSON results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cypress-fast-results
