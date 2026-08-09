@@ -21,7 +21,7 @@
 - Stale snapshot / unreachable / not-deployed states keep their existing warning blocks and
   MUST NOT show the badge.
 
-## 3. Artwork map contract (`appArtwork.jsx`)
+## 3. Artwork map contract (`appArtwork.js`, components in `appArt.jsx`)
 
 - `artworkFor(slug) → { Art }` — total function: any input (including `null`) returns
   renderable art; unknown slugs get the generic fallback.

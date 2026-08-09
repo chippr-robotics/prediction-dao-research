@@ -3,7 +3,7 @@
 ## R1 — Where per-app artwork can live without moving committed bytes
 
 **Decision**: Curated artwork is a host-side module — inline SVG illustrations keyed by app
-slug (`frontend/src/components/miniapps/appArtwork.jsx`), with a generic fallback entry.
+slug (`frontend/src/components/miniapps/appArtwork.js`, components in `appArt.jsx`), with a generic fallback entry.
 
 **Rationale**: Nothing in the registry record, manifest schema, or host object carries an icon
 today (`grep icon frontend/src/lib/miniapps` → nothing). Adding one on-chain or in package

@@ -62,14 +62,15 @@ network, and burn CPU. The registry is the defence, and curation review is a rea
 | Publish script | `scripts/miniapps/publish.js` |
 | First-party packages | `frontend/miniapps/token-mint/`, `frontend/miniapps/clearpath/` |
 | Package cache | `frontend/public/sw.js` (`fairwins-miniapp-packages-v1`) |
-| Store artwork + store bar (spec 077) | `frontend/src/components/miniapps/appArtwork.jsx`, `StoreBar.jsx`, `storeViews.js` |
+| Store artwork + store bar (spec 077) | `frontend/src/components/miniapps/appArt.jsx` + `appArtwork.js`, `StoreBar.jsx`, `storeViews.js` |
 
 ## The store surface **[host]** (spec 077)
 
 The catalog's visual layer. Three rules keep it from becoming a trust surface:
 
 - **Artwork is host-curated, full stop.** Card illustrations live in
-  `appArtwork.jsx`, keyed by the same slug the launch route uses, with a deliberate generic
+  `appArt.jsx` (the SVG components) behind `appArtwork.js` (the slug map), keyed by the same
+  slug the launch route uses, with a deliberate generic
   fallback — `artworkFor()` is total over any input. Nothing on-chain, in a manifest, or in a
   package may supply catalog imagery: an on-chain icon field would widen the registry's trust
   surface, package art would move keccak-committed bytes, and either would hand vendors a

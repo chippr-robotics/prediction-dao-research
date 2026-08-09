@@ -145,7 +145,6 @@ describe('the trust badge renders over a verified listing and nothing else (FR-0
   })
 
   it('withholds the badge on a bare outage', async () => {
-    state.fetchCatalog = vi.fn(async () => staleOutcome([]))
     state.fetchCatalog = vi.fn(async () => ({
       status: REGISTRY_STATUS.UNREACHABLE,
       chainId: CHAIN,

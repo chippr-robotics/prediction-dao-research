@@ -288,7 +288,7 @@ for (const u of UNITS) {
 // tree entirely with that bump, so guarding the old name would pass vacuously.
 //
 // The recovery is always the same and is NOT `npm install` again:
-//     rm -rf node_modules package-lock.json && npm install
+//     npm run deps:reinstall
 const REQUIRED_OPTIONAL = ["@rolldown/binding-linux-x64-gnu"];
 const lockPath = path.join(ROOT, "package-lock.json");
 const missingOptional = [];
@@ -340,7 +340,7 @@ if (missingOptional.length) {
       "  fail with a missing-native-binding error (rolldown cannot load without its platform\n" +
       "  binding), including the mini-app release path whose bytes are committed on-chain.\n" +
       "  Recover with a FULL re-resolve:\n" +
-      "      rm -rf node_modules package-lock.json && npm install\n" +
+      "      npm run deps:reinstall\n" +
       "  Re-running `npm install` alone does NOT fix it.",
   );
 }

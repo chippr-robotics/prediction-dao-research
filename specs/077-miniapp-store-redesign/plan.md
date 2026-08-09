@@ -104,7 +104,8 @@ specs/077-miniapp-store-redesign/
 ```text
 frontend/src/components/miniapps/
 ├── CatalogPanel.jsx        # redesigned: store bar, badge, grouped market, My Apps, Search
-├── appArtwork.jsx          # NEW: slug-keyed inline-SVG artwork map + generic fallback
+├── appArt.jsx              # NEW: inline-SVG illustration components (curated + generic)
+├── appArtwork.js           # NEW: slug-keyed artwork map + artworkFor resolver
 ├── StoreBar.jsx            # NEW: Market / My Apps / Search in-section navigation
 ├── MiniAppWorkspace.jsx    # unchanged (launch path)
 ├── SubmitAppPanel.jsx      # unchanged (reached via existing view=submit)

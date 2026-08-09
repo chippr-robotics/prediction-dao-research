@@ -63,7 +63,8 @@ steps documented. **Independent test**: quickstart §1.
 **Goal**: redesigned market view — artwork, badge, category headers, data box, rocket CTA,
 restructured trust copy. **Independent test**: quickstart §2 steps 1, 4–6.
 
-- [X] T010 [P] [US1] Create `frontend/src/components/miniapps/appArtwork.jsx`: slug-keyed inline
+- [X] T010 [P] [US1] Create `frontend/src/components/miniapps/appArt.jsx` (illustration
+      components) + `appArtwork.js` (slug map + resolver): slug-keyed inline
       SVG illustrations for `token-mint` (token/mint motif) and `clearpath` (governance/compass
       motif) plus a generic fallback; `artworkFor(slug)` total function; art theme-aware
       (currentColor/CSS vars) and `aria-hidden` per contracts/store-ui.md §3.
