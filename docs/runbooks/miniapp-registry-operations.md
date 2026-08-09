@@ -429,9 +429,36 @@ Categories: `0` TradeSettlement · `1` Reconciliation · `2` TreasuryLiquidity �
 
 Statuses: `0` Pending · `1` Approved · `2` Suspended · `3` Deprecated.
 
----
+### 7.1 Re-publishing after a toolchain byte move (spec 077)
 
-## 8. Known blockers
+Sometimes the packages' **source does not change but their published bytes do** — a build
+toolchain move. Spec 077 is the recorded instance: vite 7 → 8 replaced the bundler underneath
+the preset (rollup → rolldown), every emitted byte moved, the baseline
+(`specs/075-monorepo-workspaces/baseline-miniapp-builds.json`) was re-recorded in the same
+change, and both packages were hand-bumped (`1.0.0 → 1.0.1`, spec 076 FR-007b keeps the
+version/bytes pairing honest).
+
+**Until the steps below are completed on a cohort, its registry still commits to the PREVIOUS
+bytes** — members are served the old, still-approved packages. That is not an error state; it
+is content-committed approval doing its job. The repo being ahead of the chain is expected and
+harmless. The reverse — re-recording the baseline *without* intending these steps — asserts the
+published packages no longer reproduce from source, so never re-record casually.
+
+Per cohort (Mordor first, then Polygon, matching §1's table):
+
+1. **Rebuild + publish at the new CID**: `node scripts/miniapps/publish.js --app <appId>` for
+   each affected package (§7). The CID and `manifestHash` will differ from the live record —
+   that is the point.
+2. **Propose the update**: `submit-and-approve.js` with the new tuple; the record goes Pending
+   while the previous approval keeps serving (§3 — nothing is down).
+3. **Approve against the exact hash**: the curator approves with `expectedManifestHash` set to
+   the printed hash; `StaleProposal` protects against the tuple moving between review and
+   execution.
+4. **Verify from the member side**: catalog shows the bumped version, and a launch re-verifies
+   the new hash end-to-end.
+
+There is no rollback step: the old CID stays pinned and the old approval history stays
+on-chain, so an aborted rollout simply stops before step 3 and members never notice.
 
 ### The vendor gate, and how the operator key clears it  *(resolved 2026-08-02)*
 

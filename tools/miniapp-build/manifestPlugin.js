@@ -65,7 +65,7 @@ export function manifestPlugin(options) {
         throw new Error(
           '[miniapp-build] the build produced more than one chunk: ' +
             chunks.map((chunk) => chunk.fileName).join(', ') +
-            '. Dynamic imports must stay inlined (rollupOptions.output.inlineDynamicImports).'
+            '. Dynamic imports must stay inlined (rollupOptions.output.codeSplitting: false).'
         )
       }
 

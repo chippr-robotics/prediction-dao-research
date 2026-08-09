@@ -62,6 +62,29 @@ network, and burn CPU. The registry is the defence, and curation review is a rea
 | Publish script | `scripts/miniapps/publish.js` |
 | First-party packages | `frontend/miniapps/token-mint/`, `frontend/miniapps/clearpath/` |
 | Package cache | `frontend/public/sw.js` (`fairwins-miniapp-packages-v1`) |
+| Store artwork + store bar (spec 077) | `frontend/src/components/miniapps/appArt.jsx` + `appArtwork.js`, `StoreBar.jsx`, `storeViews.js` |
+
+## The store surface **[host]** (spec 077)
+
+The catalog's visual layer. Three rules keep it from becoming a trust surface:
+
+- **Artwork is host-curated, full stop.** Card illustrations live in
+  `appArt.jsx` (the SVG components) behind `appArtwork.js` (the slug map), keyed by the same
+  slug the launch route uses, with a deliberate generic
+  fallback — `artworkFor()` is total over any input. Nothing on-chain, in a manifest, or in a
+  package may supply catalog imagery: an on-chain icon field would widen the registry's trust
+  surface, package art would move keccak-committed bytes, and either would hand vendors a
+  self-served image channel into the store. Adding an app's art is an ordinary reviewed host
+  change. All of it is decorative (`aria-hidden`); the card's text is the identity.
+- **The "On-chain verified market" badge is a factual claim**, so it renders only over a
+  verified listing — never the stale snapshot, the outage, or the registry gap. If you touch the
+  header, keep that gate; `storeRedesign.test.jsx` pins it across every state.
+- **Store navigation is presentation state, not navigation.** Market / My Apps / Search ride the
+  Apps tab's existing `?view=` seam (`storeViews.js` resolves it, totally — unknown values are
+  the market; `view=submit` keeps its exclusive surface). Every sub-view is a lens over the ONE
+  fetched listing: My Apps is favorites ∩ the launchable-filtered list and inherits the market's
+  launch rules; nothing refetches on a view switch. The host's global navigation (spec 069)
+  is untouched.
 
 ## The registry **[host]**
 

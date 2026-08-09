@@ -158,7 +158,8 @@ function validateOptions({ appId, version, permissions, storeKeys, contracts, ro
  * @param {import('vite').PluginOption[]} [options.plugins] - package plugins, e.g. `react()`
  * @param {Array<{specifier: string, package: string, exports?: string[]}>} [options.sharedModules]
  *   Override the host-owned module table; must stay in step with the host scope
- * @param {boolean|string} [options.minify] - Vite `build.minify`; defaults to `'esbuild'`
+ * @param {boolean|string} [options.minify] - Vite `build.minify`; defaults to `true` (Vite 8's
+ *   bundled minifier — the pre-8 `'esbuild'` default now requires esbuild installed separately)
  * @param {string} [options.target] - Vite `build.target`; defaults to `'es2022'`
  * @param {Record<string, string>} [options.define] - extra `define` entries
  * @returns {import('vite').UserConfig} config for `vite build`
@@ -176,7 +177,7 @@ export function createMiniAppConfig(options = {}) {
     contracts = [],
     plugins = [],
     sharedModules = SHARED_MODULES,
-    minify = 'esbuild',
+    minify = true,
     target = 'es2022',
     define = {}
   } = options
@@ -230,7 +231,8 @@ export function createMiniAppConfig(options = {}) {
       rollupOptions: {
         output: {
           // A single verified module: the host hashes and imports exactly one file.
-          inlineDynamicImports: true,
+          // (Vite 8/rolldown spelling of the former `inlineDynamicImports: true`.)
+          codeSplitting: false,
           entryFileNames: ENTRY_FILENAME,
           chunkFileNames: '[name].js',
           assetFileNames
