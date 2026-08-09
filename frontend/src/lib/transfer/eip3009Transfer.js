@@ -17,18 +17,18 @@
  * and this whole path is skipped in favour of a plain `transfer` (e.g. Mordor/ETC USC).
  */
 import { ethers } from 'ethers'
+import { TRANSFER_WITH_AUTHORIZATION_TYPES } from '@fairwins/intent-types'
 
-/** EIP-3009 typed-data for a wallet-to-wallet payment (arbitrary recipient submits via a relayer). */
-export const TRANSFER_WITH_AUTHORIZATION_TYPES = {
-  TransferWithAuthorization: [
-    { name: 'from', type: 'address' },
-    { name: 'to', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'validAfter', type: 'uint256' },
-    { name: 'validBefore', type: 'uint256' },
-    { name: 'nonce', type: 'bytes32' },
-  ],
-}
+/*
+ * EIP-3009 typed-data for a wallet-to-wallet payment (any relayer may submit it) now comes from
+ * @fairwins/intent-types, next to its `ReceiveWithAuthorization` sibling — the escrow-side leg that
+ * spec 075 already consolidated. They are the same money path and the same six fields; leaving one
+ * behind was how the sibling got two copies in the first place. Pinned to the typehash deployed
+ * USDC verifies against by test/intent/TypehashParity.test.js.
+ *
+ * Re-exported so existing importers of this module are unaffected.
+ */
+export { TRANSFER_WITH_AUTHORIZATION_TYPES }
 
 /** Minimal ABI for the self-submit fallback + the relayed authorization call. */
 export const TRANSFER_ABI = [

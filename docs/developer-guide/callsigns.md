@@ -107,17 +107,21 @@ callsign contract and gates each control on the caller's role there:
 All writes use the AdminPanel's plain-signer `runTx` (admin actions are not gasless). Until the registry is
 deployed and synced (`callsignRegistry` address in `contracts.js`), the tab shows a "not configured" notice.
 
-## Gasless intents (three-way sync)
+## Gasless intents (one source, gated against the contract)
 
 The EIP-712 structs (`CommitCallsignIntent`, `RegisterCallsignIntent`, `ChangeCallsignIntent`, `ReleaseCallsignIntent`,
-`RequestRepointIntent`, `CancelRepointIntent`) must stay **byte-identical** across:
+`RequestRepointIntent`, `CancelRepointIntent`) and the domain are defined **once**, in
+`packages/intent-types` (`@fairwins/intent-types`), and imported by both
+`frontend/src/lib/relay/intentTypes.js` and `services/relay-gateway/src/intent/intentTypes.js`.
+They used to be three hand-synced copies; they are now one, checked against
+`CallsignRegistry.sol`'s own `*_TYPEHASH` literals and `__EIP712_init(...)` arguments by
+`test/intent/TypehashParity.test.js`. Add a struct or a domain to the package — never to a
+call site.
 
-1. the contract typehashes (`CallsignRegistry.sol`),
-2. `frontend/src/lib/relay/intentTypes.js`,
-3. `services/relay-gateway/src/intent/intentTypes.js`.
-
-Domain: `name = "FairWins CallsignRegistry"`, `version = "1"`. `finalizeRepoint` and `reclaimLapsed`
-are permissionless and need no signed twin. Every gasless action keeps a self-submit fallback.
+Domain: `name = "FairWins CallsignRegistry"`, `version = "1"` (`CONTRACT_DOMAINS.callsignRegistry`;
+build it with `domainFor('callsignRegistry', chainId, registryAddress)`). `finalizeRepoint` and
+`reclaimLapsed` are permissionless and need no signed twin. Every gasless action keeps a self-submit
+fallback.
 
 ## Deploy & upgrade
 

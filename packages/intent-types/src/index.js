@@ -18,11 +18,81 @@
  * imports, explicit `exports`) so BOTH can consume it.
  *
  * RULES FOR THIS FILE
- *   · Zero runtime dependencies. It is pure data plus one pure function.
+ *   · Zero runtime dependencies. It is pure data plus pure functions.
  *   · Never import from frontend/src, services/, or a Vite virtual module.
  *   · Changing a struct changes what signatures mean. test/intent/TypehashParity.test.js checks
  *     every entry against the deployed contract's own *_TYPEHASH constant and fails on a mismatch.
+ *   · The same is true of the DOMAINS below: a correct type table signed under the wrong
+ *     name/version produces a signature that verifies nowhere. Same file, same gate.
  */
+
+/**
+ * EIP-712 DOMAINS, keyed by the `getContractAddressForChain` key of the contract that verifies the
+ * signature. `chainId` and `verifyingContract` are runtime values, so only the two STATIC halves
+ * live here — they are what the contract fixed at `__EIP712_init(name, version)` and can never be
+ * inferred from the struct tables above.
+ *
+ * WHY THESE ARE HERE AND NOT NEXT TO THE CALL SITES
+ * A struct table is only half of what a signature commits to. The digest is
+ * `keccak256(0x1901 ‖ domainSeparator ‖ hashStruct)`, so a byte-perfect struct signed under the
+ * wrong domain name or version produces a signature that verifies against NOTHING — the member is
+ * prompted, pays nothing, and the relay simply fails, or (worse, if some other deployment shares
+ * that domain) verifies somewhere it was never meant to. These pairs previously existed in three
+ * production copies (the frontend's five `*Domain()` helpers, the gateway's `CONTRACT_DOMAINS`, and
+ * a sixth literal in the claim-code signer) with nothing tying any of them to the Solidity.
+ *
+ * Entries are `{ name, version }` and NOTHING else, deliberately: consumers spread them into an
+ * EIP-712 domain object, so any extra key would land in the domain and change the separator.
+ *
+ * AUTHORITY: `DOMAIN_SOURCES` below names the contract each pair is copied from;
+ * test/intent/TypehashParity.test.js parses that contract's own `__EIP712_init(...)` arguments and
+ * fails if either half drifts, in either direction.
+ */
+export const CONTRACT_DOMAINS = Object.freeze({
+  wagerRegistry: Object.freeze({ name: 'FairWins WagerRegistry', version: '1' }),
+  membershipManager: Object.freeze({ name: 'FairWins MembershipManager', version: '1' }),
+  // Tier-2 group pools (spec 034/035). The FACTORY verifies createPoolWithSig under its own domain;
+  // each CLONE verifies the six actor twins under a per-clone domain (verifyingContract = the clone),
+  // which is why these are two entries and not one.
+  wagerPool: Object.freeze({ name: 'FairWins WagerPool', version: '1' }),
+  wagerPoolFactory: Object.freeze({ name: 'FairWins WagerPoolFactory', version: '1' }),
+  callsignRegistry: Object.freeze({ name: 'FairWins CallsignRegistry', version: '1' }),
+})
+
+/**
+ * Which contract each domain is copied FROM — repo-relative, so the parity gate can read the
+ * `__EIP712_init` call rather than trusting the comment beside it. Keys must match
+ * `CONTRACT_DOMAINS` exactly (asserted). Not used at runtime.
+ */
+export const DOMAIN_SOURCES = Object.freeze({
+  wagerRegistry: 'contracts/wagers/WagerRegistry.sol',
+  membershipManager: 'contracts/access/MembershipManager.sol',
+  wagerPool: 'contracts/pools/WagerPool.sol',
+  wagerPoolFactory: 'contracts/pools/WagerPoolFactory.sol',
+  callsignRegistry: 'contracts/naming/CallsignRegistry.sol',
+})
+
+/**
+ * Build the full EIP-712 domain for a verifying contract on a chain.
+ *
+ * Throws on an unknown key rather than returning undefined: a missing domain must surface as an
+ * error at signing time, never as `signTypedData(undefined, …)` producing a digest under an empty
+ * domain.
+ *
+ * @param {keyof typeof CONTRACT_DOMAINS} key
+ * @param {number|bigint|string} chainId
+ * @param {string} verifyingContract - the PROXY (or clone) address that will verify the signature
+ * @returns {{name: string, version: string, chainId: number, verifyingContract: string}}
+ */
+export function domainFor(key, chainId, verifyingContract) {
+  const d = CONTRACT_DOMAINS[key]
+  if (!d) {
+    throw new Error(
+      `Unknown EIP-712 domain key: ${key}. Known keys: ${Object.keys(CONTRACT_DOMAINS).join(', ')}`,
+    )
+  }
+  return { name: d.name, version: d.version, chainId: Number(chainId), verifyingContract }
+}
 
 /** Common trailing fields shared by every intent struct (schema: "Common trailing fields"). */
 const TRAILING = [
@@ -198,14 +268,57 @@ export const INTENT_TYPES = {
 }
 
 /**
- * EIP-3009 `ReceiveWithAuthorization` — the token-side leg of every gasless payment intent
- * (`joinWithAuthorization`, stake pulls). Structurally identical to the two copies it replaces:
- * frontend/src/lib/pools/gasless.js and the gateway's own literal.
+ * `OpenAccept` — the claim-code proof leg of an open-challenge accept (feature 024).
  *
- * NOTE the asymmetry with everything above: this struct's authoritative typehash lives in the
- * DEPLOYED USDC contract, not in this repository. The only in-repo Solidity copy is
- * contracts/mocks/MockUSDCPermit.sol — a MOCK. So it is verified against a recorded fixed vector
- * rather than against a contract constant; asserting it against the mock would prove nothing.
+ * WHY IT IS NOT IN `INTENT_TYPES`
+ * It is not an intent: it carries no `nonce/validAfter/validBefore`, and it is not signed by the
+ * member. It is signed by the key DERIVED FROM THE FOUR-WORD CLAIM CODE
+ * (frontend/src/utils/claimCode/deriveFromCode.js), proving the accepter holds the code, and bound
+ * to `taker` so a mempool observer cannot re-point it at their own address.
+ *
+ * WHY IT IS IN THIS PACKAGE ANYWAY
+ * It is verified on-chain by WagerRegistryCore's OPEN_ACCEPT_TYPEHASH, under the SAME
+ * `wagerRegistry` domain as the intents, and it is a required leg of the relayed
+ * `acceptOpenWager` action (`acceptOpenWagerWithAuthorization(..., claimCodeSig, ...)`). It was a
+ * hand-maintained two-place struct sitting on exactly the gasless path this package exists to
+ * protect — so it belongs under the same gate, in its own table.
+ */
+export const OPEN_ACCEPT_TYPES = {
+  OpenAccept: [
+    { name: 'wagerId', type: 'uint256' },
+    { name: 'taker', type: 'address' },
+  ],
+}
+
+/**
+ * Every struct in this package that a FAIRWINS contract verifies, merged.
+ *
+ * This is the set test/intent/TypehashParity.test.js checks in BOTH directions — package→Solidity
+ * and Solidity→package. A new table of contract-verified structs must be merged in here, or the
+ * Solidity→package direction will report its structs as ungated.
+ *
+ * The two EIP-3009 tables below are deliberately absent: their authority is Circle's deployed USDC,
+ * not a contract in this repo (see the note on them).
+ */
+export const CONTRACT_VERIFIED_TYPES = { ...INTENT_TYPES, ...OPEN_ACCEPT_TYPES }
+
+/**
+ * EIP-3009 — the TOKEN-side legs. Both are structurally identical and differ only in who may
+ * submit them, which is the whole reason there are two:
+ *
+ *   · `ReceiveWithAuthorization` — the token enforces `to == msg.sender`, so ONLY the recipient
+ *     contract can submit it. This is the money leg of every gasless payment intent
+ *     (`joinWithAuthorization`, stake pulls): the escrow is both caller and recipient.
+ *   · `TransferWithAuthorization` — ANY address may submit it, moving `from → to`. This is the
+ *     wallet-to-wallet Pay & Transfer leg, where the relayer is not the recipient.
+ *
+ * NOTE the asymmetry with everything above: these typehashes' authority lives in the DEPLOYED USDC
+ * contract, not in this repository. The only in-repo Solidity copy is
+ * contracts/mocks/MockUSDCPermit.sol — a MOCK. So they are verified against recorded fixed vectors
+ * rather than against a contract constant; asserting them against the mock would prove nothing.
+ *
+ * Getting these wrong is a money-path failure with two different faces: a wrong shape simply fails
+ * to verify, but confusing the two names produces an authorization with the WRONG submitter rule.
  */
 export const RECEIVE_WITH_AUTHORIZATION_TYPES = {
   ReceiveWithAuthorization: [
@@ -218,9 +331,23 @@ export const RECEIVE_WITH_AUTHORIZATION_TYPES = {
   ],
 }
 
+export const TRANSFER_WITH_AUTHORIZATION_TYPES = {
+  TransferWithAuthorization: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'validAfter', type: 'uint256' },
+    { name: 'validBefore', type: 'uint256' },
+    { name: 'nonce', type: 'bytes32' },
+  ],
+}
+
 /**
  * Render an EIP-712 type string for `primaryType`, e.g.
- *   `InvalidateNonceIntent(address signer,bytes32 nonce,uint256 validBefore)`
+ *   `InvalidateNonce(address signer,bytes32 nonce,uint256 validBefore)`
+ * (`InvalidateNonce`, not `InvalidateNonceIntent` — the primary type is the key in INTENT_TYPES and
+ * is what the contract's typehash literal spells; the trailing `Intent` most siblings carry is part
+ * of their name, not a suffix this function adds.)
  *
  * keccak256 of this string is the struct's typehash, which is what the Solidity side stores as a
  * `*_TYPEHASH` constant. That equality is the machine check that replaces the convention.

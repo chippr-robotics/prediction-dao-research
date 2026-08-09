@@ -14,21 +14,35 @@
  * payment-class intents are unavailable on that chain (FR-020, e.g. Mordor/ETC USC).
  */
 import { NETWORKS } from '../../config/networks'
-import { INTENT_TYPES, INTENT_ACTIONS, RECEIVE_WITH_AUTHORIZATION_TYPES, typeStringFor } from '@fairwins/intent-types'
+import {
+  CONTRACT_DOMAINS,
+  INTENT_TYPES,
+  INTENT_ACTIONS,
+  RECEIVE_WITH_AUTHORIZATION_TYPES,
+  domainFor,
+  typeStringFor,
+} from '@fairwins/intent-types'
 import { PaymentUnsupportedOnChain } from './errors'
 
 /*
- * Struct definitions now live in @fairwins/intent-types (spec 075, FR-024/FR-025) — one source,
- * consumed by this app AND by services/relay-gateway, and checked against the verifying contracts
- * by test/intent/TypehashParity.test.js.
+ * Struct definitions AND the FairWins EIP-712 domains now live in @fairwins/intent-types
+ * (spec 075, FR-024/FR-025) — one source, consumed by this app AND by services/relay-gateway, and
+ * checked against the verifying contracts by test/intent/TypehashParity.test.js.
  *
  * They used to be duplicated here and in the gateway, kept in step by hand. That held for 26 of 27
- * structs; `InvalidateNonce` was missing from the gateway entirely.
+ * structs; `InvalidateNonce` was missing from the gateway entirely. The domains had the same three
+ * copies and no gate at all — and a struct signed under a wrong domain is just as dead as a wrong
+ * struct, because the domain separator is half of the digest.
  *
  * Re-exported so relay callers still need only this module for both signature legs.
  */
-export { INTENT_TYPES, INTENT_ACTIONS, RECEIVE_WITH_AUTHORIZATION_TYPES, typeStringFor }
+export { INTENT_TYPES, INTENT_ACTIONS, RECEIVE_WITH_AUTHORIZATION_TYPES, CONTRACT_DOMAINS, typeStringFor }
 
+/*
+ * The five FairWins domains, as named helpers. Each is a thin binding of a CONTRACT_DOMAINS key —
+ * the name/version pair lives in the package and is asserted against that contract's own
+ * `__EIP712_init(...)` call, so editing a literal here is no longer possible.
+ */
 
 /**
  * EIP-712 domain for CallsignRegistry intents (spec 054). Its own per-contract domain (name/version set in
@@ -37,7 +51,7 @@ export { INTENT_TYPES, INTENT_ACTIONS, RECEIVE_WITH_AUTHORIZATION_TYPES, typeStr
  * @param {string} verifyingContract - the callsignRegistry PROXY address for this chain
  */
 export function callsignRegistryDomain(chainId, verifyingContract) {
-  return { name: 'FairWins CallsignRegistry', version: '1', chainId: Number(chainId), verifyingContract }
+  return domainFor('callsignRegistry', chainId, verifyingContract)
 }
 
 /**
@@ -47,7 +61,7 @@ export function callsignRegistryDomain(chainId, verifyingContract) {
  * @param {string} verifyingContract - the wagerRegistry PROXY address for this chain
  */
 export function wagerRegistryDomain(chainId, verifyingContract) {
-  return { name: 'FairWins WagerRegistry', version: '1', chainId: Number(chainId), verifyingContract }
+  return domainFor('wagerRegistry', chainId, verifyingContract)
 }
 
 /**
@@ -56,7 +70,7 @@ export function wagerRegistryDomain(chainId, verifyingContract) {
  * @param {string} verifyingContract - the membershipManager PROXY address for this chain
  */
 export function membershipManagerDomain(chainId, verifyingContract) {
-  return { name: 'FairWins MembershipManager', version: '1', chainId: Number(chainId), verifyingContract }
+  return domainFor('membershipManager', chainId, verifyingContract)
 }
 
 /**
@@ -67,7 +81,7 @@ export function membershipManagerDomain(chainId, verifyingContract) {
  * @param {string} verifyingContract - the pool CLONE address
  */
 export function wagerPoolDomain(chainId, verifyingContract) {
-  return { name: 'FairWins WagerPool', version: '1', chainId: Number(chainId), verifyingContract }
+  return domainFor('wagerPool', chainId, verifyingContract)
 }
 
 /**
@@ -77,7 +91,7 @@ export function wagerPoolDomain(chainId, verifyingContract) {
  * @param {string} verifyingContract - the wagerPoolFactory PROXY address
  */
 export function wagerPoolFactoryDomain(chainId, verifyingContract) {
-  return { name: 'FairWins WagerPoolFactory', version: '1', chainId: Number(chainId), verifyingContract }
+  return domainFor('wagerPoolFactory', chainId, verifyingContract)
 }
 
 /**
