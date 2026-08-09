@@ -349,8 +349,13 @@ module.exports = {
     // The vendored Safe v1.4.1 closure (spec 049 test shim contracts/mocks/vendor/) compiles
     // WITHOUT viaIR: Safe's inline assembly is not annotated memory-safe, so the Yul IR pipeline
     // cannot place a memoryguard and dies with a stack-too-deep YulException. The shim is test-only
-    // (never deployed by scripts) and nothing in contracts/ imports it, so legacy codegen here
+    // (never deployed by scripts) and no APP contract imports the shim — only the two
+    // policy-guard integration suites use the artifacts it pulls in — so legacy codegen here
     // cannot affect the viaIR app contracts.
+    //
+    // To be precise, since the gate below reasons about exactly this: the Safe closure IS imported,
+    // by `contracts/mocks/vendor/SafeVendorImports.sol`, which exists to pull Safe v1.4.1 into the
+    // artifact set. That is why the Safe overrides are LIVE and the Semaphore ones below were not.
     //
     // ── DEAD OVERRIDES ARE DELETED, NOT PARKED (spec 075 / issue #1039) ──────────────────────────
     // This block also carried eight overrides for the Semaphore V4 self-deploy closure
