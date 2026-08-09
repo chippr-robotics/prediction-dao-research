@@ -32,17 +32,40 @@ const GROUPS = [
   { title: "🧹 Maintenance", types: ["chore", "style", "revert"] },
 ];
 
-function git(args) {
+/**
+ * `soft` is for cosmetic reads only (the release date). The COMMIT LOG must never be read softly:
+ * swallowing a git failure into "" produces a changelog entry that silently omits every change in
+ * the release, which is the same class of defect as version.js reporting "nothing to release" on a
+ * 192-commit history. A changelog that is quietly empty is worse than a failed release.
+ */
+function git(args, { soft = false } = {}) {
   try {
-    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-  } catch {
-    return "";
+    return execFileSync("git", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 256 * 1024 * 1024,
+    }).trim();
+  } catch (err) {
+    if (soft) return "";
+    throw err;
   }
 }
 
 function commitsIn(previous, version) {
   const range = previous ? `${previous}..${version}` : version;
   const out = git(["log", "--format=%s%x00%b%x1e", range]);
+
+  // Same cross-check as version.js: if git can count commits here but we parsed none, the read
+  // failed and an empty changelog would be a lie.
+  const expected = Number.parseInt(git(["rev-list", "--count", range]), 10);
+  const parsed = out ? out.split("\x1e").map((r) => r.trim()).filter(Boolean).length : 0;
+  if (expected > 0 && parsed === 0) {
+    throw new Error(
+      `git rev-list counts ${expected} commit(s) in "${range}" but the formatted log parsed 0. ` +
+        `Refusing to write an empty changelog entry for a non-empty release.`,
+    );
+  }
+
   if (!out) return [];
   return out
     .split("\x1e")
@@ -68,7 +91,11 @@ function group(commits) {
 }
 
 function entry({ version, previous, commits, artifacts, promotedFrom: from }) {
-  const date = git(["log", "-1", "--format=%cs", version]) || git(["log", "-1", "--format=%cs"]);
+  // Soft: the tag may not exist yet when this is called from a test or a dry run, and a missing
+  // date is cosmetic. The commit list above is not.
+  const date =
+    git(["log", "-1", "--format=%cs", version], { soft: true }) ||
+    git(["log", "-1", "--format=%cs"], { soft: true });
   const lines = [`## ${version} — ${date}`, ""];
   // FR-036: always stated. A hotfix says "none (hotfix)" rather than dropping the line, because a
   // missing line reads as an oversight and this one is load-bearing during an incident.

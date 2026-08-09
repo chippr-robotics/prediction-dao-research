@@ -135,3 +135,38 @@ test("is deterministic (quickstart S1)", () => {
   assert.deepEqual(a.release, b.release);
   assert.equal(a.bump, b.bump);
 });
+
+// ---- regression: the release that silently published nothing --------------------------------
+//
+// The first live run of release.yml reported `commits: 0` on a 192-commit history, exited
+// successfully, and published no release. `subjectsSince` read the log with `allowFail: true`, so
+// ANY git failure became "" -> zero commits -> "empty-range" -> "no release". A release pipeline
+// that silently does nothing is worse than one that fails: nobody investigates a green run.
+//
+// These tests pin the two properties that make that impossible to repeat.
+
+test("subjectsSince reads the real history rather than reporting zero (regression)", () => {
+  const { subjectsSince } = require("../version");
+  const { execFileSync } = require("child_process");
+  const expected = Number.parseInt(
+    execFileSync("git", ["rev-list", "--count", "HEAD"], { encoding: "utf8" }).trim(),
+    10,
+  );
+  const got = subjectsSince(null).length;
+  assert.ok(expected > 0, "this repository should have commits");
+  assert.equal(got, expected, `parsed ${got} commits but git counts ${expected}`);
+});
+
+test("nextVersion on the real repository does not report empty-range (regression)", () => {
+  // The exact assertion that would have failed on the shipped code in CI.
+  const r = nextVersion();
+  assert.notEqual(r.reason, "empty-range", "a non-empty history must never report empty-range");
+  assert.ok(r.classifications.length > 0, "classifications must not be empty on a real history");
+});
+
+test("a git failure propagates instead of becoming 'no release'", () => {
+  const { subjectsSince } = require("../version");
+  // An unresolvable revision is the cheapest way to make git fail. Before the fix this returned []
+  // and the caller reported "nothing to release"; now it throws.
+  assert.throws(() => subjectsSince("refs/tags/definitely-not-a-real-tag-076"));
+});

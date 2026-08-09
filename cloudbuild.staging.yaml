@@ -29,6 +29,11 @@ steps:
     args:
       - 'build'
       - '--build-arg'
+      # Nav-drawer build label (buildInfo.js, added on main while spec 076 was in flight). Mirrored
+      # here because production sets it: an unenumerated difference blocks a promotion, and staging
+      # showing a different build label than production would defeat the point of the mirror.
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
+      - '--build-arg'
       - 'VITE_TENANT_ID=fairwins'
       - '--build-arg'
       - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
@@ -72,6 +77,11 @@ steps:
     id: build-testnet
     args:
       - 'build'
+      - '--build-arg'
+      # Nav-drawer build label (buildInfo.js, added on main while spec 076 was in flight). Mirrored
+      # here because production sets it: an unenumerated difference blocks a promotion, and staging
+      # showing a different build label than production would defeat the point of the mirror.
+      - 'VITE_COMMIT_SHA=$SHORT_SHA'
       - '--build-arg'
       - 'VITE_TENANT_ID=fairwins'
       - '--build-arg'
