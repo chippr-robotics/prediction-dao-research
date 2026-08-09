@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { WagerStatus as MarketStatus } from '../../constants/wagerDefaults'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { buildWagerVm } from './wagerVm'
+import Badge from '../ui/Badge'
 import ResolveButtonWithCountdown from './ResolveButtonWithCountdown'
 import OpponentName from './OpponentName'
 import SensitiveValue from '../common/SensitiveValue'
@@ -14,13 +15,62 @@ const VARIANT_CLASS = {
   ghost: 'wc-action-ghost',
 }
 
+// spec 012 FR-007 action-needed labels.
+const ACTION_NEEDED_LABELS = {
+  accept: 'Accept',
+  resolve: 'Resolve',
+  claim: 'Claim',
+  refund: 'Refund',
+  respondDraw: 'Respond to draw',
+}
+
+// Which row control satisfies each action-needed kind. The tag is dropped only
+// when the row actually renders one of them — otherwise it stays, because it is
+// then the only signal that the wager needs attention.
+const CONTROLS_SATISFYING = {
+  accept: ['accept'],
+  resolve: ['resolve'],
+  claim: ['claim'],
+  refund: ['refund', 'clear'],
+  respondDraw: ['draw'],
+}
+
+/**
+ * True when the row still needs its action-needed tag: something is pending on
+ * this wager and no control in the row already says so.
+ */
+function needsActionTag(vm, resolveControlShown) {
+  if (!vm.actionNeeded) return false
+  const shown = new Set(vm.actions.map(a => a.key))
+  if (resolveControlShown) shown.add('resolve')
+  return !(CONTROLS_SATISFYING[vm.actionNeeded] ?? []).some(k => shown.has(k))
+}
+
+/**
+ * Inline decrypt affordance for an encrypted wager (spec 018 FR-010). Encrypted
+ * terms can be unlocked straight from the row — the member does not have to open
+ * the detail view first. Returns null when there is nothing to unlock (plain or
+ * already-revealed terms) or when the caller wired no decrypt handler.
+ */
+function decryptControlFor(vm, onDecrypt) {
+  if (typeof onDecrypt !== 'function') return null
+  if (vm.encState === 'locked') return { label: 'Decrypt', disabled: false, title: 'Decrypt wager details' }
+  if (vm.encState === 'decrypting') return { label: 'Decrypting…', disabled: true, title: 'Decrypting wager details' }
+  if (vm.encState === 'unavailable') return { label: 'Retry decrypt', disabled: false, title: 'Terms unavailable — try again' }
+  return null
+}
+
 /**
  * WagerTable (spec 018 FR-003/004)
  *
- * Compact, minimal table view for My Wagers — Wager / Amount / Date / State /
- * Actions. Clicking a row (outside an action control) opens the wager's full
- * detail view via onSelect. Shares its view model and action wiring with the
- * card grid through buildWagerVm, so behavior is identical across views.
+ * The single My Wagers list view: compact rows — Wager / Amount / Date / State /
+ * Actions — at every viewport (the card grid it used to alternate with on narrow
+ * screens was removed; below 640px the same markup restyles into stacked cards
+ * via MyMarketsModal.css, so every action stays reachable without rotating the
+ * device). Clicking a row (outside an action control) opens the wager's full
+ * detail view via onSelect, which is where resolution, refunds and the withdraw
+ * flow live. Row-level actions — resolve, accept, claim, refund, decrypt — are
+ * rendered inline so the common cases need no navigation at all.
  */
 export default function WagerTable({
   markets,
@@ -45,6 +95,8 @@ export default function WagerTable({
   onRefund,
   refundingId,
   refundError,
+  onDecrypt,
+  isDecrypting,
   statusFilter,
   account,
   showResolveCountdown = false,
@@ -62,7 +114,7 @@ export default function WagerTable({
     typeof onClearAllExpired === 'function'
 
   const ctx = {
-    account, getStatusClass, getStatusLabel, getTimeRemaining, formatDate,
+    account, isDecrypting, getStatusClass, getStatusLabel, getTimeRemaining, formatDate,
     showActions, showOutcome, showResolveCountdown,
     canResolve, canAccept, isCreatorOfPending,
     onResolve, onAccept, onClearExpired, onClaim, onRefund,
@@ -70,10 +122,19 @@ export default function WagerTable({
     actionNeededByWagerId,
   }
 
-  const rows = markets.map(m => ({ market: m, vm: buildWagerVm(m, ctx) }))
+  const rows = markets.map(m => {
+    const vm = buildWagerVm(m, ctx)
+    const resolveControlShown = showResolveCountdown && !vm.isExpired
+    return {
+      market: m,
+      vm,
+      decrypt: decryptControlFor(vm, onDecrypt),
+      showActionTag: needsActionTag(vm, resolveControlShown),
+    }
+  })
   const hasActionsColumn =
     showResolveCountdown ||
-    rows.some(({ vm }) => vm.actions.length > 0)
+    rows.some(({ vm, decrypt }) => vm.actions.length > 0 || decrypt)
 
   const openRow = (market) => {
     onView?.(market)
@@ -93,7 +154,7 @@ export default function WagerTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ market, vm }) => (
+          {rows.map(({ market, vm, decrypt, showActionTag }) => (
             <tr
               key={`${market.marketType}-${market.id}`}
               className={`mm-table-row${vm.isExpired ? ' mm-table-row-expired' : ''}`}
@@ -104,6 +165,15 @@ export default function WagerTable({
             >
               <td className="mm-table-market">
                 <span className="mm-table-market-title">
+                  {vm.isPrivate && (
+                    <svg
+                      className="wc-privacy-icon" width="13" height="13" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                  )}
                   <span>{vm.displayTitle}</span>
                 </span>
                 {vm.opponentAddress && (
@@ -123,8 +193,18 @@ export default function WagerTable({
                 )}
               </td>
               <td className="mm-table-time">{vm.meta[1]?.value}</td>
-              <td>
+              <td className="mm-table-state">
                 <span className={`mm-status-badge ${vm.statusClass}`}>{vm.statusText}</span>
+                {/* Action-needed tag (spec 012 FR-007). Dropped when the row already
+                    renders the matching control, so it never duplicates a button. */}
+                {showActionTag && (
+                  <Badge
+                    variant={vm.actionNeeded === 'claim' ? 'success' : 'warning'}
+                    className="wc-action-needed"
+                  >
+                    {ACTION_NEEDED_LABELS[vm.actionNeeded] ?? vm.actionNeeded}
+                  </Badge>
+                )}
                 {vm.draw?.phase === 'proposed' && (
                   <span className="mm-table-draw" title={vm.draw.label}>Draw pending</span>
                 )}
@@ -133,6 +213,17 @@ export default function WagerTable({
                 <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>
                   {showResolveCountdown && !vm.isExpired && (
                     <ResolveButtonWithCountdown market={market} onResolve={onResolve} account={account} />
+                  )}
+                  {decrypt && (
+                    <button
+                      type="button"
+                      className="wc-action wc-action-sm wc-action-ghost"
+                      onClick={(e) => { e.stopPropagation(); onDecrypt(market.id) }}
+                      disabled={decrypt.disabled}
+                      title={decrypt.title}
+                    >
+                      {decrypt.label}
+                    </button>
                   )}
                   {vm.actions.map((a) => (
                     <button

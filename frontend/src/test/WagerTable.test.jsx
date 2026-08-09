@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WagerTable from '../components/fairwins/WagerTable'
+import { deriveAddressName } from '../lib/naming/addressName'
 
 vi.mock('../hooks/useWagerActivity', () => ({
   useWagerActivityOptional: () => ({ actionNeededByWagerId: {} }),
@@ -31,7 +32,7 @@ const wager = (over = {}) => ({
   stakeAmount: '15.0', stakeTokenSymbol: 'USDC', ...over,
 })
 
-describe('WagerTable (spec 018)', () => {
+describe('WagerTable (spec 018) — the single My Wagers list view', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('renders compact rows with wager, amount, date and state columns', () => {
@@ -67,5 +68,85 @@ describe('WagerTable (spec 018)', () => {
     expect(onClaim).toHaveBeenCalledTimes(1)
     // Clicking the action must not bubble to the row's detail navigation.
     expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('does not offer a Claim action to the losing side', () => {
+    const lost = wager({ id: '43', status: 'resolved', computedStatus: 'resolved', winner: OTHER, paid: false })
+    render(<WagerTable {...baseProps} onClaim={vi.fn()} showOutcome markets={[lost]} />)
+    expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+  })
+
+  it('offers a Resolve control in the row when the resolve window is open', async () => {
+    const user = userEvent.setup()
+    const onResolve = vi.fn()
+    const onSelect = vi.fn()
+    // ME is the creator on an "either party resolves" wager whose trading window
+    // has closed → the resolve window is open right now.
+    const resolvable = wager({
+      resolutionType: 0,
+      tradingEndTime: Date.now() - 60 * 60 * 1000,
+    })
+    render(
+      <WagerTable {...baseProps} onSelect={onSelect} onResolve={onResolve}
+        showResolveCountdown markets={[resolvable]} />
+    )
+
+    const row = screen.getByText('Lakers ML vs Mike').closest('tr')
+    await user.click(within(row).getByRole('button', { name: /^resolve$/i }))
+    expect(onResolve).toHaveBeenCalledTimes(1)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  describe('encrypted wagers', () => {
+    it('offers an inline Decrypt action for an encrypted, undecrypted wager', async () => {
+      const user = userEvent.setup()
+      const onDecrypt = vi.fn()
+      const m = wager({ isEncrypted: true, decryptedMetadata: null })
+      render(
+        <WagerTable {...baseProps} onDecrypt={onDecrypt} isDecrypting={() => false} markets={[m]} />
+      )
+      await user.click(screen.getByRole('button', { name: /^decrypt$/i }))
+      expect(onDecrypt).toHaveBeenCalledWith('1')
+    })
+
+    it('shows a disabled in-progress state while decrypting', () => {
+      const m = wager({ isEncrypted: true, decryptedMetadata: null })
+      render(
+        <WagerTable {...baseProps} onDecrypt={vi.fn()} isDecrypting={() => true} markets={[m]} />
+      )
+      // Scope to the actions cell: the row itself is role="button", and its
+      // accessible name is the whole row text.
+      const actions = document.querySelector('.mm-table-actions')
+      expect(within(actions).getByRole('button', { name: /decrypting/i })).toBeDisabled()
+    })
+
+    it('offers a retry when decryption failed', () => {
+      const m = wager({ isEncrypted: true, decryptedMetadata: null, decryptionError: 'Signature rejected' })
+      render(
+        <WagerTable {...baseProps} onDecrypt={vi.fn()} isDecrypting={() => false} markets={[m]} />
+      )
+      const actions = document.querySelector('.mm-table-actions')
+      expect(within(actions).getByRole('button', { name: /retry decrypt/i })).toBeInTheDocument()
+      expect(within(actions).queryByRole('button', { name: /^decrypt$/i })).not.toBeInTheDocument()
+    })
+
+    it('offers no decrypt control once the terms are revealed', () => {
+      const m = wager({ isEncrypted: true, decryptedMetadata: { terms: 'Lakers win outright' } })
+      render(
+        <WagerTable {...baseProps} onDecrypt={vi.fn()} isDecrypting={() => false} markets={[m]} />
+      )
+      expect(screen.queryByRole('button', { name: /decrypt/i, exact: false })).not.toBeInTheDocument()
+    })
+  })
+
+  it('flags a draw proposal on the row (spec 040 US2)', () => {
+    const w = wager({ id: '99', drawProposedBy: ME })
+    render(<WagerTable {...baseProps} markets={[w]} />)
+    expect(screen.getByText('Draw pending')).toBeInTheDocument()
+  })
+
+  it('names the opponent on the row by generated name (spec 040 US1)', () => {
+    render(<WagerTable {...baseProps} markets={[wager()]} />)
+    expect(screen.getByText(deriveAddressName(OTHER).label)).toBeInTheDocument()
   })
 })

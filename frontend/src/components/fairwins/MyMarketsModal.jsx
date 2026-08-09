@@ -5,9 +5,8 @@ import { useActiveAccount } from '../../hooks/useActiveAccount'
 import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
-import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
-import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS, MyWagersDensity, MyWagersView } from '../../constants/wagerDefaults'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { useGaslessWrite } from '../../lib/relay/useGaslessWrite'
@@ -16,7 +15,7 @@ import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import OpenChallengeDecryptModal from './OpenChallengeDecryptModal'
-import WagerList from './WagerList'
+import WagerTable from './WagerTable'
 import MyPoolsSection from './MyPoolsSection'
 import { isCodeEnvelope } from '../../utils/crypto/envelopeEncryption.js'
 import { fetchDrawProposals } from '../../data/notifications/drawProposalScan'
@@ -27,7 +26,7 @@ import { getMarketDisplayTitle, isWinnerUnpaid } from './wagerCardHelpers'
 import OpponentName from './OpponentName'
 import { useOpponentName } from '../../hooks/useOpponentName'
 import './MyMarketsModal.css'
-import './WagerCard.css'
+import './WagerRow.css'
 
 /**
  * Passkey rail for a single WagerRegistry write (spec 041/050): a passkey smart-account session has
@@ -137,11 +136,11 @@ function MyMarketsModal({
   const [sortKey, setSortKey] = useState('newest') // 'newest' | 'endingSoon' | 'stakeHighToLow'
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Automatic view selection (spec 019): wide displays get the table, narrow
-  // displays get the compact card grid. No manual view/density toggle.
-  const isWideViewport = useMediaQuery('(min-width: 768px)')
-  const viewMode = isWideViewport ? MyWagersView.TABLE : MyWagersView.GRID
-  const density = MyWagersDensity.COMPACT
+  // One list view at every viewport: the table. It used to switch to a card grid
+  // below 768px, but a card only reached the resolution flow once expanded, so a
+  // phone user had to rotate to landscape to resolve a wager. The table's rows
+  // restyle into stacked cards below 640px (MyMarketsModal.css) and carry their
+  // actions inline, so nothing is orientation-gated any more.
 
   // Transient confirmation toast (spec 017 FR-015) shown after a successful
   // on-chain action (claim/refund). Auto-dismisses.
@@ -1128,9 +1127,7 @@ function MyMarketsModal({
                       <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
-                    <WagerList
-                      viewMode={viewMode}
-                      density={density}
+                    <WagerTable
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
                       onView={handleMarketView}
@@ -1200,9 +1197,7 @@ function MyMarketsModal({
                       <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
-                    <WagerList
-                      viewMode={viewMode}
-                      density={density}
+                    <WagerTable
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
                       onView={handleMarketView}
@@ -1259,9 +1254,7 @@ function MyMarketsModal({
                       <p className="mm-hint">When someone names you as the neutral resolver, those wagers appear here.</p>
                     </div>
                   ) : (
-                    <WagerList
-                      viewMode={viewMode}
-                      density={density}
+                    <WagerTable
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
                       onView={handleMarketView}
@@ -1310,9 +1303,7 @@ function MyMarketsModal({
                       <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
-                    <WagerList
-                      viewMode={viewMode}
-                      density={density}
+                    <WagerTable
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting}
                       onView={handleMarketView}
@@ -1424,6 +1415,16 @@ function MarketDetailView({
   claimError
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+
+  // Plaintext terms of an unlocked private wager (spec 018 FR-002). Suppressed
+  // when they only repeat the title that already heads this view, so the panel
+  // never shows the same sentence twice.
+  const decryptedTerms = useMemo(() => {
+    const raw = market.decryptedMetadata?.terms || market.decryptedMetadata?.description || ''
+    return raw && raw !== getMarketDisplayTitle(market) ? raw : ''
+  }, [market])
+  const [termsHidden, setTermsHidden] = useState(false)
+
   // Winner can pull their escrowed payout while the wager is resolved-unpaid.
   const showClaimButton =
     typeof onClaimPayout === 'function' && isWinnerUnpaid(market, account)
@@ -1665,6 +1666,46 @@ function MarketDetailView({
             >
               Decrypt Wager Details
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Decrypted private terms (spec 018 FR-002). Carried over from the card
+          grid: once the member has unlocked a private wager the plaintext shows
+          here, with a control to conceal it again for over-the-shoulder privacy.
+          View-only — concealing does not re-encrypt anything. */}
+      {decryptedTerms && (
+        <div className="wc-terms">
+          <div className="wc-terms-head">
+            <div className="wc-terms-label">Wager terms</div>
+            <button
+              type="button"
+              className="wc-terms-toggle"
+              onClick={() => setTermsHidden(h => !h)}
+              aria-pressed={termsHidden}
+              title={termsHidden ? 'Show wager terms' : 'Hide wager terms'}
+            >
+              {termsHidden ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  Show
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                  Hide
+                </>
+              )}
+            </button>
+          </div>
+          {termsHidden ? (
+            <div className="wc-terms-text wc-terms-concealed" aria-hidden="true">•••• •••••• ••••</div>
+          ) : (
+            <div className="wc-terms-text">{decryptedTerms}</div>
           )}
         </div>
       )}

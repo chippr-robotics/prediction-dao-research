@@ -1,0 +1,160 @@
+/* My Wagers row presentation (spec 017/018; single table view, spec 078)
+   Shared `wc-*` presentation for the My Wagers table rows and the wager detail
+   view, on the app's dark theme tokens (--bg-*, --text-*, accent #4C9AFF).
+   The expandable card grid these styles were written for is gone — My Wagers has
+   one list view (WagerTable) at every viewport — so only the pieces the table and
+   the detail panel still render survive here. The row layout itself lives in
+   MyMarketsModal.css (`.mm-table*`), including the ≤640px stacked-card restyle. */
+
+.wc-outcome {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.wc-outcome.positive { color: #36B37E; }
+.wc-outcome.negative { color: #E5533D; }
+.wc-outcome.neutral { color: var(--text-secondary, #AAB6C2); }
+
+/* Padlock next to a private wager's title. */
+.wc-privacy-icon {
+  flex: none;
+  opacity: 0.7;
+}
+
+/* Action-needed tag (spec 012 FR-007) beside a row's status pill. */
+.wc-action-needed {
+  vertical-align: middle;
+  margin-left: 0.375rem;
+}
+
+/* Draw submission state (spec 040 US2) — text + icon, never colour alone. */
+.mm-table-draw {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9F7AEA;
+}
+
+/* ── Decrypted private terms (spec 018 FR-002), rendered in the detail view ── */
+.wc-terms {
+  background: var(--bg-primary, #0E141B);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-bottom: 14px;
+}
+
+.wc-terms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Hide/show toggle for decrypted private-bet terms (spec 018 FR-002) */
+.wc-terms-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 6px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wc-terms-toggle:hover {
+  border-color: #4C9AFF;
+  color: #4C9AFF;
+}
+
+.wc-terms-concealed {
+  letter-spacing: 0.15em;
+  color: var(--text-muted, #7A8590);
+  user-select: none;
+}
+
+.wc-terms-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #7A8590);
+  text-transform: uppercase;
+}
+
+.wc-terms-text {
+  font-size: 0.9rem;
+  color: var(--text-primary, #E6EDF3);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* ── Actions ── */
+.wc-action {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.wc-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wc-action-primary { color: #fff; background: #4C9AFF; }
+.wc-action-primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+.wc-action-success { color: #fff; background: #16a34a; }
+.wc-action-success:hover:not(:disabled) { filter: brightness(1.08); }
+
+.wc-action-danger { color: #E5533D; background: transparent; border-color: rgba(229, 83, 61, 0.5); }
+.wc-action-danger:hover:not(:disabled) { background: rgba(229, 83, 61, 0.1); }
+
+.wc-action-warning { color: #F5A623; background: transparent; border-color: rgba(245, 166, 35, 0.5); }
+.wc-action-warning:hover:not(:disabled) { background: rgba(245, 166, 35, 0.1); }
+
+.wc-action-ghost {
+  color: var(--text-primary, #E6EDF3);
+  background: transparent;
+  border-color: var(--border-color, #23303D);
+}
+.wc-action-ghost:hover:not(:disabled) { background: rgba(76, 154, 255, 0.08); }
+
+.wc-action-error {
+  color: #E5533D;
+  font-size: 0.75rem;
+  margin-top: 8px;
+  width: 100%;
+}
+
+/* Footer affordance under the list (e.g. "Clear all expired"). */
+.wc-grid-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Table view (spec 018) — compact action buttons inside table rows. */
+.wc-action-sm {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  margin-right: 0.375rem;
+}
+
+.wc-action-sm:last-child { margin-right: 0; }
+
+.wc-table-amount {
+  white-space: nowrap;
+  color: var(--text-primary, #E6EDF3);
+}
