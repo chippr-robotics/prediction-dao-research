@@ -1,8 +1,8 @@
 /**
  * Portfolio collectibles estimate row (spec 055 US3 / FR-006, research D8) — a labeled
  * floor-price estimate rendered inside the Digital Collectibles taxonomy section that NEVER
- * joins the totalUsd headline or category subtotal, hides where the feature is unavailable,
- * and degrades without blocking token rendering.
+ * joins the category subtotal, hides where the feature is unavailable, and degrades without
+ * blocking token rendering.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -86,10 +86,13 @@ describe('Portfolio — collectibles estimate line', () => {
     expect(region).not.toHaveTextContent('No assets in this category.')
   })
 
-  it('NEVER merges the estimate into the verifiable headline total (research D8)', () => {
+  it('NEVER merges the estimate into the category subtotal (research D8)', () => {
     renderPanel()
-    // Headline stays exactly the token total; the disclosure says so explicitly.
-    expect(screen.getByText('$1,234.56')).toBeInTheDocument()
+    // The category subtotal stays exactly the token subtotal (no aggregates
+    // here, so $0.00); the disclosure says so explicitly. The verifiable
+    // portfolio total itself now lives only on the account card (issue #1078).
+    const region = screen.getByRole('region', { name: 'Digital Collectibles' })
+    expect(region.closest('.portfolio-category')).toHaveTextContent('$0.00')
     expect(screen.queryByText('$5,234.56')).not.toBeInTheDocument()
     expect(screen.getByText(/not included in the totals above/i)).toBeInTheDocument()
   })
@@ -128,7 +131,9 @@ describe('Portfolio — collectibles estimate line', () => {
     useCollectiblesValuation.mockReturnValue(valuationState({ status: 'degraded', items: [] }))
     renderPanel()
     expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument()
-    expect(screen.getByText('$1,234.56')).toBeInTheDocument() // tokens untouched
+    // The category subtotal still renders normally — tokens untouched.
+    const region = screen.getByRole('region', { name: 'Digital Collectibles' })
+    expect(region.closest('.portfolio-category')).toHaveTextContent('$0.00')
   })
 
   it('discloses partial (truncated) scans and stale data in the label (FR-013)', () => {

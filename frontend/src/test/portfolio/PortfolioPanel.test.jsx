@@ -125,8 +125,8 @@ describe('PortfolioPanel states', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ status: 'loading' }))
     const { container } = renderPanel()
     expect(screen.getByRole('status')).toHaveTextContent(/loading portfolio/i)
-    // The bones: header label + shimmering section/row placeholders.
-    expect(screen.getByText(/total portfolio balance/i)).toBeInTheDocument()
+    // The bones: shimmering section/row placeholders (the balance total lives
+    // only on the account card — issue #1078).
     const skeleton = container.querySelector('.portfolio-skeleton')
     expect(skeleton).toBeTruthy()
     expect(skeleton.getAttribute('aria-hidden')).toBe('true')
@@ -144,12 +144,13 @@ describe('PortfolioPanel states', () => {
 })
 
 describe('PortfolioPanel aggregate rows', () => {
-  it('renders one combined row per underlying with total, subtotal, and instance summary (FR-025)', () => {
+  it('renders one combined row per underlying with subtotal and instance summary (FR-025)', () => {
     mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
 
-    expect(screen.getByText('Total portfolio balance')).toBeInTheDocument()
-    expect(screen.getByText('$3,600.00')).toBeInTheDocument()
+    // The portfolio total lives only on the account card, not in the panel
+    // body (issue #1078 — duplicate balance removed).
+    expect(screen.queryByText('Total portfolio balance')).not.toBeInTheDocument()
 
     const commodities = screen.getByRole('region', { name: 'Digital Commodities' })
     const ethRow = within(commodities).getByRole('button', { name: /ethereum eth 3 instances/i })
@@ -218,12 +219,10 @@ describe('PortfolioPanel aggregate rows', () => {
     expect(screen.getByText(/< 0\.000001 ETH/)).toBeInTheDocument()
   })
 
-  it('refresh button triggers a reload', () => {
-    const snapshot = makeSnapshot({ aggregates: POPULATED })
-    mockUsePortfolio.mockReturnValue(snapshot)
+  it('does not render a mid-page refresh control (issue #1078 — lives on the account card only)', () => {
+    mockUsePortfolio.mockReturnValue(makeSnapshot({ aggregates: POPULATED }))
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }))
-    expect(snapshot.refresh).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^refresh$/i })).not.toBeInTheDocument()
   })
 })
 

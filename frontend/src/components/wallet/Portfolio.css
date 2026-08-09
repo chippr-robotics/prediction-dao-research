@@ -16,24 +16,7 @@
   color: var(--danger-color, #b91c1c);
 }
 
-/* Header */
-.portfolio-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  align-items: flex-start;
-}
-.portfolio-total-label {
-  color: var(--color-text-secondary, var(--text-secondary, #6b7280));
-  font-size: 0.85rem;
-  margin: 0;
-}
-.portfolio-total {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--color-text, var(--text-primary, #111827));
-}
+/* Error-state retry */
 .portfolio-refresh {
   appearance: none;
   background: transparent;
@@ -277,12 +260,6 @@
   }
 }
 
-.portfolio-skeleton-total {
-  width: 160px;
-  height: 34px;
-  margin: 4px auto 12px;
-}
-
 .portfolio-skeleton-heading {
   width: 180px;
   height: 16px;
@@ -327,10 +304,4 @@
   max-width: 110px;
   min-width: 48px;
   height: 10px;
-}
-
-.portfolio-updated {
-  margin: 6px 0 0;
-  font-size: 0.75rem;
-  color: var(--text-muted, var(--text-secondary, #5a6772));
 }
