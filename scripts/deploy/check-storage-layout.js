@@ -140,13 +140,63 @@ function chainIdFromDeploymentsFile(file) {
 }
 
 /**
+ * Ephemeral local chains, skipped (issue #1039).
+ *
+ * The filename filter accepts ANY `deployments/*.json` naming a chain id, which included a
+ * developer's local anvil/hardhat record. Those chains are wiped and redeployed constantly and
+ * hardhat-upgrades writes no manifest for them, so every implementation they record is
+ * undiffable — and the gate is required to FAIL on an undiffable implementation. Net effect: this
+ * gate exited 1 on a clean checkout as soon as anyone ran a local deploy. Measured on this tree,
+ * with an untracked `deployments/localhost-chain1337-v2.json` present: 3 failures
+ * (WagerRegistry, MembershipManager, TokenFactory), exit 1, nothing actually wrong.
+ *
+ * A gate that fails for a reason unrelated to what it checks gets ignored, which is how a real
+ * failure gets waved through. Local chains carry no upgrade-safety meaning: there is no live proxy
+ * whose state a bad layout could corrupt. Skip them, and say so on the run.
+ */
+const LOCAL_CHAIN_IDS = new Set([1337, 31337]);
+
+/**
+ * The estate this repo is KNOWN to have deployed, per chain.
+ *
+ *   records — implementation entries `deployments/` records for that chain
+ *   diffed  — how many of those were actually compared against a committed layout
+ *
+ * ── WHY A FLOOR, AND NOT JUST `compared === 0` (issue #1039) ─────────────────────────────────────
+ * The zero-comparison guard below was written against exactly one threat — everything disappearing
+ * — while its own comment named threats that are PARTIAL by nature: "a bad path join, a renamed
+ * record, a build system that relocates them". Measured: deleting 13 of the 14 deployment records
+ * left the gate green at `compared = 7` (of 26). Losing 73% of the estate's coverage looked
+ * identical to a pass, because the only question asked was "more than nothing?".
+ *
+ * Two floors rather than one, because they catch different regressions:
+ *   · `records`  drops when deployment records go missing or stop being found — the relocation
+ *                threat, and the one that leaves proxies silently unchecked.
+ *   · `diffed`   drops when verification is weakened without records moving — most realistically by
+ *                adding a KNOWN_UNVERIFIABLE entry to silence a failure rather than fix it.
+ *
+ * They are floors (`>=`), so deploying MORE never fails the gate. Deploying to a brand-new chain is
+ * reported and requires adding an entry here; that is a deliberate, one-line acknowledgement that
+ * the estate grew, not a hurdle.
+ */
+const EXPECTED_LIVE_IMPLS = {
+  1: { records: 3, diffed: 0, label: "Ethereum" }, // all 3 declared unverifiable (direct-deploy path)
+  10: { records: 3, diffed: 3, label: "Optimism" },
+  63: { records: 7, diffed: 7, label: "Mordor" },
+  137: { records: 9, diffed: 8, label: "Polygon" }, // wagerPoolFactory impl is declared unverifiable
+  8453: { records: 3, diffed: 3, label: "Base" },
+  42161: { records: 3, diffed: 3, label: "Arbitrum" },
+  80002: { records: 2, diffed: 2, label: "Amoy" },
+};
+
+/**
  * Every implementation this repo records as live, across every chain.
  *
  * Deliberately NOT filtered by the connected network — the whole point is that one run covers the
  * estate. One entry per (chain, address): the same address on two chains is two different
  * implementations to verify, which is exactly the case that broke the first attempt.
  */
-function loadRecordedImpls(deploymentsKey) {
+function loadRecordedImpls(deploymentsKey, skippedLocal) {
   const dir = path.join(process.cwd(), "deployments");
   if (!fs.existsSync(dir)) return [];
   const out = [];
@@ -162,6 +212,10 @@ function loadRecordedImpls(deploymentsKey) {
     if (!impl) continue;
     const chainId = chainIdFromDeploymentsFile(file);
     if (chainId === null) continue;
+    if (LOCAL_CHAIN_IDS.has(chainId)) {
+      skippedLocal?.add(file.replace(/\.json$/, ""));
+      continue;
+    }
     out.push({ impl, chainId, where: file.replace(/\.json$/, "") });
   }
   return out;
@@ -217,6 +271,14 @@ async function main() {
   let failed = false;
   let compared = 0;
   const unverified = [];
+  const skippedLocal = new Set();
+  /** chainId -> { records, diffed } actually observed on this run. */
+  const observed = new Map();
+  const bump = (chainId, field) => {
+    const row = observed.get(chainId) || { records: 0, diffed: 0 };
+    row[field] += 1;
+    observed.set(chainId, row);
+  };
 
   for (const { main: mainName, facet: facetName } of FACET_PAIRS) {
     try {
@@ -251,13 +313,14 @@ async function main() {
       continue;
     }
 
-    const recorded = loadRecordedImpls(deploymentsKey);
+    const recorded = loadRecordedImpls(deploymentsKey, skippedLocal);
     if (recorded.length === 0) {
       console.log(`· ${name}: implementation is upgrade-safe; not deployed anywhere yet`);
       continue;
     }
 
     for (const { impl, chainId, where } of recorded) {
+      bump(chainId, "records");
       const deployed = manifestLayouts.get(chainId)?.get(String(impl).toLowerCase());
       if (!deployed) {
         if (isUnverifiable(deploymentsKey, impl, chainId)) {
@@ -274,6 +337,7 @@ async function main() {
       try {
         core.assertStorageUpgradeSafe(deployed, updated, opts);
         compared += 1;
+        bump(chainId, "diffed");
         console.log(`✓ ${name}: storage-compatible with live impl ${impl} (${where})`);
       } catch (e) {
         failed = true;
@@ -294,34 +358,69 @@ async function main() {
     }
   }
 
+  if (skippedLocal.size > 0) {
+    console.log(
+      `\n· skipped ${skippedLocal.size} local-chain deployment record(s) — ephemeral dev chains carry no ` +
+        `live proxy to protect: ${[...skippedLocal].join(", ")}`,
+    );
+  }
+
+  // ── COVERAGE FLOORS: comparing SOME of the estate is not a pass either (spec 075, FR-004) ──────
+  //
+  // The original guard fired only at `compared === 0`. That was the exact failure recorded in the
+  // header — every contract fell through "no deployed impl to diff against", the script printed a
+  // checkmark, and a deliberately corrupted __gap sailed through — but the fix stopped one step
+  // short: a PARTIAL loss of the estate still reported success. Measured with 13 of 14 deployment
+  // records removed: green, at `compared = 7` instead of 26.
+  const shortfalls = [];
+  for (const [chainIdStr, want] of Object.entries(EXPECTED_LIVE_IMPLS)) {
+    const chainId = Number(chainIdStr);
+    const got = observed.get(chainId) || { records: 0, diffed: 0 };
+    if (got.records < want.records) {
+      shortfalls.push(
+        `${want.label} (chain ${chainId}): found ${got.records} recorded implementation(s), expected at least ${want.records}`,
+      );
+    }
+    if (got.diffed < want.diffed) {
+      shortfalls.push(
+        `${want.label} (chain ${chainId}): diffed ${got.diffed} implementation(s) against a committed layout, expected at least ${want.diffed}`,
+      );
+    }
+  }
+
+  const newChains = [...observed.keys()].filter((c) => !EXPECTED_LIVE_IMPLS[c]);
+  if (newChains.length > 0) {
+    console.log(
+      `\n· ${newChains.length} chain(s) carry deployment records but no entry in EXPECTED_LIVE_IMPLS: ` +
+        `${newChains.join(", ")}. Add them so their coverage is held from now on.`,
+    );
+  }
+
+  if (shortfalls.length > 0) {
+    failed = true;
+    console.error(`\n::error::Storage-layout coverage SHRANK on ${shortfalls.length} count(s):`);
+    for (const s of shortfalls) console.error(`  · ${s}`);
+    console.error(
+      "\n  This gate compares compiled layouts against DEPLOYED ones; comparing fewer than the estate\n" +
+        "  is known to contain is not a pass, it is a partial abstention that looks identical to one.\n" +
+        "  Most likely: deployments/*.json or .openzeppelin/*.json moved, were renamed, or stopped\n" +
+        "  being found (they are committed, irreproducible state — see specs/075-monorepo-workspaces/).\n" +
+        "  A drop in `diffed` alone usually means a KNOWN_UNVERIFIABLE entry was added to silence a\n" +
+        "  failure instead of recording the layout.\n" +
+        "  If an estate change is deliberate (a proxy genuinely retired), lower EXPECTED_LIVE_IMPLS in\n" +
+        "  this file in the same commit — explicitly, and reviewably.",
+    );
+  }
+
   if (failed) {
     console.error("\nStorage-layout / upgrade-safety check FAILED.");
     process.exit(1);
   }
 
-  // A gate that compared nothing has not passed — it has abstained (spec 075, FR-004).
-  //
-  // This is the exact failure recorded in the header above: every contract fell through the
-  // "no deployed impl to diff against" branch and the script printed a checkmark and exited 0,
-  // while a deliberately corrupted __gap sailed through. The comparison was fixed then; the
-  // ZERO-COMPARISON case was not, so a future change that empties `deployments/` or
-  // `.openzeppelin/` — a bad path join, a renamed record, a build system that relocates them —
-  // silently restores the same green-but-blind gate. Refuse to report success instead.
-  if (compared === 0) {
-    console.error(
-      "\nStorage-layout check FAILED: 0 live implementations were diffed.\n" +
-        "This gate exists to compare compiled layouts against deployed ones; comparing nothing is\n" +
-        "not a pass. Check that deployments/*.json and .openzeppelin/*.json are present and readable\n" +
-        "(they are committed, irreproducible state — see specs/075-monorepo-workspaces/).\n" +
-        "If this repo genuinely has no live upgradeable implementations, that is a deliberate change\n" +
-        "and this guard must be updated explicitly.",
-    );
-    process.exit(1);
-  }
-
   console.log(
     `\nAll upgradeable contracts passed. ${compared} live implementation(s) diffed for append-only compatibility` +
-      (unverified.length ? `; ${unverified.length} declared unverifiable (above).` : "."),
+      (unverified.length ? `; ${unverified.length} declared unverifiable (above).` : ".") +
+      `\nCoverage floors met on ${Object.keys(EXPECTED_LIVE_IMPLS).length} chains.`,
   );
 }
 

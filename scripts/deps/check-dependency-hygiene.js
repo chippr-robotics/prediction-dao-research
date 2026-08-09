@@ -22,6 +22,9 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..", "..");
 
+const readJson = (p) => JSON.parse(fs.readFileSync(path.join(ROOT, p), "utf8"));
+const declared = (m) => ({ ...(m.dependencies || {}), ...(m.devDependencies || {}), ...(m.peerDependencies || {}) });
+
 /** Manifests in the repo, and which source trees each one owns. */
 /*
  * `rootFallback` — may a ROOT declaration satisfy this unit's import?
@@ -40,13 +43,69 @@ const ROOT = path.join(__dirname, "..", "..");
  * build then failed in CI with "Rollup failed to resolve import". A gate that reports clean while
  * the build breaks is exactly the failure mode spec 075 exists to remove.
  */
+/*
+ * ── THE UNIT LIST IS DERIVED, NOT TYPED (issue #1039) ────────────────────────────────────────
+ *
+ * It used to be a hand-written array of six manifests, and it had silently fallen three members
+ * behind the workspace: `frontend/miniapps/token-mint`, `frontend/miniapps/clearpath`,
+ * `packages/abi` and `packages/intent-types` were never scanned at all. Proven by injection — a
+ * phantom `chalk` in packages/intent-types/src, `axios` in frontend/miniapps/token-mint/src and
+ * `fast-glob` in frontend/vite-plugins/ all reported CLEAN.
+ *
+ * A hardcoded list is the same class of defect the gate exists to catch: an invariant held by
+ * human discipline. Adding a workspace member is routine; remembering to add it here is not. So
+ * the members come from the root manifest's `workspaces` globs — the same source npm itself uses,
+ * which means the gate cannot fall behind the workspace by construction.
+ *
+ * Coverage inside a unit was also partial: only `<unit>/src` was scanned, so
+ * `frontend/vite-plugins/`, `frontend/vite.config.js`, `frontend/cypress.config.js` and
+ * `frontend/cypress/` (32 files, several of them merge-gating) were invisible. A unit now owns
+ * EVERYTHING under its directory except build output and nested workspace members — a build plugin
+ * with an undeclared import breaks the build just as thoroughly as a src/ file does.
+ */
+
+/** Directory names that are build output or vendored code — never a unit's own source. */
+const IGNORED_DIRS = new Set(["node_modules", "dist", "dist-archive", "build", "coverage", "generated"]);
+
+/** Expand one `workspaces` glob. npm's patterns here are literal paths or a single trailing `/*`. */
+function expandWorkspaceGlob(glob) {
+  if (!glob.includes("*")) return [glob];
+  const base = glob.slice(0, glob.indexOf("/*"));
+  const abs = path.join(ROOT, base);
+  if (!fs.existsSync(abs)) return [];
+  return fs
+    .readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+    .map((e) => `${base}/${e.name}`)
+    .sort();
+}
+
+const workspaceGlobs = readJson("package.json").workspaces || [];
+
+/*
+ * A glob that expands to nothing is a coverage hole wearing a green light: rename a directory and
+ * every unit under it stops being checked while this script still prints OK. Fail instead.
+ */
+const emptyGlobs = workspaceGlobs.filter(
+  (g) => expandWorkspaceGlob(g).filter((d) => fs.existsSync(path.join(ROOT, d, "package.json"))).length === 0,
+);
+
+const workspaceMembers = workspaceGlobs
+  .flatMap(expandWorkspaceGlob)
+  .filter((dir) => fs.existsSync(path.join(ROOT, dir, "package.json")))
+  .sort();
+
 const UNITS = [
-  { manifest: "package.json", label: "root", sources: ["scripts", "test"], rootFallback: true },
-  { manifest: "frontend/package.json", label: "frontend", sources: ["frontend/src"], rootFallback: false },
-  { manifest: "services/relay-gateway/package.json", label: "relay-gateway", sources: ["services/relay-gateway/src"], rootFallback: false },
-  { manifest: "services/relayer/package.json", label: "relayer", sources: ["services/relayer/src"], rootFallback: false },
-  { manifest: "subgraph/package.json", label: "subgraph", sources: ["subgraph/src"], rootFallback: false },
-  { manifest: "tools/miniapp-build/package.json", label: "miniapp-build", sources: ["tools/miniapp-build"], rootFallback: false },
+  // The root owns the code that runs in the root project: scripts/, test/ and the hardhat config.
+  { manifest: "package.json", label: "root", sources: ["scripts", "test", "hardhat.config.js"], rootFallback: true },
+  ...workspaceMembers.map((dir) => ({
+    manifest: `${dir}/package.json`,
+    label: dir,
+    sources: [dir],
+    rootFallback: false,
+    // A nested member owns its own subtree — frontend must not be blamed for frontend/miniapps/*.
+    skip: new Set(workspaceMembers.filter((other) => other !== dir && other.startsWith(`${dir}/`))),
+  })),
 ];
 
 /**
@@ -58,10 +117,8 @@ const ALLOW = {
   "@nomicfoundation/hardhat-ethers": "hardhat plugin, resolved through the hardhat runtime",
   "virtual:tenant": "Vite virtual module supplied by frontend/vite-plugins/tenant-branding.js",
   "@fairwins/miniapp-sdk": "host-provided shared scope, externalized by the mini-app build preset",
+  "k6": "k6 runtime built-in (k6/http, k6/data, k6/metrics) in services/relay-gateway/load/ — supplied by the k6 binary, never an npm package",
 };
-
-const readJson = (p) => JSON.parse(fs.readFileSync(path.join(ROOT, p), "utf8"));
-const declared = (m) => ({ ...(m.dependencies || {}), ...(m.devDependencies || {}), ...(m.peerDependencies || {}) });
 
 /** Bare specifier -> package name (`@scope/pkg/sub` -> `@scope/pkg`). */
 function pkgOf(spec) {
@@ -69,14 +126,28 @@ function pkgOf(spec) {
   return spec.split("/")[0];
 }
 
-function walk(dir, out = []) {
+const SOURCE_EXT = /\.(js|jsx|mjs|cjs|ts|tsx)$/;
+
+/**
+ * Every source file a unit owns.
+ *
+ * `skip` holds nested workspace members, which own themselves. Build output (`dist/`, `build/`,
+ * `coverage/`, `generated/`) is excluded because it is derived: a bundle inlines its dependencies,
+ * so scanning it reports imports that no manifest should ever have declared.
+ */
+function walk(dir, skip = new Set(), out = []) {
   const abs = path.join(ROOT, dir);
   if (!fs.existsSync(abs)) return out;
+  if (fs.statSync(abs).isFile()) {
+    if (SOURCE_EXT.test(dir)) out.push(dir);
+    return out;
+  }
   for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
     const rel = path.join(dir, e.name);
-    if (e.name === "node_modules" || e.name.startsWith(".")) continue;
-    if (e.isDirectory()) walk(rel, out);
-    else if (/\.(js|jsx|mjs|cjs|ts|tsx)$/.test(e.name)) out.push(rel);
+    if (IGNORED_DIRS.has(e.name) || e.name.startsWith(".")) continue;
+    if (skip.has(rel)) continue;
+    if (e.isDirectory()) walk(rel, skip, out);
+    else if (SOURCE_EXT.test(e.name)) out.push(rel);
   }
   return out;
 }
@@ -149,6 +220,8 @@ function stripTemplateLiterals(src) {
 }
 
 const problems = { versionSkew: [], phantom: [] };
+/** unit label -> files actually scanned. Reported, so a unit going dark is visible, not silent. */
+const scanned = new Map();
 
 // ── FR-015: one installed version per package name ───────────────────────────────────────────
 const ranges = {}; // pkg -> { range -> [units] }
@@ -175,7 +248,8 @@ for (const u of UNITS) {
   const own = declared(readJson(u.manifest));
   // The root manifest is a legitimate fallback for scripts/ and test/, which run in the root project.
   const rootDeclared = u.rootFallback ? declared(readJson("package.json")) : {};
-  const files = u.sources.flatMap((s) => walk(s));
+  const files = u.sources.flatMap((s) => walk(s, u.skip || new Set()));
+  scanned.set(u.label, files.length);
   const seen = new Map();
   for (const f of files) {
     const src = codeLines(fs.readFileSync(path.join(ROOT, f), "utf8"));
@@ -220,6 +294,30 @@ if (process.argv.includes("--json")) {
 
 let failed = false;
 
+// ── coverage first: a clean report from a gate that scanned nothing is the defect, not the pass ──
+if (emptyGlobs.length) {
+  failed = true;
+  console.error(`\n::error::${emptyGlobs.length} workspaces glob(s) in package.json match no package:`);
+  for (const g of emptyGlobs) console.error(`  · "${g}"`);
+  console.error(
+    "\n  Every unit under such a glob is silently UNCHECKED by this gate (and unlinked by npm).\n" +
+      "  Either the directory moved and the glob needs updating, or the members are genuinely gone\n" +
+      "  and the glob should be deleted.",
+  );
+}
+
+const emptyUnits = [...scanned].filter(([, n]) => n === 0).map(([label]) => label);
+if (emptyUnits.length) {
+  failed = true;
+  console.error(`\n::error::${emptyUnits.length} unit(s) contributed 0 source files to the scan:`);
+  for (const label of emptyUnits) console.error(`  · ${label}`);
+  console.error(
+    "\n  This gate reports nothing about them, which reads as a pass. Usually the unit's source moved\n" +
+      "  into a directory this script treats as build output (see IGNORED_DIRS). If the package really\n" +
+      "  ships no JS/TS, say so explicitly here rather than leaving the silence.",
+  );
+}
+
 if (missingOptional.length) {
   failed = true;
   console.error(`\n::error::${missingOptional.length} optional platform binary/ies missing from package-lock.json:`);
@@ -256,7 +354,13 @@ if (problems.phantom.length) {
 }
 
 if (failed) process.exit(1);
+
+// Name what was covered. "OK across 6 manifests" was true while four workspace members were not
+// being scanned at all — the number was the only clue, and nothing compared it to the workspace.
+const totalFiles = [...scanned.values()].reduce((a, b) => a + b, 0);
 console.log(
-  `Dependency hygiene OK — ${Object.keys(ranges).length} distinct packages across ${UNITS.length} manifests, ` +
+  `Dependency hygiene OK — ${Object.keys(ranges).length} distinct packages across ${UNITS.length} manifests ` +
+    `(root + ${workspaceMembers.length} workspace members), ${totalFiles} source files scanned, ` +
     "no version skew, no phantom imports.",
 );
+for (const [label, n] of scanned) console.log(`  · ${label}: ${n} file(s)`);
