@@ -11,10 +11,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ethers as ethersActual } from 'ethers'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 
-const m = vi.hoisted(() => ({ addr: {}, reads: {}, events: {}, feeQuote: null, feeThrows: null }))
+const m = vi.hoisted(() => ({ addr: {}, reads: {}, events: {}, feeQuote: null, feeThrows: null, counts: {} }))
 
 vi.mock('../../config/contracts', () => ({
   getContractAddressForChain: (name, chainId) =>
@@ -45,7 +45,12 @@ vi.mock('ethers', async (orig) => {
             return new Proxy({}, { get: (_f, name) => () => ({ __event: String(name) }) })
           }
           const key = String(prop)
-          return (...args) => (m.reads[key] ? m.reads[key](...args) : Promise.resolve(undefined))
+          // Counted, so a test can assert how MANY times the tab asked — see the refetch-loop
+          // regression at the bottom of this file.
+          return (...args) => {
+            m.counts[key] = (m.counts[key] || 0) + 1
+            return m.reads[key] ? m.reads[key](...args) : Promise.resolve(undefined)
+          }
         },
       },
     )
@@ -143,6 +148,7 @@ function props(overrides = {}) {
 beforeEach(() => {
   m.addr = { 1: ROUTER }
   m.events = {}
+  m.counts = {}
   m.feeQuote = { available: true, bps: 25, capBps: 250 }
   m.feeThrows = null
   m.pooledToken = null
@@ -517,5 +523,74 @@ describe('SupplyTab — least privilege and history', () => {
     // would have scanned a tree they had not been added to yet.
     await screen.findAllByRole('button', { name: 'Set caps' })
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ── HOW MANY TIMES THE TAB ASKS IS ITSELF A CORRECTNESS PROPERTY (issue #1031) ──────────────────
+//
+// Every assertion above is about WHAT the tab says, and all of them passed while it was asking the
+// router four hundred times in two seconds. The mount reads once shared a single effect keyed on all
+// four fetch callbacks, and `fetchState` clears `state` before reading (deliberately — the FR-050
+// no-mixing rule). That cleared `state?.feeRouter`, which is a declared dependency of `fetchFee`, so
+// `fetchFee` was rebuilt, so the shared effect re-ran, so `fetchState` cleared `state` again: a loop
+// whose period is one RPC round-trip, running for as long as an operator left the tab open.
+//
+// It is invisible to a mocked read that resolves on a microtask — React batches the blank away — so
+// these mount the tab against a round-trip that costs a macrotask, as a real one does.
+const settleFor = async (ms) => {
+  for (let i = 0; i < ms / 10; i += 1) {
+    // Each `act` boundary flushes React's queued work, so laps are actually taken rather than
+    // collapsed into one batch at the end of a single long `act`.
+    await act(async () => { await new Promise((r) => { setTimeout(r, 10) }) })
+  }
+}
+
+describe('SupplyTab — reads the router once, not in a loop (issue #1031)', () => {
+  it('asks each read exactly once per mount and leaves the table standing', async () => {
+    const later = (v) => new Promise((res) => { setTimeout(() => res(v), 0) })
+    const basePaused = m.reads.paused
+    const baseFeeRouter = m.reads.feeRouter
+    const basePoolCount = m.reads.poolCount
+    m.reads.paused = (...a) => basePaused(...a).then(later)
+    m.reads.feeRouter = (...a) => baseFeeRouter(...a).then(later)
+    m.reads.poolCount = (...a) => basePoolCount(...a).then(later)
+
+    render(<SupplyTab {...props({ isAdmin: true }).node} />)
+    const table = await screen.findByRole('table', { name: 'Curated pools' })
+    await settleFor(200)
+
+    // One round of reads, not one per render. Before the fix this was 51 in 250ms and rising
+    // linearly with how long the tab stayed open.
+    expect(m.counts.paused).toBe(1)
+    expect(m.counts.poolCount).toBe(1)
+    // The pool fan-out is per pool, once — three pools, not three per lap.
+    expect(m.counts.getPool).toBe(3)
+
+    // ── AND THE TABLE AN OPERATOR IS LOOKING AT IS THE SAME TABLE ────────────────────────────────
+    // The loop tore the table out of the DOM and rebuilt it ~100 times a second. A `findBy*` still
+    // resolved, so tests "passed" holding a node that was already detached — the failure signature
+    // is a click or a `within()` that silently addresses nothing.
+    expect(table.isConnected).toBe(true)
+    expect(screen.getByRole('table', { name: 'Curated pools' })).toBe(table)
+  })
+
+  // The clearing itself is NOT the bug and must survive the fix: an operator who pauses network A,
+  // switches to B and still sees A's PAUSED banner and A's pools walks away believing B is stopped.
+  it('still blanks the previous network’s pools the moment the scope changes', async () => {
+    m.addr = { 1: ROUTER, 137: '0x3333333333333333333333333333333333333333' }
+    render(<SupplyTab {...props().node} />)
+    await screen.findByRole('table', { name: 'Curated pools' })
+
+    // Polygon's router never answers, so `state` can only be cleared, never repopulated: whatever is
+    // on screen afterwards is what the tab is willing to show about a network it has not read.
+    m.reads.paused = () => new Promise(() => {})
+    // Only one select renders for an operator with no authority — the network scope.
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '137' } })
+
+    await waitFor(() => expect(screen.queryByRole('table', { name: 'Curated pools' })).toBeNull())
+    expect(screen.getByText('Loading pools…')).toBeInTheDocument()
+    // Ethereum's "not paused" answer must not be showing under Polygon's name either.
+    expect(screen.queryByText(/PAUSED/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/open to new deposits\)/)).not.toBeInTheDocument()
   })
 })

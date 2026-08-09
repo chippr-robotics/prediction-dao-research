@@ -387,11 +387,32 @@ export default function BridgeTab({
     }
   }, [routerRead, readProvider, state, gateway.configured, scopeChainId])
 
+  // ── THE FEE QUOTE GETS ITS OWN EFFECT (same fix as SupplyTab, #1031) ──────────────────────────
+  //
+  // Sharing one effect fed `fetchState` back into itself:
+  //
+  //   fetchState() clears `state` first (deliberately — the FR-050 network-switch honesty rule)
+  //     → `liveFeeRouter` (= state?.feeRouter, :251) flips to undefined
+  //     → `fetchFee`, which lists it as a dependency (:276), gets a new identity
+  //     → this effect re-runs → fetchState() again → …
+  //
+  // Not a bounded over-fetch: a loop with a period of one RPC round-trip, running for as long as
+  // the tab is open. Measured HERE, over one second against a mock costing a macrotask (the count
+  // scales with round-trip latency, so treat it as an order of magnitude, not a constant):
+  // `paused()` 141 -> 1, `queryFilter` 1312 -> 1. Worse than the SupplyTab case because `fetchOps`
+  // depends on the whole `state` object (:388) and is dragged along each lap, each pass carrying
+  // per-row getBlock, receipt reads and gateway status calls.
+  //
+  // The quote SHOULD re-run when the router repoints its FeeRouter, so the dependency stays; only
+  // the coupling back into `fetchState` is severed.
   useEffect(() => {
     fetchState()
-    fetchFee()
     fetchHistory()
-  }, [fetchState, fetchFee, fetchHistory])
+  }, [fetchState, fetchHistory])
+
+  useEffect(() => {
+    fetchFee()
+  }, [fetchFee])
 
   useEffect(() => {
     fetchOps()

@@ -365,12 +365,38 @@ export default function SupplyTab({
     if (run === bridgePoolsRun.current) setBridgeSizes(Object.fromEntries(entries))
   }, [readProvider, state?.pools])
 
+  // ── THE FEE QUOTE GETS ITS OWN EFFECT, AND THAT SPLIT IS THE WHOLE POINT ──────────────────────
+  //
+  // These four reads used to share one effect keyed on all four callbacks, which fed `fetchState`
+  // back into itself and made the tab refetch continuously:
+  //
+  //   fetchState() clears `state` first (deliberately — see the FR-050 note above)
+  //     → `liveFeeRouter` (= state?.feeRouter) flips to undefined
+  //     → `fetchFee`, which lists it as a dependency, gets a new identity
+  //     → the shared effect re-runs
+  //     → fetchState() again, clearing `state` again…
+  //
+  // That is not a bounded over-fetch, it is a loop with a period of one RPC round-trip, and it runs
+  // for as long as the tab is open. Measured against a round-trip that costs a macrotask rather than
+  // an instantly-resolved mock: `paused()` was called 51 times in 250ms, 201 in 1s and 401 in 2s —
+  // linear in how long an operator leaves the tab open, each lap carrying the batched address reads,
+  // the per-pool fan-out and an eight-event history scan behind it. The pool table was torn out of
+  // the DOM and rebuilt ~100 times a second, so an operator watched it strobe, and anything holding
+  // a reference to a row — a click landing mid-lap, or a test that queried an element and acted on
+  // it a tick later — was holding a detached node.
+  //
+  // The fee quote genuinely SHOULD re-run when the router's FeeRouter changes. Only the coupling
+  // back into `fetchState` was wrong, so the dependency stays and the effect is separated: router
+  // state is keyed on the router and the network, the quote on the fee router it reports.
   useEffect(() => {
     fetchState()
-    fetchFee()
     fetchHistory()
     fetchActivity()
-  }, [fetchState, fetchFee, fetchHistory, fetchActivity])
+  }, [fetchState, fetchHistory, fetchActivity])
+
+  useEffect(() => {
+    fetchFee()
+  }, [fetchFee])
 
   useEffect(() => {
     fetchBridgePools()
