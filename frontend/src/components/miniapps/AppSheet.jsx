@@ -34,8 +34,17 @@ export default function AppSheet({ app, slug, verified, isFavorite, onToggleFavo
   const { Art } = artworkFor(slug)
   const openable = verified && Boolean(slug)
 
+  // Focus lands on the close control ONCE, when the sheet opens. This must not share an effect
+  // with anything keyed on `onClose`: the panel re-creates that handler every render, so a
+  // combined effect re-fires on any state change inside the sheet (toggling My Apps) and steals
+  // focus from the control the member just pressed.
   useEffect(() => {
     closeRef.current?.focus()
+  }, [])
+
+  // Escape dismisses for as long as the sheet is mounted. Re-attaching when `onClose`'s identity
+  // changes is harmless — the listener carries no focus or state of its own.
+  useEffect(() => {
     function onKeyDown(event) {
       if (event.key === 'Escape') onClose()
     }

@@ -132,6 +132,21 @@ describe('AppSheet — dialog mechanics (FR-017)', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('keeps focus on the My Apps toggle after pressing it — the open-focus never re-fires', async () => {
+    // Regression (iteration-2 review): the focus-on-open effect used to share deps with the
+    // Escape listener, so any panel re-render (like the favorite toggle's state change) yanked
+    // focus back to the close button mid-interaction.
+    const user = userEvent.setup()
+    await renderSettled()
+
+    await user.click(screen.getByRole('button', { name: 'Settle Desk details' }))
+    const toggle = screen.getByRole('button', { name: 'Add Settle Desk to My Apps' })
+    await user.click(toggle)
+
+    const active = screen.getByRole('button', { name: 'Remove Settle Desk from My Apps' })
+    expect(document.activeElement).toBe(active)
+  })
+
   it('has no axe violations with the sheet open', async () => {
     const user = userEvent.setup()
     const { container } = await renderSettled()
