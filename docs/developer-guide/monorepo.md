@@ -12,7 +12,6 @@ that already existed.
 | `frontend/miniapps/token-mint` | `@fairwins/miniapp-token-mint` | on-chain-committed package |
 | `frontend/miniapps/clearpath` | `@fairwins/miniapp-clearpath` | on-chain-committed package |
 | `services/relay-gateway` | `fairwins-relay-gateway` | service |
-| `services/relayer` | `fairwins-pool-relayer` | service |
 | `subgraph` | `prediction-dao-research-subgraph` | indexer |
 | `tools/miniapp-build` | `@fairwins/miniapp-build` | shared build preset |
 | `packages/intent-types` | `@fairwins/intent-types` | shared EIP-712 structs + actions |

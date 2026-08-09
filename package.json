@@ -7,7 +7,6 @@
     "frontend",
     "frontend/miniapps/*",
     "services/relay-gateway",
-    "services/relayer",
     "subgraph",
     "tools/miniapp-build",
     "packages/*"
