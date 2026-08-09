@@ -97,7 +97,10 @@ describe("Compiler configuration: EVM target is declared, not inherited", functi
  * This is not hypothetical. Regenerating the lockfile during the spec-075 workspace conversion
  * floated `@chainlink/contracts` from 1.3.0 to 1.5.0 and changed the compiled bytecode of
  * ChainlinkFunctionsOracleAdapter. The byte-diff gate caught it; nothing else would have.
- * `@uma/core` was floating the same way (2.61.0 -> 2.62.2).
+ * `@uma/core` was floating the same way (2.61.0 -> 2.62.2); it has since been removed
+ * entirely — its two interfaces are declared in contracts/interfaces/IOptimisticOracleV3.sol,
+ * because AGPL-3.0-only sources cannot live in this Apache-2.0 tree and the package cost
+ * 1,157 of 3,202 installed packages to supply 199 lines of Solidity.
  *
  * Solidity-source dependencies must therefore be pinned EXACTLY, exactly as @openzeppelin/contracts
  * and @safe-global/safe-contracts already were.
@@ -111,7 +114,6 @@ describe("Solidity-source dependencies are pinned exactly (spec 075, FR-001)", f
     "@openzeppelin/contracts",
     "@openzeppelin/contracts-upgradeable",
     "@chainlink/contracts",
-    "@uma/core",
     "@safe-global/safe-contracts",
   ];
 
