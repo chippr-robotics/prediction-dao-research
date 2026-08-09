@@ -14,6 +14,28 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.2.5 — 2026-08-09
+
+Promoted from: none — released directly from main
+Previous release: v1.2.4 · Range: `v1.2.4..v1.2.5` (3 commits)
+
+### 🐛 Bug Fixes
+
+- fix(release): grant pull-requests write; require same-repo for the release exemption
+- fix(release): open a PR for the release record; backfill v1.0.0-v1.2.3
+
+### Artifacts
+
+Range: `v1.2.4..v1.2.5`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | moved | — |
+| Relay gateway image | moved | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | moved | `v0.2.0` |
+
 ## v1.2.3 — 2026-08-09
 
 Promoted from: none — released directly from main
