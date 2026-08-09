@@ -363,7 +363,7 @@ artifacts live under `specs/<feature>/`.
   detail — **`monorepo-workspace`** (dependencies, adding a package, recovering a broken install)
   and **`monorepo-verify`** (the gate suite and what each gate proves). Three rules are absolute,
   each because it already went wrong here: (1) **Never recover an install with `npm install`** —
-  npm/cli#4828 silently drops `@rollup/rollup-linux-x64-gnu` from node_modules AND the lockfile on
+  npm/cli#4828 silently drops optional platform binaries from node_modules AND the lockfile on
   an incremental install, breaking every Vite build including the on-chain mini-app release path,
   and re-running `npm install` cannot fix it (the lock is already wrong, so npm reports "up to
   date"). Use `npm run deps:reinstall`. **`npm ci` does not fix it either** — measured: it exits 0
@@ -371,8 +371,13 @@ artifacts live under `specs/<feature>/`.
   the binary uninstalled, because that entry is `optional` AND `peer` and npm skips optional peer
   deps even when locked. If a `deps:reinstall` is interrupted (no lockfile, half-built
   node_modules), restore the lockfile with `git checkout -- package-lock.json` and then install the
-  binary alone: `npm install --no-save @rollup/rollup-linux-x64-gnu@<version from the lockfile>` —
-  ~18s, and verified to leave `package-lock.json` byte-identical. **Dependabot triggers this
+  binary alone: `npm install --no-save @rolldown/binding-linux-x64-gnu@<version from the lockfile>` —
+  ~18s, and verified to leave `package-lock.json` byte-identical. **The binary's NAME moves with the
+  toolchain** — it was `@rollup/rollup-linux-x64-gnu` until Vite 8 (spec 077) replaced rollup with
+  rolldown, and rollup then left the tree entirely, so guidance naming the old package would have
+  read fine and helped nobody. Take the current name from `REQUIRED_OPTIONAL` in
+  `scripts/deps/check-dependency-hygiene.js`, which is the gate that enforces it; do not trust a
+  package name written in prose, including this one. **Dependabot triggers this
   routinely**: 3 of 5 lockfile-touching Dependabot PRs in one week dropped the binary, and
   `check:deps` is what catches it. (2) **Every dependency contributing Solidity source is
   pinned EXACTLY** — a caret range makes deployed bytecode a function of when the lockfile was last

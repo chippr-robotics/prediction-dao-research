@@ -232,7 +232,7 @@ function resolvePackageDir(appId, appIdPattern) {
  */
 function runBuild(packageDir) {
   if (!fs.existsSync(VITE_BIN)) {
-    fail(`vite is not installed at ${path.relative(REPO_ROOT, VITE_BIN)} — run \`npm install\` in frontend/`)
+    fail(`vite is not installed at ${path.relative(REPO_ROOT, VITE_BIN)} — run \`npm run deps:reinstall\` at the repo root`)
   }
 
   const env = { ...process.env }

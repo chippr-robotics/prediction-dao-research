@@ -67,8 +67,10 @@ App.jsx (Root)
 ### Installation
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies — FROM THE REPO ROOT, not here. This is an npm workspace
+# (spec 075); an install inside a child drops optional platform binaries from the
+# lockfile (npm/cli#4828) and breaks every Vite build. Recover with `npm run deps:reinstall`.
+cd .. && npm install && cd frontend
 
 # Copy environment configuration
 cp .env.example .env
