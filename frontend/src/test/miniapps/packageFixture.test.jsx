@@ -30,6 +30,7 @@
 
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { formatUnits, getAddress } from 'ethers'
 
 import { keccak256Hex, sha256Hex } from '../../lib/miniapps/integrity'
 import { HOST_PERMISSIONS, HOST_SHARED_MODULES, SUPPORTED_HOST_API, parseManifest } from '../../lib/miniapps/manifest'
@@ -39,6 +40,10 @@ import { MiniAppHostProvider } from '../../lib/miniapps/hostContext'
 import { __resetMiniAppStores } from '../../lib/miniapps/store'
 import {
   ENTRY_PATH,
+  ETHERS_FIXTURE_APP_ID,
+  ETHERS_FIXTURE_CID,
+  ETHERS_FIXTURE_MANIFEST_HASH,
+  ETHERS_ONCHAIN,
   FIXTURE_APP_ID,
   FIXTURE_CID,
   FIXTURE_GATEWAY,
@@ -49,6 +54,9 @@ import {
   STYLE_PATH,
   approvedPackageFiles,
   createGatewayFetch,
+  ethersFixtureBytes,
+  ethersFixtureRecord,
+  ethersPackageFiles,
   fixtureBytes,
   fixtureRecord,
   tamperedBytes,
@@ -69,6 +77,27 @@ const state = vi.hoisted(() => ({
   navigate: null,
   showNotification: null,
 }))
+
+/**
+ * `ethers`, restored to the SHAPE the browser actually has.
+ *
+ * `src/test/setup.js` mocks ethers globally with `{ ...actual, BrowserProvider,
+ * JsonRpcProvider, Contract }` to keep tests off the network. Vitest wraps a
+ * factory mock in a Proxy that THROWS for any key the factory did not return,
+ * and real ethers is an ESM package with no default export — so the one thing
+ * the spread cannot carry over is the absence of `default`.
+ *
+ * That matters here and nowhere else, because every host-scope shim ends with
+ * `__fwModule.default !== undefined ? … : __fwModule` — the line that makes a
+ * CJS package's default (React's) work and correctly finds none on an ESM one.
+ * Under the global mock that read throws, so a package importing ethers could
+ * not be EVALUATED in any test, for a reason that exists only in the test
+ * environment. Restoring the key (as genuinely `undefined`) makes the mock
+ * describe the module it stands in for. The provider stubs are not re-declared
+ * because this file constructs no provider — `utils/rpcProvider` is stubbed
+ * below.
+ */
+vi.mock('ethers', async (importOriginal) => ({ ...(await importOriginal()), default: undefined }))
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }))
 vi.mock('../../hooks/useWalletManagement', () => ({
@@ -314,5 +343,107 @@ describe('a tampered package is refused, and none of it runs', () => {
     expect(globalThis.__miniappFixtureTampered).toBeUndefined()
     await import(/* @vite-ignore */ moduleUrl(tamperedBytes(ENTRY_PATH)))
     expect(globalThis.__miniappFixtureTampered).toBe(true)
+  })
+})
+
+/**
+ * The ethers fixture (spec 075, T033) — the shim the real packages actually carry.
+ *
+ * Everything above runs against a package that imports React and the SDK and
+ * NOTHING ELSE, by an explicit spec-073 decision ("`ethers` is intentionally not
+ * imported: it would add a ~190-binding shim for no additional coverage"). That
+ * decision left the continuously-enforced gate blind in the one place spec 075
+ * cares about, because the whole hazard runs through ethers:
+ *
+ *   `hostScopePlugin.js#discoverExports` imports the file Vite RESOLVED and
+ *   transcribes its export names into the shim -> those bytes are `entry.js` ->
+ *   its sha256 is in `manifest.json` -> `keccak256(manifest bytes)` is the
+ *   on-chain MiniAppRegistry commitment.
+ *
+ * So a change to installation layout — adopting workspaces, changing hoisting,
+ * bumping a dependency — can rewrite thousands of bytes in every published
+ * package with no error raised anywhere. `package-ethers/` is the committed
+ * evidence: 192 ethers binding names, produced by the real preset from the real
+ * on-disk install. Regenerating after such a change produces a git diff (the
+ * spec-075 GATE 2), and the digests below re-check it on every frontend run.
+ */
+describe('the ethers fixture carries the shim the published packages carry', () => {
+  it('hashes, on the host side, to the value the build side recorded', () => {
+    expect(keccak256Hex(ethersFixtureBytes(MANIFEST_PATH))).toBe(ETHERS_FIXTURE_MANIFEST_HASH)
+    expect(sha256Hex(ethersFixtureBytes(ENTRY_PATH))).toBe(ETHERS_ONCHAIN.files[ENTRY_PATH])
+  })
+
+  it('declares exactly the shared dependencies both real packages declare', () => {
+    const manifest = parseManifest(ethersFixtureBytes(MANIFEST_PATH))
+
+    expect(manifest.id).toBe(ETHERS_FIXTURE_APP_ID)
+    expect(manifest.hostApi).toBe(SUPPORTED_HOST_API)
+    // Token Mint's and ClearPath's own manifests carry this exact set. The
+    // fixture is only a proxy for them if its shim surface is the same one.
+    expect([...manifest.sharedDeps]).toEqual([
+      '@fairwins/miniapp-sdk',
+      'ethers',
+      'react',
+      'react/jsx-runtime',
+    ])
+    for (const dep of manifest.sharedDeps) expect(HOST_SHARED_MODULES).toContain(dep)
+    // No stylesheet — a `styles: []` package shape the first fixture cannot produce.
+    expect(manifest.styles).toEqual([])
+    expect(Object.keys(manifest.files)).toEqual([ENTRY_PATH])
+  })
+
+  it('bakes the RESOLVED ethers binding list into the committed bytes', () => {
+    const entry = decode(ethersFixtureBytes(ENTRY_PATH))
+
+    // Still one self-contained module reading from the host scope…
+    expect(entry).not.toMatch(/^\s*import[\s{("']/m)
+    expect(entry).toContain('shared module ethers')
+
+    // …and the shim is a transcript of what `discoverExports()` found on disk.
+    // Sampled across the alphabet rather than counted exactly: an ethers minor
+    // release may add a binding, and that SHOULD show up as a fixture diff to be
+    // reviewed, not as a test that fails for having been written too precisely.
+    for (const binding of ['AbiCoder', 'Contract', 'JsonRpcProvider', 'formatUnits', 'getAddress', 'keccak256', 'parseUnits', 'verifyTypedData']) {
+      expect(entry, `ethers binding ${binding}`).toContain(`.${binding}`)
+    }
+    // Bulk, not just the handful the app uses: the ~190-name list is the thing
+    // module resolution moves, so a shim that had shrunk to the used bindings
+    // would no longer be sensitive to it.
+    expect(entry.match(/\.[A-Za-z_$][\w$]*;/g).length).toBeGreaterThan(150)
+  })
+
+  it('renders on the HOST’s ethers, through the real loader', async () => {
+    const harness = evaluatingHarness()
+    const fetchImpl = vi.fn(createGatewayFetch(ethersPackageFiles(), { cid: ETHERS_FIXTURE_CID }))
+
+    const result = await loadMiniApp(ethersFixtureRecord(), { ...gatewayOptions, fetchImpl, ...harness })
+    expect(result.manifestHash).toBe(ETHERS_FIXTURE_MANIFEST_HASH)
+    // The manifest declares no stylesheet, so the loader fetches only two files
+    // and injects nothing — the shape a `styles: []` package produces.
+    expect(fetchImpl.mock.calls.map(([url]) => url.split(`/ipfs/${ETHERS_FIXTURE_CID}/`)[1])).toEqual([
+      MANIFEST_PATH,
+      ENTRY_PATH,
+    ])
+    expect(result.styles).toEqual([])
+
+    const EthersFixtureApp = result.component
+    render(
+      <MiniAppHostProvider appId={ETHERS_FIXTURE_APP_ID}>
+        <EthersFixtureApp />
+      </MiniAppHostProvider>,
+    )
+
+    // Rendered output that is a FUNCTION of ethers. Both expectations are
+    // recomputed here with the host's own ethers rather than hardcoded, so this
+    // measures "the shim reached the host's copy" rather than "someone typed the
+    // right string into a test". A shim resolving to nothing throws on
+    // evaluation; one resolving to a bundled second copy could not be the same
+    // object these calls come from.
+    expect(screen.getByText(formatUnits(1234567n, 6))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Checksum' }))
+    const checksummed = getAddress('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')
+    expect(screen.getByRole('button', { name: checksummed })).toBeInTheDocument()
+    // And the SDK still reached it — the host object, not a stand-in.
+    expect(screen.getByText(ETHERS_FIXTURE_APP_ID)).toBeInTheDocument()
   })
 })

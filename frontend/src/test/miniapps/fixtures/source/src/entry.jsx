@@ -16,9 +16,11 @@
  * - it styles itself from its own stylesheet, so the package emits the
  *   `style.css` the host is expected to inject scoped.
  *
- * `ethers` is intentionally not imported: it would add a ~190-binding shim to
- * committed bytes that are meant to stay human-reviewable, and it would prove
- * nothing the React shims do not already prove.
+ * `ethers` is intentionally not imported HERE, so these committed bytes stay
+ * small enough to read. That coverage is not skipped — it moved: `../../source-
+ * ethers/` is a second fixture built by the same preset whose entry carries the
+ * full ~190-binding ethers shim, because module resolution for that one
+ * dependency is what spec 075 has to keep byte-stable.
  */
 
 import { useState } from 'react'
