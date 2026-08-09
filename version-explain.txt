@@ -1,0 +1,6 @@
+previous: v1.2.5
+commits:  1
+  [chore -> patch] Bump the dev-tooling group across 1 directory with 16 updates (#1084)
+bump:     patch
+reason:   computed
+next:     v1.2.6
