@@ -11,9 +11,16 @@ name: Branch Policy
 #
 # No `continue-on-error` anywhere below, and none may be added (constitution IV).
 
+# NO `branches:` FILTER on pull_request, deliberately — `test/config/CiGates.test.js` forbids one
+# and is right to. A base-branch filter decides whether a workflow RUNS, and the spec-075 lesson is
+# that this silently gates stacked work more weakly than a direct PR to main.
+#
+# This rule genuinely only applies to pull requests into `main`, but that belongs in an `if:` on the
+# job, not in the trigger: the workflow then runs everywhere (two git commands — cheap), reports
+# honestly on every PR, and the base-branch condition is visible as a condition rather than hidden
+# in the event filter.
 on:
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, edited, ready_for_review]
   schedule:
     # Hotfix drift (FR-019) is a state, not an event — a hotfix can sit on main unmerged for days,
@@ -32,7 +39,8 @@ permissions:
 jobs:
   source-branch:
     name: PRs into main come from staging or a hotfix
-    if: github.event_name == 'pull_request'
+    # The base-branch condition lives HERE rather than in the trigger (see the note at the top).
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +85,6 @@ jobs:
               echo "::notice::release, or the next promotion will silently revert it (FR-019)." ;;
             *)
               echo "::error::A pull request into main must come from 'staging' or 'hotfix/*'."
-              # (see below for the merge-strategy note that applies once this passes)
               echo "::error::This one comes from '$HEAD_REF'."
               echo "::error::"
               echo "::error::Changes reach production by promotion, so that they have first run on"
@@ -93,7 +100,7 @@ jobs:
     name: staging must mirror production
     # Only a promotion needs this: a hotfix bypasses staging by definition, so comparing the two
     # would be asking a question that has no meaning for it.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'staging'
+    if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.ref == 'staging'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,19 +132,24 @@ jobs:
 
       - name: Detect commits on main that staging does not have
         id: drift
+        # No `|| true` and no early `exit 0` — both are forbidden by test/config/CiGates.test.js and
+        # both would be wrong here specifically. `git log` failing (an unreadable ref, a bad range)
+        # would be swallowed into "no drift", which is a FALSE NEGATIVE in a detector whose entire
+        # job is to notice a hotfix that never came back. Under `set -e` a git failure now fails the
+        # step, which is the honest outcome: unknown is not the same as clear.
         run: |
           set -euo pipefail
-          if ! git rev-parse -q --verify origin/staging >/dev/null; then
+          if git rev-parse -q --verify origin/staging >/dev/null; then
+            git log --oneline origin/staging..origin/main > drift.txt
+            if [ -s drift.txt ]; then
+              echo "drifted=yes" >> "$GITHUB_OUTPUT"
+              cat drift.txt
+            else
+              echo "drifted=no" >> "$GITHUB_OUTPUT"
+            fi
+          else
             echo "::warning::origin/staging does not exist yet — drift detection is inactive (FR-017)."
             echo "drifted=none" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git log --oneline origin/staging..origin/main > drift.txt || true
-          if [ -s drift.txt ]; then
-            echo "drifted=yes" >> "$GITHUB_OUTPUT"
-            cat drift.txt
-          else
-            echo "drifted=no" >> "$GITHUB_OUTPUT"
           fi
 
       # Reported as an issue rather than a log line: a hotfix silently absent from staging is
