@@ -253,11 +253,15 @@ describe('BridgeView — screening the acting wallet (T116/T120, FR-032)', () =>
      * Waiting for the forced call specifically also removes the ordering assumption entirely:
      * whichever order they arrive in, the requirement is that submission re-screens.
      */
-    await waitFor(() => {
-      expect(screenOne.mock.calls.some(([, , options]) => options?.force === true)).toBe(true)
-    })
     // Forced: a cached 'clear' from the quote is exactly what must not be reused here.
-    const forced = screenOne.mock.calls.find(([, , options]) => options?.force === true)
+    // `waitFor` RETURNS the matched call, so the search happens once and the value is already
+    // proven non-null by the assertion inside — indexing it below cannot become a TypeError that
+    // masks the real expectation failure.
+    const forced = await waitFor(() => {
+      const call = screenOne.mock.calls.find(([, , options]) => options?.force === true)
+      expect(call, 'submission should re-screen with force: true').toBeDefined()
+      return call
+    })
     expect(forced[1]).toBe(137)
   })
 
