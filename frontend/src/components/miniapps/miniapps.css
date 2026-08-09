@@ -158,6 +158,64 @@
   width: 18px;
 }
 
+/* ---- Store bar: Market / My Apps / Search (spec 077, US2) -------------- */
+
+/* A floating dock, sticky at the viewport bottom while the catalog scrolls — the concept art's
+   bottom navigation, scoped to the Apps section. It sits last in the DOM, so its visual position
+   and its tab order agree. `bottom` keeps a thumb-height gap plus the device safe area. */
+.miniapp-store-bar {
+  align-self: center;
+  background: var(--surface-color, #fff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 999px;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  padding: 0.3rem;
+  position: sticky;
+  z-index: 2;
+}
+.miniapp-store-bar-link {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-secondary, #5a6772);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.miniapp-store-bar-link:hover {
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-store-bar-link:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+/* Active section: tinted pill + border + weight — and `aria-current` in the markup — so the
+   state never rides on colour alone. */
+.miniapp-store-bar-link.is-active {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 14%, transparent);
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+  color: var(--text-primary, #1f2933);
+}
+
+@media (max-width: 480px) {
+  .miniapp-store-bar {
+    justify-content: space-around;
+    width: 100%;
+  }
+  .miniapp-store-bar-link {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+
 /* ---- State blocks ------------------------------------------------------ */
 
 .miniapp-catalog-loading {

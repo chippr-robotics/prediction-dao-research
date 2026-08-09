@@ -90,19 +90,19 @@ restructured trust copy. **Independent test**: quickstart §2 steps 1, 4–6.
 **Goal**: persistent Market / My Apps / Search store bar on the `?view=` seam.
 **Independent test**: quickstart §2 steps 2–3.
 
-- [ ] T014 [P] [US2] Create `frontend/src/components/miniapps/StoreBar.jsx`: `<nav>` with
+- [X] T014 [P] [US2] Create `frontend/src/components/miniapps/StoreBar.jsx`: `<nav>` with
       accessible name, link entries Market (`view` absent), My Apps (`view=mine`), Search
       (`view=search`), `aria-current="page"` on the active entry; bottom-anchored on small
       viewports, inline on wide (styles in miniapps.css).
-- [ ] T015 [US2] Wire sub-views in `frontend/src/components/miniapps/CatalogPanel.jsx`: StoreView
+- [X] T015 [US2] Wire sub-views in `frontend/src/components/miniapps/CatalogPanel.jsx`: StoreView
       resolution from `useSearchParams` (unknown → market; `submit` keeps exclusive rendering);
       My Apps = favorites ∩ verified listing with identical AppCard/launch rules and honest empty
       state; Search = market with autofocused search + filters; all sub-views share the single
       fetched listing and state branches per contracts/store-ui.md §1.
-- [ ] T016 [US2] Store bar + sub-view styles in
+- [X] T016 [US2] Store bar + sub-view styles in
       `frontend/src/components/miniapps/miniapps.css` (thumb-reachable bottom bar on small
       viewports without occluding content; safe-area padding).
-- [ ] T017 [US2] Vitest suites in `frontend/src/test/miniapps/`: view switching via query param,
+- [X] T017 [US2] Vitest suites in `frontend/src/test/miniapps/`: view switching via query param,
       unknown view falls back to market, My Apps filtering + empty state, Search focus/filters,
       store bar aria-current and keyboard operability, sub-views never refetch (single
       fetchCatalog call), honest states rendered identically across sub-views.

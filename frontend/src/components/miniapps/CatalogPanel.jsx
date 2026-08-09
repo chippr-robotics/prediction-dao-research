@@ -36,10 +36,12 @@
  * under a heading per category (FR-007's category is otherwise readable only per-card), in the
  * same on-chain enum order the chip row already uses, so browsing and filtering agree on one order.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import './miniapps.css'
 import SubmitAppPanel from './SubmitAppPanel'
+import StoreBar from './StoreBar'
+import { STORE_VIEWS, resolveStoreView } from './storeViews'
 import { artworkFor } from './appArtwork'
 import EmptyState from '../account/EmptyState'
 import NavIcon from '../nav/NavIcon'
@@ -261,7 +263,7 @@ function AppCard({ app, launchable, isFavorite, onToggleFavorite }) {
   )
 }
 
-function CatalogView() {
+function CatalogView({ view = STORE_VIEWS.MARKET }) {
   /**
    * The last completed read, tagged with the request it answered.
    *
@@ -350,10 +352,20 @@ function CatalogView() {
     return null
   }, [outcome])
 
-  const visible = useMemo(() => {
+  /**
+   * The sub-view's app set (spec 077, US2). My Apps is a pure FILTER of the one fetched listing —
+   * favorites ∩ launchable — so it inherits the market's trust semantics wholesale: same cards,
+   * same launch rules, same verified/stale treatment. Nothing here refetches or re-derives.
+   */
+  const storeApps = useMemo(() => {
     if (!listing) return []
+    if (view !== STORE_VIEWS.MINE) return listing.apps
+    return listing.apps.filter((app) => favoriteIds.has(app.id))
+  }, [listing, view, favoriteIds])
+
+  const visible = useMemo(() => {
     const term = query.trim().toLowerCase()
-    return listing.apps.filter((app) => {
+    return storeApps.filter((app) => {
       // An empty selection means "every category", not "no category" — the filter row starts
       // unfiltered and clearing it must return the whole list rather than emptying the grid.
       if (selectedCategories.size > 0 && !selectedCategories.has(app.category)) return false
@@ -363,7 +375,7 @@ function CatalogView() {
         String(app.description).toLowerCase().includes(term)
       )
     })
-  }, [listing, query, selectedCategories])
+  }, [storeApps, query, selectedCategories])
 
   /**
    * `visible`, grouped under a heading per category (FR-007) in the chip row's own order.
@@ -400,10 +412,21 @@ function CatalogView() {
     })
   }
 
-  const totalCount = listing ? listing.apps.length : 0
+  const totalCount = storeApps.length
   // Controls appear only when there is something to narrow. A search box over a list that is empty —
   // or that we could not read at all — is an affordance that cannot do anything.
   const showControls = totalCount > 0
+
+  /**
+   * The Search sub-view is the market with search emphasized: same listing, same filters — the
+   * input is simply focused on arrival so a member who chose "Search" can type immediately. The
+   * effect (rather than `autoFocus`) covers the switch from another sub-view, where the input is
+   * already mounted and would otherwise keep focus wherever it was.
+   */
+  const searchInputRef = useRef(null)
+  useEffect(() => {
+    if (view === STORE_VIEWS.SEARCH) searchInputRef.current?.focus()
+  }, [view, showControls])
 
   return (
     <section className="miniapp-catalog" aria-label="Apps">
@@ -516,6 +539,7 @@ function CatalogView() {
             <label className="miniapp-catalog-search">
               <span className="sr-only">Search apps by name or description</span>
               <input
+                ref={searchInputRef}
                 type="search"
                 placeholder="Search apps…"
                 value={query}
@@ -578,11 +602,21 @@ function CatalogView() {
       )}
 
       {/* The genuinely-empty catalog: the registry answered, and it holds nothing launchable. Gated on
-          `verified` so an unreadable registry can never borrow this copy. */}
-      {listing && listing.verified && totalCount === 0 && (
+          `verified` so an unreadable registry can never borrow this copy — and on the market/search
+          views, because an empty My Apps is the member's own state, not the registry's (below). */}
+      {view !== STORE_VIEWS.MINE && listing && listing.verified && totalCount === 0 && (
         <EmptyState
           title="No apps are approved yet"
           message="The registry answered — it simply holds no approved apps for this environment. Anything a curator approves will appear here."
+        />
+      )}
+
+      {/* My Apps with nothing favorited: the member's empty shelf, never confusable with an empty
+          registry. The listing exists (verified or stale) — there is simply nothing starred. */}
+      {view === STORE_VIEWS.MINE && listing && totalCount === 0 && (
+        <EmptyState
+          title="Nothing in My Apps yet"
+          message="Star an app in the Market and it will appear here for quick access."
         />
       )}
 
@@ -615,6 +649,11 @@ function CatalogView() {
           </ul>
         </section>
       ))}
+
+      {/* The store's own section navigation (spec 077, US2): persistent — sticky at the viewport
+          bottom while the catalog scrolls — and withheld only when there is no store at all (no
+          registry on this build), where all three entries would lead nowhere. */}
+      {outcome && outcome.status !== REGISTRY_STATUS.NOT_DEPLOYED && <StoreBar active={view} />}
     </section>
   )
 }
@@ -633,5 +672,9 @@ function CatalogView() {
  */
 export default function CatalogPanel() {
   const [searchParams] = useSearchParams()
-  return searchParams.get('view') === 'submit' ? <SubmitAppPanel /> : <CatalogView />
+  const rawView = searchParams.get('view')
+  if (rawView === 'submit') return <SubmitAppPanel />
+  // Everything else is the store: market / mine / search, with unknown values falling back to
+  // market (`resolveStoreView` is total) so a stale bookmark still lands somewhere real.
+  return <CatalogView view={resolveStoreView(rawView)} />
 }
