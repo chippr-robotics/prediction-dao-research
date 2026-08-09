@@ -1,8 +1,26 @@
 import process from 'node:process'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { tenantBrandingPlugin } from './vite-plugins/tenant-branding.js'
+
+/*
+ * Build stamp for the nav drawer (see src/config/buildInfo.js for why).
+ *
+ * Version comes from the ROOT package.json, not frontend's — frontend's is `0.0.0`, a workspace
+ * placeholder that is never bumped, so displaying it would be noise dressed as information.
+ *
+ * The commit arrives as an ENV VAR, not from git: `.dockerignore` excludes `.git`, so the image
+ * build genuinely cannot run `git rev-parse`. cloudbuild.yaml passes $SHORT_SHA through as a build
+ * arg. Unset (a local dev server) resolves to 'dev', which the drawer displays honestly rather
+ * than hiding.
+ */
+const ROOT_PKG = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
+)
+const COMMIT_SHA = (process.env.VITE_COMMIT_SHA || '').trim().slice(0, 7) || 'dev'
 
 // Fails a production build if Pinata write credentials are present in the build
 // environment. Any VITE_*-prefixed value is inlined into the client bundle in
@@ -33,6 +51,13 @@ function pinataSecretGuard() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), pinataSecretGuard(), tenantBrandingPlugin()],
+  // Build-time constants, NOT `import.meta.env`: the preset used for mini-app packages sets an
+  // envPrefix that turns any bundled `import.meta.env` read into `undefined`, and a value that is
+  // only sometimes present would make the drawer's build label sometimes lie.
+  define: {
+    __APP_VERSION__: JSON.stringify(ROOT_PKG.version),
+    __APP_COMMIT__: JSON.stringify(COMMIT_SHA),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

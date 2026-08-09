@@ -34,6 +34,10 @@ WORKDIR /app/frontend
 # Note: VITE_PINATA_JWT is NOT included here - it's handled at runtime via nginx proxy
 # Tenant selection (spec 072): one image = one tenant. Unset => the default
 # (fairwins) tenant, byte-identical to the pre-072 build.
+# Build stamp for the nav drawer's version label (src/config/buildInfo.js). Passed as a build ARG
+# rather than derived: .dockerignore excludes .git, so the image build cannot run `git rev-parse`.
+# Unset resolves to 'dev', which the drawer displays honestly instead of hiding the label.
+ARG VITE_COMMIT_SHA
 ARG VITE_TENANT_ID
 ARG VITE_WALLETCONNECT_PROJECT_ID
 ARG VITE_APP_URL
@@ -53,6 +57,7 @@ ARG VITE_BUNDLER_URLS_POLYGON
 ARG VITE_SPONSOR_PAYMASTER_POLYGON
 
 # Set environment variables from build args
+ENV VITE_COMMIT_SHA=${VITE_COMMIT_SHA}
 ENV VITE_TENANT_ID=${VITE_TENANT_ID}
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
 ENV VITE_APP_URL=${VITE_APP_URL}
