@@ -1,8 +1,8 @@
 {
- "token-mint/entry.js": "08b770f429e1f1b7938e5deda8f69ecf4a8972b21b18a356acdbeb0d2fff5ec2",
- "token-mint/manifest.json": "e03c69fe08316a2ea17d87d0d8b2f3368a39156061d60ed171614528e88d7ee7",
- "token-mint/style.css": "6460e7686e9bd9047d8ce380cd2fafa0f79d95f63c41001b23ec2f7715afe94e",
- "clearpath/entry.js": "8acbfa764d41f16733f0e3cb4527413168c893edcccfe6bb7854c14e128b02e8",
- "clearpath/manifest.json": "ace18c71fecfcca57d7718e4b65d261b294d8eeb76fee7c1d7cf4aaaca986f19",
- "clearpath/style.css": "a202c3d608ae5859d9a0b63bdfa8907ff292ff46438ffce09025432804820da8"
+ "token-mint/entry.js": "7ac5984932237fae03e5e94b950a97fa07009ccf70c202aa186225d8e3a023bf",
+ "token-mint/manifest.json": "5137825f5ad31709106b30b38828e677340e1240480ca8d545342274b5aa8e8b",
+ "token-mint/style.css": "366ca9390251961a336704a2b44b5cac85cd93d75f7dc7c1f352680fc33e23a6",
+ "clearpath/entry.js": "ca28def625831c678721f7f43b94fb187e53b8350aa4bed4ec59abb91dfaa39f",
+ "clearpath/manifest.json": "86d9c4f649065b6cacc536f5bbc22a2bec1554c44bd70963e9e3bd223ebee39c",
+ "clearpath/style.css": "1498a81e32a134174eeb8effe70461ce0705e0c77131c6ebfa33f3199b0aaecc"
 }

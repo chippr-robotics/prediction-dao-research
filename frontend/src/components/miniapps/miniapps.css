@@ -58,7 +58,7 @@
 .miniapp-catalog-submit {
   background: transparent;
   border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 8px;
+  border-radius: 999px;
   color: var(--text-primary, #1f2933);
   cursor: pointer;
   font-size: 0.85rem;
@@ -83,6 +83,137 @@
 .miniapp-catalog-refresh[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
+}
+
+/* ---- Store hero: title, trust badge, trust blocks (spec 077) ----------- */
+
+.miniapp-store-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-width: 44rem;
+}
+.miniapp-store-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+/* The verified-market badge. It only renders over a verified listing (see the component), so the
+   styling can afford to be celebratory. Text stays at full contrast; only the rosette glyph takes
+   the brand colour, so the claim never depends on hue to be readable (WCAG 1.4.1/1.4.3). */
+.miniapp-store-badge {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+  border-radius: 999px;
+  color: var(--text-primary, #1f2933);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  letter-spacing: 0.05em;
+  margin: 0;
+  padding: 0.25rem 0.7rem;
+  text-transform: uppercase;
+}
+.miniapp-store-badge .miniapp-glyph-badge {
+  color: var(--brand-primary, #36b37e);
+}
+/* The trust story as two scannable blocks instead of one dense paragraph. */
+.miniapp-store-trust {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.miniapp-store-trust li {
+  align-items: flex-start;
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
+  color: var(--text-secondary, #5a6772);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 0.5rem;
+  line-height: 1.45;
+  padding: 0.55rem 0.7rem;
+}
+.miniapp-store-trust li strong {
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-store-trust .miniapp-glyph {
+  color: var(--brand-primary, #36b37e);
+  height: 20px;
+  margin-top: 0.1rem;
+  width: 20px;
+}
+
+/* Decorative glyph base: sized to sit beside a line of text, never focusable, never announced. */
+.miniapp-glyph {
+  flex: 0 0 auto;
+  height: 18px;
+  width: 18px;
+}
+
+/* ---- Store bar: Market / My Apps / Search (spec 077, US2) -------------- */
+
+/* A floating dock, sticky at the viewport bottom while the catalog scrolls — the concept art's
+   bottom navigation, scoped to the Apps section. It sits last in the DOM, so its visual position
+   and its tab order agree. `bottom` keeps a thumb-height gap plus the device safe area. */
+.miniapp-store-bar {
+  align-self: center;
+  background: var(--surface-color, #fff);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 999px;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary, #1f2933) 14%, transparent);
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  padding: 0.3rem;
+  position: sticky;
+  z-index: 2;
+}
+.miniapp-store-bar-link {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-secondary, #5a6772);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.miniapp-store-bar-link:hover {
+  color: var(--text-primary, #1f2933);
+}
+.miniapp-store-bar-link:focus-visible {
+  outline: 2px solid var(--brand-primary, #36b37e);
+  outline-offset: 2px;
+}
+/* Active section: tinted pill + border + weight — and `aria-current` in the markup — so the
+   state never rides on colour alone. */
+.miniapp-store-bar-link.is-active {
+  background: color-mix(in srgb, var(--brand-primary, #36b37e) 14%, transparent);
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, transparent);
+  color: var(--text-primary, #1f2933);
+}
+
+@media (max-width: 480px) {
+  .miniapp-store-bar {
+    justify-content: space-around;
+    width: 100%;
+  }
+  .miniapp-store-bar-link {
+    flex: 1 1 0;
+    justify-content: center;
+  }
 }
 
 /* ---- State blocks ------------------------------------------------------ */
@@ -155,10 +286,10 @@
 .miniapp-catalog-search input {
   background: var(--surface-color, #fff);
   border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 10px;
+  border-radius: 999px;
   color: var(--text-primary, #1f2933);
   font-size: 0.95rem;
-  padding: 0.55rem 0.75rem;
+  padding: 0.55rem 0.9rem;
   width: 100%;
 }
 .miniapp-catalog-search input:focus-visible {
@@ -170,7 +301,7 @@
   align-items: center;
   background: transparent;
   border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 10px;
+  border-radius: 999px;
   color: var(--text-primary, #1f2933);
   cursor: pointer;
   display: inline-flex;
@@ -238,13 +369,26 @@
   flex-direction: column;
   gap: 0.5rem;
 }
+/* Category banners: an accent bar plus the label — distinct from card headings at a glance, and
+   the bar is decoration over a text label rather than a colour-only signal. */
 .miniapp-catalog-group-title {
-  color: var(--text-secondary, #5a6772);
-  font-size: 0.78rem;
+  align-items: center;
+  color: var(--text-primary, #1f2933);
+  display: flex;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  margin: 0;
+  gap: 0.5rem;
+  letter-spacing: 0.06em;
+  margin: 0.35rem 0 0;
   text-transform: uppercase;
+}
+.miniapp-catalog-group-title::before {
+  background: var(--brand-primary, #36b37e);
+  border-radius: 999px;
+  content: '';
+  display: inline-block;
+  height: 1em;
+  width: 4px;
 }
 
 /* ---- Catalog grid ------------------------------------------------------ */
@@ -261,11 +405,40 @@
 .miniapp-card {
   background: var(--surface-color, #fff);
   border: 1px solid var(--border-color, #e3e7eb);
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.miniapp-card:hover {
+  border-color: color-mix(in srgb, var(--brand-primary, #36b37e) 45%, var(--border-color, #e3e7eb));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--text-primary, #1f2933) 10%, transparent);
+}
+/* The illustration panel: a soft brand-tinted stage for the curated art. Decorative throughout —
+   it is aria-hidden in the markup and carries no text. */
+.miniapp-card-art {
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary, #36b37e) 16%, transparent),
+    color-mix(in srgb, var(--brand-primary, #36b37e) 4%, transparent)
+  );
+  border-bottom: 1px solid var(--border-color, #e3e7eb);
+  display: flex;
+  justify-content: center;
+  padding: 0.8rem;
+}
+.miniapp-art {
+  height: 72px;
+  width: 72px;
+}
+.miniapp-card-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 0.4rem;
-  padding: 0.85rem 0.9rem;
+  padding: 0.8rem 0.9rem 0.9rem;
 }
 .miniapp-card-head {
   align-items: flex-start;
@@ -317,13 +490,18 @@
   line-height: 1.4;
   margin: 0;
 }
+/* The technical-data box (FR-005): vendor + version contained and visibly apart from the prose. */
 .miniapp-card-meta {
+  background: var(--bg-primary, #f7f9fa);
+  border: 1px solid var(--border-color, #e3e7eb);
+  border-radius: 10px;
   color: var(--text-secondary, #5a6772);
   display: flex;
   flex-wrap: wrap;
   font-size: 0.78rem;
   gap: 0.25rem 1rem;
-  margin: 0.15rem 0 0;
+  margin: 0.25rem 0 0;
+  padding: 0.45rem 0.65rem;
 }
 .miniapp-card-meta > div {
   align-items: baseline;
@@ -341,16 +519,23 @@
 }
 
 .miniapp-card-launch {
+  align-items: center;
   align-self: flex-start;
   background: var(--primary-button, var(--brand-primary, #36b37e));
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 999px;
   color: var(--primary-button-text, #fff);
+  display: inline-flex;
   font-size: 0.85rem;
   font-weight: 600;
-  margin-top: 0.35rem;
-  padding: 0.35rem 0.95rem;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding: 0.4rem 1.1rem;
   text-decoration: none;
+}
+.miniapp-card-launch .miniapp-glyph {
+  height: 16px;
+  width: 16px;
 }
 .miniapp-card-launch:hover {
   background: var(--primary-button-hover, #2f9e6e);

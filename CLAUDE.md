@@ -419,5 +419,5 @@ artifacts live under `specs/<feature>/`.
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/076-monorepo-semantic-versioning/plan.md
+at specs/077-miniapp-store-redesign/plan.md
 <!-- SPECKIT END -->
