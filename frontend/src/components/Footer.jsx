@@ -10,12 +10,14 @@ import './Footer.css'
  *
  *   variant="full"      → landing-page footer (brand + Oracles/Docs/Legal/Community) + copyright.
  *   variant="condensed" → in-app footer: legal/policy links + copyright only (no marketing columns).
- *   variant="drawer"    → condensed footer restyled to sit contained at the bottom of the
- *                         wallet section drawer (same links/copyright, stacked + compact).
+ *   variant="drawer"    → copyright only, restyled to sit contained at the bottom of the
+ *                         side nav drawer. The legal/policy links themselves moved out of the
+ *                         drawer into Settings → App (issue #1025) — the side panel should stay
+ *                         lean, and those links now live where Install App / Software Update do.
  *
  * The copyright year is derived from the current date so it never goes stale (FR-008),
- * and the legal links come from the single LEGAL_LINKS source so the two footers can't
- * drift and never point at the external marketing site (FR-006/009, SC-002).
+ * and the legal links come from the single LEGAL_LINKS source so the footers that still
+ * carry them can't drift and never point at the external marketing site (FR-006/009, SC-002).
  * Brand identity, docs, and community links resolve from the tenant manifest (spec 072) —
  * columns whose links the tenant does not define are simply absent.
  */
@@ -32,11 +34,13 @@ export default function Footer({ variant = 'full' }) {
     const className = variant === 'drawer' ? 'app-footer app-footer--drawer' : 'app-footer'
     return (
       <footer className={className}>
-        <nav className="app-footer-links" aria-label="Legal">
-          {LEGAL_LINKS.map((l) => (
-            <a key={l.href} href={l.href}>{l.label}</a>
-          ))}
-        </nav>
+        {variant === 'condensed' && (
+          <nav className="app-footer-links" aria-label="Legal">
+            {LEGAL_LINKS.map((l) => (
+              <a key={l.href} href={l.href}>{l.label}</a>
+            ))}
+          </nav>
+        )}
         <p className="app-footer-copyright">{copyright}</p>
         {/*
           * Which build this is. Deliberately selectable (not `user-select: none`) — the whole

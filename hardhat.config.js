@@ -346,21 +346,33 @@ module.exports = {
         },
       },
     ],
-    // Compile the vendored Semaphore V4 self-deploy closure (spec 034, ETC/Mordor) WITHOUT viaIR.
-    // PoseidonT3 (auto-generated assembly) and SemaphoreVerifier (bn128 pairing assembly) are
-    // hand-optimized for legacy codegen; the Yul IR pipeline balloons their compile to ~13 GB RSS
-    // and OOM-thrashes a 16 GB box (and would do the same to CI). These are deployed standalone and
-    // linked/held by address, so different codegen here cannot affect the viaIR app contracts.
-    // Nothing in contracts/ imports this closure except SemaphoreDeploy.sol.
+    // The vendored Safe v1.4.1 closure (spec 049 test shim contracts/mocks/vendor/) compiles
+    // WITHOUT viaIR: Safe's inline assembly is not annotated memory-safe, so the Yul IR pipeline
+    // cannot place a memoryguard and dies with a stack-too-deep YulException. The shim is test-only
+    // (never deployed by scripts) and no APP contract imports the shim — only the two
+    // policy-guard integration suites use the artifacts it pulls in — so legacy codegen here
+    // cannot affect the viaIR app contracts.
     //
-    // The vendored Safe v1.4.1 closure (spec 049 test shim contracts/mocks/vendor/) likewise
-    // compiles WITHOUT viaIR: Safe's inline assembly is not annotated memory-safe, so the Yul IR
-    // pipeline cannot place a memoryguard and dies with a stack-too-deep YulException. The shim
-    // is test-only (never deployed by scripts) and nothing in contracts/ imports it, so legacy
-    // codegen here cannot affect the viaIR app contracts.
+    // To be precise, since the gate below reasons about exactly this: the Safe closure IS imported,
+    // by `contracts/mocks/vendor/SafeVendorImports.sol`, which exists to pull Safe v1.4.1 into the
+    // artifact set. That is why the Safe overrides are LIVE and the Semaphore ones below were not.
+    //
+    // ── DEAD OVERRIDES ARE DELETED, NOT PARKED (spec 075 / issue #1039) ──────────────────────────
+    // This block also carried eight overrides for the Semaphore V4 self-deploy closure
+    // (`contracts/pools/SemaphoreDeploy.sol` plus `@semaphore-protocol/contracts/*`,
+    // `@zk-kit/lean-imt.sol/*` and `poseidon-solidity/PoseidonT3.sol`). Spec 034 removed Semaphore
+    // from the pools design and deleted SemaphoreDeploy.sol; nothing under contracts/ has imported
+    // any of those packages since, so the entries named files that were never in the compilation.
+    // They were pure decoration — and worse than decoration, because an override that matches
+    // nothing looks like a live compiler decision when read. `@zk-kit/lean-imt.sol` and
+    // `poseidon-solidity` were not even root dependencies (they resolved transitively through
+    // `@semaphore-protocol/contracts`, itself declared as a FLOATING `^4.14.2`), so the config
+    // appeared to pin compiler settings for source this repo did not control the version of.
+    //
+    // `test/config/CompilerTargets.test.js` now fails on any override whose target is not a real
+    // file belonging to a package contracts/ actually imports, so this cannot silently come back.
     overrides: Object.fromEntries(
       [
-        "contracts/pools/SemaphoreDeploy.sol",
         "contracts/mocks/vendor/SafeVendorImports.sol",
         "@safe-global/safe-contracts/contracts/Safe.sol",
         "@safe-global/safe-contracts/contracts/SafeL2.sol",
@@ -391,13 +403,6 @@ module.exports = {
         "@safe-global/safe-contracts/contracts/proxies/IProxyCreationCallback.sol",
         "@safe-global/safe-contracts/contracts/proxies/SafeProxy.sol",
         "@safe-global/safe-contracts/contracts/proxies/SafeProxyFactory.sol",
-        "@semaphore-protocol/contracts/Semaphore.sol",
-        "@semaphore-protocol/contracts/base/SemaphoreGroups.sol",
-        "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol",
-        "@semaphore-protocol/contracts/base/SemaphoreVerifierKeyPts.sol",
-        "@zk-kit/lean-imt.sol/InternalLeanIMT.sol",
-        "@zk-kit/lean-imt.sol/LeanIMT.sol",
-        "poseidon-solidity/PoseidonT3.sol",
         // `evmVersion: "paris"` is REQUIRED here, not decorative (spec 075, FR-001). An override
         // that omits it inherits Hardhat's internal default exactly as a compiler entry does —
         // verified: before spec 075 the user config declared evmVersion on 0 of these 38 entries
