@@ -3,6 +3,8 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+const { SALT_PREFIXES } = require("../lib/constants");
+
 // Safe Singleton Factory address (same on all EVM networks)
 const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 
@@ -322,7 +324,7 @@ async function main() {
   console.log("\nDeployer:", deployer.address);
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
 
-  const saltPrefix = "ClearPathDAO-TRM-v1.1-";
+  const saltPrefix = SALT_PREFIXES.TIERED_ROLE_MANAGER;
 
   // Deploy TieredRoleManager
   const tieredRoleManager = await deployDeterministic(
