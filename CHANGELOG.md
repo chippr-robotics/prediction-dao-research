@@ -14,6 +14,31 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.5.3 — 2026-08-10
+
+Promoted from: v1.5.3-rc.1
+Previous release: v1.5.1 · Range: `v1.5.1..v1.5.3` (4 commits)
+
+### 🐛 Bug Fixes
+
+- fix(ci): point dependabot at staging so its PRs are mergeable (#1122)
+
+### 🧹 Maintenance
+
+- chore(release): consolidate 10 lost release records, and stop them accumulating (#1119)
+
+### Artifacts
+
+Range: `v1.5.2..v1.5.3`
+
+| Artifact | Status | Identity |
+|---|---|---|
+| SPA image | unchanged | — |
+| Relay gateway image | unchanged | — |
+| Contract implementations | unchanged | — |
+| Mini-app packages | unchanged | — |
+| Subgraph endpoint | unchanged | `v0.2.0` |
+
 ## v1.5.1 — 2026-08-10
 
 > **Consolidated record.** This entry covers the whole range **v1.2.5 → v1.5.1**, i.e. it also

@@ -1,8 +1,8 @@
-previous: v1.2.4
+previous: v1.5.2
 commits:  3
-  [unclassified] Merge pull request #1088 from chippr-robotics/claude/monorepo-semantic-versioning-kkk4lq
-  [fix -> patch] grant pull-requests write; require same-repo for the release exemption
-  [fix -> patch] open a PR for the release record; backfill v1.0.0-v1.2.3
+  [unclassified] Merge pull request #1123 from chippr-robotics/staging
+  [fix -> patch] point dependabot at staging so its PRs are mergeable (#1122)
+  [unclassified] hotfix(ci): let the promotion rule admit generated release records (#1121)
 bump:     patch
 reason:   computed
-next:     v1.2.5
+next:     v1.5.3
