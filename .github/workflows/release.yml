@@ -38,7 +38,7 @@ jobs:
     # The CHANGELOG commit this job pushes must not trigger it again.
     if: "!contains(github.event.head_commit.message, '[skip release]')"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history AND tags: the version is computed from the commit range since the last
           # tag, so a shallow clone would silently produce a wrong answer rather than an error.
