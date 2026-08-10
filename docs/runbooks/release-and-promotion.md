@@ -38,6 +38,12 @@ correctly, but GitHub will happily let a red check merge until it is marked requ
 
 ### 3. Nothing to do — the release record arrives as a pull request
 
+> The promotion rule admits `release/*-changelog` alongside `staging` and `hotfix/*` for exactly
+> this reason. Without that arm, turning the rule on makes the release record unmergeable and the
+> in-repo record drifts behind the tags — which is how `CHANGELOG.md` ended up ten versions behind
+> and `v1.2.4`'s entry was lost. The contradiction is invisible until `staging` exists, because the
+> job is inert before then.
+
 `release.yml` pushes the TAG directly (tags are not covered by the branch ruleset) and then opens a
 **pull request** for the generated `CHANGELOG.md` and manifest version bumps.
 
