@@ -14,6 +14,47 @@ production releases are.
 
 <!-- RELEASES:START -->
 
+## v1.5.1 — 2026-08-10
+
+> **Consolidated record.** This entry covers the whole range **v1.2.5 → v1.5.1**, i.e. it also
+> accounts for the commits released as v1.2.6, v1.2.7, v1.2.8, v1.2.9, v1.3.0, v1.3.1, v1.4.0,
+> v1.4.1 and v1.4.2. Those tags exist and are immutable, but their individual release-record pull
+> requests were never merged — each was branched from `main`, so they accumulated and conflicted
+> with one another until the in-repo record was ten versions behind what had actually shipped.
+> `.github/workflows/release.yml` now closes superseded records and derives its range from the
+> CHANGELOG rather than the last tag, so a record can no longer be silently lost this way.
+>
+> One earlier entry could not be recovered: **v1.2.4** was tagged but its record was lost before
+> this consolidation, and the commits it covered are folded into the v1.2.5 range above it.
+
+Promoted from: none — released directly from main
+Previous release: v1.2.5 · Range: `v1.2.5..v1.5.1` (13 commits)
+
+### 🚀 Features
+
+- feat(080): make compiled bytecode path-independent — addresses stop moving when source moves (#1110)
+- feat(frontend): rework Address Book into 3a expandable roster (#1113)
+- feat(frontend): modernize Address Book UI with colored network pills (#1023) (#1106)
+
+### 🐛 Bug Fixes
+
+- fix(frontend): stop the Bridge quote fetch loop that flickered between pricing and unavailable (#1111)
+- fix(deps): drop @uma/core — 1,138 packages (−35.5%) for 199 lines of Solidity (#1089)
+
+### 📚 Documentation
+
+- spec: Hardhat 3 toolchain migration (079) (#1102)
+
+### 🧹 Maintenance
+
+- chore(release): v1.2.5 [skip release] (#1091)
+- chore(deps): Bump @scure/bip39 from 1.6.0 to 2.2.0 (#1100)
+- chore(deps): Bump express from 4.22.2 to 5.2.1 (#1098)
+- chore(deps): Bump release-drafter/release-drafter from 6 to 7 (#1095)
+- chore(deps): Bump actions/setup-python from 5 to 7 (#1093)
+- chore(deps): Bump actions/setup-go from 5 to 7 (#1094)
+- chore(deps-dev): Bump the dev-tooling group across 1 directory with 16 updates (#1084)
+
 ## v1.2.5 — 2026-08-09
 
 Promoted from: none — released directly from main

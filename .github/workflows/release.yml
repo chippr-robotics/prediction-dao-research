@@ -186,9 +186,35 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           BRANCH="release/${VERSION}-changelog"
 
+          # RANGE START COMES FROM THE CHANGELOG, NOT THE LAST TAG.
+          #
+          # The tag is published immediately and immutably; the in-repo record only lands when its
+          # pull request is merged. Those are not the same event, and deriving the range from the
+          # tag assumes they are. When a record is not merged before the next push, a tag-derived
+          # range starts AFTER commits that were never written down, and they are lost silently.
+          #
+          # That is not hypothetical: v1.2.4's entry is gone, and by 2026-08-10 the CHANGELOG sat at
+          # v1.2.5 while v1.5.1 was tagged — ten versions of drift, because ten records were open at
+          # once and conflicting.
+          #
+          # Starting from what the CHANGELOG actually contains makes the record self-healing: a
+          # missed merge widens the next range instead of dropping its contents. It is also what
+          # makes closing superseded records safe.
+          TAG_PREV="${{ steps.version.outputs.previous }}"
+          DOC_PREV="$(grep -oE '^## \[?v?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | head -1 | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          [ -n "$DOC_PREV" ] && case "$DOC_PREV" in v*) : ;; *) DOC_PREV="v$DOC_PREV" ;; esac
+          PREV="$TAG_PREV"
+          if [ -n "$DOC_PREV" ] && git rev-parse -q --verify "refs/tags/$DOC_PREV" >/dev/null; then
+            # Widen to whichever is the ANCESTOR — never narrow the range.
+            if [ -n "$TAG_PREV" ] && git merge-base --is-ancestor "$DOC_PREV" "$TAG_PREV" 2>/dev/null; then
+              PREV="$DOC_PREV"
+              echo "::notice::CHANGELOG is behind the tags ($DOC_PREV < $TAG_PREV) — widening the range to $PREV so unmerged records are recovered rather than lost."
+            fi
+          fi
+
           node scripts/release/changelog.js \
             --version "$VERSION" \
-            --previous "${{ steps.version.outputs.previous }}" \
+            --previous "$PREV" \
             --artifacts artifacts.md
 
           # Sync the repository version into every non-mini-app manifest (FR-007a). The tracked list
@@ -245,6 +271,41 @@ jobs:
             if (existing.data.length > 0) {
               core.notice(`Release-record PR already open: #${existing.data[0].number}`)
               return
+            }
+
+            /*
+             * CLOSE SUPERSEDED RECORDS BEFORE OPENING A NEW ONE.
+             *
+             * This job runs on every push to main, and each run computes a new version, branches
+             * `release/<version>-changelog` from main, and opens a PR. Nothing closed the previous
+             * one. Measured 2026-08-10: TEN open release PRs (v1.2.6 through v1.5.1), most of them
+             * CONFLICTING with each other because every one edits CHANGELOG.md and the same
+             * manifests — and because each was branched from a main that never received the
+             * earlier entries, none of them was cumulative.
+             *
+             * The damage was not cosmetic. The tags were published and immutable while the in-repo
+             * record sat ten versions behind, and v1.2.4's entry was lost outright: its PR was
+             * closed or superseded before merge and nothing preserved what it said.
+             *
+             * A superseded record is genuinely redundant ONLY because the new one is generated for
+             * a range starting at the last version in CHANGELOG.md rather than the last tag (see
+             * the `--previous` argument above). If that ever reverts to tag-derived, closing these
+             * would start destroying entries again.
+             */
+            const stale = await github.rest.pulls.list({ ...context.repo, state: 'open', base: 'main' })
+            for (const pr of stale.data) {
+              if (!/^chore\(release\): /.test(pr.title)) continue
+              if (!/^release\/.*-changelog$/.test(pr.head.ref)) continue
+              if (pr.head.ref === head) continue
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: pr.number,
+                body:
+                  `Superseded by the release record for **${version}**, which covers this range too.\n\n` +
+                  'Closing so release records cannot accumulate and conflict with one another — see the ' +
+                  'note in `.github/workflows/release.yml`.',
+              })
+              await github.rest.pulls.update({ ...context.repo, pull_number: pr.number, state: 'closed' })
+              core.notice(`Closed superseded release-record PR #${pr.number} (${pr.title})`)
             }
             const pr = await github.rest.pulls.create({
               ...context.repo,
