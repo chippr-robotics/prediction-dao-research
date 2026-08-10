@@ -3,12 +3,11 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol";
-import "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3CallbackRecipientInterface.sol";
+import "../interfaces/IOptimisticOracleV3.sol";
 
 /// @notice Minimal OOv3 mock — implements the subset of the interface our adapter calls,
 ///         plus test setters to fire the resolved/disputed callbacks.
-contract MockOptimisticOracleV3 is OptimisticOracleV3Interface {
+contract MockOptimisticOracleV3 is IOptimisticOracleV3 {
     using SafeERC20 for IERC20;
 
     bytes32 public constant DEFAULT_IDENTIFIER = bytes32("ASSERT_TRUTH");
@@ -52,7 +51,7 @@ contract MockOptimisticOracleV3 is OptimisticOracleV3Interface {
         a.settled = true;
         a.currency.safeTransfer(a.asserter, a.bond);
         if (a.callbackRecipient != address(0)) {
-            OptimisticOracleV3CallbackRecipientInterface(a.callbackRecipient)
+            IOptimisticOracleV3CallbackRecipient(a.callbackRecipient)
                 .assertionResolvedCallback(assertionId, assertedTruthfully);
         }
     }
@@ -62,28 +61,20 @@ contract MockOptimisticOracleV3 is OptimisticOracleV3Interface {
         StoredAssertion storage a = storedAssertions[assertionId];
         require(a.exists && !a.settled, "bad assertion");
         if (a.callbackRecipient != address(0)) {
-            OptimisticOracleV3CallbackRecipientInterface(a.callbackRecipient)
+            IOptimisticOracleV3CallbackRecipient(a.callbackRecipient)
                 .assertionDisputedCallback(assertionId);
         }
     }
 
-    // ---- OOv3 interface stubs (unused by our adapter but required for interface conformance) ----
+    // ---- IOptimisticOracleV3 conformance ----
+    //
+    // The stub list used to be much longer: the mock inherited UMA's FULL OOv3 interface, so it had
+    // to implement eight functions the adapter never calls (getMinimumBond, disputeAssertion,
+    // syncUmaParams, settleAssertion, settleAndGetAssertionResult, getAssertionResult,
+    // assertTruthWithDefaults, getAssertion) purely to satisfy the compiler. Against the
+    // call-surface-only IOptimisticOracleV3 they are dead weight, and a stub that returns a
+    // hardcoded `true` for a result the adapter does not read is a trap for whoever wires up the
+    // next call site. Deleted rather than carried.
 
     function defaultIdentifier() external pure returns (bytes32) { return DEFAULT_IDENTIFIER; }
-    function getMinimumBond(address) external pure returns (uint256) { return 0; }
-    function disputeAssertion(bytes32, address) external {}
-    function syncUmaParams(bytes32, address) external {}
-    function settleAssertion(bytes32) external {}
-    function settleAndGetAssertionResult(bytes32) external returns (bool) { return true; }
-    function getAssertionResult(bytes32) external pure returns (bool) { return true; }
-    function assertTruthWithDefaults(bytes memory, address) external pure returns (bytes32) { return bytes32(0); }
-
-    function getAssertion(bytes32 assertionId) external view returns (Assertion memory a) {
-        StoredAssertion storage s = storedAssertions[assertionId];
-        a.asserter = s.asserter;
-        a.callbackRecipient = s.callbackRecipient;
-        a.currency = s.currency;
-        a.bond = s.bond;
-        a.settled = s.settled;
-    }
 }

@@ -63,7 +63,7 @@ describeFork("Amoy oracle adapters (fork)", function () {
     const adapter = await Adapter.deploy(admin.address, AMOY.UMA_OOV3);
     expect(await adapter.isAvailable()).to.equal(true);
     const oo = await ethers.getContractAt(
-      "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol:OptimisticOracleV3Interface",
+      "contracts/interfaces/IOptimisticOracleV3.sol:IOptimisticOracleV3",
       AMOY.UMA_OOV3
     );
     const id = await oo.defaultIdentifier();

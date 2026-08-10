@@ -138,7 +138,7 @@ jobs:
       - name: Publish the release
         if: steps.gate.outputs.proceed == 'true'
         id: drafter
-        uses: release-drafter/release-drafter@v6
+        uses: release-drafter/release-drafter@v7
         with:
           version: ${{ steps.version.outputs.version }}
           tag: ${{ steps.version.outputs.version }}

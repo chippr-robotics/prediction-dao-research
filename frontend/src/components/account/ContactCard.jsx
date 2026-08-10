@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { addressKey } from '../../lib/addressBook/addressBookStore'
 import RestrictionTag from './RestrictionTag'
+import NetworkPill from '../ui/NetworkPill'
 
 function shorten(addr) {
   if (!addr || addr.length < 12) return addr
@@ -68,21 +69,28 @@ export default function ContactCard({
     })
   }
 
+  const initial = (contact.nickname || '?').trim().charAt(0).toUpperCase() || '?'
+
   return (
     <div className="ab-contact-card">
       <div className="ab-contact-head">
-        <div className="ab-contact-name">
-          <span className="ab-contact-nickname">{contact.nickname}</span>
-          {/* Spec 068 — a multisig vault is an ordinary address-book entry, badged by matching the
-              member's own vault references rather than by storing a type on the entry (the book is
-              a synced object whose loader rebuilds a fixed field list, so an extra key would be
-              dropped). Renaming it here renames it everywhere the vault appears. */}
-          {isVault && <span className="ab-contact-tag">Multisig</span>}
-          {containsRestricted && (
-            <span className="ab-contact-restricted-flag">
-              <RestrictionTag status="restricted" />
-            </span>
-          )}
+        <div className="ab-contact-id">
+          <span className="ab-contact-avatar" aria-hidden="true">
+            {initial}
+          </span>
+          <div className="ab-contact-name">
+            <span className="ab-contact-nickname">{contact.nickname}</span>
+            {/* Spec 068 — a multisig vault is an ordinary address-book entry, badged by matching the
+                member's own vault references rather than by storing a type on the entry (the book is
+                a synced object whose loader rebuilds a fixed field list, so an extra key would be
+                dropped). Renaming it here renames it everywhere the vault appears. */}
+            {isVault && <span className="ab-contact-tag">Multisig</span>}
+            {containsRestricted && (
+              <span className="ab-contact-restricted-flag">
+                <RestrictionTag status="restricted" />
+              </span>
+            )}
+          </div>
         </div>
         <div className="ab-contact-actions">
           <button
@@ -125,9 +133,18 @@ export default function ContactCard({
                   {copied ? <IconCheck /> : <IconCopy />}
                   <span className="ab-btn-label">{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
-                <span className="ab-address-network">{networkName(a.chainId)}</span>
-                <RestrictionTag status={statuses[i]} />
               </div>
+              <div className="ab-address-tags">
+                <NetworkPill chainId={a.chainId} name={networkName(a.chainId)} />
+              </div>
+              {/* Screening status sits on its own line below the network pills so
+                  an Unscreened/Restricted state is never lost in the tag row
+                  (issue #1023). RestrictionTag renders nothing when clear. */}
+              {statuses[i] && statuses[i] !== 'clear' && (
+                <div className="ab-address-status">
+                  <RestrictionTag status={statuses[i]} />
+                </div>
+              )}
               {a.notes && <p className="ab-address-notes">{a.notes}</p>}
             </li>
           )
